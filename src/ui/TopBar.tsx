@@ -1,3 +1,5 @@
+import { HelpButton } from "@/ui/HelpButton";
+
 interface TopBarProps {
   activeFloor:   number;
   onFloorChange: (level: number) => void;
@@ -42,6 +44,8 @@ export function TopBar({ activeFloor, onFloorChange }: TopBarProps) {
         </button>
       ))}
 
+      <div style={{ width: 1, height: 20, background: "rgba(80,120,180,0.2)" }} />
+      <HelpButton />
       <div style={{ flex: 1 }} />
 
       {(["Save", "Load"] as const).map(label => (

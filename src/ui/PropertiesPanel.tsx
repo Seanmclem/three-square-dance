@@ -90,18 +90,6 @@ export function PropertiesPanel({ activeTool }: PropertiesPanelProps) {
       </div>
 
       <div style={{ flex: 1 }} />
-
-      <div style={{ padding: "8px 16px", borderTop: "1px solid rgba(80,120,180,0.15)", display: "flex", gap: 12 }}>
-        {([["RMB", "Orbit"], ["MMB", "Pan"], ["Scroll", "Zoom"]] as const).map(([key, action]) => (
-          <div key={key} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <span style={{
-              background: "rgba(80,120,180,0.15)", border: "1px solid rgba(80,120,180,0.3)",
-              borderRadius: 3, padding: "1px 4px", fontSize: 8, color: "#5a7a9a", fontFamily: "monospace",
-            }}>{key}</span>
-            <span style={{ color: "#3a5a7a", fontSize: 9 }}>{action}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

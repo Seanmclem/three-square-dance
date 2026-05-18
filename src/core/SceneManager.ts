@@ -44,9 +44,9 @@ export class SceneManager {
   }
 
   private _setupLighting(): void {
-    this.scene.add(new THREE.AmbientLight(0x8899bb, 0.6));
+    this.scene.add(new THREE.AmbientLight(0xaabbcc, 1.2));
 
-    const sun = new THREE.DirectionalLight(0xfff4e0, 1.8);
+    const sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
     sun.position.set(30, 50, 20);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -56,9 +56,13 @@ export class SceneManager {
     sun.shadow.bias = -0.001;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0x4466aa, 0.4);
+    const fill = new THREE.DirectionalLight(0x6688cc, 1.0);
     fill.position.set(-20, 10, -20);
     this.scene.add(fill);
+
+    const rim = new THREE.DirectionalLight(0xffeedd, 0.6);
+    rim.position.set(0, 5, -30);
+    this.scene.add(rim);
   }
 
   private _setupGrid(): void {
