@@ -14,6 +14,7 @@ export type TransitionEffect = "fade" | "none";
 
 export interface Vec2 { x: number; z: number }
 export interface Vec3 { x: number; y: number; z: number }
+export interface ScreenPos { x: number; y: number }
 export interface Euler3 { x: number; y: number; z: number }
 export interface Scale3 { x: number; y: number; z: number }
 export interface Bounds { x: number; z: number; width: number; depth: number }
@@ -59,11 +60,11 @@ export interface BusEvents {
   "scene:loaded":          { metadata: SceneMetadata };
   "world:loaded":          { metadata: SceneMetadata };
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
-  "input:click":           { screenPos: Vec2; worldPos: Vec3; button: number };
-  "input:dblclick":        { screenPos: Vec2; worldPos: Vec3 };
-  "input:mousemove":       { screenPos: Vec2; worldPos: Vec3; delta: Vec2 };
-  "input:mousedown":       { button: number; screenPos: Vec2 };
-  "input:mouseup":         { button: number; screenPos: Vec2 };
+  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
+  "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
+  "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
+  "input:mousedown":       { button: number; screenPos: ScreenPos };
+  "input:mouseup":         { button: number; screenPos: ScreenPos };
   "input:wheel":           { delta: number };
   "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
   "input:keyup":           { code: string };

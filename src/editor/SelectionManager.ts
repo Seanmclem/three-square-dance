@@ -1,0 +1,219 @@
+import * as THREE from "three";
+import type { EventBus } from "@/core/EventBus";
+import type { WorldState } from "@/world/WorldState";
+import type {
+  IEditorModule, ToolId, EditorObjectType, ScreenPos,
+  SelectedObjectPayload, WorldObject,
+} from "@/types";
+
+const PRIORITY: EditorObjectType[] = ["object", "platform", "wall", "floor"];
+
+const SELECT_EMISSIVE  = 0x3366ff;
+const SELECT_INTENSITY = 0.25;
+const HOVER_EMISSIVE   = 0x224488;
+const HOVER_INTENSITY  = 0.12;
+
+/**
+ * Raycast-based picking. Listens for centralized input events, applies emissive
+ * tint for hover/selection, resolves grouped (GLTF-style) meshes to their root,
+ * and emits `object:selected` / `object:deselected` for the React UI.
+ */
+export class SelectionManager implements IEditorModule {
+  private readonly _scene:      THREE.Scene;
+  private readonly _camera:     THREE.PerspectiveCamera;
+  private readonly _dom:        HTMLCanvasElement;
+  private readonly _worldState: WorldState;
+  private readonly _bus:        EventBus;
+
+  private readonly _raycaster = new THREE.Raycaster();
+  private readonly _mouse     = new THREE.Vector2();
+
+  private _selected:   THREE.Object3D | null = null;
+  private _hovered:    THREE.Object3D | null = null;
+  private _activeTool: ToolId = "select";
+  private _unsub: Array<() => void> = [];
+
+  constructor(
+    scene: THREE.Scene,
+    camera: THREE.PerspectiveCamera,
+    domElement: HTMLCanvasElement,
+    worldState: WorldState,
+    bus: EventBus,
+  ) {
+    this._scene      = scene;
+    this._camera     = camera;
+    this._dom        = domElement;
+    this._worldState = worldState;
+    this._bus        = bus;
+  }
+
+  init(): void {
+    this._unsub.push(
+      this._bus.on("input:click",     ({ screenPos }) => this._onClick(screenPos)),
+      this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
+      this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
+      this._bus.on("object:updated",  ({ id, changes }) => this._onExternalUpdate(id, changes)),
+    );
+  }
+
+  update(_dt: number): void {}
+
+  dispose(): void {
+    this._unsub.forEach(u => u());
+    this._unsub = [];
+    if (this._hovered  && this._hovered !== this._selected) this._restore(this._hovered);
+    if (this._selected) this._restore(this._selected);
+    this._selected = null;
+    this._hovered  = null;
+  }
+
+  // ─── Picking ────────────────────────────────────────────────────────────────
+
+  private _onClick(screenPos: ScreenPos): void {
+    if (this._activeTool !== "select") return;
+    const selectable = this._cast(screenPos);
+    if (selectable.length === 0) { this._deselect(); return; }
+    this._select(this._resolveRoot(this._pickByPriority(selectable).object));
+  }
+
+  private _onMove(screenPos: ScreenPos): void {
+    if (this._activeTool !== "select") return;
+    const selectable = this._cast(screenPos);
+    const hovered = selectable.length
+      ? this._resolveRoot(this._pickByPriority(selectable).object)
+      : null;
+    if (hovered === this._hovered) return;
+    if (this._hovered && this._hovered !== this._selected) this._restore(this._hovered);
+    this._hovered = hovered;
+    if (hovered && hovered !== this._selected) this._applyTint(hovered, HOVER_EMISSIVE, HOVER_INTENSITY);
+  }
+
+  private _cast(screenPos: ScreenPos): THREE.Intersection[] {
+    const rect = this._dom.getBoundingClientRect();
+    this._mouse.x =  ((screenPos.x - rect.left) / rect.width)  * 2 - 1;
+    this._mouse.y = -((screenPos.y - rect.top)  / rect.height) * 2 + 1;
+    this._raycaster.setFromCamera(this._mouse, this._camera);
+    return this._raycaster
+      .intersectObjects(this._scene.children, true)
+      .filter(h => h.object.userData.selectable === true);
+  }
+
+  private _pickByPriority(hits: THREE.Intersection[]): THREE.Intersection {
+    for (const type of PRIORITY) {
+      const hit = hits.find(h => h.object.userData.editorType === type);
+      if (hit) return hit;
+    }
+    return hits[0];
+  }
+
+  /** Walk up from a child mesh to the group carrying the real editorId. */
+  private _resolveRoot(obj: THREE.Object3D): THREE.Object3D {
+    if (!obj.userData._parentId) return obj;
+    let node: THREE.Object3D | null = obj;
+    while (node && node.parent) {
+      node = node.parent;
+      if (node.userData.editorId && !node.userData._parentId) return node;
+    }
+    return obj;
+  }
+
+  // ─── Selection state ────────────────────────────────────────────────────────
+
+  private _select(root: THREE.Object3D): void {
+    if (this._selected === root) return;
+    if (this._selected) this._restore(this._selected);
+    this._selected = root;
+    if (this._hovered === root) this._hovered = null;
+    this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
+
+    const ud = root.userData;
+    this._bus.emit("object:selected", {
+      id:     ud.editorId,
+      type:   ud.editorType,
+      zoneId: ud.zoneId,
+      position: { x: root.position.x, y: root.position.y, z: root.position.z },
+      rotation: {
+        x: THREE.MathUtils.radToDeg(root.rotation.x),
+        y: THREE.MathUtils.radToDeg(root.rotation.y),
+        z: THREE.MathUtils.radToDeg(root.rotation.z),
+      },
+      scale: { x: root.scale.x, y: root.scale.y, z: root.scale.z },
+      data:  this._getDataRecord(root),
+    });
+  }
+
+  private _deselect(): void {
+    if (!this._selected) return;
+    this._restore(this._selected);
+    this._selected = null;
+    this._bus.emit("object:deselected", {});
+  }
+
+  /** React edited a transform field — apply it to the live mesh. */
+  private _onExternalUpdate(id: string, changes: Partial<WorldObject>): void {
+    if (!this._selected || this._selected.userData.editorId !== id) return;
+    const { position, rotation, scale } = changes;
+    if (position) this._selected.position.set(position.x, position.y, position.z);
+    if (rotation) {
+      this._selected.rotation.set(
+        THREE.MathUtils.degToRad(rotation.x),
+        THREE.MathUtils.degToRad(rotation.y),
+        THREE.MathUtils.degToRad(rotation.z),
+      );
+    }
+    if (scale) this._selected.scale.set(scale.x, scale.y, scale.z);
+  }
+
+  private _getDataRecord(root: THREE.Object3D): SelectedObjectPayload["data"] {
+    const { editorType, editorId, zoneId, floorLevel } = root.userData;
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return null;
+    switch (editorType as EditorObjectType) {
+      case "wall":     return zone.walls.find(w => w.id === editorId) ?? null;
+      case "floor":    return zone.floors.find(f => f.level === floorLevel) ?? null;
+      case "platform": return zone.platforms.find(p => p.id === editorId) ?? null;
+      case "stair":    return zone.stairs.find(s => s.id === editorId) ?? null;
+      case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
+      default:         return null;
+    }
+  }
+
+  // ─── Emissive tinting ───────────────────────────────────────────────────────
+
+  private _applyTint(root: THREE.Object3D, color: number, intensity: number): void {
+    root.traverse(child => {
+      const mat = this._ownMaterial(child);
+      if (!mat) return;
+      mat.emissive.setHex(color);
+      mat.emissiveIntensity = intensity;
+    });
+  }
+
+  private _restore(root: THREE.Object3D): void {
+    root.traverse(child => {
+      if (!(child instanceof THREE.Mesh) || !child.userData._ownsMaterial) return;
+      const mat = child.material;
+      if (Array.isArray(mat) || !(mat instanceof THREE.MeshStandardMaterial)) return;
+      mat.emissive.setHex(child.userData._origEmissive ?? 0x000000);
+      mat.emissiveIntensity = child.userData._origEmissiveIntensity ?? 0;
+    });
+  }
+
+  /**
+   * Clone the material on first touch so tinting never mutates a shared
+   * material, and capture the pristine emissive once for later restore.
+   */
+  private _ownMaterial(child: THREE.Object3D): THREE.MeshStandardMaterial | null {
+    if (!(child instanceof THREE.Mesh)) return null;
+    let mat = child.material;
+    if (Array.isArray(mat) || !(mat instanceof THREE.MeshStandardMaterial)) return null;
+    if (!child.userData._ownsMaterial) {
+      mat = mat.clone();
+      child.material = mat;
+      child.userData._ownsMaterial = true;
+      child.userData._origEmissive = mat.emissive.getHex();
+      child.userData._origEmissiveIntensity = mat.emissiveIntensity;
+    }
+    return mat;
+  }
+}

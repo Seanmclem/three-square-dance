@@ -1,8 +1,21 @@
 import * as THREE from "three";
 import { EditorCamera } from "@/editor/EditorCamera";
 import type { EventBus } from "@/core/EventBus";
+import type { EditorObjectType, MeshUserData } from "@/types";
 
 type UpdateCallback = (dt: number) => void;
+
+const DEMO_ZONE = "demo";
+
+/** Build a selectable mesh's userData; pass `parentId` for grouped child meshes. */
+function selData(id: string, type: EditorObjectType, parentId?: string): MeshUserData {
+  const data: MeshUserData = {
+    editorId: id, editorType: type, zoneId: DEMO_ZONE,
+    selectable: true, floorLevel: 0, _ownsMaterial: false,
+  };
+  if (parentId) data._parentId = parentId;
+  return data;
+}
 
 export class SceneManager {
   public readonly scene:        THREE.Scene;
@@ -80,6 +93,10 @@ export class SceneManager {
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
+    ground.userData = {
+      editorId: "ground", editorType: "terrain", zoneId: DEMO_ZONE,
+      selectable: false, floorLevel: 0, _ownsMaterial: false,
+    } satisfies MeshUserData;
     this.scene.add(ground);
   }
 
@@ -90,40 +107,56 @@ export class SceneManager {
     const platformMat = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.5 });
     const stepMat     = new THREE.MeshStandardMaterial({ color: 0x4a5a6a });
 
-    const addBuilding = (x: number, z: number, w: number, d: number, h: number): void => {
+    // Each building is a Group (body + roof) so picking a child resolves to one
+    // selectable entity — exercises the grouped-mesh resolution path.
+    const addBuilding = (id: string, x: number, z: number, w: number, d: number, h: number): void => {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+      group.userData = selData(id, "object");
+
       const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), buildingMat);
-      body.position.set(x, h / 2, z);
+      body.position.set(0, h / 2, 0);
       body.castShadow = true;
       body.receiveShadow = true;
-      this.scene.add(body);
+      body.userData = selData(id, "object", id);
+      group.add(body);
 
       const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.15, d + 0.3), roofMat);
-      roof.position.set(x, h + 0.075, z);
-      this.scene.add(roof);
+      roof.position.set(0, h + 0.075, 0);
+      roof.userData = selData(id, "object", id);
+      group.add(roof);
+
+      this.scene.add(group);
     };
 
-    addBuilding(-8, -5,  6,  8, 4);
-    addBuilding( 5, -8, 10,  7, 6);
-    addBuilding(-12, 6,  5,  5, 3.2);
-    addBuilding( 8,  5,  8, 10, 8);
+    addBuilding("building_0", -8, -5,  6,  8, 4);
+    addBuilding("building_1",  5, -8, 10,  7, 6);
+    addBuilding("building_2", -12, 6,  5,  5, 3.2);
+    addBuilding("building_3",  8,  5,  8, 10, 8);
 
     const wall = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.2), wallMat);
     wall.position.set(0, 1.5, 0);
     wall.castShadow = true;
+    wall.userData = selData("wall_demo", "wall");
     this.scene.add(wall);
 
     const platform = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 6), platformMat);
     platform.position.set(0, 3.2, 8);
     platform.castShadow = true;
     platform.receiveShadow = true;
+    platform.userData = selData("platform_demo", "platform");
     this.scene.add(platform);
 
+    const stair = new THREE.Group();
+    stair.userData = selData("stair_demo", "stair");
     for (let i = 0; i < 8; i++) {
       const step = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 0.5), stepMat);
       step.position.set(-5, i * 0.4 + 0.2, 8 + i * 0.5 - 2);
       step.castShadow = true;
-      this.scene.add(step);
+      step.userData = selData("stair_demo", "stair", "stair_demo");
+      stair.add(step);
     }
+    this.scene.add(stair);
   }
 
   onUpdate(cb: UpdateCallback): void {

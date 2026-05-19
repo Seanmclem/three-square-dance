@@ -1,4 +1,5 @@
-import type { ToolId } from "@/types";
+import { useEffect, useRef, useState } from "react";
+import type { ToolId, SelectedObjectPayload, WorldObject, Vec3 } from "@/types";
 
 interface ToolInfo { desc: string; hint: string }
 
@@ -14,29 +15,130 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
 
 const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;
 
-const TRANSFORM_AXES = [
-  { axis: "X", color: "#ff6b6b" },
-  { axis: "Y", color: "#6bff8a" },
-  { axis: "Z", color: "#6b8aff" },
+const AXES = [
+  { axis: "x", color: "#ff6b6b" },
+  { axis: "y", color: "#6bff8a" },
+  { axis: "z", color: "#6b8aff" },
 ] as const;
 
+type GroupKey = "position" | "rotation" | "scale";
+const GROUPS: Array<{ key: GroupKey; label: string; step: number }> = [
+  { key: "position", label: "Position", step: 0.5 },
+  { key: "rotation", label: "Rotation (deg)", step: 15 },
+  { key: "scale",    label: "Scale",    step: 0.1 },
+];
+
+type AxisStr = { x: string; y: string; z: string };
+type Draft = Record<GroupKey, AxisStr>;
+
+const toStr = (v: Vec3): AxisStr => ({ x: String(v.x), y: String(v.y), z: String(v.z) });
+const toNum = (s: string): number => { const n = parseFloat(s); return Number.isFinite(n) ? n : 0; };
+
+const PANEL_STYLE: React.CSSProperties = {
+  position: "absolute", right: 0, top: 0, bottom: 0, width: 280,
+  background: "rgba(10,14,22,0.95)", borderLeft: "1px solid rgba(80,120,180,0.2)",
+  display: "flex", flexDirection: "column", zIndex: 10,
+};
+
 interface PropertiesPanelProps {
-  activeTool: ToolId;
+  activeTool:     ToolId;
+  selected:       SelectedObjectPayload | null;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
 }
 
-export function PropertiesPanel({ activeTool }: PropertiesPanelProps) {
-  const info = TOOL_INFO[activeTool];
+export function PropertiesPanel({ activeTool, selected, onObjectUpdate }: PropertiesPanelProps) {
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    setDraft(selected
+      ? { position: toStr(selected.position), rotation: toStr(selected.rotation), scale: toStr(selected.scale) }
+      : null);
+  }, [selected]);
+
+  useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
+
+  const commit = (group: GroupKey, axis: "x" | "y" | "z", raw: string): void => {
+    setDraft(prev => {
+      if (!prev) return prev;
+      const next: Draft = { ...prev, [group]: { ...prev[group], [axis]: raw } };
+      const g = next[group];
+      if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+      debounceRef.current = window.setTimeout(() => {
+        onObjectUpdate({ [group]: { x: toNum(g.x), y: toNum(g.y), z: toNum(g.z) } } as Partial<WorldObject>);
+        debounceRef.current = null;
+      }, 150);
+      return next;
+    });
+  };
 
   return (
-    <div style={{
-      position: "absolute", right: 0, top: 0, bottom: 0, width: 280,
-      background: "rgba(10,14,22,0.95)", borderLeft: "1px solid rgba(80,120,180,0.2)",
-      display: "flex", flexDirection: "column", zIndex: 10,
-    }}>
+    <div style={PANEL_STYLE}>
       <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(80,120,180,0.15)" }}>
-        <div style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2, marginBottom: 4 }}>PROPERTIES</div>
-        <div style={{ color: "#4a6a8a", fontSize: 11 }}>{info.desc}</div>
+        <div style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</div>
       </div>
+      {selected && draft
+        ? <TransformView selected={selected} draft={draft} commit={commit} />
+        : <ToolView activeTool={activeTool} />}
+      <div style={{ flex: 1 }} />
+    </div>
+  );
+}
+
+function TransformView({ selected, draft, commit }: {
+  selected: SelectedObjectPayload;
+  draft: Draft;
+  commit: (g: GroupKey, a: "x" | "y" | "z", raw: string) => void;
+}) {
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
+          {selected.type}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {GROUPS.map(({ key, label, step }) => (
+          <div key={key}>
+            <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>{label}</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {AXES.map(({ axis, color }) => (
+                <div key={axis} style={{
+                  flex: 1, display: "flex", gap: 4, alignItems: "center",
+                  background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+                  borderRadius: 4, padding: "2px 6px",
+                }}>
+                  <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft[key][axis]}
+                    step={step}
+                    onChange={e => commit(key, axis, e.target.value)}
+                    style={{
+                      width: "100%", minWidth: 0, border: "none", outline: "none",
+                      background: "transparent", color: "#9ab8d4",
+                      fontSize: 10, fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function ToolView({ activeTool }: { activeTool: ToolId }) {
+  const info = TOOL_INFO[activeTool];
+  return (
+    <>
+      <div style={{ padding: "10px 16px 0", color: "#4a6a8a", fontSize: 11 }}>{info.desc}</div>
 
       <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
         <div style={{
@@ -48,27 +150,7 @@ export function PropertiesPanel({ activeTool }: PropertiesPanelProps) {
         </div>
       </div>
 
-      <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {(["Position", "Rotation", "Scale"] as const).map(label => (
-          <div key={label}>
-            <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>{label}</div>
-            <div style={{ display: "flex", gap: 4 }}>
-              {TRANSFORM_AXES.map(({ axis, color }) => (
-                <div key={axis} style={{
-                  flex: 1, padding: "4px 8px",
-                  background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
-                  borderRadius: 4, display: "flex", gap: 4, alignItems: "center",
-                }}>
-                  <span style={{ color, fontSize: 9 }}>{axis}</span>
-                  <span style={{ color: "#3a5a7a", fontSize: 10, fontFamily: "monospace" }}>0.00</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ margin: "8px 16px 0", borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10 }}>
+      <div style={{ margin: "10px 16px 0", paddingTop: 2 }}>
         <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>ASSETS</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {PLACEHOLDER_ASSETS.map(name => (
@@ -88,8 +170,6 @@ export function PropertiesPanel({ activeTool }: PropertiesPanelProps) {
           ))}
         </div>
       </div>
-
-      <div style={{ flex: 1 }} />
-    </div>
+    </>
   );
 }

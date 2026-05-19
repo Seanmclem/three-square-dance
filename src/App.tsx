@@ -1,50 +1,48 @@
 import { useEffect, useRef, useState } from "react";
-import * as THREE from "three";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
+import { InputManager } from "@/core/InputManager";
+import { WorldState } from "@/world/WorldState";
+import { SelectionManager } from "@/editor/SelectionManager";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3 } from "@/types";
+import type { ToolId, Vec3, SelectedObjectPayload, WorldObject } from "@/types";
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const sceneRef  = useRef<SceneManager | null>(null);
   const busRef    = useRef<EventBus>(new EventBus());
 
   const [activeTool,  setActiveTool]  = useState<ToolId>("select");
   const [activeFloor, setActiveFloor] = useState<number>(0);
   const [coords,      setCoords]      = useState<Vec3>({ x: 0, y: 0, z: 0 });
+  const [selected,    setSelected]    = useState<SelectedObjectPayload | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const bus = busRef.current;
 
-    const sm = new SceneManager(canvas, busRef.current);
-    sceneRef.current = sm;
+    const scene     = new SceneManager(canvas, bus);
+    const world     = new WorldState(bus);
+    const input     = new InputManager(canvas, scene.camera, bus);
+    const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
+    input.init();
+    selection.init();
 
-    const raycaster   = new THREE.Raycaster();
-    const mouse       = new THREE.Vector2();
-    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const target      = new THREE.Vector3();
+    const unsub = [
+      bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
+      bus.on("object:selected",   payload       => setSelected(payload)),
+      bus.on("object:deselected", ()            => setSelected(null)),
+    ];
 
-    const onMouseMove = (e: MouseEvent): void => {
-      if (!canvasRef.current) return;
-      const rect = canvasRef.current.getBoundingClientRect();
-      mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-      mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-      raycaster.setFromCamera(mouse, sm.camera);
-      if (raycaster.ray.intersectPlane(groundPlane, target)) {
-        setCoords({ x: target.x, y: target.y, z: target.z });
-      }
-    };
-
-    canvas.addEventListener("mousemove", onMouseMove);
     return () => {
-      canvas.removeEventListener("mousemove", onMouseMove);
-      sm.dispose();
+      unsub.forEach(u => u());
+      selection.dispose();
+      input.dispose();
+      scene.dispose();
     };
   }, []);
 
@@ -58,6 +56,11 @@ export default function App() {
     busRef.current.emit("floor:select", { level });
   };
 
+  const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
+    if (!selected) return;
+    busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
+  };
+
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#0a0e16", position: "relative", overflow: "hidden" }}>
       <canvas
@@ -67,14 +70,14 @@ export default function App() {
 
       <Toolbar         activeTool={activeTool}   onToolSelect={handleToolSelect} />
       <TopBar          activeFloor={activeFloor} onFloorChange={handleFloorChange} />
-      <PropertiesPanel activeTool={activeTool} />
+      <PropertiesPanel activeTool={activeTool}   selected={selected} onObjectUpdate={handleObjectUpdate} />
       <CoordinateDisplay coords={coords} />
 
       <div style={{
         position: "absolute", bottom: 16, right: 296,
         color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
       }}>
-        PHASE 1 — SCENE FOUNDATION
+        PHASE 2 — SELECTION SYSTEM
       </div>
     </div>
   );
