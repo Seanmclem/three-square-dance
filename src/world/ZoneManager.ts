@@ -17,6 +17,7 @@ interface ZoneColliders {
 
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
+  private readonly _unsubs: Array<() => void> = [];
 
   constructor(
     private readonly _scene:      THREE.Scene,
@@ -25,9 +26,11 @@ export class ZoneManager {
   ) {}
 
   init(): void {
-    this._bus.on("floor:added", ({ zoneId, floor }) => {
-      this._rebuildFloor(zoneId, floor.level);
-    });
+    this._unsubs.push(
+      this._bus.on("floor:added", ({ zoneId, floor }) => {
+        this._rebuildFloor(zoneId, floor.level);
+      }),
+    );
   }
 
   async loadZone(zoneId: string): Promise<void> {
@@ -106,6 +109,7 @@ export class ZoneManager {
   }
 
   dispose(): void {
+    this._unsubs.forEach(u => u());
     for (const zoneId of [...this._loadedZones.keys()]) this.unloadZone(zoneId);
   }
 }

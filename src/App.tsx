@@ -59,6 +59,9 @@ export default function App() {
     zones.init();
     floorTool.init();
 
+    // Register the demo zone so ZoneManager can rebuild floors on placement
+    zones.loadZone(DEMO_ZONE_ID);
+
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
 

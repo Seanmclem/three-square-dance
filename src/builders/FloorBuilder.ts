@@ -12,17 +12,26 @@ export interface FloorBuildOutput {
 export class FloorBuilder {
   static async build(
     floor: FloorDef,
-    bounds: { x: number; z: number; width: number; depth: number },
+    _bounds: { x: number; z: number; width: number; depth: number },
     zoneId: string,
   ): Promise<FloorBuildOutput> {
-    const { width, depth } = bounds;
-    const geo = new THREE.PlaneGeometry(width, depth);
+    const pts  = floor.floorMesh.points ?? [];
+    const minX = Math.min(...pts.map(p => p.x));
+    const maxX = Math.max(...pts.map(p => p.x));
+    const minZ = Math.min(...pts.map(p => p.z));
+    const maxZ = Math.max(...pts.map(p => p.z));
+    const w    = maxX - minX;
+    const d    = maxZ - minZ;
+    const cx   = minX + w / 2;
+    const cz   = minZ + d / 2;
+
+    const geo = new THREE.PlaneGeometry(w, d);
     geo.rotateX(-Math.PI / 2);
-    geo.translate(bounds.x + width / 2, floor.elevation, bounds.z + depth / 2);
+    geo.translate(cx, floor.elevation + 0.004, cz);
 
     const uvAttr = geo.attributes["uv"] as THREE.BufferAttribute;
     for (let i = 0; i < uvAttr.count; i++) {
-      uvAttr.setXY(i, uvAttr.getX(i) * width, uvAttr.getY(i) * depth);
+      uvAttr.setXY(i, uvAttr.getX(i) * w, uvAttr.getY(i) * d);
     }
 
     const mat = await assetManager.getMaterial(floor.floorMesh.material)
@@ -39,7 +48,10 @@ export class FloorBuilder {
       _ownsMaterial: false,
     } satisfies MeshUserData;
 
-    const collider = ColliderBuilder.registerFloor(bounds, floor.elevation);
+    const collider = ColliderBuilder.registerFloor(
+      { x: minX, z: minZ, width: w, depth: d },
+      floor.elevation,
+    );
 
     return { mesh, collider };
   }

@@ -17,9 +17,10 @@ function makePreviewMesh(): THREE.Mesh {
   const mat = new THREE.MeshBasicMaterial({
     color: 0x4d8cff,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.4,
     side: THREE.DoubleSide,
     depthWrite: false,
+    depthTest: false,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 1;
@@ -28,6 +29,7 @@ function makePreviewMesh(): THREE.Mesh {
 
 export class FloorTool {
   private _state: FloorToolState = "IDLE";
+  private _active       = false;
   private _startPoint: THREE.Vector3 | null = null;
   private _preview: THREE.Mesh | null = null;
   private _activeZoneId = "demo";
@@ -44,15 +46,25 @@ export class FloorTool {
 
   init(): void {
     this._unsubs.push(
-      this._bus.on("tool:select",   ({ tool }) => { if (tool !== "floor") this._reset(); }),
+      this._bus.on("tool:select", ({ tool }) => {
+        this._active = tool === "floor";
+        if (!this._active) this._reset();
+      }),
       this._bus.on("floor:select",  ({ level }) => { this._activeLevel = level; }),
       this._bus.on("input:click",   ({ worldPos, button }) => {
+        if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
         this._onLeftClick(worldPos);
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => this._onMouseMove(worldPos)),
-      this._bus.on("input:keydown",   ({ code }) => { if (code === "Escape") this._reset(); }),
-      this._bus.on("input:mousedown", ({ button }) => { if (button === 2) this._reset(); }),
+      this._bus.on("input:mousemove", ({ worldPos }) => {
+        if (this._active) this._onMouseMove(worldPos);
+      }),
+      this._bus.on("input:keydown",   ({ code }) => {
+        if (this._active && code === "Escape") this._reset();
+      }),
+      this._bus.on("input:mousedown", ({ button }) => {
+        if (this._active && button === 2) this._reset();
+      }),
     );
   }
 
