@@ -100,8 +100,12 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _pickByPriority(hits: THREE.Intersection[]): THREE.Intersection {
+    const nearest = hits[0].distance;
+    // Only use type priority as a tiebreaker among co-planar / nearly co-planar hits.
+    // Anything clearly further back loses to the closest hit regardless of type.
+    const coplanar = hits.filter(h => h.distance <= nearest + 0.05);
     for (const type of PRIORITY) {
-      const hit = hits.find(h => h.object.userData.editorType === type);
+      const hit = coplanar.find(h => h.object.userData.editorType === type);
       if (hit) return hit;
     }
     return hits[0];
