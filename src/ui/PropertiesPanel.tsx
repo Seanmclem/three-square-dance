@@ -192,12 +192,33 @@ function WallView({ selected, onObjectUpdate }: {
   selected: SelectedObjectPayload;
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
 }) {
-  const wallData  = selected.data as WallDef | null;
+  const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
-  const currentMat = wallData?.material ?? "brick_01";
+  const currentMat  = wallData?.material ?? "brick_01";
+  const debounceRef = useRef<number | null>(null);
 
-  const commitNum = (field: "height" | "thickness", val: string) => {
+  // Reset local state when a different wall is selected
+  useEffect(() => {
+    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    setHeight(String(wallData?.height ?? 3));
+    setThickness(String(wallData?.thickness ?? 0.2));
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
+
+  const scheduleCommit = (field: "height" | "thickness", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => {
+      onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
+      debounceRef.current = null;
+    }, 300);
+  };
+
+  const flushCommit = (field: "height" | "thickness", val: string) => {
+    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     const n = parseFloat(val);
     if (!Number.isFinite(n) || n <= 0) return;
     onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
@@ -216,15 +237,15 @@ function WallView({ selected, onObjectUpdate }: {
         <div>
           <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>HEIGHT</div>
           <input type="number" value={height} step={0.5} min={0.5} style={NUM_INPUT}
-            onChange={e => setHeight(e.target.value)}
-            onBlur={e => commitNum("height", e.target.value)}
+            onChange={e => { setHeight(e.target.value); scheduleCommit("height", e.target.value); }}
+            onBlur={e => flushCommit("height", e.target.value)}
           />
         </div>
         <div>
           <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>THICKNESS</div>
           <input type="number" value={thickness} step={0.1} min={0.1} style={NUM_INPUT}
-            onChange={e => setThickness(e.target.value)}
-            onBlur={e => commitNum("thickness", e.target.value)}
+            onChange={e => { setThickness(e.target.value); scheduleCommit("thickness", e.target.value); }}
+            onBlur={e => flushCommit("thickness", e.target.value)}
           />
         </div>
         <div>

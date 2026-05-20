@@ -34,6 +34,7 @@ function createDemoZone(): ZoneDef {
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const busRef    = useRef<EventBus>(new EventBus());
+  const worldRef  = useRef<WorldState | null>(null);
 
   const [activeTool,  setActiveTool]  = useState<ToolId>("select");
   const [activeFloor, setActiveFloor] = useState<number>(0);
@@ -47,6 +48,7 @@ export default function App() {
 
     const scene     = new SceneManager(canvas, bus);
     const world     = new WorldState(bus);
+    worldRef.current = world;
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const zones     = new ZoneManager(scene.scene, world, bus);
@@ -78,6 +80,7 @@ export default function App() {
     physicsWorld.init().catch(err => console.error("PhysicsWorld init failed:", err));
 
     return () => {
+      worldRef.current = null;
       unsub.forEach(u => u());
       wallTool.dispose();
       floorTool.dispose();
@@ -102,11 +105,7 @@ export default function App() {
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     if (selected.type === "wall") {
-      busRef.current.emit("wall:updated", {
-        zoneId: selected.zoneId,
-        wallId: selected.id,
-        changes: changes as Partial<import("@/types").WallDef>,
-      });
+      worldRef.current?.updateWall(selected.zoneId, selected.id, changes as Partial<import("@/types").WallDef>);
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as import("@/types").WallDef), ...changes } } : null);
     } else {
       busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
@@ -129,7 +128,7 @@ export default function App() {
         position: "absolute", bottom: 16, right: 296,
         color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
       }}>
-        PHASE 4 — WALL TOOL
+        WORLD BUILDER
       </div>
     </div>
   );

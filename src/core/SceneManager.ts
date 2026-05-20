@@ -3,20 +3,11 @@ import { Sky } from "three/addons/objects/Sky.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EditorCamera } from "@/editor/EditorCamera";
 import type { EventBus } from "@/core/EventBus";
-import type { EditorObjectType, MeshUserData } from "@/types";
+import type { MeshUserData } from "@/types";
 
 type UpdateCallback = (dt: number) => void;
 
 const DEMO_ZONE = "demo";
-
-function selData(id: string, type: EditorObjectType, parentId?: string): MeshUserData {
-  const data: MeshUserData = {
-    editorId: id, editorType: type, zoneId: DEMO_ZONE,
-    selectable: true, floorLevel: 0, _ownsMaterial: false,
-  };
-  if (parentId) data._parentId = parentId;
-  return data;
-}
 
 export class SceneManager {
   public readonly scene:        THREE.Scene;
@@ -48,7 +39,6 @@ export class SceneManager {
     this._sunLight = this._setupLighting();
     this._setupSky();
     this._setupGrid();
-    this._setupDemoScene();
 
     this._onResize = this._handleResize.bind(this);
     window.addEventListener("resize", this._onResize);
@@ -134,63 +124,6 @@ export class SceneManager {
       selectable: false, floorLevel: 0, _ownsMaterial: false,
     } satisfies MeshUserData;
     this.scene.add(ground);
-  }
-
-  private _setupDemoScene(): void {
-    const buildingMat = new THREE.MeshStandardMaterial({ color: 0x3a4a5a, roughness: 0.7, metalness: 0.1 });
-    const wallMat     = new THREE.MeshStandardMaterial({ color: 0x4a5a6a, roughness: 0.8 });
-    const roofMat     = new THREE.MeshStandardMaterial({ color: 0x2a3545, roughness: 0.6 });
-    const platformMat = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.5 });
-    const stepMat     = new THREE.MeshStandardMaterial({ color: 0x4a5a6a });
-
-    const addBuilding = (id: string, x: number, z: number, w: number, d: number, h: number): void => {
-      const group = new THREE.Group();
-      group.position.set(x, 0, z);
-      group.userData = selData(id, "object");
-
-      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), buildingMat);
-      body.position.set(0, h / 2, 0);
-      body.castShadow = true;
-      body.receiveShadow = true;
-      body.userData = selData(id, "object", id);
-      group.add(body);
-
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.15, d + 0.3), roofMat);
-      roof.position.set(0, h + 0.075, 0);
-      roof.userData = selData(id, "object", id);
-      group.add(roof);
-
-      this.scene.add(group);
-    };
-
-    addBuilding("building_0", -8, -5,  6,  8, 4);
-    addBuilding("building_1",  5, -8, 10,  7, 6);
-    addBuilding("building_2", -12, 6,  5,  5, 3.2);
-    addBuilding("building_3",  8,  5,  8, 10, 8);
-
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.2), wallMat);
-    wall.position.set(0, 1.5, 0);
-    wall.castShadow = true;
-    wall.userData = selData("wall_demo", "wall");
-    this.scene.add(wall);
-
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 6), platformMat);
-    platform.position.set(0, 3.2, 8);
-    platform.castShadow = true;
-    platform.receiveShadow = true;
-    platform.userData = selData("platform_demo", "platform");
-    this.scene.add(platform);
-
-    const stair = new THREE.Group();
-    stair.userData = selData("stair_demo", "stair");
-    for (let i = 0; i < 8; i++) {
-      const step = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 0.5), stepMat);
-      step.position.set(-5, i * 0.4 + 0.2, 8 + i * 0.5 - 2);
-      step.castShadow = true;
-      step.userData = selData("stair_demo", "stair", "stair_demo");
-      stair.add(step);
-    }
-    this.scene.add(stair);
   }
 
   onUpdate(cb: UpdateCallback): void {
