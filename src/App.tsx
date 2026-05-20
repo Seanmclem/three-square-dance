@@ -7,6 +7,7 @@ import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { SelectionManager } from "@/editor/SelectionManager";
 import { FloorTool } from "@/editor/FloorTool";
+import { WallTool } from "@/editor/WallTool";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -50,6 +51,7 @@ export default function App() {
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const zones     = new ZoneManager(scene.scene, world, bus);
     const floorTool = new FloorTool(scene.scene, world, bus);
+    const wallTool  = new WallTool(scene.scene, world, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
@@ -58,6 +60,7 @@ export default function App() {
     selection.init();
     zones.init();
     floorTool.init();
+    wallTool.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -76,6 +79,7 @@ export default function App() {
 
     return () => {
       unsub.forEach(u => u());
+      wallTool.dispose();
       floorTool.dispose();
       zones.dispose();
       selection.dispose();
@@ -97,7 +101,16 @@ export default function App() {
 
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
-    busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
+    if (selected.type === "wall") {
+      busRef.current.emit("wall:updated", {
+        zoneId: selected.zoneId,
+        wallId: selected.id,
+        changes: changes as Partial<import("@/types").WallDef>,
+      });
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as import("@/types").WallDef), ...changes } } : null);
+    } else {
+      busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
+    }
   };
 
   return (
@@ -116,7 +129,7 @@ export default function App() {
         position: "absolute", bottom: 16, right: 296,
         color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
       }}>
-        PHASE 3 — PHYSICS + FLOOR TOOL
+        PHASE 4 — WALL TOOL
       </div>
     </div>
   );

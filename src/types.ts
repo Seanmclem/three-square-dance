@@ -32,6 +32,7 @@ export interface BusEvents {
   "wall:added":            { zoneId: string; wall: WallDef };
   "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef> };
   "wall:removed":          { zoneId: string; wallId: string };
+  "wall:rebuilt":          { zoneId: string; wallId: string };
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; level: number; changes: Partial<FloorDef> };
   "platform:added":        { zoneId: string; platform: PlatformDef };

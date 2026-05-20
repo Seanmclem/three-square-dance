@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ToolId, SelectedObjectPayload, WorldObject, Vec3, FloorDef } from "@/types";
+import type { ToolId, SelectedObjectPayload, WorldObject, Vec3, FloorDef, WallDef } from "@/types";
 import { MATERIAL_IDS } from "@/core/AssetManager";
 
 interface ToolInfo { desc: string; hint: string }
@@ -81,9 +81,11 @@ export function PropertiesPanel({ activeTool, selected, onObjectUpdate }: Proper
       </div>
       {selected && selected.type === "floor"
         ? <FloorView selected={selected} onObjectUpdate={onObjectUpdate} />
-        : selected && draft
-          ? <TransformView selected={selected} draft={draft} commit={commit} />
-          : <ToolView activeTool={activeTool} />}
+        : selected && selected.type === "wall"
+          ? <WallView selected={selected} onObjectUpdate={onObjectUpdate} />
+          : selected && draft
+            ? <TransformView selected={selected} draft={draft} commit={commit} />
+            : <ToolView activeTool={activeTool} />}
       <div style={{ flex: 1 }} />
     </div>
   );
@@ -175,6 +177,74 @@ function TransformView({ selected, draft, commit }: {
             </div>
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+
+const NUM_INPUT: React.CSSProperties = {
+  width: "100%", border: "1px solid rgba(80,120,180,0.2)", borderRadius: 4,
+  background: "rgba(20,30,45,0.8)", color: "#9ab8d4", fontSize: 11,
+  fontFamily: "monospace", padding: "4px 8px", outline: "none",
+};
+
+function WallView({ selected, onObjectUpdate }: {
+  selected: SelectedObjectPayload;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const wallData  = selected.data as WallDef | null;
+  const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
+  const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
+  const currentMat = wallData?.material ?? "brick_01";
+
+  const commitNum = (field: "height" | "thickness", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
+  };
+
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
+          wall · level {wallData?.floor ?? 0}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>HEIGHT</div>
+          <input type="number" value={height} step={0.5} min={0.5} style={NUM_INPUT}
+            onChange={e => setHeight(e.target.value)}
+            onBlur={e => commitNum("height", e.target.value)}
+          />
+        </div>
+        <div>
+          <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>THICKNESS</div>
+          <input type="number" value={thickness} step={0.1} min={0.1} style={NUM_INPUT}
+            onChange={e => setThickness(e.target.value)}
+            onBlur={e => commitNum("thickness", e.target.value)}
+          />
+        </div>
+        <div>
+          <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {MATERIAL_IDS.map(id => (
+              <div key={id}
+                onClick={() => onObjectUpdate({ material: id } as unknown as Partial<WorldObject>)}
+                style={{
+                  padding: "6px 10px",
+                  background: id === currentMat ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
+                  border: `1px solid ${id === currentMat ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
+                  borderRadius: 4,
+                  color: id === currentMat ? "#80aaff" : "#5a7a9a",
+                  fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+                }}
+              >{id}</div>
+            ))}
+          </div>
+        </div>
       </div>
     </>
   );

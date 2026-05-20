@@ -53,6 +53,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
       this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
       this._bus.on("object:updated",  ({ id, changes }) => this._onExternalUpdate(id, changes)),
+      this._bus.on("wall:rebuilt",    ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
     );
   }
 
@@ -147,6 +148,26 @@ export class SelectionManager implements IEditorModule {
     this._restore(this._selected);
     this._selected = null;
     this._bus.emit("object:deselected", {});
+  }
+
+  /** Wall was rebuilt — re-apply selection tint to the new mesh. */
+  private _onWallRebuilt(zoneId: string, wallId: string): void {
+    if (!this._selected ||
+        this._selected.userData.editorId !== wallId ||
+        this._selected.userData.zoneId   !== zoneId) return;
+    const newMesh = this._findMesh(wallId, zoneId);
+    if (!newMesh) { this._selected = null; return; }
+    this._selected = newMesh;
+    this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+  }
+
+  private _findMesh(editorId: string, zoneId: string): THREE.Object3D | null {
+    let found: THREE.Object3D | null = null;
+    this._scene.traverse(obj => {
+      if (!found && obj.userData.editorId === editorId && obj.userData.zoneId === zoneId)
+        found = obj;
+    });
+    return found;
   }
 
   /** React edited a transform field — apply it to the live mesh. */
