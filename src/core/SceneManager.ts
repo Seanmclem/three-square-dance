@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { Sky } from "three/addons/objects/Sky.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EditorCamera } from "@/editor/EditorCamera";
 import type { EventBus } from "@/core/EventBus";
 import type { EditorObjectType, MeshUserData } from "@/types";
@@ -7,7 +9,6 @@ type UpdateCallback = (dt: number) => void;
 
 const DEMO_ZONE = "demo";
 
-/** Build a selectable mesh's userData; pass `parentId` for grouped child meshes. */
 function selData(id: string, type: EditorObjectType, parentId?: string): MeshUserData {
   const data: MeshUserData = {
     editorId: id, editorType: type, zoneId: DEMO_ZONE,
@@ -29,22 +30,23 @@ export class SceneManager {
   private _disposed  = false;
   private readonly _onResize: () => void;
 
+  private readonly _sunLight: THREE.DirectionalLight;
+
   constructor(canvas: HTMLCanvasElement, bus: EventBus) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 0.5;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a1f2e);
-    this.scene.fog = new THREE.FogExp2(0x1a1f2e, 0.012);
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
     this.editorCamera = new EditorCamera(this.camera, canvas, bus);
 
-    this._setupLighting();
+    this._sunLight = this._setupLighting();
+    this._setupSky();
     this._setupGrid();
     this._setupDemoScene();
 
@@ -56,10 +58,10 @@ export class SceneManager {
     this._raf = requestAnimationFrame(this._loop.bind(this));
   }
 
-  private _setupLighting(): void {
-    this.scene.add(new THREE.AmbientLight(0xaabbcc, 1.2));
+  private _setupLighting(): THREE.DirectionalLight {
+    this.scene.add(new THREE.AmbientLight(0xaabbcc, 0.5));
 
-    const sun = new THREE.DirectionalLight(0xfff4e0, 3.0);
+    const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
     sun.position.set(30, 50, 20);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
@@ -69,13 +71,47 @@ export class SceneManager {
     sun.shadow.bias = -0.001;
     this.scene.add(sun);
 
-    const fill = new THREE.DirectionalLight(0x6688cc, 1.0);
+    const fill = new THREE.DirectionalLight(0x6688cc, 0.6);
     fill.position.set(-20, 10, -20);
     this.scene.add(fill);
 
-    const rim = new THREE.DirectionalLight(0xffeedd, 0.6);
+    const rim = new THREE.DirectionalLight(0xffeedd, 0.3);
     rim.position.set(0, 5, -30);
     this.scene.add(rim);
+
+    return sun;
+  }
+
+  private _setupSky(): void {
+    const sky = new Sky();
+    sky.scale.setScalar(450000);
+    this.scene.add(sky);
+
+    const uniforms = sky.material.uniforms;
+    uniforms["turbidity"].value      = 10;
+    uniforms["rayleigh"].value       = 3;
+    uniforms["mieCoefficient"].value = 0.005;
+    uniforms["mieDirectionalG"].value = 0.7;
+
+    // Sun elevation 25°, azimuth 180°
+    const elevation = 25;
+    const azimuth   = 180;
+    const phi   = THREE.MathUtils.degToRad(90 - elevation);
+    const theta = THREE.MathUtils.degToRad(azimuth);
+    const sunPos = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+    uniforms["sunPosition"].value.copy(sunPos);
+
+    // Link directional light to sky sun position
+    this._sunLight.position.copy(sunPos.multiplyScalar(50));
+
+    // Generate env map for reflections
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envMap = pmrem.fromScene(new RoomEnvironment()).texture;
+    this.scene.environment = envMap;
+    pmrem.dispose();
+
+    // Atmospheric fog derived from sky
+    this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.006);
   }
 
   private _setupGrid(): void {
@@ -107,8 +143,6 @@ export class SceneManager {
     const platformMat = new THREE.MeshStandardMaterial({ color: 0x5a6a7a, roughness: 0.5 });
     const stepMat     = new THREE.MeshStandardMaterial({ color: 0x4a5a6a });
 
-    // Each building is a Group (body + roof) so picking a child resolves to one
-    // selectable entity — exercises the grouped-mesh resolution path.
     const addBuilding = (id: string, x: number, z: number, w: number, d: number, h: number): void => {
       const group = new THREE.Group();
       group.position.set(x, 0, z);

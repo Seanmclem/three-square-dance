@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ToolId, SelectedObjectPayload, WorldObject, Vec3 } from "@/types";
+import type { ToolId, SelectedObjectPayload, WorldObject, Vec3, FloorDef } from "@/types";
+import { MATERIAL_IDS } from "@/core/AssetManager";
 
 interface ToolInfo { desc: string; hint: string }
 
@@ -78,11 +79,56 @@ export function PropertiesPanel({ activeTool, selected, onObjectUpdate }: Proper
       <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(80,120,180,0.15)" }}>
         <div style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</div>
       </div>
-      {selected && draft
-        ? <TransformView selected={selected} draft={draft} commit={commit} />
-        : <ToolView activeTool={activeTool} />}
+      {selected && selected.type === "floor"
+        ? <FloorView selected={selected} onObjectUpdate={onObjectUpdate} />
+        : selected && draft
+          ? <TransformView selected={selected} draft={draft} commit={commit} />
+          : <ToolView activeTool={activeTool} />}
       <div style={{ flex: 1 }} />
     </div>
+  );
+}
+
+function FloorView({ selected, onObjectUpdate }: {
+  selected: SelectedObjectPayload;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const floorData = selected.data as FloorDef | null;
+  const currentMat = floorData?.floorMesh.material ?? "concrete_01";
+
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
+          floor · level {floorData?.level ?? 0}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px" }}>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {MATERIAL_IDS.map(id => (
+            <div
+              key={id}
+              onClick={() => onObjectUpdate({ id: selected.id } as Partial<WorldObject>)}
+              style={{
+                padding: "6px 10px",
+                background: id === currentMat ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
+                border: `1px solid ${id === currentMat ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
+                borderRadius: 4,
+                color: id === currentMat ? "#80aaff" : "#5a7a9a",
+                fontSize: 11,
+                fontFamily: "monospace",
+                cursor: "pointer",
+              }}
+            >
+              {id}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
   );
 }
 

@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.167.0"
+    "three": "^0.167.0",
+    "three-mesh-bvh": "^0.9.10"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

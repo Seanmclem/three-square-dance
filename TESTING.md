@@ -77,7 +77,28 @@ the current demo layout — revisit when real geometry exists.
 
 ---
 
-## 4. Regression checks (every phase)
+## 4. Phase 3 — Physics Foundation + Sky + Floor Tool
+
+Reload `localhost:7373` before starting. Switch to the Floor tool.
+
+| # | Step | Expected result |
+|---|---|---|
+| 1 | Initial load | Sky visible — blue gradient with sun, no solid background color. Atmospheric fog (lighter than before). Watermark reads "PHASE 3 — PHYSICS + FLOOR TOOL". |
+| 2 | Select tool → click building | Building glows; PropertiesPanel shows transform (unchanged from Phase 2). |
+| 3 | Switch to Floor tool | PropertiesPanel shows "Click and drag to paint a floor region." hint. |
+| 4 | Left-click on ground, drag, release | Semi-transparent blue preview rect stretches from click point to mouse. |
+| 5 | Left-click to commit floor | Preview disappears; a flat grey plane mesh appears where you dragged. |
+| 6 | Place floor < 0.5m wide or deep | Nothing is placed (too small), tool returns to IDLE. |
+| 7 | Escape during PLACING | Preview removed, returns to IDLE with no floor placed. |
+| 8 | RMB during PLACING | Preview removed, returns to IDLE with no floor placed. |
+| 9 | Click floor mesh (Select tool) | PropertiesPanel shows floor panel: id, "floor · level 0", material picker list. |
+| 10 | Grid snap verification | Placed floor edges land exactly on 0.5m grid. |
+| 11 | No console errors | Browser console clean on load, on floor placement, on selection. |
+| 12 | Physics world initialized | No "PhysicsWorld init failed" error in console. |
+
+---
+
+## 5. Regression checks (every phase)
 
 - `npm run typecheck` → 0 errors.
 - vite-plugin-checker overlay clean (no red banner).

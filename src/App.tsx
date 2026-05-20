@@ -4,12 +4,31 @@ import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
+import { ZoneManager } from "@/world/ZoneManager";
 import { SelectionManager } from "@/editor/SelectionManager";
+import { FloorTool } from "@/editor/FloorTool";
+import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3, SelectedObjectPayload, WorldObject } from "@/types";
+import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef } from "@/types";
+
+const DEMO_ZONE_ID = "demo";
+
+function createDemoZone(): ZoneDef {
+  return {
+    id: DEMO_ZONE_ID,
+    name: "Demo Zone",
+    type: "outdoor",
+    bounds: { x: -50, z: -50, width: 100, depth: 100 },
+    floors:    [],
+    walls:     [],
+    platforms: [],
+    stairs:    [],
+    objects:   [],
+  };
+}
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,8 +48,19 @@ export default function App() {
     const world     = new WorldState(bus);
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
+    const zones     = new ZoneManager(scene.scene, world, bus);
+    const floorTool = new FloorTool(scene.scene, world, bus);
+
+    // Seed world with the demo zone
+    world.addZone(createDemoZone());
+
     input.init();
     selection.init();
+    zones.init();
+    floorTool.init();
+
+    // Physics step after Three.js render
+    scene.onUpdate(dt => physicsWorld.step(dt));
 
     const unsub = [
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
@@ -38,11 +68,17 @@ export default function App() {
       bus.on("object:deselected", ()            => setSelected(null)),
     ];
 
+    // Init physics async — not blocking render
+    physicsWorld.init().catch(err => console.error("PhysicsWorld init failed:", err));
+
     return () => {
       unsub.forEach(u => u());
+      floorTool.dispose();
+      zones.dispose();
       selection.dispose();
       input.dispose();
       scene.dispose();
+      physicsWorld.dispose();
     };
   }, []);
 
@@ -77,7 +113,7 @@ export default function App() {
         position: "absolute", bottom: 16, right: 296,
         color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
       }}>
-        PHASE 2 — SELECTION SYSTEM
+        PHASE 3 — PHYSICS + FLOOR TOOL
       </div>
     </div>
   );
