@@ -135,6 +135,7 @@ export class InputManager implements IEditorModule {
   }
 
   private _handleKeyDown(e: KeyboardEvent): void {
+    if (this._isTypingTarget(e)) return;
     this._keys[e.code] = true;
     if (this._suppress) return;
     this._bus.emit("input:keydown", {
@@ -143,8 +144,16 @@ export class InputManager implements IEditorModule {
   }
 
   private _handleKeyUp(e: KeyboardEvent): void {
+    if (this._isTypingTarget(e)) return;
     delete this._keys[e.code];
     if (this._suppress) return;
     this._bus.emit("input:keyup", { code: e.code });
+  }
+
+  private _isTypingTarget(e: KeyboardEvent): boolean {
+    const el = e.target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
   }
 }

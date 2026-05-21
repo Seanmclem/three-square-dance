@@ -4,49 +4,103 @@
     {
       "id": "brick_01",
       "label": "Brick",
-      "tileScale": 1.0,
+      "tileScale": 1,
       "roughnessVal": 0.9,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.03,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/brick_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/brick_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/brick_01/roughness.jpg" },
-        "metalness":    { "enabled": false, "path": "/assets/textures/brick_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/brick_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/brick_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/brick_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/brick_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/brick_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/brick_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/brick_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/brick_01/displacement.jpg"
+        }
       }
     },
     {
       "id": "brick_ext_01",
       "label": "Brick Exterior",
-      "tileScale": 1.0,
+      "tileScale": 1,
       "roughnessVal": 0.85,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.03,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/brick_ext_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/brick_ext_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/brick_ext_01/roughness.jpg" },
-        "metalness":    { "enabled": false, "path": "/assets/textures/brick_ext_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/brick_ext_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/brick_ext_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/brick_ext_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/brick_ext_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/brick_ext_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/brick_ext_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/brick_ext_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/brick_ext_01/displacement.jpg"
+        }
       }
     },
     {
       "id": "concrete_01",
       "label": "Concrete",
-      "tileScale": 2.0,
+      "tileScale": 2,
       "roughnessVal": 0.85,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.02,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/concrete_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/concrete_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/concrete_01/roughness.jpg" },
-        "metalness":    { "enabled": false, "path": "/assets/textures/concrete_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/concrete_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/concrete_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/concrete_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/concrete_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/concrete_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/concrete_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/concrete_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/concrete_01/displacement.jpg"
+        }
       }
     },
     {
@@ -54,15 +108,33 @@
       "label": "Cobblestone",
       "tileScale": 0.5,
       "roughnessVal": 0.95,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.04,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/cobblestone_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/cobblestone_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/cobblestone_01/roughness.jpg" },
-        "metalness":    { "enabled": false, "path": "/assets/textures/cobblestone_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/cobblestone_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/cobblestone_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/cobblestone_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/cobblestone_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/cobblestone_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/cobblestone_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/cobblestone_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/cobblestone_01/displacement.jpg"
+        }
       }
     },
     {
@@ -70,15 +142,33 @@
       "label": "Paving Stone",
       "tileScale": 0.6,
       "roughnessVal": 0.9,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.03,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/pavingstone_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/pavingstone_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/pavingstone_01/roughness.jpg" },
-        "metalness":    { "enabled": false, "path": "/assets/textures/pavingstone_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/pavingstone_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/pavingstone_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/pavingstone_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/pavingstone_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/pavingstone_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/pavingstone_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/pavingstone_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/pavingstone_01/displacement.jpg"
+        }
       }
     },
     {
@@ -86,15 +176,67 @@
       "label": "Wood Planks",
       "tileScale": 0.8,
       "roughnessVal": 0.7,
-      "metalnessVal": 0.0,
+      "metalnessVal": 0,
       "displacementScale": 0.01,
       "maps": {
-        "albedo":       { "enabled": true,  "path": "/assets/textures/wood_planks_01/albedo.jpg" },
-        "normal":       { "enabled": true,  "path": "/assets/textures/wood_planks_01/normal.jpg" },
-        "roughness":    { "enabled": true,  "path": "/assets/textures/wood_planks_01/roughness.jpg" },
-        "metalness":    { "enabled": true,  "path": "/assets/textures/wood_planks_01/metalness.jpg" },
-        "ao":           { "enabled": true,  "path": "/assets/textures/wood_planks_01/ao.jpg" },
-        "displacement": { "enabled": false, "path": "/assets/textures/wood_planks_01/displacement.jpg" }
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/wood_planks_01/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/wood_planks_01/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/wood_planks_01/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": true,
+          "path": "/assets/textures/wood_planks_01/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/wood_planks_01/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/wood_planks_01/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "tester_123",
+      "label": "Tester 123",
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/tester_123/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/tester_123/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/tester_123/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/tester_123/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/tester_123/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/tester_123/displacement.jpg"
+        }
       }
     }
   ]

@@ -79,6 +79,9 @@ export function MaterialImporterModal({
     try {
       const dir = await window.showDirectoryPicker({ mode: "readwrite" });
       onTextureDirSet(dir);
+      if (!dir.name.toLowerCase().includes("textures")) {
+        setError(`⚠ "${dir.name}" doesn't look like the textures folder. Expected public/assets/textures/.`);
+      }
     } catch (e) {
       if ((e as DOMException).name !== "AbortError")
         setError("Could not open folder: " + String(e));
