@@ -104,6 +104,11 @@ export class AssetManager {
     return this._buildMaterial(def, overrides);
   }
 
+  /** Replace {quality} placeholder with the current quality level. */
+  private _resolveQualityPath(path: string): string {
+    return path.includes('{quality}') ? path.replace('{quality}', this._quality) : path;
+  }
+
   private async _buildMaterial(
     def:       MaterialDef,
     overrides: MaterialOverrides | undefined,
@@ -113,8 +118,9 @@ export class AssetManager {
       return ov !== undefined ? ov : def.maps[key].enabled;
     };
 
-    const loadData  = (path: string) => this.loadTexture(path, THREE.NoColorSpace);
-    const loadColor = (path: string) => this.loadTexture(path, THREE.SRGBColorSpace);
+    const r         = (path: string) => this._resolveQualityPath(path);
+    const loadData  = (path: string) => this.loadTexture(r(path), THREE.NoColorSpace);
+    const loadColor = (path: string) => this.loadTexture(r(path), THREE.SRGBColorSpace);
 
     const mat = new THREE.MeshStandardMaterial({
       roughness: overrides?.roughnessVal ?? def.roughnessVal,

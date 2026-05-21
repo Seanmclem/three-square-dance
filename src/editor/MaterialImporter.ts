@@ -61,15 +61,18 @@ export class MaterialImporter {
   ): Promise<ImportResult> {
     const result: ImportResult = { materialId, copied: [], skipped: [], failed: [] };
 
-    // Create/open target subfolder
+    // Create/open target subfolder + quality subdirectories
     const outDir = await texturesDir.getDirectoryHandle(materialId, { create: true });
+    const qualityDirs = await Promise.all(
+      (["low", "medium", "high"] as const).map(q => outDir.getDirectoryHandle(q, { create: true })),
+    );
 
     for (const [mapKey, info] of Object.entries(detectedMaps) as Array<[keyof MaterialDef["maps"], DetectedMap]>) {
       const targetName = `${mapKey}.jpg`;
 
-      // Skip if already exists
+      // Use the high/ folder as the existence check proxy
       try {
-        await outDir.getFileHandle(targetName);
+        await qualityDirs[2].getFileHandle(targetName);
         result.skipped.push(targetName);
         continue;
       } catch { /* doesn't exist — proceed */ }
@@ -77,10 +80,12 @@ export class MaterialImporter {
       try {
         const srcFile = await info.handle.getFile();
         const buf     = await srcFile.arrayBuffer();
-        const outHandle  = await outDir.getFileHandle(targetName, { create: true });
-        const writable   = await outHandle.createWritable();
-        await writable.write(buf);
-        await writable.close();
+        for (const qualityDir of qualityDirs) {
+          const outHandle = await qualityDir.getFileHandle(targetName, { create: true });
+          const writable  = await outHandle.createWritable();
+          await writable.write(buf);
+          await writable.close();
+        }
         result.copied.push(targetName);
       } catch (err) {
         console.error(`Failed to copy ${info.srcName} → ${targetName}`, err);
@@ -114,7 +119,7 @@ export class MaterialImporter {
     label:        string,
     detectedMaps: DetectedMaps,
   ): MaterialDef {
-    const base = `/assets/textures/${id}`;
+    const base = `/assets/textures/${id}/{quality}`;
     return {
       id,
       label,
