@@ -84,22 +84,11 @@ export function PropertiesPanel({
     });
   };
 
-  const openImporter = async () => {
+  const openImporter = () => {
     setDirError(null);
     if (!("showDirectoryPicker" in window)) {
       setDirError("Material importer requires Chrome or Edge.");
       return;
-    }
-    let dir = texturesDir;
-    if (!dir) {
-      try {
-        dir = await window.showDirectoryPicker({ mode: "readwrite" });
-        setTexturesDir(dir);
-      } catch (e) {
-        if ((e as DOMException).name !== "AbortError")
-          setDirError("Could not open textures folder: " + String(e));
-        return;
-      }
     }
     setImporterOpen(true);
   };
@@ -134,9 +123,10 @@ export function PropertiesPanel({
         <div style={{ padding: "6px 16px", color: "#ff6b6b", fontSize: 10 }}>{dirError}</div>
       )}
 
-      {importerOpen && texturesDir && (
+      {importerOpen && (
         <MaterialImporterModal
           texturesDir={texturesDir}
+          onTextureDirSet={setTexturesDir}
           onComplete={handleImportComplete}
           onClose={() => setImporterOpen(false)}
         />
