@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolId, SelectedObjectPayload, WorldObject, Vec3, FloorDef, WallDef } from "@/types";
-import { MATERIAL_IDS, MATERIAL_REGISTRY } from "@/core/AssetManager";
+import type { MaterialDef } from "@/types";
+import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
 interface ToolInfo { desc: string; hint: string }
 
@@ -44,12 +45,21 @@ const PANEL_STYLE: React.CSSProperties = {
 interface PropertiesPanelProps {
   activeTool:     ToolId;
   selected:       SelectedObjectPayload | null;
+  materialList:   MaterialDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onMaterialsReload: () => void;
 }
 
-export function PropertiesPanel({ activeTool, selected, onObjectUpdate }: PropertiesPanelProps) {
+export function PropertiesPanel({
+  activeTool, selected, materialList, onObjectUpdate, onMaterialsReload,
+}: PropertiesPanelProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const debounceRef = useRef<number | null>(null);
+
+  // texturesDir handle — requested once per session, kept in state
+  const [texturesDir,   setTexturesDir]   = useState<FileSystemDirectoryHandle | null>(null);
+  const [importerOpen,  setImporterOpen]  = useState(false);
+  const [dirError,      setDirError]      = useState<string | null>(null);
 
   useEffect(() => {
     if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
@@ -74,26 +84,72 @@ export function PropertiesPanel({ activeTool, selected, onObjectUpdate }: Proper
     });
   };
 
+  const openImporter = async () => {
+    setDirError(null);
+    if (!("showDirectoryPicker" in window)) {
+      setDirError("Material importer requires Chrome or Edge.");
+      return;
+    }
+    let dir = texturesDir;
+    if (!dir) {
+      try {
+        dir = await window.showDirectoryPicker({ mode: "readwrite" });
+        setTexturesDir(dir);
+      } catch (e) {
+        if ((e as DOMException).name !== "AbortError")
+          setDirError("Could not open textures folder: " + String(e));
+        return;
+      }
+    }
+    setImporterOpen(true);
+  };
+
+  const handleImportComplete = (material: MaterialDef) => {
+    void material;
+    setImporterOpen(false);
+    onMaterialsReload();
+  };
+
   return (
     <div style={PANEL_STYLE}>
       <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid rgba(80,120,180,0.15)" }}>
         <div style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</div>
       </div>
       {selected && selected.type === "floor"
-        ? <FloorView selected={selected} onObjectUpdate={onObjectUpdate} />
+        ? <FloorView
+            selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
+            onAddMaterial={openImporter}
+          />
         : selected && selected.type === "wall"
-          ? <WallView selected={selected} onObjectUpdate={onObjectUpdate} />
+          ? <WallView
+              selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
+              onAddMaterial={openImporter}
+            />
           : selected && draft
             ? <TransformView selected={selected} draft={draft} commit={commit} />
             : <ToolView activeTool={activeTool} />}
       <div style={{ flex: 1 }} />
+
+      {dirError && (
+        <div style={{ padding: "6px 16px", color: "#ff6b6b", fontSize: 10 }}>{dirError}</div>
+      )}
+
+      {importerOpen && texturesDir && (
+        <MaterialImporterModal
+          texturesDir={texturesDir}
+          onComplete={handleImportComplete}
+          onClose={() => setImporterOpen(false)}
+        />
+      )}
     </div>
   );
 }
 
-function FloorView({ selected, onObjectUpdate }: {
-  selected: SelectedObjectPayload;
+function FloorView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
+  selected:       SelectedObjectPayload;
+  materialList:   MaterialDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onAddMaterial:  () => void;
 }) {
   const floorData  = selected.data as FloorDef | null;
   const currentMat = floorData?.floorMesh.material ?? "concrete_01";
@@ -110,11 +166,12 @@ function FloorView({ selected, onObjectUpdate }: {
       <div style={{ padding: "10px 16px" }}>
         <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
         <MaterialPicker
-          materialIds={MATERIAL_IDS}
+          materialList={materialList}
           current={currentMat}
           onSelect={id => onObjectUpdate({
             floorMesh: { ...floorData!.floorMesh, material: id },
           } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
         />
       </div>
     </>
@@ -175,9 +232,11 @@ const NUM_INPUT: React.CSSProperties = {
   fontFamily: "monospace", padding: "4px 8px", outline: "none",
 };
 
-function WallView({ selected, onObjectUpdate }: {
-  selected: SelectedObjectPayload;
+function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
+  selected:       SelectedObjectPayload;
+  materialList:   MaterialDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onAddMaterial:  () => void;
 }) {
   const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
@@ -185,7 +244,6 @@ function WallView({ selected, onObjectUpdate }: {
   const currentMat  = wallData?.material ?? "brick_01";
   const debounceRef = useRef<number | null>(null);
 
-  // Reset local state when a different wall is selected
   useEffect(() => {
     if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     setHeight(String(wallData?.height ?? 3));
@@ -238,9 +296,10 @@ function WallView({ selected, onObjectUpdate }: {
         <div>
           <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
           <MaterialPicker
-            materialIds={MATERIAL_IDS}
+            materialList={materialList}
             current={currentMat}
             onSelect={id => onObjectUpdate({ material: id } as unknown as Partial<WorldObject>)}
+            onAddMaterial={onAddMaterial}
           />
         </div>
       </div>
@@ -248,20 +307,35 @@ function WallView({ selected, onObjectUpdate }: {
   );
 }
 
-function MaterialPicker({ materialIds, current, onSelect }: {
-  materialIds: string[];
-  current:     string;
-  onSelect:    (id: string) => void;
+function MaterialPicker({ materialList, current, onSelect, onAddMaterial }: {
+  materialList: MaterialDef[];
+  current:      string;
+  onSelect:     (id: string) => void;
+  onAddMaterial: () => void;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {materialIds.map(id => {
-        const label = MATERIAL_REGISTRY[id]?.label ?? id;
-        const active = id === current;
+      <button
+        onClick={onAddMaterial}
+        style={{
+          padding: "6px 10px", borderRadius: 4, cursor: "pointer",
+          background: "rgba(20,30,45,0.6)",
+          border: "1px dashed rgba(80,120,180,0.3)",
+          color: "#4a6a8a", fontSize: 10, fontFamily: "monospace",
+          textAlign: "left", marginBottom: 2,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; e.currentTarget.style.color = "#80aaff"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(80,120,180,0.3)"; e.currentTarget.style.color = "#4a6a8a"; }}
+      >
+        + add ambientcg material
+      </button>
+
+      {materialList.map(mat => {
+        const active = mat.id === current;
         return (
           <div
-            key={id}
-            onClick={() => onSelect(id)}
+            key={mat.id}
+            onClick={() => onSelect(mat.id)}
             style={{
               padding: "6px 10px",
               background: active ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
@@ -271,7 +345,7 @@ function MaterialPicker({ materialIds, current, onSelect }: {
               fontSize: 11, fontFamily: "monospace", cursor: "pointer",
             }}
           >
-            {label}
+            {mat.label}
           </div>
         );
       })}

@@ -14,7 +14,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef } from "@/types";
+import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -37,10 +37,11 @@ export default function App() {
   const busRef    = useRef<EventBus>(new EventBus());
   const worldRef  = useRef<WorldState | null>(null);
 
-  const [activeTool,  setActiveTool]  = useState<ToolId>("select");
-  const [activeFloor, setActiveFloor] = useState<number>(0);
-  const [coords,      setCoords]      = useState<Vec3>({ x: 0, y: 0, z: 0 });
-  const [selected,    setSelected]    = useState<SelectedObjectPayload | null>(null);
+  const [activeTool,   setActiveTool]   = useState<ToolId>("select");
+  const [activeFloor,  setActiveFloor]  = useState<number>(0);
+  const [coords,       setCoords]       = useState<Vec3>({ x: 0, y: 0, z: 0 });
+  const [selected,     setSelected]     = useState<SelectedObjectPayload | null>(null);
+  const [materialList, setMaterialList] = useState<MaterialDef[]>([]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,6 +50,10 @@ export default function App() {
 
     const scene     = new SceneManager(canvas, bus);
     assetManager.init(scene.renderer);
+    assetManager.initMaterials().then(mats => {
+      setMaterialList(mats);
+      bus.emit("materials:loaded", { materials: mats });
+    }).catch(err => console.error("initMaterials failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
     const input     = new InputManager(canvas, scene.camera, bus);
@@ -104,6 +109,11 @@ export default function App() {
     busRef.current.emit("floor:select", { level });
   };
 
+  const handleMaterialsReload = (): void => {
+    assetManager.initMaterials().then(mats => setMaterialList(mats))
+      .catch(err => console.error("materials reload failed:", err));
+  };
+
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     if (selected.type === "wall") {
@@ -141,7 +151,13 @@ export default function App() {
 
       <Toolbar         activeTool={activeTool}   onToolSelect={handleToolSelect} />
       <TopBar          activeFloor={activeFloor} onFloorChange={handleFloorChange} />
-      <PropertiesPanel activeTool={activeTool}   selected={selected} onObjectUpdate={handleObjectUpdate} />
+      <PropertiesPanel
+        activeTool={activeTool}
+        selected={selected}
+        materialList={materialList}
+        onObjectUpdate={handleObjectUpdate}
+        onMaterialsReload={handleMaterialsReload}
+      />
       <CoordinateDisplay coords={coords} />
 
       <div style={{

@@ -1,5 +1,34 @@
 import type * as THREE from "three";
 
+// ─── Material types ───────────────────────────────────────────────────────────
+
+export interface MaterialMapConfig {
+  enabled: boolean;
+  path:    string;
+}
+
+export interface MaterialDef {
+  id:                string;
+  label:             string;
+  tileScale:         number;
+  roughnessVal:      number;
+  metalnessVal:      number;
+  displacementScale: number;
+  maps: {
+    albedo:       MaterialMapConfig;
+    normal:       MaterialMapConfig;
+    roughness:    MaterialMapConfig;
+    metalness:    MaterialMapConfig;
+    ao:           MaterialMapConfig;
+    displacement: MaterialMapConfig;
+  };
+}
+
+export interface MaterialManifest {
+  version:   string;
+  materials: MaterialDef[];
+}
+
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
 export type ToolId = "select" | "floor" | "wall" | "platform" | "stair" | "object" | "zone";
@@ -60,6 +89,7 @@ export interface BusEvents {
   "scene:saved":           { json: SceneFile };
   "scene:loaded":          { metadata: SceneMetadata };
   "world:loaded":          { metadata: SceneMetadata };
+  "materials:loaded":      { materials: MaterialDef[] };
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
   "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };

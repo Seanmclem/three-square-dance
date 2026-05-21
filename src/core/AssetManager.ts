@@ -1,9 +1,7 @@
 import * as THREE from "three";
-import { MATERIAL_REGISTRY } from "./materials";
-import type { MaterialMapConfig } from "./materials";
+import type { MaterialDef, MaterialManifest } from "@/types";
 
-export { MATERIAL_REGISTRY };
-export const MATERIAL_IDS = Object.keys(MATERIAL_REGISTRY);
+export type { MaterialDef };
 
 export class AssetManager {
   private readonly _textureCache  = new Map<string, THREE.Texture>();
@@ -12,10 +10,38 @@ export class AssetManager {
   private readonly _textureLoader = new THREE.TextureLoader();
   private _gltfLoader: unknown    = null;
   private _renderer: THREE.WebGLRenderer | null = null;
+  private _materialRegistry: Record<string, MaterialDef> = {};
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
   init(renderer: THREE.WebGLRenderer): void {
     this._renderer = renderer;
+  }
+
+  /** Fetch manifest.json, populate the material registry, return the list. */
+  async initMaterials(): Promise<MaterialDef[]> {
+    try {
+      const res = await fetch('/assets/textures/manifest.json');
+      if (!res.ok) {
+        console.warn('AssetManager: no manifest found — material picker will be empty');
+        this._materialRegistry = {};
+        return [];
+      }
+      const manifest: MaterialManifest = await res.json();
+      this._materialRegistry = Object.fromEntries(manifest.materials.map(m => [m.id, m]));
+      return manifest.materials;
+    } catch (err) {
+      console.warn('AssetManager: failed to load manifest', err);
+      this._materialRegistry = {};
+      return [];
+    }
+  }
+
+  getMaterialDef(id: string): MaterialDef | undefined {
+    return this._materialRegistry[id];
+  }
+
+  getMaterialList(): MaterialDef[] {
+    return Object.values(this._materialRegistry);
   }
 
   async loadTexture(url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace): Promise<THREE.Texture> {
@@ -35,27 +61,27 @@ export class AssetManager {
     const cached = this._materialCache.get(materialId);
     if (cached) return cached;
 
-    const def = MATERIAL_REGISTRY[materialId];
+    const def = this._materialRegistry[materialId];
     if (!def) {
       console.warn(`Unknown material: ${materialId}`);
       return new THREE.MeshStandardMaterial({ color: 0x888888 });
     }
 
-    const loadData  = (m: MaterialMapConfig) => this.loadTexture(m.path, THREE.NoColorSpace);
-    const loadColor = (m: MaterialMapConfig) => this.loadTexture(m.path, THREE.SRGBColorSpace);
+    const loadData  = (path: string) => this.loadTexture(path, THREE.NoColorSpace);
+    const loadColor = (path: string) => this.loadTexture(path, THREE.SRGBColorSpace);
 
     const mat = new THREE.MeshStandardMaterial({
       roughness: def.roughnessVal,
       metalness: def.metalnessVal,
     });
 
-    if (def.maps.albedo.enabled)      mat.map          = await loadColor(def.maps.albedo);
-    if (def.maps.normal.enabled)      mat.normalMap     = await loadData(def.maps.normal);
-    if (def.maps.roughness.enabled)   mat.roughnessMap  = await loadData(def.maps.roughness);
-    if (def.maps.metalness.enabled)   mat.metalnessMap  = await loadData(def.maps.metalness);
-    if (def.maps.ao.enabled)          mat.aoMap         = await loadData(def.maps.ao);
+    if (def.maps.albedo.enabled)       mat.map           = await loadColor(def.maps.albedo.path);
+    if (def.maps.normal.enabled)       mat.normalMap      = await loadData(def.maps.normal.path);
+    if (def.maps.roughness.enabled)    mat.roughnessMap   = await loadData(def.maps.roughness.path);
+    if (def.maps.metalness.enabled)    mat.metalnessMap   = await loadData(def.maps.metalness.path);
+    if (def.maps.ao.enabled)           mat.aoMap          = await loadData(def.maps.ao.path);
     if (def.maps.displacement.enabled) {
-      mat.displacementMap   = await loadData(def.maps.displacement);
+      mat.displacementMap   = await loadData(def.maps.displacement.path);
       mat.displacementScale = def.displacementScale;
     }
 
@@ -79,6 +105,15 @@ export class AssetManager {
     const gltf = await loader.loadAsync(`/assets/models/${assetId}.glb`);
     this._gltfCache.set(assetId, gltf);
     return gltf;
+  }
+
+  /** Bust the cached Three.js material so next getMaterial() reloads textures. */
+  evictMaterial(materialId: string): void {
+    const mat = this._materialCache.get(materialId);
+    if (mat) {
+      mat.dispose();
+      this._materialCache.delete(materialId);
+    }
   }
 
   dispose(): void {

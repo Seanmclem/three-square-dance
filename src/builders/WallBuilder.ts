@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
-import { assetManager, MATERIAL_REGISTRY } from "@/core/AssetManager";
+import { assetManager } from "@/core/AssetManager";
 import type { WallDef, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -52,7 +52,7 @@ export class WallBuilder {
 
     const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness);
 
-    const tileScale = MATERIAL_REGISTRY[wall.material]?.tileScale ?? 1.0;
+    const tileScale = assetManager.getMaterialDef(wall.material)?.tileScale ?? 1.0;
     applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileScale);
     geo.setAttribute('uv2', geo.attributes.uv);
 
