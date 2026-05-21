@@ -31,6 +31,11 @@ export class ZoneManager {
 
   init(): void {
     this._unsubs.push(
+      this._bus.on("quality:changed", () => {
+        const ids = [...this._loadedZones.keys()];
+        for (const id of ids) this.unloadZone(id);
+        void Promise.all(ids.map(id => this.loadZone(id)));
+      }),
       this._bus.on("floor:added", ({ zoneId, floor }) => {
         this._rebuildFloor(zoneId, floor.level);
       }),

@@ -9,11 +9,6 @@ export interface WallBuildOutput {
   colliders: RAPIER.Collider[];
 }
 
-/**
- * Scale UVs on a BoxGeometry by physical surface dimensions × tileScale.
- * BoxGeometry group order: +x, -x, +y, -y, +z, -z.
- * For BoxGeometry(W, H, D): +x/-x faces span D×H, +y/-y span W×D, +z/-z span W×H.
- */
 function applyBoxUVTiling(
   geo: THREE.BoxGeometry,
   W: number, H: number, D: number,
@@ -21,7 +16,6 @@ function applyBoxUVTiling(
 ): void {
   const uv  = geo.attributes.uv as THREE.BufferAttribute;
   const idx = geo.index!;
-  // [uScale, vScale] per face group
   const dims: [number, number][] = [
     [D, H], [D, H], // +x, -x
     [W, D], [W, D], // +y, -y
@@ -50,14 +44,26 @@ export class WallBuilder {
     const cx     = (wall.start.x + wall.end.x) / 2;
     const cz     = (wall.start.z + wall.end.z) / 2;
 
-    const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness);
+    const ovr      = wall.materialOverrides;
+    const baseDef  = assetManager.getMaterialDef(wall.material);
+    const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
 
-    const tileScale = assetManager.getMaterialDef(wall.material)?.tileScale ?? 1.0;
+    // Displacement requires subdivided geometry to show any effect
+    const dispEnabled = ovr?.maps?.displacement?.enabled
+      ?? baseDef?.maps.displacement.enabled
+      ?? false;
+    const segX = dispEnabled ? Math.max(1, Math.ceil(length * 4)) : 1;
+    const segY = dispEnabled ? Math.max(1, Math.ceil(wall.height * 4)) : 1;
+
+    const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness, segX, segY, 1);
     applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileScale);
     geo.setAttribute('uv2', geo.attributes.uv);
 
-    const mat = await assetManager.getMaterial(wall.material)
-      .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
+    const mat = ovr
+      ? await assetManager.getMaterialWithOverrides(wall.material, ovr)
+          .catch(() => assetManager.getDefaultMaterial(0x4a5a6a))
+      : await assetManager.getMaterial(wall.material)
+          .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, wall.height / 2, cz);
@@ -70,7 +76,7 @@ export class WallBuilder {
       zoneId,
       selectable:    true,
       floorLevel:    wall.floor,
-      _ownsMaterial: false,
+      _ownsMaterial: !!ovr,  // true → ZoneManager disposes on rebuild
     } satisfies MeshUserData;
 
     const colliders = ColliderBuilder.registerWallSegments(wall, 0);

@@ -29,6 +29,15 @@ export interface MaterialManifest {
   materials: MaterialDef[];
 }
 
+export interface MaterialOverrides {
+  maps?:              Partial<Record<keyof MaterialDef['maps'], { enabled: boolean }>>;
+  tileScale?:         number;
+  roughnessVal?:      number;
+  displacementScale?: number;
+}
+
+export type QualityScale = 'low' | 'medium' | 'high';
+
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
 export type ToolId = "select" | "floor" | "wall" | "platform" | "stair" | "object" | "zone";
@@ -90,6 +99,7 @@ export interface BusEvents {
   "scene:loaded":          { metadata: SceneMetadata };
   "world:loaded":          { metadata: SceneMetadata };
   "materials:loaded":      { materials: MaterialDef[] };
+  "quality:changed":       { quality: QualityScale };
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
   "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
@@ -187,10 +197,11 @@ export interface FloorMeshDef {
 }
 
 export interface FloorDef {
-  level:         number;
-  elevation:     number;
-  ceilingHeight: number | null;
-  floorMesh:     FloorMeshDef;
+  level:             number;
+  elevation:         number;
+  ceilingHeight:     number | null;
+  floorMesh:         FloorMeshDef;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface Opening {
@@ -205,15 +216,16 @@ export interface Opening {
 }
 
 export interface WallDef {
-  id:               string;
-  start:            Vec2;
-  end:              Vec2;
-  floor:            number;
-  height:           number;
-  thickness:        number;
-  material:         string;
-  exteriorMaterial: string;
-  openings:         Opening[];
+  id:                string;
+  start:             Vec2;
+  end:               Vec2;
+  floor:             number;
+  height:            number;
+  thickness:         number;
+  material:          string;
+  exteriorMaterial:  string;
+  openings:          Opening[];
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface PlatformDef {

@@ -44,8 +44,9 @@ export class WorldState {
     const floor = zone?.floors.find(f => f.level === level);
     if (!floor) return;
     if (changes.floorMesh) Object.assign(floor.floorMesh, changes.floorMesh);
-    if (changes.elevation     !== undefined) floor.elevation     = changes.elevation;
-    if (changes.ceilingHeight !== undefined) floor.ceilingHeight = changes.ceilingHeight;
+    if (changes.elevation          !== undefined) floor.elevation          = changes.elevation;
+    if (changes.ceilingHeight      !== undefined) floor.ceilingHeight      = changes.ceilingHeight;
+    if ('materialOverrides' in changes)           floor.materialOverrides  = changes.materialOverrides;
     this._bus.emit("floor:updated", { zoneId, level, changes });
   }
 

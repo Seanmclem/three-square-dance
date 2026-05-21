@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { MaterialDef, MaterialManifest } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale } from "@/types";
 
 export type { MaterialDef };
 
@@ -11,11 +11,23 @@ export class AssetManager {
   private _gltfLoader: unknown    = null;
   private _renderer: THREE.WebGLRenderer | null = null;
   private _materialRegistry: Record<string, MaterialDef> = {};
+  private _quality: QualityScale = 'high';
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
   init(renderer: THREE.WebGLRenderer): void {
     this._renderer = renderer;
   }
+
+  setQuality(q: QualityScale): void {
+    this._quality = q;
+    // Clear all caches; next getMaterial() calls reload at new quality level
+    this._textureCache.forEach(t => t.dispose());
+    this._materialCache.forEach(m => m.dispose());
+    this._textureCache.clear();
+    this._materialCache.clear();
+  }
+
+  getQuality(): QualityScale { return this._quality; }
 
   /** Fetch manifest.json, populate the material registry, return the list. */
   async initMaterials(): Promise<MaterialDef[]> {
@@ -52,13 +64,23 @@ export class AssetManager {
     tex.wrapS      = THREE.RepeatWrapping;
     tex.wrapT      = THREE.RepeatWrapping;
     tex.colorSpace = colorSpace;
-    tex.anisotropy = this._renderer?.capabilities.getMaxAnisotropy() ?? 4;
+    // Quality-dependent settings
+    if (this._quality === 'low') {
+      tex.anisotropy    = 1;
+      tex.minFilter     = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+    } else {
+      tex.anisotropy = this._quality === 'medium'
+        ? Math.min(4, this._renderer?.capabilities.getMaxAnisotropy() ?? 4)
+        : (this._renderer?.capabilities.getMaxAnisotropy() ?? 4);
+    }
     this._textureCache.set(key, tex);
     return tex;
   }
 
   async getMaterial(materialId: string): Promise<THREE.MeshStandardMaterial> {
-    const cached = this._materialCache.get(materialId);
+    const cacheKey = `${materialId}:${this._quality}`;
+    const cached = this._materialCache.get(cacheKey);
     if (cached) return cached;
 
     const def = this._materialRegistry[materialId];
@@ -67,25 +89,48 @@ export class AssetManager {
       return new THREE.MeshStandardMaterial({ color: 0x888888 });
     }
 
+    const mat = await this._buildMaterial(def, undefined);
+    this._materialCache.set(cacheKey, mat);
+    return mat;
+  }
+
+  /** Build an uncached material applying per-instance overrides. */
+  async getMaterialWithOverrides(
+    materialId: string,
+    overrides:  MaterialOverrides,
+  ): Promise<THREE.MeshStandardMaterial> {
+    const def = this._materialRegistry[materialId];
+    if (!def) return new THREE.MeshStandardMaterial({ color: 0x888888 });
+    return this._buildMaterial(def, overrides);
+  }
+
+  private async _buildMaterial(
+    def:       MaterialDef,
+    overrides: MaterialOverrides | undefined,
+  ): Promise<THREE.MeshStandardMaterial> {
+    const isEnabled = (key: keyof MaterialDef['maps']): boolean => {
+      const ov = overrides?.maps?.[key]?.enabled;
+      return ov !== undefined ? ov : def.maps[key].enabled;
+    };
+
     const loadData  = (path: string) => this.loadTexture(path, THREE.NoColorSpace);
     const loadColor = (path: string) => this.loadTexture(path, THREE.SRGBColorSpace);
 
     const mat = new THREE.MeshStandardMaterial({
-      roughness: def.roughnessVal,
+      roughness: overrides?.roughnessVal ?? def.roughnessVal,
       metalness: def.metalnessVal,
     });
 
-    if (def.maps.albedo.enabled)       mat.map           = await loadColor(def.maps.albedo.path);
-    if (def.maps.normal.enabled)       mat.normalMap      = await loadData(def.maps.normal.path);
-    if (def.maps.roughness.enabled)    mat.roughnessMap   = await loadData(def.maps.roughness.path);
-    if (def.maps.metalness.enabled)    mat.metalnessMap   = await loadData(def.maps.metalness.path);
-    if (def.maps.ao.enabled)           mat.aoMap          = await loadData(def.maps.ao.path);
-    if (def.maps.displacement.enabled) {
+    if (isEnabled('albedo'))       mat.map           = await loadColor(def.maps.albedo.path);
+    if (isEnabled('normal'))       mat.normalMap      = await loadData(def.maps.normal.path);
+    if (isEnabled('roughness'))    mat.roughnessMap   = await loadData(def.maps.roughness.path);
+    if (isEnabled('metalness'))    mat.metalnessMap   = await loadData(def.maps.metalness.path);
+    if (isEnabled('ao'))           mat.aoMap          = await loadData(def.maps.ao.path);
+    if (isEnabled('displacement')) {
       mat.displacementMap   = await loadData(def.maps.displacement.path);
-      mat.displacementScale = def.displacementScale;
+      mat.displacementScale = overrides?.displacementScale ?? def.displacementScale;
     }
 
-    this._materialCache.set(materialId, mat);
     return mat;
   }
 
@@ -107,12 +152,10 @@ export class AssetManager {
     return gltf;
   }
 
-  /** Bust the cached Three.js material so next getMaterial() reloads textures. */
+  /** Bust the cached Three.js material so next getMaterial() reloads. */
   evictMaterial(materialId: string): void {
-    const mat = this._materialCache.get(materialId);
-    if (mat) {
-      mat.dispose();
-      this._materialCache.delete(materialId);
+    for (const [key, mat] of this._materialCache) {
+      if (key.startsWith(`${materialId}:`)) { mat.dispose(); this._materialCache.delete(key); }
     }
   }
 

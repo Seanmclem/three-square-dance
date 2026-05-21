@@ -14,7 +14,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef } from "@/types";
+import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef, QualityScale } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -42,6 +42,9 @@ export default function App() {
   const [coords,       setCoords]       = useState<Vec3>({ x: 0, y: 0, z: 0 });
   const [selected,     setSelected]     = useState<SelectedObjectPayload | null>(null);
   const [materialList, setMaterialList] = useState<MaterialDef[]>([]);
+  const [quality,      setQuality]      = useState<QualityScale>(
+    () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -109,6 +112,13 @@ export default function App() {
     busRef.current.emit("floor:select", { level });
   };
 
+  const handleQualityChange = (q: QualityScale): void => {
+    setQuality(q);
+    localStorage.setItem('editorQuality', q);
+    assetManager.setQuality(q);
+    busRef.current.emit('quality:changed', { quality: q });
+  };
+
   const handleMaterialsReload = (): void => {
     assetManager.initMaterials().then(mats => setMaterialList(mats))
       .catch(err => console.error("materials reload failed:", err));
@@ -155,8 +165,10 @@ export default function App() {
         activeTool={activeTool}
         selected={selected}
         materialList={materialList}
+        quality={quality}
         onObjectUpdate={handleObjectUpdate}
         onMaterialsReload={handleMaterialsReload}
+        onQualityChange={handleQualityChange}
       />
       <CoordinateDisplay coords={coords} />
 
