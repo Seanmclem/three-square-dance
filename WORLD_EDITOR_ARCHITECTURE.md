@@ -1,5 +1,4 @@
 # 3D World Editor — Full Project Architecture
-
 > RPG/Exploration Game World Editor built with Vite + React + Three.js (no R3F)
 
 ---
@@ -11,7 +10,6 @@ A browser-based 3D world editor for building explorable 3D spaces. The user cons
 The world is designed from day one to support a full game runtime: playable characters, NPCs, and enemies. This means every wall, floor, platform, and stair built in the editor generates a proper Rapier physics collider alongside its visual mesh — not a raycast approximation added later. The physics world is always live and game-ready.
 
 **Two tools, two jobs:**
-
 - `three-mesh-bvh` — editor only: fast raycasting for object selection, tool snapping, and surface placement
 - `@dimforge/rapier3d-compat` — runtime: rigid body physics, character capsule controller, NPC/enemy colliders
 
@@ -19,16 +17,16 @@ The world is designed from day one to support a full game runtime: playable char
 
 ## Tech Stack
 
-| Layer               | Library                    | Notes                                         |
-| ------------------- | -------------------------- | --------------------------------------------- |
-| Language            | TypeScript 5               | Strict mode, all files `.ts` / `.tsx`         |
-| Build               | Vite + vite-plugin-checker | Fast HMR, TS type-checking in dev             |
-| UI Shell            | React 18 + @types/react    | UI panels only — no Three.js inside React     |
-| 3D Renderer         | Three.js + @types/three    | Initialized outside React in plain TS classes |
-| CSG (wall openings) | three-bvh-csg              | Boolean mesh operations for doors/windows     |
-| BVH Raycasting      | three-mesh-bvh             | Fast collision/selection raycasting           |
-| Physics (Phase 3+)  | @dimforge/rapier3d-compat  | WASM — static colliders built with every mesh |
-| Persistence         | JSON                       | Save/load scene files                         |
+| Layer | Library | Notes |
+|---|---|---|
+| Language | TypeScript 5 | Strict mode, all files `.ts` / `.tsx` |
+| Build | Vite + vite-plugin-checker | Fast HMR, TS type-checking in dev |
+| UI Shell | React 18 + @types/react | UI panels only — no Three.js inside React |
+| 3D Renderer | Three.js + @types/three | Initialized outside React in plain TS classes |
+| CSG (wall openings) | three-bvh-csg | Boolean mesh operations for doors/windows |
+| BVH Raycasting | three-mesh-bvh | Fast collision/selection raycasting |
+| Physics (Phase 3+) | @dimforge/rapier3d-compat | WASM — static colliders built with every mesh |
+| Persistence | JSON | Save/load scene files |
 
 **Critical rule:** React never touches Three.js objects. Three.js never touches React state. They communicate only through an `EventBus` (custom event emitter). No exceptions.
 
@@ -43,130 +41,76 @@ All shared types live in `src/types.ts` and are imported across every module. Ne
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId =
-  | "select"
-  | "floor"
-  | "wall"
-  | "platform"
-  | "stair"
-  | "object"
-  | "zone";
+export type ToolId = "select" | "floor" | "wall" | "platform" | "stair" | "object" | "zone";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType =
-  | "wall"
-  | "floor"
-  | "platform"
-  | "stair"
-  | "object"
-  | "terrain"
-  | "trigger"
-  | "trim";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
 
-export interface Vec2 {
-  x: number;
-  z: number;
-}
-export interface Vec3 {
-  x: number;
-  y: number;
-  z: number;
-}
-export interface Euler3 {
-  x: number;
-  y: number;
-  z: number;
-} // degrees
-export interface Scale3 {
-  x: number;
-  y: number;
-  z: number;
-}
-export interface Bounds {
-  x: number;
-  z: number;
-  width: number;
-  depth: number;
-}
+export interface Vec2 { x: number; z: number }
+export interface Vec3 { x: number; y: number; z: number }
+export interface Euler3 { x: number; y: number; z: number }   // degrees
+export interface Scale3 { x: number; y: number; z: number }
+export interface Bounds { x: number; z: number; width: number; depth: number }
 
 // ─── EventBus typed map ───────────────────────────────────────────────────────
 
 export interface BusEvents {
-  "tool:select": { tool: ToolId };
-  "floor:select": { level: number };
-  "object:selected": SelectedObjectPayload;
-  "object:deselected": Record<string, never>;
-  "object:updated": {
-    id: string;
-    zoneId: string;
-    changes: Partial<WorldObject>;
-  };
-  "asset:selected": { assetId: string };
-  "asset:dropped": { assetId: string; screenPos: { x: number; y: number } };
-  "wall:added": { zoneId: string; wall: WallDef };
-  "wall:updated": { zoneId: string; wallId: string; changes: Partial<WallDef> };
-  "wall:removed": { zoneId: string; wallId: string };
-  "floor:added": { zoneId: string; floor: FloorDef };
-  "floor:updated": {
-    zoneId: string;
-    level: number;
-    changes: Partial<FloorDef>;
-  };
-  "platform:added": { zoneId: string; platform: PlatformDef };
-  "platform:updated": {
-    zoneId: string;
-    id: string;
-    changes: Partial<PlatformDef>;
-  };
-  "platform:removed": { zoneId: string; id: string };
-  "stair:added": { zoneId: string; stair: StairDef };
-  "stair:removed": { zoneId: string; id: string };
-  "object:added": { zoneId: string; object: WorldObject };
-  "object:removed": { zoneId: string; id: string };
-  "zone:added": { zone: ZoneDef };
-  "zone:activated": { zoneId: string };
-  "zone:enter": { zoneId: string };
-  "transition:added": { transition: TransitionDef };
-  "preview:start": Record<string, never>;
-  "preview:stop": Record<string, never>;
+  "tool:select":          { tool: ToolId };
+  "floor:select":         { level: number };
+  "object:selected":      SelectedObjectPayload;
+  "object:deselected":    Record<string, never>;
+  "object:updated":       { id: string; zoneId: string; changes: Partial<WorldObject> };
+  "asset:selected":       { assetId: string };
+  "asset:dropped":        { assetId: string; screenPos: { x: number; y: number } };
+  "node:updated":         { zoneId: string; nodeId: string; pos: { x: number; z: number } };
+  "wall:added":           { zoneId: string; wall: WallDef };
+  "wall:updated":         { zoneId: string; wallId: string; changes: Partial<WallDef> };
+  "wall:removed":         { zoneId: string; wallId: string };
+  "floor:added":          { zoneId: string; floor: FloorDef };
+  "floor:updated":        { zoneId: string; level: number; changes: Partial<FloorDef> };
+  "platform:added":       { zoneId: string; platform: PlatformDef };
+  "platform:updated":     { zoneId: string; id: string; changes: Partial<PlatformDef> };
+  "platform:removed":     { zoneId: string; id: string };
+  "stair:added":          { zoneId: string; stair: StairDef };
+  "stair:removed":        { zoneId: string; id: string };
+  "object:added":         { zoneId: string; object: WorldObject };
+  "object:removed":       { zoneId: string; id: string };
+  "zone:added":           { zone: ZoneDef };
+  "zone:activated":       { zoneId: string };
+  "zone:enter":           { zoneId: string };
+  "transition:added":     { transition: TransitionDef };
+  "preview:start":        Record<string, never>;
+  "preview:stop":         Record<string, never>;
   "preview:zone-entered": { zoneName: string };
-  "gizmo:dragging": { isDragging: boolean };
-  "camera:jump": { x: number; z: number };
-  "character:teleport": { position: Vec3; facing: number };
-  "character:triggerdoor": { transitionId: string };
-  "overlay:fade-in": { color: string; duration: number };
-  "overlay:fade-out": { duration: number };
-  "scene:save": Record<string, never>;
-  "scene:load": { json: unknown };
-  "scene:saved": { json: SceneFile };
-  "scene:loaded": { metadata: SceneMetadata };
-  "world:loaded": { metadata: SceneMetadata };
-  "terrain:sculpt": { x: number; z: number; radius: number; delta: number };
-  "input:click": { screenPos: Vec2; worldPos: Vec3; button: number };
-  "input:dblclick": { screenPos: Vec2; worldPos: Vec3 };
-  "input:mousemove": { screenPos: Vec2; worldPos: Vec3; delta: Vec2 };
-  "input:mousedown": { button: number; screenPos: Vec2 };
-  "input:mouseup": { button: number; screenPos: Vec2 };
-  "input:wheel": { delta: number };
-  "input:keydown": {
-    code: string;
-    key: string;
-    shift: boolean;
-    ctrl: boolean;
-    alt: boolean;
-  };
-  "input:keyup": { code: string };
+  "gizmo:dragging":       { isDragging: boolean };
+  "camera:jump":          { x: number; z: number };
+  "character:teleport":   { position: Vec3; facing: number };
+  "character:triggerdoor":{ transitionId: string };
+  "overlay:fade-in":      { color: string; duration: number };
+  "overlay:fade-out":     { duration: number };
+  "scene:save":           Record<string, never>;
+  "scene:load":           { json: unknown };
+  "scene:saved":          { json: SceneFile };
+  "scene:loaded":         { metadata: SceneMetadata };
+  "world:loaded":         { metadata: SceneMetadata };
+  "terrain:sculpt":       { x: number; z: number; radius: number; delta: number };
+  "input:click":          { screenPos: Vec2; worldPos: Vec3; button: number };
+  "input:dblclick":       { screenPos: Vec2; worldPos: Vec3 };
+  "input:mousemove":      { screenPos: Vec2; worldPos: Vec3; delta: Vec2 };
+  "input:mousedown":      { button: number; screenPos: Vec2 };
+  "input:mouseup":        { button: number; screenPos: Vec2 };
+  "input:wheel":          { delta: number };
+  "input:keydown":        { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
+  "input:keyup":          { code: string };
 }
 
 export type BusEventName = keyof BusEvents;
-export type BusCallback<K extends BusEventName> = (
-  payload: BusEvents[K],
-) => void;
+export type BusCallback<K extends BusEventName> = (payload: BusEvents[K]) => void;
 
 // ─── Selection ────────────────────────────────────────────────────────────────
 
@@ -183,182 +127,194 @@ export interface SelectedObjectPayload {
 // ─── userData on Three.js meshes ─────────────────────────────────────────────
 
 export interface MeshUserData {
-  editorId: string;
-  editorType: EditorObjectType;
-  zoneId: string;
-  selectable: boolean;
-  floorLevel: number;
-  _ownsMaterial: boolean;
-  _origEmissive?: number;
+  editorId:        string;
+  editorType:      EditorObjectType;
+  zoneId:          string;
+  selectable:      boolean;
+  floorLevel:      number;
+  _ownsMaterial:   boolean;
+  _origEmissive?:  number;
   _origEmissiveIntensity?: number;
   _hoverEmissive?: number;
-  _parentId?: string; // set on child meshes of GLTF objects
+  _parentId?:      string;       // set on child meshes of GLTF objects
   // trigger-specific
-  triggerType?: "door";
-  transitionId?: string;
-  openingId?: string;
+  triggerType?:    "door";
+  transitionId?:   string;
+  openingId?:      string;
   // wall-specific
-  wallId?: string;
+  wallId?:         string;
   // object-specific
-  assetId?: string;
+  assetId?:        string;
 }
 
 // ─── Scene file data model ────────────────────────────────────────────────────
 
 export interface SceneMetadata {
-  name: string;
-  version: string;
-  author: string;
-  created: string;
+  name:         string;
+  version:      string;
+  author:       string;
+  created:      string;
   lastModified: string;
 }
 
 export interface PlayerSettings {
-  cameraMode: CameraMode;
-  moveSpeed: number;
-  jumpHeight: number;
-  fov: number;
-  thirdPersonDistance: number;
-  thirdPersonHeight: number;
+  cameraMode:           CameraMode;
+  moveSpeed:            number;
+  jumpHeight:           number;
+  fov:                  number;
+  thirdPersonDistance:  number;
+  thirdPersonHeight:    number;
 }
 
 export interface SkyConfig {
-  turbidity: number; // atmospheric haze, default 10
-  rayleigh: number; // sky blueness, default 3
-  mieCoefficient: number; // default 0.005
-  mieDirectionalG: number; // default 0.7
-  sunElevation: number; // degrees above horizon, default 25
-  sunAzimuth: number; // degrees, default 180
+  turbidity:        number;   // atmospheric haze, default 10
+  rayleigh:         number;   // sky blueness, default 3
+  mieCoefficient:   number;   // default 0.005
+  mieDirectionalG:  number;   // default 0.7
+  sunElevation:     number;   // degrees above horizon, default 25
+  sunAzimuth:       number;   // degrees, default 180
 }
 
 export interface WorldConfig {
-  size: { width: number; depth: number };
-  ambientLight: { color: string; intensity: number };
-  sunLight: { color: string; intensity: number }; // position derived from sky sun angles
-  sky: SkyConfig;
-  fogDensity: number; // fog color derived from sky at horizon, not hardcoded
+  size:           { width: number; depth: number };
+  ambientLight:   { color: string; intensity: number };
+  sunLight:       { color: string; intensity: number };  // position derived from sky sun angles
+  sky:            SkyConfig;
+  fogDensity:     number;   // fog color derived from sky at horizon, not hardcoded
   playerSettings: PlayerSettings;
 }
 
 export interface TerrainLayerMaterial {
-  id: string;
-  texture: string;
+  id:        string;
+  texture:   string;
   tileScale: number;
   minHeight: number;
   maxHeight: number;
 }
 
 export interface TerrainDef {
-  resolution: number;
-  heightData: Float32Array | string; // Float32Array in memory, base64 string on disk
-  maxHeight: number;
-  layerMaterials: TerrainLayerMaterial[];
+  resolution:      number;
+  heightData:      Float32Array | string;   // Float32Array in memory, base64 string on disk
+  maxHeight:       number;
+  layerMaterials:  TerrainLayerMaterial[];
 }
 
 export interface FloorMeshDef {
-  shape: "rect" | "polygon";
-  points: Vec2[] | null;
+  shape:    "rect" | "polygon";
+  points:   Vec2[] | null;
   material: string;
 }
 
 export interface FloorDef {
-  level: number;
-  elevation: number;
+  level:         number;
+  elevation:     number;
   ceilingHeight: number | null;
-  floorMesh: FloorMeshDef;
+  floorMesh:     FloorMeshDef;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface Opening {
+  id:                string;
+  type:              OpeningType;
+  offsetAlongWall:   number;
+  width:             number;
+  height:            number;
+  elevation:         number;
+  linkedZoneId:      string | null;
+  linkedTransitionId:string | null;
+}
+
+export interface WallNode {
   id: string;
-  type: OpeningType;
-  offsetAlongWall: number;
-  width: number;
-  height: number;
-  elevation: number;
-  linkedZoneId: string | null;
-  linkedTransitionId: string | null;
+  x:  number;
+  z:  number;
 }
 
 export interface WallDef {
-  id: string;
-  start: Vec2;
-  end: Vec2;
-  floor: number;
-  height: number;
-  thickness: number;
-  material: string;
+  id:           string;
+  startNodeId:  string;
+  endNodeId:    string;
+  floor:            number;
+  height:           number;
+  thickness:        number;
+  material:         string;
   exteriorMaterial: string;
-  openings: Opening[];
+  openings:         Opening[];
+  materialOverrides?: MaterialOverrides;
+  exteriorMaterialOverrides?: MaterialOverrides;
 }
 
 export interface PlatformDef {
-  id: string;
-  position: Vec3;
-  size: { width: number; depth: number };
-  thickness: number;
-  material: string;
-  hasRailing: boolean;
-  railingHeight: number;
-  floorLevel?: number;
+  id:           string;
+  position:     Vec3;
+  size:         { width: number; depth: number };
+  thickness:    number;
+  material:     string;
+  hasRailing:   boolean;
+  railingHeight:number;
+  floorLevel?:  number;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface StairDef {
-  id: string;
-  start: Vec3;
-  end: Vec3;
-  width: number;
-  style: StairStyle;
-  material: string;
+  id:         string;
+  start:      Vec3;
+  end:        Vec3;
+  width:      number;
+  style:      StairStyle;
+  material:   string;
   hasRailing: boolean;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface ObjectProperties {
-  interactable: boolean;
-  npcSpawn: boolean;
-  lootTableId: string | null;
+  interactable:   boolean;
+  npcSpawn:       boolean;
+  lootTableId:    string | null;
   triggerEventId: string | null;
 }
 
 export interface WorldObject {
-  id: string;
-  assetId: string;
-  position: Vec3;
-  rotation: Euler3;
-  scale: Scale3;
-  floor: number;
-  zoneId?: string;
+  id:         string;
+  assetId:    string;
+  position:   Vec3;
+  rotation:   Euler3;
+  scale:      Scale3;
+  floor:      number;
+  zoneId?:    string;
   properties: ObjectProperties;
 }
 
 export interface ZoneDef {
-  id: string;
-  name: string;
-  type: ZoneType;
-  bounds: Bounds;
-  floors: FloorDef[];
-  walls: WallDef[];
+  id:        string;
+  name:      string;
+  type:      ZoneType;
+  bounds:    Bounds;
+  nodes:     WallNode[];
+  floors:    FloorDef[];
+  walls:     WallDef[];
   platforms: PlatformDef[];
-  stairs: StairDef[];
-  objects: WorldObject[];
+  stairs:    StairDef[];
+  objects:   WorldObject[];
 }
 
 export interface TransitionDef {
-  id: string;
-  fromZone: string;
-  toZone: string;
-  triggerType: "door" | "volume" | "loading-zone";
+  id:               string;
+  fromZone:         string;
+  toZone:           string;
+  triggerType:      "door" | "volume" | "loading-zone";
   triggerOpeningId: string;
-  effect: TransitionEffect;
-  fadeColor: string;
-  fadeDuration: number;
-  spawnPoint: Vec3 & { facing: number };
+  effect:           TransitionEffect;
+  fadeColor:        string;
+  fadeDuration:     number;
+  spawnPoint:       Vec3 & { facing: number };
 }
 
 export interface SceneFile {
-  metadata: SceneMetadata;
-  world: WorldConfig;
-  terrain: TerrainDef | null;
-  zones: ZoneDef[];
+  metadata:    SceneMetadata;
+  world:       WorldConfig;
+  terrain:     TerrainDef | null;
+  zones:       ZoneDef[];
   transitions: TransitionDef[];
 }
 
@@ -366,82 +322,123 @@ export interface SceneFile {
 
 // Stored by ZoneManager alongside mesh groups — used to clean up Rapier on zone unload
 export interface ZoneColliders {
-  floors: import("@dimforge/rapier3d-compat").Collider[];
-  walls: import("@dimforge/rapier3d-compat").Collider[][]; // per wall: segment colliders
+  floors:    import("@dimforge/rapier3d-compat").Collider[];
+  walls:     import("@dimforge/rapier3d-compat").Collider[][];   // per wall: segment colliders
   platforms: import("@dimforge/rapier3d-compat").Collider[];
-  stairs: import("@dimforge/rapier3d-compat").Collider[][]; // per stair: step colliders
-  sensors: import("@dimforge/rapier3d-compat").Collider[]; // door sensors
-  terrain: import("@dimforge/rapier3d-compat").Collider | null;
+  stairs:    import("@dimforge/rapier3d-compat").Collider[][];   // per stair: step colliders
+  sensors:   import("@dimforge/rapier3d-compat").Collider[];     // door sensors
+  terrain:   import("@dimforge/rapier3d-compat").Collider | null;
 }
 
 // ─── Characters, NPCs, Enemies ───────────────────────────────────────────────
 
 export interface CharacterDef {
-  id: string;
-  name: string;
-  modelAssetId: string;
-  capsuleRadius: number;
-  capsuleHeight: number;
-  moveSpeed: number;
-  jumpHeight: number;
-  cameraMode: CameraMode;
-  thirdPersonOffset: Vec3;
-  health?: number;
-  maxHealth?: number;
-  faction?: string;
+  id:                 string;
+  name:               string;
+  modelAssetId:       string;
+  capsuleRadius:      number;
+  capsuleHeight:      number;
+  moveSpeed:          number;
+  jumpHeight:         number;
+  cameraMode:         CameraMode;
+  thirdPersonOffset:  Vec3;
+  health?:            number;
+  maxHealth?:         number;
+  faction?:           string;
 }
 
 export type NpcBehaviour = "idle" | "patrol" | "follow" | "guard";
 
 export interface NpcDef {
-  id: string;
-  name: string;
-  modelAssetId: string;
+  id:            string;
+  name:          string;
+  modelAssetId:  string;
   spawnPosition: Vec3;
-  faction: string;
-  behaviour: NpcBehaviour;
-  patrolPath?: Vec3[];
-  dialogueId?: string | null;
-  lootTableId?: string | null;
+  faction:       string;
+  behaviour:     NpcBehaviour;
+  patrolPath?:   Vec3[];
+  dialogueId?:   string | null;
+  lootTableId?:  string | null;
 }
 
 export interface EnemyDef extends NpcDef {
-  attackRange: number;
-  detectionRange: number;
-  damage: number;
-  attackCooldown: number;
+  attackRange:     number;
+  detectionRange:  number;
+  damage:          number;
+  attackCooldown:  number;
+}
+
+// ─── Material system ─────────────────────────────────────────────────────────
+
+export type QualityScale = 'low' | 'medium' | 'high';
+
+export interface QualitySettings {
+  textureScale:    QualityScale;
+  shadowMapSize:   512 | 1024 | 2048;
+  shadowsEnabled:  boolean;
+  fogEnabled:      boolean;
+  antialias:       boolean;
+}
+
+export interface MaterialMapConfig {
+  enabled: boolean;
+  path:    string;
+}
+
+export interface MaterialDef {
+  id:                string;
+  label:             string;
+  tileScale:         number;
+  roughnessVal:      number;
+  metalnessVal:      number;
+  displacementScale: number;
+  maps: {
+    albedo:       MaterialMapConfig;
+    normal:       MaterialMapConfig;
+    roughness:    MaterialMapConfig;
+    metalness:    MaterialMapConfig;
+    ao:           MaterialMapConfig;
+    displacement: MaterialMapConfig;
+  };
+}
+
+export interface MaterialOverrides {
+  maps?:              Partial<Record<keyof MaterialDef['maps'], { enabled: boolean }>>;
+  tileScale?:         number;
+  roughnessVal?:      number;
+  displacementScale?: number;
 }
 
 // ─── Builder return types ─────────────────────────────────────────────────────
 
 export interface WallBuildResult {
-  mesh: THREE.Mesh;
-  trimMeshes: THREE.Mesh[];
-  collisionMeshes: THREE.Mesh[];
-  triggerMeshes: THREE.Mesh[];
+  mesh:             THREE.Mesh;
+  trimMeshes:       THREE.Mesh[];
+  collisionMeshes:  THREE.Mesh[];
+  triggerMeshes:    THREE.Mesh[];
 }
 
 export interface FloorBuildResult {
-  mesh: THREE.Mesh;
+  mesh:          THREE.Mesh;
   collisionMesh: THREE.Mesh;
 }
 
 export interface PlatformBuildResult {
-  meshes: THREE.Mesh[];
+  meshes:        THREE.Mesh[];
   collisionMesh: THREE.Mesh;
 }
 
 export interface StairBuildResult {
-  meshes: THREE.Mesh[];
+  meshes:        THREE.Mesh[];
   collisionMesh: THREE.Mesh;
 }
 
 // ─── Module interfaces (lifecycle contract) ───────────────────────────────────
 
 export interface IEditorModule {
-  init(): void;
+  init():        void;
   update(dt: number): void;
-  dispose(): void;
+  dispose():     void;
 }
 ```
 
@@ -533,7 +530,6 @@ App.tsx
 ```
 
 In `App.tsx` `useEffect`:
-
 ```js
 const bus = new EventBus();
 const sm = new SceneManager(canvasRef.current, bus);
@@ -545,21 +541,12 @@ React components call `bus.emit(...)` to send instructions to Three.js. Three.js
 ### Module Lifecycle
 
 Every engine module implements this interface:
-
 ```js
 class SomeModule {
-  constructor(deps) {
-    /* store deps, don't start yet */
-  }
-  init() {
-    /* attach listeners, add objects to scene */
-  }
-  update(dt) {
-    /* called every frame via SceneManager */
-  }
-  dispose() {
-    /* remove listeners, dispose geometries/materials */
-  }
+  constructor(deps) { /* store deps, don't start yet */ }
+  init()            { /* attach listeners, add objects to scene */ }
+  update(dt)        { /* called every frame via SceneManager */ }
+  dispose()         { /* remove listeners, dispose geometries/materials */ }
 }
 ```
 
@@ -588,7 +575,7 @@ The canonical save/load format. All builders read exclusively from this structur
     "version": "1.0",
     "author": "",
     "created": "2026-01-01T00:00:00Z",
-    "lastModified": "2026-01-01T00:00:00Z",
+    "lastModified": "2026-01-01T00:00:00Z"
   },
   "world": {
     "size": { "width": 200, "depth": 200 },
@@ -600,7 +587,7 @@ The canonical save/load format. All builders read exclusively from this structur
       "mieCoefficient": 0.005,
       "mieDirectionalG": 0.7,
       "sunElevation": 25,
-      "sunAzimuth": 180,
+      "sunAzimuth": 180
     },
     "fogDensity": 0.012,
     "playerSettings": {
@@ -609,36 +596,18 @@ The canonical save/load format. All builders read exclusively from this structur
       "jumpHeight": 1.2,
       "fov": 75,
       "thirdPersonDistance": 4.0,
-      "thirdPersonHeight": 1.8,
-    },
+      "thirdPersonHeight": 1.8
+    }
   },
   "terrain": {
     "resolution": 64,
     "heightData": "<base64-encoded Float32Array, resolution×resolution floats 0..1>",
     "maxHeight": 10.0,
     "layerMaterials": [
-      {
-        "id": "grass",
-        "texture": "grass_01.jpg",
-        "tileScale": 4.0,
-        "minHeight": 0.0,
-        "maxHeight": 0.4,
-      },
-      {
-        "id": "dirt",
-        "texture": "dirt_01.jpg",
-        "tileScale": 3.0,
-        "minHeight": 0.3,
-        "maxHeight": 0.7,
-      },
-      {
-        "id": "rock",
-        "texture": "rock_01.jpg",
-        "tileScale": 2.0,
-        "minHeight": 0.6,
-        "maxHeight": 1.0,
-      },
-    ],
+      { "id": "grass", "texture": "grass_01.jpg", "tileScale": 4.0, "minHeight": 0.0, "maxHeight": 0.4 },
+      { "id": "dirt",  "texture": "dirt_01.jpg",  "tileScale": 3.0, "minHeight": 0.3, "maxHeight": 0.7 },
+      { "id": "rock",  "texture": "rock_01.jpg",  "tileScale": 2.0, "minHeight": 0.6, "maxHeight": 1.0 }
+    ]
   },
   "zones": [
     {
@@ -651,28 +620,20 @@ The canonical save/load format. All builders read exclusively from this structur
           "level": 0,
           "elevation": 0.0,
           "ceilingHeight": 3.0,
-          "floorMesh": {
-            "shape": "rect",
-            "points": null,
-            "material": "cobblestone",
-          },
+          "floorMesh": { "shape": "rect", "points": null, "material": "cobblestone" }
         },
         {
           "level": 1,
           "elevation": 3.2,
           "ceilingHeight": 3.0,
-          "floorMesh": {
-            "shape": "rect",
-            "points": null,
-            "material": "wood_planks",
-          },
-        },
+          "floorMesh": { "shape": "rect", "points": null, "material": "wood_planks" }
+        }
       ],
       "walls": [
         {
           "id": "wall_001",
           "start": { "x": 0.0, "z": 0.0 },
-          "end": { "x": 10.0, "z": 0.0 },
+          "end":   { "x": 10.0, "z": 0.0 },
           "floor": 0,
           "height": 3.0,
           "thickness": 0.2,
@@ -687,7 +648,7 @@ The canonical save/load format. All builders read exclusively from this structur
               "height": 2.2,
               "elevation": 0.0,
               "linkedZoneId": "zone_002",
-              "linkedTransitionId": "trans_001",
+              "linkedTransitionId": "trans_001"
             },
             {
               "id": "opening_002",
@@ -697,10 +658,10 @@ The canonical save/load format. All builders read exclusively from this structur
               "height": 1.2,
               "elevation": 0.9,
               "linkedZoneId": null,
-              "linkedTransitionId": null,
-            },
-          ],
-        },
+              "linkedTransitionId": null
+            }
+          ]
+        }
       ],
       "platforms": [
         {
@@ -710,19 +671,19 @@ The canonical save/load format. All builders read exclusively from this structur
           "thickness": 0.3,
           "material": "concrete_01",
           "hasRailing": true,
-          "railingHeight": 1.0,
-        },
+          "railingHeight": 1.0
+        }
       ],
       "stairs": [
         {
           "id": "stair_001",
           "start": { "x": 2.0, "y": 0.0, "z": 4.0 },
-          "end": { "x": 2.0, "y": 3.2, "z": 8.0 },
+          "end":   { "x": 2.0, "y": 3.2, "z": 8.0 },
           "width": 1.5,
           "style": "straight",
           "material": "concrete_01",
-          "hasRailing": true,
-        },
+          "hasRailing": true
+        }
       ],
       "objects": [
         {
@@ -730,17 +691,17 @@ The canonical save/load format. All builders read exclusively from this structur
           "assetId": "prop_bench_01",
           "position": { "x": 2.0, "y": 0.0, "z": 3.0 },
           "rotation": { "x": 0, "y": 45, "z": 0 },
-          "scale": { "x": 1.0, "y": 1.0, "z": 1.0 },
+          "scale":    { "x": 1.0, "y": 1.0, "z": 1.0 },
           "floor": 0,
           "properties": {
             "interactable": false,
             "npcSpawn": false,
             "lootTableId": null,
-            "triggerEventId": null,
-          },
-        },
-      ],
-    },
+            "triggerEventId": null
+          }
+        }
+      ]
+    }
   ],
   "transitions": [
     {
@@ -752,9 +713,9 @@ The canonical save/load format. All builders read exclusively from this structur
       "effect": "fade",
       "fadeColor": "#000000",
       "fadeDuration": 0.3,
-      "spawnPoint": { "x": 1.0, "y": 0.0, "z": 1.0, "facing": 180 },
-    },
-  ],
+      "spawnPoint": { "x": 1.0, "y": 0.0, "z": 1.0, "facing": 180 }
+    }
+  ]
 }
 ```
 
@@ -771,91 +732,71 @@ class WorldState {
     this.metadata = {};
     this.world = {};
     this.terrain = null;
-    this.zones = new Map(); // zoneId → ZoneData
-    this.transitions = new Map(); // transitionId → TransitionData
+    this.zones = new Map();        // zoneId → ZoneData
+    this.transitions = new Map();  // transitionId → TransitionData
     this.activeZoneId = null;
   }
 
   // --- Zone mutations ---
   addZone(zoneData) {
     this.zones.set(zoneData.id, zoneData);
-    this.bus.emit("zone:added", { zone: zoneData });
+    this.bus.emit('zone:added', { zone: zoneData });
   }
   setActiveZone(zoneId) {
     this.activeZoneId = zoneId;
-    this.bus.emit("zone:activated", { zoneId });
+    this.bus.emit('zone:activated', { zoneId });
   }
 
   // --- Wall mutations ---
   addWall(zoneId, wallData) {
     this.zones.get(zoneId).walls.push(wallData);
-    this.bus.emit("wall:added", { zoneId, wall: wallData });
+    this.bus.emit('wall:added', { zoneId, wall: wallData });
   }
   updateWall(zoneId, wallId, changes) {
-    const wall = this.zones.get(zoneId).walls.find((w) => w.id === wallId);
+    const wall = this.zones.get(zoneId).walls.find(w => w.id === wallId);
     Object.assign(wall, changes);
-    this.bus.emit("wall:updated", { zoneId, wallId, changes });
+    this.bus.emit('wall:updated', { zoneId, wallId, changes });
   }
   removeWall(zoneId, wallId) {
     const zone = this.zones.get(zoneId);
-    zone.walls = zone.walls.filter((w) => w.id !== wallId);
-    this.bus.emit("wall:removed", { zoneId, wallId });
+    zone.walls = zone.walls.filter(w => w.id !== wallId);
+    this.bus.emit('wall:removed', { zoneId, wallId });
   }
   addOpening(zoneId, wallId, openingData) {
-    const wall = this.zones.get(zoneId).walls.find((w) => w.id === wallId);
+    const wall = this.zones.get(zoneId).walls.find(w => w.id === wallId);
     wall.openings.push(openingData);
-    this.bus.emit("wall:updated", {
-      zoneId,
-      wallId,
-      changes: { openings: wall.openings },
-    });
+    this.bus.emit('wall:updated', { zoneId, wallId, changes: { openings: wall.openings } });
   }
 
   // --- Floor mutations ---
   addFloor(zoneId, floorData) {
     this.zones.get(zoneId).floors.push(floorData);
-    this.bus.emit("floor:added", { zoneId, floor: floorData });
+    this.bus.emit('floor:added', { zoneId, floor: floorData });
   }
   updateFloor(zoneId, level, changes) {
-    const floor = this.zones.get(zoneId).floors.find((f) => f.level === level);
+    const floor = this.zones.get(zoneId).floors.find(f => f.level === level);
     Object.assign(floor, changes);
-    this.bus.emit("floor:updated", { zoneId, level, changes });
+    this.bus.emit('floor:updated', { zoneId, level, changes });
   }
 
   // --- Platform mutations ---
-  addPlatform(zoneId, data) {
-    /* push + emit 'platform:added' */
-  }
-  updatePlatform(zoneId, id, changes) {
-    /* find + assign + emit 'platform:updated' */
-  }
-  removePlatform(zoneId, id) {
-    /* filter + emit 'platform:removed' */
-  }
+  addPlatform(zoneId, data)          { /* push + emit 'platform:added' */ }
+  updatePlatform(zoneId, id, changes){ /* find + assign + emit 'platform:updated' */ }
+  removePlatform(zoneId, id)         { /* filter + emit 'platform:removed' */ }
 
   // --- Stair mutations ---
-  addStair(zoneId, data) {
-    /* push + emit 'stair:added' */
-  }
-  removeStair(zoneId, id) {
-    /* filter + emit 'stair:removed' */
-  }
+  addStair(zoneId, data)             { /* push + emit 'stair:added' */ }
+  removeStair(zoneId, id)            { /* filter + emit 'stair:removed' */ }
 
   // --- Object mutations ---
-  addObject(zoneId, data) {
-    /* push + emit 'object:added' */
-  }
-  updateObject(zoneId, id, changes) {
-    /* find + assign + emit 'object:updated' */
-  }
-  removeObject(zoneId, id) {
-    /* filter + emit 'object:removed' */
-  }
+  addObject(zoneId, data)            { /* push + emit 'object:added' */ }
+  updateObject(zoneId, id, changes)  { /* find + assign + emit 'object:updated' */ }
+  removeObject(zoneId, id)           { /* filter + emit 'object:removed' */ }
 
   // --- Transition mutations ---
   addTransition(transData) {
     this.transitions.set(transData.id, transData);
-    this.bus.emit("transition:added", { transition: transData });
+    this.bus.emit('transition:added', { transition: transData });
   }
 
   // --- Bulk load (called by WorldLoader) ---
@@ -865,10 +806,10 @@ class WorldState {
     this.terrain = json.terrain;
     this.zones.clear();
     this.transitions.clear();
-    json.zones.forEach((z) => this.zones.set(z.id, z));
-    json.transitions.forEach((t) => this.transitions.set(t.id, t));
+    json.zones.forEach(z => this.zones.set(z.id, z));
+    json.transitions.forEach(t => this.transitions.set(t.id, t));
     this.activeZoneId = json.zones[0]?.id || null;
-    this.bus.emit("world:loaded", { metadata: json.metadata });
+    this.bus.emit('world:loaded', { metadata: json.metadata });
   }
 
   // --- Snapshot (called by WorldSerializer) ---
@@ -893,28 +834,28 @@ Every Three.js mesh that participates in selection, raycasting, or collision **m
 ```js
 // Minimum required on ALL meshes
 mesh.userData = {
-  editorId: "wall_001", // matches data model id
-  editorType: "wall", // "wall"|"floor"|"platform"|"stair"|"object"|"terrain"|"trigger"|"trim"
-  zoneId: "zone_001",
-  selectable: true, // false for triggers, trim, terrain, helpers
-  floorLevel: 0, // which floor level (walls, floors, objects)
-  _ownsMaterial: false, // true if this mesh cloned the material (must dispose it)
-};
+  editorId:    "wall_001",      // matches data model id
+  editorType:  "wall",          // "wall"|"floor"|"platform"|"stair"|"object"|"terrain"|"trigger"|"trim"
+  zoneId:      "zone_001",
+  selectable:  true,            // false for triggers, trim, terrain, helpers
+  floorLevel:  0,               // which floor level (walls, floors, objects)
+  _ownsMaterial: false,         // true if this mesh cloned the material (must dispose it)
+}
 
 // Wall meshes add:
 mesh.userData.wallId = "wall_001";
 
 // Opening trigger volumes add:
-mesh.userData.triggerType = "door";
-mesh.userData.transitionId = "trans_001";
-mesh.userData.openingId = "opening_001";
-mesh.userData.selectable = false; // not selectable, only walkable trigger
+mesh.userData.triggerType     = "door";
+mesh.userData.transitionId    = "trans_001";
+mesh.userData.openingId       = "opening_001";
+mesh.userData.selectable      = false;         // not selectable, only walkable trigger
 
 // Object meshes add:
-mesh.userData.assetId = "prop_bench_01";
+mesh.userData.assetId         = "prop_bench_01";
 
 // Child meshes of GLTF objects add:
-mesh.userData._parentId = "obj_001"; // id of the root object group
+mesh.userData._parentId       = "obj_001";    // id of the root object group
 ```
 
 Builders tag child meshes too — GLTF models have deep mesh hierarchies that raycasting will hit. Every child gets `_parentId` so SelectionManager can resolve to the root object.
@@ -939,7 +880,6 @@ When a click ray intersects multiple meshes, priority order (highest first):
 Use **emissive tint** (not outline post-process — that requires EffectComposer, Phase 12+).
 
 On select:
-
 ```js
 // Clone material if shared (never mutate a shared material)
 if (!mesh.userData._ownsMaterial) {
@@ -953,7 +893,6 @@ mesh.material.emissiveIntensity = 0.25;
 ```
 
 On deselect:
-
 ```js
 mesh.material.emissive.set(mesh.userData._origEmissive ?? 0x000000);
 mesh.material.emissiveIntensity = mesh.userData._origEmissiveIntensity ?? 0;
@@ -978,34 +917,21 @@ class SelectionManager {
     this._mouse = new THREE.Vector2();
     this._selectedMesh = null;
     this._hoveredMesh = null;
-    this._activeTool = "select";
+    this._activeTool = 'select';
   }
 
   init() {
-    this._dom.addEventListener(
-      "click",
-      (this._onClick = this._onClick.bind(this)),
-    );
-    this._dom.addEventListener(
-      "mousemove",
-      (this._onMouseMove = this._onMouseMove.bind(this)),
-    );
-    this._bus.on("tool:select", ({ tool }) => {
-      this._activeTool = tool;
-    });
-    this._bus.on("object:updated", ({ id, zoneId, changes }) =>
-      this._onExternalUpdate(id, zoneId, changes),
-    );
+    this._dom.addEventListener('click', this._onClick = this._onClick.bind(this));
+    this._dom.addEventListener('mousemove', this._onMouseMove = this._onMouseMove.bind(this));
+    this._bus.on('tool:select', ({ tool }) => { this._activeTool = tool; });
+    this._bus.on('object:updated', ({ id, zoneId, changes }) => this._onExternalUpdate(id, zoneId, changes));
   }
 
   _onClick(e) {
-    if (this._activeTool !== "select") return;
+    if (this._activeTool !== 'select') return;
     const hits = this._castRay(e);
-    const selectable = hits.filter((h) => h.object.userData.selectable);
-    if (selectable.length === 0) {
-      this._deselect();
-      return;
-    }
+    const selectable = hits.filter(h => h.object.userData.selectable);
+    if (selectable.length === 0) { this._deselect(); return; }
     const best = this._pickByPriority(selectable);
     // Resolve GLTF child to root group
     const root = this._resolveRoot(best.object);
@@ -1013,17 +939,16 @@ class SelectionManager {
   }
 
   _onMouseMove(e) {
-    if (this._activeTool !== "select") return;
+    if (this._activeTool !== 'select') return;
     const hits = this._castRay(e);
-    const selectable = hits.filter((h) => h.object.userData.selectable);
-    const hovered = selectable.length
-      ? this._resolveRoot(this._pickByPriority(selectable).object)
-      : null;
+    const selectable = hits.filter(h => h.object.userData.selectable);
+    const hovered = selectable.length ? this._resolveRoot(this._pickByPriority(selectable).object) : null;
     if (hovered !== this._hoveredMesh) {
       if (this._hoveredMesh && this._hoveredMesh !== this._selectedMesh)
         this._clearHover(this._hoveredMesh);
       this._hoveredMesh = hovered;
-      if (hovered && hovered !== this._selectedMesh) this._applyHover(hovered);
+      if (hovered && hovered !== this._selectedMesh)
+        this._applyHover(hovered);
     }
   }
 
@@ -1033,18 +958,14 @@ class SelectionManager {
     this._selectedMesh = root;
     this._applySelect(root);
 
-    this._bus.emit("object:selected", {
-      id: root.userData.editorId,
-      type: root.userData.editorType,
-      zoneId: root.userData.zoneId,
+    this._bus.emit('object:selected', {
+      id:       root.userData.editorId,
+      type:     root.userData.editorType,
+      zoneId:   root.userData.zoneId,
       position: root.position.clone(),
-      rotation: {
-        x: THREE.MathUtils.radToDeg(root.rotation.x),
-        y: THREE.MathUtils.radToDeg(root.rotation.y),
-        z: THREE.MathUtils.radToDeg(root.rotation.z),
-      },
-      scale: root.scale.clone(),
-      data: this._getDataRecord(root),
+      rotation: { x: THREE.MathUtils.radToDeg(root.rotation.x), y: THREE.MathUtils.radToDeg(root.rotation.y), z: THREE.MathUtils.radToDeg(root.rotation.z) },
+      scale:    root.scale.clone(),
+      data:     this._getDataRecord(root),
     });
   }
 
@@ -1052,11 +973,11 @@ class SelectionManager {
     if (!this._selectedMesh) return;
     this._clearSelect(this._selectedMesh);
     this._selectedMesh = null;
-    this._bus.emit("object:deselected", {});
+    this._bus.emit('object:deselected', {});
   }
 
   _applySelect(root) {
-    root.traverse((child) => {
+    root.traverse(child => {
       if (!child.isMesh) return;
       if (!child.userData._ownsMaterial) {
         child.material = child.material.clone();
@@ -1070,16 +991,15 @@ class SelectionManager {
   }
 
   _clearSelect(root) {
-    root.traverse((child) => {
+    root.traverse(child => {
       if (!child.isMesh || !child.userData._ownsMaterial) return;
       child.material.emissive.set(child.userData._origEmissive ?? 0x000000);
-      child.material.emissiveIntensity =
-        child.userData._origEmissiveIntensity ?? 0;
+      child.material.emissiveIntensity = child.userData._origEmissiveIntensity ?? 0;
     });
   }
 
   _applyHover(root) {
-    root.traverse((child) => {
+    root.traverse(child => {
       if (!child.isMesh) return;
       if (!child.userData._ownsMaterial) {
         child.material = child.material.clone();
@@ -1092,7 +1012,7 @@ class SelectionManager {
   }
 
   _clearHover(root) {
-    root.traverse((child) => {
+    root.traverse(child => {
       if (!child.isMesh || !child.userData._ownsMaterial) return;
       child.material.emissive.set(child.userData._hoverEmissive ?? 0x000000);
       child.material.emissiveIntensity = 0;
@@ -1112,9 +1032,9 @@ class SelectionManager {
   }
 
   _pickByPriority(hits) {
-    const order = ["object", "platform", "wall", "floor"];
+    const order = ['object', 'platform', 'wall', 'floor'];
     for (const type of order) {
-      const hit = hits.find((h) => h.object.userData.editorType === type);
+      const hit = hits.find(h => h.object.userData.editorType === type);
       if (hit) return hit;
     }
     return hits[0];
@@ -1133,52 +1053,32 @@ class SelectionManager {
     const zone = this._worldState.zones.get(zoneId);
     if (!zone) return null;
     switch (editorType) {
-      case "wall":
-        return zone.walls.find((w) => w.id === editorId);
-      case "floor":
-        return zone.floors.find((f) => f.level === root.userData.floorLevel);
-      case "platform":
-        return zone.platforms.find((p) => p.id === editorId);
-      case "stair":
-        return zone.stairs.find((s) => s.id === editorId);
-      case "object":
-        return zone.objects.find((o) => o.id === editorId);
-      default:
-        return null;
+      case 'wall':     return zone.walls.find(w => w.id === editorId);
+      case 'floor':    return zone.floors.find(f => f.level === root.userData.floorLevel);
+      case 'platform': return zone.platforms.find(p => p.id === editorId);
+      case 'stair':    return zone.stairs.find(s => s.id === editorId);
+      case 'object':   return zone.objects.find(o => o.id === editorId);
+      default:         return null;
     }
   }
 
   _onExternalUpdate(id, zoneId, changes) {
     // React edited a field — apply transform changes directly to mesh if selected
-    if (!this._selectedMesh || this._selectedMesh.userData.editorId !== id)
-      return;
-    if (changes.position)
-      this._selectedMesh.position.set(
-        changes.position.x,
-        changes.position.y,
-        changes.position.z,
-      );
-    if (changes.rotation)
-      this._selectedMesh.rotation.set(
-        THREE.MathUtils.degToRad(changes.rotation.x),
-        THREE.MathUtils.degToRad(changes.rotation.y),
-        THREE.MathUtils.degToRad(changes.rotation.z),
-      );
-    if (changes.scale)
-      this._selectedMesh.scale.set(
-        changes.scale.x,
-        changes.scale.y,
-        changes.scale.z,
-      );
+    if (!this._selectedMesh || this._selectedMesh.userData.editorId !== id) return;
+    if (changes.position) this._selectedMesh.position.set(changes.position.x, changes.position.y, changes.position.z);
+    if (changes.rotation) this._selectedMesh.rotation.set(
+      THREE.MathUtils.degToRad(changes.rotation.x),
+      THREE.MathUtils.degToRad(changes.rotation.y),
+      THREE.MathUtils.degToRad(changes.rotation.z)
+    );
+    if (changes.scale) this._selectedMesh.scale.set(changes.scale.x, changes.scale.y, changes.scale.z);
   }
 
-  update(dt) {
-    /* gizmo update in Phase 7 */
-  }
+  update(dt) { /* gizmo update in Phase 7 */ }
 
   dispose() {
-    this._dom.removeEventListener("click", this._onClick);
-    this._dom.removeEventListener("mousemove", this._onMouseMove);
+    this._dom.removeEventListener('click', this._onClick);
+    this._dom.removeEventListener('mousemove', this._onMouseMove);
   }
 }
 ```
@@ -1188,7 +1088,7 @@ class SelectionManager {
 Use `THREE.TransformControls` from `three/addons/controls/TransformControls.js`:
 
 ```js
-import { TransformControls } from "three/addons/controls/TransformControls.js";
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 
 this._gizmo = new TransformControls(camera, domElement);
 scene.add(this._gizmo);
@@ -1198,28 +1098,24 @@ this._gizmo.attach(selectedMesh);
 
 // Key bindings
 // G = translate, R = rotate (Y-axis only for objects), S = scale uniform
-bus.on("input:keydown", ({ code }) => {
+bus.on('input:keydown', ({ code }) => {
   if (!this._selectedMesh) return;
-  if (code === "KeyG") this._gizmo.setMode("translate");
-  if (code === "KeyR") this._gizmo.setMode("rotate");
-  if (code === "KeyS") this._gizmo.setMode("scale");
+  if (code === 'KeyG') this._gizmo.setMode('translate');
+  if (code === 'KeyR') this._gizmo.setMode('rotate');
+  if (code === 'KeyS') this._gizmo.setMode('scale');
 });
 
 // Suppress camera during drag
-this._gizmo.addEventListener("dragging-changed", (e) => {
-  bus.emit("gizmo:dragging", { isDragging: e.value });
+this._gizmo.addEventListener('dragging-changed', e => {
+  bus.emit('gizmo:dragging', { isDragging: e.value });
 });
 
 // Write back to WorldState on drag end
-this._gizmo.addEventListener("objectChange", () => {
+this._gizmo.addEventListener('objectChange', () => {
   const mesh = this._selectedMesh;
   worldState.updateObject(mesh.userData.zoneId, mesh.userData.editorId, {
     position: mesh.position,
-    rotation: {
-      x: THREE.MathUtils.radToDeg(mesh.rotation.x),
-      y: THREE.MathUtils.radToDeg(mesh.rotation.y),
-      z: THREE.MathUtils.radToDeg(mesh.rotation.z),
-    },
+    rotation: { x: THREE.MathUtils.radToDeg(mesh.rotation.x), y: THREE.MathUtils.radToDeg(mesh.rotation.y), z: THREE.MathUtils.radToDeg(mesh.rotation.z) },
     scale: mesh.scale,
   });
 });
@@ -1239,53 +1135,53 @@ class EventBus {
 
 ### Full Event Table
 
-| Event                  | Direction          | Payload                                                 |
-| ---------------------- | ------------------ | ------------------------------------------------------- |
-| `tool:select`          | React → Three.js   | `{ tool: string }`                                      |
-| `floor:select`         | React → Three.js   | `{ level: number }`                                     |
-| `object:selected`      | Three.js → React   | `{ id, type, zoneId, position, rotation, scale, data }` |
-| `object:deselected`    | Three.js → React   | `{}`                                                    |
-| `object:updated`       | React → Three.js   | `{ id, zoneId, changes }`                               |
-| `asset:selected`       | React → Three.js   | `{ assetId }`                                           |
-| `asset:dropped`        | React → Three.js   | `{ assetId, screenPos }`                                |
-| `wall:added`           | internal           | `{ zoneId, wall }`                                      |
-| `wall:updated`         | internal           | `{ zoneId, wallId, changes }`                           |
-| `wall:removed`         | internal           | `{ zoneId, wallId }`                                    |
-| `floor:added`          | internal           | `{ zoneId, floor }`                                     |
-| `floor:updated`        | internal           | `{ zoneId, level, changes }`                            |
-| `platform:added`       | internal           | `{ zoneId, platform }`                                  |
-| `platform:updated`     | internal           | `{ zoneId, id, changes }`                               |
-| `platform:removed`     | internal           | `{ zoneId, id }`                                        |
-| `stair:added`          | internal           | `{ zoneId, stair }`                                     |
-| `stair:removed`        | internal           | `{ zoneId, id }`                                        |
-| `object:added`         | internal           | `{ zoneId, object }`                                    |
-| `object:removed`       | internal           | `{ zoneId, id }`                                        |
-| `zone:added`           | internal           | `{ zone }`                                              |
-| `zone:activated`       | internal           | `{ zoneId }`                                            |
-| `zone:enter`           | React → Three.js   | `{ zoneId }`                                            |
-| `transition:added`     | internal           | `{ transition }`                                        |
-| `preview:start`        | React → Three.js   | `{}`                                                    |
-| `preview:stop`         | Three.js → React   | `{}`                                                    |
-| `preview:zone-entered` | Three.js → React   | `{ zoneName }`                                          |
-| `gizmo:dragging`       | internal           | `{ isDragging: bool }`                                  |
-| `camera:jump`          | internal           | `{ x, z }`                                              |
-| `character:teleport`   | internal           | `{ position, facing }`                                  |
-| `overlay:fade-in`      | internal           | `{ color, duration }`                                   |
-| `overlay:fade-out`     | internal           | `{ duration }`                                          |
-| `scene:save`           | React → Three.js   | `{}`                                                    |
-| `scene:load`           | React → Three.js   | `{ json }`                                              |
-| `scene:saved`          | Three.js → React   | `{ json }`                                              |
-| `scene:loaded`         | Three.js → React   | `{ metadata }`                                          |
-| `world:loaded`         | internal           | `{ metadata }`                                          |
-| `terrain:sculpt`       | internal           | `{ x, z, radius, delta }`                               |
-| `input:click`          | InputManager → all | `{ screenPos, worldPos, button }`                       |
-| `input:dblclick`       | InputManager → all | `{ screenPos, worldPos }`                               |
-| `input:mousemove`      | InputManager → all | `{ screenPos, worldPos, delta }`                        |
-| `input:mousedown`      | InputManager → all | `{ button, screenPos }`                                 |
-| `input:mouseup`        | InputManager → all | `{ button, screenPos }`                                 |
-| `input:wheel`          | InputManager → all | `{ delta }`                                             |
-| `input:keydown`        | InputManager → all | `{ code, key, shift, ctrl, alt }`                       |
-| `input:keyup`          | InputManager → all | `{ code }`                                              |
+| Event | Direction | Payload |
+|---|---|---|
+| `tool:select` | React → Three.js | `{ tool: string }` |
+| `floor:select` | React → Three.js | `{ level: number }` |
+| `object:selected` | Three.js → React | `{ id, type, zoneId, position, rotation, scale, data }` |
+| `object:deselected` | Three.js → React | `{}` |
+| `object:updated` | React → Three.js | `{ id, zoneId, changes }` |
+| `asset:selected` | React → Three.js | `{ assetId }` |
+| `asset:dropped` | React → Three.js | `{ assetId, screenPos }` |
+| `wall:added` | internal | `{ zoneId, wall }` |
+| `wall:updated` | internal | `{ zoneId, wallId, changes }` |
+| `wall:removed` | internal | `{ zoneId, wallId }` |
+| `floor:added` | internal | `{ zoneId, floor }` |
+| `floor:updated` | internal | `{ zoneId, level, changes }` |
+| `platform:added` | internal | `{ zoneId, platform }` |
+| `platform:updated` | internal | `{ zoneId, id, changes }` |
+| `platform:removed` | internal | `{ zoneId, id }` |
+| `stair:added` | internal | `{ zoneId, stair }` |
+| `stair:removed` | internal | `{ zoneId, id }` |
+| `object:added` | internal | `{ zoneId, object }` |
+| `object:removed` | internal | `{ zoneId, id }` |
+| `zone:added` | internal | `{ zone }` |
+| `zone:activated` | internal | `{ zoneId }` |
+| `zone:enter` | React → Three.js | `{ zoneId }` |
+| `transition:added` | internal | `{ transition }` |
+| `preview:start` | React → Three.js | `{}` |
+| `preview:stop` | Three.js → React | `{}` |
+| `preview:zone-entered` | Three.js → React | `{ zoneName }` |
+| `gizmo:dragging` | internal | `{ isDragging: bool }` |
+| `camera:jump` | internal | `{ x, z }` |
+| `character:teleport` | internal | `{ position, facing }` |
+| `overlay:fade-in` | internal | `{ color, duration }` |
+| `overlay:fade-out` | internal | `{ duration }` |
+| `scene:save` | React → Three.js | `{}` |
+| `scene:load` | React → Three.js | `{ json }` |
+| `scene:saved` | Three.js → React | `{ json }` |
+| `scene:loaded` | Three.js → React | `{ metadata }` |
+| `world:loaded` | internal | `{ metadata }` |
+| `terrain:sculpt` | internal | `{ x, z, radius, delta }` |
+| `input:click` | InputManager → all | `{ screenPos, worldPos, button }` |
+| `input:dblclick` | InputManager → all | `{ screenPos, worldPos }` |
+| `input:mousemove` | InputManager → all | `{ screenPos, worldPos, delta }` |
+| `input:mousedown` | InputManager → all | `{ button, screenPos }` |
+| `input:mouseup` | InputManager → all | `{ button, screenPos }` |
+| `input:wheel` | InputManager → all | `{ delta }` |
+| `input:keydown` | InputManager → all | `{ code, key, shift, ctrl, alt }` |
+| `input:keyup` | InputManager → all | `{ code }` |
 
 ---
 
@@ -1303,56 +1199,27 @@ class InputManager {
     this._mousePos = new THREE.Vector2();
     this._groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this._raycaster = new THREE.Raycaster();
-    this._suppress = false; // set true during transitions
+    this._suppress = false;  // set true during transitions
   }
 
   init() {
-    this._dom.addEventListener(
-      "mousedown",
-      (this._md = (e) => this._onMouseDown(e)),
-    );
-    this._dom.addEventListener(
-      "mousemove",
-      (this._mm = (e) => this._onMouseMove(e)),
-    );
-    this._dom.addEventListener(
-      "mouseup",
-      (this._mu = (e) => this._onMouseUp(e)),
-    );
-    this._dom.addEventListener("click", (this._mc = (e) => this._onClick(e)));
-    this._dom.addEventListener(
-      "dblclick",
-      (this._dc = (e) => this._onDblClick(e)),
-    );
-    this._dom.addEventListener("wheel", (this._mw = (e) => this._onWheel(e)), {
-      passive: false,
-    });
-    this._dom.addEventListener(
-      "contextmenu",
-      (this._cx = (e) => e.preventDefault()),
-    );
-    window.addEventListener("keydown", (this._kd = (e) => this._onKeyDown(e)));
-    window.addEventListener("keyup", (this._ku = (e) => this._onKeyUp(e)));
-    this._bus.on("overlay:fade-in", () => {
-      this._suppress = true;
-    });
-    this._bus.on("overlay:fade-out", () => {
-      this._suppress = false;
-    });
+    this._dom.addEventListener('mousedown',   this._md = e => this._onMouseDown(e));
+    this._dom.addEventListener('mousemove',   this._mm = e => this._onMouseMove(e));
+    this._dom.addEventListener('mouseup',     this._mu = e => this._onMouseUp(e));
+    this._dom.addEventListener('click',       this._mc = e => this._onClick(e));
+    this._dom.addEventListener('dblclick',    this._dc = e => this._onDblClick(e));
+    this._dom.addEventListener('wheel',       this._mw = e => this._onWheel(e), { passive: false });
+    this._dom.addEventListener('contextmenu', this._cx = e => e.preventDefault());
+    window.addEventListener('keydown',        this._kd = e => this._onKeyDown(e));
+    window.addEventListener('keyup',          this._ku = e => this._onKeyUp(e));
+    this._bus.on('overlay:fade-in',  () => { this._suppress = true; });
+    this._bus.on('overlay:fade-out', () => { this._suppress = false; });
   }
 
-  get isShiftDown() {
-    return !!(this._keys["ShiftLeft"] || this._keys["ShiftRight"]);
-  }
-  get isAltDown() {
-    return !!(this._keys["AltLeft"] || this._keys["AltRight"]);
-  }
-  get isCtrlDown() {
-    return !!(this._keys["ControlLeft"] || this._keys["ControlRight"]);
-  }
-  isKeyDown(code) {
-    return !!this._keys[code];
-  }
+  get isShiftDown() { return !!(this._keys['ShiftLeft'] || this._keys['ShiftRight']); }
+  get isAltDown()   { return !!(this._keys['AltLeft']   || this._keys['AltRight']); }
+  get isCtrlDown()  { return !!(this._keys['ControlLeft'] || this._keys['ControlRight']); }
+  isKeyDown(code)   { return !!this._keys[code]; }
 
   _worldPos(event) {
     const rect = this._dom.getBoundingClientRect();
@@ -1366,72 +1233,37 @@ class InputManager {
 
   _onMouseDown(e) {
     if (this._suppress) return;
-    this._bus.emit("input:mousedown", {
-      button: e.button,
-      screenPos: { x: e.clientX, y: e.clientY },
-    });
+    this._bus.emit('input:mousedown', { button: e.button, screenPos: { x: e.clientX, y: e.clientY } });
   }
   _onMouseMove(e) {
     if (this._suppress) return;
     const worldPos = this._worldPos(e);
-    this._bus.emit("input:mousemove", {
+    this._bus.emit('input:mousemove', {
       screenPos: { x: e.clientX, y: e.clientY },
       worldPos,
       delta: { x: e.movementX, y: e.movementY },
     });
   }
-  _onMouseUp(e) {
-    if (!this._suppress)
-      this._bus.emit("input:mouseup", {
-        button: e.button,
-        screenPos: { x: e.clientX, y: e.clientY },
-      });
-  }
-  _onClick(e) {
-    if (!this._suppress)
-      this._bus.emit("input:click", {
-        screenPos: { x: e.clientX, y: e.clientY },
-        worldPos: this._worldPos(e),
-        button: e.button,
-      });
-  }
-  _onDblClick(e) {
-    if (!this._suppress)
-      this._bus.emit("input:dblclick", {
-        screenPos: { x: e.clientX, y: e.clientY },
-        worldPos: this._worldPos(e),
-      });
-  }
-  _onWheel(e) {
-    e.preventDefault();
-    if (!this._suppress) this._bus.emit("input:wheel", { delta: e.deltaY });
-  }
-  _onKeyDown(e) {
+  _onMouseUp(e)    { if (!this._suppress) this._bus.emit('input:mouseup',   { button: e.button, screenPos: { x: e.clientX, y: e.clientY } }); }
+  _onClick(e)      { if (!this._suppress) this._bus.emit('input:click',     { screenPos: { x: e.clientX, y: e.clientY }, worldPos: this._worldPos(e), button: e.button }); }
+  _onDblClick(e)   { if (!this._suppress) this._bus.emit('input:dblclick',  { screenPos: { x: e.clientX, y: e.clientY }, worldPos: this._worldPos(e) }); }
+  _onWheel(e)      { e.preventDefault(); if (!this._suppress) this._bus.emit('input:wheel', { delta: e.deltaY }); }
+  _onKeyDown(e)    {
     this._keys[e.code] = true;
-    if (!this._suppress)
-      this._bus.emit("input:keydown", {
-        code: e.code,
-        key: e.key,
-        shift: e.shiftKey,
-        ctrl: e.ctrlKey,
-        alt: e.altKey,
-      });
+    if (!this._suppress) this._bus.emit('input:keydown', { code: e.code, key: e.key, shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey });
   }
-  _onKeyUp(e) {
-    delete this._keys[e.code];
-    if (!this._suppress) this._bus.emit("input:keyup", { code: e.code });
-  }
+  _onKeyUp(e)      { delete this._keys[e.code]; if (!this._suppress) this._bus.emit('input:keyup', { code: e.code }); }
 
   dispose() {
-    this._dom.removeEventListener("mousedown", this._md);
-    this._dom.removeEventListener("mousemove", this._mm);
-    this._dom.removeEventListener("mouseup", this._mu);
-    this._dom.removeEventListener("click", this._mc);
-    this._dom.removeEventListener("dblclick", this._dc);
-    this._dom.removeEventListener("wheel", this._mw);
-    this._dom.removeEventListener("contextmenu", this._cx);
-    window.removeEventListener("keydown", this._kd);
-    window.removeEventListener("keyup", this._ku);
+    this._dom.removeEventListener('mousedown',   this._md);
+    this._dom.removeEventListener('mousemove',   this._mm);
+    this._dom.removeEventListener('mouseup',     this._mu);
+    this._dom.removeEventListener('click',       this._mc);
+    this._dom.removeEventListener('dblclick',    this._dc);
+    this._dom.removeEventListener('wheel',       this._mw);
+    this._dom.removeEventListener('contextmenu', this._cx);
+    window.removeEventListener('keydown',        this._kd);
+    window.removeEventListener('keyup',          this._ku);
   }
 }
 ```
@@ -1442,18 +1274,18 @@ class InputManager {
 
 ### Controls
 
-| Input             | Action                                           |
-| ----------------- | ------------------------------------------------ |
-| Right-click drag  | Orbit around focus point                         |
-| Middle-click drag | Pan focus point on XZ plane                      |
-| WASD / Arrow keys | Pan focus point on XZ plane                      |
-| Scroll wheel      | Zoom in/out                                      |
-| Q / E             | Snap rotate 45° left / right                     |
-| F                 | Frame selected object (focus on its AABB center) |
-| `[` / `]`         | Previous / next floor level                      |
-| P                 | Enter preview mode                               |
-| Esc               | Exit preview                                     |
-| Home              | Reset to default position                        |
+| Input | Action |
+|---|---|
+| Right-click drag | Orbit around focus point |
+| Middle-click drag | Pan focus point on XZ plane |
+| WASD / Arrow keys | Pan focus point on XZ plane |
+| Scroll wheel | Zoom in/out |
+| Q / E | Snap rotate 45° left / right |
+| F | Frame selected object (focus on its AABB center) |
+| `[` / `]` | Previous / next floor level |
+| P | Enter preview mode |
+| Esc | Exit preview |
+| Home | Reset to default position |
 
 ### Implementation
 
@@ -1483,12 +1315,10 @@ Disable all camera inputs when `gizmo:dragging` = true (subscribe to bus).
 ### Floor Clip Plane
 
 When active floor level > 0:
-
 ```js
 const clipY = zone.floors[level].elevation + zone.floors[level].ceilingHeight;
 renderer.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, -1, 0), clipY)];
 ```
-
 When floor 0 is active: `renderer.clippingPlanes = []`.
 
 Lower floor meshes: set `material.opacity = 0.2`, `material.transparent = true` on all meshes with `floorLevel < activeLevel`. Restore on floor change.
@@ -1561,7 +1391,6 @@ Return {
 ### Corner Joining
 
 Adjacent walls sharing a corner must be trimmed to avoid overlap:
-
 1. Query `worldState.zones.get(zoneId).walls` for other walls sharing `start` or `end` point
 2. For each shared corner, shorten this wall by `thickness / 2` at that end
 3. This produces a clean mitered visual join
@@ -1570,7 +1399,6 @@ Adjacent walls sharing a corner must be trimmed to avoid overlap:
 ### Incremental Rebuild
 
 When `wall:updated` fires on bus:
-
 1. `ZoneManager` finds the existing mesh group for this wall
 2. Calls `dispose()` on old meshes (geometry + owned materials)
 3. Calls `WallBuilder.build(newWallDef, zone)` for fresh meshes
@@ -2132,11 +1960,11 @@ Step 9: Clicking a linked door opening in editor → TransitionManager.editorJum
 ```js
 class AssetManager {
   constructor() {
-    this._textureCache = new Map();
+    this._textureCache  = new Map();
     this._materialCache = new Map();
-    this._gltfCache = new Map();
+    this._gltfCache     = new Map();
     this._textureLoader = new THREE.TextureLoader();
-    this._gltfLoader = null;
+    this._gltfLoader    = null;
   }
 
   async loadTexture(url) {
@@ -2149,15 +1977,14 @@ class AssetManager {
   }
 
   async getMaterial(materialId) {
-    if (this._materialCache.has(materialId))
-      return this._materialCache.get(materialId);
+    if (this._materialCache.has(materialId)) return this._materialCache.get(materialId);
     const def = MATERIAL_REGISTRY[materialId];
     if (!def) {
       console.warn(`Unknown material: ${materialId}, using default`);
       return new THREE.MeshStandardMaterial({ color: 0x888888 });
     }
     const mat = new THREE.MeshStandardMaterial({
-      map: await this.loadTexture(def.texture),
+      map:       await this.loadTexture(def.texture),
       roughness: def.roughness ?? 0.8,
       metalness: def.metalness ?? 0.0,
     });
@@ -2169,19 +1996,17 @@ class AssetManager {
   async loadGLTF(assetId) {
     if (this._gltfCache.has(assetId)) return this._gltfCache.get(assetId);
     if (!this._gltfLoader) {
-      const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
       this._gltfLoader = new GLTFLoader();
     }
-    const gltf = await this._gltfLoader.loadAsync(
-      `/assets/models/${assetId}.glb`,
-    );
+    const gltf = await this._gltfLoader.loadAsync(`/assets/models/${assetId}.glb`);
     this._gltfCache.set(assetId, gltf);
     return gltf;
   }
 
   dispose() {
-    this._textureCache.forEach((t) => t.dispose());
-    this._materialCache.forEach((m) => m.dispose());
+    this._textureCache.forEach(t => t.dispose());
+    this._materialCache.forEach(m => m.dispose());
     this._textureCache.clear();
     this._materialCache.clear();
     this._gltfCache.clear();
@@ -2190,36 +2015,11 @@ class AssetManager {
 
 // Material registry — add entries as textures are added to /assets/textures/
 const MATERIAL_REGISTRY = {
-  brick_01: {
-    texture: "/assets/textures/brick_01.jpg",
-    tileWidth: 1.0,
-    tileHeight: 1.0,
-    roughness: 0.9,
-  },
-  brick_exterior_01: {
-    texture: "/assets/textures/brick_ext_01.jpg",
-    tileWidth: 1.0,
-    tileHeight: 1.0,
-    roughness: 0.85,
-  },
-  cobblestone: {
-    texture: "/assets/textures/cobblestone_01.jpg",
-    tileWidth: 1.0,
-    tileHeight: 1.0,
-    roughness: 0.95,
-  },
-  wood_planks: {
-    texture: "/assets/textures/wood_planks_01.jpg",
-    tileWidth: 0.8,
-    tileHeight: 0.8,
-    roughness: 0.7,
-  },
-  concrete_01: {
-    texture: "/assets/textures/concrete_01.jpg",
-    tileWidth: 2.0,
-    tileHeight: 2.0,
-    roughness: 0.8,
-  },
+  brick_01:          { texture: '/assets/textures/brick_01.jpg',      tileWidth: 1.0, tileHeight: 1.0, roughness: 0.9 },
+  brick_exterior_01: { texture: '/assets/textures/brick_ext_01.jpg',  tileWidth: 1.0, tileHeight: 1.0, roughness: 0.85 },
+  cobblestone:       { texture: '/assets/textures/cobblestone_01.jpg',tileWidth: 1.0, tileHeight: 1.0, roughness: 0.95 },
+  wood_planks:       { texture: '/assets/textures/wood_planks_01.jpg',tileWidth: 0.8, tileHeight: 0.8, roughness: 0.7 },
+  concrete_01:       { texture: '/assets/textures/concrete_01.jpg',   tileWidth: 2.0, tileHeight: 2.0, roughness: 0.8 },
 };
 ```
 
@@ -2228,6 +2028,7 @@ const MATERIAL_REGISTRY = {
 ## CollisionWorld.ts
 
 > **Superseded by Rapier (Phase 3).** Replaced by `src/physics/PhysicsWorld.ts` + `src/physics/ColliderBuilder.ts`. `three-mesh-bvh`'s `computeBoundsTree()` is still called on visual meshes for **editor raycasting** (selection, snapping) — but all runtime collision is Rapier. See the **Physics Architecture** section for full implementation details.
+
 
 ## CharacterController.ts
 
@@ -2249,23 +2050,17 @@ class CharacterController {
     this._position.copy(position);
     this._velocity.set(0, 0, 0);
     this._active = true;
-    this._bus.on(
-      "input:mousemove",
-      (this._onMouseMove = ({ delta }) => {
-        if (document.pointerLockElement) {
-          this._yaw -= delta.x * 0.002;
-          this._pitch = Math.max(
-            -1.4,
-            Math.min(1.4, this._pitch - delta.y * 0.002),
-          );
-        }
-      }),
-    );
+    this._bus.on('input:mousemove', this._onMouseMove = ({ delta }) => {
+      if (document.pointerLockElement) {
+        this._yaw   -= delta.x * 0.002;
+        this._pitch  = Math.max(-1.4, Math.min(1.4, this._pitch - delta.y * 0.002));
+      }
+    });
   }
 
   despawn() {
     this._active = false;
-    this._bus.off("input:mousemove", this._onMouseMove);
+    this._bus.off('input:mousemove', this._onMouseMove);
   }
 
   update(dt) {
@@ -2273,21 +2068,13 @@ class CharacterController {
 
     // --- Input ---
     const s = this._settings;
-    const fwd = new THREE.Vector3(
-      -Math.sin(this._yaw),
-      0,
-      -Math.cos(this._yaw),
-    );
-    const right = new THREE.Vector3(
-      -Math.cos(this._yaw),
-      0,
-      Math.sin(this._yaw),
-    );
-    const move = new THREE.Vector3();
-    if (this._input.isKeyDown("KeyW")) move.add(fwd);
-    if (this._input.isKeyDown("KeyS")) move.sub(fwd);
-    if (this._input.isKeyDown("KeyA")) move.sub(right);
-    if (this._input.isKeyDown("KeyD")) move.add(right);
+    const fwd  = new THREE.Vector3(-Math.sin(this._yaw), 0, -Math.cos(this._yaw));
+    const right = new THREE.Vector3(-Math.cos(this._yaw), 0,  Math.sin(this._yaw));
+    const move  = new THREE.Vector3();
+    if (this._input.isKeyDown('KeyW')) move.add(fwd);
+    if (this._input.isKeyDown('KeyS')) move.sub(fwd);
+    if (this._input.isKeyDown('KeyA')) move.sub(right);
+    if (this._input.isKeyDown('KeyD')) move.add(right);
     if (move.lengthSq() > 0) move.normalize().multiplyScalar(s.moveSpeed);
 
     this._velocity.x = move.x;
@@ -2297,10 +2084,7 @@ class CharacterController {
     this._velocity.y -= 20 * dt;
 
     // --- Ground check ---
-    const groundY = this._collisionWorld.getGroundHeight(
-      this._position.x,
-      this._position.z,
-    );
+    const groundY = this._collisionWorld.getGroundHeight(this._position.x, this._position.z);
     const feetY = this._position.y - this._capsuleHeight / 2;
     if (feetY <= groundY) {
       this._position.y = groundY + this._capsuleHeight / 2;
@@ -2311,7 +2095,7 @@ class CharacterController {
     }
 
     // --- Jump ---
-    if (this._grounded && this._input.isKeyDown("Space")) {
+    if (this._grounded && this._input.isKeyDown('Space')) {
       this._velocity.y = Math.sqrt(2 * 20 * s.jumpHeight);
     }
 
@@ -2319,35 +2103,29 @@ class CharacterController {
     this._position.addScaledVector(this._velocity, dt);
 
     // --- Camera ---
-    if (s.cameraMode === "fps") {
+    if (s.cameraMode === 'fps') {
       this._camera.position.set(
         this._position.x,
         this._position.y + this._capsuleHeight * 0.4,
-        this._position.z,
+        this._position.z
       );
-      this._camera.rotation.order = "YXZ";
+      this._camera.rotation.order = 'YXZ';
       this._camera.rotation.y = this._yaw;
       this._camera.rotation.x = this._pitch;
     } else {
       const offset = new THREE.Vector3(
         -Math.sin(this._yaw) * s.thirdPersonDistance,
         s.thirdPersonHeight,
-        -Math.cos(this._yaw) * s.thirdPersonDistance,
+        -Math.cos(this._yaw) * s.thirdPersonDistance
       );
       this._camera.position.copy(this._position).add(offset);
-      this._camera.lookAt(
-        this._position.x,
-        this._position.y + 1.0,
-        this._position.z,
-      );
+      this._camera.lookAt(this._position.x, this._position.y + 1.0, this._position.z);
     }
 
     // --- Trigger check ---
     const trigger = this._collisionWorld.checkTriggers(this._position);
-    if (trigger?.triggerType === "door" && trigger.transitionId) {
-      this._bus.emit("character:triggerdoor", {
-        transitionId: trigger.transitionId,
-      });
+    if (trigger?.triggerType === 'door' && trigger.transitionId) {
+      this._bus.emit('character:triggerdoor', { transitionId: trigger.transitionId });
     }
   }
 }
@@ -2458,7 +2236,7 @@ class WorldSerializer {
     // Encode terrain heightData to base64
     if (state.terrain?.heightData instanceof Float32Array) {
       state.terrain.heightData = btoa(
-        String.fromCharCode(...new Uint8Array(state.terrain.heightData.buffer)),
+        String.fromCharCode(...new Uint8Array(state.terrain.heightData.buffer))
       );
     }
     return state;
@@ -2466,25 +2244,19 @@ class WorldSerializer {
 
   download(worldState) {
     const json = JSON.stringify(this.serialize(worldState), null, 2);
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement("a"), {
-      href: url,
-      download: `${worldState.metadata.name || "world"}.json`,
-    });
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${worldState.metadata.name || 'world'}.json` });
     a.click();
     URL.revokeObjectURL(url);
   }
 
   autoSave(worldState) {
     try {
-      localStorage.setItem(
-        "worldeditor_autosave",
-        JSON.stringify(this.serialize(worldState)),
-      );
-      localStorage.setItem("worldeditor_autosave_time", Date.now());
+      localStorage.setItem('worldeditor_autosave', JSON.stringify(this.serialize(worldState)));
+      localStorage.setItem('worldeditor_autosave_time', Date.now());
     } catch (e) {
-      console.warn("Auto-save failed (storage quota?)", e);
+      console.warn('Auto-save failed (storage quota?)', e);
     }
   }
 }
@@ -2495,8 +2267,7 @@ class WorldSerializer {
 ```js
 class WorldLoader {
   async load(json, worldState, zoneManager) {
-    if (!json?.metadata?.version)
-      throw new Error("Invalid or missing scene file version");
+    if (!json?.metadata?.version) throw new Error('Invalid or missing scene file version');
 
     // Unload all current zones
     for (const zoneId of worldState.zones.keys()) {
@@ -2504,10 +2275,7 @@ class WorldLoader {
     }
 
     // Decode terrain heightData base64 → Float32Array
-    if (
-      json.terrain?.heightData &&
-      typeof json.terrain.heightData === "string"
-    ) {
+    if (json.terrain?.heightData && typeof json.terrain.heightData === 'string') {
       const binary = atob(json.terrain.heightData);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -2522,12 +2290,12 @@ class WorldLoader {
       await zoneManager.loadZone(json.zones[0].id);
     }
 
-    this._bus.emit("scene:loaded", { metadata: json.metadata });
+    this._bus.emit('scene:loaded', { metadata: json.metadata });
   }
 
   checkAutoSave() {
-    const saved = localStorage.getItem("worldeditor_autosave");
-    const time = localStorage.getItem("worldeditor_autosave_time");
+    const saved = localStorage.getItem('worldeditor_autosave');
+    const time  = localStorage.getItem('worldeditor_autosave_time');
     if (!saved || !time) return null;
     return { json: JSON.parse(saved), age: Date.now() - Number(time) };
   }
@@ -2544,12 +2312,7 @@ Auto-save: `setInterval(() => serializer.autoSave(worldState), 60_000)` started 
 class TerrainBuilder {
   static build(terrainDef, worldSize) {
     const { resolution, heightData, maxHeight, layerMaterials } = terrainDef;
-    const geo = new THREE.PlaneGeometry(
-      worldSize,
-      worldSize,
-      resolution - 1,
-      resolution - 1,
-    );
+    const geo = new THREE.PlaneGeometry(worldSize, worldSize, resolution - 1, resolution - 1);
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -2561,14 +2324,11 @@ class TerrainBuilder {
     geo.computeVertexNormals();
 
     // Multi-layer material — basic MeshStandardMaterial for now (Phase 11 adds shader blending)
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x3a5c2a,
-      roughness: 0.95,
-    });
+    const mat = new THREE.MeshStandardMaterial({ color: 0x3a5c2a, roughness: 0.95 });
 
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
-    mesh.userData = { editorType: "terrain", selectable: false };
+    mesh.userData = { editorType: 'terrain', selectable: false };
 
     // BVH for ground collision in preview mode
     geo.computeBoundsTree();
@@ -2588,7 +2348,7 @@ class TerrainBuilder {
       const vz = pos.getZ(i);
       const dist = Math.hypot(vx - worldX, vz - worldZ);
       if (dist < radius) {
-        const falloff = 1 - dist / radius;
+        const falloff = 1 - (dist / radius);
         const newY = Math.max(0, pos.getY(i) + delta * falloff);
         pos.setY(i, newY);
       }
@@ -2605,7 +2365,7 @@ class TerrainBuilder {
 ## utils/math.ts
 
 ```js
-import * as THREE from "three";
+import * as THREE from 'three';
 
 export const snapToGrid = (val, unit = 0.5) => Math.round(val / unit) * unit;
 
@@ -2614,10 +2374,7 @@ export const snapVec3XZ = (v, unit = 0.5) =>
 
 export const dist2D = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
 
-export const midpoint2D = (a, b) => ({
-  x: (a.x + b.x) / 2,
-  z: (a.z + b.z) / 2,
-});
+export const midpoint2D = (a, b) => ({ x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 });
 
 export const angleXZ = (a, b) => Math.atan2(b.z - a.z, b.x - a.x);
 
@@ -2638,8 +2395,8 @@ export const normalizeRect = (a, b) => ({
 export const screenToWorld = (event, camera, domElement, planeY = 0) => {
   const rect = domElement.getBoundingClientRect();
   const mouse = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    ((event.clientX - rect.left) / rect.width)  * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1
   );
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
@@ -2673,7 +2430,7 @@ export const uuid = () =>
 ## utils/csg.ts
 
 ```js
-import { Brush, Evaluator, SUBTRACTION } from "three-bvh-csg";
+import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 
 let _evaluator = null;
 const getEvaluator = () => {
@@ -2708,7 +2465,6 @@ export const csgSubtract = (meshA, meshB) => {
 ## Build Phases
 
 ### Phase 1 — Scene Foundation ✅
-
 - Vite + React + TypeScript scaffold
 - SceneManager (scene, renderer, RAF loop with registered update callbacks)
 - EditorCamera (orbit, pan, zoom, smooth lerp, WASD)
@@ -2717,7 +2473,6 @@ export const csgSubtract = (meshA, meshB) => {
 - React UI shell: Toolbar with SVG icons, PropertiesPanel stub, FloorLevelSelector, coordinate display
 
 ### Phase 2 — Selection System ✅
-
 - InputManager (centralized events, suppress flag)
 - `userData as MeshUserData` tagging on all demo meshes
 - SelectionManager: BVH raycast, priority ordering, emissive highlight (select + hover), GLTF child resolution
@@ -2726,11 +2481,9 @@ export const csgSubtract = (meshA, meshB) => {
 - Deselect on empty click
 
 ### Phase 3 — Physics Foundation + Sky + Floor Tool
-
 Rapier goes in here, not later. Every subsequent builder depends on it.
 
 **Sky setup (SceneManager addition):**
-
 - Import `Sky` from `three/addons/objects/Sky.js`
 - Add `THREE.Sky` mesh to scene, scale to `450000`
 - Expose `skyUniforms`: `turbidity`, `rayleigh`, `mieCoefficient`, `mieDirectionalG`, `sunPosition`
@@ -2742,19 +2495,18 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
   ```ts
   // Add to WorldConfig in types.ts
   sky: {
-    turbidity: number; // default 10 — atmospheric haze
-    rayleigh: number; // default 3  — sky blueness
-    mieCoefficient: number; // default 0.005
-    mieDirectionalG: number; // default 0.7
-    sunElevation: number; // degrees above horizon, default 25
-    sunAzimuth: number; // degrees, default 180
+    turbidity:           number;  // default 10 — atmospheric haze
+    rayleigh:            number;  // default 3  — sky blueness
+    mieCoefficient:      number;  // default 0.005
+    mieDirectionalG:     number;  // default 0.7
+    sunElevation:        number;  // degrees above horizon, default 25
+    sunAzimuth:          number;  // degrees, default 180
   }
   ```
 - When sky params change (editor scrubbing): rebuild PMREMGenerator env map, update `DirectionalLight` position to match new sun angles
 - Remove the hardcoded `scene.background = new THREE.Color(0x1a1f2e)` and `scene.fog` from Phase 1 SceneManager — sky replaces background, fog color should be derived from sky
 
 **Physics setup:**
-
 - `npm install @dimforge/rapier3d-compat`
 - `PhysicsWorld.ts`: init Rapier WASM, create world with gravity `(0, -9.81, 0)`, step in RAF loop after Three.js update
 - `ColliderBuilder.ts`: utility that takes a Three.js mesh + type and registers a matching Rapier collider
@@ -2767,7 +2519,6 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - Rapier world lives in `src/physics/PhysicsWorld.ts` — imported by builders, NOT by React components
 
 **Floor Tool:**
-
 - WorldState (floor mutations only)
 - FloorBuilder: rect → PlaneGeometry + UV + `ColliderBuilder.registerFloor(mesh, floorDef)`
 - AssetManager: texture loading, material cache, MATERIAL_REGISTRY
@@ -2778,15 +2529,509 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 **Collider lifecycle rule:** Every builder `build()` call returns collider handles alongside meshes. ZoneManager stores these. On rebuild or removal, ZoneManager calls `physicsWorld.removeCollider(handle)` before disposing the mesh.
 
 ### Phase 4 — Wall Tool
-
 - WallBuilder: BoxGeometry, orientation, UV tiling, trim pieces, corner joining, `userData` tagging
 - WallBuilder registers Rapier cuboid colliders per wall segment via `ColliderBuilder` (one per gap between openings — no collider where a door/window will be cut)
 - WallTool: click-chain state machine, ghost wall, length label, angle snap (Shift)
 - ZoneManager: wall rebuild on `wall:added`/`wall:updated`/`wall:removed` — removes old colliders, registers new ones
 - PropertiesPanel: height, thickness, material → `object:updated` → ZoneManager rebuilds wall + re-registers colliders
 
-### Phase 5 — Openings (Doors & Windows)
+### Phase 4.5 — Material System
 
+Sits between Phase 4 (walls working) and Phase 5 (openings). Once complete, every surface in the editor — walls, floors, platforms, stairs, and any future geometry — uses the same material pipeline. Nothing about this phase needs to be revisited later.
+
+#### Applies To
+
+Every builder that produces a visible mesh:
+- `WallBuilder` — wall body, trim pieces
+- `FloorBuilder` — floor slabs
+- `PlatformBuilder` — platform slabs, railings
+- `StairBuilder` — step meshes, railings
+- `TerrainBuilder` (Phase 11) — terrain surface
+- `ObjectPlacer` (Phase 7) — static prop surfaces where materials are overridable
+
+#### File Naming Convention
+
+All textures live in `public/assets/textures/<material_id>/`. Each map is a separate file named by suffix. This is the canonical naming spec — `AssetManager` derives all paths from the material ID and these suffixes automatically.
+
+```
+public/
+  assets/
+    textures/
+      brick_01/
+        albedo.jpg       ← base color / diffuse (required)
+        normal.jpg       ← normal map (optional)
+        roughness.jpg    ← roughness map (optional, grayscale)
+        metalness.jpg    ← metalness map (optional, grayscale)
+        ao.jpg           ← ambient occlusion (optional, grayscale)
+        displacement.jpg ← displacement/height map (optional, grayscale)
+      concrete_01/
+        albedo.jpg
+        normal.jpg
+        roughness.jpg
+        ao.jpg
+      wood_planks_01/
+        albedo.jpg
+        normal.jpg
+        roughness.jpg
+      cobblestone_01/
+        albedo.jpg
+        normal.jpg
+        roughness.jpg
+        ao.jpg
+```
+
+**Where to get textures:** Polyhaven (polyhaven.com) — free CC0, download at 1K or 2K resolution, rename maps to match the convention above. Every Polyhaven material provides all six map types.
+
+**Resolution guidance:**
+- `1K` (1024×1024) — good default, fine for most surfaces at normal viewing distance
+- `2K` (2048×2048) — use for hero surfaces seen up close (floors you walk on, walls at eye level)
+- `4K` — avoid in the editor, too expensive for a tool
+
+#### Updated MATERIAL_REGISTRY
+
+```ts
+// src/materials.ts
+
+export interface MaterialMapConfig {
+  enabled:  boolean;   // toggle in UI — disabled maps are not loaded
+  path:     string;    // derived automatically: /assets/textures/<id>/<suffix>.jpg
+}
+
+export interface MaterialDef {
+  id:            string;
+  label:         string;         // display name in AssetBrowser / PropertiesPanel
+  tileScale:     number;         // UV repeat per meter, default 1.0
+  // PBR scalars (used when map is disabled or absent)
+  roughnessVal:  number;         // 0–1
+  metalnessVal:  number;         // 0–1
+  displacementScale: number;     // meters, default 0.05 — only matters if displacement enabled
+  // Per-map toggles
+  maps: {
+    albedo:      MaterialMapConfig;   // always enabled
+    normal:      MaterialMapConfig;
+    roughness:   MaterialMapConfig;
+    metalness:   MaterialMapConfig;
+    ao:          MaterialMapConfig;
+    displacement:MaterialMapConfig;   // off by default — expensive
+  };
+}
+
+export const MATERIAL_REGISTRY: Record<string, MaterialDef> = {
+  brick_01: {
+    id: 'brick_01', label: 'Brick',
+    tileScale: 1.0, roughnessVal: 0.9, metalnessVal: 0.0, displacementScale: 0.03,
+    maps: {
+      albedo:      { enabled: true,  path: '/assets/textures/brick_01/albedo.jpg' },
+      normal:      { enabled: true,  path: '/assets/textures/brick_01/normal.jpg' },
+      roughness:   { enabled: true,  path: '/assets/textures/brick_01/roughness.jpg' },
+      metalness:   { enabled: false, path: '/assets/textures/brick_01/metalness.jpg' },
+      ao:          { enabled: true,  path: '/assets/textures/brick_01/ao.jpg' },
+      displacement:{ enabled: false, path: '/assets/textures/brick_01/displacement.jpg' },
+    },
+  },
+  concrete_01: {
+    id: 'concrete_01', label: 'Concrete',
+    tileScale: 2.0, roughnessVal: 0.85, metalnessVal: 0.0, displacementScale: 0.02,
+    maps: {
+      albedo:      { enabled: true,  path: '/assets/textures/concrete_01/albedo.jpg' },
+      normal:      { enabled: true,  path: '/assets/textures/concrete_01/normal.jpg' },
+      roughness:   { enabled: true,  path: '/assets/textures/concrete_01/roughness.jpg' },
+      metalness:   { enabled: false, path: '/assets/textures/concrete_01/metalness.jpg' },
+      ao:          { enabled: true,  path: '/assets/textures/concrete_01/ao.jpg' },
+      displacement:{ enabled: false, path: '/assets/textures/concrete_01/displacement.jpg' },
+    },
+  },
+  wood_planks_01: {
+    id: 'wood_planks_01', label: 'Wood Planks',
+    tileScale: 0.8, roughnessVal: 0.7, metalnessVal: 0.0, displacementScale: 0.01,
+    maps: {
+      albedo:      { enabled: true,  path: '/assets/textures/wood_planks_01/albedo.jpg' },
+      normal:      { enabled: true,  path: '/assets/textures/wood_planks_01/normal.jpg' },
+      roughness:   { enabled: true,  path: '/assets/textures/wood_planks_01/roughness.jpg' },
+      metalness:   { enabled: false, path: '/assets/textures/wood_planks_01/metalness.jpg' },
+      ao:          { enabled: false, path: '/assets/textures/wood_planks_01/ao.jpg' },
+      displacement:{ enabled: false, path: '/assets/textures/wood_planks_01/displacement.jpg' },
+    },
+  },
+  cobblestone_01: {
+    id: 'cobblestone_01', label: 'Cobblestone',
+    tileScale: 0.5, roughnessVal: 0.95, metalnessVal: 0.0, displacementScale: 0.04,
+    maps: {
+      albedo:      { enabled: true,  path: '/assets/textures/cobblestone_01/albedo.jpg' },
+      normal:      { enabled: true,  path: '/assets/textures/cobblestone_01/normal.jpg' },
+      roughness:   { enabled: true,  path: '/assets/textures/cobblestone_01/roughness.jpg' },
+      metalness:   { enabled: false, path: '/assets/textures/cobblestone_01/metalness.jpg' },
+      ao:          { enabled: true,  path: '/assets/textures/cobblestone_01/ao.jpg' },
+      displacement:{ enabled: false, path: '/assets/textures/cobblestone_01/displacement.jpg' },
+    },
+  },
+};
+```
+
+#### Updated AssetManager.getMaterial()
+
+```ts
+async getMaterial(
+  materialId: string,
+  overrides?: Partial<MaterialDef>,        // per-instance overrides from WorldState
+  qualityScale?: QualityScale              // global quality setting
+): Promise<THREE.MeshStandardMaterial> {
+
+  const cacheKey = `${materialId}_${qualityScale ?? 'high'}`;
+  if (this._materialCache.has(cacheKey)) return this._materialCache.get(cacheKey)!;
+
+  const def = { ...MATERIAL_REGISTRY[materialId], ...overrides };
+  if (!def) {
+    console.warn(`Unknown material: ${materialId}`);
+    return new THREE.MeshStandardMaterial({ color: 0x888888 });
+  }
+
+  const load = async (mapDef: MaterialMapConfig): Promise<THREE.Texture> => {
+    const tex = await this._textureLoader.loadAsync(mapDef.path);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    // Quality scaling — downscale by halving anisotropy and capping resolution
+    tex.anisotropy = qualityScale === 'low' ? 1 : qualityScale === 'medium' ? 4 : this._renderer.capabilities.getMaxAnisotropy();
+    tex.minFilter = qualityScale === 'low' ? THREE.LinearFilter : THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = qualityScale !== 'low';
+    return tex;
+  };
+
+  const mat = new THREE.MeshStandardMaterial({
+    roughness: def.roughnessVal,
+    metalness: def.metalnessVal,
+  });
+
+  // Load only enabled maps
+  if (def.maps.albedo.enabled)
+    mat.map = await load(def.maps.albedo);
+
+  if (def.maps.normal.enabled)
+    mat.normalMap = await load(def.maps.normal);
+
+  if (def.maps.roughness.enabled)
+    mat.roughnessMap = await load(def.maps.roughness);
+
+  if (def.maps.metalness.enabled)
+    mat.metalnessMap = await load(def.maps.metalness);
+
+  if (def.maps.ao.enabled)
+    mat.aoMap = await load(def.maps.ao);
+
+  if (def.maps.displacement.enabled) {
+    mat.displacementMap = await load(def.maps.displacement);
+    mat.displacementScale = def.displacementScale;
+    // NOTE: displacement requires subdivided geometry to have any effect.
+    // Builders must check if displacement is enabled and increase geometry
+    // segments accordingly (see Displacement section below).
+  }
+
+  // UV tiling applied at geometry level via repeat — see builders
+  this._materialCache.set(cacheKey, mat);
+  return mat;
+}
+```
+
+#### Displacement — Special Handling
+
+Displacement actually moves vertices, so it requires subdivided geometry. Flat boxes with 1 segment per face show no effect.
+
+When `displacement.enabled === true` for a material:
+- `WallBuilder` uses `BoxGeometry(length, height, thickness, Math.ceil(length * 4), Math.ceil(height * 4), 1)` — 4 segments per meter
+- `FloorBuilder` uses `PlaneGeometry(w, d, Math.ceil(w * 4), Math.ceil(d * 4))`
+- `PlatformBuilder` same as floor
+- `StairBuilder` — displacement disabled, steps are too small to subdivide usefully
+
+**Default is off.** Displacement is the most expensive map. Enable only for hero surfaces where close-up detail matters. A normal map gives 90% of the visual benefit at a fraction of the cost.
+
+#### Quality Scale System
+
+```ts
+// src/types.ts addition
+export type QualityScale = 'low' | 'medium' | 'high';
+
+export interface QualitySettings {
+  textureScale:    QualityScale;   // controls anisotropy, mipmaps, filter mode
+  shadowMapSize:   number;         // 512 | 1024 | 2048
+  shadowsEnabled:  boolean;
+  fogEnabled:      boolean;
+  antialias:       boolean;        // set at renderer init — requires restart to change
+}
+
+export const QUALITY_PRESETS: Record<QualityScale, QualitySettings> = {
+  low: {
+    textureScale:  'low',
+    shadowMapSize:  512,
+    shadowsEnabled: false,
+    fogEnabled:     false,
+    antialias:      false,
+  },
+  medium: {
+    textureScale:  'medium',
+    shadowMapSize:  1024,
+    shadowsEnabled: true,
+    fogEnabled:     true,
+    antialias:      false,
+  },
+  high: {
+    textureScale:  'high',
+    shadowMapSize:  2048,
+    shadowsEnabled: true,
+    fogEnabled:     true,
+    antialias:      true,
+  },
+};
+```
+
+Quality settings stored in `WorldConfig` (not the scene file — it's a user preference, not world data). Persisted to `localStorage` independently of save/load.
+
+When quality changes:
+1. Clear `AssetManager` material cache
+2. Reload all materials for the active zone at new quality level
+3. Update `renderer.shadowMap.mapSize` (requires `renderer.shadowMap.needsUpdate = true`)
+4. Toggle fog on scene
+5. Antialias requires renderer recreation — warn user, offer page reload
+
+#### Per-Surface Material Overrides
+
+Each wall, floor, platform, stair in WorldState can carry per-instance map overrides:
+
+```ts
+// Addition to WallDef, FloorDef, PlatformDef, StairDef in types.ts
+materialOverrides?: {
+  maps?: Partial<Record<keyof MaterialDef['maps'], { enabled: boolean }>>;
+  tileScale?:         number;
+  roughnessVal?:      number;
+  displacementScale?: number;
+};
+```
+
+This lets you disable normal maps on a specific wall that's far away, or crank up tileScale on a large floor without touching the global registry.
+
+#### PropertiesPanel — Material Section
+
+When a wall, floor, platform, or stair is selected, the Properties Panel shows a **Material** section:
+
+```
+MATERIAL
+┌─────────────────────────────────┐
+│ [Brick ▾]          Tile: [1.0]  │  ← material picker + tile scale
+├─────────────────────────────────┤
+│ MAPS                            │
+│ [✓] Albedo                      │
+│ [✓] Normal                      │
+│ [✓] Roughness      val: [0.9]   │  ← scalar shown when map disabled
+│ [ ] Metalness      val: [0.0]   │
+│ [✓] AO                          │
+│ [ ] Displacement   val: [0.03]  │  ← scale shown when enabled
+├─────────────────────────────────┤
+│ QUALITY                         │
+│ ○ Low  ● Medium  ○ High         │  ← global, not per-surface
+└─────────────────────────────────┘
+```
+
+Toggling a map checkbox:
+1. React emits `object:updated { id, zoneId, changes: { materialOverrides: { maps: { normal: { enabled: false } } } } }`
+2. Three.js side calls `worldState.updateWall()` → `wall:updated` fires
+3. ZoneManager detects material-only change → calls `AssetManager.getMaterial()` with new overrides → swaps material on mesh without full geometry rebuild
+4. No flicker — material swap is instant
+
+Changing the material picker (e.g. Brick → Concrete):
+- Same flow but full material replacement
+- If new material has displacement enabled and old didn't (or vice versa): geometry rebuild required (different segment count)
+- Otherwise: material swap only
+
+#### Performance Notes for Claude Code
+
+- Never call `getMaterial()` inside the RAF loop — materials are loaded once and cached
+- `aoMap` requires a second UV set (`uv2`) on the geometry — builders must call `geometry.setAttribute('uv2', geometry.attributes.uv)` when AO is enabled
+- Displacement on walls with CSG openings: run CSG first on unsubdivided geometry, then subdivide the result — CSG on high-segment geometry is very slow
+- Texture memory: a single 2K RGBA texture = ~16MB GPU memory. With 6 maps × 2K = ~96MB per material. Keep an eye on total materials loaded. The quality system's cache clear helps with this.
+- `THREE.DefaultLoadingManager` can be used to show a loading indicator while textures load on zone switch
+
+### Phase 4.6 — Wall Graph
+
+Sits between Phase 4.5 (material system) and Phase 5 (openings). Retrofits a node-based connection system onto the wall data model so that walls can share corners, corner geometry trimming works reliably, and the foundation exists for rooms and connected wall manipulation later.
+
+#### Why Before Phase 5
+
+Openings (doors, windows) are placed at an offset along a wall. If walls are later restructured to use nodes, all opening offset calculations need revisiting. Better to have the correct data model in place before adding that complexity.
+
+#### Data Model Changes
+
+Replace raw `start`/`end` coordinates on `WallDef` with node ID references. Add a `nodes` array to `ZoneDef`.
+
+```ts
+// Addition to ZoneDef in types.ts
+nodes: WallNode[];
+
+// New type in types.ts
+export interface WallNode {
+  id:  string;
+  x:   number;
+  z:   number;
+}
+
+// WallDef — replace start/end with node references
+// BEFORE:
+// start: Vec2;
+// end:   Vec2;
+// AFTER:
+startNodeId: string;
+endNodeId:   string;
+```
+
+Two walls sharing a corner reference the same `WallNode` ID. No coordinate comparison needed — connection is explicit in the data.
+
+#### WorldState Changes
+
+```ts
+// New mutations on WorldState
+addNode(zoneId: string, node: WallNode): void
+updateNode(zoneId: string, nodeId: string, pos: { x: number; z: number }): void
+removeNode(zoneId: string, nodeId: string): void   // only if no walls reference it
+getNode(zoneId: string, nodeId: string): WallNode
+getWallsAtNode(zoneId: string, nodeId: string): WallDef[]  // all walls referencing this node
+
+// updateNode emits 'node:updated' { zoneId, nodeId, pos }
+// ZoneManager listens and rebuilds ALL walls referencing that node
+```
+
+#### WallTool — Endpoint Snapping
+
+When placing a wall start or end point, check proximity to existing nodes:
+
+```
+On click (placing wall endpoint):
+  1. Get all existing nodes in active zone
+  2. Find closest node within snap radius (0.5m)
+  3. If found:
+       reuse that node's ID as startNodeId/endNodeId
+       snap cursor position to that node's exact coordinates
+  4. If not found:
+       create new WallNode { id: uuid(), x: snapped.x, z: snapped.z }
+       worldState.addNode(zoneId, newNode)
+       use new node's ID
+
+Visual feedback:
+  - Existing nodes render as small dots (visible only when WallTool is active)
+  - Dot highlights when cursor is within snap radius
+  - Cursor snaps visually before click confirms
+  - Snap radius indicator ring shown around highlighted node
+```
+
+Node dots are editor-only helpers — not selectable, not saved as geometry, invisible in preview mode.
+
+#### WallBuilder Changes
+
+WallBuilder no longer reads `wall.start` / `wall.end` directly. It receives node positions as resolved coordinates:
+
+```ts
+// WallBuilder.build() signature change
+static build(
+  wall:      WallDef,
+  zone:      ZoneDef,        // used to resolve node positions
+  nodes:     Map<string, WallNode>  // passed in, not looked up internally
+): WallBuildResult
+
+// Inside build():
+const start = nodes.get(wall.startNodeId)!;
+const end   = nodes.get(wall.endNodeId)!;
+// rest of build logic unchanged
+```
+
+#### Corner Joining — Now Reliable
+
+With shared node IDs, corner detection is exact:
+
+```ts
+// In WallBuilder, before computing geometry:
+const connectedAtStart = zone.walls.filter(w =>
+  w.id !== wall.id &&
+  (w.startNodeId === wall.startNodeId || w.endNodeId === wall.startNodeId)
+);
+const connectedAtEnd = zone.walls.filter(w =>
+  w.id !== wall.id &&
+  (w.startNodeId === wall.endNodeId || w.endNodeId === wall.endNodeId)
+);
+
+// Shorten wall by thickness/2 at each connected end
+// This eliminates visible overlap at corners — guaranteed to fire
+// because connection is by ID, not by coordinate proximity
+if (connectedAtStart.length > 0) startOffset += wall.thickness / 2;
+if (connectedAtEnd.length > 0)   endOffset   += wall.thickness / 2;
+```
+
+No floating point comparison. No missed corners. Overlap at wall joins is eliminated.
+
+#### ColliderBuilder Changes
+
+Same as WallBuilder — resolves node positions from the nodes map before computing collider positions. No other changes needed.
+
+#### WorldLoader — Migration
+
+Old scene files store `start`/`end` as raw `Vec2`. WorldLoader detects and migrates on load:
+
+```ts
+// In WorldLoader, after parsing JSON:
+for (const zone of json.zones) {
+  if (!zone.nodes) zone.nodes = [];
+
+  for (const wall of zone.walls) {
+    // Detect old format
+    if ('start' in wall && 'end' in wall) {
+      // Find or create node for start position
+      let startNode = zone.nodes.find(n =>
+        Math.abs(n.x - (wall as any).start.x) < 0.001 &&
+        Math.abs(n.z - (wall as any).start.z) < 0.001
+      );
+      if (!startNode) {
+        startNode = { id: uuid(), x: (wall as any).start.x, z: (wall as any).start.z };
+        zone.nodes.push(startNode);
+      }
+
+      // Find or create node for end position
+      let endNode = zone.nodes.find(n =>
+        Math.abs(n.x - (wall as any).end.x) < 0.001 &&
+        Math.abs(n.z - (wall as any).end.z) < 0.001
+      );
+      if (!endNode) {
+        endNode = { id: uuid(), x: (wall as any).end.x, z: (wall as any).end.z };
+        zone.nodes.push(endNode);
+      }
+
+      wall.startNodeId = startNode.id;
+      wall.endNodeId   = endNode.id;
+      delete (wall as any).start;
+      delete (wall as any).end;
+    }
+  }
+}
+```
+
+Two old walls that happened to share the same coordinates get the same node — preserving any accidental connections from Phase 4 work.
+
+#### What This Does NOT Include Yet
+
+- Dragging a node to stretch connected walls (SelectionManager + node gizmo — Phase 12)
+- Room detection from closed wall loops (Phase 12+)
+- Any UI panel showing node data — nodes are invisible infrastructure
+- Merging two nearby nodes that aren't exactly equal (snap-merge tool — Phase 12)
+
+#### Summary of Changes
+
+| File | Change |
+|---|---|
+| `src/types.ts` | Add `WallNode`, add `nodes` to `ZoneDef`, update `WallDef` |
+| `src/world/WorldState.ts` | Add node mutations, `getWallsAtNode()` |
+| `src/world/WorldLoader.ts` | Migration from old `start`/`end` format |
+| `src/builders/WallBuilder.ts` | Resolve nodes from map, reliable corner joining |
+| `src/physics/ColliderBuilder.ts` | Resolve nodes from map |
+| `src/editor/WallTool.ts` | Snap detection, node creation/reuse, node dot rendering |
+
+
+
+### Phase 5 — Openings (Doors & Windows)
 - CSG integration via `utils/csg.ts` (three-bvh-csg) — visual mesh only
 - WallBuilder: CSG subtract openings from visual mesh; collision geometry is **separate** (no CSG on physics — split wall into segments around openings instead)
 - "Add Opening" → `addOpening` → `wall:updated` → WallBuilder rebuilds visual + re-registers split collision segments
@@ -2796,7 +3041,6 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - TransitionTool skeleton: door openings show "Link zone..." option
 
 ### Phase 6 — Multi-Floor
-
 - FloorLevelSelector fully functional (tabs G/1/2/3)
 - ZoneManager: floor dimming (opacity 0.15 for non-active), clip plane for active floor
 - PlatformTool + PlatformBuilder: slab + railings + `ColliderBuilder.registerPlatform()`
@@ -2804,7 +3048,6 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - All new geometry assigned to active floor level, colliders positioned at correct world Y
 
 ### Phase 7 — Object Placement
-
 - ObjectPlacer + GLTF loading via AssetManager
 - Static prop objects get optional simplified Rapier colliders (box approximation from AABB) — toggled by a `collidable` flag in asset registry
 - AssetBrowser: placeholder colored boxes as stand-in assets (real GLTFs in Phase 12)
@@ -2814,7 +3057,6 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - Objects stored in WorldState, selectable, editable in PropertiesPanel
 
 ### Phase 8 — Zones & Transitions
-
 - ZoneTool: rect draw, naming dialog, zone list population
 - ZonePanel UI fully functional
 - ZoneManager: multi-zone load/unload — on unload, ALL colliders for that zone are removed from Rapier world
@@ -2823,7 +3065,6 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - Editor zone jump (camera teleport) on door click
 
 ### Phase 9 — Save / Load
-
 - WorldSerializer: toJSON, download (colliders are not serialised — they are always rebuilt from geometry data on load)
 - WorldLoader: JSON → WorldState → full mesh + collider rebuild
 - SaveLoadPanel UI
@@ -2831,11 +3072,9 @@ Rapier goes in here, not later. Every subsequent builder depends on it.
 - Encoding/decoding of Float32Array terrain data
 
 ### Phase 10 — Preview Mode (Character Controller)
-
 The preview camera is for checking the space, not gameplay. The character controller is built on Rapier's `KinematicCharacterController` so it is immediately game-ready.
 
 **`CharacterBody.ts`** — wraps Rapier KCC:
-
 ```ts
 // Init
 const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased();
@@ -2843,37 +3082,29 @@ this._body = world.createRigidBody(bodyDesc);
 const colliderDesc = RAPIER.ColliderDesc.capsule(height / 2 - radius, radius);
 this._collider = world.createCollider(colliderDesc, this._body);
 this._kcc = world.createCharacterController(0.01); // 1cm offset
-this._kcc.enableAutostep(0.5, 0.2, true); // max step height 0.5m
+this._kcc.enableAutostep(0.5, 0.2, true);          // max step height 0.5m
 this._kcc.enableSnapToGround(0.3);
 this._kcc.setSlideEnabled(true);
 
 // Per frame
-const corrected = this._kcc.computeColliderMovement(
-  this._collider,
-  desiredMovement,
-);
+const corrected = this._kcc.computeColliderMovement(this._collider, desiredMovement);
 const newPos = this._body.translation();
-newPos.x += corrected.x;
-newPos.y += corrected.y;
-newPos.z += corrected.z;
+newPos.x += corrected.x; newPos.y += corrected.y; newPos.z += corrected.z;
 this._body.setNextKinematicTranslation(newPos);
 ```
 
 **`CharacterController.ts`** — input + camera, delegates to CharacterBody:
-
 - Reads WASD + mouse look
 - Computes `desiredMovement` vector (includes gravity accumulation)
 - Passes to `CharacterBody.move(desiredMovement)`
 - Reads corrected position back from `CharacterBody.position` and updates Three.js camera
 
 **`TriggerSystem.ts`** — door detection:
-
 - Each door opening has a Rapier sensor collider (registered in Phase 5)
 - Each frame: `world.intersectionsWith(characterCollider, (other) => { ... })`
 - When character sensor overlaps door sensor: emit `character:triggerdoor { transitionId }`
 
 **`PreviewController.ts`**:
-
 - `enter()`: pointer lock, spawn CharacterBody at editor camera focus, register update callback
 - `exit()`: pointer lock release, remove CharacterBody from Rapier world, restore editor camera
 - Camera modes (FPS / third-person) both read position from CharacterBody — configurable from `playerSettings`
@@ -2881,7 +3112,6 @@ this._body.setNextKinematicTranslation(newPos);
 **PreviewHUD**: crosshair, zone name toast, floor indicator, Esc hint
 
 ### Phase 11 — Terrain
-
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)
 - Terrain Rapier collider: `ColliderDesc.heightfield(res, res, heightData, { x: worldSize, y: maxHeight, z: worldSize })`
 - Terrain sculpt tool: raise/lower brush, on stroke end rebuild both Three.js geometry AND Rapier heightfield collider
@@ -2890,7 +3120,6 @@ this._body.setNextKinematicTranslation(newPos);
 - Road tool: spline control points → flat corridor on terrain
 
 ### Phase 12 — Polish
-
 - L-shape and spiral stair styles in StairBuilder (each with correct per-step colliders)
 - Outline post-process selection highlight (EffectComposer + OutlinePass, replaces emissive tint)
 - Wall exterior material (material array on BoxGeometry for inside/outside faces)
@@ -2906,9 +3135,9 @@ this._body.setNextKinematicTranslation(newPos);
 
 ### Two Tools, Two Jobs
 
-| Tool                        | Used For                                                                                                       | Not Used For                  |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `three-mesh-bvh`            | Editor raycasting (selection, snapping, surface detection), terrain sculpt queries                             | Any runtime physics           |
+| Tool | Used For | Not Used For |
+|---|---|---|
+| `three-mesh-bvh` | Editor raycasting (selection, snapping, surface detection), terrain sculpt queries | Any runtime physics |
 | `@dimforge/rapier3d-compat` | All runtime: character movement, wall/floor collision, stair step-up, door sensors, future NPC/enemy colliders | Editor visual mesh generation |
 
 These never replace each other. BVH makes the editor fast. Rapier makes the world physically correct at runtime.
@@ -2929,12 +3158,8 @@ export class PhysicsWorld {
     this._initialized = true;
   }
 
-  get world(): RAPIER.World {
-    return this._world;
-  }
-  get initialized(): boolean {
-    return this._initialized;
-  }
+  get world(): RAPIER.World { return this._world; }
+  get initialized(): boolean { return this._initialized; }
 
   // Called by SceneManager RAF loop, after Three.js render
   step(dt: number): void {
@@ -2976,131 +3201,81 @@ export const physicsWorld = new PhysicsWorld();
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "./PhysicsWorld.ts";
-import type {
-  WallDef,
-  FloorDef,
-  PlatformDef,
-  StairDef,
-  Opening,
-} from "../types.ts";
+import type { WallDef, FloorDef, PlatformDef, StairDef, Opening } from "../types.ts";
 
 export class ColliderBuilder {
+
   // Floor slab — thin box at floor elevation
-  static registerFloor(
-    bounds: { x: number; z: number; width: number; depth: number },
-    elevation: number,
-  ): RAPIER.Collider {
-    const desc = RAPIER.ColliderDesc.cuboid(
-      bounds.width / 2,
-      0.05,
-      bounds.depth / 2,
-    ).setTranslation(
-      bounds.x + bounds.width / 2,
-      elevation - 0.05,
-      bounds.z + bounds.depth / 2,
-    );
+  static registerFloor(bounds: { x: number; z: number; width: number; depth: number }, elevation: number): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc
+      .cuboid(bounds.width / 2, 0.05, bounds.depth / 2)
+      .setTranslation(
+        bounds.x + bounds.width / 2,
+        elevation - 0.05,
+        bounds.z + bounds.depth / 2
+      );
     return physicsWorld.createStaticCollider(desc);
   }
 
   // Wall — split into segments around openings, one cuboid per solid segment
   // Returns one collider per segment (gaps at door/window positions have no collider)
-  static registerWallSegments(
-    wall: WallDef,
-    elevation: number,
-  ): RAPIER.Collider[] {
-    const length = Math.hypot(
-      wall.end.x - wall.start.x,
-      wall.end.z - wall.start.z,
-    );
-    const angle = Math.atan2(
-      wall.end.z - wall.start.z,
-      wall.end.x - wall.start.x,
-    );
-    const midX = (wall.start.x + wall.end.x) / 2;
-    const midZ = (wall.start.z + wall.end.z) / 2;
+  static registerWallSegments(wall: WallDef, elevation: number): RAPIER.Collider[] {
+    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.z - wall.start.z);
+    const angle  = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
+    const midX   = (wall.start.x + wall.end.x) / 2;
+    const midZ   = (wall.start.z + wall.end.z) / 2;
 
     // Build list of solid segments between openings
-    const sorted: Opening[] = [...wall.openings].sort(
-      (a, b) => a.offsetAlongWall - b.offsetAlongWall,
-    );
+    const sorted: Opening[] = [...wall.openings].sort((a, b) => a.offsetAlongWall - b.offsetAlongWall);
     const segments: Array<{ start: number; end: number }> = [];
     let cursor = 0;
     for (const opening of sorted) {
-      if (opening.offsetAlongWall > cursor)
-        segments.push({ start: cursor, end: opening.offsetAlongWall });
+      if (opening.offsetAlongWall > cursor) segments.push({ start: cursor, end: opening.offsetAlongWall });
       cursor = opening.offsetAlongWall + opening.width;
     }
     if (cursor < length) segments.push({ start: cursor, end: length });
 
-    return segments.map((seg) => {
-      const segLen = seg.end - seg.start;
-      const segMid = seg.start + segLen / 2 - length / 2; // offset from wall center
+    return segments.map(seg => {
+      const segLen  = seg.end - seg.start;
+      const segMid  = seg.start + segLen / 2 - length / 2; // offset from wall center
       const wx = midX + Math.cos(angle) * segMid;
       const wz = midZ + Math.sin(angle) * segMid;
-      const desc = RAPIER.ColliderDesc.cuboid(
-        segLen / 2,
-        wall.height / 2,
-        wall.thickness / 2,
-      )
+      const desc = RAPIER.ColliderDesc
+        .cuboid(segLen / 2, wall.height / 2, wall.thickness / 2)
         .setTranslation(wx, elevation + wall.height / 2, wz)
-        .setRotation({
-          x: 0,
-          y: Math.sin(-angle / 2),
-          z: 0,
-          w: Math.cos(-angle / 2),
-        });
+        .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
       return physicsWorld.createStaticCollider(desc);
     });
   }
 
   // Platform slab
   static registerPlatform(platform: PlatformDef): RAPIER.Collider {
-    const desc = RAPIER.ColliderDesc.cuboid(
-      platform.size.width / 2,
-      platform.thickness / 2,
-      platform.size.depth / 2,
-    ).setTranslation(
-      platform.position.x,
-      platform.position.y + platform.thickness / 2,
-      platform.position.z,
-    );
+    const desc = RAPIER.ColliderDesc
+      .cuboid(platform.size.width / 2, platform.thickness / 2, platform.size.depth / 2)
+      .setTranslation(platform.position.x, platform.position.y + platform.thickness / 2, platform.position.z);
     return physicsWorld.createStaticCollider(desc);
   }
 
   // Stairs — one cuboid per step
   static registerStairSteps(stair: StairDef): RAPIER.Collider[] {
-    const heightDiff = stair.end.y - stair.start.y;
-    const horizDist = Math.hypot(
-      stair.end.x - stair.start.x,
-      stair.end.z - stair.start.z,
-    );
-    const angle = Math.atan2(
-      stair.end.z - stair.start.z,
-      stair.end.x - stair.start.x,
-    );
-    const stepHeight = 0.2;
-    const numSteps = Math.max(1, Math.round(heightDiff / stepHeight));
-    const stepDepth = horizDist / numSteps;
+    const heightDiff  = stair.end.y - stair.start.y;
+    const horizDist   = Math.hypot(stair.end.x - stair.start.x, stair.end.z - stair.start.z);
+    const angle       = Math.atan2(stair.end.z - stair.start.z, stair.end.x - stair.start.x);
+    const stepHeight  = 0.2;
+    const numSteps    = Math.max(1, Math.round(heightDiff / stepHeight));
+    const stepDepth   = horizDist / numSteps;
     const colliders: RAPIER.Collider[] = [];
 
     for (let i = 0; i < numSteps; i++) {
       const t = (i + 0.5) / numSteps;
-      const desc = RAPIER.ColliderDesc.cuboid(
-        stair.width / 2,
-        stepHeight / 2,
-        stepDepth / 2,
-      )
+      const desc = RAPIER.ColliderDesc
+        .cuboid(stair.width / 2, stepHeight / 2, stepDepth / 2)
         .setTranslation(
           stair.start.x + (stair.end.x - stair.start.x) * t,
           stair.start.y + (i + 0.5) * stepHeight,
-          stair.start.z + (stair.end.z - stair.start.z) * t,
+          stair.start.z + (stair.end.z - stair.start.z) * t
         )
-        .setRotation({
-          x: 0,
-          y: Math.sin(-angle / 2),
-          z: 0,
-          w: Math.cos(-angle / 2),
-        });
+        .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
       colliders.push(physicsWorld.createStaticCollider(desc));
     }
     return colliders;
@@ -3110,35 +3285,19 @@ export class ColliderBuilder {
   static registerDoorSensor(
     wall: WallDef,
     opening: Opening,
-    elevation: number,
+    elevation: number
   ): RAPIER.Collider {
-    const angle = Math.atan2(
-      wall.end.z - wall.start.z,
-      wall.end.x - wall.start.x,
-    );
-    const length = Math.hypot(
-      wall.end.x - wall.start.x,
-      wall.end.z - wall.start.z,
-    );
+    const angle  = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
+    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.z - wall.start.z);
     const offset = opening.offsetAlongWall - length / 2;
-    const desc = RAPIER.ColliderDesc.cuboid(
-      (opening.width - 0.1) / 2,
-      opening.height / 2,
-      0.4,
-    )
+    const desc = RAPIER.ColliderDesc
+      .cuboid((opening.width - 0.1) / 2, opening.height / 2, 0.4)
       .setTranslation(
-        wall.start.x +
-          Math.cos(angle) * (opening.offsetAlongWall + opening.width / 2),
+        wall.start.x + Math.cos(angle) * (opening.offsetAlongWall + opening.width / 2),
         elevation + opening.elevation + opening.height / 2,
-        wall.start.z +
-          Math.sin(angle) * (opening.offsetAlongWall + opening.width / 2),
+        wall.start.z + Math.sin(angle) * (opening.offsetAlongWall + opening.width / 2)
       )
-      .setRotation({
-        x: 0,
-        y: Math.sin(-angle / 2),
-        z: 0,
-        w: Math.cos(-angle / 2),
-      });
+      .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
     return physicsWorld.createSensorCollider(desc);
   }
 
@@ -3147,18 +3306,13 @@ export class ColliderBuilder {
     heightData: Float32Array,
     resolution: number,
     worldSize: number,
-    maxHeight: number,
+    maxHeight: number
   ): RAPIER.Collider {
-    const desc = RAPIER.ColliderDesc.heightfield(
-      resolution - 1,
-      resolution - 1,
-      heightData,
-      {
-        x: worldSize,
-        y: maxHeight,
-        z: worldSize,
-      },
-    ).setTranslation(0, 0, 0);
+    const desc = RAPIER.ColliderDesc
+      .heightfield(resolution - 1, resolution - 1, heightData, {
+        x: worldSize, y: maxHeight, z: worldSize,
+      })
+      .setTranslation(0, 0, 0);
     return physicsWorld.createStaticCollider(desc);
   }
 }
@@ -3170,23 +3324,21 @@ ZoneManager stores collider references per zone so they can be cleaned up correc
 
 ```ts
 interface ZoneColliders {
-  floors: RAPIER.Collider[];
-  walls: RAPIER.Collider[][]; // per wall: array of segment colliders
+  floors:    RAPIER.Collider[];
+  walls:     RAPIER.Collider[][];  // per wall: array of segment colliders
   platforms: RAPIER.Collider[];
-  stairs: RAPIER.Collider[][]; // per stair: array of step colliders
-  sensors: RAPIER.Collider[]; // door sensors
-  terrain: RAPIER.Collider | null;
+  stairs:    RAPIER.Collider[][];  // per stair: array of step colliders
+  sensors:   RAPIER.Collider[];    // door sensors
+  terrain:   RAPIER.Collider | null;
 }
 
 // On unloadZone:
-for (const c of colliders.floors) physicsWorld.removeCollider(c);
-for (const segs of colliders.walls)
-  segs.forEach((c) => physicsWorld.removeCollider(c));
-for (const c of colliders.platforms) physicsWorld.removeCollider(c);
-for (const steps of colliders.stairs)
-  steps.forEach((c) => physicsWorld.removeCollider(c));
-for (const c of colliders.sensors) physicsWorld.removeCollider(c);
-if (colliders.terrain) physicsWorld.removeCollider(colliders.terrain);
+for (const c of colliders.floors)              physicsWorld.removeCollider(c);
+for (const segs of colliders.walls)    segs.forEach(c => physicsWorld.removeCollider(c));
+for (const c of colliders.platforms)           physicsWorld.removeCollider(c);
+for (const steps of colliders.stairs)  steps.forEach(c => physicsWorld.removeCollider(c));
+for (const c of colliders.sensors)             physicsWorld.removeCollider(c);
+if (colliders.terrain)                         physicsWorld.removeCollider(colliders.terrain);
 ```
 
 ### CharacterBody.ts
@@ -3202,38 +3354,30 @@ export class CharacterBody {
   private _kcc!: RAPIER.KinematicCharacterController;
 
   readonly capsuleRadius = 0.3;
-  readonly capsuleHalfHeight = 0.6; // half of the cylinder part (total height ~1.5m + 2*radius)
+  readonly capsuleHalfHeight = 0.6;   // half of the cylinder part (total height ~1.5m + 2*radius)
 
   init(spawnPosition: THREE.Vector3): void {
-    const bodyDesc =
-      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(
-        spawnPosition.x,
-        spawnPosition.y,
-        spawnPosition.z,
-      );
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+      .setTranslation(spawnPosition.x, spawnPosition.y, spawnPosition.z);
     this._body = physicsWorld.world.createRigidBody(bodyDesc);
 
-    const collDesc = RAPIER.ColliderDesc.capsule(
-      this.capsuleHalfHeight,
-      this.capsuleRadius,
-    );
+    const collDesc = RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius);
     this._collider = physicsWorld.world.createCollider(collDesc, this._body);
 
     this._kcc = physicsWorld.world.createCharacterController(0.01);
-    this._kcc.enableAutostep(0.5, 0.2, true); // step up to 0.5m, min width 0.2m
-    this._kcc.enableSnapToGround(0.3); // snap down to ground within 0.3m
+    this._kcc.enableAutostep(0.5, 0.2, true);  // step up to 0.5m, min width 0.2m
+    this._kcc.enableSnapToGround(0.3);          // snap down to ground within 0.3m
     this._kcc.setSlideEnabled(true);
-    this._kcc.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
-    this._kcc.setMinSlopeSlideAngle((30 * Math.PI) / 180);
+    this._kcc.setMaxSlopeClimbAngle(45 * Math.PI / 180);
+    this._kcc.setMinSlopeSlideAngle(30 * Math.PI / 180);
   }
 
   // Call each frame with the desired movement vector (gravity already included)
   move(desired: THREE.Vector3): void {
-    this._kcc.computeColliderMovement(this._collider, {
-      x: desired.x,
-      y: desired.y,
-      z: desired.z,
-    });
+    this._kcc.computeColliderMovement(
+      this._collider,
+      { x: desired.x, y: desired.y, z: desired.z }
+    );
     const mv = this._kcc.computedMovement();
     const pos = this._body.translation();
     this._body.setNextKinematicTranslation({
@@ -3314,19 +3458,19 @@ The preview `CharacterBody` + `CharacterController` become the base for the play
 
 ```ts
 interface CharacterDef {
-  id: string;
-  name: string;
-  modelAssetId: string; // GLTF
-  capsuleRadius: number;
-  capsuleHeight: number;
-  moveSpeed: number;
-  jumpHeight: number;
-  cameraMode: CameraMode;
-  thirdPersonOffset: Vec3;
+  id:           string;
+  name:         string;
+  modelAssetId: string;         // GLTF
+  capsuleRadius:    number;
+  capsuleHeight:    number;
+  moveSpeed:        number;
+  jumpHeight:       number;
+  cameraMode:       CameraMode;
+  thirdPersonOffset:Vec3;
   // Game stats (Phase 13+)
-  health?: number;
-  maxHealth?: number;
-  faction?: string;
+  health?:      number;
+  maxHealth?:   number;
+  faction?:     string;
 }
 ```
 
@@ -3340,14 +3484,14 @@ Each NPC is a `CharacterBody` (Rapier KCC) driven by an AI controller instead of
 
 ```ts
 interface NpcDef {
-  id: string;
-  name: string;
+  id:           string;
+  name:         string;
   modelAssetId: string;
-  spawnPosition: Vec3;
-  faction: string;
-  behaviour: "idle" | "patrol" | "follow" | "guard";
-  patrolPath?: Vec3[];
-  dialogueId?: string;
+  spawnPosition:Vec3;
+  faction:      string;
+  behaviour:    "idle" | "patrol" | "follow" | "guard";
+  patrolPath?:  Vec3[];
+  dialogueId?:  string;
   lootTableId?: string;
 }
 ```
@@ -3362,9 +3506,9 @@ Same `CharacterBody` base, different controller:
 
 ```ts
 interface EnemyDef extends NpcDef {
-  attackRange: number;
+  attackRange:    number;
   detectionRange: number;
-  damage: number;
+  damage:         number;
   attackCooldown: number;
 }
 ```
@@ -3376,7 +3520,6 @@ interface EnemyDef extends NpcDef {
 ### Editor Support for Characters/NPCs/Enemies
 
 These are added as editor tools in Phase 13:
-
 - **Spawn Point Tool**: place a character spawn marker in a zone (`zone.objects` with `properties.characterSpawn = true`)
 - **NPC Tool**: place NPC with behaviour config in PropertiesPanel
 - **Enemy Tool**: place enemy with combat config
@@ -3436,14 +3579,16 @@ import react from "@vitejs/plugin-react";
 import checker from "vite-plugin-checker";
 
 export default defineConfig({
-  plugins: [react(), checker({ typescript: true })],
+  plugins: [
+    react(),
+    checker({ typescript: true }),
+  ],
 });
 ```
 
 ### Prompt template for Claude Code
 
 > "Read `WORLD_EDITOR_ARCHITECTURE.md` in the project root. Implement **Phase [N] — [Name]** exactly as specified. Rules:
->
 > - **TypeScript only.** Every file is `.ts` or `.tsx`. No `.js` or `.jsx`. `strict: true`. No `any` — use `unknown` and narrow with type guards.
 > - All shared types come from `src/types.ts`. Never redefine types locally if they already exist there.
 > - `three` is only imported in `src/core/`, `src/world/`, `src/builders/`, `src/editor/`, `src/preview/`
