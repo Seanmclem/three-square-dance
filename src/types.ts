@@ -52,6 +52,12 @@ export type TransitionEffect = "fade" | "none";
 
 export interface Vec2 { x: number; z: number }
 export interface Vec3 { x: number; y: number; z: number }
+
+export interface WallNode {
+  id: string;
+  x:  number;
+  z:  number;
+}
 export interface ScreenPos { x: number; y: number }
 export interface Euler3 { x: number; y: number; z: number }
 export interface Scale3 { x: number; y: number; z: number }
@@ -71,6 +77,7 @@ export interface BusEvents {
   "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef> };
   "wall:removed":          { zoneId: string; wallId: string };
   "wall:rebuilt":          { zoneId: string; wallId: string };
+  "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; level: number; changes: Partial<FloorDef> };
   "platform:added":        { zoneId: string; platform: PlatformDef };
@@ -216,37 +223,39 @@ export interface Opening {
 }
 
 export interface WallDef {
-  id:                string;
-  start:             Vec2;
-  end:               Vec2;
-  floor:             number;
-  height:            number;
-  thickness:         number;
-  material:          string;
-  exteriorMaterial:  string;
-  openings:          Opening[];
+  id:                 string;
+  startNodeId:        string;
+  endNodeId:          string;
+  floor:              number;
+  height:             number;
+  thickness:          number;
+  material:           string;
+  exteriorMaterial:   string;
+  openings:           Opening[];
   materialOverrides?: MaterialOverrides;
 }
 
 export interface PlatformDef {
-  id:            string;
-  position:      Vec3;
-  size:          { width: number; depth: number };
-  thickness:     number;
-  material:      string;
-  hasRailing:    boolean;
-  railingHeight: number;
-  floorLevel?:   number;
+  id:             string;
+  position:       Vec3;
+  size:           { width: number; depth: number };
+  thickness:      number;
+  material:       string;
+  hasRailing:     boolean;
+  railingHeight:  number;
+  floorLevel?:    number;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface StairDef {
-  id:         string;
-  start:      Vec3;
-  end:        Vec3;
-  width:      number;
-  style:      StairStyle;
-  material:   string;
-  hasRailing: boolean;
+  id:          string;
+  start:       Vec3;
+  end:         Vec3;
+  width:       number;
+  style:       StairStyle;
+  material:    string;
+  hasRailing:  boolean;
+  materialOverrides?: MaterialOverrides;
 }
 
 export interface ObjectProperties {
@@ -272,6 +281,7 @@ export interface ZoneDef {
   name:      string;
   type:      ZoneType;
   bounds:    Bounds;
+  nodes:     WallNode[];
   floors:    FloorDef[];
   walls:     WallDef[];
   platforms: PlatformDef[];

@@ -1,7 +1,7 @@
 import type { EventBus } from "@/core/EventBus";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
-  ZoneDef, TransitionDef, FloorDef, WallDef, PlatformDef, StairDef, WorldObject,
+  ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
   SceneFile,
 } from "@/types";
 
@@ -48,6 +48,41 @@ export class WorldState {
     if (changes.ceilingHeight      !== undefined) floor.ceilingHeight      = changes.ceilingHeight;
     if ('materialOverrides' in changes)           floor.materialOverrides  = changes.materialOverrides;
     this._bus.emit("floor:updated", { zoneId, level, changes });
+  }
+
+  // ─── Node mutations ───────────────────────────────────────────────────────
+
+  addNode(zoneId: string, node: WallNode): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    zone.nodes.push(node);
+  }
+
+  updateNode(zoneId: string, nodeId: string, pos: { x: number; z: number }): void {
+    const zone = this.zones.get(zoneId);
+    const node = zone?.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    node.x = pos.x;
+    node.z = pos.z;
+    this._bus.emit("node:updated", { zoneId, nodeId, pos });
+  }
+
+  removeNode(zoneId: string, nodeId: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    const hasWalls = zone.walls.some(w => w.startNodeId === nodeId || w.endNodeId === nodeId);
+    if (hasWalls) return;
+    zone.nodes = zone.nodes.filter(n => n.id !== nodeId);
+  }
+
+  getNode(zoneId: string, nodeId: string): WallNode | undefined {
+    return this.zones.get(zoneId)?.nodes.find(n => n.id === nodeId);
+  }
+
+  getWallsAtNode(zoneId: string, nodeId: string): WallDef[] {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return [];
+    return zone.walls.filter(w => w.startNodeId === nodeId || w.endNodeId === nodeId);
   }
 
   // ─── Wall mutations ───────────────────────────────────────────────────────

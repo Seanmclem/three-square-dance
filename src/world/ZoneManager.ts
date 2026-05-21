@@ -4,6 +4,7 @@ import { WallBuilder } from "@/builders/WallBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { WallNode, ZoneDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 interface WallEntry {
@@ -51,7 +52,19 @@ export class ZoneManager {
       this._bus.on("wall:removed", ({ zoneId, wallId }) => {
         this._removeWall(zoneId, wallId);
       }),
+      this._bus.on("node:updated", ({ zoneId, nodeId }) => {
+        const zone = this._worldState.zones.get(zoneId);
+        if (!zone) return;
+        const affected = zone.walls.filter(
+          w => w.startNodeId === nodeId || w.endNodeId === nodeId,
+        );
+        for (const wall of affected) void this._rebuildWall(zoneId, wall.id);
+      }),
     );
+  }
+
+  private _buildNodesMap(zone: ZoneDef): Map<string, WallNode> {
+    return new Map((zone.nodes ?? []).map(n => [n.id, n]));
   }
 
   async loadZone(zoneId: string): Promise<void> {
@@ -75,8 +88,9 @@ export class ZoneManager {
       floorColliders.push(collider);
     }
 
+    const nodesMap = this._buildNodesMap(zone);
     for (const wall of zone.walls) {
-      const { mesh, colliders } = await WallBuilder.build(wall, zoneId);
+      const { mesh, colliders } = await WallBuilder.build(wall, zoneId, zone, nodesMap);
       wallsGroup.add(mesh);
       wallData.set(wall.id, { mesh, colliders });
     }
@@ -139,7 +153,8 @@ export class ZoneManager {
 
     const wall = zone.walls.find(w => w.id === wallId);
     if (!wall) return;
-    const { mesh, colliders } = await WallBuilder.build(wall, zoneId);
+    const nodesMap = this._buildNodesMap(zone);
+    const { mesh, colliders } = await WallBuilder.build(wall, zoneId, zone, nodesMap);
     entry.wallsGroup.add(mesh);
     entry.wallData.set(wallId, { mesh, colliders });
     this._bus.emit("wall:rebuilt", { zoneId, wallId });

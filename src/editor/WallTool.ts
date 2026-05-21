@@ -1,12 +1,12 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { Vec2, Vec3, WallDef } from "@/types";
+import type { Vec2, Vec3, WallDef, WallNode } from "@/types";
 
 type WallToolState = "IDLE" | "PLACING";
 
-const GRID = 0.5;
-let _wallIdCounter = 0;
+const GRID        = 0.5;
+const SNAP_RADIUS = 0.5;
 
 function snap(v: number): number {
   return Math.round(v / GRID) * GRID;
@@ -27,17 +27,34 @@ function makePreviewMesh(height: number, thickness: number): THREE.Mesh {
   return mesh;
 }
 
+function makeNodeDot(highlighted = false): THREE.Mesh {
+  const geo = new THREE.SphereGeometry(0.12, 8, 8);
+  const mat = new THREE.MeshBasicMaterial({
+    color:       highlighted ? 0xffdd44 : 0x4d8cff,
+    depthTest:   false,
+    depthWrite:  false,
+    transparent: true,
+    opacity:     highlighted ? 1.0 : 0.7,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = 2;
+  return mesh;
+}
+
 export class WallTool {
   private _state: WallToolState = "IDLE";
   private _active       = false;
   private _startPoint: Vec2 | null = null;
+  private _startNodeId: string | null = null;
   private _preview: THREE.Mesh | null = null;
+  private _nodeDots     = new Map<string, THREE.Mesh>();   // nodeId → dot mesh
   private _activeZoneId = "demo";
   private _activeLevel  = 0;
   private _height       = 3;
   private _thickness    = 0.2;
   private _material     = "brick_01";
   private _shiftDown    = false;
+  private _hoveredNodeId: string | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -50,8 +67,14 @@ export class WallTool {
   init(): void {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
+        const wasActive = this._active;
         this._active = tool === "wall";
-        if (!this._active) this._reset();
+        if (!this._active) {
+          this._reset();
+          if (wasActive) this._hideNodeDots();
+        } else {
+          this._refreshNodeDots();
+        }
       }),
       this._bus.on("floor:select", ({ level }) => { this._activeLevel = level; }),
       this._bus.on("input:click", ({ worldPos, button }) => {
@@ -75,6 +98,32 @@ export class WallTool {
     );
   }
 
+  private _getActiveZone() {
+    return this._world.zones.get(this._activeZoneId);
+  }
+
+  private _findSnapNode(x: number, z: number): WallNode | null {
+    const zone = this._getActiveZone();
+    if (!zone) return null;
+    let best: WallNode | null = null;
+    let bestDist = SNAP_RADIUS;
+    for (const node of zone.nodes) {
+      const d = Math.hypot(node.x - x, node.z - z);
+      if (d < bestDist) { bestDist = d; best = node; }
+    }
+    return best;
+  }
+
+  private _getOrCreateNode(x: number, z: number): { nodeId: string; pos: Vec2 } {
+    const existing = this._findSnapNode(x, z);
+    if (existing) return { nodeId: existing.id, pos: { x: existing.x, z: existing.z } };
+
+    const node: WallNode = { id: crypto.randomUUID(), x, z };
+    this._world.addNode(this._activeZoneId, node);
+    this._addNodeDot(node);
+    return { nodeId: node.id, pos: { x, z } };
+  }
+
   private _calcEnd(worldPos: Vec3): Vec2 {
     let ex = snap(worldPos.x);
     let ez = snap(worldPos.z);
@@ -86,12 +135,19 @@ export class WallTool {
       ex = snap(this._startPoint.x + Math.cos(snappedAngle) * len);
       ez = snap(this._startPoint.z + Math.sin(snappedAngle) * len);
     }
+    // Snap to existing node if close enough
+    const snapped = this._findSnapNode(ex, ez);
+    if (snapped) return { x: snapped.x, z: snapped.z };
     return { x: ex, z: ez };
   }
 
   private _onLeftClick(worldPos: Vec3): void {
     if (this._state === "IDLE") {
-      this._startPoint = { x: snap(worldPos.x), z: snap(worldPos.z) };
+      const sx = snap(worldPos.x);
+      const sz = snap(worldPos.z);
+      const { nodeId, pos } = this._getOrCreateNode(sx, sz);
+      this._startPoint  = pos;
+      this._startNodeId = nodeId;
       this._state = "PLACING";
       this._preview = makePreviewMesh(this._height, this._thickness);
       this._scene.add(this._preview);
@@ -101,31 +157,53 @@ export class WallTool {
   }
 
   private _onMouseMove(worldPos: Vec3): void {
-    if (this._state !== "PLACING" || !this._preview || !this._startPoint) return;
-    const end = this._calcEnd(worldPos);
-    const dx = end.x - this._startPoint.x;
-    const dz = end.z - this._startPoint.z;
-    const length = Math.hypot(dx, dz) || 0.001;
-    const angle  = Math.atan2(dz, dx);
-    this._preview.scale.set(length, 1, 1);
-    this._preview.position.set(
-      (this._startPoint.x + end.x) / 2,
-      this._height / 2,
-      (this._startPoint.z + end.z) / 2,
-    );
-    this._preview.rotation.y = -angle;
+    if (this._state === "PLACING" && this._preview && this._startPoint) {
+      const end = this._calcEnd(worldPos);
+      const dx = end.x - this._startPoint.x;
+      const dz = end.z - this._startPoint.z;
+      const length = Math.hypot(dx, dz) || 0.001;
+      const angle  = Math.atan2(dz, dx);
+      this._preview.scale.set(length, 1, 1);
+      this._preview.position.set(
+        (this._startPoint.x + end.x) / 2,
+        this._height / 2,
+        (this._startPoint.z + end.z) / 2,
+      );
+      this._preview.rotation.y = -angle;
+    }
+
+    // Highlight nearest node
+    const sx = snap(worldPos.x);
+    const sz = snap(worldPos.z);
+    const nearest = this._findSnapNode(sx, sz);
+    const nearestId = nearest?.id ?? null;
+    if (nearestId !== this._hoveredNodeId) {
+      if (this._hoveredNodeId) {
+        const dot = this._nodeDots.get(this._hoveredNodeId);
+        if (dot) (dot.material as THREE.MeshBasicMaterial).color.setHex(0x4d8cff);
+      }
+      if (nearestId) {
+        const dot = this._nodeDots.get(nearestId);
+        if (dot) (dot.material as THREE.MeshBasicMaterial).color.setHex(0xffdd44);
+      }
+      this._hoveredNodeId = nearestId;
+    }
   }
 
   private _commit(worldPos: Vec3): void {
     const sp = this._startPoint;
-    if (!sp) return;
-    const ep = this._calcEnd(worldPos);
-    if (Math.hypot(ep.x - sp.x, ep.z - sp.z) < GRID) { this._reset(); return; }
+    const startNodeId = this._startNodeId;
+    if (!sp || !startNodeId) return;
+
+    const epSnapped = this._calcEnd(worldPos);
+    if (Math.hypot(epSnapped.x - sp.x, epSnapped.z - sp.z) < GRID) { this._reset(); return; }
+
+    const { nodeId: endNodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
 
     const wall: WallDef = {
-      id:               `wall_${++_wallIdCounter}`,
-      start:            sp,
-      end:              ep,
+      id:               `wall_${crypto.randomUUID().slice(0, 8)}`,
+      startNodeId,
+      endNodeId,
       floor:            this._activeLevel,
       height:           this._height,
       thickness:        this._thickness,
@@ -138,6 +216,33 @@ export class WallTool {
     this._reset();
   }
 
+  // ─── Node dot helpers ────────────────────────────────────────────────────
+
+  private _addNodeDot(node: WallNode): void {
+    if (this._nodeDots.has(node.id)) return;
+    const dot = makeNodeDot();
+    dot.position.set(node.x, 0.12, node.z);
+    this._scene.add(dot);
+    this._nodeDots.set(node.id, dot);
+  }
+
+  private _refreshNodeDots(): void {
+    this._hideNodeDots();
+    const zone = this._getActiveZone();
+    if (!zone) return;
+    for (const node of zone.nodes) this._addNodeDot(node);
+  }
+
+  private _hideNodeDots(): void {
+    for (const dot of this._nodeDots.values()) {
+      this._scene.remove(dot);
+      (dot.geometry as THREE.BufferGeometry).dispose();
+      (dot.material as THREE.Material).dispose();
+    }
+    this._nodeDots.clear();
+    this._hoveredNodeId = null;
+  }
+
   private _reset(): void {
     if (this._preview) {
       this._scene.remove(this._preview);
@@ -145,7 +250,8 @@ export class WallTool {
       (this._preview.material as THREE.Material).dispose();
       this._preview = null;
     }
-    this._startPoint = null;
+    this._startPoint  = null;
+    this._startNodeId = null;
     this._state = "IDLE";
   }
 
@@ -154,6 +260,7 @@ export class WallTool {
 
   dispose(): void {
     this._reset();
+    this._hideNodeDots();
     this._unsubs.forEach(u => u());
   }
 }

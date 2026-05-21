@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
-import type { WallDef, MeshUserData } from "@/types";
+import type { WallDef, ZoneDef, WallNode, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface WallBuildOutput {
@@ -36,13 +36,43 @@ function applyBoxUVTiling(
 }
 
 export class WallBuilder {
-  static async build(wall: WallDef, zoneId: string): Promise<WallBuildOutput> {
-    const dx     = wall.end.x - wall.start.x;
-    const dz     = wall.end.z - wall.start.z;
+  static async build(
+    wall:   WallDef,
+    zoneId: string,
+    zone:   ZoneDef,
+    nodes:  Map<string, WallNode>,
+  ): Promise<WallBuildOutput> {
+    const rawStart = nodes.get(wall.startNodeId)!;
+    const rawEnd   = nodes.get(wall.endNodeId)!;
+
+    // Corner joining: shorten wall at ends that connect to other walls
+    const connectedAtStart = zone.walls.filter(w =>
+      w.id !== wall.id &&
+      (w.startNodeId === wall.startNodeId || w.endNodeId === wall.startNodeId),
+    );
+    const connectedAtEnd = zone.walls.filter(w =>
+      w.id !== wall.id &&
+      (w.startNodeId === wall.endNodeId || w.endNodeId === wall.endNodeId),
+    );
+
+    const totalDx  = rawEnd.x - rawStart.x;
+    const totalDz  = rawEnd.z - rawStart.z;
+    const totalLen = Math.hypot(totalDx, totalDz) || 0.001;
+    const ux = totalDx / totalLen;
+    const uz = totalDz / totalLen;
+
+    const startOff = connectedAtStart.length > 0 ? wall.thickness / 2 : 0;
+    const endOff   = connectedAtEnd.length   > 0 ? wall.thickness / 2 : 0;
+
+    const start = { x: rawStart.x + ux * startOff, z: rawStart.z + uz * startOff };
+    const end   = { x: rawEnd.x   - ux * endOff,   z: rawEnd.z   - uz * endOff   };
+
+    const dx     = end.x - start.x;
+    const dz     = end.z - start.z;
     const length = Math.hypot(dx, dz);
     const angle  = Math.atan2(dz, dx);
-    const cx     = (wall.start.x + wall.end.x) / 2;
-    const cz     = (wall.start.z + wall.end.z) / 2;
+    const cx     = (start.x + end.x) / 2;
+    const cz     = (start.z + end.z) / 2;
 
     const ovr      = wall.materialOverrides;
     const baseDef  = assetManager.getMaterialDef(wall.material);
@@ -79,7 +109,7 @@ export class WallBuilder {
       _ownsMaterial: !!ovr,  // true → ZoneManager disposes on rebuild
     } satisfies MeshUserData;
 
-    const colliders = ColliderBuilder.registerWallSegments(wall, 0);
+    const colliders = ColliderBuilder.registerWallSegments(wall, 0, start, end);
 
     return { mesh, colliders };
   }

@@ -24,6 +24,7 @@ function createDemoZone(): ZoneDef {
     name: "Demo Zone",
     type: "outdoor",
     bounds: { x: -50, z: -50, width: 100, depth: 100 },
+    nodes:     [],
     floors:    [],
     walls:     [],
     platforms: [],

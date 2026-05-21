@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "./PhysicsWorld";
-import type { WallDef, PlatformDef, StairDef, Opening } from "@/types";
+import type { WallDef, Vec2, PlatformDef, StairDef, Opening } from "@/types";
 
 export class ColliderBuilder {
   static registerFloor(
@@ -16,11 +16,11 @@ export class ColliderBuilder {
     return physicsWorld.createStaticCollider(desc);
   }
 
-  static registerWallSegments(wall: WallDef, elevation: number): RAPIER.Collider[] {
-    const length = Math.hypot(wall.end.x - wall.start.x, wall.end.z - wall.start.z);
-    const angle  = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
-    const midX   = (wall.start.x + wall.end.x) / 2;
-    const midZ   = (wall.start.z + wall.end.z) / 2;
+  static registerWallSegments(wall: WallDef, elevation: number, start: Vec2, end: Vec2): RAPIER.Collider[] {
+    const length = Math.hypot(end.x - start.x, end.z - start.z);
+    const angle  = Math.atan2(end.z - start.z, end.x - start.x);
+    const midX   = (start.x + end.x) / 2;
+    const midZ   = (start.z + end.z) / 2;
 
     const sorted: Opening[] = [...wall.openings].sort(
       (a, b) => a.offsetAlongWall - b.offsetAlongWall,
@@ -82,13 +82,13 @@ export class ColliderBuilder {
     return colliders;
   }
 
-  static registerDoorSensor(wall: WallDef, opening: Opening, elevation: number): RAPIER.Collider {
-    const angle = Math.atan2(wall.end.z - wall.start.z, wall.end.x - wall.start.x);
+  static registerDoorSensor(wall: WallDef, opening: Opening, elevation: number, start: Vec2, end: Vec2): RAPIER.Collider {
+    const angle = Math.atan2(end.z - start.z, end.x - start.x);
     const desc = RAPIER.ColliderDesc.cuboid((opening.width - 0.1) / 2, opening.height / 2, 0.4)
       .setTranslation(
-        wall.start.x + Math.cos(angle) * (opening.offsetAlongWall + opening.width / 2),
+        start.x + Math.cos(angle) * (opening.offsetAlongWall + opening.width / 2),
         elevation + opening.elevation + opening.height / 2,
-        wall.start.z + Math.sin(angle) * (opening.offsetAlongWall + opening.width / 2),
+        start.z + Math.sin(angle) * (opening.offsetAlongWall + opening.width / 2),
       )
       .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
     return physicsWorld.createSensorCollider(desc);
