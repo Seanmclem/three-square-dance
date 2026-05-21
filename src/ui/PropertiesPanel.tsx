@@ -76,7 +76,8 @@ export function PropertiesPanel({
 
   useEffect(() => {
     if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
-    setDraft(selected
+    const needsDraft = selected && selected.type !== "wall" && selected.type !== "floor";
+    setDraft(needsDraft
       ? { position: toStr(selected.position), rotation: toStr(selected.rotation), scale: toStr(selected.scale) }
       : null);
   }, [selected]);
