@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
+import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
@@ -13,7 +14,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef } from "@/types";
+import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -47,6 +48,7 @@ export default function App() {
     const bus = busRef.current;
 
     const scene     = new SceneManager(canvas, bus);
+    assetManager.init(scene.renderer);
     const world     = new WorldState(bus);
     worldRef.current = world;
     const input     = new InputManager(canvas, scene.camera, bus);
@@ -105,8 +107,26 @@ export default function App() {
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     if (selected.type === "wall") {
-      worldRef.current?.updateWall(selected.zoneId, selected.id, changes as Partial<import("@/types").WallDef>);
-      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as import("@/types").WallDef), ...changes } } : null);
+      worldRef.current?.updateWall(selected.zoneId, selected.id, changes as Partial<WallDef>);
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as WallDef), ...changes } } : null);
+    } else if (selected.type === "floor") {
+      const floorDef = selected.data as FloorDef;
+      worldRef.current?.updateFloor(selected.zoneId, floorDef.level, changes as unknown as Partial<FloorDef>);
+      const floorChanges = changes as unknown as Partial<FloorDef>;
+      setSelected(prev => {
+        if (!prev) return null;
+        const current = prev.data as FloorDef;
+        return {
+          ...prev,
+          data: {
+            ...current,
+            ...floorChanges,
+            floorMesh: floorChanges.floorMesh
+              ? { ...current.floorMesh, ...floorChanges.floorMesh }
+              : current.floorMesh,
+          },
+        };
+      });
     } else {
       busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
     }

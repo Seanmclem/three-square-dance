@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolId, SelectedObjectPayload, WorldObject, Vec3, FloorDef, WallDef } from "@/types";
-import { MATERIAL_IDS } from "@/core/AssetManager";
+import { MATERIAL_IDS, MATERIAL_REGISTRY } from "@/core/AssetManager";
 
 interface ToolInfo { desc: string; hint: string }
 
@@ -95,7 +95,7 @@ function FloorView({ selected, onObjectUpdate }: {
   selected: SelectedObjectPayload;
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
 }) {
-  const floorData = selected.data as FloorDef | null;
+  const floorData  = selected.data as FloorDef | null;
   const currentMat = floorData?.floorMesh.material ?? "concrete_01";
 
   return (
@@ -109,26 +109,13 @@ function FloorView({ selected, onObjectUpdate }: {
 
       <div style={{ padding: "10px 16px" }}>
         <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {MATERIAL_IDS.map(id => (
-            <div
-              key={id}
-              onClick={() => onObjectUpdate({ id: selected.id } as Partial<WorldObject>)}
-              style={{
-                padding: "6px 10px",
-                background: id === currentMat ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
-                border: `1px solid ${id === currentMat ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
-                borderRadius: 4,
-                color: id === currentMat ? "#80aaff" : "#5a7a9a",
-                fontSize: 11,
-                fontFamily: "monospace",
-                cursor: "pointer",
-              }}
-            >
-              {id}
-            </div>
-          ))}
-        </div>
+        <MaterialPicker
+          materialIds={MATERIAL_IDS}
+          current={currentMat}
+          onSelect={id => onObjectUpdate({
+            floorMesh: { ...floorData!.floorMesh, material: id },
+          } as unknown as Partial<WorldObject>)}
+        />
       </div>
     </>
   );
@@ -250,24 +237,45 @@ function WallView({ selected, onObjectUpdate }: {
         </div>
         <div>
           <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>MATERIAL</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {MATERIAL_IDS.map(id => (
-              <div key={id}
-                onClick={() => onObjectUpdate({ material: id } as unknown as Partial<WorldObject>)}
-                style={{
-                  padding: "6px 10px",
-                  background: id === currentMat ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
-                  border: `1px solid ${id === currentMat ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
-                  borderRadius: 4,
-                  color: id === currentMat ? "#80aaff" : "#5a7a9a",
-                  fontSize: 11, fontFamily: "monospace", cursor: "pointer",
-                }}
-              >{id}</div>
-            ))}
-          </div>
+          <MaterialPicker
+            materialIds={MATERIAL_IDS}
+            current={currentMat}
+            onSelect={id => onObjectUpdate({ material: id } as unknown as Partial<WorldObject>)}
+          />
         </div>
       </div>
     </>
+  );
+}
+
+function MaterialPicker({ materialIds, current, onSelect }: {
+  materialIds: string[];
+  current:     string;
+  onSelect:    (id: string) => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {materialIds.map(id => {
+        const label = MATERIAL_REGISTRY[id]?.label ?? id;
+        const active = id === current;
+        return (
+          <div
+            key={id}
+            onClick={() => onSelect(id)}
+            style={{
+              padding: "6px 10px",
+              background: active ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
+              border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
+              borderRadius: 4,
+              color: active ? "#80aaff" : "#5a7a9a",
+              fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+            }}
+          >
+            {label}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
-import { assetManager } from "@/core/AssetManager";
+import { assetManager, MATERIAL_REGISTRY } from "@/core/AssetManager";
 import type { FloorDef, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -29,10 +29,12 @@ export class FloorBuilder {
     geo.rotateX(-Math.PI / 2);
     geo.translate(cx, floor.elevation + 0.004, cz);
 
+    const tileScale = MATERIAL_REGISTRY[floor.floorMesh.material]?.tileScale ?? 1.0;
     const uvAttr = geo.attributes["uv"] as THREE.BufferAttribute;
     for (let i = 0; i < uvAttr.count; i++) {
-      uvAttr.setXY(i, uvAttr.getX(i) * w, uvAttr.getY(i) * d);
+      uvAttr.setXY(i, uvAttr.getX(i) * w * tileScale, uvAttr.getY(i) * d * tileScale);
     }
+    geo.setAttribute('uv2', geo.attributes.uv);
 
     const mat = await assetManager.getMaterial(floor.floorMesh.material)
       .catch(() => assetManager.getDefaultMaterial(0x4a5a40));

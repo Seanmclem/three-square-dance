@@ -1,23 +1,9 @@
 import * as THREE from "three";
+import { MATERIAL_REGISTRY } from "./materials";
+import type { MaterialMapConfig } from "./materials";
 
-interface MaterialDef {
-  texture:    string;
-  tileWidth?: number;
-  tileHeight?: number;
-  roughness?: number;
-  metalness?: number;
-  normalMap?: string;
-}
-
-const MATERIAL_REGISTRY: Record<string, MaterialDef> = {
-  brick_01:          { texture: "/assets/textures/brick_01.jpg",         tileWidth: 1.0, tileHeight: 1.0, roughness: 0.9 },
-  brick_exterior_01: { texture: "/assets/textures/brick_ext_01.jpg",     tileWidth: 1.0, tileHeight: 1.0, roughness: 0.85 },
-  cobblestone:       { texture: "/assets/textures/cobblestone_01.jpg",   tileWidth: 1.0, tileHeight: 1.0, roughness: 0.95 },
-  wood_planks:       { texture: "/assets/textures/wood_planks_01.jpg",   tileWidth: 0.8, tileHeight: 0.8, roughness: 0.7 },
-  concrete_01:       { texture: "/assets/textures/concrete_01.jpg",      tileWidth: 2.0, tileHeight: 2.0, roughness: 0.8 },
-};
-
-export const MATERIAL_IDS = Object.keys(MATERIAL_REGISTRY) as (keyof typeof MATERIAL_REGISTRY)[];
+export { MATERIAL_REGISTRY };
+export const MATERIAL_IDS = Object.keys(MATERIAL_REGISTRY);
 
 export class AssetManager {
   private readonly _textureCache  = new Map<string, THREE.Texture>();
@@ -25,15 +11,23 @@ export class AssetManager {
   private readonly _gltfCache     = new Map<string, unknown>();
   private readonly _textureLoader = new THREE.TextureLoader();
   private _gltfLoader: unknown    = null;
+  private _renderer: THREE.WebGLRenderer | null = null;
 
-  async loadTexture(url: string): Promise<THREE.Texture> {
-    const cached = this._textureCache.get(url);
+  /** Call once after renderer is created so anisotropy uses hardware max. */
+  init(renderer: THREE.WebGLRenderer): void {
+    this._renderer = renderer;
+  }
+
+  async loadTexture(url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace): Promise<THREE.Texture> {
+    const key = `${url}:${colorSpace}`;
+    const cached = this._textureCache.get(key);
     if (cached) return cached;
     const tex = await this._textureLoader.loadAsync(url);
-    tex.wrapS     = THREE.RepeatWrapping;
-    tex.wrapT     = THREE.RepeatWrapping;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    this._textureCache.set(url, tex);
+    tex.wrapS      = THREE.RepeatWrapping;
+    tex.wrapT      = THREE.RepeatWrapping;
+    tex.colorSpace = colorSpace;
+    tex.anisotropy = this._renderer?.capabilities.getMaxAnisotropy() ?? 4;
+    this._textureCache.set(key, tex);
     return tex;
   }
 
@@ -43,21 +37,33 @@ export class AssetManager {
 
     const def = MATERIAL_REGISTRY[materialId];
     if (!def) {
-      console.warn(`Unknown material: ${materialId}, using default`);
+      console.warn(`Unknown material: ${materialId}`);
       return new THREE.MeshStandardMaterial({ color: 0x888888 });
     }
 
+    const loadData  = (m: MaterialMapConfig) => this.loadTexture(m.path, THREE.NoColorSpace);
+    const loadColor = (m: MaterialMapConfig) => this.loadTexture(m.path, THREE.SRGBColorSpace);
+
     const mat = new THREE.MeshStandardMaterial({
-      map:       await this.loadTexture(def.texture),
-      roughness: def.roughness ?? 0.8,
-      metalness: def.metalness ?? 0.0,
+      roughness: def.roughnessVal,
+      metalness: def.metalnessVal,
     });
-    if (def.normalMap) mat.normalMap = await this.loadTexture(def.normalMap);
+
+    if (def.maps.albedo.enabled)      mat.map          = await loadColor(def.maps.albedo);
+    if (def.maps.normal.enabled)      mat.normalMap     = await loadData(def.maps.normal);
+    if (def.maps.roughness.enabled)   mat.roughnessMap  = await loadData(def.maps.roughness);
+    if (def.maps.metalness.enabled)   mat.metalnessMap  = await loadData(def.maps.metalness);
+    if (def.maps.ao.enabled)          mat.aoMap         = await loadData(def.maps.ao);
+    if (def.maps.displacement.enabled) {
+      mat.displacementMap   = await loadData(def.maps.displacement);
+      mat.displacementScale = def.displacementScale;
+    }
+
     this._materialCache.set(materialId, mat);
     return mat;
   }
 
-  /** Synchronous fallback material used before async textures load. */
+  /** Synchronous fallback used before async textures load. */
   getDefaultMaterial(color = 0x888888): THREE.MeshStandardMaterial {
     return new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
   }

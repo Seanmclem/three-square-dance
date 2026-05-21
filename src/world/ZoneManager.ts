@@ -34,6 +34,9 @@ export class ZoneManager {
       this._bus.on("floor:added", ({ zoneId, floor }) => {
         this._rebuildFloor(zoneId, floor.level);
       }),
+      this._bus.on("floor:updated", ({ zoneId, level }) => {
+        this._rebuildFloor(zoneId, level);
+      }),
       this._bus.on("wall:added", ({ zoneId, wall }) => {
         this._rebuildWall(zoneId, wall.id);
       }),

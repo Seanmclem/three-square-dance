@@ -39,6 +39,16 @@ export class WorldState {
     this._bus.emit("floor:added", { zoneId, floor });
   }
 
+  updateFloor(zoneId: string, level: number, changes: Partial<FloorDef>): void {
+    const zone  = this.zones.get(zoneId);
+    const floor = zone?.floors.find(f => f.level === level);
+    if (!floor) return;
+    if (changes.floorMesh) Object.assign(floor.floorMesh, changes.floorMesh);
+    if (changes.elevation     !== undefined) floor.elevation     = changes.elevation;
+    if (changes.ceilingHeight !== undefined) floor.ceilingHeight = changes.ceilingHeight;
+    this._bus.emit("floor:updated", { zoneId, level, changes });
+  }
+
   // ─── Wall mutations ───────────────────────────────────────────────────────
 
   addWall(zoneId: string, wall: WallDef): void {
