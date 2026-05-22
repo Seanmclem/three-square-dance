@@ -125,7 +125,27 @@ export class ZoneManager {
       this._bus.on("wall:added", ({ zoneId, wall }) => {
         this._queueRebuild(zoneId, wall.id);
       }),
-      this._bus.on("wall:updated", ({ zoneId, wallId }) => {
+      this._bus.on("wall:updated", ({ zoneId, wallId, changes }) => {
+        // If a merge-criteria field changed, silently sync all run-mates so the
+        // run stays together after rebuild (no extra events → no recursion).
+        if (changes.material !== undefined || changes.exteriorMaterial !== undefined || changes.height !== undefined) {
+          const entry = this._loadedZones.get(zoneId);
+          const zone  = this._worldState.zones.get(zoneId);
+          if (entry && zone) {
+            const re = entry.wallData.get(wallId);
+            if (re && re.wallIds.length > 1) {
+              const sync: Partial<WallDef> = {};
+              if (changes.material          !== undefined) sync.material          = changes.material;
+              if (changes.exteriorMaterial  !== undefined) sync.exteriorMaterial  = changes.exteriorMaterial;
+              if (changes.height            !== undefined) sync.height            = changes.height;
+              for (const id of re.wallIds) {
+                if (id === wallId) continue;
+                const wall = zone.walls.find(w => w.id === id);
+                if (wall) Object.assign(wall, sync);
+              }
+            }
+          }
+        }
         this._queueRebuild(zoneId, wallId);
       }),
       this._bus.on("wall:removed", ({ zoneId, wallId }) => {
