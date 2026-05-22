@@ -4,13 +4,14 @@ import { TOOL_ICONS, IconPlay } from "@/ui/icons";
 interface ToolDef { id: ToolId; label: string; shortcut: string }
 
 const TOOLS: ToolDef[] = [
-  { id: "select",   label: "Select",   shortcut: "V" },
-  { id: "floor",    label: "Floor",    shortcut: "F" },
-  { id: "wall",     label: "Wall",     shortcut: "W" },
-  { id: "platform", label: "Platform", shortcut: "L" },
-  { id: "stair",    label: "Stair",    shortcut: "T" },
-  { id: "object",   label: "Object",   shortcut: "O" },
-  { id: "zone",     label: "Zone",     shortcut: "Z" },
+  { id: "select",     label: "Select",   shortcut: "V" },
+  { id: "floor",      label: "Floor",    shortcut: "F" },
+  { id: "poly-floor", label: "Poly Flr", shortcut: "P" },
+  { id: "wall",       label: "Wall",     shortcut: "W" },
+  { id: "platform",   label: "Platform", shortcut: "L" },
+  { id: "stair",      label: "Stair",    shortcut: "T" },
+  { id: "object",     label: "Object",   shortcut: "O" },
+  { id: "zone",       label: "Zone",     shortcut: "Z" },
 ];
 
 interface ToolbarProps {

@@ -112,6 +112,7 @@ export class FloorTool {
     const elevation = zone?.floors.find(f => f.level === this._activeLevel)?.elevation ?? 0;
 
     const floor: FloorDef = {
+      id:            crypto.randomUUID(),
       level:         this._activeLevel,
       elevation,
       ceilingHeight: null,

@@ -4,7 +4,7 @@ import { WallBuilder } from "@/builders/WallBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { WallDef, WallNode, ZoneDef } from "@/types";
+import type { FloorDef, WallDef, WallNode, ZoneDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -18,7 +18,8 @@ interface ZoneEntry {
   group:          THREE.Group;
   floorsGroup:    THREE.Group;
   wallsGroup:     THREE.Group;
-  floorColliders: RAPIER.Collider[];
+  // keyed by floor.id
+  floorColliders: Map<string, RAPIER.Collider>;
   // Multiple wallIds can map to the same RunEntry (all walls in a merged run)
   wallData:       Map<string, RunEntry>;
 }
@@ -117,10 +118,10 @@ export class ZoneManager {
         void Promise.all(ids.map(id => this.loadZone(id)));
       }),
       this._bus.on("floor:added", ({ zoneId, floor }) => {
-        void this._rebuildFloor(zoneId, floor.level);
+        void this._addFloor(zoneId, floor);
       }),
-      this._bus.on("floor:updated", ({ zoneId, level }) => {
-        void this._rebuildFloor(zoneId, level);
+      this._bus.on("floor:updated", ({ zoneId, floorId }) => {
+        void this._rebuildFloor(zoneId, floorId);
       }),
       this._bus.on("wall:added", ({ zoneId, wall }) => {
         this._queueRebuild(zoneId, wall.id);
@@ -196,13 +197,22 @@ export class ZoneManager {
     group.add(floorsGroup);
     group.add(wallsGroup);
 
-    const floorColliders: RAPIER.Collider[] = [];
+    const floorColliders = new Map<string, RAPIER.Collider>();
     const wallData = new Map<string, RunEntry>();
 
+    // Group floors by level so we can pass levelIndex for Z-fighting prevention
+    const floorsByLevel = new Map<number, typeof zone.floors>();
     for (const floor of zone.floors) {
-      const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId);
-      floorsGroup.add(mesh);
-      floorColliders.push(collider);
+      if (!floorsByLevel.has(floor.level)) floorsByLevel.set(floor.level, []);
+      floorsByLevel.get(floor.level)!.push(floor);
+    }
+    for (const levFloors of floorsByLevel.values()) {
+      for (let i = 0; i < levFloors.length; i++) {
+        const floor = levFloors[i]!;
+        const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, i);
+        floorsGroup.add(mesh);
+        floorColliders.set(floor.id, collider);
+      }
     }
 
     const nodesMap = this._buildNodesMap(zone);
@@ -230,6 +240,7 @@ export class ZoneManager {
     if (!entry) return;
 
     entry.floorColliders.forEach(c => physicsWorld.removeCollider(c));
+    entry.floorColliders.clear();
 
     // Use Set to avoid double-disposing shared RunEntry instances
     const uniqueRuns = new Set(entry.wallData.values());
@@ -248,14 +259,28 @@ export class ZoneManager {
     this._loadedZones.delete(zoneId);
   }
 
-  private async _rebuildFloor(zoneId: string, level: number): Promise<void> {
+  // Called when a brand-new floor is added — just build and append it.
+  private async _addFloor(zoneId: string, floor: FloorDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     const zone  = this._worldState.zones.get(zoneId);
     if (!entry || !zone) return;
 
+    const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
+    const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, levelIndex);
+    entry.floorsGroup.add(mesh);
+    entry.floorColliders.set(floor.id, collider);
+  }
+
+  // Called when an existing floor's material/overrides changed — replace just that floor.
+  private async _rebuildFloor(zoneId: string, floorId: string): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    const zone  = this._worldState.zones.get(zoneId);
+    if (!entry || !zone) return;
+
+    // Remove old mesh
     const toRemove: THREE.Mesh[] = [];
     entry.floorsGroup.traverse(child => {
-      if (child instanceof THREE.Mesh && child.userData["floorLevel"] === level)
+      if (child instanceof THREE.Mesh && child.userData["editorId"] === floorId)
         toRemove.push(child);
     });
     for (const mesh of toRemove) {
@@ -265,14 +290,17 @@ export class ZoneManager {
       entry.floorsGroup.remove(mesh);
     }
 
-    entry.floorColliders.forEach(c => physicsWorld.removeCollider(c));
-    entry.floorColliders.length = 0;
+    // Remove old collider
+    const oldCollider = entry.floorColliders.get(floorId);
+    if (oldCollider) { physicsWorld.removeCollider(oldCollider); entry.floorColliders.delete(floorId); }
 
-    const floor = zone.floors.find(f => f.level === level);
+    const floor = zone.floors.find(f => f.id === floorId);
     if (!floor) return;
-    const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId);
+
+    const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
+    const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, levelIndex);
     entry.floorsGroup.add(mesh);
-    entry.floorColliders.push(collider);
+    entry.floorColliders.set(floorId, collider);
   }
 
   // Processes a batch of wall IDs that need rebuilding in a single async pass.

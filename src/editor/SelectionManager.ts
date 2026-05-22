@@ -195,7 +195,7 @@ export class SelectionManager implements IEditorModule {
     if (!zone) return null;
     switch (editorType as EditorObjectType) {
       case "wall":     return zone.walls.find(w => w.id === editorId) ?? null;
-      case "floor":    return zone.floors.find(f => f.level === floorLevel) ?? null;
+      case "floor":    return zone.floors.find(f => f.id === editorId) ?? null;
       case "platform": return zone.platforms.find(p => p.id === editorId) ?? null;
       case "stair":    return zone.stairs.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;

@@ -8,13 +8,14 @@ import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 interface ToolInfo { desc: string; hint: string }
 
 const TOOL_INFO: Record<ToolId, ToolInfo> = {
-  select:   { desc: "Click any object to select it. Use gizmos to transform.", hint: "Nothing selected" },
-  floor:    { desc: "Click and drag to paint a floor region.",                 hint: "Click to place floor origin" },
-  wall:     { desc: "Click to set wall start, click again to set end.",        hint: "Click to place wall start" },
-  platform: { desc: "Click and drag to define a freestanding platform.",       hint: "Click to place platform" },
-  stair:    { desc: "Click bottom point, then top point of staircase.",        hint: "Click bottom of stair" },
-  object:   { desc: "Choose an asset below, click to place.",                  hint: "Select an asset first" },
-  zone:     { desc: "Draw a zone boundary to group rooms.",                    hint: "Click to define zone area" },
+  select:      { desc: "Click any object to select it. Use gizmos to transform.",  hint: "Nothing selected" },
+  floor:       { desc: "Click and drag to paint a rectangular floor region.",      hint: "Click to place floor origin" },
+  "poly-floor": { desc: "Click to place vertices. Enter or click first dot to close.", hint: "Click to add first vertex" },
+  wall:        { desc: "Click to set wall start, click again to set end.",         hint: "Click to place wall start" },
+  platform:    { desc: "Click and drag to define a freestanding platform.",        hint: "Click to place platform" },
+  stair:       { desc: "Click bottom point, then top point of staircase.",         hint: "Click bottom of stair" },
+  object:      { desc: "Choose an asset below, click to place.",                   hint: "Select an asset first" },
+  zone:        { desc: "Draw a zone boundary to group rooms.",                     hint: "Click to define zone area" },
 };
 
 const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;

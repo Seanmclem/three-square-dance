@@ -8,6 +8,7 @@ import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { SelectionManager } from "@/editor/SelectionManager";
 import { FloorTool } from "@/editor/FloorTool";
+import { PolygonFloorTool } from "@/editor/PolygonFloorTool";
 import { WallTool } from "@/editor/WallTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { physicsWorld } from "@/physics/PhysicsWorld";
@@ -15,7 +16,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef, QualityScale } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef, QualityScale } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -39,14 +40,15 @@ export default function App() {
   const busRef    = useRef<EventBus>(new EventBus());
   const worldRef  = useRef<WorldState | null>(null);
 
-  const [activeTool,   setActiveTool]   = useState<ToolId>("select");
-  const [activeFloor,  setActiveFloor]  = useState<number>(0);
-  const [coords,       setCoords]       = useState<Vec3>({ x: 0, y: 0, z: 0 });
-  const [selected,     setSelected]     = useState<SelectedObjectPayload | null>(null);
-  const [materialList, setMaterialList] = useState<MaterialDef[]>([]);
-  const [quality,      setQuality]      = useState<QualityScale>(
+  const [activeTool,       setActiveTool]       = useState<ToolId>("select");
+  const [activeFloor,      setActiveFloor]      = useState<number>(0);
+  const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
+  const [selected,         setSelected]         = useState<SelectedObjectPayload | null>(null);
+  const [materialList,     setMaterialList]     = useState<MaterialDef[]>([]);
+  const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
+  const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[] } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,9 +66,10 @@ export default function App() {
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const zones     = new ZoneManager(scene.scene, world, bus);
-    const floorTool  = new FloorTool(scene.scene, world, bus);
-    const wallTool   = new WallTool(scene.scene, world, bus);
-    const nodeDragger = new NodeDragger(scene.scene, world, bus);
+    const floorTool    = new FloorTool(scene.scene, world, bus);
+    const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
+    const wallTool     = new WallTool(scene.scene, world, bus);
+    const nodeDragger  = new NodeDragger(scene.scene, world, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
@@ -82,6 +85,7 @@ export default function App() {
     selection.init();
     zones.init();
     floorTool.init();
+    polyFloorTool.init();
     wallTool.init();
     nodeDragger.init();
 
@@ -95,6 +99,7 @@ export default function App() {
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected",   payload       => setSelected(payload)),
       bus.on("object:deselected", ()            => setSelected(null)),
+      bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
     ];
 
     // Init physics async — not blocking render
@@ -105,6 +110,7 @@ export default function App() {
       unsub.forEach(u => u());
       nodeDragger.dispose();
       wallTool.dispose();
+      polyFloorTool.dispose();
       floorTool.dispose();
       zones.dispose();
       selection.dispose();
@@ -143,7 +149,7 @@ export default function App() {
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as WallDef), ...changes } } : null);
     } else if (selected.type === "floor") {
       const floorDef = selected.data as FloorDef;
-      worldRef.current?.updateFloor(selected.zoneId, floorDef.level, changes as unknown as Partial<FloorDef>);
+      worldRef.current?.updateFloor(selected.zoneId, floorDef.id, changes as unknown as Partial<FloorDef>);
       const floorChanges = changes as unknown as Partial<FloorDef>;
       setSelected(prev => {
         if (!prev) return null;
@@ -187,6 +193,48 @@ export default function App() {
         onQualityChange={handleQualityChange}
       />
       <CoordinateDisplay coords={coords} />
+
+      {autoFloorPrompt && (
+        <div style={{
+          position: "absolute", bottom: 56, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(10,14,22,0.97)", border: "1px solid rgba(80,180,120,0.4)",
+          borderRadius: 8, padding: "10px 16px", zIndex: 30,
+          display: "flex", alignItems: "center", gap: 12,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+        }}>
+          <span style={{ color: "#7acca0", fontSize: 11 }}>
+            Fill closed loop with floor?
+          </span>
+          <button
+            onClick={() => {
+              const { zoneId, level, points } = autoFloorPrompt;
+              const zone = worldRef.current?.zones.get(zoneId);
+              const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? 0;
+              worldRef.current?.addFloor(zoneId, {
+                id:            crypto.randomUUID(),
+                level,
+                elevation,
+                ceilingHeight: null,
+                floorMesh: { shape: "polygon", points, material: "concrete_01" },
+              });
+              setAutoFloorPrompt(null);
+            }}
+            style={{
+              background: "rgba(80,180,120,0.2)", border: "1px solid rgba(80,180,120,0.5)",
+              borderRadius: 4, color: "#7acca0", fontSize: 10, cursor: "pointer",
+              padding: "3px 10px", fontFamily: "monospace",
+            }}
+          >Yes</button>
+          <button
+            onClick={() => setAutoFloorPrompt(null)}
+            style={{
+              background: "transparent", border: "1px solid rgba(80,120,180,0.3)",
+              borderRadius: 4, color: "#4a6a8a", fontSize: 10, cursor: "pointer",
+              padding: "3px 10px", fontFamily: "monospace",
+            }}
+          >No</button>
+        </div>
+      )}
 
       <div style={{
         position: "absolute", bottom: 16, right: 296,

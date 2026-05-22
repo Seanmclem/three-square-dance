@@ -3,6 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { Vec2, Vec3, WallDef, WallNode } from "@/types";
 
+
 type WallToolState = "IDLE" | "DRAWING";
 
 const GRID        = 0.5;
@@ -47,6 +48,7 @@ export class WallTool {
   private _startPoint: Vec2 | null = null;
   private _startNodeId: string | null = null;
   private _chainStartNodeId: string | null = null;
+  private _chainNodeIds: string[] = [];
   private _preview: THREE.Mesh | null = null;
   private _nodeDots     = new Map<string, THREE.Mesh>();
   private _activeZoneId = "demo";
@@ -153,6 +155,7 @@ export class WallTool {
       this._startPoint       = pos;
       this._startNodeId      = nodeId;
       this._chainStartNodeId = nodeId;
+      this._chainNodeIds     = [nodeId];
       this._state = "DRAWING";
       this._preview = makePreviewMesh(this._height, this._thickness);
       this._scene.add(this._preview);
@@ -237,8 +240,22 @@ export class WallTool {
     };
 
     this._world.addWall(this._activeZoneId, wall);
+    this._chainNodeIds.push(endNodeId);
 
     if (isLoopClose) {
+      // Emit auto-floor suggestion with the closed loop's points
+      const zone = this._getActiveZone();
+      if (zone) {
+        const points = this._chainNodeIds.slice(0, -1).map(id => {
+          const n = zone.nodes.find(nn => nn.id === id);
+          return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
+        });
+        this._bus.emit("floortool:suggest-auto-floor", {
+          zoneId: this._activeZoneId,
+          level:  this._activeLevel,
+          points,
+        });
+      }
       this._reset();
     } else {
       // Chain: continue drawing from the new end node
@@ -311,6 +328,7 @@ export class WallTool {
     this._startPoint       = null;
     this._startNodeId      = null;
     this._chainStartNodeId = null;
+    this._chainNodeIds     = [];
     this._hoveredNodeId    = null;
     this._state = "IDLE";
     document.body.style.cursor = "";

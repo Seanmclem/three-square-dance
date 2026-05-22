@@ -33,21 +33,19 @@ export class WorldState {
   addFloor(zoneId: string, floor: FloorDef): void {
     const zone = this.zones.get(zoneId);
     if (!zone) return;
-    const existing = zone.floors.findIndex(f => f.level === floor.level);
-    if (existing >= 0) zone.floors[existing] = floor;
-    else zone.floors.push(floor);
+    zone.floors.push(floor);
     this._bus.emit("floor:added", { zoneId, floor });
   }
 
-  updateFloor(zoneId: string, level: number, changes: Partial<FloorDef>): void {
+  updateFloor(zoneId: string, floorId: string, changes: Partial<FloorDef>): void {
     const zone  = this.zones.get(zoneId);
-    const floor = zone?.floors.find(f => f.level === level);
+    const floor = zone?.floors.find(f => f.id === floorId);
     if (!floor) return;
     if (changes.floorMesh) Object.assign(floor.floorMesh, changes.floorMesh);
     if (changes.elevation          !== undefined) floor.elevation          = changes.elevation;
     if (changes.ceilingHeight      !== undefined) floor.ceilingHeight      = changes.ceilingHeight;
     if ('materialOverrides' in changes)           floor.materialOverrides  = changes.materialOverrides;
-    this._bus.emit("floor:updated", { zoneId, level, changes });
+    this._bus.emit("floor:updated", { zoneId, floorId, changes });
   }
 
   // ─── Node mutations ───────────────────────────────────────────────────────

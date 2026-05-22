@@ -23,6 +23,15 @@ const SECTIONS: ShortcutSection[] = [
     ],
   },
   {
+    label: "POLYGON FLOOR TOOL  (P)",
+    rows: [
+      { keys: ["LMB"],               action: "Add vertex" },
+      { keys: ["click first dot"],   action: "Close & commit polygon" },
+      { keys: ["Enter", "Dbl-click"], action: "Commit polygon (3+ points)" },
+      { keys: ["Esc"],               action: "Cancel polygon" },
+    ],
+  },
+  {
     label: "SELECT TOOL",
     rows: [
       { keys: ["LMB drag node"],     action: "Move node (live rebuild)" },

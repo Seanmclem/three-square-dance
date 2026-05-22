@@ -42,7 +42,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "wall" | "platform" | "stair" | "object" | "zone";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "stair" | "object" | "zone";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -81,7 +81,8 @@ export interface BusEvents {
   "wall:rebuilt":          { zoneId: string; wallId: string };
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
   "floor:added":           { zoneId: string; floor: FloorDef };
-  "floor:updated":         { zoneId: string; level: number; changes: Partial<FloorDef> };
+  "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
+  "floortool:suggest-auto-floor": { zoneId: string; level: number; points: Vec2[] };
   "platform:added":        { zoneId: string; platform: PlatformDef };
   "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":      { zoneId: string; id: string };
@@ -207,6 +208,7 @@ export interface FloorMeshDef {
 }
 
 export interface FloorDef {
+  id:                string;
   level:             number;
   elevation:         number;
   ceilingHeight:     number | null;
