@@ -17,9 +17,7 @@ const SECTIONS: ShortcutSection[] = [
     label: "WALL TOOL",
     rows: [
       { keys: ["LMB"],               action: "Place segment / start chain" },
-      { keys: ["Enter"],             action: "Finish chain (keep walls)" },
-      { keys: ["Dbl-click"],         action: "Finish chain (keep walls)" },
-      { keys: ["Esc"],               action: "Discard ghost, keep placed" },
+      { keys: ["Enter", "Dbl-click", "Esc"], action: "End chain (placed walls kept)" },
       { keys: ["Shift"],             action: "Snap angle to 45°" },
       { keys: ["click start dot"],   action: "Close loop" },
     ],
