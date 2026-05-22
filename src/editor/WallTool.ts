@@ -246,14 +246,16 @@ export class WallTool {
       // Emit auto-floor suggestion with the closed loop's points
       const zone = this._getActiveZone();
       if (zone) {
-        const points = this._chainNodeIds.slice(0, -1).map(id => {
+        const nodeIds = this._chainNodeIds.slice(0, -1);
+        const points  = nodeIds.map(id => {
           const n = zone.nodes.find(nn => nn.id === id);
           return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
         });
         this._bus.emit("floortool:suggest-auto-floor", {
-          zoneId: this._activeZoneId,
-          level:  this._activeLevel,
+          zoneId:  this._activeZoneId,
+          level:   this._activeLevel,
           points,
+          nodeIds,
         });
       }
       this._reset();

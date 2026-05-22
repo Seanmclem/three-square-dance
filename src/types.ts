@@ -82,7 +82,7 @@ export interface BusEvents {
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
-  "floortool:suggest-auto-floor": { zoneId: string; level: number; points: Vec2[] };
+  "floortool:suggest-auto-floor": { zoneId: string; level: number; points: Vec2[]; nodeIds: string[] };
   "platform:added":        { zoneId: string; platform: PlatformDef };
   "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":      { zoneId: string; id: string };
@@ -204,6 +204,7 @@ export interface TerrainDef {
 export interface FloorMeshDef {
   shape:    "rect" | "polygon";
   points:   Vec2[] | null;
+  nodeIds?: string[];  // if set, points are derived from these wall nodes at build time
   material: string;
 }
 

@@ -4,7 +4,7 @@ import { WallBuilder } from "@/builders/WallBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, WallDef, WallNode, ZoneDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, WallNode, ZoneDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -96,6 +96,16 @@ function groupWallRuns(zone: ZoneDef, _nodes: Map<string, WallNode>): WallDef[][
   return runs;
 }
 
+// If a floor's floorMesh has nodeIds, resolve them to current node positions.
+function resolveFloorMesh(floorMesh: FloorMeshDef, zone: ZoneDef): FloorMeshDef {
+  if (!floorMesh.nodeIds?.length) return floorMesh;
+  const points = floorMesh.nodeIds.map(id => {
+    const n = zone.nodes.find(nn => nn.id === id);
+    return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
+  });
+  return { ...floorMesh, points };
+}
+
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
   private readonly _unsubs: Array<() => void> = [];
@@ -159,6 +169,10 @@ export class ZoneManager {
           if (wall.startNodeId === nodeId || wall.endNodeId === nodeId)
             this._queueRebuild(zoneId, wall.id);
         }
+        for (const floor of zone.floors) {
+          if (floor.floorMesh.nodeIds?.includes(nodeId))
+            void this._rebuildFloor(zoneId, floor.id);
+        }
       }),
     );
   }
@@ -208,8 +222,9 @@ export class ZoneManager {
     }
     for (const levFloors of floorsByLevel.values()) {
       for (let i = 0; i < levFloors.length; i++) {
-        const floor = levFloors[i]!;
-        const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, i);
+        const floor    = levFloors[i]!;
+        const resolved = { ...floor, floorMesh: resolveFloorMesh(floor.floorMesh, zone) };
+        const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, i);
         floorsGroup.add(mesh);
         floorColliders.set(floor.id, collider);
       }
@@ -266,7 +281,8 @@ export class ZoneManager {
     if (!entry || !zone) return;
 
     const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
-    const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, levelIndex);
+    const resolved   = { ...floor, floorMesh: resolveFloorMesh(floor.floorMesh, zone) };
+    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floor.id, collider);
   }
@@ -298,7 +314,8 @@ export class ZoneManager {
     if (!floor) return;
 
     const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
-    const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId, levelIndex);
+    const resolved   = { ...floor, floorMesh: resolveFloorMesh(floor.floorMesh, zone) };
+    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floorId, collider);
   }

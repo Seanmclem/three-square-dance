@@ -48,7 +48,7 @@ export default function App() {
   const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
-  const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[] } | null>(null);
+  const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -207,7 +207,7 @@ export default function App() {
           </span>
           <button
             onClick={() => {
-              const { zoneId, level, points } = autoFloorPrompt;
+              const { zoneId, level, points, nodeIds } = autoFloorPrompt;
               const zone = worldRef.current?.zones.get(zoneId);
               const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? 0;
               worldRef.current?.addFloor(zoneId, {
@@ -215,7 +215,7 @@ export default function App() {
                 level,
                 elevation,
                 ceilingHeight: null,
-                floorMesh: { shape: "polygon", points, material: "concrete_01" },
+                floorMesh: { shape: "polygon", points, nodeIds, material: "concrete_01" },
               });
               setAutoFloorPrompt(null);
             }}
