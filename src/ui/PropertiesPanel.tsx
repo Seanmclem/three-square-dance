@@ -183,13 +183,38 @@ function FloorView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   onAddMaterial:  () => void;
 }) {
   const floorData = selected.data as FloorDef | null;
+  const [elevStr, setElevStr] = useState(String(floorData?.elevation ?? 0));
+
+  useEffect(() => {
+    setElevStr(String(floorData?.elevation ?? 0));
+  }, [selected.id, floorData?.elevation]);
+
+  const commitElev = (raw: string) => {
+    const n = parseFloat(raw);
+    if (Number.isFinite(n)) onObjectUpdate({ elevation: n } as unknown as Partial<WorldObject>);
+  };
 
   return (
     <>
       <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
         <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
         <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
-          floor · level {floorData?.level ?? 0}
+          {floorData?.floorMesh.shape ?? "rect"} floor · level {floorData?.level ?? 0}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.08)" }}>
+        <div style={LABEL}>ELEVATION</div>
+        <input
+          type="text" inputMode="decimal"
+          value={elevStr}
+          onChange={e => setElevStr(e.target.value)}
+          onBlur={e => commitElev(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") commitElev((e.target as HTMLInputElement).value); }}
+          style={{ ...NUM_INPUT, width: 80 }}
+        />
+        <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 4 }}>
+          Adjust to layer overlapping floors (+0.001 per step)
         </div>
       </div>
 
