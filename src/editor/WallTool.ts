@@ -287,6 +287,27 @@ export class WallTool {
       (this._preview.material as THREE.Material).dispose();
       this._preview = null;
     }
+
+    // If the chain start node has no walls referencing it, it was created by
+    // the first click and never used — remove it so it doesn't become a
+    // dangling draggable dot with no geometry behind it.
+    if (this._chainStartNodeId) {
+      const zone = this._getActiveZone();
+      const unreferenced = zone && !zone.walls.some(
+        w => w.startNodeId === this._chainStartNodeId || w.endNodeId === this._chainStartNodeId,
+      );
+      if (unreferenced) {
+        this._world.removeNode(this._activeZoneId, this._chainStartNodeId);
+        const dot = this._nodeDots.get(this._chainStartNodeId);
+        if (dot) {
+          this._scene.remove(dot);
+          (dot.geometry as THREE.BufferGeometry).dispose();
+          (dot.material as THREE.Material).dispose();
+          this._nodeDots.delete(this._chainStartNodeId);
+        }
+      }
+    }
+
     this._startPoint       = null;
     this._startNodeId      = null;
     this._chainStartNodeId = null;
