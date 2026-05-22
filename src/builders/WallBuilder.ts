@@ -12,7 +12,7 @@ export interface WallBuildOutput {
 function applyBoxUVTiling(
   geo: THREE.BoxGeometry,
   W: number, H: number, D: number,
-  tileScale: number,
+  tileX: number, tileY: number,
 ): void {
   const uv  = geo.attributes.uv as THREE.BufferAttribute;
   const idx = geo.index!;
@@ -29,7 +29,7 @@ function applyBoxUVTiling(
       const vi = idx.getX(i);
       if (seen.has(vi)) continue;
       seen.add(vi);
-      uv.setXY(vi, uv.getX(vi) * uS * tileScale, uv.getY(vi) * vS * tileScale);
+      uv.setXY(vi, uv.getX(vi) * uS * tileX, uv.getY(vi) * vS * tileY);
     }
   }
   uv.needsUpdate = true;
@@ -110,6 +110,8 @@ export class WallBuilder {
     const ovr       = wall.materialOverrides;
     const baseDef   = assetManager.getMaterialDef(wall.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
+    const tileX     = ovr?.tileScaleX ?? tileScale;
+    const tileY     = ovr?.tileScaleY ?? tileScale;
 
     const dispEnabled = ovr?.maps?.displacement?.enabled
       ?? baseDef?.maps.displacement.enabled
@@ -118,7 +120,7 @@ export class WallBuilder {
     const segY = dispEnabled ? Math.max(1, Math.ceil(wall.height * 4)) : 1;
 
     const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness, segX, segY, 1);
-    applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileScale);
+    applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileX, tileY);
     geo.setAttribute('uv2', geo.attributes.uv);
 
     const mat = ovr
@@ -170,6 +172,8 @@ export class WallBuilder {
     const ovr       = wall.materialOverrides;
     const baseDef   = assetManager.getMaterialDef(wall.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
+    const tileX     = ovr?.tileScaleX ?? tileScale;
+    const tileY     = ovr?.tileScaleY ?? tileScale;
 
     // Cumulative arc-length for UV continuity across corners
     const cumDist: number[] = [0];
@@ -229,8 +233,8 @@ export class WallBuilder {
 
     for (let i = 0; i < pts.length; i++) {
       const l = lefts[i]!, r = rights[i]!;
-      const u = cumDist[i]! / tileScale;
-      const vTop = H / tileScale;
+      const u = cumDist[i]! / tileX;
+      const vTop = H / tileY;
       posArr.push(l.x, 0, l.z,  l.x, H, l.z,  r.x, 0, r.z,  r.x, H, r.z);
       uvArr.push( u,   0, u,   vTop,  u,  0, u, vTop);
     }

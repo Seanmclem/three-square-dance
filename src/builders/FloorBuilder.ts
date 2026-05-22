@@ -25,9 +25,11 @@ export class FloorBuilder {
     const cx   = minX + w / 2;
     const cz   = minZ + d / 2;
 
-    const ovr      = floor.materialOverrides;
-    const baseDef  = assetManager.getMaterialDef(floor.floorMesh.material);
+    const ovr       = floor.materialOverrides;
+    const baseDef   = assetManager.getMaterialDef(floor.floorMesh.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
+    const tileX     = ovr?.tileScaleX ?? tileScale;
+    const tileY     = ovr?.tileScaleY ?? tileScale;
 
     // Displacement requires subdivided geometry
     const dispEnabled = ovr?.maps?.displacement?.enabled
@@ -42,7 +44,7 @@ export class FloorBuilder {
 
     const uvAttr = geo.attributes["uv"] as THREE.BufferAttribute;
     for (let i = 0; i < uvAttr.count; i++) {
-      uvAttr.setXY(i, uvAttr.getX(i) * w * tileScale, uvAttr.getY(i) * d * tileScale);
+      uvAttr.setXY(i, uvAttr.getX(i) * w * tileX, uvAttr.getY(i) * d * tileY);
     }
     geo.setAttribute('uv2', geo.attributes.uv);
 

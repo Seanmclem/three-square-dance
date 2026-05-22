@@ -364,13 +364,21 @@ function MaterialSection({
 }) {
   const baseDef = materialList.find(m => m.id === currentMaterialId);
 
-  const [tileStr,  setTileStr]  = useState(String(overrides?.tileScale         ?? baseDef?.tileScale         ?? 1.0));
-  const [roughStr, setRoughStr] = useState(String(overrides?.roughnessVal      ?? baseDef?.roughnessVal      ?? 0.85));
-  const [dispStr,  setDispStr]  = useState(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
+  const hasSplitInit = !!(overrides?.tileScaleX !== undefined || overrides?.tileScaleY !== undefined);
+  const [tileStr,   setTileStr]   = useState(String(overrides?.tileScale         ?? baseDef?.tileScale         ?? 1.0));
+  const [tileXStr,  setTileXStr]  = useState(String(overrides?.tileScaleX        ?? overrides?.tileScale        ?? baseDef?.tileScale ?? 1.0));
+  const [tileYStr,  setTileYStr]  = useState(String(overrides?.tileScaleY        ?? overrides?.tileScale        ?? baseDef?.tileScale ?? 1.0));
+  const [splitTile, setSplitTile] = useState(hasSplitInit);
+  const [roughStr,  setRoughStr]  = useState(String(overrides?.roughnessVal      ?? baseDef?.roughnessVal      ?? 0.85));
+  const [dispStr,   setDispStr]   = useState(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
 
   // Reset local string state when the selected material changes
   useEffect(() => {
-    setTileStr(String(overrides?.tileScale         ?? baseDef?.tileScale         ?? 1.0));
+    const base = overrides?.tileScale ?? baseDef?.tileScale ?? 1.0;
+    setTileStr(String(base));
+    setTileXStr(String(overrides?.tileScaleX ?? base));
+    setTileYStr(String(overrides?.tileScaleY ?? base));
+    setSplitTile(!!(overrides?.tileScaleX !== undefined || overrides?.tileScaleY !== undefined));
     setRoughStr(String(overrides?.roughnessVal     ?? baseDef?.roughnessVal      ?? 0.85));
     setDispStr(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
   }, [currentMaterialId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -395,7 +403,36 @@ function MaterialSection({
   const commitTile = (val: string) => {
     const n = parseFloat(val);
     if (!Number.isFinite(n) || n <= 0) return;
-    onOverridesChange({ ...overrides, tileScale: n });
+    onOverridesChange({ ...overrides, tileScale: n, tileScaleX: undefined, tileScaleY: undefined });
+  };
+
+  const commitTileX = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onOverridesChange({ ...overrides, tileScaleX: n });
+  };
+
+  const commitTileY = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onOverridesChange({ ...overrides, tileScaleY: n });
+  };
+
+  const toggleSplitTile = () => {
+    const next = !splitTile;
+    setSplitTile(next);
+    if (next) {
+      // Seed X/Y from the current unified value
+      const base = parseFloat(tileStr);
+      const seed = Number.isFinite(base) && base > 0 ? base : 1.0;
+      setTileXStr(String(seed));
+      setTileYStr(String(seed));
+      onOverridesChange({ ...overrides, tileScaleX: seed, tileScaleY: seed });
+    } else {
+      // Collapse back: keep tileScale, drop X/Y
+      setTileStr(tileXStr);
+      onOverridesChange({ ...overrides, tileScale: parseFloat(tileXStr) || 1.0, tileScaleX: undefined, tileScaleY: undefined });
+    }
   };
 
   const commitRough = (val: string) => {
@@ -449,15 +486,55 @@ function MaterialSection({
       </div>
 
       {/* Tile scale */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE</div>
+      {splitTile ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE X</div>
+            <input
+              type="number" step={0.1} min={0.1}
+              value={tileXStr}
+              onChange={e => setTileXStr(e.target.value)}
+              onBlur={e => commitTileX(e.target.value)}
+              style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE Y</div>
+            <input
+              type="number" step={0.1} min={0.1}
+              value={tileYStr}
+              onChange={e => setTileYStr(e.target.value)}
+              onBlur={e => commitTileY(e.target.value)}
+              style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE</div>
+          <input
+            type="number" step={0.1} min={0.1}
+            value={tileStr}
+            onChange={e => setTileStr(e.target.value)}
+            onBlur={e => commitTile(e.target.value)}
+            style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+          />
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
-          type="number" step={0.1} min={0.1}
-          value={tileStr}
-          onChange={e => setTileStr(e.target.value)}
-          onBlur={e => commitTile(e.target.value)}
-          style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+          type="checkbox"
+          id="split-tile"
+          checked={splitTile}
+          onChange={toggleSplitTile}
+          style={{ cursor: "pointer", accentColor: "#4d8cff", margin: 0 }}
         />
+        <label
+          htmlFor="split-tile"
+          style={{ color: "#4a6a8a", fontSize: 10, cursor: "pointer", userSelect: "none" }}
+        >
+          split X / Y
+        </label>
       </div>
 
       {/* Map toggles */}

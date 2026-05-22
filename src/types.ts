@@ -32,6 +32,8 @@ export interface MaterialManifest {
 export interface MaterialOverrides {
   maps?:              Partial<Record<keyof MaterialDef['maps'], { enabled: boolean }>>;
   tileScale?:         number;
+  tileScaleX?:        number;
+  tileScaleY?:        number;
   roughnessVal?:      number;
   displacementScale?: number;
 }
