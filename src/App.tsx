@@ -9,6 +9,7 @@ import { ZoneManager } from "@/world/ZoneManager";
 import { SelectionManager } from "@/editor/SelectionManager";
 import { FloorTool } from "@/editor/FloorTool";
 import { WallTool } from "@/editor/WallTool";
+import { NodeDragger } from "@/editor/NodeDragger";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -63,8 +64,9 @@ export default function App() {
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const zones     = new ZoneManager(scene.scene, world, bus);
-    const floorTool = new FloorTool(scene.scene, world, bus);
-    const wallTool  = new WallTool(scene.scene, world, bus);
+    const floorTool  = new FloorTool(scene.scene, world, bus);
+    const wallTool   = new WallTool(scene.scene, world, bus);
+    const nodeDragger = new NodeDragger(scene.scene, world, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
@@ -81,6 +83,7 @@ export default function App() {
     zones.init();
     floorTool.init();
     wallTool.init();
+    nodeDragger.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -100,6 +103,7 @@ export default function App() {
     return () => {
       worldRef.current = null;
       unsub.forEach(u => u());
+      nodeDragger.dispose();
       wallTool.dispose();
       floorTool.dispose();
       zones.dispose();

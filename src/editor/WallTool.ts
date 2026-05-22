@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { Vec2, Vec3, WallDef, WallNode } from "@/types";
 
-type WallToolState = "IDLE" | "PLACING";
+type WallToolState = "IDLE" | "DRAWING";
 
 const GRID        = 0.5;
 const SNAP_RADIUS = 0.5;
@@ -27,14 +27,14 @@ function makePreviewMesh(height: number, thickness: number): THREE.Mesh {
   return mesh;
 }
 
-function makeNodeDot(highlighted = false): THREE.Mesh {
+function makeNodeDot(): THREE.Mesh {
   const geo = new THREE.SphereGeometry(0.12, 8, 8);
   const mat = new THREE.MeshBasicMaterial({
-    color:       highlighted ? 0xffdd44 : 0x4d8cff,
+    color:       0x4d8cff,
     depthTest:   false,
     depthWrite:  false,
     transparent: true,
-    opacity:     highlighted ? 1.0 : 0.7,
+    opacity:     0.7,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 2;
@@ -43,11 +43,12 @@ function makeNodeDot(highlighted = false): THREE.Mesh {
 
 export class WallTool {
   private _state: WallToolState = "IDLE";
-  private _active       = false;
+  private _active              = false;
   private _startPoint: Vec2 | null = null;
   private _startNodeId: string | null = null;
+  private _chainStartNodeId: string | null = null;
   private _preview: THREE.Mesh | null = null;
-  private _nodeDots     = new Map<string, THREE.Mesh>();   // nodeId → dot mesh
+  private _nodeDots     = new Map<string, THREE.Mesh>();
   private _activeZoneId = "demo";
   private _activeLevel  = 0;
   private _height       = 3;
@@ -82,12 +83,16 @@ export class WallTool {
         if (button !== 0) { this._reset(); return; }
         this._onLeftClick(worldPos);
       }),
+      this._bus.on("input:dblclick", () => {
+        if (this._active && this._state === "DRAWING") this._finishChain();
+      }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
         if (this._active) this._onMouseMove(worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (code === "ShiftLeft" || code === "ShiftRight") this._shiftDown = true;
         if (this._active && code === "Escape") this._reset();
+        if (this._active && code === "Enter" && this._state === "DRAWING") this._finishChain();
       }),
       this._bus.on("input:keyup", ({ code }) => {
         if (code === "ShiftLeft" || code === "ShiftRight") this._shiftDown = false;
@@ -135,7 +140,6 @@ export class WallTool {
       ex = snap(this._startPoint.x + Math.cos(snappedAngle) * len);
       ez = snap(this._startPoint.z + Math.sin(snappedAngle) * len);
     }
-    // Snap to existing node if close enough
     const snapped = this._findSnapNode(ex, ez);
     if (snapped) return { x: snapped.x, z: snapped.z };
     return { x: ex, z: ez };
@@ -146,9 +150,10 @@ export class WallTool {
       const sx = snap(worldPos.x);
       const sz = snap(worldPos.z);
       const { nodeId, pos } = this._getOrCreateNode(sx, sz);
-      this._startPoint  = pos;
-      this._startNodeId = nodeId;
-      this._state = "PLACING";
+      this._startPoint       = pos;
+      this._startNodeId      = nodeId;
+      this._chainStartNodeId = nodeId;
+      this._state = "DRAWING";
       this._preview = makePreviewMesh(this._height, this._thickness);
       this._scene.add(this._preview);
     } else {
@@ -157,7 +162,7 @@ export class WallTool {
   }
 
   private _onMouseMove(worldPos: Vec3): void {
-    if (this._state === "PLACING" && this._preview && this._startPoint) {
+    if (this._state === "DRAWING" && this._preview && this._startPoint) {
       const end = this._calcEnd(worldPos);
       const dx = end.x - this._startPoint.x;
       const dz = end.z - this._startPoint.z;
@@ -172,21 +177,39 @@ export class WallTool {
       this._preview.rotation.y = -angle;
     }
 
-    // Highlight nearest node
     const sx = snap(worldPos.x);
     const sz = snap(worldPos.z);
     const nearest = this._findSnapNode(sx, sz);
     const nearestId = nearest?.id ?? null;
+    const isNearChainStart = this._state === "DRAWING"
+      && nearestId !== null
+      && nearestId === this._chainStartNodeId;
+
     if (nearestId !== this._hoveredNodeId) {
       if (this._hoveredNodeId) {
         const dot = this._nodeDots.get(this._hoveredNodeId);
-        if (dot) (dot.material as THREE.MeshBasicMaterial).color.setHex(0x4d8cff);
+        if (dot) {
+          (dot.material as THREE.MeshBasicMaterial).color.setHex(0x4d8cff);
+          (dot.material as THREE.MeshBasicMaterial).opacity = 0.7;
+        }
       }
       if (nearestId) {
         const dot = this._nodeDots.get(nearestId);
-        if (dot) (dot.material as THREE.MeshBasicMaterial).color.setHex(0xffdd44);
+        if (dot) {
+          (dot.material as THREE.MeshBasicMaterial).color.setHex(isNearChainStart ? 0x00ff88 : 0xffdd44);
+          (dot.material as THREE.MeshBasicMaterial).opacity = 1.0;
+        }
       }
       this._hoveredNodeId = nearestId;
+    }
+
+    // Cursor state
+    if (this._state === "DRAWING") {
+      if (isNearChainStart) document.body.style.cursor = "pointer";
+      else if (nearestId)   document.body.style.cursor = "move";
+      else                  document.body.style.cursor = "crosshair";
+    } else {
+      document.body.style.cursor = nearestId ? "move" : "crosshair";
     }
   }
 
@@ -199,6 +222,7 @@ export class WallTool {
     if (Math.hypot(epSnapped.x - sp.x, epSnapped.z - sp.z) < GRID) { this._reset(); return; }
 
     const { nodeId: endNodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
+    const isLoopClose = endNodeId === this._chainStartNodeId;
 
     const wall: WallDef = {
       id:               `wall_${crypto.randomUUID().slice(0, 8)}`,
@@ -213,6 +237,19 @@ export class WallTool {
     };
 
     this._world.addWall(this._activeZoneId, wall);
+
+    if (isLoopClose) {
+      this._reset();
+    } else {
+      // Chain: continue drawing from the new end node
+      this._startPoint      = epSnapped;
+      this._startNodeId     = endNodeId;
+      this._hoveredNodeId   = null;
+      // Keep the existing preview mesh; _onMouseMove will reposition it
+    }
+  }
+
+  private _finishChain(): void {
     this._reset();
   }
 
@@ -250,9 +287,12 @@ export class WallTool {
       (this._preview.material as THREE.Material).dispose();
       this._preview = null;
     }
-    this._startPoint  = null;
-    this._startNodeId = null;
+    this._startPoint       = null;
+    this._startNodeId      = null;
+    this._chainStartNodeId = null;
+    this._hoveredNodeId    = null;
     this._state = "IDLE";
+    document.body.style.cursor = "";
   }
 
   setActiveZone(zoneId: string): void { this._activeZoneId = zoneId; }
