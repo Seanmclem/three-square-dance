@@ -69,6 +69,13 @@ export default function App() {
     // Seed world with the demo zone
     world.addZone(createDemoZone());
 
+    if (import.meta.env.DEV) {
+      const g = window as unknown as Record<string, unknown>;
+      g.__scene = scene.scene; g.__camera = scene.camera;
+      g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
+    }
+
+
     input.init();
     selection.init();
     zones.init();

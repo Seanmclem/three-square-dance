@@ -1,5 +1,15 @@
 # 3D World Editor — Full Project Architecture
-> RPG/Exploration Game World Editor built with Vite + React + Three.js (no R3F)
+> Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
+
+**Version 1.7.0** — last updated during active development session
+- v1.0 — Initial architecture, Phases 1–12
+- v1.1 — TypeScript conversion, full type system, tsconfig
+- v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
+- v1.3 — Phase 4.5 material system, Phase 4.6 wall graph, ambientCG naming convention
+- v1.4 — Dynamic asset manifest, Phase 7 model importer, Phase 9 persistence split, Phase 10.5 scripting/event system
+- v1.5 — Default spawn system, Preview vs Start Game, SpawnPointTool, item/dialogue/quest/audio stubs in Phase 12
+- v1.6 — Phase 6 fully specced: dynamic floor tabs, floor creation flow, derived elevation, PropertiesPanel floor view, ceiling toggle, no deletion
+- v1.7 — Phase 4.7 merged corner geometry, Phase 4.8 complete wall interaction model (chain, loop close, node dragging)
 
 ---
 
@@ -73,6 +83,7 @@ export interface BusEvents {
   "wall:removed":         { zoneId: string; wallId: string };
   "floor:added":          { zoneId: string; floor: FloorDef };
   "floor:updated":        { zoneId: string; level: number; changes: Partial<FloorDef> };
+  "floor:elevation-changed": { zoneId: string; affectedLevels: number[] };  // cascade rebuild trigger
   "platform:added":       { zoneId: string; platform: PlatformDef };
   "platform:updated":     { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":     { zoneId: string; id: string };
@@ -98,6 +109,11 @@ export interface BusEvents {
   "scene:saved":          { json: SceneFile };
   "scene:loaded":         { metadata: SceneMetadata };
   "world:loaded":         { metadata: SceneMetadata };
+  "materials:loaded":     { materials: MaterialDef[] };
+  "assets:loaded":        { assets: AssetDef[] };
+  "script:trigger":       { triggerId: string; context: ScriptContext };
+  "flag:set":             { flag: string; value: boolean };
+  "spawn:set":            { spawn: SpawnPoint };
   "terrain:sculpt":       { x: number; z: number; radius: number; delta: number };
   "input:click":          { screenPos: Vec2; worldPos: Vec3; button: number };
   "input:dblclick":       { screenPos: Vec2; worldPos: Vec3 };
@@ -175,6 +191,12 @@ export interface SkyConfig {
   sunAzimuth:       number;   // degrees, default 180
 }
 
+export interface SpawnPoint {
+  position:  Vec3;
+  zoneId:    string;
+  facing:    number;   // degrees
+}
+
 export interface WorldConfig {
   size:           { width: number; depth: number };
   ambientLight:   { color: string; intensity: number };
@@ -182,6 +204,7 @@ export interface WorldConfig {
   sky:            SkyConfig;
   fogDensity:     number;   // fog color derived from sky at horizon, not hardcoded
   playerSettings: PlayerSettings;
+  defaultSpawn:   SpawnPoint;   // where the player starts with no game save
 }
 
 export interface TerrainLayerMaterial {
@@ -206,10 +229,12 @@ export interface FloorMeshDef {
 }
 
 export interface FloorDef {
-  level:         number;
-  elevation:     number;
-  ceilingHeight: number | null;
-  floorMesh:     FloorMeshDef;
+  level:          number;
+  elevation:      number;    // read-only at runtime — always derived from floors below
+  ceilingHeight:  number | null;  // null = no ceiling (outdoor zones)
+  slabThickness:  number;    // default 0.2m — affects elevation of floor above
+  renderCeiling:  boolean;   // false for outdoor zones
+  floorMesh:      FloorMeshDef;
   materialOverrides?: MaterialOverrides;
 }
 
@@ -295,7 +320,9 @@ export interface ZoneDef {
   walls:     WallDef[];
   platforms: PlatformDef[];
   stairs:    StairDef[];
-  objects:   WorldObject[];
+  objects:        WorldObject[];
+  scripts:        ScriptDef[];
+  triggerVolumes: TriggerVolume[];
 }
 
 export interface TransitionDef {
@@ -409,6 +436,174 @@ export interface MaterialOverrides {
   displacementScale?: number;
 }
 
+// ─── Asset registry ──────────────────────────────────────────────────────────
+
+export type ColliderType = 'box' | 'mesh' | 'none';
+export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other';
+
+export interface AssetDef {
+  id:            string;
+  label:         string;
+  category:      AssetCategory;
+  path:          string;                  // /assets/models/<id>.glb
+  thumbnail?:    string;                  // /assets/models/thumbnails/<id>.png — auto-generated on import
+  collidable:    boolean;
+  colliderType:  ColliderType;
+  tags:          string[];
+  dateAdded:     string;                  // ISO timestamp
+}
+
+export interface AssetManifest {
+  version:  string;
+  assets:   AssetDef[];
+}
+
+// ─── Scripting / Event system ─────────────────────────────────────────────────
+
+export type TriggerType =
+  | 'on_player_enter'   // player enters a trigger volume
+  | 'on_player_exit'    // player leaves a trigger volume
+  | 'on_interact'       // player presses interact key near object
+  | 'on_timer'          // fires after N seconds
+  | 'on_health_zero'    // NPC/enemy dies
+  | 'on_flag_set'       // a game flag was set
+  | 'on_flag_cleared'   // a game flag was cleared
+  | 'on_zone_enter'     // player enters a zone
+  | 'on_game_start';    // fires once on scene load
+
+export type ConditionType =
+  | 'flag_set'
+  | 'flag_not_set'
+  | 'player_has_item'
+  | 'player_health_above'
+  | 'player_health_below'
+  | 'npc_alive'
+  | 'npc_dead';
+
+export type ActionType =
+  | 'play_sound'
+  | 'show_dialogue'
+  | 'move_object'
+  | 'play_animation'
+  | 'spawn_npc'
+  | 'despawn_object'
+  | 'change_material'
+  | 'open_door'
+  | 'close_door'
+  | 'set_flag'
+  | 'clear_flag'
+  | 'fire_event'
+  | 'fade_screen'
+  | 'teleport_player'
+  | 'show_ui'
+  | 'give_item'
+  | 'run_script';        // JavaScript escape hatch
+
+export interface ScriptTrigger {
+  type:       TriggerType;
+  targetId?:  string;        // object/zone/volume ID the trigger watches
+  delay?:     number;        // seconds delay before firing (optional)
+  repeat?:    boolean;       // for on_timer: repeat or one-shot
+  interval?:  number;        // for on_timer: seconds between fires
+}
+
+export interface ScriptCondition {
+  type:    ConditionType;
+  flag?:   string;
+  itemId?: string;
+  value?:  number;
+  npcId?:  string;
+}
+
+export interface ScriptAction {
+  type:         ActionType;
+  targetId?:    string;       // object to act on
+  animation?:   string;       // animation clip name
+  sound?:       string;       // sound asset id
+  dialogue?:    DialogueDef;
+  material?:    string;       // material id for change_material
+  position?:    Vec3;         // for move_object, teleport_player, spawn_npc
+  flag?:        string;       // for set_flag / clear_flag
+  eventId?:     string;       // for fire_event
+  itemId?:      string;       // for give_item
+  fadeColor?:   string;
+  fadeDuration?:number;
+  uiElementId?: string;
+  // JavaScript escape hatch — sandboxed, runs in a limited context
+  script?:      string;       // JS function body as string — see ScriptContext
+}
+
+export interface DialogueDef {
+  speaker:  string;
+  lines:    string[];         // array of lines, player advances through them
+  portrait?:string;           // asset id for speaker portrait image
+}
+
+export interface ScriptDef {
+  id:          string;
+  label:       string;        // human-readable name shown in Script Panel
+  zoneId:      string;        // which zone this script belongs to
+  enabled:     boolean;
+  trigger:     ScriptTrigger;
+  conditions:  ScriptCondition[];   // ALL must pass (AND logic)
+  actions:     ScriptAction[];      // executed in order
+  oneShot:     boolean;       // if true, disables itself after first successful fire
+}
+
+// Runtime context passed to sandboxed JS scripts
+export interface ScriptContext {
+  objectId:   string;         // ID of the object that triggered this
+  playerId:   string;
+  flags:      Record<string, boolean>;
+  // Methods available to scripts:
+  // setFlag(flag: string): void
+  // clearFlag(flag: string): void
+  // hasFlag(flag: string): boolean
+  // playSound(id: string): void
+  // showDialogue(speaker: string, lines: string[]): void
+  // teleportPlayer(position: Vec3): void
+  // despawnObject(id: string): void
+  // fireEvent(eventId: string): void
+}
+
+// Trigger volume — placed in world, referenced by scripts
+export interface TriggerVolume {
+  id:       string;
+  label:    string;
+  position: Vec3;
+  size:     Vec3;             // width, height, depth
+  zoneId:   string;
+}
+
+// ─── Persistence ──────────────────────────────────────────────────────────────
+
+// Scene file — world definition, saved/loaded by user explicitly
+// (already defined as SceneFile — add scripts and triggerVolumes to ZoneDef)
+
+// Game state — runtime state, auto-saved separately
+export interface GameSave {
+  version:        string;
+  timestamp:      string;
+  sceneName:      string;
+  playerPosition: Vec3;
+  playerZoneId:   string;
+  playerFacing:   number;
+  flags:          Record<string, boolean>;
+  firedOneShots:  string[];               // script IDs that have fired and disabled
+  inventory:      string[];               // item IDs
+}
+
+// Editor preferences — user settings, persisted to localStorage
+export interface EditorPreferences {
+  quality:          QualitySettings;
+  lastOpenedScene:  string | null;
+  gridVisible:      boolean;
+  snapEnabled:      boolean;
+  snapUnit:         number;
+  cameraSpeed:      number;
+  theme:            'dark';               // only dark for now
+}
+
 // ─── Builder return types ─────────────────────────────────────────────────────
 
 export interface WallBuildResult {
@@ -487,6 +682,9 @@ world-editor/
 │   │   ├── PhysicsWorld.ts         ← Rapier world singleton, step loop, debug draw
 │   │   ├── ColliderBuilder.ts      ← mesh → Rapier collider (called by every builder)
 │   │   └── CharacterBody.ts        ← Rapier KinematicCharacterController wrapper
+│   ├── scripting/
+│   │   ├── ScriptEngine.ts         ← Runtime script execution, flag system
+│   │   └── GameStateManager.ts     ← GameSave persistence, auto-save
 │   ├── preview/
 │   │   ├── PreviewController.ts
 │   │   ├── CharacterController.ts  ← input + camera; delegates physics to CharacterBody
@@ -597,6 +795,11 @@ The canonical save/load format. All builders read exclusively from this structur
       "fov": 75,
       "thirdPersonDistance": 4.0,
       "thirdPersonHeight": 1.8
+    },
+    "defaultSpawn": {
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "zoneId": "zone_001",
+      "facing": 0
     }
   },
   "terrain": {
@@ -3031,6 +3234,167 @@ Two old walls that happened to share the same coordinates get the same node — 
 
 
 
+### Phase 4.7 — Merged Corner Geometry
+
+Builds directly on the wall graph from Phase 4.6. Instead of two separate trimmed meshes at corners, compatible connected walls are merged into a single continuous extruded mesh with a clean mitered join.
+
+#### Compatibility Rules for Merging
+
+Two walls sharing a node are merged into one run only when ALL of the following are true:
+- Same `material` and `exteriorMaterial`
+- Same `height`
+- The shared node has exactly **two** walls connected (no T-junctions or crossings)
+
+If any condition fails, fall back to the existing trimmed separate mesh approach from 4.6.
+
+#### WallBuilder — new `buildRun()` method
+
+```ts
+// Existing — builds one wall segment independently
+static build(wall: WallDef, zone: ZoneDef, nodes: Map<string, WallNode>): WallBuildResult
+
+// New — builds a continuous merged mesh from a sequence of compatible walls
+static buildRun(walls: WallDef[], zone: ZoneDef, nodes: Map<string, WallNode>): WallBuildResult
+```
+
+The run is an ordered array of walls that form a connected chain. `buildRun()` traces the node sequence to get an ordered polyline of points, then extrudes a rectangular cross-section along it with proper mitered joins at each corner:
+
+```ts
+// Pseudocode for miter join at interior corner
+// Given three consecutive points A → B → C:
+// 1. Compute inward normals of AB and BC
+// 2. Find miter direction (bisector of the two normals)
+// 3. Compute miter length = thickness / 2 / sin(half-angle)
+// 4. Offset corner vertex along miter direction
+// This gives a clean sharp join regardless of angle
+```
+
+UV mapping along a run: U coordinate continues across the entire run length — so a brick texture flows continuously around a corner without restarting at the join.
+
+**Openings on merged runs:** CSG cutouts still work per-opening. Each opening's position is computed as a world offset along the run's total length, same as before. The merged mesh is the base geometry; openings are subtracted from it.
+
+**Collision geometry:** Still split into per-segment boxes around openings — same as before, not affected by visual merge.
+
+#### ZoneManager — run grouping
+
+Before building wall meshes for a zone, ZoneManager groups walls into runs:
+
+```ts
+function groupWallRuns(zone: ZoneDef, nodes: Map<string, WallNode>): WallDef[][] {
+  // 1. Build adjacency: for each node, list connected walls
+  // 2. Traverse connected walls, grouping compatible ones into runs
+  // 3. A run ends when: node has >2 walls (T-junction), material/height differs, or no more connected walls
+  // 4. Return array of runs (each run is an array of WallDef in connection order)
+}
+```
+
+Single-wall runs (isolated walls, T-junction endpoints) → `WallBuilder.build()`
+Multi-wall runs → `WallBuilder.buildRun()`
+
+#### Incremental Rebuild
+
+When a wall in a run changes (material, height, opening added):
+1. Re-evaluate which run it belongs to
+2. Dispose and rebuild the entire run's mesh
+3. Adjacent runs that may have changed compatibility also rebuilt
+
+This is slightly more expensive than rebuilding a single wall, but runs are typically short (2–6 walls) so it's fast in practice.
+
+---
+
+### Phase 4.8 — Wall Tool Interaction Model
+
+Completes the wall drawing and editing experience. Builds on 4.6 (node graph) and 4.7 (merged geometry).
+
+#### Wall Chain — Complete Spec
+
+The WallTool already chains walls (set startPoint = endPoint after each click). Phase 4.8 fills in the gaps:
+
+**Closing a loop:**
+- While in DRAWING state, if the cursor snaps to the very first node of the current chain (the node where the chain started), clicking completes the loop
+- Visual indicator: the first node pulses/highlights when the cursor is within snap radius of it
+- On close: the final wall connects endNode back to the chain's startNode
+- ZoneManager detects the closed loop — in Phase 12 this enables room auto-detection
+- After closing: return to IDLE
+
+**Starting from an existing node:**
+- In IDLE state, clicking near an existing node (within snap radius) starts a new chain FROM that node
+- Uses that node's ID as `startNodeId` of the first new wall
+- Continuation feels natural — like picking up where you left off
+
+**Escape behaviour:**
+- Esc during DRAWING: discard only the current in-progress wall segment (the ghost), keep all previously placed walls in the chain
+- Double-Esc or Esc from IDLE: do nothing (already idle)
+- The chain is committed wall by wall — placing a wall is immediately written to WorldState, not held in a buffer
+
+#### Node Dragging in Select Mode
+
+When the Select tool is active and the user clicks/drags a wall node:
+
+```
+Detection:
+  On mousemove (select tool active):
+    Check proximity to all nodes in active zone (within 8px screen space)
+    If near a node: show node highlight, cursor changes to move cursor
+
+On mousedown near a node:
+  Enter NODE_DRAG state
+  Store original node position (for cancel)
+  Suppress camera orbit during drag
+
+During NODE_DRAG (mousemove):
+  Update node position to snapped world position (0.5m grid, or free if Alt held)
+  All walls referencing this node immediately rebuild their meshes (live preview)
+  Rapier colliders update in real time
+
+On mouseup:
+  Confirm drag — node position written to WorldState via worldState.updateNode()
+  All affected wall runs re-evaluated and rebuilt
+  Return to normal select state
+
+On Esc during drag:
+  Restore node to original position
+  Rebuild affected walls
+  Return to normal select state
+```
+
+Node dragging is only available in Select mode — not while any other tool is active.
+
+**Visual node indicators (Select mode):**
+- All nodes in active zone shown as small square dots (4px, colour: `--text-dim`)
+- Hovered node: larger dot (6px, colour: `--accent`)
+- Dragging node: ring indicator showing original position as ghost
+- Nodes only visible when Select tool OR Wall tool is active — hidden otherwise
+
+#### WallTool Cursor States
+
+| State | Cursor | Visual |
+|---|---|---|
+| IDLE, no node nearby | crosshair | snapped dot on ground |
+| IDLE, near existing node | move | node highlight pulse |
+| DRAWING, free space | crosshair | ghost wall + length label |
+| DRAWING, near existing node | move | node highlight + snap indicator |
+| DRAWING, near chain start node | pointer | chain-start node pulses green |
+
+#### Updated WallTool State Machine
+
+```
+IDLE
+  mousemove → check node proximity → highlight nearest node if within snap
+  click (free space) → create new node → startNodeId = new node → enter DRAWING
+  click (near existing node) → startNodeId = existing node → enter DRAWING
+
+DRAWING
+  mousemove → update ghost wall end position
+             → check node proximity at end position
+             → if near chain start node: highlight it green (loop close indicator)
+  click (free space) → create new node → place wall → startNode = new node → stay DRAWING
+  click (near existing node, not chain start) → reuse node → place wall → startNode = that node → stay DRAWING
+  click (near chain start node) → close loop → place final wall → worldState → IDLE
+  dblclick or Enter → finish chain open-ended → IDLE
+  Esc → discard current ghost segment → IDLE (prior walls in chain already committed)
+```
+
 ### Phase 5 — Openings (Doors & Windows)
 - CSG integration via `utils/csg.ts` (three-bvh-csg) — visual mesh only
 - WallBuilder: CSG subtract openings from visual mesh; collision geometry is **separate** (no CSG on physics — split wall into segments around openings instead)
@@ -3111,6 +3475,138 @@ this._body.setNextKinematicTranslation(newPos);
 
 **PreviewHUD**: crosshair, zone name toast, floor indicator, Esc hint
 
+**Spawn Point Tool (`SpawnPointTool.ts`):**
+- Places a visible spawn marker in the editor (arrow/character icon at ground level)
+- Only one default spawn exists per world — placing a new one moves the existing one
+- Marker shows facing direction as an arrow
+- Stored as `worldConfig.defaultSpawn` in WorldState
+- Editable in PropertiesPanel when selected: position XYZ, facing degrees
+- Visible in editor, invisible in preview/play mode
+
+**Preview vs Start Game — two distinct modes:**
+
+| | Preview | Start Game |
+|---|---|---|
+| Spawn position | Editor camera focus point | `worldConfig.defaultSpawn` |
+| Game save | Ignored | Loaded if exists, else fresh |
+| Flags | All cleared | Restored from game save |
+| Scripts | Active | Active |
+| Purpose | Test geometry/feel quickly | Test actual game flow |
+
+The Play button in the toolbar has two states:
+- Single click → **Preview** (drop at camera, no game save involvement)
+- Long press or dropdown → **Start Game** (proper spawn, load/create game save)
+
+`PreviewController.enter(mode: 'preview' | 'game')` handles both — in `'game'` mode it reads `worldConfig.defaultSpawn` for position and calls `GameStateManager.load()` before spawning the character.
+
+### Phase 10.5 — Scripting / Event System
+
+Sits after preview mode (Phase 10) because scripts need a character to trigger them. Before terrain (Phase 11) because terrain zones need scripts too.
+
+**`ScriptEngine.ts`** — runtime execution, lives in `src/scripting/`:
+
+```ts
+export class ScriptEngine {
+  private _flags:      Record<string, boolean> = {};
+  private _firedOnce:  Set<string> = new Set();
+  private _scripts:    ScriptDef[] = [];
+
+  // Load scripts from active zone
+  loadZone(zone: ZoneDef): void {
+    this._scripts = zone.scripts.filter(s => s.enabled);
+  }
+
+  // Called by TriggerSystem, CharacterController, NPC controllers etc.
+  fire(triggerType: TriggerType, targetId: string, context: Partial<ScriptContext>): void {
+    for (const script of this._scripts) {
+      if (script.trigger.type !== triggerType) continue;
+      if (script.trigger.targetId && script.trigger.targetId !== targetId) continue;
+      if (script.oneShot && this._firedOnce.has(script.id)) continue;
+      if (!this._checkConditions(script.conditions)) continue;
+      this._executeActions(script.actions, context);
+      if (script.oneShot) this._firedOnce.add(script.id);
+    }
+  }
+
+  // Flag accessors
+  setFlag(flag: string): void   { this._flags[flag] = true;  this._bus.emit('flag:set', { flag, value: true }); }
+  clearFlag(flag: string): void { this._flags[flag] = false; this._bus.emit('flag:set', { flag, value: false }); }
+  hasFlag(flag: string): boolean { return !!this._flags[flag]; }
+
+  // Persistence
+  exportGameSave(): Partial<GameSave> {
+    return { flags: { ...this._flags }, firedOneShots: [...this._firedOnce] };
+  }
+  loadGameSave(save: Partial<GameSave>): void {
+    this._flags     = save.flags      ?? {};
+    this._firedOnce = new Set(save.firedOneShots ?? []);
+  }
+
+  private _checkConditions(conditions: ScriptCondition[]): boolean { ... }
+  private _executeActions(actions: ScriptAction[], context: Partial<ScriptContext>): void { ... }
+}
+```
+
+**JavaScript escape hatch — sandboxed execution:**
+
+When an action has `type: 'run_script'` and a `script` string:
+```ts
+const fn = new Function('ctx', action.script);
+fn({
+  setFlag:        (f: string) => this.setFlag(f),
+  clearFlag:      (f: string) => this.clearFlag(f),
+  hasFlag:        (f: string) => this.hasFlag(f),
+  playSound:      (id: string) => this._bus.emit('audio:play', { id }),
+  showDialogue:   (speaker: string, lines: string[]) => this._bus.emit('dialogue:show', { speaker, lines }),
+  teleportPlayer: (pos: Vec3) => this._bus.emit('character:teleport', { position: pos, facing: 0 }),
+  despawnObject:  (id: string) => this._bus.emit('object:despawn', { id }),
+  fireEvent:      (eventId: string) => this.fire('on_flag_set', eventId, {}),
+  objectId:       context.objectId ?? '',
+  flags:          { ...this._flags },
+});
+```
+
+The script runs in a `new Function()` scope — no access to `window`, `document`, Three.js, or Rapier. Only the explicitly provided `ctx` methods. This is the intended constraint.
+
+**Trigger volumes in editor:**
+
+New `TriggerVolumeTool.ts` — places invisible box volumes in the scene:
+- Shown as dashed wireframe boxes in editor (not visible in preview)
+- Rapier sensor collider registered via `ColliderBuilder` (same as door sensors)
+- `TriggerSystem` maps collider handles to trigger volume IDs
+- When character enters/exits: `scriptEngine.fire('on_player_enter', volumeId, context)`
+
+**Script Panel UI (`ScriptPanel.tsx`):**
+
+New panel accessible from a "Scripts" tab in the editor sidebar:
+- Lists all scripts in active zone
+- Each script: collapsible card showing trigger → conditions → actions
+- "Add script" button creates a new empty ScriptDef
+- Trigger picker: dropdown of TriggerType values
+- Condition builder: add/remove conditions, each with type + value fields
+- Action builder: add/remove actions, each with type + relevant fields
+- `run_script` action shows a small code textarea for the JS body
+- Enable/disable toggle per script
+- Scripts stored in `zone.scripts[]` in WorldState, serialised in scene file
+
+**New bus events added:**
+- `audio:play` `{ id: string }`
+- `dialogue:show` `{ speaker: string; lines: string[] }`
+- `object:despawn` `{ id: string }`
+- `flag:set` `{ flag: string; value: boolean }` (already in types)
+
+**`GameStateManager.ts`** (`src/world/`):
+
+Owns the `GameSave` — player position, flags, inventory, fired one-shots:
+```ts
+class GameStateManager {
+  save(): void   { localStorage.setItem('worldeditor_gamesave', JSON.stringify(this._buildSave())); }
+  load(): void   { const raw = localStorage.getItem('worldeditor_gamesave'); if (raw) this._applySave(JSON.parse(raw)); }
+  clear(): void  { localStorage.removeItem('worldeditor_gamesave'); }
+}
+```
+Auto-saves every 30 seconds during preview mode and on every zone transition.
+
 ### Phase 11 — Terrain
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)
 - Terrain Rapier collider: `ColliderDesc.heightfield(res, res, heightData, { x: worldSize, y: maxHeight, z: worldSize })`
@@ -3119,15 +3615,28 @@ this._body.setNextKinematicTranslation(newPos);
 - TerrainBuilder integrated into ZoneManager for outdoor zones
 - Road tool: spline control points → flat corridor on terrain
 
-### Phase 12 — Polish
+### Phase 12 — Polish + Future Systems
+
+**Polish:**
 - L-shape and spiral stair styles in StairBuilder (each with correct per-step colliders)
 - Outline post-process selection highlight (EffectComposer + OutlinePass, replaces emissive tint)
 - Wall exterior material (material array on BoxGeometry for inside/outside faces)
 - Undo/redo stack (WorldState mutation log, last 50 operations — each undo removes/re-adds colliders correctly)
 - Real GLTF prop assets in AssetBrowser with authored collision shapes in asset registry
-- Skybox options
 - Ambient/sun light controls in PropertiesPanel
-- Export as self-contained HTML (bakes textures as base64 data URLs)
+- Node drag — select a wall node and drag to stretch all connected walls simultaneously
+- Room detection — find closed wall loops, auto-label as rooms, apply room-level properties
+- Snap-merge tool — merge two nearby nodes that aren't exactly equal
+
+**Future systems (to be specced when needed):**
+
+- **Item system** — `ItemDef` type, item registry/manifest, item pickup objects, inventory UI panel, equippable/consumable/stackable flags, item icons. Currently stubbed as string IDs in `GameSave.inventory` and script actions `give_item` / `player_has_item`.
+- **Dialogue system** — branching dialogue trees, NPC conversation UI, dialogue editor panel. Currently stubbed as linear `lines[]` array in `DialogueDef`.
+- **Quest system** — quest definitions, objectives, completion conditions, quest log UI.
+- **Audio system** — sound asset manifest, positional audio, ambient loops, music tracks, audio mixer.
+- **Navmesh** — walkable surface generation from Rapier floor colliders, NPC pathfinding via Recast/Detour.
+- **Export** — export as self-contained playable HTML (bakes textures as base64, bundles scripts).
+- **Multiplayer** — out of scope for now, noted for future.
 
 ---
 
@@ -3600,4 +4109,7 @@ export default defineConfig({
 > - All world coordinates are in meters, grid unit 0.5m
 > - Use `const` over `let` everywhere possible. Prefer `readonly` on class properties that don't change after construction.
 > - **Physics:** `three-mesh-bvh` is for editor raycasting only. All runtime collision uses Rapier via `PhysicsWorld` singleton. Every builder that creates geometry must also register Rapier colliders via `ColliderBuilder` and return their handles. ZoneManager is responsible for removing colliders on unload.
-> - Never create Rapier objects outside of `src/physics/`. Never import `@dimforge/rapier3d-compat` directly in builders — use `ColliderBuilder` methods."
+> - Never create Rapier objects outside of `src/physics/`. Never import `@dimforge/rapier3d-compat` directly in builders — use `ColliderBuilder` methods.
+> - **Assets:** No hardcoded asset or material registries. Both are loaded dynamically from `public/assets/textures/manifest.json` and `public/assets/models/manifest.json` via `AssetManager.initMaterials()` and `AssetManager.initAssets()` on startup.
+> - **Scripting:** `ScriptEngine` is the only place scripts execute. No other module calls `new Function()` or `eval()`. Bus events are the only way scripts communicate with the rest of the engine.
+> - **Persistence:** Three separate stores — scene file (explicit save/load), game save (localStorage, auto), editor preferences (localStorage, on change). Never mix them."

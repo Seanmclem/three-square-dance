@@ -4,12 +4,14 @@ import { WallBuilder } from "@/builders/WallBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { WallNode, ZoneDef } from "@/types";
+import type { WallDef, WallNode, ZoneDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
-interface WallEntry {
+// A run is one or more compatible walls merged into a single mesh.
+interface RunEntry {
   mesh:      THREE.Mesh;
   colliders: RAPIER.Collider[];
+  wallIds:   string[];
 }
 
 interface ZoneEntry {
@@ -17,12 +19,89 @@ interface ZoneEntry {
   floorsGroup:    THREE.Group;
   wallsGroup:     THREE.Group;
   floorColliders: RAPIER.Collider[];
-  wallData:       Map<string, WallEntry>;
+  // Multiple wallIds can map to the same RunEntry (all walls in a merged run)
+  wallData:       Map<string, RunEntry>;
+}
+
+// Groups zone walls into compatible runs for merged geometry.
+// Two walls can merge when they share a node that has exactly 2 connected walls
+// and the walls have matching material, exteriorMaterial, and height.
+function groupWallRuns(zone: ZoneDef, _nodes: Map<string, WallNode>): WallDef[][] {
+  const nodeWalls = new Map<string, string[]>();
+  for (const wall of zone.walls) {
+    const s = nodeWalls.get(wall.startNodeId) ?? [];
+    s.push(wall.id);
+    nodeWalls.set(wall.startNodeId, s);
+    const e = nodeWalls.get(wall.endNodeId) ?? [];
+    e.push(wall.id);
+    nodeWalls.set(wall.endNodeId, e);
+  }
+
+  const wallById = new Map(zone.walls.map(w => [w.id, w]));
+
+  function canMerge(w1: WallDef, w2: WallDef, sharedNodeId: string): boolean {
+    return (
+      (nodeWalls.get(sharedNodeId)?.length ?? 0) === 2 &&
+      w1.material          === w2.material &&
+      w1.exteriorMaterial  === w2.exteriorMaterial &&
+      w1.height            === w2.height
+    );
+  }
+
+  const visited = new Set<string>();
+  const runs: WallDef[][] = [];
+
+  for (const startWall of zone.walls) {
+    if (visited.has(startWall.id)) continue;
+    visited.add(startWall.id);
+
+    const run: WallDef[] = [startWall];
+
+    // Extend forward from the end node of the last wall in the run
+    let forwardNode = startWall.endNodeId;
+    let prevId = startWall.id;
+    for (;;) {
+      const neighbors = nodeWalls.get(forwardNode) ?? [];
+      if (neighbors.length !== 2) break;
+      const nextId = neighbors.find(id => id !== prevId);
+      if (!nextId || visited.has(nextId)) break;
+      const next = wallById.get(nextId);
+      if (!next || !canMerge(run[run.length - 1]!, next, forwardNode)) break;
+      visited.add(nextId);
+      run.push(next);
+      forwardNode = next.startNodeId === forwardNode ? next.endNodeId : next.startNodeId;
+      prevId = nextId;
+    }
+
+    // Extend backward from the start node of the first wall in the run
+    let backwardNode = startWall.startNodeId;
+    prevId = startWall.id;
+    for (;;) {
+      const neighbors = nodeWalls.get(backwardNode) ?? [];
+      if (neighbors.length !== 2) break;
+      const prevWallId = neighbors.find(id => id !== prevId);
+      if (!prevWallId || visited.has(prevWallId)) break;
+      const prev = wallById.get(prevWallId);
+      if (!prev || !canMerge(run[0]!, prev, backwardNode)) break;
+      visited.add(prevWallId);
+      run.unshift(prev);
+      backwardNode = prev.startNodeId === backwardNode ? prev.endNodeId : prev.startNodeId;
+      prevId = prevWallId;
+    }
+
+    runs.push(run);
+  }
+
+  return runs;
 }
 
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
   private readonly _unsubs: Array<() => void> = [];
+
+  // Pending wall rebuild requests — coalesced per microtask to avoid concurrent async races
+  private readonly _pendingRebuild = new Map<string, Set<string>>();
+  private _rebuildScheduled = false;
 
   constructor(
     private readonly _scene:      THREE.Scene,
@@ -38,29 +117,47 @@ export class ZoneManager {
         void Promise.all(ids.map(id => this.loadZone(id)));
       }),
       this._bus.on("floor:added", ({ zoneId, floor }) => {
-        this._rebuildFloor(zoneId, floor.level);
+        void this._rebuildFloor(zoneId, floor.level);
       }),
       this._bus.on("floor:updated", ({ zoneId, level }) => {
-        this._rebuildFloor(zoneId, level);
+        void this._rebuildFloor(zoneId, level);
       }),
       this._bus.on("wall:added", ({ zoneId, wall }) => {
-        this._rebuildWall(zoneId, wall.id);
+        this._queueRebuild(zoneId, wall.id);
       }),
       this._bus.on("wall:updated", ({ zoneId, wallId }) => {
-        this._rebuildWall(zoneId, wallId);
+        this._queueRebuild(zoneId, wallId);
       }),
       this._bus.on("wall:removed", ({ zoneId, wallId }) => {
-        this._removeWall(zoneId, wallId);
+        void this._removeWall(zoneId, wallId);
       }),
       this._bus.on("node:updated", ({ zoneId, nodeId }) => {
         const zone = this._worldState.zones.get(zoneId);
         if (!zone) return;
-        const affected = zone.walls.filter(
-          w => w.startNodeId === nodeId || w.endNodeId === nodeId,
-        );
-        for (const wall of affected) void this._rebuildWall(zoneId, wall.id);
+        for (const wall of zone.walls) {
+          if (wall.startNodeId === nodeId || wall.endNodeId === nodeId)
+            this._queueRebuild(zoneId, wall.id);
+        }
       }),
     );
+  }
+
+  private _queueRebuild(zoneId: string, wallId: string): void {
+    if (!this._pendingRebuild.has(zoneId))
+      this._pendingRebuild.set(zoneId, new Set());
+    this._pendingRebuild.get(zoneId)!.add(wallId);
+
+    if (!this._rebuildScheduled) {
+      this._rebuildScheduled = true;
+      queueMicrotask(() => {
+        this._rebuildScheduled = false;
+        for (const [zid, ids] of this._pendingRebuild) {
+          const snapshot = [...ids];
+          this._pendingRebuild.delete(zid);
+          void this._rebuildWallBatch(zid, snapshot);
+        }
+      });
+    }
   }
 
   private _buildNodesMap(zone: ZoneDef): Map<string, WallNode> {
@@ -80,7 +177,7 @@ export class ZoneManager {
     group.add(wallsGroup);
 
     const floorColliders: RAPIER.Collider[] = [];
-    const wallData = new Map<string, WallEntry>();
+    const wallData = new Map<string, RunEntry>();
 
     for (const floor of zone.floors) {
       const { mesh, collider } = await FloorBuilder.build(floor, zone.bounds, zoneId);
@@ -89,10 +186,19 @@ export class ZoneManager {
     }
 
     const nodesMap = this._buildNodesMap(zone);
-    for (const wall of zone.walls) {
-      const { mesh, colliders } = await WallBuilder.build(wall, zoneId, zone, nodesMap);
-      wallsGroup.add(mesh);
-      wallData.set(wall.id, { mesh, colliders });
+    const runs = groupWallRuns(zone, nodesMap);
+
+    for (const run of runs) {
+      const output = run.length > 1
+        ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
+        : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
+      const entry: RunEntry = {
+        mesh:      output.mesh,
+        colliders: output.colliders,
+        wallIds:   run.map(w => w.id),
+      };
+      wallsGroup.add(output.mesh);
+      for (const w of run) wallData.set(w.id, entry);
     }
 
     this._scene.add(group);
@@ -104,7 +210,12 @@ export class ZoneManager {
     if (!entry) return;
 
     entry.floorColliders.forEach(c => physicsWorld.removeCollider(c));
-    entry.wallData.forEach(({ colliders }) => colliders.forEach(c => physicsWorld.removeCollider(c)));
+
+    // Use Set to avoid double-disposing shared RunEntry instances
+    const uniqueRuns = new Set(entry.wallData.values());
+    for (const re of uniqueRuns) {
+      re.colliders.forEach(c => physicsWorld.removeCollider(c));
+    }
 
     this._scene.remove(entry.group);
     entry.group.traverse(child => {
@@ -144,37 +255,107 @@ export class ZoneManager {
     entry.floorColliders.push(collider);
   }
 
-  private async _rebuildWall(zoneId: string, wallId: string): Promise<void> {
+  // Processes a batch of wall IDs that need rebuilding in a single async pass.
+  // All IDs are computed before any await, so there are no concurrent mutation races.
+  private async _rebuildWallBatch(zoneId: string, wallIds: string[]): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     const zone  = this._worldState.zones.get(zoneId);
     if (!entry || !zone) return;
 
-    this._removeWallEntry(entry, wallId);
+    // Expand seed IDs to all walls that share endpoint nodes with any seed wall.
+    const affectedWallIds = new Set<string>(wallIds);
+    for (const wallId of wallIds) {
+      const w = zone.walls.find(w => w.id === wallId);
+      if (!w) continue;
+      for (const other of zone.walls) {
+        if (other.id === wallId) continue;
+        if (
+          other.startNodeId === w.startNodeId || other.endNodeId === w.startNodeId ||
+          other.startNodeId === w.endNodeId   || other.endNodeId === w.endNodeId
+        ) affectedWallIds.add(other.id);
+      }
+    }
 
-    const wall = zone.walls.find(w => w.id === wallId);
-    if (!wall) return;
+    // Expand again to include all walls already in the same RunEntry.
+    const runEntriesToRemove = new Set<RunEntry>();
+    for (const wid of affectedWallIds) {
+      const re = entry.wallData.get(wid);
+      if (re) {
+        runEntriesToRemove.add(re);
+        for (const id of re.wallIds) affectedWallIds.add(id);
+      }
+    }
+
+    // Dispose old run meshes + colliders (sync, before any await).
+    for (const re of runEntriesToRemove) {
+      re.colliders.forEach(c => physicsWorld.removeCollider(c));
+      re.mesh.geometry.dispose();
+      if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (re.mesh.material as THREE.Material).dispose();
+      entry.wallsGroup.remove(re.mesh);
+      for (const id of re.wallIds) entry.wallData.delete(id);
+    }
+
+    // Rebuild the runs that intersect the affected set.
     const nodesMap = this._buildNodesMap(zone);
-    const { mesh, colliders } = await WallBuilder.build(wall, zoneId, zone, nodesMap);
-    entry.wallsGroup.add(mesh);
-    entry.wallData.set(wallId, { mesh, colliders });
-    this._bus.emit("wall:rebuilt", { zoneId, wallId });
+    const allRuns  = groupWallRuns(zone, nodesMap);
+    const newRuns  = allRuns.filter(r => r.some(w => affectedWallIds.has(w.id)));
+
+    for (const run of newRuns) {
+      const output = run.length > 1
+        ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
+        : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
+      const newEntry: RunEntry = {
+        mesh:      output.mesh,
+        colliders: output.colliders,
+        wallIds:   run.map(w => w.id),
+      };
+      entry.wallsGroup.add(output.mesh);
+      for (const w of run) entry.wallData.set(w.id, newEntry);
+    }
+
+    for (const wallId of wallIds) this._bus.emit("wall:rebuilt", { zoneId, wallId });
   }
 
-  private _removeWall(zoneId: string, wallId: string): void {
+  private async _removeWall(zoneId: string, wallId: string): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
+    const zone  = this._worldState.zones.get(zoneId);
     if (!entry) return;
-    this._removeWallEntry(entry, wallId);
-  }
 
-  private _removeWallEntry(entry: ZoneEntry, wallId: string): void {
-    const existing = entry.wallData.get(wallId);
-    if (!existing) return;
-    existing.colliders.forEach(c => physicsWorld.removeCollider(c));
-    existing.mesh.geometry.dispose();
-    if ((existing.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
-      (existing.mesh.material as THREE.Material).dispose();
-    entry.wallsGroup.remove(existing.mesh);
-    entry.wallData.delete(wallId);
+    const re = entry.wallData.get(wallId);
+    if (!re) return;
+
+    // Walls in the same run that still exist in the zone need to be rebuilt
+    const survivingIds = re.wallIds.filter(
+      id => id !== wallId && (zone?.walls.some(w => w.id === id) ?? false),
+    );
+
+    // Remove the old run
+    re.colliders.forEach(c => physicsWorld.removeCollider(c));
+    re.mesh.geometry.dispose();
+    if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+      (re.mesh.material as THREE.Material).dispose();
+    entry.wallsGroup.remove(re.mesh);
+    for (const id of re.wallIds) entry.wallData.delete(id);
+
+    // Rebuild runs for surviving walls from the old run
+    if (survivingIds.length > 0 && zone) {
+      const nodesMap = this._buildNodesMap(zone);
+      const allRuns  = groupWallRuns(zone, nodesMap);
+      const newRuns  = allRuns.filter(r => r.some(w => survivingIds.includes(w.id)));
+      for (const run of newRuns) {
+        const output = run.length > 1
+          ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
+          : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
+        const newEntry: RunEntry = {
+          mesh:      output.mesh,
+          colliders: output.colliders,
+          wallIds:   run.map(w => w.id),
+        };
+        entry.wallsGroup.add(output.mesh);
+        for (const w of run) entry.wallData.set(w.id, newEntry);
+      }
+    }
   }
 
   dispose(): void {
