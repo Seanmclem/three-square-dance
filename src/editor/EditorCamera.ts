@@ -51,6 +51,10 @@ export class EditorCamera {
     window.addEventListener("keyup",           this._onKeyUp);
 
     bus.on("gizmo:dragging", ({ isDragging }) => { this._gizmoDragging = isDragging; });
+    bus.on("camera:topdown", () => {
+      this.targetSpherical.phi    = 0.02;
+      this.targetSpherical.radius = Math.min(this.targetSpherical.radius, 30);
+    });
 
     this._applyCamera();
   }
@@ -69,7 +73,7 @@ export class EditorCamera {
 
     if (this._isOrbiting) {
       this.targetSpherical.theta -= dx * 0.005;
-      this.targetSpherical.phi = Math.max(0.05, Math.min(Math.PI / 2 - 0.05, this.targetSpherical.phi - dy * 0.005));
+      this.targetSpherical.phi = Math.max(0.02, Math.min(Math.PI / 2 - 0.02, this.targetSpherical.phi - dy * 0.005));
     }
     if (this._isPanning) {
       const speed = this.spherical.radius * 0.001;
@@ -101,10 +105,15 @@ export class EditorCamera {
     const speed = this.spherical.radius * 0.02;
     const angle = this.spherical.theta;
 
-    if (this._keys["KeyW"] || this._keys["ArrowUp"])    this.targetFocus.x -= Math.sin(angle) * speed * dt * 60;
-    if (this._keys["KeyS"] || this._keys["ArrowDown"])  this.targetFocus.x += Math.sin(angle) * speed * dt * 60;
-    if (this._keys["KeyA"] || this._keys["ArrowLeft"])  this.targetFocus.z += Math.cos(angle) * speed * dt * 60;
-    if (this._keys["KeyD"] || this._keys["ArrowRight"]) this.targetFocus.z -= Math.cos(angle) * speed * dt * 60;
+    const sinA = Math.sin(angle);
+    const cosA = Math.cos(angle);
+    const s    = speed * dt * 60;
+
+    // fwd = (-sinA, 0, -cosA), right = (cosA, 0, -sinA)
+    if (this._keys["KeyW"] || this._keys["ArrowUp"])    { this.targetFocus.x -= sinA * s; this.targetFocus.z -= cosA * s; }
+    if (this._keys["KeyS"] || this._keys["ArrowDown"])  { this.targetFocus.x += sinA * s; this.targetFocus.z += cosA * s; }
+    if (this._keys["KeyA"] || this._keys["ArrowLeft"])  { this.targetFocus.x -= cosA * s; this.targetFocus.z += sinA * s; }
+    if (this._keys["KeyD"] || this._keys["ArrowRight"]) { this.targetFocus.x += cosA * s; this.targetFocus.z -= sinA * s; }
 
     const k = 0.12;
     this.spherical.radius += (this.targetSpherical.radius - this.spherical.radius) * k;

@@ -1,8 +1,9 @@
 import { HelpButton } from "@/ui/HelpButton";
 
 interface TopBarProps {
-  activeFloor:   number;
-  onFloorChange: (level: number) => void;
+  activeFloor:     number;
+  onFloorChange:   (level: number) => void;
+  onCameraTopDown: () => void;
 }
 
 const FLOORS = [
@@ -12,7 +13,7 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange }: TopBarProps) {
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown }: TopBarProps) {
   return (
     <div style={{
       position: "absolute", top: 0, left: 64, right: 280, height: 48,
@@ -44,6 +45,18 @@ export function TopBar({ activeFloor, onFloorChange }: TopBarProps) {
         </button>
       ))}
 
+      <div style={{ width: 1, height: 20, background: "rgba(80,120,180,0.2)" }} />
+      <button
+        onClick={onCameraTopDown}
+        title="Top-down view"
+        style={{
+          padding: "3px 8px", border: "1px solid rgba(80,120,180,0.25)",
+          borderRadius: 6, background: "transparent", color: "#5a7a9a",
+          fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
+        }}
+      >
+        TOP
+      </button>
       <div style={{ width: 1, height: 20, background: "rgba(80,120,180,0.2)" }} />
       <HelpButton />
       <div style={{ flex: 1 }} />

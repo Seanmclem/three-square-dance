@@ -161,7 +161,11 @@ export default function App() {
       />
 
       <Toolbar         activeTool={activeTool}   onToolSelect={handleToolSelect} />
-      <TopBar          activeFloor={activeFloor} onFloorChange={handleFloorChange} />
+      <TopBar
+        activeFloor={activeFloor}
+        onFloorChange={handleFloorChange}
+        onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
+      />
       <PropertiesPanel
         activeTool={activeTool}
         selected={selected}

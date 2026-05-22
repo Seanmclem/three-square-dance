@@ -96,6 +96,7 @@ export interface BusEvents {
   "preview:zone-entered":  { zoneName: string };
   "gizmo:dragging":        { isDragging: boolean };
   "camera:jump":           { x: number; z: number };
+  "camera:topdown":        Record<string, never>;
   "character:teleport":    { position: Vec3; facing: number };
   "character:triggerdoor": { transitionId: string };
   "overlay:fade-in":       { color: string; duration: number };
