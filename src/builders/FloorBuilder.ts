@@ -32,31 +32,26 @@ export class FloorBuilder {
     let colliderBounds: { x: number; z: number; width: number; depth: number };
 
     if (floor.floorMesh.shape === "polygon" && pts.length >= 3) {
+      // Negate z so that after rotateX(-PI/2) the winding is CCW from above.
+      // rotateX(-PI/2): (x, y, 0) → (x, 0, -y), normal +Z → +Y ✓
       const shape = new THREE.Shape();
-      shape.moveTo(pts[0]!.x, pts[0]!.z);
-      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i]!.x, pts[i]!.z);
+      shape.moveTo(pts[0]!.x, -pts[0]!.z);
+      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i]!.x, -pts[i]!.z);
       shape.closePath();
 
       const shapeGeo = new THREE.ShapeGeometry(shape);
-      // ShapeGeometry is in XY — remap to XZ plane
-      const pos = shapeGeo.attributes["position"] as THREE.BufferAttribute;
-      for (let i = 0; i < pos.count; i++) {
-        const px = pos.getX(i);
-        const py = pos.getY(i);
-        pos.setXYZ(i, px, yBase, py);
-      }
-      pos.needsUpdate = true;
-      shapeGeo.computeVertexNormals();
+      shapeGeo.rotateX(-Math.PI / 2);
+      shapeGeo.translate(0, yBase, 0);
 
-      const uvAttr = shapeGeo.attributes["uv"] as THREE.BufferAttribute;
       const minX = Math.min(...pts.map(p => p.x));
       const minZ = Math.min(...pts.map(p => p.z));
       const szW  = Math.max(...pts.map(p => p.x)) - minX;
       const szD  = Math.max(...pts.map(p => p.z)) - minZ;
+      const uvAttr = shapeGeo.attributes["uv"] as THREE.BufferAttribute;
       for (let i = 0; i < uvAttr.count; i++) {
         uvAttr.setXY(i, uvAttr.getX(i) * szW * tileX, uvAttr.getY(i) * szD * tileY);
       }
-      shapeGeo.setAttribute('uv2', shapeGeo.attributes.uv);
+      shapeGeo.setAttribute('uv2', shapeGeo.attributes.uv.clone());
       geo = shapeGeo;
 
       const bMinX = Math.min(...pts.map(p => p.x));
