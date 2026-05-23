@@ -415,11 +415,22 @@ export class WallBuilder {
     geo.computeVertexNormals();
 
     // --- Opening processing: CSG cuts + trim/trigger meshes for any wall in the run ---
+    // Uses global arc-length so openings slide around corners when offset > wall length.
     let finalGeo: THREE.BufferGeometry = geo;
     const trimMeshes: THREE.Mesh[] = [];
     const hasAnyOpenings = walls.some(w => w.openings.length > 0);
 
     if (hasAnyOpenings) {
+      // Per-segment lengths (closed loops include the wrap-around segment).
+      const segLens: number[] = [];
+      for (let si = 0; si < walls.length; si++) {
+        const j = (si + 1) % N;
+        segLens.push(Math.hypot(pts[j]!.x - pts[si]!.x, pts[j]!.z - pts[si]!.z) || 0.001);
+      }
+      // cumDist[k] = arc from pts[0] to the START of segment k.
+      // End of segment k = cumDist[k] + segLens[k].
+      const segArcEnd = (k: number) => cumDist[k]! + segLens[k]!;
+
       let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
       workMesh.updateMatrixWorld();
       let prevIsOriginal = true;
@@ -428,96 +439,138 @@ export class WallBuilder {
         const wallSeg = walls[si]!;
         if (wallSeg.openings.length === 0) continue;
 
-        const j      = (si + 1) % N;
-        const ptA    = pts[si]!;
-        const ptB    = pts[j]!;
-        const segDx  = ptB.x - ptA.x, segDz = ptB.z - ptA.z;
-        const segLen = Math.hypot(segDx, segDz) || 0.001;
-        const segUx  = segDx / segLen, segUz = segDz / segLen;
-        const segAngle = Math.atan2(segDz, segDx);
-        const segCx  = (ptA.x + ptB.x) / 2;
-        const segCz  = (ptA.z + ptB.z) / 2;
-        // Is the wall stored in the same direction as the run traversal?
         const isForward = wallSeg.startNodeId === resolvedIds[si];
 
         for (const opening of wallSeg.openings) {
-          // Distance from ptA (run direction) to opening centre
-          const centerDist = isForward
-            ? opening.offsetAlongWall + opening.width / 2
-            : segLen - opening.offsetAlongWall - opening.width / 2;
+          // Map the opening's left edge to a global run arc-length position so
+          // it can slide around corners when the offset exceeds the wall length.
+          const effectiveLeft = isForward
+            ? opening.offsetAlongWall
+            : segLens[si]! - opening.offsetAlongWall - opening.width;
+          const openingArcStart  = cumDist[si]! + effectiveLeft;
+          const openingArcEnd    = openingArcStart + opening.width;
+          const openingArcCenter = (openingArcStart + openingArcEnd) / 2;
 
-          // CSG cutter positioned in world space (run mesh has no transform)
-          const worldX = ptA.x + segUx * centerDist;
-          const worldY = opening.elevation + opening.height / 2;
-          const worldZ = ptA.z + segUz * centerDist;
+          // ── CSG: apply one cut per run segment that this opening overlaps ──────
+          let trimSegIdx   = -1;
+          let trimCenterDist = 0;
 
-          const cutterGeo = opening.type === "arch"
-            ? createArchCutterGeo(opening.width + 0.05, opening.height + 0.05, T)
-            : new THREE.BoxGeometry(opening.width + 0.05, opening.height + 0.05, T + 0.1);
-          const cutterMesh = new THREE.Mesh(cutterGeo, new THREE.MeshBasicMaterial());
-          cutterMesh.position.set(worldX, worldY, worldZ);
-          cutterMesh.rotation.y = -segAngle;
-          cutterMesh.updateMatrixWorld();
+          for (let k = 0; k < walls.length; k++) {
+            const arcS = cumDist[k]!;
+            const arcE = segArcEnd(k);
 
-          const oldGeo = workMesh.geometry;
-          workMesh = csgSubtract(workMesh, cutterMesh);
-          workMesh.updateMatrixWorld();
+            const overlapS = Math.max(openingArcStart, arcS);
+            const overlapE = Math.min(openingArcEnd,   arcE);
+            if (overlapS >= overlapE) continue;
 
-          cutterGeo.dispose();
-          if (!prevIsOriginal) oldGeo.dispose();
-          prevIsOriginal = false;
-
-          // Wall-centred local coords for trim + trigger meshes
-          const localX   = centerDist - segLen / 2;
-          const localY_m = opening.elevation + opening.height / 2 - H / 2;
-          const TRIM_D   = T + 0.06;
-
-          if (opening.type !== "passage") {
-            const addPiece = (lx: number, ly: number, pw: number, ph: number) => {
-              const tmat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
-              const pm   = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, TRIM_D), tmat);
-              pm.position.set(segCx + segUx * lx, H / 2 + ly, segCz + segUz * lx);
-              pm.rotation.y   = -segAngle;
-              pm.castShadow   = true;
-              pm.receiveShadow = true;
-              pm.userData = { selectable: false, _ownsMaterial: true };
-              trimMeshes.push(pm);
-            };
-            addPiece(localX - opening.width / 2 - TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
-            addPiece(localX + opening.width / 2 + TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
-            if (opening.type !== "arch") {
-              addPiece(localX, localY_m + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+            // Track which segment contains the opening centre (for trim/trigger).
+            if (openingArcCenter >= arcS && openingArcCenter < arcE) {
+              trimSegIdx     = k;
+              trimCenterDist = openingArcCenter - arcS;
             }
-            if (opening.type === "window") {
-              addPiece(localX, localY_m - opening.height / 2 - TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
-            }
+
+            const cutWidth   = overlapE - overlapS;
+            const cutCtrDist = (overlapS + overlapE) / 2 - arcS;
+
+            const kj = (k + 1) % N;
+            const kA = pts[k]!, kB = pts[kj]!;
+            const kDx  = kB.x - kA.x, kDz = kB.z - kA.z;
+            const kLen = segLens[k]!;
+            const kUx  = kDx / kLen, kUz = kDz / kLen;
+            const kAng = Math.atan2(kDz, kDx);
+
+            const worldX = kA.x + kUx * cutCtrDist;
+            const worldY = opening.elevation + opening.height / 2;
+            const worldZ = kA.z + kUz * cutCtrDist;
+
+            // Use arch cutter only when the whole opening lives on one segment.
+            const cutterGeo = (opening.type === "arch" && Math.abs(cutWidth - opening.width) < 0.001)
+              ? createArchCutterGeo(cutWidth + 0.05, opening.height + 0.05, T)
+              : new THREE.BoxGeometry(cutWidth + 0.05, opening.height + 0.05, T + 0.1);
+
+            const cutterMesh = new THREE.Mesh(cutterGeo, new THREE.MeshBasicMaterial());
+            cutterMesh.position.set(worldX, worldY, worldZ);
+            cutterMesh.rotation.y = -kAng;
+            cutterMesh.updateMatrixWorld();
+
+            const oldGeo = workMesh.geometry;
+            workMesh = csgSubtract(workMesh, cutterMesh);
+            workMesh.updateMatrixWorld();
+
+            cutterGeo.dispose();
+            if (!prevIsOriginal) oldGeo.dispose();
+            prevIsOriginal = false;
           }
 
-          const triggerMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(opening.width, opening.height, 0.01),
-            new THREE.MeshStandardMaterial({
-              color: 0x4d8cff, emissive: 0x000000, emissiveIntensity: 0.0,
-              transparent: true, opacity: 0.04,
-              depthTest: false, depthWrite: false, side: THREE.DoubleSide,
-            }),
-          );
-          triggerMesh.renderOrder = 1;
-          triggerMesh.position.set(segCx + segUx * localX, H / 2 + localY_m, segCz + segUz * localX);
-          triggerMesh.rotation.y = -segAngle;
-          triggerMesh.userData = {
-            editorId:      opening.id,
-            editorType:    "opening",
-            zoneId,
-            selectable:    true,
-            floorLevel:    wallSeg.floor,
-            _ownsMaterial: true,
-            wallId:        wallSeg.id,
-            _selectOpacity:         0.55,
-            _origOpacity:           0.04,
-            _origEmissive:          0x000000,
-            _origEmissiveIntensity: 0,
-          };
-          trimMeshes.push(triggerMesh);
+          // ── Trim frame + trigger on the segment containing the opening centre ──
+          if (trimSegIdx < 0) {
+            // Opening centre is outside run bounds (open run, extreme offset).
+            trimSegIdx     = openingArcCenter < 0 ? 0 : walls.length - 1;
+            trimCenterDist = openingArcCenter < 0 ? 0 : segLens[trimSegIdx]!;
+          }
+
+          {
+            const k   = trimSegIdx;
+            const kj  = (k + 1) % N;
+            const kA  = pts[k]!, kB = pts[kj]!;
+            const kDx = kB.x - kA.x, kDz = kB.z - kA.z;
+            const kLen = segLens[k]!;
+            const kUx  = kDx / kLen, kUz = kDz / kLen;
+            const kAng = Math.atan2(kDz, kDx);
+            const kCx  = (kA.x + kB.x) / 2;
+            const kCz  = (kA.z + kB.z) / 2;
+
+            const localX   = trimCenterDist - kLen / 2;
+            const localY_m = opening.elevation + opening.height / 2 - H / 2;
+            const TRIM_D   = T + 0.06;
+
+            if (opening.type !== "passage") {
+              const addPiece = (lx: number, ly: number, pw: number, ph: number) => {
+                const tmat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
+                const pm   = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, TRIM_D), tmat);
+                pm.position.set(kCx + kUx * lx, H / 2 + ly, kCz + kUz * lx);
+                pm.rotation.y    = -kAng;
+                pm.castShadow    = true;
+                pm.receiveShadow = true;
+                pm.userData = { selectable: false, _ownsMaterial: true };
+                trimMeshes.push(pm);
+              };
+              addPiece(localX - opening.width / 2 - TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
+              addPiece(localX + opening.width / 2 + TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
+              if (opening.type !== "arch") {
+                addPiece(localX, localY_m + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+              }
+              if (opening.type === "window") {
+                addPiece(localX, localY_m - opening.height / 2 - TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+              }
+            }
+
+            const triggerMesh = new THREE.Mesh(
+              new THREE.BoxGeometry(opening.width, opening.height, 0.01),
+              new THREE.MeshStandardMaterial({
+                color: 0x4d8cff, emissive: 0x000000, emissiveIntensity: 0.0,
+                transparent: true, opacity: 0.04,
+                depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+              }),
+            );
+            triggerMesh.renderOrder = 1;
+            triggerMesh.position.set(kCx + kUx * localX, H / 2 + localY_m, kCz + kUz * localX);
+            triggerMesh.rotation.y = -kAng;
+            triggerMesh.userData = {
+              editorId:      opening.id,
+              editorType:    "opening",
+              zoneId,
+              selectable:    true,
+              floorLevel:    wallSeg.floor,
+              _ownsMaterial: true,
+              wallId:        wallSeg.id,
+              _selectOpacity:         0.55,
+              _origOpacity:           0.04,
+              _origEmissive:          0x000000,
+              _origEmissiveIntensity: 0,
+            };
+            trimMeshes.push(triggerMesh);
+          }
         }
       }
 
