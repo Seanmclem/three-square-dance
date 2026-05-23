@@ -16,7 +16,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, MaterialDef, QualityScale } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -78,6 +78,7 @@ export default function App() {
       const g = window as unknown as Record<string, unknown>;
       g.__scene = scene.scene; g.__camera = scene.camera;
       g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
+      g.__editorCamera = scene.editorCamera;
     }
 
 
@@ -144,7 +145,12 @@ export default function App() {
 
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
-    if (selected.type === "wall") {
+    if (selected.type === "opening") {
+      const wallId = selected.parentId;
+      if (!wallId) return;
+      worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, changes as unknown as Partial<Opening>);
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...changes } } : null);
+    } else if (selected.type === "wall") {
       worldRef.current?.updateWall(selected.zoneId, selected.id, changes as Partial<WallDef>);
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as WallDef), ...changes } } : null);
     } else if (selected.type === "floor") {
@@ -240,7 +246,7 @@ export default function App() {
         position: "absolute", bottom: 16, right: 296,
         color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
       }}>
-        WORLD BUILDER
+SquareDance
       </div>
     </div>
   );

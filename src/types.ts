@@ -47,7 +47,7 @@ export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -131,10 +131,11 @@ export interface SelectedObjectPayload {
   id: string;
   type: EditorObjectType;
   zoneId: string;
+  parentId?: string;   // wallId when type === "opening"
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | null;
 }
 
 // ─── userData on Three.js meshes ─────────────────────────────────────────────

@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 1.7.0** — last updated during active development session
+**Version 1.8.0** — last updated during active development session
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -10,6 +10,7 @@
 - v1.5 — Default spawn system, Preview vs Start Game, SpawnPointTool, item/dialogue/quest/audio stubs in Phase 12
 - v1.6 — Phase 6 fully specced: dynamic floor tabs, floor creation flow, derived elevation, PropertiesPanel floor view, ceiling toggle, no deletion
 - v1.7 — Phase 4.7 merged corner geometry, Phase 4.8 complete wall interaction model (chain, loop close, node dragging)
+- v1.8 — Phase 4.9 floor system: multi-floor bug fix, Z-fighting offset, auto-floor from loop, polygon floor tool, vertex editing
 
 ---
 
@@ -82,6 +83,7 @@ export interface BusEvents {
   "wall:updated":         { zoneId: string; wallId: string; changes: Partial<WallDef> };
   "wall:removed":         { zoneId: string; wallId: string };
   "floor:added":          { zoneId: string; floor: FloorDef };
+  "floortool:suggest-auto-floor": { points: Vec2[]; level: number };  // prompt user to create floor from closed wall loop
   "floor:updated":        { zoneId: string; level: number; changes: Partial<FloorDef> };
   "floor:elevation-changed": { zoneId: string; affectedLevels: number[] };  // cascade rebuild trigger
   "platform:added":       { zoneId: string; platform: PlatformDef };
@@ -3394,6 +3396,193 @@ DRAWING
   dblclick or Enter → finish chain open-ended → IDLE
   Esc → discard current ghost segment → IDLE (prior walls in chain already committed)
 ```
+
+### Phase 4.9 — Floor System Improvements
+
+Builds on Phase 3 (FloorTool, FloorBuilder) and Phase 4.8 (wall loop closing). Fixes the multiple floors bug, adds auto-floor from closed wall loops, a polygon floor tool, proper floor properties in PropertiesPanel, polygon vertex editing, and Z-fighting prevention.
+
+#### Bug Fix — Multiple Floors Disappearing
+
+**Root cause:** `floor:added` event causes ZoneManager to rebuild all floor meshes for the zone rather than appending the new one. Fix: ZoneManager listens to `floor:added` and only builds the new floor mesh, adding it to the existing `floorsGroup` without touching existing meshes.
+
+```ts
+// ZoneManager — fix floor:added handler
+this._bus.on('floor:added', ({ zoneId, floor }) => {
+  if (zoneId !== this._activeZoneId) return;
+  const { floorsGroup } = this._loadedZones.get(zoneId)!;
+  const result = FloorBuilder.build(floor, zone.bounds, zone.floors.indexOf(floor));
+  floorsGroup.add(result.mesh, result.collisionMesh);
+  this._zoneColliders.get(zoneId)!.floors.push(result.collider);
+});
+```
+
+Each floor mesh is independently tracked in `floorsGroup` by its `editorId` — never wiped on subsequent adds.
+
+#### Z-Fighting Prevention
+
+Floor meshes at the same elevation (e.g. inner room floor on top of outer floor) Z-fight because the GPU can't determine draw order.
+
+Fix: each floor mesh gets a tiny Y offset based on its index within the zone's floors array at the same level:
+
+```ts
+// In FloorBuilder.build() — floorIndex is the position in zone.floors filtered to this level
+const Z_OFFSET = 0.001;
+mesh.position.y = floorDef.elevation + (floorIndex * Z_OFFSET);
+```
+
+This is invisible at normal viewing distances but prevents flickering. A floor placed inside another floor will always sit fractionally higher, which is also physically correct. The Rapier collider uses the base elevation without the offset — physics doesn't need sub-millimeter precision here.
+
+#### Auto-Floor from Closed Wall Loop (Phase 4.8 integration)
+
+When `WallTool` closes a loop in Phase 4.8, after the final wall is committed:
+
+```ts
+// In WallTool, on loop close:
+const loopNodes = this._getChainNodes(); // ordered WallNode[] forming the closed polygon
+const points: Vec2[] = loopNodes.map(n => ({ x: n.x, z: n.z }));
+
+// Check if a polygon floor already covers this area — skip if so
+const exists = worldState.zones.get(zoneId)?.floors
+  .some(f => f.floorMesh.shape === 'polygon' && polygonsOverlap(f.floorMesh.points!, points));
+
+if (!exists) {
+  this._bus.emit('floortool:suggest-auto-floor', { points, level: activeFloorLevel });
+}
+```
+
+React receives `floortool:suggest-auto-floor` and shows a subtle non-blocking prompt (bottom of canvas, not a modal):
+
+```
+┌─────────────────────────────────────────────┐
+│  Create floor for this room?  [Yes] [Dismiss]│
+└─────────────────────────────────────────────┘
+```
+
+On "Yes":
+1. `worldState.addFloor(zoneId, { shape: 'polygon', points, material: activeFloorMaterial, level: activeFloorLevel, ... })`
+2. `FloorBuilder` builds `ShapeGeometry` from points
+3. Rapier collider registered
+4. Prompt dismisses
+
+On "Dismiss": nothing happens, user can place a floor manually later.
+
+#### Polygon Floor Tool
+
+New tool: `PolygonFloorTool.ts`. Works like the WallTool — click to place vertices, close the loop to finish.
+
+```
+States: IDLE → DRAWING → IDLE
+
+IDLE:
+  Show snapped cursor dot on ground plane
+  On click: place first vertex → enter DRAWING
+
+DRAWING:
+  Show placed vertices as dots connected by lines (preview polygon outline)
+  Show ghost line from last vertex to current cursor position
+  Show filled semi-transparent preview polygon as vertices are added (THREE.ShapeGeometry, 30% opacity)
+  Minimum 3 vertices required before closing is allowed
+
+  On click (free space): add new vertex, update preview
+  On click (near first vertex, ≥3 vertices placed): close polygon → create floor → IDLE
+  On click (near existing vertex, not first): snap to it, add as next vertex
+  Esc: remove last placed vertex (step back one vertex)
+  Double-Esc or Esc with only 1 vertex: discard entirely → IDLE
+
+On close:
+  worldState.addFloor(zoneId, {
+    level: activeFloorLevel,
+    elevation: activeFloor.elevation,
+    ceilingHeight: activeFloor.ceilingHeight,
+    slabThickness: 0.2,
+    renderCeiling: activeFloor.renderCeiling,
+    floorMesh: {
+      shape: 'polygon',
+      points: placedVertices,   // Vec2[] in order placed
+      material: selectedMaterial,
+    }
+  })
+
+Grid snap: 0.5m (disable with Alt)
+Angle snap: hold Shift for 45° snapping from last vertex
+```
+
+Add `PolygonFloorTool` to the Toolbar as a sub-tool of the Floor tool — long press or dropdown on the Floor button shows Rect and Polygon options. Or a separate toolbar button if preferred.
+
+Add to project structure: `src/editor/PolygonFloorTool.ts`
+
+#### Polygon Vertex Editing (Select Mode)
+
+Once a polygon floor exists, its vertices are editable in Select mode — same pattern as node dragging in Phase 4.8.
+
+```
+Detection (Select tool active):
+  On mousemove over a polygon floor:
+    Check proximity to each vertex point (within 8px screen space)
+    If near a vertex: highlight it, cursor changes to move cursor
+
+On mousedown near a polygon vertex:
+  Enter VERTEX_DRAG state
+  Store original vertex position
+  Suppress camera orbit
+
+During VERTEX_DRAG (mousemove):
+  Update vertex position to snapped world position
+  Rebuild floor ShapeGeometry live
+  Update Rapier collider
+
+On mouseup:
+  Confirm — write updated points back to worldState.updateFloor()
+  Return to normal select state
+
+On Esc during drag:
+  Restore original vertex position
+  Rebuild floor
+  Return to normal select state
+```
+
+Vertex dots rendered as small squares on polygon floors when Select tool is active — same visual style as wall node dots.
+
+#### Floor PropertiesPanel
+
+When a floor is selected, PropertiesPanel shows floor-appropriate properties:
+
+```
+FLOOR — Level G
+┌─────────────────────────────────┐
+│ Material   [Cobblestone      ▾] │
+│ Shape      rect / polygon       │  ← read-only label
+│ Level      G (0)                │  ← read-only
+│ Elevation  0.00m                │  ← read-only, derived
+└─────────────────────────────────┘
+```
+
+No position/rotation/scale — those don't apply to floors. Material change triggers mesh rebuild. Shape and level are informational only.
+
+#### Floor Overlap Warning
+
+Two polygon/rect floors at the same level that overlap produce a warning in the editor — a subtle orange outline on the overlapping meshes and a console warning. No hard prevention — the user may intentionally want layered floors with Z-offset. Just a visual hint.
+
+#### FloorBuilder — polygon support confirmation
+
+`FloorBuilder.build()` must handle both `shape: 'rect'` and `shape: 'polygon'`:
+
+```ts
+if (floorDef.floorMesh.shape === 'polygon' && floorDef.floorMesh.points) {
+  const shape = new THREE.Shape(
+    floorDef.floorMesh.points.map(p => new THREE.Vector2(p.x, p.z))
+  );
+  geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+} else {
+  geo = new THREE.PlaneGeometry(zoneBounds.width, zoneBounds.depth);
+  geo.rotateX(-Math.PI / 2);
+}
+```
+
+If this isn't already implemented from Phase 3, it must be added here.
+
+
 
 ### Phase 5 — Openings (Doors & Windows)
 - CSG integration via `utils/csg.ts` (three-bvh-csg) — visual mesh only

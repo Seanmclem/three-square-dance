@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile,
+  SceneFile, Opening,
 } from "@/types";
 
 export class WorldState {
@@ -105,6 +105,31 @@ export class WorldState {
     if (!zone) return;
     zone.walls = zone.walls.filter(w => w.id !== wallId);
     this._bus.emit("wall:removed", { zoneId, wallId });
+  }
+
+  updateOpening(zoneId: string, wallId: string, openingId: string, changes: Partial<Opening>): void {
+    const zone    = this.zones.get(zoneId);
+    const wall    = zone?.walls.find(w => w.id === wallId);
+    const opening = wall?.openings.find(o => o.id === openingId);
+    if (!opening || !wall) return;
+    Object.assign(opening, changes);
+    this._bus.emit("wall:updated", { zoneId, wallId, changes: { openings: wall.openings } });
+  }
+
+  addOpening(zoneId: string, wallId: string, opening: Opening): void {
+    const zone = this.zones.get(zoneId);
+    const wall = zone?.walls.find(w => w.id === wallId);
+    if (!wall) return;
+    wall.openings.push(opening);
+    this._bus.emit("wall:updated", { zoneId, wallId, changes: { openings: wall.openings } });
+  }
+
+  removeOpening(zoneId: string, wallId: string, openingId: string): void {
+    const zone = this.zones.get(zoneId);
+    const wall = zone?.walls.find(w => w.id === wallId);
+    if (!wall) return;
+    wall.openings = wall.openings.filter(o => o.id !== openingId);
+    this._bus.emit("wall:updated", { zoneId, wallId, changes: { openings: wall.openings } });
   }
 
   // ─── Platform mutations ───────────────────────────────────────────────────

@@ -9,9 +9,10 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
 interface RunEntry {
-  mesh:      THREE.Mesh;
-  colliders: RAPIER.Collider[];
-  wallIds:   string[];
+  mesh:       THREE.Mesh;
+  colliders:  RAPIER.Collider[];
+  wallIds:    string[];
+  trimMeshes: THREE.Mesh[];
 }
 
 interface ZoneEntry {
@@ -43,6 +44,8 @@ function groupWallRuns(zone: ZoneDef, _nodes: Map<string, WallNode>): WallDef[][
   function canMerge(w1: WallDef, w2: WallDef, sharedNodeId: string): boolean {
     return (
       (nodeWalls.get(sharedNodeId)?.length ?? 0) === 2 &&
+      w1.openings.length   === 0 &&
+      w2.openings.length   === 0 &&
       w1.material          === w2.material &&
       w1.exteriorMaterial  === w2.exteriorMaterial &&
       w1.height            === w2.height
@@ -238,11 +241,13 @@ export class ZoneManager {
         ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
         : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
       const entry: RunEntry = {
-        mesh:      output.mesh,
-        colliders: output.colliders,
-        wallIds:   run.map(w => w.id),
+        mesh:       output.mesh,
+        colliders:  output.colliders,
+        wallIds:    run.map(w => w.id),
+        trimMeshes: output.trimMeshes,
       };
       wallsGroup.add(output.mesh);
+      for (const tm of output.trimMeshes) wallsGroup.add(tm);
       for (const w of run) wallData.set(w.id, entry);
     }
 
@@ -358,6 +363,12 @@ export class ZoneManager {
       if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
         (re.mesh.material as THREE.Material).dispose();
       entry.wallsGroup.remove(re.mesh);
+      for (const tm of re.trimMeshes) {
+        entry.wallsGroup.remove(tm);
+        tm.geometry.dispose();
+        if ((tm.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+          (tm.material as THREE.Material).dispose();
+      }
       for (const id of re.wallIds) entry.wallData.delete(id);
     }
 
@@ -371,11 +382,13 @@ export class ZoneManager {
         ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
         : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
       const newEntry: RunEntry = {
-        mesh:      output.mesh,
-        colliders: output.colliders,
-        wallIds:   run.map(w => w.id),
+        mesh:       output.mesh,
+        colliders:  output.colliders,
+        wallIds:    run.map(w => w.id),
+        trimMeshes: output.trimMeshes,
       };
       entry.wallsGroup.add(output.mesh);
+      for (const tm of output.trimMeshes) entry.wallsGroup.add(tm);
       for (const w of run) entry.wallData.set(w.id, newEntry);
     }
 
@@ -401,6 +414,12 @@ export class ZoneManager {
     if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
       (re.mesh.material as THREE.Material).dispose();
     entry.wallsGroup.remove(re.mesh);
+    for (const tm of re.trimMeshes) {
+      entry.wallsGroup.remove(tm);
+      tm.geometry.dispose();
+      if ((tm.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (tm.material as THREE.Material).dispose();
+    }
     for (const id of re.wallIds) entry.wallData.delete(id);
 
     // Rebuild runs for surviving walls from the old run
@@ -413,11 +432,13 @@ export class ZoneManager {
           ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
           : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
         const newEntry: RunEntry = {
-          mesh:      output.mesh,
-          colliders: output.colliders,
-          wallIds:   run.map(w => w.id),
+          mesh:       output.mesh,
+          colliders:  output.colliders,
+          wallIds:    run.map(w => w.id),
+          trimMeshes: output.trimMeshes,
         };
         entry.wallsGroup.add(output.mesh);
+        for (const tm of output.trimMeshes) entry.wallsGroup.add(tm);
         for (const w of run) entry.wallData.set(w.id, newEntry);
       }
     }

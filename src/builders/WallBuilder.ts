@@ -1,12 +1,14 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
-import type { WallDef, ZoneDef, WallNode, MeshUserData } from "@/types";
+import { csgSubtract } from "@/utils/csg";
+import type { WallDef, ZoneDef, WallNode, MeshUserData, Opening } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface WallBuildOutput {
-  mesh:      THREE.Mesh;
-  colliders: RAPIER.Collider[];
+  mesh:       THREE.Mesh;
+  colliders:  RAPIER.Collider[];
+  trimMeshes: THREE.Mesh[];
 }
 
 function applyBoxUVTiling(
@@ -33,6 +35,72 @@ function applyBoxUVTiling(
     }
   }
   uv.needsUpdate = true;
+}
+
+const TRIM_W = 0.08;
+
+function createArchCutterGeo(width: number, height: number, thickness: number): THREE.BufferGeometry {
+  const radius   = width / 2;
+  const rectH    = height - radius;
+  const archCy   = -height / 2 + rectH; // Y center of the semicircle in opening-local space
+  const depth    = thickness + 0.1;
+
+  const shape = new THREE.Shape();
+  shape.moveTo(-width / 2, -height / 2);
+  shape.lineTo( width / 2, -height / 2);
+  shape.lineTo( width / 2, archCy);
+  shape.absarc(0, archCy, radius, 0, Math.PI, false);
+  shape.lineTo(-width / 2, -height / 2);
+
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  geo.translate(0, 0, -depth / 2); // center along Z for wall thickness
+  return geo;
+}
+
+function buildTrimFrame(
+  opening: Opening,
+  length: number,
+  wallHeight: number,
+  wallThickness: number,
+  cx: number,
+  cz: number,
+  angle: number,
+): THREE.Mesh[] {
+  const TRIM_D = wallThickness + 0.06;
+  // passage: clean hole, no trim
+  if (opening.type === "passage") return [];
+
+  const localX = opening.offsetAlongWall + opening.width / 2 - length / 2;
+  const localY = opening.elevation + opening.height / 2 - wallHeight / 2;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+
+  const meshes: THREE.Mesh[] = [];
+
+  const addPiece = (lx: number, ly: number, w: number, h: number) => {
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, TRIM_D), mat);
+    mesh.position.set(cx + cos * lx, wallHeight / 2 + ly, cz + sin * lx);
+    mesh.rotation.y = -angle;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.userData = { selectable: false, _ownsMaterial: true };
+    meshes.push(mesh);
+  };
+
+  // Left jamb
+  addPiece(localX - opening.width / 2 - TRIM_W / 2, localY, TRIM_W, opening.height + TRIM_W * 2);
+  // Right jamb
+  addPiece(localX + opening.width / 2 + TRIM_W / 2, localY, TRIM_W, opening.height + TRIM_W * 2);
+  // Header — arch implies a curved top, so skip the straight header
+  if (opening.type !== "arch") {
+    addPiece(localX, localY + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+  }
+  // Sill for windows
+  if (opening.type === "window") {
+    addPiece(localX, localY - opening.height / 2 - TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+  }
+
+  return meshes;
 }
 
 // Returns the ordered sequence of node IDs for a connected chain of walls.
@@ -121,7 +189,73 @@ export class WallBuilder {
 
     const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness, segX, segY, 1);
     applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileX, tileY);
-    geo.setAttribute('uv2', geo.attributes.uv);
+
+    // CSG: subtract each opening from the wall geometry
+    let finalGeo: THREE.BufferGeometry = geo;
+    const trimMeshes: THREE.Mesh[] = [];
+
+    if (wall.openings.length > 0) {
+      let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+      workMesh.updateMatrixWorld();
+      let prevIsOriginal = true;
+
+      for (const opening of wall.openings) {
+        // Cutter position in wall local space (wall runs along X, centered at origin)
+        const localX = opening.offsetAlongWall + opening.width / 2 - length / 2;
+        const localY = opening.elevation + opening.height / 2 - wall.height / 2;
+
+        const cutterGeo = opening.type === "arch"
+          ? createArchCutterGeo(opening.width + 0.05, opening.height + 0.05, wall.thickness)
+          : new THREE.BoxGeometry(opening.width + 0.05, opening.height + 0.05, wall.thickness + 0.1);
+        const cutterMesh = new THREE.Mesh(cutterGeo, new THREE.MeshBasicMaterial());
+        cutterMesh.position.set(localX, localY, 0);
+        cutterMesh.updateMatrixWorld();
+
+        const oldGeo = workMesh.geometry;
+        workMesh = csgSubtract(workMesh, cutterMesh);
+        workMesh.updateMatrixWorld();
+
+        cutterGeo.dispose();
+        if (!prevIsOriginal) oldGeo.dispose();
+        prevIsOriginal = false;
+      }
+
+      finalGeo = workMesh.geometry;
+      finalGeo.setAttribute('uv2', finalGeo.attributes.uv);
+
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      for (const opening of wall.openings) {
+        trimMeshes.push(...buildTrimFrame(opening, length, wall.height, wall.thickness, cx, cz, angle));
+
+        // Invisible trigger mesh — fills the opening so raycasting can select it
+        const lx = opening.offsetAlongWall + opening.width / 2 - length / 2;
+        const ly = opening.elevation + opening.height / 2 - wall.height / 2;
+        const triggerMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(opening.width, opening.height, 0.01),
+          new THREE.MeshStandardMaterial({
+            color: 0x4d8cff, emissive: 0x000000, emissiveIntensity: 0.0,
+            transparent: true, opacity: 0.04,
+            depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+          }),
+        );
+        triggerMesh.renderOrder = 1;
+        triggerMesh.position.set(cx + cos * lx, wall.height / 2 + ly, cz + sin * lx);
+        triggerMesh.rotation.y = -angle;
+        triggerMesh.userData = {
+          editorId:      opening.id,
+          editorType:    "opening",
+          zoneId,
+          selectable:    true,
+          floorLevel:    wall.floor,
+          _ownsMaterial: true,
+          wallId:        wall.id,
+          _selectOpacity: 0.55,
+        };
+        trimMeshes.push(triggerMesh);
+      }
+    } else {
+      geo.setAttribute('uv2', geo.attributes.uv);
+    }
 
     const mat = ovr
       ? await assetManager.getMaterialWithOverrides(wall.material, ovr)
@@ -129,7 +263,7 @@ export class WallBuilder {
       : await assetManager.getMaterial(wall.material)
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(finalGeo, mat);
     mesh.position.set(cx, wall.height / 2, cz);
     mesh.rotation.y = -angle;
     mesh.castShadow    = true;
@@ -145,11 +279,11 @@ export class WallBuilder {
 
     const colliders = ColliderBuilder.registerWallSegments(wall, 0, start, end);
 
-    return { mesh, colliders };
+    return { mesh, colliders, trimMeshes };
   }
 
   // Builds a single continuous mesh for a chain of compatible walls with mitered corner joins.
-  // All walls in the run must share material, exteriorMaterial, and height.
+  // All walls in the run must share material, exteriorMaterial, and height — and have no openings.
   static async buildRun(
     walls:  WallDef[],
     zoneId: string,
@@ -297,6 +431,6 @@ export class WallBuilder {
       );
     }
 
-    return { mesh, colliders: allColliders };
+    return { mesh, colliders: allColliders, trimMeshes: [] };
   }
 }

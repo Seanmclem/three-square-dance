@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
-  FloorDef, WallDef, MaterialDef, MaterialOverrides, QualityScale,
+  FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -120,19 +120,21 @@ export function PropertiesPanel({
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {selected && selected.type === "floor"
-          ? <FloorView
-              selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
-              onAddMaterial={openImporter}
-            />
-          : selected && selected.type === "wall"
-            ? <WallView
+        {selected && selected.type === "opening"
+          ? <OpeningView selected={selected} onObjectUpdate={onObjectUpdate} />
+          : selected && selected.type === "floor"
+            ? <FloorView
                 selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
                 onAddMaterial={openImporter}
               />
-            : selected && draft
-              ? <TransformView selected={selected} draft={draft} commit={commit} />
-              : <ToolView activeTool={activeTool} />}
+            : selected && selected.type === "wall"
+              ? <WallView
+                  selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
+                  onAddMaterial={openImporter}
+                />
+              : selected && draft
+                ? <TransformView selected={selected} draft={draft} commit={commit} />
+                : <ToolView activeTool={activeTool} />}
       </div>
 
       {/* Quality — always visible at panel bottom */}
@@ -295,12 +297,14 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
+  const [openings,  setOpenings]  = useState<Opening[]>(wallData?.openings ?? []);
   const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     setHeight(String(wallData?.height ?? 3));
     setThickness(String(wallData?.thickness ?? 0.2));
+    setOpenings(wallData?.openings ?? []);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
@@ -320,6 +324,42 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
     const n = parseFloat(val);
     if (!Number.isFinite(n) || n <= 0) return;
     onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
+  };
+
+  const addOpening = () => {
+    const next: Opening[] = [...openings, {
+      id:                 crypto.randomUUID(),
+      type:               "door",
+      offsetAlongWall:    0.5,
+      width:              1.0,
+      height:             2.1,
+      elevation:          0,
+      linkedZoneId:       null,
+      linkedTransitionId: null,
+    }];
+    setOpenings(next);
+    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
+  };
+
+  const updateOpening = (idx: number, changes: Partial<Opening>) => {
+    // Apply sensible dimension defaults when switching type
+    let extra: Partial<Opening> = {};
+    if (changes.type && changes.type !== openings[idx]?.type) {
+      if (changes.type === "window" || changes.type === "passage") {
+        extra = { height: 1.0, elevation: 1.0 };
+      } else {
+        extra = { height: 2.1, elevation: 0 };
+      }
+    }
+    const next = openings.map((op, i) => i === idx ? { ...op, ...changes, ...extra } : op);
+    setOpenings(next);
+    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
+  };
+
+  const deleteOpening = (idx: number) => {
+    const next = openings.filter((_, i) => i !== idx);
+    setOpenings(next);
+    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
   };
 
   return (
@@ -360,8 +400,150 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
           } as unknown as Partial<WorldObject>)}
           onAddMaterial={onAddMaterial}
         />
+
+        {/* Openings */}
+        <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <div style={LABEL}>OPENINGS</div>
+            <button
+              onClick={addOpening}
+              style={{
+                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                borderRadius: 4, color: "#80aaff", fontSize: 9, cursor: "pointer",
+                padding: "2px 8px", fontFamily: "monospace",
+              }}
+            >+ ADD</button>
+          </div>
+
+          {openings.length === 0 && (
+            <div style={{ color: "#2a4a6a", fontSize: 10, fontStyle: "italic" }}>No openings</div>
+          )}
+
+          {openings.map((op, idx) => (
+            <OpeningRow
+              key={op.id}
+              opening={op}
+              onUpdate={changes => updateOpening(idx, changes)}
+              onDelete={() => deleteOpening(idx)}
+            />
+          ))}
+        </div>
       </div>
     </>
+  );
+}
+
+// ─── Opening view (when an individual opening is selected) ───────────────────
+
+function OpeningView({ selected, onObjectUpdate }: {
+  selected:       SelectedObjectPayload;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const opening = selected.data as Opening | null;
+  if (!opening) return null;
+
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace", textTransform: "capitalize" }}>
+          {opening.type} Opening
+        </div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
+          {selected.id.slice(0, 20)}
+        </div>
+      </div>
+      <div style={{ padding: "10px 16px" }}>
+        <OpeningRow
+          opening={opening}
+          onUpdate={changes => onObjectUpdate(changes as unknown as Partial<WorldObject>)}
+          onDelete={() => {/* deletion handled from the wall's openings list */}}
+          hideDelete
+        />
+      </div>
+    </>
+  );
+}
+
+// ─── Opening row ──────────────────────────────────────────────────────────────
+
+function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
+  opening:     Opening;
+  onUpdate:    (changes: Partial<Opening>) => void;
+  onDelete:    () => void;
+  hideDelete?: boolean;
+}) {
+  const [offsetStr, setOffsetStr] = useState(String(opening.offsetAlongWall));
+  const [widthStr,  setWidthStr]  = useState(String(opening.width));
+  const [heightStr, setHeightStr] = useState(String(opening.height));
+  const [elevStr,   setElevStr]   = useState(String(opening.elevation));
+
+  useEffect(() => {
+    setOffsetStr(String(opening.offsetAlongWall));
+    setWidthStr(String(opening.width));
+    setHeightStr(String(opening.height));
+    setElevStr(String(opening.elevation));
+  }, [opening.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep height/elevation strings in sync when type change applies new defaults
+  useEffect(() => {
+    setHeightStr(String(opening.height));
+    setElevStr(String(opening.elevation));
+  }, [opening.type]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const blurNum = (val: string, min: number, field: keyof Opening) => {
+    const n = parseFloat(val);
+    if (Number.isFinite(n) && n >= min) onUpdate({ [field]: n } as Partial<Opening>);
+  };
+
+  return (
+    <div style={{
+      background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+      borderRadius: 4, padding: "6px 8px", marginBottom: 6,
+      display: "flex", flexDirection: "column", gap: 4,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <select
+          value={opening.type}
+          onChange={e => onUpdate({ type: e.target.value as Opening["type"] })}
+          style={{
+            ...NUM_INPUT, width: "auto", padding: "2px 4px", cursor: "pointer",
+          }}
+        >
+          <option value="door">Door</option>
+          <option value="window">Window</option>
+          <option value="arch">Arch</option>
+          <option value="passage">Passage</option>
+        </select>
+        {!hideDelete && (
+          <button
+            onClick={onDelete}
+            style={{
+              background: "transparent", border: "none", color: "#ff6b6b",
+              cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1,
+            }}
+          >×</button>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+        {([
+          ["OFFSET", offsetStr, setOffsetStr, 0,   "offsetAlongWall"] ,
+          ["WIDTH",  widthStr,  setWidthStr,  0.1, "width"]           ,
+          ["HEIGHT", heightStr, setHeightStr, 0.1, "height"]          ,
+          ["ELEV",   elevStr,   setElevStr,   0,   "elevation"]       ,
+        ] as const).map(([label, val, setter, min, field]) => (
+          <div key={field}>
+            <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{label}</div>
+            <input
+              type="number" step={0.1} min={min} value={val}
+              style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+              onChange={e => setter(e.target.value)}
+              onBlur={e => blurNum(e.target.value, min, field)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

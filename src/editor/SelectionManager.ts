@@ -6,7 +6,7 @@ import type {
   SelectedObjectPayload, WorldObject,
 } from "@/types";
 
-const PRIORITY: EditorObjectType[] = ["object", "platform", "wall", "floor"];
+const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor"];
 
 const SELECT_EMISSIVE  = 0x3366ff;
 const SELECT_INTENSITY = 0.25;
@@ -133,9 +133,10 @@ export class SelectionManager implements IEditorModule {
 
     const ud = root.userData;
     this._bus.emit("object:selected", {
-      id:     ud.editorId,
-      type:   ud.editorType,
-      zoneId: ud.zoneId,
+      id:       ud.editorId,
+      type:     ud.editorType,
+      zoneId:   ud.zoneId,
+      parentId: ud.wallId,
       position: { x: root.position.x, y: root.position.y, z: root.position.z },
       rotation: {
         x: THREE.MathUtils.radToDeg(root.rotation.x),
@@ -156,13 +157,31 @@ export class SelectionManager implements IEditorModule {
 
   /** Wall was rebuilt — re-apply selection tint to the new mesh. */
   private _onWallRebuilt(zoneId: string, wallId: string): void {
-    if (!this._selected ||
-        this._selected.userData.editorId !== wallId ||
-        this._selected.userData.zoneId   !== zoneId) return;
-    const newMesh = this._findMesh(wallId, zoneId);
-    if (!newMesh) { this._selected = null; return; }
-    this._selected = newMesh;
-    this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
+    const ud = this._selected.userData;
+
+    if (ud.editorType === "wall" && ud.editorId === wallId) {
+      const newMesh = this._findMesh(wallId, zoneId);
+      if (!newMesh) { this._selected = null; return; }
+      this._selected = newMesh;
+      this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    } else if (ud.editorType === "opening" && ud.wallId === wallId) {
+      const newMesh = this._findMesh(ud.editorId, zoneId);
+      if (!newMesh) { this._deselect(); return; }
+      this._selected = newMesh;
+      this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+      // Re-emit so PropertiesPanel reflects the updated opening data
+      this._bus.emit("object:selected", {
+        id:       newMesh.userData.editorId,
+        type:     "opening",
+        zoneId,
+        parentId: wallId,
+        position: { x: newMesh.position.x, y: newMesh.position.y, z: newMesh.position.z },
+        rotation: { x: 0, y: THREE.MathUtils.radToDeg(newMesh.rotation.y), z: 0 },
+        scale:    { x: 1, y: 1, z: 1 },
+        data:     this._getDataRecord(newMesh),
+      });
+    }
   }
 
   private _findMesh(editorId: string, zoneId: string): THREE.Object3D | null {
@@ -199,6 +218,10 @@ export class SelectionManager implements IEditorModule {
       case "platform": return zone.platforms.find(p => p.id === editorId) ?? null;
       case "stair":    return zone.stairs.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
+      case "opening": {
+        const wall = zone.walls.find(w => w.id === root.userData.wallId);
+        return wall?.openings.find(o => o.id === editorId) ?? null;
+      }
       default:         return null;
     }
   }
@@ -211,6 +234,7 @@ export class SelectionManager implements IEditorModule {
       if (!mat) return;
       mat.emissive.setHex(color);
       mat.emissiveIntensity = intensity;
+      if (child.userData._selectOpacity !== undefined) mat.opacity = child.userData._selectOpacity;
     });
   }
 
@@ -221,6 +245,7 @@ export class SelectionManager implements IEditorModule {
       if (Array.isArray(mat) || !(mat instanceof THREE.MeshStandardMaterial)) return;
       mat.emissive.setHex(child.userData._origEmissive ?? 0x000000);
       mat.emissiveIntensity = child.userData._origEmissiveIntensity ?? 0;
+      if (child.userData._origOpacity !== undefined) mat.opacity = child.userData._origOpacity;
     });
   }
 
@@ -238,6 +263,7 @@ export class SelectionManager implements IEditorModule {
       child.userData._ownsMaterial = true;
       child.userData._origEmissive = mat.emissive.getHex();
       child.userData._origEmissiveIntensity = mat.emissiveIntensity;
+      if (mat.transparent) child.userData._origOpacity = mat.opacity;
     }
     return mat;
   }

@@ -23,7 +23,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown }: TopBarPr
       padding: "0 16px", zIndex: 10,
     }}>
       <span style={{ color: "#80aaff", fontFamily: "monospace", fontSize: 13, letterSpacing: 2, opacity: 0.8 }}>
-        WORLD EDITOR
+        SquareDance
       </span>
       <div style={{ width: 1, height: 24, background: "rgba(80,120,180,0.3)" }} />
 
