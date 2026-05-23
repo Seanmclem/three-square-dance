@@ -249,7 +249,10 @@ export class WallBuilder {
           floorLevel:    wall.floor,
           _ownsMaterial: true,
           wallId:        wall.id,
-          _selectOpacity: 0.55,
+          _selectOpacity:         0.55,
+          _origOpacity:           0.04,
+          _origEmissive:          0x000000,
+          _origEmissiveIntensity: 0,
         };
         trimMeshes.push(triggerMesh);
       }
