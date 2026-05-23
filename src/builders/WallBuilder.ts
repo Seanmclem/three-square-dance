@@ -414,13 +414,124 @@ export class WallBuilder {
     geo.setIndex(idxArr);
     geo.computeVertexNormals();
 
+    // --- Opening processing: CSG cuts + trim/trigger meshes for any wall in the run ---
+    let finalGeo: THREE.BufferGeometry = geo;
+    const trimMeshes: THREE.Mesh[] = [];
+    const hasAnyOpenings = walls.some(w => w.openings.length > 0);
+
+    if (hasAnyOpenings) {
+      let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+      workMesh.updateMatrixWorld();
+      let prevIsOriginal = true;
+
+      for (let si = 0; si < walls.length; si++) {
+        const wallSeg = walls[si]!;
+        if (wallSeg.openings.length === 0) continue;
+
+        const j      = (si + 1) % N;
+        const ptA    = pts[si]!;
+        const ptB    = pts[j]!;
+        const segDx  = ptB.x - ptA.x, segDz = ptB.z - ptA.z;
+        const segLen = Math.hypot(segDx, segDz) || 0.001;
+        const segUx  = segDx / segLen, segUz = segDz / segLen;
+        const segAngle = Math.atan2(segDz, segDx);
+        const segCx  = (ptA.x + ptB.x) / 2;
+        const segCz  = (ptA.z + ptB.z) / 2;
+        // Is the wall stored in the same direction as the run traversal?
+        const isForward = wallSeg.startNodeId === resolvedIds[si];
+
+        for (const opening of wallSeg.openings) {
+          // Distance from ptA (run direction) to opening centre
+          const centerDist = isForward
+            ? opening.offsetAlongWall + opening.width / 2
+            : segLen - opening.offsetAlongWall - opening.width / 2;
+
+          // CSG cutter positioned in world space (run mesh has no transform)
+          const worldX = ptA.x + segUx * centerDist;
+          const worldY = opening.elevation + opening.height / 2;
+          const worldZ = ptA.z + segUz * centerDist;
+
+          const cutterGeo = opening.type === "arch"
+            ? createArchCutterGeo(opening.width + 0.05, opening.height + 0.05, T)
+            : new THREE.BoxGeometry(opening.width + 0.05, opening.height + 0.05, T + 0.1);
+          const cutterMesh = new THREE.Mesh(cutterGeo, new THREE.MeshBasicMaterial());
+          cutterMesh.position.set(worldX, worldY, worldZ);
+          cutterMesh.rotation.y = -segAngle;
+          cutterMesh.updateMatrixWorld();
+
+          const oldGeo = workMesh.geometry;
+          workMesh = csgSubtract(workMesh, cutterMesh);
+          workMesh.updateMatrixWorld();
+
+          cutterGeo.dispose();
+          if (!prevIsOriginal) oldGeo.dispose();
+          prevIsOriginal = false;
+
+          // Wall-centred local coords for trim + trigger meshes
+          const localX   = centerDist - segLen / 2;
+          const localY_m = opening.elevation + opening.height / 2 - H / 2;
+          const TRIM_D   = T + 0.06;
+
+          if (opening.type !== "passage") {
+            const addPiece = (lx: number, ly: number, pw: number, ph: number) => {
+              const tmat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
+              const pm   = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, TRIM_D), tmat);
+              pm.position.set(segCx + segUx * lx, H / 2 + ly, segCz + segUz * lx);
+              pm.rotation.y   = -segAngle;
+              pm.castShadow   = true;
+              pm.receiveShadow = true;
+              pm.userData = { selectable: false, _ownsMaterial: true };
+              trimMeshes.push(pm);
+            };
+            addPiece(localX - opening.width / 2 - TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
+            addPiece(localX + opening.width / 2 + TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
+            if (opening.type !== "arch") {
+              addPiece(localX, localY_m + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+            }
+            if (opening.type === "window") {
+              addPiece(localX, localY_m - opening.height / 2 - TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
+            }
+          }
+
+          const triggerMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(opening.width, opening.height, 0.01),
+            new THREE.MeshStandardMaterial({
+              color: 0x4d8cff, emissive: 0x000000, emissiveIntensity: 0.0,
+              transparent: true, opacity: 0.04,
+              depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+            }),
+          );
+          triggerMesh.renderOrder = 1;
+          triggerMesh.position.set(segCx + segUx * localX, H / 2 + localY_m, segCz + segUz * localX);
+          triggerMesh.rotation.y = -segAngle;
+          triggerMesh.userData = {
+            editorId:      opening.id,
+            editorType:    "opening",
+            zoneId,
+            selectable:    true,
+            floorLevel:    wallSeg.floor,
+            _ownsMaterial: true,
+            wallId:        wallSeg.id,
+            _selectOpacity:         0.55,
+            _origOpacity:           0.04,
+            _origEmissive:          0x000000,
+            _origEmissiveIntensity: 0,
+          };
+          trimMeshes.push(triggerMesh);
+        }
+      }
+
+      finalGeo = workMesh.geometry;
+      finalGeo.setAttribute('uv2', finalGeo.attributes.uv);
+    }
+
     const mat = ovr
       ? await assetManager.getMaterialWithOverrides(wall.material, ovr)
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a))
       : await assetManager.getMaterial(wall.material)
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(finalGeo, mat);
     mesh.castShadow    = true;
     mesh.receiveShadow = true;
     mesh.userData = {
@@ -446,6 +557,6 @@ export class WallBuilder {
       );
     }
 
-    return { mesh, colliders: allColliders, trimMeshes: [] };
+    return { mesh, colliders: allColliders, trimMeshes };
   }
 }

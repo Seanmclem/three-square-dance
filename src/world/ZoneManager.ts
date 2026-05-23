@@ -44,8 +44,6 @@ function groupWallRuns(zone: ZoneDef, _nodes: Map<string, WallNode>): WallDef[][
   function canMerge(w1: WallDef, w2: WallDef, sharedNodeId: string): boolean {
     return (
       (nodeWalls.get(sharedNodeId)?.length ?? 0) === 2 &&
-      w1.openings.length   === 0 &&
-      w2.openings.length   === 0 &&
       w1.material          === w2.material &&
       w1.exteriorMaterial  === w2.exteriorMaterial &&
       w1.height            === w2.height
