@@ -327,11 +327,17 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   };
 
   const addOpening = () => {
+    const newWidth = 1.0;
+    const rightmost = openings.reduce(
+      (max, o) => Math.max(max, o.offsetAlongWall + o.width),
+      0,
+    );
+    const smartOffset = openings.length === 0 ? 0.5 : rightmost + 0.5;
     const next: Opening[] = [...openings, {
       id:                 crypto.randomUUID(),
       type:               "door",
-      offsetAlongWall:    0.5,
-      width:              1.0,
+      offsetAlongWall:    smartOffset,
+      width:              newWidth,
       height:             2.1,
       elevation:          0,
       linkedZoneId:       null,
