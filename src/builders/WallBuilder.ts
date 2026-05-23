@@ -298,7 +298,12 @@ export class WallBuilder {
     const nodeIds = resolveRunNodeIds(walls);
     if (!nodeIds) return WallBuilder.build(walls[0]!, zoneId, zone, nodes);
 
-    const pts = nodeIds.map(id => {
+    // Detect closed loop: resolveRunNodeIds appends the start node again when the
+    // run wraps back to where it began (e.g. a fully-enclosed room).
+    const isClosed = nodeIds.length > 2 && nodeIds[0] === nodeIds[nodeIds.length - 1];
+    const resolvedIds = isClosed ? nodeIds.slice(0, -1) : nodeIds;
+
+    const pts = resolvedIds.map(id => {
       const n = nodes.get(id)!;
       return { x: n.x, z: n.z };
     });
@@ -320,29 +325,33 @@ export class WallBuilder {
     }
 
     // Left/right edge positions at each polyline point using miter bisectors at interior corners.
+    // For closed loops every point is interior; open runs treat the two endpoints as flat caps.
     // Normal formula: for direction (dx, dz), left normal = (dz/len, -dx/len) in XZ.
+    const N = pts.length;
     const lefts:  { x: number; z: number }[] = [];
     const rights: { x: number; z: number }[] = [];
 
-    for (let i = 0; i < pts.length; i++) {
+    for (let i = 0; i < N; i++) {
       const p = pts[i]!;
       let mx: number, mz: number, mLen: number;
 
-      if (i === 0) {
+      if (!isClosed && i === 0) {
         const nxt = pts[1]!;
         const dx = nxt.x - p.x, dz = nxt.z - p.z;
         const len = Math.hypot(dx, dz) || 0.001;
         mx = dz / len; mz = -dx / len;
         mLen = T / 2;
-      } else if (i === pts.length - 1) {
+      } else if (!isClosed && i === N - 1) {
         const prv = pts[i - 1]!;
         const dx = p.x - prv.x, dz = p.z - prv.z;
         const len = Math.hypot(dx, dz) || 0.001;
         mx = dz / len; mz = -dx / len;
         mLen = T / 2;
       } else {
-        // Miter bisector: average of the two adjacent segment normals
-        const prv = pts[i - 1]!, nxt = pts[i + 1]!;
+        // Interior corner (or any point in a closed loop): miter bisector.
+        // Use modular indexing so the first/last points of a closed loop
+        // correctly reference their wrap-around neighbours.
+        const prv = pts[(i - 1 + N) % N]!, nxt = pts[(i + 1) % N]!;
         const dx1 = p.x - prv.x, dz1 = p.z - prv.z;
         const len1 = Math.hypot(dx1, dz1) || 0.001;
         const nx1 = dz1 / len1, nz1 = -dx1 / len1;
@@ -368,7 +377,7 @@ export class WallBuilder {
     const uvArr:  number[] = [];
     const idxArr: number[] = [];
 
-    for (let i = 0; i < pts.length; i++) {
+    for (let i = 0; i < N; i++) {
       const l = lefts[i]!, r = rights[i]!;
       const u = cumDist[i]! / tileX;
       const vTop = H / tileY;
@@ -376,9 +385,12 @@ export class WallBuilder {
       uvArr.push( u,   0, u,   vTop,  u,  0, u, vTop);
     }
 
-    for (let i = 0; i < pts.length - 1; i++) {
-      const LBi  = 4 * i,       LTi  = 4 * i + 1,     RBi  = 4 * i + 2,     RTi  = 4 * i + 3;
-      const LBi1 = 4 * (i + 1), LTi1 = 4 * (i + 1) + 1, RBi1 = 4 * (i + 1) + 2, RTi1 = 4 * (i + 1) + 3;
+    // Closed loops have N segments (last wraps back to 0); open runs have N-1.
+    const segCount = isClosed ? N : N - 1;
+    for (let i = 0; i < segCount; i++) {
+      const j   = (i + 1) % N;
+      const LBi  = 4 * i,  LTi  = 4 * i + 1,  RBi  = 4 * i + 2,  RTi  = 4 * i + 3;
+      const LBi1 = 4 * j,  LTi1 = 4 * j + 1,  RBi1 = 4 * j + 2,  RTi1 = 4 * j + 3;
 
       // Left face — outward normal points left
       idxArr.push(LBi, LTi, LTi1,  LBi, LTi1, LBi1);
@@ -388,12 +400,12 @@ export class WallBuilder {
       idxArr.push(LTi, RTi, RTi1,  LTi, RTi1, LTi1);
     }
 
-    // Start cap
-    idxArr.push(0, 2, 3,  0, 3, 1);
-
-    // End cap
-    const L = pts.length - 1;
-    idxArr.push(4*L, 4*L+1, 4*L+3,  4*L, 4*L+3, 4*L+2);
+    // End caps only for open runs — closed loops need no caps.
+    if (!isClosed) {
+      idxArr.push(0, 2, 3,  0, 3, 1);
+      const L = N - 1;
+      idxArr.push(4*L, 4*L+1, 4*L+3,  4*L, 4*L+3, 4*L+2);
+    }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
