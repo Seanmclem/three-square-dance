@@ -57,6 +57,70 @@ function createArchCutterGeo(width: number, height: number, thickness: number): 
   return geo;
 }
 
+// Builds the 4 inward-facing faces of a passage/opening tunnel as explicit geometry.
+// Geometry is centered at origin in opening-local space (width × height × thickness).
+// includeLintel: false for arch openings (arch curve replaces the top face).
+function buildPassageLiner(
+  W: number, H: number, T: number,
+  tileH: number, tileV: number,
+  includeLintel = true,
+): THREE.BufferGeometry {
+  const hw = W / 2, hh = H / 2, ht = T / 2;
+
+  const pos: number[] = [], nrm: number[] = [], uv: number[] = [];
+
+  const tri = (
+    verts: [number, number, number][],
+    nx: number, ny: number, nz: number,
+    uvFn: (x: number, y: number, z: number) => [number, number],
+  ) => {
+    for (const [x, y, z] of verts) {
+      pos.push(x, y, z);
+      nrm.push(nx, ny, nz);
+      uv.push(...uvFn(x, y, z));
+    }
+  };
+
+  // Jamb UV: U = depth (Z from -ht→+ht), V = height (Y from -hh→+hh)
+  const jUV = (x: number, y: number, z: number): [number, number] =>
+    [(z + ht) * tileV, (y + hh) * tileV];
+
+  // Sill/lintel UV: U = width (X from -hw→+hw), V = depth (Z from -ht→+ht)
+  const hUV = (x: number, y: number, z: number): [number, number] =>
+    [(x + hw) * tileH, (z + ht) * tileH];
+
+  // Right jamb (x = +hw, normal = -X toward center)
+  tri([[+hw,-hh,-ht],[+hw,-hh,+ht],[+hw,+hh,+ht]], -1, 0, 0, jUV);
+  tri([[+hw,-hh,-ht],[+hw,+hh,+ht],[+hw,+hh,-ht]], -1, 0, 0, jUV);
+
+  // Left jamb  (x = -hw, normal = +X toward center)
+  tri([[-hw,-hh,-ht],[-hw,+hh,-ht],[-hw,+hh,+ht]], +1, 0, 0, jUV);
+  tri([[-hw,-hh,-ht],[-hw,+hh,+ht],[-hw,-hh,+ht]], +1, 0, 0, jUV);
+
+  // Top lintel (y = +hh, normal = -Y downward into opening)
+  if (includeLintel) {
+    tri([[-hw,+hh,-ht],[-hw,+hh,+ht],[+hw,+hh,+ht]], 0, -1, 0, hUV);
+    tri([[-hw,+hh,-ht],[+hw,+hh,+ht],[+hw,+hh,-ht]], 0, -1, 0, hUV);
+  }
+
+  // Bottom sill (y = -hh, normal = +Y upward into opening)
+  tri([[-hw,-hh,+ht],[+hw,-hh,+ht],[+hw,-hh,-ht]], 0, +1, 0, hUV);
+  tri([[-hw,-hh,+ht],[+hw,-hh,-ht],[-hw,-hh,-ht]], 0, +1, 0, hUV);
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv',       new THREE.Float32BufferAttribute(uv,  2));
+  g.setAttribute('uv2',      new THREE.Float32BufferAttribute([...uv], 2));
+  return g;
+}
+
+interface LinerSetup {
+  geo: THREE.BufferGeometry;
+  px: number; py: number; pz: number;
+  ry: number;
+}
+
 function buildTrimFrame(
   opening: Opening,
   length: number,
@@ -199,6 +263,7 @@ export class WallBuilder {
     // CSG: subtract each opening from the wall geometry
     let finalGeo: THREE.BufferGeometry = geo;
     const trimMeshes: THREE.Mesh[] = [];
+    const linerSetups: LinerSetup[] = [];
 
     if (wall.openings.length > 0) {
       let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
@@ -261,6 +326,20 @@ export class WallBuilder {
           _origEmissiveIntensity: 0,
         };
         trimMeshes.push(triggerMesh);
+
+        // Collect liner setup — mesh created after material is loaded
+        const iTH = opening.innerTileH ?? tileX;
+        const iTV = opening.innerTileV ?? tileX;
+        const isArch    = opening.type === "arch";
+        const linerH    = isArch ? opening.height - opening.width / 2 : opening.height;
+        const linerOfsY = isArch ? -opening.width / 4 : 0;
+        linerSetups.push({
+          geo: buildPassageLiner(opening.width, linerH, wall.thickness, iTH, iTV, !isArch),
+          px:  cx + cos * lx,
+          py:  wall.height / 2 + ly + linerOfsY,
+          pz:  cz + sin * lx,
+          ry: -angle,
+        });
       }
     } else {
       geo.setAttribute('uv2', geo.attributes.uv);
@@ -285,6 +364,22 @@ export class WallBuilder {
       floorLevel:    wall.floor,
       _ownsMaterial: !!ovr,
     } satisfies MeshUserData;
+
+    // Create liner meshes now that the material is available
+    for (const ls of linerSetups) {
+      const lm = mat.clone();
+      lm.side = THREE.DoubleSide;
+      lm.polygonOffset = true;
+      lm.polygonOffsetFactor = -1;
+      lm.polygonOffsetUnits  = -1;
+      const linerMesh = new THREE.Mesh(ls.geo, lm);
+      linerMesh.position.set(ls.px, ls.py, ls.pz);
+      linerMesh.rotation.y = ls.ry;
+      linerMesh.castShadow    = true;
+      linerMesh.receiveShadow = true;
+      linerMesh.userData = { selectable: false, _ownsMaterial: true };
+      trimMeshes.push(linerMesh);
+    }
 
     const colliders = ColliderBuilder.registerWallSegments(wall, 0, start, end);
 
@@ -426,6 +521,7 @@ export class WallBuilder {
     // Uses global arc-length so openings slide around corners when offset > wall length.
     let finalGeo: THREE.BufferGeometry = geo;
     const trimMeshes: THREE.Mesh[] = [];
+    const linerSetups: LinerSetup[] = [];
     const hasAnyOpenings = walls.some(w => w.openings.length > 0);
 
     if (hasAnyOpenings) {
@@ -584,6 +680,20 @@ export class WallBuilder {
               _origEmissiveIntensity: 0,
             };
             trimMeshes.push(triggerMesh);
+
+            // Collect liner setup — mesh created after material is loaded
+            const iTH = opening.innerTileH ?? tileX;
+            const iTV = opening.innerTileV ?? tileX;
+            const isArch2    = opening.type === "arch";
+            const linerH2    = isArch2 ? opening.height - opening.width / 2 : opening.height;
+            const linerOfsY2 = isArch2 ? -opening.width / 4 : 0;
+            linerSetups.push({
+              geo: buildPassageLiner(opening.width, linerH2, T, iTH, iTV, !isArch2),
+              px:  kCx + kUx * localX,
+              py:  H / 2 + localY_m + linerOfsY2,
+              pz:  kCz + kUz * localX,
+              ry: -kAng,
+            });
           }
         }
       }
@@ -609,6 +719,22 @@ export class WallBuilder {
       floorLevel:    wall.floor,
       _ownsMaterial: !!ovr,
     } satisfies MeshUserData;
+
+    // Create liner meshes now that the material is available
+    for (const ls of linerSetups) {
+      const lm = mat.clone();
+      lm.side = THREE.DoubleSide;
+      lm.polygonOffset = true;
+      lm.polygonOffsetFactor = -1;
+      lm.polygonOffsetUnits  = -1;
+      const linerMesh = new THREE.Mesh(ls.geo, lm);
+      linerMesh.position.set(ls.px, ls.py, ls.pz);
+      linerMesh.rotation.y = ls.ry;
+      linerMesh.castShadow    = true;
+      linerMesh.receiveShadow = true;
+      linerMesh.userData = { selectable: false, _ownsMaterial: true };
+      trimMeshes.push(linerMesh);
+    }
 
     // One collider per wall segment using full (untrimmed) node positions
     const allColliders: RAPIER.Collider[] = [];

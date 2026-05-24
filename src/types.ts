@@ -226,6 +226,8 @@ export interface Opening {
   height:             number;
   elevation:          number;
   trim?:              boolean;   // default true — false hides the jamb/header/sill
+  innerTileH?:        number;    // tiling scale for top + bottom inner faces (sill/lintel)
+  innerTileV?:        number;    // tiling scale for left + right inner faces (jambs)
   linkedZoneId:       string | null;
   linkedTransitionId: string | null;
 }

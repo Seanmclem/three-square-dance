@@ -478,16 +478,20 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
   onDelete:    () => void;
   hideDelete?: boolean;
 }) {
-  const [offsetStr, setOffsetStr] = useState(String(opening.offsetAlongWall));
-  const [widthStr,  setWidthStr]  = useState(String(opening.width));
-  const [heightStr, setHeightStr] = useState(String(opening.height));
-  const [elevStr,   setElevStr]   = useState(String(opening.elevation));
+  const [offsetStr,  setOffsetStr]  = useState(String(opening.offsetAlongWall));
+  const [widthStr,   setWidthStr]   = useState(String(opening.width));
+  const [heightStr,  setHeightStr]  = useState(String(opening.height));
+  const [elevStr,    setElevStr]    = useState(String(opening.elevation));
+  const [innerHStr,  setInnerHStr]  = useState(String(opening.innerTileH ?? ""));
+  const [innerVStr,  setInnerVStr]  = useState(String(opening.innerTileV ?? ""));
 
   useEffect(() => {
     setOffsetStr(String(opening.offsetAlongWall));
     setWidthStr(String(opening.width));
     setHeightStr(String(opening.height));
     setElevStr(String(opening.elevation));
+    setInnerHStr(String(opening.innerTileH ?? ""));
+    setInnerVStr(String(opening.innerTileV ?? ""));
   }, [opening.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep height/elevation strings in sync when type change applies new defaults
@@ -499,6 +503,12 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
   const blurNum = (val: string, min: number, field: keyof Opening) => {
     const n = parseFloat(val);
     if (Number.isFinite(n) && n >= min) onUpdate({ [field]: n } as Partial<Opening>);
+  };
+
+  const blurInnerTile = (val: string, field: "innerTileH" | "innerTileV") => {
+    if (val === "" || val === undefined) { onUpdate({ [field]: undefined }); return; }
+    const n = parseFloat(val);
+    if (Number.isFinite(n) && n > 0) onUpdate({ [field]: n });
   };
 
   return (
@@ -561,6 +571,28 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
             />
           </div>
         ))}
+
+        {/* Inner passage tiling: top+bottom (H) and left+right (V) */}
+        <div>
+          <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER T+B</div>
+          <input
+            type="number" step={0.1} min={0.01} placeholder="auto"
+            value={innerHStr}
+            style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+            onChange={e => setInnerHStr(e.target.value)}
+            onBlur={e => blurInnerTile(e.target.value, "innerTileH")}
+          />
+        </div>
+        <div>
+          <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER L+R</div>
+          <input
+            type="number" step={0.1} min={0.01} placeholder="auto"
+            value={innerVStr}
+            style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+            onChange={e => setInnerVStr(e.target.value)}
+            onBlur={e => blurInnerTile(e.target.value, "innerTileV")}
+          />
+        </div>
       </div>
     </div>
   );
