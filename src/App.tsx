@@ -10,6 +10,8 @@ import { SelectionManager } from "@/editor/SelectionManager";
 import { FloorTool } from "@/editor/FloorTool";
 import { PolygonFloorTool } from "@/editor/PolygonFloorTool";
 import { WallTool } from "@/editor/WallTool";
+import { PlatformTool } from "@/editor/PlatformTool";
+import { StairTool } from "@/editor/StairTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { physicsWorld } from "@/physics/PhysicsWorld";
@@ -17,7 +19,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -70,6 +72,8 @@ export default function App() {
     const floorTool    = new FloorTool(scene.scene, world, bus);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
     const wallTool     = new WallTool(scene.scene, world, bus);
+    const platformTool   = new PlatformTool(scene.scene, world, bus);
+    const stairTool      = new StairTool(scene.scene, world, bus);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
 
@@ -90,6 +94,8 @@ export default function App() {
     floorTool.init();
     polyFloorTool.init();
     wallTool.init();
+    platformTool.init();
+    stairTool.init();
     nodeDragger.init();
     openingDragger.init();
 
@@ -114,6 +120,8 @@ export default function App() {
       unsub.forEach(u => u());
       openingDragger.dispose();
       nodeDragger.dispose();
+      stairTool.dispose();
+      platformTool.dispose();
       wallTool.dispose();
       polyFloorTool.dispose();
       floorTool.dispose();
@@ -175,6 +183,10 @@ export default function App() {
           },
         };
       });
+    } else if (selected.type === "platform") {
+      const platChanges = changes as unknown as Partial<PlatformDef>;
+      worldRef.current?.updatePlatform(selected.zoneId, selected.id, platChanges);
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as PlatformDef), ...platChanges } } : null);
     } else {
       busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
     }

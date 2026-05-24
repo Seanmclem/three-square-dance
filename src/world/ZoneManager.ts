@@ -1,11 +1,13 @@
 import * as THREE from "three";
 import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
+import { PlatformBuilder } from "@/builders/PlatformBuilder";
+import { StairBuilder } from "@/builders/StairBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -16,14 +18,28 @@ interface RunEntry {
   trimMeshes: THREE.Mesh[];
 }
 
+interface PlatformEntry {
+  meshes:   THREE.Mesh[];
+  collider: RAPIER.Collider;
+}
+
+interface StairEntry {
+  meshes:    THREE.Mesh[];
+  colliders: RAPIER.Collider[];
+}
+
 interface ZoneEntry {
   group:          THREE.Group;
   floorsGroup:    THREE.Group;
   wallsGroup:     THREE.Group;
+  platformsGroup: THREE.Group;
+  stairsGroup:    THREE.Group;
   // keyed by floor.id
   floorColliders: Map<string, RAPIER.Collider>;
   // Multiple wallIds can map to the same RunEntry (all walls in a merged run)
   wallData:       Map<string, RunEntry>;
+  platformEntries: Map<string, PlatformEntry>;
+  stairEntries:    Map<string, StairEntry>;
 }
 
 
@@ -45,6 +61,11 @@ export class ZoneManager {
   private readonly _pendingRebuild = new Map<string, Set<string>>();
   private _rebuildScheduled = false;
 
+  // Floor dimming state
+  private _activeLevel = 0;
+  private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
+  private readonly _dimMaterials = new Set<THREE.Material>();
+
   constructor(
     private readonly _scene:      THREE.Scene,
     private readonly _worldState: WorldState,
@@ -57,6 +78,10 @@ export class ZoneManager {
         const ids = [...this._loadedZones.keys()];
         for (const id of ids) this.unloadZone(id);
         void Promise.all(ids.map(id => this.loadZone(id)));
+      }),
+      this._bus.on("floor:select", ({ level }) => {
+        this._activeLevel = level;
+        this._applyDimming();
       }),
       this._bus.on("floor:added", ({ zoneId, floor }) => {
         void this._addFloor(zoneId, floor);
@@ -105,6 +130,21 @@ export class ZoneManager {
             void this._rebuildFloor(zoneId, floor.id);
         }
       }),
+      this._bus.on("platform:added", ({ zoneId, platform }) => {
+        void this._addPlatform(zoneId, platform);
+      }),
+      this._bus.on("platform:updated", ({ zoneId, id }) => {
+        void this._rebuildPlatform(zoneId, id);
+      }),
+      this._bus.on("platform:removed", ({ zoneId, id }) => {
+        this._removePlatform(zoneId, id);
+      }),
+      this._bus.on("stair:added", ({ zoneId, stair }) => {
+        void this._addStair(zoneId, stair);
+      }),
+      this._bus.on("stair:removed", ({ zoneId, id }) => {
+        this._removeStair(zoneId, id);
+      }),
     );
   }
 
@@ -131,17 +171,20 @@ export class ZoneManager {
     if (!zone) { console.warn(`ZoneManager: zone "${zoneId}" not found`); return; }
     if (this._loadedZones.has(zoneId)) return;
 
-    const group       = new THREE.Group();
-    group.name        = `zone_${zoneId}`;
-    const floorsGroup = new THREE.Group();
-    const wallsGroup  = new THREE.Group();
-    group.add(floorsGroup);
-    group.add(wallsGroup);
+    const group          = new THREE.Group();
+    group.name           = `zone_${zoneId}`;
+    const floorsGroup    = new THREE.Group();
+    const wallsGroup     = new THREE.Group();
+    const platformsGroup = new THREE.Group();
+    const stairsGroup    = new THREE.Group();
+    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup);
 
-    const floorColliders = new Map<string, RAPIER.Collider>();
-    const wallData = new Map<string, RunEntry>();
+    const floorColliders  = new Map<string, RAPIER.Collider>();
+    const wallData        = new Map<string, RunEntry>();
+    const platformEntries = new Map<string, PlatformEntry>();
+    const stairEntries    = new Map<string, StairEntry>();
 
-    // Group floors by level so we can pass levelIndex for Z-fighting prevention
+    // ── Floors ────────────────────────────────────────────────────────────
     const floorsByLevel = new Map<number, typeof zone.floors>();
     for (const floor of zone.floors) {
       if (!floorsByLevel.has(floor.level)) floorsByLevel.set(floor.level, []);
@@ -157,6 +200,7 @@ export class ZoneManager {
       }
     }
 
+    // ── Walls ─────────────────────────────────────────────────────────────
     const nodesMap = buildNodesMap(zone);
     const runs = groupWallRuns(zone, nodesMap);
 
@@ -175,8 +219,28 @@ export class ZoneManager {
       for (const w of run) wallData.set(w.id, entry);
     }
 
+    // ── Platforms ─────────────────────────────────────────────────────────
+    for (const platform of zone.platforms) {
+      const { meshes, collider } = await PlatformBuilder.build(platform, zoneId);
+      for (const m of meshes) platformsGroup.add(m);
+      platformEntries.set(platform.id, { meshes, collider });
+    }
+
+    // ── Stairs ────────────────────────────────────────────────────────────
+    for (const stair of zone.stairs) {
+      const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
+      for (const m of meshes) stairsGroup.add(m);
+      stairEntries.set(stair.id, { meshes, colliders });
+    }
+
     this._scene.add(group);
-    this._loadedZones.set(zoneId, { group, floorsGroup, wallsGroup, floorColliders, wallData });
+    this._loadedZones.set(zoneId, {
+      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup,
+      floorColliders, wallData, platformEntries, stairEntries,
+    });
+
+    // Apply current dimming level after loading
+    this._applyDimming();
   }
 
   unloadZone(zoneId: string): void {
@@ -192,6 +256,26 @@ export class ZoneManager {
       re.colliders.forEach(c => physicsWorld.removeCollider(c));
     }
 
+    for (const pe of entry.platformEntries.values()) {
+      physicsWorld.removeCollider(pe.collider);
+    }
+
+    for (const se of entry.stairEntries.values()) {
+      se.colliders.forEach(c => physicsWorld.removeCollider(c));
+    }
+
+    // Clear any dimming references for this zone's meshes
+    entry.group.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        const orig = this._dimmedMeshes.get(child);
+        if (orig !== undefined) {
+          // Restore before disposal to avoid leaking dim clone
+          child.material = orig;
+          this._dimmedMeshes.delete(child);
+        }
+      }
+    });
+
     this._scene.remove(entry.group);
     entry.group.traverse(child => {
       if (child instanceof THREE.Mesh) {
@@ -201,9 +285,13 @@ export class ZoneManager {
       }
     });
     this._loadedZones.delete(zoneId);
+
+    // Dispose any dim-cloned materials that are now orphaned
+    this._pruneDimMaterials();
   }
 
-  // Called when a brand-new floor is added — just build and append it.
+  // ── Floor helpers ─────────────────────────────────────────────────────────
+
   private async _addFloor(zoneId: string, floor: FloorDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     const zone  = this._worldState.zones.get(zoneId);
@@ -214,9 +302,9 @@ export class ZoneManager {
     const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floor.id, collider);
+    this._applyDimming();
   }
 
-  // Called when an existing floor's material/overrides changed — replace just that floor.
   private async _rebuildFloor(zoneId: string, floorId: string): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     const zone  = this._worldState.zones.get(zoneId);
@@ -229,13 +317,14 @@ export class ZoneManager {
         toRemove.push(child);
     });
     for (const mesh of toRemove) {
+      const origMat = this._dimmedMeshes.get(mesh);
+      if (origMat) { mesh.material = origMat; this._dimmedMeshes.delete(mesh); }
       mesh.geometry.dispose();
       if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
         (mesh.material as THREE.Material).dispose();
       entry.floorsGroup.remove(mesh);
     }
 
-    // Remove old collider
     const oldCollider = entry.floorColliders.get(floorId);
     if (oldCollider) { physicsWorld.removeCollider(oldCollider); entry.floorColliders.delete(floorId); }
 
@@ -247,16 +336,16 @@ export class ZoneManager {
     const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floorId, collider);
+    this._applyDimming();
   }
 
-  // Processes a batch of wall IDs that need rebuilding in a single async pass.
-  // All IDs are computed before any await, so there are no concurrent mutation races.
+  // ── Wall helpers ──────────────────────────────────────────────────────────
+
   private async _rebuildWallBatch(zoneId: string, wallIds: string[]): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     const zone  = this._worldState.zones.get(zoneId);
     if (!entry || !zone) return;
 
-    // Expand seed IDs to all walls that share endpoint nodes with any seed wall.
     const affectedWallIds = new Set<string>(wallIds);
     for (const wallId of wallIds) {
       const w = zone.walls.find(w => w.id === wallId);
@@ -270,7 +359,6 @@ export class ZoneManager {
       }
     }
 
-    // Expand again to include all walls already in the same RunEntry.
     const runEntriesToRemove = new Set<RunEntry>();
     for (const wid of affectedWallIds) {
       const re = entry.wallData.get(wid);
@@ -280,14 +368,18 @@ export class ZoneManager {
       }
     }
 
-    // Dispose old run meshes + colliders (sync, before any await).
     for (const re of runEntriesToRemove) {
       re.colliders.forEach(c => physicsWorld.removeCollider(c));
+      // Restore dim if needed before disposal
+      const origMat = this._dimmedMeshes.get(re.mesh);
+      if (origMat) { re.mesh.material = origMat; this._dimmedMeshes.delete(re.mesh); }
       re.mesh.geometry.dispose();
       if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
         (re.mesh.material as THREE.Material).dispose();
       entry.wallsGroup.remove(re.mesh);
       for (const tm of re.trimMeshes) {
+        const origTrim = this._dimmedMeshes.get(tm);
+        if (origTrim) { tm.material = origTrim; this._dimmedMeshes.delete(tm); }
         entry.wallsGroup.remove(tm);
         tm.geometry.dispose();
         if ((tm.userData as { _ownsMaterial?: boolean })._ownsMaterial)
@@ -296,7 +388,6 @@ export class ZoneManager {
       for (const id of re.wallIds) entry.wallData.delete(id);
     }
 
-    // Rebuild the runs that intersect the affected set.
     const nodesMap = buildNodesMap(zone);
     const allRuns  = groupWallRuns(zone, nodesMap);
     const newRuns  = allRuns.filter(r => r.some(w => affectedWallIds.has(w.id)));
@@ -316,6 +407,7 @@ export class ZoneManager {
       for (const w of run) entry.wallData.set(w.id, newEntry);
     }
 
+    this._applyDimming();
     for (const wallId of wallIds) this._bus.emit("wall:rebuilt", { zoneId, wallId });
   }
 
@@ -327,18 +419,20 @@ export class ZoneManager {
     const re = entry.wallData.get(wallId);
     if (!re) return;
 
-    // Walls in the same run that still exist in the zone need to be rebuilt
     const survivingIds = re.wallIds.filter(
       id => id !== wallId && (zone?.walls.some(w => w.id === id) ?? false),
     );
 
-    // Remove the old run
     re.colliders.forEach(c => physicsWorld.removeCollider(c));
+    const origMat = this._dimmedMeshes.get(re.mesh);
+    if (origMat) { re.mesh.material = origMat; this._dimmedMeshes.delete(re.mesh); }
     re.mesh.geometry.dispose();
     if ((re.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
       (re.mesh.material as THREE.Material).dispose();
     entry.wallsGroup.remove(re.mesh);
     for (const tm of re.trimMeshes) {
+      const origTrim = this._dimmedMeshes.get(tm);
+      if (origTrim) { tm.material = origTrim; this._dimmedMeshes.delete(tm); }
       entry.wallsGroup.remove(tm);
       tm.geometry.dispose();
       if ((tm.userData as { _ownsMaterial?: boolean })._ownsMaterial)
@@ -346,7 +440,6 @@ export class ZoneManager {
     }
     for (const id of re.wallIds) entry.wallData.delete(id);
 
-    // Rebuild runs for surviving walls from the old run
     if (survivingIds.length > 0 && zone) {
       const nodesMap = buildNodesMap(zone);
       const allRuns  = groupWallRuns(zone, nodesMap);
@@ -366,10 +459,140 @@ export class ZoneManager {
         for (const w of run) entry.wallData.set(w.id, newEntry);
       }
     }
+    this._applyDimming();
+  }
+
+  // ── Platform helpers ──────────────────────────────────────────────────────
+
+  private async _addPlatform(zoneId: string, platform: PlatformDef): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const { meshes, collider } = await PlatformBuilder.build(platform, zoneId);
+    for (const m of meshes) entry.platformsGroup.add(m);
+    entry.platformEntries.set(platform.id, { meshes, collider });
+    this._applyDimming();
+  }
+
+  private async _rebuildPlatform(zoneId: string, platformId: string): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    const zone  = this._worldState.zones.get(zoneId);
+    if (!entry || !zone) return;
+
+    this._removePlatform(zoneId, platformId);
+
+    const platform = zone.platforms.find(p => p.id === platformId);
+    if (!platform) return;
+    await this._addPlatform(zoneId, platform);
+  }
+
+  private _removePlatform(zoneId: string, platformId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+
+    const pe = entry.platformEntries.get(platformId);
+    if (!pe) return;
+
+    physicsWorld.removeCollider(pe.collider);
+    for (const mesh of pe.meshes) {
+      const orig = this._dimmedMeshes.get(mesh);
+      if (orig) { mesh.material = orig; this._dimmedMeshes.delete(mesh); }
+      entry.platformsGroup.remove(mesh);
+      mesh.geometry.dispose();
+      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (mesh.material as THREE.Material).dispose();
+    }
+    entry.platformEntries.delete(platformId);
+  }
+
+  // ── Stair helpers ─────────────────────────────────────────────────────────
+
+  private async _addStair(zoneId: string, stair: StairDef): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
+    for (const m of meshes) entry.stairsGroup.add(m);
+    entry.stairEntries.set(stair.id, { meshes, colliders });
+    this._applyDimming();
+  }
+
+  private _removeStair(zoneId: string, stairId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+
+    const se = entry.stairEntries.get(stairId);
+    if (!se) return;
+
+    se.colliders.forEach(c => physicsWorld.removeCollider(c));
+    for (const mesh of se.meshes) {
+      const orig = this._dimmedMeshes.get(mesh);
+      if (orig) { mesh.material = orig; this._dimmedMeshes.delete(mesh); }
+      entry.stairsGroup.remove(mesh);
+      mesh.geometry.dispose();
+      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (mesh.material as THREE.Material).dispose();
+    }
+    entry.stairEntries.delete(stairId);
+  }
+
+  // ── Floor dimming ─────────────────────────────────────────────────────────
+
+  private _applyDimming(): void {
+    // Restore all previously dimmed meshes to their original materials
+    for (const [mesh, origMat] of this._dimmedMeshes) {
+      mesh.material = origMat;
+    }
+    this._dimmedMeshes.clear();
+    this._pruneDimMaterials();
+
+    // Only dim when above ground level
+    if (this._activeLevel === 0) return;
+
+    for (const [, zoneEntry] of this._loadedZones) {
+      zoneEntry.group.traverse(child => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const ud    = child.userData as { floorLevel?: number; _ownsMaterial?: boolean };
+        const level = ud.floorLevel;
+        if (level === undefined || level === this._activeLevel) return;
+
+        // Don't re-dim something that's already a dim clone
+        if (this._dimMaterials.has(child.material as THREE.Material)) return;
+
+        const origMat = child.material as THREE.Material;
+        const dimMat  = origMat.clone() as THREE.MeshStandardMaterial;
+        dimMat.transparent = true;
+        dimMat.opacity     = 0.15;
+        dimMat.depthWrite  = false;
+        this._dimMaterials.add(dimMat);
+        this._dimmedMeshes.set(child, origMat);
+        child.material = dimMat;
+      });
+    }
+  }
+
+  private _pruneDimMaterials(): void {
+    // Remove dim clones that are no longer referenced by any mesh
+    const inUse = new Set<THREE.Material>(this._dimmedMeshes.values() as unknown as Iterable<THREE.Material>);
+    // Actually: values() are the ORIGINAL mats; dim clones are in _dimMaterials
+    // Rebuild inUse from current mesh materials
+    const usedDimMats = new Set<THREE.Material>();
+    for (const [mesh] of this._dimmedMeshes) {
+      usedDimMats.add(mesh.material as THREE.Material);
+    }
+    for (const dimMat of this._dimMaterials) {
+      if (!usedDimMats.has(dimMat)) {
+        dimMat.dispose();
+        this._dimMaterials.delete(dimMat);
+      }
+    }
+    void inUse; // suppress unused warning
   }
 
   dispose(): void {
     this._unsubs.forEach(u => u());
     for (const zoneId of [...this._loadedZones.keys()]) this.unloadZone(zoneId);
+    // Dispose remaining dim clones
+    for (const mat of this._dimMaterials) mat.dispose();
+    this._dimMaterials.clear();
+    this._dimmedMeshes.clear();
   }
 }

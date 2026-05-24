@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
+  PlatformDef, StairDef,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -132,9 +133,16 @@ export function PropertiesPanel({
                   selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
                   onAddMaterial={openImporter}
                 />
-              : selected && draft
-                ? <TransformView selected={selected} draft={draft} commit={commit} />
-                : <ToolView activeTool={activeTool} />}
+              : selected && selected.type === "platform"
+                ? <PlatformView
+                    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
+                    onAddMaterial={openImporter}
+                  />
+                : selected && selected.type === "stair"
+                  ? <StairView selected={selected} />
+                  : selected && draft
+                    ? <TransformView selected={selected} draft={draft} commit={commit} />
+                    : <ToolView activeTool={activeTool} />}
       </div>
 
       {/* Quality — always visible at panel bottom */}
@@ -844,6 +852,210 @@ function MaterialSection({
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Platform view ────────────────────────────────────────────────────────────
+
+function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
+  selected:       SelectedObjectPayload;
+  materialList:   MaterialDef[];
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onAddMaterial:  () => void;
+}) {
+  const plat = selected.data as PlatformDef | null;
+  const [posStr,   setPosStr]   = useState({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
+  const [sizeStr,  setSizeStr]  = useState({ w: String(plat?.size.width ?? 2), d: String(plat?.size.depth ?? 2) });
+  const [thickStr, setThickStr] = useState(String(plat?.thickness ?? 0.3));
+  const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
+  const [hasRail,  setHasRail]  = useState(plat?.hasRailing ?? false);
+
+  useEffect(() => {
+    setPosStr({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
+    setSizeStr({ w: String(plat?.size.width ?? 2), d: String(plat?.size.depth ?? 2) });
+    setThickStr(String(plat?.thickness ?? 0.3));
+    setRailH(String(plat?.railingHeight ?? 1.0));
+    setHasRail(plat?.hasRailing ?? false);
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitPos = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitSize = (dim: "width" | "depth", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onObjectUpdate({ size: { ...(plat?.size ?? { width: 2, depth: 2 }), [dim]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitThick = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onObjectUpdate({ thickness: n } as unknown as Partial<WorldObject>);
+  };
+
+  const toggleRail = (checked: boolean) => {
+    setHasRail(checked);
+    onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>);
+  };
+
+  const commitRailH = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onObjectUpdate({ railingHeight: n } as unknown as Partial<WorldObject>);
+  };
+
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
+          platform · level {plat?.floorLevel ?? 0}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* Position */}
+        <div>
+          <div style={LABEL}>POSITION</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["x", "#ff6b6b"], ["y", "#6bff8a"], ["z", "#6b8aff"]] as const).map(([axis, color]) => (
+              <div key={axis} style={{
+                flex: 1, display: "flex", gap: 4, alignItems: "center",
+                background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+                borderRadius: 4, padding: "2px 6px",
+              }}>
+                <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+                <input
+                  type="text" inputMode="decimal"
+                  value={posStr[axis]}
+                  onChange={e => setPosStr(p => ({ ...p, [axis]: e.target.value }))}
+                  onBlur={e => commitPos(axis, e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") commitPos(axis, (e.target as HTMLInputElement).value); }}
+                  style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Size */}
+        <div>
+          <div style={LABEL}>SIZE</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+            {([["W", "width", sizeStr.w, (v: string) => setSizeStr(p => ({ ...p, w: v })), "width"],
+               ["D", "depth",  sizeStr.d, (v: string) => setSizeStr(p => ({ ...p, d: v })), "depth"]] as const).map(
+              ([label, , val, setter, dim]) => (
+                <div key={dim}>
+                  <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{label}</div>
+                  <input
+                    type="number" step={0.5} min={0.5} value={val}
+                    style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                    onChange={e => setter(e.target.value)}
+                    onBlur={e => commitSize(dim as "width" | "depth", e.target.value)}
+                  />
+                </div>
+              )
+            )}
+          </div>
+        </div>
+
+        {/* Thickness */}
+        <div>
+          <div style={LABEL}>THICKNESS</div>
+          <input
+            type="number" step={0.05} min={0.05} value={thickStr}
+            style={{ ...NUM_INPUT, width: 90 }}
+            onChange={e => setThickStr(e.target.value)}
+            onBlur={e => commitThick(e.target.value)}
+          />
+        </div>
+
+        {/* Railing */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={hasRail}
+              onChange={e => toggleRail(e.target.checked)}
+              style={{ accentColor: "#4d8cff", cursor: "pointer" }}
+            />
+            <span style={{ color: "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+          </label>
+          {hasRail && (
+            <div>
+              <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>RAILING HEIGHT</div>
+              <input
+                type="number" step={0.1} min={0.3} value={railH}
+                style={{ ...NUM_INPUT, width: 90 }}
+                onChange={e => setRailH(e.target.value)}
+                onBlur={e => commitRailH(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Material */}
+        <MaterialSection
+          materialList={materialList}
+          currentMaterialId={plat?.material ?? "concrete_01"}
+          overrides={plat?.materialOverrides}
+          onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
+          onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
+        />
+      </div>
+    </>
+  );
+}
+
+// ─── Stair view ───────────────────────────────────────────────────────────────
+
+function StairView({ selected }: { selected: SelectedObjectPayload }) {
+  const stair = selected.data as StairDef | null;
+  if (!stair) return null;
+
+  const fmt = (n: number) => n.toFixed(2);
+
+  return (
+    <>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
+        <div style={{ color: "#6a90b8", fontSize: 12, fontFamily: "monospace" }}>{selected.id}</div>
+        <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>
+          stair · {stair.style}
+        </div>
+      </div>
+
+      <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <div style={LABEL}>START</div>
+          <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>
+            ({fmt(stair.start.x)}, {fmt(stair.start.y)}, {fmt(stair.start.z)})
+          </div>
+        </div>
+        <div>
+          <div style={LABEL}>END</div>
+          <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>
+            ({fmt(stair.end.x)}, {fmt(stair.end.y)}, {fmt(stair.end.z)})
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <div style={LABEL}>WIDTH</div>
+            <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>{fmt(stair.width)} m</div>
+          </div>
+          <div>
+            <div style={LABEL}>RISE</div>
+            <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>{fmt(stair.end.y - stair.start.y)} m</div>
+          </div>
+        </div>
+        <div style={{ color: "#2a4a6a", fontSize: 9, fontStyle: "italic" }}>
+          Stair geometry is determined by start/end points. Use Delete to remove.
+        </div>
+      </div>
+    </>
   );
 }
 

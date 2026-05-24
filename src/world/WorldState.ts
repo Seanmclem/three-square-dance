@@ -141,6 +141,14 @@ export class WorldState {
     this._bus.emit("platform:added", { zoneId, platform });
   }
 
+  updatePlatform(zoneId: string, id: string, changes: Partial<PlatformDef>): void {
+    const zone     = this.zones.get(zoneId);
+    const platform = zone?.platforms.find(p => p.id === id);
+    if (!platform) return;
+    Object.assign(platform, changes);
+    this._bus.emit("platform:updated", { zoneId, id, changes });
+  }
+
   removePlatform(zoneId: string, id: string): void {
     const zone = this.zones.get(zoneId);
     if (!zone) return;
