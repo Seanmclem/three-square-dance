@@ -11,6 +11,7 @@ import { FloorTool } from "@/editor/FloorTool";
 import { PolygonFloorTool } from "@/editor/PolygonFloorTool";
 import { WallTool } from "@/editor/WallTool";
 import { NodeDragger } from "@/editor/NodeDragger";
+import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -69,7 +70,8 @@ export default function App() {
     const floorTool    = new FloorTool(scene.scene, world, bus);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
     const wallTool     = new WallTool(scene.scene, world, bus);
-    const nodeDragger  = new NodeDragger(scene.scene, world, bus);
+    const nodeDragger    = new NodeDragger(scene.scene, world, bus);
+    const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
@@ -89,6 +91,7 @@ export default function App() {
     polyFloorTool.init();
     wallTool.init();
     nodeDragger.init();
+    openingDragger.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -109,6 +112,7 @@ export default function App() {
     return () => {
       worldRef.current = null;
       unsub.forEach(u => u());
+      openingDragger.dispose();
       nodeDragger.dispose();
       wallTool.dispose();
       polyFloorTool.dispose();

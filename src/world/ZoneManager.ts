@@ -2,9 +2,10 @@ import * as THREE from "three";
 import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
+import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, WallNode, ZoneDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -25,77 +26,6 @@ interface ZoneEntry {
   wallData:       Map<string, RunEntry>;
 }
 
-// Groups zone walls into compatible runs for merged geometry.
-// Two walls can merge when they share a node that has exactly 2 connected walls
-// and the walls have matching material, exteriorMaterial, and height.
-function groupWallRuns(zone: ZoneDef, _nodes: Map<string, WallNode>): WallDef[][] {
-  const nodeWalls = new Map<string, string[]>();
-  for (const wall of zone.walls) {
-    const s = nodeWalls.get(wall.startNodeId) ?? [];
-    s.push(wall.id);
-    nodeWalls.set(wall.startNodeId, s);
-    const e = nodeWalls.get(wall.endNodeId) ?? [];
-    e.push(wall.id);
-    nodeWalls.set(wall.endNodeId, e);
-  }
-
-  const wallById = new Map(zone.walls.map(w => [w.id, w]));
-
-  function canMerge(w1: WallDef, w2: WallDef, sharedNodeId: string): boolean {
-    return (
-      (nodeWalls.get(sharedNodeId)?.length ?? 0) === 2 &&
-      w1.material          === w2.material &&
-      w1.exteriorMaterial  === w2.exteriorMaterial &&
-      w1.height            === w2.height
-    );
-  }
-
-  const visited = new Set<string>();
-  const runs: WallDef[][] = [];
-
-  for (const startWall of zone.walls) {
-    if (visited.has(startWall.id)) continue;
-    visited.add(startWall.id);
-
-    const run: WallDef[] = [startWall];
-
-    // Extend forward from the end node of the last wall in the run
-    let forwardNode = startWall.endNodeId;
-    let prevId = startWall.id;
-    for (;;) {
-      const neighbors = nodeWalls.get(forwardNode) ?? [];
-      if (neighbors.length !== 2) break;
-      const nextId = neighbors.find(id => id !== prevId);
-      if (!nextId || visited.has(nextId)) break;
-      const next = wallById.get(nextId);
-      if (!next || !canMerge(run[run.length - 1]!, next, forwardNode)) break;
-      visited.add(nextId);
-      run.push(next);
-      forwardNode = next.startNodeId === forwardNode ? next.endNodeId : next.startNodeId;
-      prevId = nextId;
-    }
-
-    // Extend backward from the start node of the first wall in the run
-    let backwardNode = startWall.startNodeId;
-    prevId = startWall.id;
-    for (;;) {
-      const neighbors = nodeWalls.get(backwardNode) ?? [];
-      if (neighbors.length !== 2) break;
-      const prevWallId = neighbors.find(id => id !== prevId);
-      if (!prevWallId || visited.has(prevWallId)) break;
-      const prev = wallById.get(prevWallId);
-      if (!prev || !canMerge(run[0]!, prev, backwardNode)) break;
-      visited.add(prevWallId);
-      run.unshift(prev);
-      backwardNode = prev.startNodeId === backwardNode ? prev.endNodeId : prev.startNodeId;
-      prevId = prevWallId;
-    }
-
-    runs.push(run);
-  }
-
-  return runs;
-}
 
 // If a floor's floorMesh has nodeIds, resolve them to current node positions.
 function resolveFloorMesh(floorMesh: FloorMeshDef, zone: ZoneDef): FloorMeshDef {
@@ -196,10 +126,6 @@ export class ZoneManager {
     }
   }
 
-  private _buildNodesMap(zone: ZoneDef): Map<string, WallNode> {
-    return new Map((zone.nodes ?? []).map(n => [n.id, n]));
-  }
-
   async loadZone(zoneId: string): Promise<void> {
     const zone = this._worldState.zones.get(zoneId);
     if (!zone) { console.warn(`ZoneManager: zone "${zoneId}" not found`); return; }
@@ -231,7 +157,7 @@ export class ZoneManager {
       }
     }
 
-    const nodesMap = this._buildNodesMap(zone);
+    const nodesMap = buildNodesMap(zone);
     const runs = groupWallRuns(zone, nodesMap);
 
     for (const run of runs) {
@@ -371,7 +297,7 @@ export class ZoneManager {
     }
 
     // Rebuild the runs that intersect the affected set.
-    const nodesMap = this._buildNodesMap(zone);
+    const nodesMap = buildNodesMap(zone);
     const allRuns  = groupWallRuns(zone, nodesMap);
     const newRuns  = allRuns.filter(r => r.some(w => affectedWallIds.has(w.id)));
 
@@ -422,7 +348,7 @@ export class ZoneManager {
 
     // Rebuild runs for surviving walls from the old run
     if (survivingIds.length > 0 && zone) {
-      const nodesMap = this._buildNodesMap(zone);
+      const nodesMap = buildNodesMap(zone);
       const allRuns  = groupWallRuns(zone, nodesMap);
       const newRuns  = allRuns.filter(r => r.some(w => survivingIds.includes(w.id)));
       for (const run of newRuns) {

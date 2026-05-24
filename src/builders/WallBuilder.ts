@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { csgSubtract } from "@/utils/csg";
+import { resolveRunNodeIds } from "@/utils/wallRuns";
 import type { WallDef, ZoneDef, WallNode, MeshUserData, Opening } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -171,39 +172,6 @@ function buildTrimFrame(
   }
 
   return meshes;
-}
-
-// Returns the ordered sequence of node IDs for a connected chain of walls.
-// Determines traversal direction from the connection between walls[0] and walls[1].
-function resolveRunNodeIds(walls: WallDef[]): string[] | null {
-  if (walls.length === 0) return null;
-  if (walls.length === 1) return [walls[0]!.startNodeId, walls[0]!.endNodeId];
-
-  const w0 = walls[0]!, w1 = walls[1]!;
-  const w1Nodes = new Set([w1.startNodeId, w1.endNodeId]);
-
-  let nodeIds: string[];
-  if (w1Nodes.has(w0.endNodeId)) {
-    nodeIds = [w0.startNodeId, w0.endNodeId];
-  } else if (w1Nodes.has(w0.startNodeId)) {
-    nodeIds = [w0.endNodeId, w0.startNodeId];
-  } else {
-    return null;
-  }
-
-  for (let i = 1; i < walls.length; i++) {
-    const prevNodeId = nodeIds[nodeIds.length - 1]!;
-    const w = walls[i]!;
-    if (w.startNodeId === prevNodeId) {
-      nodeIds.push(w.endNodeId);
-    } else if (w.endNodeId === prevNodeId) {
-      nodeIds.push(w.startNodeId);
-    } else {
-      return null;
-    }
-  }
-
-  return nodeIds;
 }
 
 export class WallBuilder {
