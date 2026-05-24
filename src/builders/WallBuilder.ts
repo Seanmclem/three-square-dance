@@ -404,6 +404,8 @@ export class WallBuilder {
       idxArr.push(RBi, RBi1, RTi1,  RBi, RTi1, RTi);
       // Top face — outward normal points up
       idxArr.push(LTi, RTi, RTi1,  LTi, RTi1, LTi1);
+      // Bottom face — outward normal points down (closes mesh for watertight CSG)
+      idxArr.push(LBi, LBi1, RBi1,  LBi, RBi1, RBi);
     }
 
     // End caps only for open runs — closed loops need no caps.
