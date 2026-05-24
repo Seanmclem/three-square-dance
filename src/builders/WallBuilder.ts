@@ -67,8 +67,8 @@ function buildTrimFrame(
   angle: number,
 ): THREE.Mesh[] {
   const TRIM_D = wallThickness + 0.06;
-  // passage: clean hole, no trim
-  if (opening.type === "passage") return [];
+  // passage or trim disabled: clean hole, no trim
+  if (opening.type === "passage" || opening.trim === false) return [];
 
   const localX = opening.offsetAlongWall + opening.width / 2 - length / 2;
   const localY = opening.elevation + opening.height / 2 - wallHeight / 2;
@@ -87,12 +87,18 @@ function buildTrimFrame(
     meshes.push(mesh);
   };
 
-  // Left jamb
-  addPiece(localX - opening.width / 2 - TRIM_W / 2, localY, TRIM_W, opening.height + TRIM_W * 2);
-  // Right jamb
-  addPiece(localX + opening.width / 2 + TRIM_W / 2, localY, TRIM_W, opening.height + TRIM_W * 2);
-  // Header — arch implies a curved top, so skip the straight header
-  if (opening.type !== "arch") {
+  // For arch openings the jambs only cover the straight rectangular part;
+  // the arch curve needs no framing on its sides.
+  const isArch  = opening.type === "arch";
+  const jambH   = isArch
+    ? (opening.height - opening.width / 2) + TRIM_W * 2
+    : opening.height + TRIM_W * 2;
+  const jambY   = isArch ? localY - opening.width / 4 : localY;
+
+  addPiece(localX - opening.width / 2 - TRIM_W / 2, jambY, TRIM_W, jambH);
+  addPiece(localX + opening.width / 2 + TRIM_W / 2, jambY, TRIM_W, jambH);
+  // No straight header for arch (the arch curve IS the top)
+  if (!isArch) {
     addPiece(localX, localY + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
   }
   // Sill for windows
@@ -524,7 +530,13 @@ export class WallBuilder {
             const localY_m = opening.elevation + opening.height / 2 - H / 2;
             const TRIM_D   = T + 0.06;
 
-            if (opening.type !== "passage") {
+            if (opening.type !== "passage" && opening.trim !== false) {
+              const isArch = opening.type === "arch";
+              const jambH  = isArch
+                ? (opening.height - opening.width / 2) + TRIM_W * 2
+                : opening.height + TRIM_W * 2;
+              const jambY  = isArch ? localY_m - opening.width / 4 : localY_m;
+
               const addPiece = (lx: number, ly: number, pw: number, ph: number) => {
                 const tmat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
                 const pm   = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, TRIM_D), tmat);
@@ -535,9 +547,9 @@ export class WallBuilder {
                 pm.userData = { selectable: false, _ownsMaterial: true };
                 trimMeshes.push(pm);
               };
-              addPiece(localX - opening.width / 2 - TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
-              addPiece(localX + opening.width / 2 + TRIM_W / 2, localY_m, TRIM_W, opening.height + TRIM_W * 2);
-              if (opening.type !== "arch") {
+              addPiece(localX - opening.width / 2 - TRIM_W / 2, jambY, TRIM_W, jambH);
+              addPiece(localX + opening.width / 2 + TRIM_W / 2, jambY, TRIM_W, jambH);
+              if (!isArch) {
                 addPiece(localX, localY_m + opening.height / 2 + TRIM_W / 2, opening.width + TRIM_W * 2, TRIM_W);
               }
               if (opening.type === "window") {

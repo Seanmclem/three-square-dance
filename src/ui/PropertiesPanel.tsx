@@ -520,15 +520,28 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           <option value="arch">Arch</option>
           <option value="passage">Passage</option>
         </select>
-        {!hideDelete && (
-          <button
-            onClick={onDelete}
-            style={{
-              background: "transparent", border: "none", color: "#ff6b6b",
-              cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1,
-            }}
-          >×</button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {opening.type !== "passage" && (
+            <label style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={opening.trim !== false}
+                onChange={e => onUpdate({ trim: e.target.checked })}
+                style={{ cursor: "pointer", accentColor: "#4d8cff" }}
+              />
+              <span style={{ color: "#3a5a7a", fontSize: 9, userSelect: "none" }}>TRIM</span>
+            </label>
+          )}
+          {!hideDelete && (
+            <button
+              onClick={onDelete}
+              style={{
+                background: "transparent", border: "none", color: "#ff6b6b",
+                cursor: "pointer", fontSize: 14, padding: "0 2px", lineHeight: 1,
+              }}
+            >×</button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>

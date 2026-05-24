@@ -225,6 +225,7 @@ export interface Opening {
   width:              number;
   height:             number;
   elevation:          number;
+  trim?:              boolean;   // default true — false hides the jamb/header/sill
   linkedZoneId:       string | null;
   linkedTransitionId: string | null;
 }
