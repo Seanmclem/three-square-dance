@@ -327,19 +327,21 @@ export class WallBuilder {
         };
         trimMeshes.push(triggerMesh);
 
-        // Collect liner setup — mesh created after material is loaded
-        const iTH = opening.innerTileH ?? tileX;
-        const iTV = opening.innerTileV ?? tileX;
-        const isArch    = opening.type === "arch";
-        const linerH    = isArch ? opening.height - opening.width / 2 : opening.height;
-        const linerOfsY = isArch ? -opening.width / 4 : 0;
-        linerSetups.push({
-          geo: buildPassageLiner(opening.width, linerH, wall.thickness, iTH, iTV, !isArch),
-          px:  cx + cos * lx,
-          py:  wall.height / 2 + ly + linerOfsY,
-          pz:  cz + sin * lx,
-          ry: -angle,
-        });
+        // Liner only for passage/arch — doors and windows use trim frames instead
+        if (opening.type === "passage" || opening.type === "arch") {
+          const iTH = opening.innerTileH ?? tileX;
+          const iTV = opening.innerTileV ?? tileX;
+          const isArch    = opening.type === "arch";
+          const linerH    = isArch ? opening.height - opening.width / 2 : opening.height;
+          const linerOfsY = isArch ? -opening.width / 4 : 0;
+          linerSetups.push({
+            geo: buildPassageLiner(opening.width, linerH, wall.thickness, iTH, iTV, !isArch),
+            px:  cx + cos * lx,
+            py:  wall.height / 2 + ly + linerOfsY,
+            pz:  cz + sin * lx,
+            ry: -angle,
+          });
+        }
       }
     } else {
       geo.setAttribute('uv2', geo.attributes.uv);
@@ -681,19 +683,21 @@ export class WallBuilder {
             };
             trimMeshes.push(triggerMesh);
 
-            // Collect liner setup — mesh created after material is loaded
-            const iTH = opening.innerTileH ?? tileX;
-            const iTV = opening.innerTileV ?? tileX;
-            const isArch2    = opening.type === "arch";
-            const linerH2    = isArch2 ? opening.height - opening.width / 2 : opening.height;
-            const linerOfsY2 = isArch2 ? -opening.width / 4 : 0;
-            linerSetups.push({
-              geo: buildPassageLiner(opening.width, linerH2, T, iTH, iTV, !isArch2),
-              px:  kCx + kUx * localX,
-              py:  H / 2 + localY_m + linerOfsY2,
-              pz:  kCz + kUz * localX,
-              ry: -kAng,
-            });
+            // Liner only for passage/arch — doors and windows use trim frames instead
+            if (opening.type === "passage" || opening.type === "arch") {
+              const iTH = opening.innerTileH ?? tileX;
+              const iTV = opening.innerTileV ?? tileX;
+              const isArch2    = opening.type === "arch";
+              const linerH2    = isArch2 ? opening.height - opening.width / 2 : opening.height;
+              const linerOfsY2 = isArch2 ? -opening.width / 4 : 0;
+              linerSetups.push({
+                geo: buildPassageLiner(opening.width, linerH2, T, iTH, iTV, !isArch2),
+                px:  kCx + kUx * localX,
+                py:  H / 2 + localY_m + linerOfsY2,
+                pz:  kCz + kUz * localX,
+                ry: -kAng,
+              });
+            }
           }
         }
       }
