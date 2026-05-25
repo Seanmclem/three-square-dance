@@ -159,6 +159,7 @@ export class WallTool {
       this._chainNodeIds     = [nodeId];
       this._state = "DRAWING";
       this._preview = makePreviewMesh(this._height, this._thickness);
+      this._preview.visible = false;
       this._scene.add(this._preview);
     } else {
       this._commit(worldPos);
@@ -167,6 +168,7 @@ export class WallTool {
 
   private _onMouseMove(worldPos: Vec3): void {
     if (this._state === "DRAWING" && this._preview && this._startPoint) {
+      this._preview.visible = true;
       const end = this._calcEnd(worldPos);
       const dx = end.x - this._startPoint.x;
       const dz = end.z - this._startPoint.z;
