@@ -197,8 +197,11 @@ export class SelectionManager implements IEditorModule {
   private _findMesh(editorId: string, zoneId: string): THREE.Object3D | null {
     let found: THREE.Object3D | null = null;
     this._scene.traverse(obj => {
-      if (!found && obj.userData.editorId === editorId && obj.userData.zoneId === zoneId)
-        found = obj;
+      if (found) return;
+      if (obj.userData.zoneId !== zoneId) return;
+      if (obj.userData.editorId === editorId) { found = obj; return; }
+      const wallIds = obj.userData.wallIds as string[] | undefined;
+      if (wallIds?.includes(editorId)) found = obj;
     });
     return found;
   }

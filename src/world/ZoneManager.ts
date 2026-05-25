@@ -224,6 +224,7 @@ export class ZoneManager {
         wallIds:    run.map(w => w.id),
         trimMeshes: output.trimMeshes,
       };
+      output.mesh.userData.wallIds = entry.wallIds;
       wallsGroup.add(output.mesh);
       for (const tm of output.trimMeshes) wallsGroup.add(tm);
       for (const w of run) wallData.set(w.id, entry);
@@ -414,6 +415,7 @@ export class ZoneManager {
         wallIds:    run.map(w => w.id),
         trimMeshes: output.trimMeshes,
       };
+      output.mesh.userData.wallIds = newEntry.wallIds;
       entry.wallsGroup.add(output.mesh);
       for (const tm of output.trimMeshes) entry.wallsGroup.add(tm);
       for (const w of run) entry.wallData.set(w.id, newEntry);
