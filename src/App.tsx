@@ -154,6 +154,18 @@ export default function App() {
     busRef.current.emit('quality:changed', { quality: q });
   };
 
+  const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
+    if (!selected) return;
+    worldRef.current?.updateWall(selected.zoneId, wallId, changes);
+    setSelected(prev => {
+      if (!prev?.runWalls) return prev;
+      return {
+        ...prev,
+        runWalls: prev.runWalls.map(w => w.id === wallId ? { ...w, ...changes } : w),
+      };
+    });
+  };
+
   const handleMaterialsReload = (): void => {
     assetManager.initMaterials().then(mats => setMaterialList(mats))
       .catch(err => console.error("materials reload failed:", err));
@@ -167,8 +179,19 @@ export default function App() {
       worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, changes as unknown as Partial<Opening>);
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...changes } } : null);
     } else if (selected.type === "wall") {
-      worldRef.current?.updateWall(selected.zoneId, selected.id, changes as Partial<WallDef>);
-      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as WallDef), ...changes } } : null);
+      const wallChanges = changes as Partial<WallDef>;
+      worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
+      setSelected(prev => {
+        if (!prev) return null;
+        // If a merge-criteria field changed, ZoneManager will sync it to all run members.
+        // Mirror that locally so the segment rows update before the async rebuild arrives.
+        const syncKeys = ["material", "exteriorMaterial", "height"] as const;
+        const needsSync = syncKeys.some(k => wallChanges[k] !== undefined);
+        const updRunWalls = needsSync && prev.runWalls
+          ? prev.runWalls.map(w => ({ ...w, ...Object.fromEntries(syncKeys.filter(k => wallChanges[k] !== undefined).map(k => [k, wallChanges[k]])) }))
+          : prev.runWalls;
+        return { ...prev, data: { ...(prev.data as WallDef), ...wallChanges }, runWalls: updRunWalls };
+      });
     } else if (selected.type === "floor") {
       const floorDef = selected.data as FloorDef;
       worldRef.current?.updateFloor(selected.zoneId, floorDef.id, changes as unknown as Partial<FloorDef>);
@@ -219,6 +242,7 @@ export default function App() {
         materialList={materialList}
         quality={quality}
         onObjectUpdate={handleObjectUpdate}
+        onSegmentUpdate={handleSegmentUpdate}
         onMaterialsReload={handleMaterialsReload}
         onQualityChange={handleQualityChange}
       />

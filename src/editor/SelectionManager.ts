@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, ToolId, EditorObjectType, ScreenPos,
-  SelectedObjectPayload, WorldObject,
+  SelectedObjectPayload, WorldObject, WallDef,
 } from "@/types";
 
 const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor"];
@@ -131,7 +131,10 @@ export class SelectionManager implements IEditorModule {
     this._selected = root;
     if (this._hovered === root) this._hovered = null;
     this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelected(root);
+  }
 
+  private _emitSelected(root: THREE.Object3D): void {
     const ud = root.userData;
     this._bus.emit("object:selected", {
       id:       ud.editorId,
@@ -144,9 +147,21 @@ export class SelectionManager implements IEditorModule {
         y: THREE.MathUtils.radToDeg(root.rotation.y),
         z: THREE.MathUtils.radToDeg(root.rotation.z),
       },
-      scale: { x: root.scale.x, y: root.scale.y, z: root.scale.z },
-      data:  this._getDataRecord(root),
+      scale:    { x: root.scale.x, y: root.scale.y, z: root.scale.z },
+      data:     this._getDataRecord(root),
+      runWalls: this._getRunWalls(root),
     });
+  }
+
+  private _getRunWalls(root: THREE.Object3D): WallDef[] | undefined {
+    if (root.userData.editorType !== "wall") return undefined;
+    const wallIds = root.userData.wallIds as string[] | undefined;
+    if (!wallIds || wallIds.length <= 1) return undefined;
+    const zone = this._worldState.zones.get(root.userData.zoneId as string);
+    if (!zone) return undefined;
+    return wallIds
+      .map(id => zone.walls.find(w => w.id === id))
+      .filter((w): w is WallDef => w !== undefined);
   }
 
   private _deselect(): void {
@@ -156,22 +171,30 @@ export class SelectionManager implements IEditorModule {
     this._bus.emit("object:deselected", {});
   }
 
-  /** Wall was rebuilt — re-apply selection tint to the new mesh. */
+  /** Wall was rebuilt — re-apply selection tint to the new mesh and refresh panel. */
   private _onWallRebuilt(zoneId: string, wallId: string): void {
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     const ud = this._selected.userData;
 
-    if (ud.editorType === "wall" && ud.editorId === wallId) {
-      const newMesh = this._findMesh(wallId, zoneId);
+    if (ud.editorType === "wall") {
+      // Match if this wall IS the selected primary, or was a member of the selected run.
+      // We check the OLD userData.wallIds (stale ref is fine — it captures pre-split membership).
+      const inMyRun =
+        ud.editorId === wallId ||
+        (ud.wallIds as string[] | undefined)?.includes(wallId);
+      if (!inMyRun) return;
+      const newMesh = this._findMesh(ud.editorId as string, zoneId);
       if (!newMesh) { this._selected = null; return; }
       this._selected = newMesh;
       this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+      // Re-emit so PropertiesPanel gets fresh runWalls after splits/merges.
+      // Guard to one emit per batch: only fire when the primary wall's event arrives.
+      if (ud.editorId === wallId) this._emitSelected(newMesh);
     } else if (ud.editorType === "opening" && ud.wallId === wallId) {
-      const newMesh = this._findMesh(ud.editorId, zoneId);
+      const newMesh = this._findMesh(ud.editorId as string, zoneId);
       if (!newMesh) { this._deselect(); return; }
       this._selected = newMesh;
       this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
-      // Re-emit so PropertiesPanel reflects the updated opening data
       this._bus.emit("object:selected", {
         id:       newMesh.userData.editorId,
         type:     "opening",

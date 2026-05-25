@@ -21,11 +21,23 @@ export function groupWallRuns(zone: ZoneDef, nodes: Map<string, WallNode>): Wall
 
   const wallById = new Map(zone.walls.map(w => [w.id, w]));
 
-  const canMerge = (w1: WallDef, w2: WallDef, sharedNodeId: string): boolean =>
-    (nodeWalls.get(sharedNodeId)?.length ?? 0) === 2 &&
-    w1.material         === w2.material         &&
-    w1.exteriorMaterial === w2.exteriorMaterial  &&
-    w1.height           === w2.height;
+  const canMerge = (w1: WallDef, w2: WallDef, sharedNodeId: string): boolean => {
+    if ((nodeWalls.get(sharedNodeId)?.length ?? 0) !== 2) return false;
+    if (w1.material         !== w2.material)        return false;
+    if (w1.exteriorMaterial !== w2.exteriorMaterial) return false;
+    if (w1.height           !== w2.height)           return false;
+    const ov1 = w1.materialOverrides, ov2 = w2.materialOverrides;
+    if (ov1 !== ov2) {
+      if (!ov1 || !ov2)                                         return false;
+      if (ov1.tileScale         !== ov2.tileScale)              return false;
+      if (ov1.tileScaleX        !== ov2.tileScaleX)             return false;
+      if (ov1.tileScaleY        !== ov2.tileScaleY)             return false;
+      if (ov1.roughnessVal      !== ov2.roughnessVal)           return false;
+      if (ov1.displacementScale !== ov2.displacementScale)      return false;
+      if (JSON.stringify(ov1.maps ?? null) !== JSON.stringify(ov2.maps ?? null)) return false;
+    }
+    return true;
+  };
 
   const visited = new Set<string>();
   const runs: WallDef[][] = [];

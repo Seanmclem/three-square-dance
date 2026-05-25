@@ -139,6 +139,7 @@ export interface SelectedObjectPayload {
   rotation: Euler3;
   scale: Scale3;
   data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | null;
+  runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
 }
 
 // ─── userData on Three.js meshes ─────────────────────────────────────────────

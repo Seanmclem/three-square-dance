@@ -62,12 +62,13 @@ interface PropertiesPanelProps {
   materialList:      MaterialDef[];
   quality:           QualityScale;
   onObjectUpdate:    (changes: Partial<WorldObject>) => void;
+  onSegmentUpdate:   (wallId: string, changes: Partial<WallDef>) => void;
   onMaterialsReload: () => void;
   onQualityChange:   (q: QualityScale) => void;
 }
 
 export function PropertiesPanel({
-  activeTool, selected, materialList, quality, onObjectUpdate, onMaterialsReload, onQualityChange,
+  activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate, onMaterialsReload, onQualityChange,
 }: PropertiesPanelProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const debounceRef = useRef<number | null>(null);
@@ -132,6 +133,8 @@ export function PropertiesPanel({
               ? <WallView
                   selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate}
                   onAddMaterial={openImporter}
+                  runWalls={selected.runWalls}
+                  onSegmentUpdate={onSegmentUpdate}
                 />
               : selected && selected.type === "platform"
                 ? <PlatformView
@@ -296,11 +299,13 @@ function TransformView({ selected, draft, commit }: {
 
 // ─── Wall view ────────────────────────────────────────────────────────────────
 
-function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
-  selected:       SelectedObjectPayload;
-  materialList:   MaterialDef[];
-  onObjectUpdate: (changes: Partial<WorldObject>) => void;
-  onAddMaterial:  () => void;
+function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWalls, onSegmentUpdate }: {
+  selected:        SelectedObjectPayload;
+  materialList:    MaterialDef[];
+  onObjectUpdate:  (changes: Partial<WorldObject>) => void;
+  onAddMaterial:   () => void;
+  runWalls?:       WallDef[];
+  onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
 }) {
   const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
@@ -442,8 +447,121 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
             />
           ))}
         </div>
+
+        {runWalls && runWalls.length > 1 && (
+          <SegmentsSection
+            runWalls={runWalls}
+            materialList={materialList}
+            onAddMaterial={onAddMaterial}
+            onSegmentUpdate={onSegmentUpdate}
+          />
+        )}
       </div>
     </>
+  );
+}
+
+// ─── Wall segments section ────────────────────────────────────────────────────
+
+function SegmentsSection({ runWalls, materialList, onAddMaterial, onSegmentUpdate }: {
+  runWalls:        WallDef[];
+  materialList:    MaterialDef[];
+  onAddMaterial:   () => void;
+  onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          width: "100%", background: "none", border: "none", cursor: "pointer",
+          padding: "0 0 4px",
+        }}
+      >
+        <span style={{ ...LABEL, marginBottom: 0 }}>SEGMENTS ({runWalls.length})</span>
+        <span style={{ color: "#4a6a8a", fontSize: 10 }}>{open ? "▴" : "▾"}</span>
+      </button>
+
+      {open && runWalls.map((wall, i) => (
+        <WallSegmentRow
+          key={wall.id}
+          index={i + 1}
+          wall={wall}
+          materialList={materialList}
+          onAddMaterial={onAddMaterial}
+          onUpdate={changes => onSegmentUpdate(wall.id, changes)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function WallSegmentRow({ index, wall, materialList, onUpdate }: {
+  index:        number;
+  wall:         WallDef;
+  materialList: MaterialDef[];
+  onAddMaterial:() => void;
+  onUpdate:     (changes: Partial<WallDef>) => void;
+}) {
+  const [tileStr, setTileStr] = useState(String(wall.materialOverrides?.tileScale ?? ""));
+
+  useEffect(() => {
+    setTileStr(String(wall.materialOverrides?.tileScale ?? ""));
+  }, [wall.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitTile = (val: string) => {
+    const trimmed = val.trim();
+    if (trimmed === "") { onUpdate({ materialOverrides: undefined }); return; }
+    const n = parseFloat(trimmed);
+    if (Number.isFinite(n) && n > 0)
+      onUpdate({ materialOverrides: { ...(wall.materialOverrides ?? {}), tileScale: n } });
+  };
+
+  const STOP = (e: React.KeyboardEvent) => {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key))
+      e.nativeEvent.stopPropagation();
+  };
+
+  return (
+    <div style={{
+      background: "rgba(20,30,45,0.6)", border: "1px solid rgba(80,120,180,0.1)",
+      borderRadius: 4, padding: "6px 8px", marginBottom: 4,
+    }}>
+      <div style={{ color: "#4a6a8a", fontSize: 9, letterSpacing: 1, marginBottom: 5 }}>
+        SEG {index}
+      </div>
+
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>MATERIAL</div>
+        <select
+          value={wall.material}
+          onChange={e => onUpdate({ material: e.target.value, materialOverrides: undefined })}
+          style={{ ...NUM_INPUT, padding: "2px 4px", cursor: "pointer" }}
+        >
+          {materialList.length === 0 && (
+            <option value={wall.material}>{wall.material}</option>
+          )}
+          {materialList.map(m => (
+            <option key={m.id} value={m.id}>{m.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ color: "#3a5a7a", fontSize: 9, flexShrink: 0 }}>TILE</div>
+        <input
+          type="number" step={0.1} min={0.1} placeholder="default"
+          value={tileStr}
+          style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+          onChange={e => setTileStr(e.target.value)}
+          onBlur={e => commitTile(e.target.value)}
+          onKeyDown={STOP}
+        />
+      </div>
+    </div>
   );
 }
 
