@@ -1,5 +1,15 @@
 {
-  "name": "three-world-builder",
+  "name": "square-dance",
+  "description": "A 3D world editor for building explorable 3D spaces.",
+  "author": "Seanmclem",
+  "license": "MIT",
+  "keywords": [
+    "3d",
+    "world",
+    "editor",
+    "builder",
+    "threejs"
+  ],
   "private": true,
   "version": "0.1.0",
   "type": "module",
