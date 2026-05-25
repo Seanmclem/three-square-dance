@@ -86,8 +86,11 @@ export interface BusEvents {
   "platform:added":        { zoneId: string; platform: PlatformDef };
   "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":      { zoneId: string; id: string };
+  "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
+  "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
   "stair:removed":         { zoneId: string; id: string };
+  "stair:rebuilt":         { zoneId: string; stairId: string };
   "object:added":          { zoneId: string; object: WorldObject };
   "object:removed":        { zoneId: string; id: string };
   "zone:added":            { zone: ZoneDef };
@@ -262,6 +265,7 @@ export interface StairDef {
   start:       Vec3;
   end:         Vec3;
   width:       number;
+  numSteps?:   number;
   style:       StairStyle;
   material:    string;
   hasRailing:  boolean;

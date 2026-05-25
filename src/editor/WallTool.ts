@@ -58,6 +58,7 @@ export class WallTool {
   private _material     = "brick_01";
   private _shiftDown    = false;
   private _hoveredNodeId: string | null = null;
+  private _lastWallId: string | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -240,6 +241,7 @@ export class WallTool {
     };
 
     this._world.addWall(this._activeZoneId, wall);
+    this._lastWallId = wall.id;
     this._chainNodeIds.push(endNodeId);
 
     if (isLoopClose) {
@@ -258,6 +260,8 @@ export class WallTool {
           nodeIds,
         });
       }
+      if (this._lastWallId)
+        this._bus.emit("tool:placed", { type: "wall", id: this._lastWallId, zoneId: this._activeZoneId });
       this._reset();
     } else {
       // Chain: continue drawing from the new end node
@@ -269,6 +273,8 @@ export class WallTool {
   }
 
   private _finishChain(): void {
+    if (this._lastWallId)
+      this._bus.emit("tool:placed", { type: "wall", id: this._lastWallId, zoneId: this._activeZoneId });
     this._reset();
   }
 
@@ -332,6 +338,7 @@ export class WallTool {
     this._chainStartNodeId = null;
     this._chainNodeIds     = [];
     this._hoveredNodeId    = null;
+    this._lastWallId       = null;
     this._state = "IDLE";
     document.body.style.cursor = "";
   }

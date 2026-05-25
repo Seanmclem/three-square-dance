@@ -19,7 +19,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef } from "@/types";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -110,6 +110,10 @@ export default function App() {
       bus.on("object:selected",   payload       => setSelected(payload)),
       bus.on("object:deselected", ()            => setSelected(null)),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
+      bus.on("tool:placed", () => {
+        setActiveTool("select");
+        bus.emit("tool:select", { tool: "select" });
+      }),
     ];
 
     // Init physics async — not blocking render
@@ -187,6 +191,10 @@ export default function App() {
       const platChanges = changes as unknown as Partial<PlatformDef>;
       worldRef.current?.updatePlatform(selected.zoneId, selected.id, platChanges);
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as PlatformDef), ...platChanges } } : null);
+    } else if (selected.type === "stair") {
+      const stairChanges = changes as unknown as Partial<StairDef>;
+      worldRef.current?.updateStair(selected.zoneId, selected.id, stairChanges);
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
     } else {
       busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
     }

@@ -54,6 +54,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
       this._bus.on("object:updated",  ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",    ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
+      this._bus.on("tool:placed",     ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
     );
   }
 
@@ -181,6 +182,15 @@ export class SelectionManager implements IEditorModule {
         scale:    { x: 1, y: 1, z: 1 },
         data:     this._getDataRecord(newMesh),
       });
+    }
+  }
+
+  private _selectAfterPlace(id: string, zoneId: string, attempt = 0): void {
+    const mesh = this._findMesh(id, zoneId);
+    if (mesh) {
+      this._select(this._resolveRoot(mesh));
+    } else if (attempt < 15) {
+      setTimeout(() => this._selectAfterPlace(id, zoneId, attempt + 1), 50);
     }
   }
 

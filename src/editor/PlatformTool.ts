@@ -135,6 +135,7 @@ export class PlatformTool implements IEditorModule {
     };
 
     this._world.addPlatform(this._activeZoneId, platform);
+    this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
     this._reset();
   }
 

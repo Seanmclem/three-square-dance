@@ -24,6 +24,7 @@ interface PlatformEntry {
 }
 
 interface StairEntry {
+  group:     THREE.Group;
   meshes:    THREE.Mesh[];
   colliders: RAPIER.Collider[];
 }
@@ -42,6 +43,12 @@ interface ZoneEntry {
   stairEntries:    Map<string, StairEntry>;
 }
 
+
+function makeStairGroup(stairId: string, zoneId: string): THREE.Group {
+  const g = new THREE.Group();
+  g.userData = { editorId: stairId, editorType: "stair", zoneId, selectable: false };
+  return g;
+}
 
 // If a floor's floorMesh has nodeIds, resolve them to current node positions.
 function resolveFloorMesh(floorMesh: FloorMeshDef, zone: ZoneDef): FloorMeshDef {
@@ -142,6 +149,9 @@ export class ZoneManager {
       this._bus.on("stair:added", ({ zoneId, stair }) => {
         void this._addStair(zoneId, stair);
       }),
+      this._bus.on("stair:updated", ({ zoneId, id }) => {
+        void this._rebuildStair(zoneId, id);
+      }),
       this._bus.on("stair:removed", ({ zoneId, id }) => {
         this._removeStair(zoneId, id);
       }),
@@ -229,8 +239,10 @@ export class ZoneManager {
     // ── Stairs ────────────────────────────────────────────────────────────
     for (const stair of zone.stairs) {
       const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
-      for (const m of meshes) stairsGroup.add(m);
-      stairEntries.set(stair.id, { meshes, colliders });
+      const stairGroup = makeStairGroup(stair.id, zoneId);
+      for (const m of meshes) stairGroup.add(m);
+      stairsGroup.add(stairGroup);
+      stairEntries.set(stair.id, { group: stairGroup, meshes, colliders });
     }
 
     this._scene.add(group);
@@ -510,9 +522,21 @@ export class ZoneManager {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
     const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
-    for (const m of meshes) entry.stairsGroup.add(m);
-    entry.stairEntries.set(stair.id, { meshes, colliders });
+    const stairGroup = makeStairGroup(stair.id, zoneId);
+    for (const m of meshes) stairGroup.add(m);
+    entry.stairsGroup.add(stairGroup);
+    entry.stairEntries.set(stair.id, { group: stairGroup, meshes, colliders });
     this._applyDimming();
+  }
+
+  private async _rebuildStair(zoneId: string, stairId: string): Promise<void> {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return;
+    this._removeStair(zoneId, stairId);
+    const stair = zone.stairs.find(s => s.id === stairId);
+    if (!stair) return;
+    await this._addStair(zoneId, stair);
+    this._bus.emit("stair:rebuilt", { zoneId, stairId });
   }
 
   private _removeStair(zoneId: string, stairId: string): void {
@@ -526,11 +550,11 @@ export class ZoneManager {
     for (const mesh of se.meshes) {
       const orig = this._dimmedMeshes.get(mesh);
       if (orig) { mesh.material = orig; this._dimmedMeshes.delete(mesh); }
-      entry.stairsGroup.remove(mesh);
       mesh.geometry.dispose();
       if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
         (mesh.material as THREE.Material).dispose();
     }
+    entry.stairsGroup.remove(se.group);
     entry.stairEntries.delete(stairId);
   }
 

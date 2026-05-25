@@ -139,7 +139,7 @@ export function PropertiesPanel({
                     onAddMaterial={openImporter}
                   />
                 : selected && selected.type === "stair"
-                  ? <StairView selected={selected} />
+                  ? <StairView selected={selected} onObjectUpdate={onObjectUpdate} />
                   : selected && draft
                     ? <TransformView selected={selected} draft={draft} commit={commit} />
                     : <ToolView activeTool={activeTool} />}
@@ -869,6 +869,7 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
   const [thickStr, setThickStr] = useState(String(plat?.thickness ?? 0.3));
   const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
   const [hasRail,  setHasRail]  = useState(plat?.hasRailing ?? false);
+  const posDebounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     setPosStr({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
@@ -878,10 +879,23 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
     setHasRail(plat?.hasRailing ?? false);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => () => { if (posDebounceRef.current !== null) clearTimeout(posDebounceRef.current); }, []);
+
   const commitPos = (axis: "x" | "y" | "z", val: string) => {
+    if (posDebounceRef.current !== null) { clearTimeout(posDebounceRef.current); posDebounceRef.current = null; }
     const n = parseFloat(val);
     if (!Number.isFinite(n)) return;
     onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const schedulePos = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    if (posDebounceRef.current !== null) clearTimeout(posDebounceRef.current);
+    posDebounceRef.current = window.setTimeout(() => {
+      onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
+      posDebounceRef.current = null;
+    }, 100);
   };
 
   const commitSize = (dim: "width" | "depth", val: string) => {
@@ -929,11 +943,16 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
               }}>
                 <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
                 <input
-                  type="text" inputMode="decimal"
+                  type="number"
+                  step={0.5}
                   value={posStr[axis]}
-                  onChange={e => setPosStr(p => ({ ...p, [axis]: e.target.value }))}
+                  onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedulePos(axis, e.target.value); }}
                   onBlur={e => commitPos(axis, e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") commitPos(axis, (e.target as HTMLInputElement).value); }}
+                  onKeyDown={e => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")
+                      e.nativeEvent.stopPropagation();
+                    if (e.key === "Enter") commitPos(axis, (e.target as HTMLInputElement).value);
+                  }}
                   style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
                 />
               </div>
@@ -1013,11 +1032,134 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 
 // ─── Stair view ───────────────────────────────────────────────────────────────
 
-function StairView({ selected }: { selected: SelectedObjectPayload }) {
+const STAIR_STEP_H = 0.2; // default riser height matching StairBuilder
+
+const STAIR_ARROW_STOP = (e: React.KeyboardEvent) => {
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key))
+    e.nativeEvent.stopPropagation();
+};
+
+function effectiveSteps(stair: StairDef): number {
+  return stair.numSteps ?? Math.max(1, Math.round((stair.end.y - stair.start.y) / STAIR_STEP_H));
+}
+
+function StairView({ selected, onObjectUpdate }: {
+  selected:       SelectedObjectPayload;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
   const stair = selected.data as StairDef | null;
+
+  const [startStr, setStartStr] = useState({
+    x: String(stair?.start.x ?? 0), y: String(stair?.start.y ?? 0), z: String(stair?.start.z ?? 0),
+  });
+  const [endStr, setEndStr] = useState({
+    x: String(stair?.end.x ?? 0), y: String(stair?.end.y ?? 0), z: String(stair?.end.z ?? 0),
+  });
+  const [widthStr,   setWidthStr]   = useState(String(stair?.width ?? 2.5));
+  const [stepsStr,   setStepsStr]   = useState(String(stair ? effectiveSteps(stair) : 1));
+  const [hasRailing, setHasRailing] = useState(stair?.hasRailing ?? false);
+  const [linked,     setLinked]     = useState(false);
+
+  // Full reset when a different stair is selected
+  useEffect(() => {
+    if (!stair) return;
+    setStartStr({ x: String(stair.start.x), y: String(stair.start.y), z: String(stair.start.z) });
+    setEndStr({ x: String(stair.end.x), y: String(stair.end.y), z: String(stair.end.z) });
+    setWidthStr(String(stair.width));
+    setStepsStr(String(effectiveSteps(stair)));
+    setHasRailing(stair.hasRailing);
+    setLinked(false);
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync end/steps UI after a rebuild updates the data
+  useEffect(() => {
+    if (!stair) return;
+    setEndStr({ x: String(stair.end.x), y: String(stair.end.y), z: String(stair.end.z) });
+    setStepsStr(String(effectiveSteps(stair)));
+  }, [stair?.end.x, stair?.end.y, stair?.end.z, stair?.numSteps]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!stair) return null;
 
-  const fmt = (n: number) => n.toFixed(2);
+  const rise = stair.end.y - stair.start.y;
+
+  const commitEndY = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const newEnd = { ...stair.end, y: n };
+    if (linked) {
+      // Linked: auto-recalculate steps from new height
+      const newSteps = Math.max(1, Math.round((n - stair.start.y) / STAIR_STEP_H));
+      setStepsStr(String(newSteps));
+      onObjectUpdate({ end: newEnd, numSteps: newSteps } as unknown as Partial<WorldObject>);
+    } else {
+      // Unlinked: freeze current effective step count so height change doesn't shift it
+      onObjectUpdate({ end: newEnd, numSteps: effectiveSteps(stair) } as unknown as Partial<WorldObject>);
+    }
+  };
+
+  const commitVec = (field: "start" | "end", axis: "x" | "y" | "z", val: string) => {
+    if (field === "end" && axis === "y") { commitEndY(val); return; }
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ [field]: { ...stair[field], [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitSteps = (val: string) => {
+    const n = Math.round(parseFloat(val));
+    if (!Number.isFinite(n) || n < 1) return;
+    if (linked) {
+      // Linked: adjust end.y so total rise = n × default step height
+      const newEndY = stair.start.y + n * STAIR_STEP_H;
+      setEndStr(p => ({ ...p, y: String(newEndY) }));
+      onObjectUpdate({ numSteps: n, end: { ...stair.end, y: newEndY } } as unknown as Partial<WorldObject>);
+    } else {
+      onObjectUpdate({ numSteps: n } as unknown as Partial<WorldObject>);
+    }
+  };
+
+  const commitWidth = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    onObjectUpdate({ width: n } as unknown as Partial<WorldObject>);
+  };
+
+  const toggleRailing = (checked: boolean) => {
+    setHasRailing(checked);
+    onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>);
+  };
+
+  const vecRow = (
+    label: string,
+    field: "start" | "end",
+    vals: { x: string; y: string; z: string },
+    setter: React.Dispatch<React.SetStateAction<{ x: string; y: string; z: string }>>,
+  ) => (
+    <div>
+      <div style={LABEL}>{label}</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {(["x", "y", "z"] as const).map((axis, i) => (
+          <div key={axis} style={{
+            flex: 1, display: "flex", gap: 4, alignItems: "center",
+            background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+            borderRadius: 4, padding: "2px 6px",
+          }}>
+            <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
+            <input
+              type="number" step={0.5}
+              value={vals[axis]}
+              onChange={e => setter(p => ({ ...p, [axis]: e.target.value }))}
+              onBlur={e => commitVec(field, axis, e.target.value)}
+              onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitVec(field, axis, (e.target as HTMLInputElement).value); }}
+              style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const curSteps = effectiveSteps(stair);
+  const stepH    = rise > 0 ? rise / curSteps : STAIR_STEP_H;
 
   return (
     <>
@@ -1029,31 +1171,59 @@ function StairView({ selected }: { selected: SelectedObjectPayload }) {
       </div>
 
       <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div>
-          <div style={LABEL}>START</div>
-          <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>
-            ({fmt(stair.start.x)}, {fmt(stair.start.y)}, {fmt(stair.start.z)})
-          </div>
-        </div>
-        <div>
-          <div style={LABEL}>END</div>
-          <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>
-            ({fmt(stair.end.x)}, {fmt(stair.end.y)}, {fmt(stair.end.z)})
-          </div>
-        </div>
+        {vecRow("START", "start", startStr, setStartStr)}
+        {vecRow("END",   "end",   endStr,   setEndStr)}
+
+        {/* Steps / Width */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <div>
-            <div style={LABEL}>WIDTH</div>
-            <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>{fmt(stair.width)} m</div>
+            <div style={LABEL}>STEPS</div>
+            <input
+              type="number" step={1} min={1}
+              value={stepsStr}
+              onChange={e => setStepsStr(e.target.value)}
+              onBlur={e => commitSteps(e.target.value)}
+              onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitSteps((e.target as HTMLInputElement).value); }}
+              style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+            />
           </div>
           <div>
-            <div style={LABEL}>RISE</div>
-            <div style={{ color: "#6a90b8", fontSize: 11, fontFamily: "monospace" }}>{fmt(stair.end.y - stair.start.y)} m</div>
+            <div style={LABEL}>WIDTH</div>
+            <input
+              type="number" step={0.5} min={0.5}
+              value={widthStr}
+              onChange={e => setWidthStr(e.target.value)}
+              onBlur={e => commitWidth(e.target.value)}
+              onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitWidth((e.target as HTMLInputElement).value); }}
+              style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+            />
           </div>
         </div>
-        <div style={{ color: "#2a4a6a", fontSize: 9, fontStyle: "italic" }}>
-          Stair geometry is determined by start/end points. Use Delete to remove.
+
+        {/* Link toggle */}
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={linked}
+            onChange={e => setLinked(e.target.checked)}
+            style={{ accentColor: "#4d8cff", cursor: "pointer", flexShrink: 0 }}
+          />
+          <span style={{ color: linked ? "#80aaff" : "#4a6a8a", fontSize: 10, userSelect: "none" }}>
+            Link end-Y to step count
+          </span>
+        </label>
+
+        <div style={{ color: "#2a4a6a", fontSize: 9 }}>
+          Rise: {rise.toFixed(2)} m · Step H: {stepH.toFixed(3)} m
         </div>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox" checked={hasRailing}
+            onChange={e => toggleRailing(e.target.checked)}
+            style={{ accentColor: "#4d8cff", cursor: "pointer" }}
+          />
+          <span style={{ color: "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+        </label>
       </div>
     </>
   );

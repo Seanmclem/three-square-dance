@@ -165,6 +165,14 @@ export class WorldState {
     this._bus.emit("stair:added", { zoneId, stair });
   }
 
+  updateStair(zoneId: string, id: string, changes: Partial<StairDef>): void {
+    const zone = this.zones.get(zoneId);
+    const stair = zone?.stairs.find(s => s.id === id);
+    if (!stair) return;
+    Object.assign(stair, changes);
+    this._bus.emit("stair:updated", { zoneId, id, changes });
+  }
+
   removeStair(zoneId: string, id: string): void {
     const zone = this.zones.get(zoneId);
     if (!zone) return;

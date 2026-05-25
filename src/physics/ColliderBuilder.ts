@@ -63,17 +63,18 @@ export class ColliderBuilder {
     const heightDiff = stair.end.y - stair.start.y;
     const horizDist  = Math.hypot(stair.end.x - stair.start.x, stair.end.z - stair.start.z);
     const angle      = Math.atan2(stair.end.z - stair.start.z, stair.end.x - stair.start.x);
-    const stepHeight = 0.2;
-    const numSteps   = Math.max(1, Math.round(heightDiff / stepHeight));
+    const defaultStepH = 0.2;
+    const numSteps   = stair.numSteps ?? Math.max(1, Math.round(heightDiff / defaultStepH));
+    const stepRise   = heightDiff / numSteps;
     const stepDepth  = horizDist / numSteps;
     const colliders: RAPIER.Collider[] = [];
 
     for (let i = 0; i < numSteps; i++) {
       const t = (i + 0.5) / numSteps;
-      const desc = RAPIER.ColliderDesc.cuboid(stair.width / 2, stepHeight / 2, stepDepth / 2)
+      const desc = RAPIER.ColliderDesc.cuboid(stepDepth / 2, stepRise / 2, stair.width / 2)
         .setTranslation(
           stair.start.x + (stair.end.x - stair.start.x) * t,
-          stair.start.y + (i + 0.5) * stepHeight,
+          stair.start.y + (i + 0.5) * stepRise,
           stair.start.z + (stair.end.z - stair.start.z) * t,
         )
         .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });

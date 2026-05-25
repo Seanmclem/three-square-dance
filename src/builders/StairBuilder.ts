@@ -22,7 +22,8 @@ export class StairBuilder {
     const horizDist  = Math.hypot(dx, dz);
     const angle      = Math.atan2(dz, dx);
 
-    const numSteps  = Math.max(1, Math.round(heightDiff / STEP_HEIGHT));
+    const numSteps  = stair.numSteps ?? Math.max(1, Math.round(heightDiff / STEP_HEIGHT));
+    const stepRise  = heightDiff / numSteps;
     const stepDepth = horizDist / numSteps;
     const meshes: THREE.Mesh[] = [];
 
@@ -33,10 +34,10 @@ export class StairBuilder {
       const t = (i + 0.5) / numSteps;
 
       const cx = stair.start.x + dx * t;
-      const cy = stair.start.y + (i + 0.5) * STEP_HEIGHT;
+      const cy = stair.start.y + (i + 0.5) * stepRise;
       const cz = stair.start.z + dz * t;
 
-      const stepGeo = new THREE.BoxGeometry(stair.width, STEP_HEIGHT, stepDepth);
+      const stepGeo = new THREE.BoxGeometry(stepDepth, stepRise, stair.width);
       const stepMesh = new THREE.Mesh(stepGeo, mat);
 
       stepMesh.position.set(cx, cy, cz);
@@ -48,9 +49,10 @@ export class StairBuilder {
         editorId:      stair.id,
         editorType:    "stair",
         zoneId,
-        selectable:    i === 0, // only first step is selectable (represents the whole stair)
+        selectable:    true,
         floorLevel:    0,
         _ownsMaterial: false,
+        _parentId:     stair.id,
       } satisfies MeshUserData;
 
       meshes.push(stepMesh);

@@ -32,7 +32,7 @@ function buildSlabGeo(w: number, h: number, d: number, tileScale: number): THREE
     pos.push(ax, ay, az,  bx, by, bz,  cx, cy, cz,  dx, dy, dz);
     nrm.push(nx, ny, nz,  nx, ny, nz,  nx, ny, nz,  nx, ny, nz);
     uv.push(0, 0,  uScl, 0,  uScl, vScl,  0, vScl);
-    idx.push(vi, vi+1, vi+2,  vi, vi+2, vi+3);
+    idx.push(vi, vi+2, vi+1,  vi, vi+3, vi+2);
     vi += 4;
   }
 

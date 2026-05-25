@@ -7,7 +7,7 @@ type StairState = "IDLE" | "PLACING";
 
 const GRID       = 0.5;
 const MIN_HORIZ  = 1.0;
-const DEFAULT_W  = 1.5;
+const DEFAULT_W  = 2.5;
 const STEP_H     = 0.2;   // must match ColliderBuilder / StairBuilder
 
 function snap(v: number): number {
@@ -149,6 +149,7 @@ export class StairTool implements IEditorModule {
     };
 
     this._world.addStair(this._activeZoneId, stair);
+    this._bus.emit("tool:placed", { type: "stair", id: stair.id, zoneId: this._activeZoneId });
     this._reset();
   }
 
