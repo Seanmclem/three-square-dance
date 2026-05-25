@@ -85,6 +85,7 @@ export class PlatformTool implements IEditorModule {
       this._corner1 = { x: sx, z: sz };
       this._state   = "PLACING";
       this._preview = makePreview();
+      this._preview.visible = false;
       this._scene.add(this._preview);
       document.body.style.cursor = "crosshair";
     } else {
@@ -94,6 +95,7 @@ export class PlatformTool implements IEditorModule {
 
   private _onMouseMove(worldPos: Vec3): void {
     if (this._state !== "PLACING" || !this._preview || !this._corner1) return;
+    this._preview.visible = true;
     const ex = snap(worldPos.x);
     const ez = snap(worldPos.z);
     this._updatePreview(ex, ez);

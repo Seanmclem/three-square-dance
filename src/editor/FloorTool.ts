@@ -73,6 +73,7 @@ export class FloorTool {
       this._startPoint = new THREE.Vector3(snap(worldPos.x), 0, snap(worldPos.z));
       this._state = "PLACING";
       this._preview = makePreviewMesh();
+      this._preview.visible = false;
       this._scene.add(this._preview);
     } else {
       this._commit(worldPos);
@@ -81,7 +82,7 @@ export class FloorTool {
 
   private _onMouseMove(worldPos: Vec3): void {
     if (this._state !== "PLACING" || !this._preview || !this._startPoint) return;
-
+    this._preview.visible = true;
     const ex = snap(worldPos.x);
     const ez = snap(worldPos.z);
     const sx = this._startPoint.x;

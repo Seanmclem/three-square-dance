@@ -99,6 +99,7 @@ export class StairTool implements IEditorModule {
       this._scene.add(this._startDot);
 
       this._previewLine = makePreviewLine();
+      this._previewLine.visible = false;
       this._scene.add(this._previewLine);
 
       this._state = "PLACING";
@@ -110,6 +111,7 @@ export class StairTool implements IEditorModule {
 
   private _onMouseMove(worldPos: Vec3): void {
     if (this._state !== "PLACING" || !this._previewLine || !this._startPos) return;
+    this._previewLine.visible = true;
     const ex = snap(worldPos.x);
     const ez = snap(worldPos.z);
     const ey = this._computeEndY(ex, ez);
