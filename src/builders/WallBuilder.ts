@@ -520,6 +520,7 @@ export class WallBuilder {
     // Build indexed BufferGeometry.
     // Per polyline point: 4 vertices — LB(4i), LT(4i+1), RB(4i+2), RT(4i+3)
     // Face winding verified for correct outward normals (CCW from outside).
+    const vTop   = H / tileY;
     const posArr: number[] = [];
     const uvArr:  number[] = [];
     const idxArr: number[] = [];
@@ -527,15 +528,29 @@ export class WallBuilder {
     for (let i = 0; i < N; i++) {
       const l = lefts[i]!, r = rights[i]!;
       const u = cumDist[i]! / tileX;
-      const vTop = H / tileY;
       posArr.push(l.x, 0, l.z,  l.x, H, l.z,  r.x, 0, r.z,  r.x, H, r.z);
       uvArr.push( u,   0, u,   vTop,  u,  0, u, vTop);
+    }
+
+    // Closed loops: the wrap-around segment (pts[N-1]→pts[0]) would interpolate
+    // from cumDist[N-1]/tileX back to UV=0, cramming the full arc-length into
+    // one face and producing tiny compressed tiling. Fix: add a duplicate of
+    // pts[0]'s vertices with U = totalCumDist so the face gets one segment's
+    // worth of UV, then point the wrap-around indices at that extra vertex.
+    if (isClosed) {
+      const wrapLen    = Math.hypot(pts[0]!.x - pts[N - 1]!.x, pts[0]!.z - pts[N - 1]!.z);
+      const uTotal     = (cumDist[N - 1]! + wrapLen) / tileX;
+      const l = lefts[0]!, r = rights[0]!;
+      posArr.push(l.x, 0, l.z,  l.x, H, l.z,  r.x, 0, r.z,  r.x, H, r.z);
+      uvArr.push(uTotal, 0, uTotal, vTop, uTotal, 0, uTotal, vTop);
     }
 
     // Closed loops have N segments (last wraps back to 0); open runs have N-1.
     const segCount = isClosed ? N : N - 1;
     for (let i = 0; i < segCount; i++) {
-      const j   = (i + 1) % N;
+      // Wrap-around segment uses the extra vertex (index N) instead of vertex 0
+      // so its UV continues forward rather than jumping back to 0.
+      const j   = (isClosed && i === N - 1) ? N : (i + 1) % N;
       const LBi  = 4 * i,  LTi  = 4 * i + 1,  RBi  = 4 * i + 2,  RTi  = 4 * i + 3;
       const LBi1 = 4 * j,  LTi1 = 4 * j + 1,  RBi1 = 4 * j + 2,  RTi1 = 4 * j + 3;
 
