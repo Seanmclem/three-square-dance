@@ -99,10 +99,16 @@ export class ZoneManager {
       this._bus.on("wall:added", ({ zoneId, wall }) => {
         this._queueRebuild(zoneId, wall.id);
       }),
-      this._bus.on("wall:updated", ({ zoneId, wallId, changes }) => {
-        // If a merge-criteria field changed, silently sync all run-mates so the
-        // run stays together after rebuild (no extra events → no recursion).
-        if (changes.material !== undefined || changes.exteriorMaterial !== undefined || changes.height !== undefined) {
+      this._bus.on("wall:updated", ({ zoneId, wallId, changes, segmentOnly }) => {
+        // Silently sync merge-criteria fields to all run-mates so the run stays
+        // together after a shared edit. Skip for per-segment updates (segmentOnly)
+        // so individual walls can legitimately diverge and split from the run.
+        if (!segmentOnly && (
+          changes.material          !== undefined ||
+          changes.exteriorMaterial  !== undefined ||
+          changes.height            !== undefined ||
+          changes.materialOverrides !== undefined
+        )) {
           const entry = this._loadedZones.get(zoneId);
           const zone  = this._worldState.zones.get(zoneId);
           if (entry && zone) {
@@ -112,6 +118,7 @@ export class ZoneManager {
               if (changes.material          !== undefined) sync.material          = changes.material;
               if (changes.exteriorMaterial  !== undefined) sync.exteriorMaterial  = changes.exteriorMaterial;
               if (changes.height            !== undefined) sync.height            = changes.height;
+              if (changes.materialOverrides !== undefined) sync.materialOverrides = changes.materialOverrides;
               for (const id of re.wallIds) {
                 if (id === wallId) continue;
                 const wall = zone.walls.find(w => w.id === id);

@@ -156,7 +156,7 @@ export default function App() {
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
-    worldRef.current?.updateWall(selected.zoneId, wallId, changes);
+    worldRef.current?.updateWallSegment(selected.zoneId, wallId, changes);
     setSelected(prev => {
       if (!prev?.runWalls) return prev;
       return {
@@ -183,12 +183,10 @@ export default function App() {
       worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
       setSelected(prev => {
         if (!prev) return null;
-        // If a merge-criteria field changed, ZoneManager will sync it to all run members.
-        // Mirror that locally so the segment rows update before the async rebuild arrives.
-        const syncKeys = ["material", "exteriorMaterial", "height"] as const;
-        const needsSync = syncKeys.some(k => wallChanges[k] !== undefined);
-        const updRunWalls = needsSync && prev.runWalls
-          ? prev.runWalls.map(w => ({ ...w, ...Object.fromEntries(syncKeys.filter(k => wallChanges[k] !== undefined).map(k => [k, wallChanges[k]])) }))
+        // Mirror sync keys locally so segment rows update before the async rebuild arrives.
+        const syncKeys = ["material", "exteriorMaterial", "height", "materialOverrides"] as const;
+        const updRunWalls = prev.runWalls
+          ? prev.runWalls.map(w => ({ ...w, ...Object.fromEntries(syncKeys.filter(k => k in wallChanges).map(k => [k, (wallChanges as Record<string, unknown>)[k]])) }))
           : prev.runWalls;
         return { ...prev, data: { ...(prev.data as WallDef), ...wallChanges }, runWalls: updRunWalls };
       });

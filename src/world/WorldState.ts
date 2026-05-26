@@ -100,6 +100,15 @@ export class WorldState {
     this._bus.emit("wall:updated", { zoneId, wallId, changes });
   }
 
+  /** Like updateWall but marks the change as per-segment — skips run-mate sync in ZoneManager. */
+  updateWallSegment(zoneId: string, wallId: string, changes: Partial<WallDef>): void {
+    const zone = this.zones.get(zoneId);
+    const wall = zone?.walls.find(w => w.id === wallId);
+    if (!wall) return;
+    Object.assign(wall, changes);
+    this._bus.emit("wall:updated", { zoneId, wallId, changes, segmentOnly: true });
+  }
+
   removeWall(zoneId: string, wallId: string): void {
     const zone = this.zones.get(zoneId);
     if (!zone) return;

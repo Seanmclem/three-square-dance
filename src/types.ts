@@ -76,7 +76,7 @@ export interface BusEvents {
   "asset:selected":        { assetId: string };
   "asset:dropped":         { assetId: string; screenPos: { x: number; y: number } };
   "wall:added":            { zoneId: string; wall: WallDef };
-  "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef> };
+  "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef>; segmentOnly?: boolean };
   "wall:removed":          { zoneId: string; wallId: string };
   "wall:rebuilt":          { zoneId: string; wallId: string };
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
