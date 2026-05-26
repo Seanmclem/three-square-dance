@@ -174,6 +174,70 @@ function buildTrimFrame(
   return meshes;
 }
 
+/**
+ * Computes miter-bisected left/right corner positions at an open run endpoint.
+ * If exactly one non-run wall connects at the node, a bisector miter is used
+ * so the geometry flush-joins with the adjacent run. Otherwise returns a flat cap.
+ *
+ * isStart=true  → runDir is the OUTGOING direction from pt (start of run/wall).
+ * isStart=false → runDir is the INCOMING direction into pt (end of run/wall).
+ */
+function endpointMiter(
+  nodeId: string,
+  pt: { x: number; z: number },
+  runDir: { dx: number; dz: number },
+  isStart: boolean,
+  zone: ZoneDef,
+  nodes: Map<string, WallNode>,
+  runWallIds: Set<string>,
+  T: number,
+): { left: { x: number; z: number }; right: { x: number; z: number } } {
+  const adjacent = zone.walls.filter(w =>
+    !runWallIds.has(w.id) &&
+    (w.startNodeId === nodeId || w.endNodeId === nodeId),
+  );
+
+  if (adjacent.length === 1) {
+    const neighbor    = adjacent[0]!;
+    const otherNodeId = neighbor.startNodeId === nodeId ? neighbor.endNodeId : neighbor.startNodeId;
+    const otherNode   = nodes.get(otherNodeId);
+
+    if (otherNode) {
+      let dx1: number, dz1: number, dx2: number, dz2: number;
+      if (isStart) {
+        // incoming = from neighbor toward pt; outgoing = run's first segment
+        dx1 = pt.x - otherNode.x; dz1 = pt.z - otherNode.z;
+        dx2 = runDir.dx;           dz2 = runDir.dz;
+      } else {
+        // incoming = run's last segment; outgoing = toward neighbor
+        dx1 = runDir.dx;                dz1 = runDir.dz;
+        dx2 = otherNode.x - pt.x; dz2 = otherNode.z - pt.z;
+      }
+      const len1 = Math.hypot(dx1, dz1) || 0.001;
+      const nx1 = dz1 / len1, nz1 = -dx1 / len1;
+      const len2 = Math.hypot(dx2, dz2) || 0.001;
+      const nx2 = dz2 / len2, nz2 = -dx2 / len2;
+      const bx = nx1 + nx2, bz = nz1 + nz2;
+      const bLen = Math.hypot(bx, bz) || 0.001;
+      const mx = bx / bLen, mz = bz / bLen;
+      const cosHalf = Math.max(nx1 * mx + nz1 * mz, 0.2);
+      const mLen = (T / 2) / cosHalf;
+      return {
+        left:  { x: pt.x + mx * mLen, z: pt.z + mz * mLen },
+        right: { x: pt.x - mx * mLen, z: pt.z - mz * mLen },
+      };
+    }
+  }
+
+  // Flat cap perpendicular to the run direction.
+  const flatLen = Math.hypot(runDir.dx, runDir.dz) || 0.001;
+  const nx = runDir.dz / flatLen, nz = -runDir.dx / flatLen;
+  return {
+    left:  { x: pt.x + nx * T / 2, z: pt.z + nz * T / 2 },
+    right: { x: pt.x - nx * T / 2, z: pt.z - nz * T / 2 },
+  };
+}
+
 export class WallBuilder {
   static async build(
     wall:   WallDef,
@@ -184,76 +248,85 @@ export class WallBuilder {
     const rawStart = nodes.get(wall.startNodeId)!;
     const rawEnd   = nodes.get(wall.endNodeId)!;
 
-    // Corner joining: shorten wall at ends that connect to other walls
-    const connectedAtStart = zone.walls.filter(w =>
-      w.id !== wall.id &&
-      (w.startNodeId === wall.startNodeId || w.endNodeId === wall.startNodeId),
-    );
-    const connectedAtEnd = zone.walls.filter(w =>
-      w.id !== wall.id &&
-      (w.startNodeId === wall.endNodeId || w.endNodeId === wall.endNodeId),
-    );
-
     const totalDx  = rawEnd.x - rawStart.x;
     const totalDz  = rawEnd.z - rawStart.z;
     const totalLen = Math.hypot(totalDx, totalDz) || 0.001;
-    const ux = totalDx / totalLen;
-    const uz = totalDz / totalLen;
+    const angle    = Math.atan2(totalDz, totalDx);
+    const cos      = Math.cos(angle), sin = Math.sin(angle);
+    const cx       = (rawStart.x + rawEnd.x) / 2;
+    const cz       = (rawStart.z + rawEnd.z) / 2;
 
-    const startOff = connectedAtStart.length > 0 ? wall.thickness / 2 : 0;
-    const endOff   = connectedAtEnd.length   > 0 ? wall.thickness / 2 : 0;
-
-    const start = { x: rawStart.x + ux * startOff, z: rawStart.z + uz * startOff };
-    const end   = { x: rawEnd.x   - ux * endOff,   z: rawEnd.z   - uz * endOff   };
-
-    const dx     = end.x - start.x;
-    const dz     = end.z - start.z;
-    const length = Math.hypot(dx, dz);
-    const angle  = Math.atan2(dz, dx);
-    const cx     = (start.x + end.x) / 2;
-    const cz     = (start.z + end.z) / 2;
-
+    const H  = wall.height;
+    const T  = wall.thickness;
     const ovr       = wall.materialOverrides;
     const baseDef   = assetManager.getMaterialDef(wall.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
     const tileX     = ovr?.tileScaleX ?? tileScale;
     const tileY     = ovr?.tileScaleY ?? tileScale;
 
-    const dispEnabled = ovr?.maps?.displacement?.enabled
-      ?? baseDef?.maps.displacement.enabled
-      ?? false;
-    const segX = dispEnabled ? Math.max(1, Math.ceil(length * 4)) : 1;
-    const segY = dispEnabled ? Math.max(1, Math.ceil(wall.height * 4)) : 1;
+    const runWallIds = new Set([wall.id]);
+    const runDir     = { dx: totalDx, dz: totalDz };
 
-    const geo = new THREE.BoxGeometry(length, wall.height, wall.thickness, segX, segY, 1);
-    applyBoxUVTiling(geo, length, wall.height, wall.thickness, tileX, tileY);
+    // Miter-correct corners at both endpoints using neighbor wall directions.
+    // This ensures geometry is flush with adjacent run meshes at shared nodes.
+    const startMiter = endpointMiter(
+      wall.startNodeId, rawStart, runDir, true,
+      zone, nodes, runWallIds, T,
+    );
+    const endMiter = endpointMiter(
+      wall.endNodeId, rawEnd, runDir, false,
+      zone, nodes, runWallIds, T,
+    );
 
-    // CSG: subtract each opening from the wall geometry
-    let finalGeo: THREE.BufferGeometry = geo;
+    // Build strip geometry in world space (Y: 0..H) — same structure as buildRun.
+    // Vertices: 0=SL_bot 1=SL_top 2=SR_bot 3=SR_top 4=EL_bot 5=EL_top 6=ER_bot 7=ER_top
+    const sl = startMiter.left, sr = startMiter.right;
+    const el = endMiter.left,   er = endMiter.right;
+    const posArr = [
+      sl.x, 0, sl.z,  sl.x, H, sl.z,  sr.x, 0, sr.z,  sr.x, H, sr.z,
+      el.x, 0, el.z,  el.x, H, el.z,  er.x, 0, er.z,  er.x, H, er.z,
+    ];
+    const uE = totalLen / tileX, vT = H / tileY;
+    const uvArr = [0,0,0,vT,0,0,0,vT, uE,0,uE,vT,uE,0,uE,vT];
+    const idxArr = [
+      0,1,5, 0,5,4,  // left face
+      2,6,7, 2,7,3,  // right face
+      1,3,7, 1,7,5,  // top
+      0,4,6, 0,6,2,  // bottom
+      0,2,3, 0,3,1,  // start cap
+      4,5,7, 4,7,6,  // end cap
+    ];
+
+    const baseGeo = new THREE.BufferGeometry();
+    baseGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    baseGeo.setAttribute('uv',  new THREE.Float32BufferAttribute(uvArr, 2));
+    baseGeo.setAttribute('uv2', new THREE.Float32BufferAttribute([...uvArr], 2));
+    baseGeo.setIndex(idxArr);
+    baseGeo.computeVertexNormals();
+
+    // CSG: subtract openings. Cutters positioned in world space (matching buildRun).
+    let finalGeo: THREE.BufferGeometry = baseGeo;
     const trimMeshes: THREE.Mesh[] = [];
     const linerSetups: LinerSetup[] = [];
 
     if (wall.openings.length > 0) {
-      let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+      let workMesh: THREE.Mesh = new THREE.Mesh(baseGeo, new THREE.MeshBasicMaterial());
       workMesh.updateMatrixWorld();
       let prevIsOriginal = true;
 
       for (const opening of wall.openings) {
-        // Cutter position in wall local space (wall runs along X, centered at origin)
-        const localX = opening.offsetAlongWall + opening.width / 2 - length / 2;
-        const localY = opening.elevation + opening.height / 2 - wall.height / 2;
-
+        const lx = opening.offsetAlongWall + opening.width / 2 - totalLen / 2;
         const cutterGeo = opening.type === "arch"
-          ? createArchCutterGeo(opening.width + 0.05, opening.height + 0.05, wall.thickness)
-          : new THREE.BoxGeometry(opening.width + 0.05, opening.height + 0.05, wall.thickness + 0.1);
+          ? createArchCutterGeo(opening.width + 0.05, opening.height + 0.05, T)
+          : new THREE.BoxGeometry(opening.width + 0.05, opening.height + 0.05, T + 0.1);
         const cutterMesh = new THREE.Mesh(cutterGeo, new THREE.MeshBasicMaterial());
-        cutterMesh.position.set(localX, localY, 0);
+        cutterMesh.position.set(cx + cos * lx, opening.elevation + opening.height / 2, cz + sin * lx);
+        cutterMesh.rotation.y = -angle;
         cutterMesh.updateMatrixWorld();
 
         const oldGeo = workMesh.geometry;
         workMesh = csgSubtract(workMesh, cutterMesh);
         workMesh.updateMatrixWorld();
-
         cutterGeo.dispose();
         if (!prevIsOriginal) oldGeo.dispose();
         prevIsOriginal = false;
@@ -262,13 +335,12 @@ export class WallBuilder {
       finalGeo = workMesh.geometry;
       finalGeo.setAttribute('uv2', finalGeo.attributes.uv);
 
-      const cos = Math.cos(angle), sin = Math.sin(angle);
       for (const opening of wall.openings) {
-        trimMeshes.push(...buildTrimFrame(opening, length, wall.height, wall.thickness, cx, cz, angle));
+        const lx     = opening.offsetAlongWall + opening.width / 2 - totalLen / 2;
+        const worldY = opening.elevation + opening.height / 2;
 
-        // Invisible trigger mesh — fills the opening so raycasting can select it
-        const lx = opening.offsetAlongWall + opening.width / 2 - length / 2;
-        const ly = opening.elevation + opening.height / 2 - wall.height / 2;
+        trimMeshes.push(...buildTrimFrame(opening, totalLen, H, T, cx, cz, angle));
+
         const triggerMesh = new THREE.Mesh(
           new THREE.BoxGeometry(opening.width, opening.height, 0.01),
           new THREE.MeshStandardMaterial({
@@ -278,7 +350,7 @@ export class WallBuilder {
           }),
         );
         triggerMesh.renderOrder = 1;
-        triggerMesh.position.set(cx + cos * lx, wall.height / 2 + ly, cz + sin * lx);
+        triggerMesh.position.set(cx + cos * lx, worldY, cz + sin * lx);
         triggerMesh.rotation.y = -angle;
         triggerMesh.userData = {
           editorId:      opening.id,
@@ -295,7 +367,6 @@ export class WallBuilder {
         };
         trimMeshes.push(triggerMesh);
 
-        // Liner only for passage/arch — doors and windows use trim frames instead
         if (opening.type === "passage" || opening.type === "arch") {
           const iTH = opening.innerTileH ?? tileX;
           const iTV = opening.innerTileV ?? tileX;
@@ -303,16 +374,14 @@ export class WallBuilder {
           const linerH    = isArch ? opening.height - opening.width / 2 : opening.height;
           const linerOfsY = isArch ? -opening.width / 4 : 0;
           linerSetups.push({
-            geo: buildPassageLiner(opening.width, linerH, wall.thickness, iTH, iTV, !isArch),
+            geo: buildPassageLiner(opening.width, linerH, T, iTH, iTV, !isArch),
             px:  cx + cos * lx,
-            py:  wall.height / 2 + ly + linerOfsY,
+            py:  worldY + linerOfsY,
             pz:  cz + sin * lx,
             ry: -angle,
           });
         }
       }
-    } else {
-      geo.setAttribute('uv2', geo.attributes.uv);
     }
 
     const mat = ovr
@@ -322,8 +391,7 @@ export class WallBuilder {
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
     const mesh = new THREE.Mesh(finalGeo, mat);
-    mesh.position.set(cx, wall.height / 2, cz);
-    mesh.rotation.y = -angle;
+    mesh.position.set(0, 0, 0);
     mesh.castShadow    = true;
     mesh.receiveShadow = true;
     mesh.userData = {
@@ -335,7 +403,6 @@ export class WallBuilder {
       _ownsMaterial: !!ovr,
     } satisfies MeshUserData;
 
-    // Create liner meshes now that the material is available
     for (const ls of linerSetups) {
       const lm = mat.clone();
       lm.side = THREE.DoubleSide;
@@ -351,7 +418,11 @@ export class WallBuilder {
       trimMeshes.push(linerMesh);
     }
 
-    const colliders = ColliderBuilder.registerWallSegments(wall, 0, start, end);
+    const colliders = ColliderBuilder.registerWallSegments(
+      wall, 0,
+      { x: rawStart.x, z: rawStart.z },
+      { x: rawEnd.x,   z: rawEnd.z   },
+    );
 
     return { mesh, colliders, trimMeshes };
   }
@@ -396,46 +467,51 @@ export class WallBuilder {
     }
 
     // Left/right edge positions at each polyline point using miter bisectors at interior corners.
-    // For closed loops every point is interior; open runs treat the two endpoints as flat caps.
-    // Normal formula: for direction (dx, dz), left normal = (dz/len, -dx/len) in XZ.
+    // Open-run endpoints check for adjacent non-run walls and miter toward them so geometry
+    // flush-joins with standalone wall meshes that share those corner nodes.
     const N = pts.length;
+    const runWallIds = new Set(walls.map(w => w.id));
     const lefts:  { x: number; z: number }[] = [];
     const rights: { x: number; z: number }[] = [];
 
     for (let i = 0; i < N; i++) {
       const p = pts[i]!;
-      let mx: number, mz: number, mLen: number;
 
       if (!isClosed && i === 0) {
         const nxt = pts[1]!;
-        const dx = nxt.x - p.x, dz = nxt.z - p.z;
-        const len = Math.hypot(dx, dz) || 0.001;
-        mx = dz / len; mz = -dx / len;
-        mLen = T / 2;
-      } else if (!isClosed && i === N - 1) {
-        const prv = pts[i - 1]!;
-        const dx = p.x - prv.x, dz = p.z - prv.z;
-        const len = Math.hypot(dx, dz) || 0.001;
-        mx = dz / len; mz = -dx / len;
-        mLen = T / 2;
-      } else {
-        // Interior corner (or any point in a closed loop): miter bisector.
-        // Use modular indexing so the first/last points of a closed loop
-        // correctly reference their wrap-around neighbours.
-        const prv = pts[(i - 1 + N) % N]!, nxt = pts[(i + 1) % N]!;
-        const dx1 = p.x - prv.x, dz1 = p.z - prv.z;
-        const len1 = Math.hypot(dx1, dz1) || 0.001;
-        const nx1 = dz1 / len1, nz1 = -dx1 / len1;
-        const dx2 = nxt.x - p.x, dz2 = nxt.z - p.z;
-        const len2 = Math.hypot(dx2, dz2) || 0.001;
-        const nx2 = dz2 / len2, nz2 = -dx2 / len2;
-        const bx = nx1 + nx2, bz = nz1 + nz2;
-        const bLen = Math.hypot(bx, bz) || 0.001;
-        mx = bx / bLen; mz = bz / bLen;
-        // miterLen = (T/2) / cos(half-angle); clamp cosine to prevent extreme miters
-        const cosHalf = Math.max(nx1 * mx + nz1 * mz, 0.2);
-        mLen = (T / 2) / cosHalf;
+        const em = endpointMiter(
+          resolvedIds[0]!, p, { dx: nxt.x - p.x, dz: nxt.z - p.z }, true,
+          zone, nodes, runWallIds, T,
+        );
+        lefts.push(em.left); rights.push(em.right);
+        continue;
       }
+      if (!isClosed && i === N - 1) {
+        const prv = pts[i - 1]!;
+        const em = endpointMiter(
+          resolvedIds[resolvedIds.length - 1]!, p, { dx: p.x - prv.x, dz: p.z - prv.z }, false,
+          zone, nodes, runWallIds, T,
+        );
+        lefts.push(em.left); rights.push(em.right);
+        continue;
+      }
+
+      // Interior corner (or any point in a closed loop): miter bisector.
+      // Use modular indexing so the first/last points of a closed loop
+      // correctly reference their wrap-around neighbours.
+      const prv = pts[(i - 1 + N) % N]!, nxt = pts[(i + 1) % N]!;
+      const dx1 = p.x - prv.x, dz1 = p.z - prv.z;
+      const len1 = Math.hypot(dx1, dz1) || 0.001;
+      const nx1 = dz1 / len1, nz1 = -dx1 / len1;
+      const dx2 = nxt.x - p.x, dz2 = nxt.z - p.z;
+      const len2 = Math.hypot(dx2, dz2) || 0.001;
+      const nx2 = dz2 / len2, nz2 = -dx2 / len2;
+      const bx = nx1 + nx2, bz = nz1 + nz2;
+      const bLen = Math.hypot(bx, bz) || 0.001;
+      const mx = bx / bLen, mz = bz / bLen;
+      // miterLen = (T/2) / cos(half-angle); clamp cosine to prevent extreme miters
+      const cosHalf = Math.max(nx1 * mx + nz1 * mz, 0.2);
+      const mLen = (T / 2) / cosHalf;
 
       lefts.push({  x: p.x + mx * mLen, z: p.z + mz * mLen });
       rights.push({ x: p.x - mx * mLen, z: p.z - mz * mLen });
