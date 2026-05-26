@@ -28,9 +28,10 @@ export class SelectionManager implements IEditorModule {
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _mouse     = new THREE.Vector2();
 
-  private _selected:   THREE.Object3D | null = null;
-  private _hovered:    THREE.Object3D | null = null;
-  private _activeTool: ToolId = "select";
+  private _selected:          THREE.Object3D | null = null;
+  private _hovered:           THREE.Object3D | null = null;
+  private _activeTool:        ToolId = "select";
+  private _suppressNextClick = false;
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -55,6 +56,9 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("object:updated",  ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",    ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
       this._bus.on("tool:placed",     ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
+      this._bus.on("gizmo:dragging",  ({ isDragging }) => {
+        if (!isDragging) this._suppressNextClick = true;
+      }),
     );
   }
 
@@ -72,6 +76,7 @@ export class SelectionManager implements IEditorModule {
   // ─── Picking ────────────────────────────────────────────────────────────────
 
   private _onClick(screenPos: ScreenPos): void {
+    if (this._suppressNextClick) { this._suppressNextClick = false; return; }
     if (this._activeTool !== "select") return;
     const selectable = this._cast(screenPos);
     if (selectable.length === 0) { this._deselect(); return; }
