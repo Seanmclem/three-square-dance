@@ -158,6 +158,7 @@ export class PolygonFloorTool {
     };
 
     this._world.addFloor(this._activeZoneId, floor);
+    this._bus.emit("tool:placed", { type: "floor", id: floor.id, zoneId: this._activeZoneId });
     this._reset();
   }
 
