@@ -143,7 +143,10 @@ export function PropertiesPanel({
                     onAddMaterial={openImporter}
                   />
                 : selected && selected.type === "stair"
-                  ? <StairView selected={selected} onObjectUpdate={onObjectUpdate} />
+                  ? <StairView
+                      selected={selected} materialList={materialList}
+                      onObjectUpdate={onObjectUpdate} onAddMaterial={openImporter}
+                    />
                   : selected && draft
                     ? <TransformView selected={selected} draft={draft} commit={commit} />
                     : <ToolView activeTool={activeTool} />}
@@ -739,8 +742,10 @@ const MAP_ROWS: Array<{ key: MapKey; label: string }> = [
 ];
 
 function MaterialSection({
+  label = "MATERIAL",
   materialList, currentMaterialId, overrides, onMaterialChange, onOverridesChange, onAddMaterial,
 }: {
+  label?:            string;
   materialList:      MaterialDef[];
   currentMaterialId: string;
   overrides:         MaterialOverrides | undefined;
@@ -838,7 +843,7 @@ function MaterialSection({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={LABEL}>MATERIAL</div>
+      <div style={LABEL}>{label}</div>
 
       {/* Picker */}
       <button
@@ -1135,13 +1140,25 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
           )}
         </div>
 
-        {/* Material */}
+        {/* Material — top/bottom */}
         <MaterialSection
+          label="TOP / BOTTOM"
           materialList={materialList}
           currentMaterialId={plat?.material ?? "concrete_01"}
           overrides={plat?.materialOverrides}
           onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
           onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
+        />
+
+        {/* Material — sides */}
+        <MaterialSection
+          label="SIDES"
+          materialList={materialList}
+          currentMaterialId={plat?.sideMaterial ?? plat?.material ?? "concrete_01"}
+          overrides={plat?.sideMaterialOverrides}
+          onMaterialChange={id => onObjectUpdate({ sideMaterial: id, sideMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
+          onOverridesChange={ov => onObjectUpdate({ sideMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
           onAddMaterial={onAddMaterial}
         />
       </div>
@@ -1162,9 +1179,11 @@ function effectiveSteps(stair: StairDef): number {
   return stair.numSteps ?? Math.max(1, Math.round((stair.end.y - stair.start.y) / STAIR_STEP_H));
 }
 
-function StairView({ selected, onObjectUpdate }: {
+function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   selected:       SelectedObjectPayload;
+  materialList:   MaterialDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onAddMaterial:  () => void;
 }) {
   const stair = selected.data as StairDef | null;
 
@@ -1343,6 +1362,28 @@ function StairView({ selected, onObjectUpdate }: {
           />
           <span style={{ color: "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
         </label>
+
+        {/* Material — body (top, bottom, sides) */}
+        <MaterialSection
+          label="BODY"
+          materialList={materialList}
+          currentMaterialId={stair.material ?? "concrete_01"}
+          overrides={stair.materialOverrides}
+          onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
+          onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
+        />
+
+        {/* Material — risers */}
+        <MaterialSection
+          label="RISERS"
+          materialList={materialList}
+          currentMaterialId={stair.riserMaterial ?? stair.material ?? "concrete_01"}
+          overrides={stair.riserMaterialOverrides}
+          onMaterialChange={id => onObjectUpdate({ riserMaterial: id, riserMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
+          onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
+        />
       </div>
     </>
   );

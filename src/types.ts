@@ -260,7 +260,9 @@ export interface PlatformDef {
   floorLevel?:    number;
   points?:        Vec2[];
   nodeIds?:       string[];
-  materialOverrides?: MaterialOverrides;
+  materialOverrides?:     MaterialOverrides;
+  sideMaterial?:          string;
+  sideMaterialOverrides?: MaterialOverrides;
 }
 
 export interface StairDef {
@@ -272,7 +274,9 @@ export interface StairDef {
   style:       StairStyle;
   material:    string;
   hasRailing:  boolean;
-  materialOverrides?: MaterialOverrides;
+  materialOverrides?:      MaterialOverrides;
+  riserMaterial?:          string;
+  riserMaterialOverrides?: MaterialOverrides;
 }
 
 export interface ObjectProperties {
