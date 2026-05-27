@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { Vec3, FloorDef } from "@/types";
+import type { Vec3, FloorDef, WallNode } from "@/types";
 
 type FloorToolState = "IDLE" | "PLACING";
 
@@ -112,6 +112,15 @@ export class FloorTool {
     const zone = this._world.zones.get(this._activeZoneId);
     const elevation = zone?.floors.find(f => f.level === this._activeLevel)?.elevation ?? 0;
 
+    const corners = [
+      { x: minX,     z: minZ },
+      { x: minX + w, z: minZ },
+      { x: minX + w, z: minZ + d },
+      { x: minX,     z: minZ + d },
+    ];
+    const nodes: WallNode[] = corners.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
+    for (const node of nodes) this._world.addNode(this._activeZoneId, node);
+
     const floor: FloorDef = {
       id:            crypto.randomUUID(),
       level:         this._activeLevel,
@@ -119,12 +128,8 @@ export class FloorTool {
       ceilingHeight: null,
       floorMesh: {
         shape:    "rect",
-        points:   [
-          { x: minX, z: minZ },
-          { x: minX + w, z: minZ },
-          { x: minX + w, z: minZ + d },
-          { x: minX, z: minZ + d },
-        ],
+        points:   corners,
+        nodeIds:  nodes.map(n => n.id),
         material: this._material,
       },
     };
