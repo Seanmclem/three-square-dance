@@ -72,9 +72,10 @@ export class PlatformTool implements IEditorModule {
   private _getElevation(): number {
     const zone = this._world.zones.get(this._activeZoneId);
     const floorsAtLevel = zone?.floors.filter(f => f.level === this._activeLevel) ?? [];
-    if (floorsAtLevel.length > 0)
-      return Math.max(...floorsAtLevel.map(f => f.elevation));
-    return Math.max(2.0, this._activeLevel * 3.0);
+    const base = floorsAtLevel.length > 0
+      ? Math.max(...floorsAtLevel.map(f => f.elevation))
+      : Math.max(2.0, this._activeLevel * 3.0);
+    return base + 1.5;
   }
 
   private _onLeftClick(worldPos: Vec3): void {
