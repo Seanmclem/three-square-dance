@@ -30,6 +30,7 @@ interface EdgeEntry {
   nodeId2:         string;
   line:            THREE.Line;
   axisConstraint:  AxisConstraint;
+  y:               number;  // world Y for the edge line
 }
 
 // Rect floor corner adjacency: corners stored as [TL, TR, BR, BL] (indices 0-3).
@@ -52,8 +53,8 @@ function makeNodeDot(): THREE.Mesh {
   return mesh;
 }
 
-function makeEdgeLine(x1: number, z1: number, x2: number, z2: number): THREE.Line {
-  const pts = [new THREE.Vector3(x1, 0.04, z1), new THREE.Vector3(x2, 0.04, z2)];
+function makeEdgeLine(x1: number, z1: number, x2: number, z2: number, y = 0.04): THREE.Line {
+  const pts = [new THREE.Vector3(x1, y, z1), new THREE.Vector3(x2, y, z2)];
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   const mat = new THREE.LineBasicMaterial({
     color:       0x3366aa,
@@ -72,6 +73,7 @@ export class NodeDragger {
   private _activeZoneId        = "demo";
 
   private _nodeDots         = new Map<string, THREE.Mesh>();
+  private _nodeDotY         = new Map<string, number>();    // nodeId → world Y for the dot
   private _hoveredNodeId:   string | null = null;
   private _dragNodeId:      string | null = null;
   private _dragOrigPos:     Vec2   | null = null;
@@ -91,9 +93,10 @@ export class NodeDragger {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene:  THREE.Scene,
-    private readonly _world:  WorldState,
-    private readonly _bus:    EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _camera:  THREE.Camera,
   ) {}
 
   init(): void {
@@ -125,19 +128,45 @@ export class NodeDragger {
       this._bus.on("input:keyup", ({ code }) => {
         if (code === "AltLeft" || code === "AltRight") this._altDown = false;
       }),
+      this._bus.on("platform:updated", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+      }),
+      this._bus.on("floor:updated", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+      }),
     );
+  }
+
+  private _dotY(nodeId: string): number { return this._nodeDotY.get(nodeId) ?? 0.12; }
+
+  /**
+   * InputManager always raycasts to y=0. When a node is elevated (e.g. on a
+   * platform slab), the ground-plane hit point is perspective-shifted from the
+   * visual dot. This projects the y=0 hit back up to the dot's actual world Y
+   * so that distance checks work correctly regardless of camera angle.
+   */
+  private _projectRayToY(rawX: number, rawZ: number, targetY: number): { x: number; z: number } {
+    const cam = this._camera as THREE.PerspectiveCamera;
+    const cy = cam.position.y;
+    if (targetY <= 0.01 || cy <= targetY) return { x: rawX, z: rawZ };
+    const t = 1 - targetY / cy;
+    return {
+      x: cam.position.x + t * (rawX - cam.position.x),
+      z: cam.position.z + t * (rawZ - cam.position.z),
+    };
   }
 
   private _getActiveZone() {
     return this._world.zones.get(this._activeZoneId);
   }
 
-  private _findNearestNode(x: number, z: number): string | null {
+  private _findNearestNode(rawX: number, rawZ: number): string | null {
     const zone = this._getActiveZone();
     if (!zone) return null;
     let bestId: string | null = null;
     let bestDist = SNAP_RADIUS;
     for (const node of zone.nodes) {
+      const { x, z } = this._projectRayToY(rawX, rawZ, this._dotY(node.id));
       const d = Math.hypot(node.x - x, node.z - z);
       if (d < bestDist) { bestDist = d; bestId = node.id; }
     }
@@ -153,7 +182,8 @@ export class NodeDragger {
       const n1 = zone.nodes.find(n => n.id === edge.nodeId1);
       const n2 = zone.nodes.find(n => n.id === edge.nodeId2);
       if (!n1 || !n2) continue;
-      const d = distToSegment(rawX, rawZ, n1.x, n1.z, n2.x, n2.z);
+      const { x, z } = this._projectRayToY(rawX, rawZ, edge.y);
+      const d = distToSegment(x, z, n1.x, n1.z, n2.x, n2.z);
       if (d < bestDist) { bestDist = d; bestKey = key; }
     }
     return bestKey;
@@ -166,9 +196,13 @@ export class NodeDragger {
 
     // ── Node drag ──────────────────────────────────────────────────────────
     if (this._state === "DRAG" && this._dragNodeId) {
+      const nodeY = this._dotY(this._dragNodeId);
+      const { x: cx, z: cz } = this._projectRayToY(rawX, rawZ, nodeY);
+      const sx = this._altDown ? cx : snap(cx);
+      const sz = this._altDown ? cz : snap(cz);
       this._world.updateNode(this._activeZoneId, this._dragNodeId, { x: sx, z: sz });
       const dot = this._nodeDots.get(this._dragNodeId);
-      if (dot) dot.position.set(sx, 0.12, sz);
+      if (dot) dot.position.set(sx, nodeY, sz);
       this._syncRectCorner(this._dragNodeId, sx, sz);
       this._updateEdgeLinesForNode(this._dragNodeId, sx, sz);
       return;
@@ -178,8 +212,9 @@ export class NodeDragger {
     if (this._state === "DRAG" && this._dragEdgeKey && this._dragEdgeOrig && this._dragEdgeStart) {
       const edge = this._edgeEntries.get(this._dragEdgeKey);
       if (edge) {
-        const rawDx = rawX - this._dragEdgeStart.x;
-        const rawDz = rawZ - this._dragEdgeStart.z;
+        const { x: curCx, z: curCz } = this._projectRayToY(rawX, rawZ, edge.y);
+        const rawDx = curCx - this._dragEdgeStart.x;
+        const rawDz = curCz - this._dragEdgeStart.z;
         const ax = edge.axisConstraint;
         const dx = ax === "lock_x" ? 0 : (this._altDown ? rawDx : snap(rawDx));
         const dz = ax === "lock_z" ? 0 : (this._altDown ? rawDz : snap(rawDz));
@@ -194,8 +229,8 @@ export class NodeDragger {
 
         const dot1 = this._nodeDots.get(edge.nodeId1);
         const dot2 = this._nodeDots.get(edge.nodeId2);
-        if (dot1) dot1.position.set(newX1, 0.12, newZ1);
-        if (dot2) dot2.position.set(newX2, 0.12, newZ2);
+        if (dot1) dot1.position.set(newX1, this._dotY(edge.nodeId1), newZ1);
+        if (dot2) dot2.position.set(newX2, this._dotY(edge.nodeId2), newZ2);
 
         this._updateEdgeLinesForNode(edge.nodeId1, newX1, newZ1);
         this._updateEdgeLinesForNode(edge.nodeId2, newX2, newZ2);
@@ -271,7 +306,8 @@ export class NodeDragger {
       if (!n1 || !n2) return;
       this._dragEdgeKey   = this._hoveredEdgeKey;
       this._dragEdgeOrig  = { x1: n1.x, z1: n1.z, x2: n2.x, z2: n2.z };
-      this._dragEdgeStart = { x: this._lastRawPos.x, z: this._lastRawPos.z };
+      const { x: esx, z: esz } = this._projectRayToY(this._lastRawPos.x, this._lastRawPos.z, edge.y);
+      this._dragEdgeStart = { x: esx, z: esz };
       this._state         = "DRAG";
       this._bus.emit("gizmo:dragging", { isDragging: true });
       document.body.style.cursor = "grabbing";
@@ -289,7 +325,7 @@ export class NodeDragger {
     if (this._dragNodeId && this._dragOrigPos) {
       this._world.updateNode(this._activeZoneId, this._dragNodeId, this._dragOrigPos);
       const dot = this._nodeDots.get(this._dragNodeId);
-      if (dot) dot.position.set(this._dragOrigPos.x, 0.12, this._dragOrigPos.z);
+      if (dot) dot.position.set(this._dragOrigPos.x, this._dotY(this._dragNodeId), this._dragOrigPos.z);
       this._syncRectCorner(this._dragNodeId, this._dragOrigPos.x, this._dragOrigPos.z);
       this._updateEdgeLinesForNode(this._dragNodeId, this._dragOrigPos.x, this._dragOrigPos.z);
     }
@@ -301,8 +337,8 @@ export class NodeDragger {
         this._world.updateNode(this._activeZoneId, edge.nodeId2, { x: this._dragEdgeOrig.x2, z: this._dragEdgeOrig.z2 });
         const dot1 = this._nodeDots.get(edge.nodeId1);
         const dot2 = this._nodeDots.get(edge.nodeId2);
-        if (dot1) dot1.position.set(this._dragEdgeOrig.x1, 0.12, this._dragEdgeOrig.z1);
-        if (dot2) dot2.position.set(this._dragEdgeOrig.x2, 0.12, this._dragEdgeOrig.z2);
+        if (dot1) dot1.position.set(this._dragEdgeOrig.x1, this._dotY(edge.nodeId1), this._dragEdgeOrig.z1);
+        if (dot2) dot2.position.set(this._dragEdgeOrig.x2, this._dotY(edge.nodeId2), this._dragEdgeOrig.z2);
         this._updateEdgeLinesForNode(edge.nodeId1, this._dragEdgeOrig.x1, this._dragEdgeOrig.z1);
         this._updateEdgeLinesForNode(edge.nodeId2, this._dragEdgeOrig.x2, this._dragEdgeOrig.z2);
       }
@@ -367,14 +403,14 @@ export class NodeDragger {
     if (sameXNode) {
       sameXNode.x = nx;
       const dot = this._nodeDots.get(sameXId);
-      if (dot) dot.position.set(nx, 0.12, sameXNode.z);
+      if (dot) dot.position.set(nx, this._dotY(sameXId), sameXNode.z);
       this._updateEdgeLinesForNode(sameXId, nx, sameXNode.z);
     }
 
     if (sameZNode) {
       sameZNode.z = nz;
       const dot = this._nodeDots.get(sameZId);
-      if (dot) dot.position.set(sameZNode.x, 0.12, nz);
+      if (dot) dot.position.set(sameZNode.x, this._dotY(sameZId), nz);
       this._updateEdgeLinesForNode(sameZId, sameZNode.x, nz);
     }
   }
@@ -386,9 +422,19 @@ export class NodeDragger {
     const zone = this._getActiveZone();
     if (!zone) return;
 
+    // Build a lookup: nodeId → platform top-face Y (only for polygon platform nodes)
+    const platformNodeY = new Map<string, number>();
+    for (const platform of zone.platforms) {
+      if (!platform.nodeIds?.length) continue;
+      const topY = platform.position.y + platform.thickness + 0.06;
+      for (const id of platform.nodeIds) platformNodeY.set(id, topY);
+    }
+
     for (const node of zone.nodes) {
+      const y = platformNodeY.get(node.id) ?? 0.12;
+      this._nodeDotY.set(node.id, y);
       const dot = makeNodeDot();
-      dot.position.set(node.x, 0.12, node.z);
+      dot.position.set(node.x, y, node.z);
       this._scene.add(dot);
       this._nodeDots.set(node.id, dot);
     }
@@ -414,13 +460,33 @@ export class NodeDragger {
 
         let axisConstraint: AxisConstraint = "free";
         if (isRect) {
-          if (Math.abs(n1.z - n2.z) < 0.001) axisConstraint = "lock_x"; // horizontal → lock X
-          else if (Math.abs(n1.x - n2.x) < 0.001) axisConstraint = "lock_z"; // vertical → lock Z
+          if (Math.abs(n1.z - n2.z) < 0.001) axisConstraint = "lock_x";
+          else if (Math.abs(n1.x - n2.x) < 0.001) axisConstraint = "lock_z";
         }
 
         const line = makeEdgeLine(n1.x, n1.z, n2.x, n2.z);
         this._scene.add(line);
-        this._edgeEntries.set(key, { nodeId1: id1, nodeId2: id2, line, axisConstraint });
+        this._edgeEntries.set(key, { nodeId1: id1, nodeId2: id2, line, axisConstraint, y: 0.04 });
+      }
+    }
+
+    for (const platform of zone.platforms) {
+      const ids = platform.nodeIds;
+      if (!ids || ids.length < 3) continue;
+      const edgeY = platform.position.y + platform.thickness + 0.04;
+
+      for (let i = 0; i < ids.length; i++) {
+        const id1 = ids[i]!;
+        const id2 = ids[(i + 1) % ids.length]!;
+        const n1  = zone.nodes.find(n => n.id === id1);
+        const n2  = zone.nodes.find(n => n.id === id2);
+        if (!n1 || !n2) continue;
+        const key = `${id1}::${id2}`;
+        if (this._edgeEntries.has(key)) continue;
+
+        const line = makeEdgeLine(n1.x, n1.z, n2.x, n2.z, edgeY);
+        this._scene.add(line);
+        this._edgeEntries.set(key, { nodeId1: id1, nodeId2: id2, line, axisConstraint: "free", y: edgeY });
       }
     }
   }
@@ -432,6 +498,7 @@ export class NodeDragger {
       (dot.material as THREE.Material).dispose();
     }
     this._nodeDots.clear();
+    this._nodeDotY.clear();
     this._hoveredNodeId = null;
 
     for (const entry of this._edgeEntries.values()) {
@@ -454,8 +521,8 @@ export class NodeDragger {
 
   private _updateEdgeLine(edge: EdgeEntry, x1: number, z1: number, x2: number, z2: number): void {
     const pos = edge.line.geometry.attributes["position"] as THREE.BufferAttribute;
-    pos.setXYZ(0, x1, 0.04, z1);
-    pos.setXYZ(1, x2, 0.04, z2);
+    pos.setXYZ(0, x1, edge.y, z1);
+    pos.setXYZ(1, x2, edge.y, z2);
     pos.needsUpdate = true;
   }
 

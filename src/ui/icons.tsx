@@ -71,6 +71,21 @@ export const IconPolyFloor = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconPolyPlatform = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <polygon points="14,3 23,9 21,18 7,20 3,11"
+      stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.12"/>
+    <line x1="3"  y1="11" x2="3"  y2="15" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.55"/>
+    <line x1="7"  y1="20" x2="7"  y2="24" stroke={color} strokeWidth="1.2" strokeLinecap="round" opacity="0.55"/>
+    <line x1="3"  y1="15" x2="7"  y2="24" stroke={color} strokeWidth="1"   strokeLinecap="round" opacity="0.4"/>
+    <circle cx="14" cy="3"  r="1.7" fill={color} fillOpacity="0.9"/>
+    <circle cx="23" cy="9"  r="1.7" fill={color} fillOpacity="0.9"/>
+    <circle cx="21" cy="18" r="1.7" fill={color} fillOpacity="0.9"/>
+    <circle cx="7"  cy="20" r="1.7" fill={color} fillOpacity="0.9"/>
+    <circle cx="3"  cy="11" r="1.7" fill={color} fillOpacity="0.9"/>
+  </svg>
+);
+
 export const IconPlay = ({ color }: IconProps) => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
     <polygon points="5,3 17,10 5,17" fill={color} stroke={color} strokeWidth="1" strokeLinejoin="round"/>
@@ -78,12 +93,13 @@ export const IconPlay = ({ color }: IconProps) => (
 );
 
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
-  select:      IconSelect,
-  floor:       IconFloor,
-  "poly-floor": IconPolyFloor,
-  wall:        IconWall,
-  platform:    IconPlatform,
-  stair:       IconStair,
-  object:      IconObject,
-  zone:        IconZone,
+  select:           IconSelect,
+  floor:            IconFloor,
+  "poly-floor":     IconPolyFloor,
+  wall:             IconWall,
+  platform:         IconPlatform,
+  "poly-platform":  IconPolyPlatform,
+  stair:            IconStair,
+  object:           IconObject,
+  zone:             IconZone,
 };

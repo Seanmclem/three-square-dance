@@ -8,8 +8,9 @@ const TOOLS: ToolDef[] = [
   { id: "floor",      label: "Floor",    shortcut: "F" },
   { id: "poly-floor", label: "Poly Flr", shortcut: "P" },
   { id: "wall",       label: "Wall",     shortcut: "W" },
-  { id: "platform",   label: "Platform", shortcut: "L" },
-  { id: "stair",      label: "Stair",    shortcut: "T" },
+  { id: "platform",        label: "Platform", shortcut: "L" },
+  { id: "poly-platform",   label: "Poly Plat", shortcut: "K" },
+  { id: "stair",           label: "Stair",     shortcut: "T" },
   { id: "object",     label: "Object",   shortcut: "O" },
   { id: "zone",       label: "Zone",     shortcut: "Z" },
 ];

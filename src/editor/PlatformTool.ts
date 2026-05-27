@@ -74,7 +74,7 @@ export class PlatformTool implements IEditorModule {
     const floorsAtLevel = zone?.floors.filter(f => f.level === this._activeLevel) ?? [];
     const base = floorsAtLevel.length > 0
       ? Math.max(...floorsAtLevel.map(f => f.elevation))
-      : Math.max(2.0, this._activeLevel * 3.0);
+      : Math.max(1.0, this._activeLevel * 3.0);
     return base + 1.5;
   }
 

@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
-import type { PlatformDef, MeshUserData } from "@/types";
+import type { PlatformDef, MeshUserData, Vec2 } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface PlatformBuildOutput {
@@ -59,6 +59,34 @@ function buildSlabGeo(w: number, h: number, d: number, tileScale: number): THREE
   return geo;
 }
 
+function buildPolygonSlabGeo(points: Vec2[], cx: number, cz: number, thickness: number, tileScale: number): THREE.BufferGeometry {
+  // Shape lives in the XY plane; rotateX(-π/2) maps shape-Y → -worldZ, so negate
+  // Z here so the double negation produces the correct worldZ position.
+  const shape = new THREE.Shape();
+  const first = points[0]!;
+  shape.moveTo(first.x - cx, -(first.z - cz));
+  for (let i = 1; i < points.length; i++) {
+    const pt = points[i]!;
+    shape.lineTo(pt.x - cx, -(pt.z - cz));
+  }
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -thickness / 2, 0);
+
+  // Remap UVs to world-scale tiling so tileScale behaves like the rect slab:
+  // 1 world unit = tileScale UV units (positive or negative is fine for tileable textures).
+  const pos = geo.attributes["position"] as THREE.BufferAttribute;
+  const uv  = geo.attributes["uv"]       as THREE.BufferAttribute;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, pos.getX(i) * tileScale, pos.getZ(i) * tileScale);
+  }
+  uv.needsUpdate = true;
+
+  return geo;
+}
+
 export class PlatformBuilder {
   static async build(platform: PlatformDef, zoneId: string): Promise<PlatformBuildOutput> {
     const ovr = platform.materialOverrides;
@@ -76,7 +104,9 @@ export class PlatformBuilder {
     const meshes: THREE.Mesh[] = [];
 
     // ── Slab ─────────────────────────────────────────────────────────────
-    const slabGeo  = buildSlabGeo(size.width, thickness, size.depth, tileScale);
+    const slabGeo = platform.points && platform.points.length >= 3
+      ? buildPolygonSlabGeo(platform.points, p.x, p.z, thickness, tileScale)
+      : buildSlabGeo(size.width, thickness, size.depth, tileScale);
     const slab     = new THREE.Mesh(slabGeo, mat);
     slab.position.set(p.x, p.y + thickness / 2, p.z);
     slab.receiveShadow = true;

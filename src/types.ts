@@ -42,7 +42,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "stair" | "object" | "zone";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -258,6 +258,8 @@ export interface PlatformDef {
   hasRailing:     boolean;
   railingHeight:  number;
   floorLevel?:    number;
+  points?:        Vec2[];
+  nodeIds?:       string[];
   materialOverrides?: MaterialOverrides;
 }
 

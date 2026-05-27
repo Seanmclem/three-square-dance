@@ -68,6 +68,13 @@ export class ZoneManager {
   private readonly _pendingRebuild = new Map<string, Set<string>>();
   private _rebuildScheduled = false;
 
+  // Pending polygon-platform rebuild requests — same coalescing pattern
+  private readonly _pendingPlatformRebuild = new Map<string, Set<string>>();
+  private _platformRebuildScheduled = false;
+
+  // Cancellation tokens — increment on each new build; stale async results are discarded
+  private readonly _platformBuildTokens = new Map<string, number>();
+
   // Floor dimming state
   private _activeLevel = 0;
   private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
@@ -143,6 +150,10 @@ export class ZoneManager {
           if (floor.floorMesh.nodeIds?.includes(nodeId))
             void this._rebuildFloor(zoneId, floor.id);
         }
+        for (const platform of zone.platforms) {
+          if (platform.nodeIds?.includes(nodeId))
+            this._queuePlatformRebuild(zoneId, platform.id);
+        }
       }),
       this._bus.on("platform:added", ({ zoneId, platform }) => {
         void this._addPlatform(zoneId, platform);
@@ -178,6 +189,23 @@ export class ZoneManager {
           const snapshot = [...ids];
           this._pendingRebuild.delete(zid);
           void this._rebuildWallBatch(zid, snapshot);
+        }
+      });
+    }
+  }
+
+  private _queuePlatformRebuild(zoneId: string, platformId: string): void {
+    if (!this._pendingPlatformRebuild.has(zoneId))
+      this._pendingPlatformRebuild.set(zoneId, new Set());
+    this._pendingPlatformRebuild.get(zoneId)!.add(platformId);
+
+    if (!this._platformRebuildScheduled) {
+      this._platformRebuildScheduled = true;
+      queueMicrotask(() => {
+        this._platformRebuildScheduled = false;
+        for (const [zid, ids] of this._pendingPlatformRebuild) {
+          this._pendingPlatformRebuild.delete(zid);
+          for (const pid of ids) void this._rebuildPlatform(zid, pid);
         }
       });
     }
@@ -495,15 +523,60 @@ export class ZoneManager {
   }
 
   private async _rebuildPlatform(zoneId: string, platformId: string): Promise<void> {
-    const entry = this._loadedZones.get(zoneId);
-    const zone  = this._worldState.zones.get(zoneId);
-    if (!entry || !zone) return;
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return;
 
-    this._removePlatform(zoneId, platformId);
+    // Claim a token — any older in-flight build for this platform is now stale
+    const myToken = (this._platformBuildTokens.get(platformId) ?? 0) + 1;
+    this._platformBuildTokens.set(platformId, myToken);
 
     const platform = zone.platforms.find(p => p.id === platformId);
     if (!platform) return;
-    await this._addPlatform(zoneId, platform);
+
+    // Resolve polygon vertices from current node positions (synchronous, before the await)
+    let resolved = platform;
+    if (platform.nodeIds?.length) {
+      const pts = platform.nodeIds
+        .map(id => zone.nodes.find(n => n.id === id))
+        .filter((n): n is NonNullable<typeof n> => n != null)
+        .map(n => ({ x: n.x, z: n.z }));
+      if (pts.length >= 3) {
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+        const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+        const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
+        resolved = {
+          ...platform,
+          points:   pts,
+          position: { ...platform.position, x: cx, z: cz },
+          size: {
+            width: Math.max(Math.max(...xs) - Math.min(...xs), 0.5),
+            depth: Math.max(Math.max(...zs) - Math.min(...zs), 0.5),
+          },
+        };
+      }
+    }
+
+    // Build the geometry/material (potentially async due to material loading)
+    const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId);
+
+    // If a newer rebuild started while we were awaiting, discard this stale result
+    if (this._platformBuildTokens.get(platformId) !== myToken) {
+      for (const m of meshes) {
+        m.geometry.dispose();
+        if ((m.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+          (m.material as THREE.Material).dispose();
+      }
+      physicsWorld.removeCollider(collider);
+      return;
+    }
+
+    // Atomically swap: remove old mesh then add the fresh one
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    this._removePlatform(zoneId, platformId);
+    for (const m of meshes) entry.platformsGroup.add(m);
+    entry.platformEntries.set(platformId, { meshes, collider });
+    this._applyDimming();
   }
 
   private _removePlatform(zoneId: string, platformId: string): void {

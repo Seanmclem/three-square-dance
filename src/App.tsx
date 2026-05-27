@@ -11,6 +11,7 @@ import { FloorTool } from "@/editor/FloorTool";
 import { PolygonFloorTool } from "@/editor/PolygonFloorTool";
 import { WallTool } from "@/editor/WallTool";
 import { PlatformTool } from "@/editor/PlatformTool";
+import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -72,9 +73,10 @@ export default function App() {
     const floorTool    = new FloorTool(scene.scene, world, bus);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
     const wallTool     = new WallTool(scene.scene, world, bus);
-    const platformTool   = new PlatformTool(scene.scene, world, bus);
-    const stairTool      = new StairTool(scene.scene, world, bus);
-    const nodeDragger    = new NodeDragger(scene.scene, world, bus);
+    const platformTool       = new PlatformTool(scene.scene, world, bus);
+    const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus);
+    const stairTool          = new StairTool(scene.scene, world, bus);
+    const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
 
     // Seed world with the demo zone
@@ -95,6 +97,7 @@ export default function App() {
     polyFloorTool.init();
     wallTool.init();
     platformTool.init();
+    polyPlatformTool.init();
     stairTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -125,6 +128,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       stairTool.dispose();
+      polyPlatformTool.dispose();
       platformTool.dispose();
       wallTool.dispose();
       polyFloorTool.dispose();
