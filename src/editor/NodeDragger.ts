@@ -153,6 +153,7 @@ export class NodeDragger {
       this._world.updateNode(this._activeZoneId, this._dragNodeId, { x: sx, z: sz });
       const dot = this._nodeDots.get(this._dragNodeId);
       if (dot) dot.position.set(sx, 0.12, sz);
+      this._updateEdgeLinesForNode(this._dragNodeId, sx, sz);
       return;
     }
 
@@ -386,6 +387,20 @@ export class NodeDragger {
     pos.setXYZ(0, x1, 0.04, z1);
     pos.setXYZ(1, x2, 0.04, z2);
     pos.needsUpdate = true;
+  }
+
+  private _updateEdgeLinesForNode(nodeId: string, nx: number, nz: number): void {
+    const zone = this._getActiveZone();
+    if (!zone) return;
+    for (const edge of this._edgeEntries.values()) {
+      if (edge.nodeId1 !== nodeId && edge.nodeId2 !== nodeId) continue;
+      const isFirst = edge.nodeId1 === nodeId;
+      const otherId = isFirst ? edge.nodeId2 : edge.nodeId1;
+      const other   = zone.nodes.find(n => n.id === otherId);
+      if (!other) continue;
+      if (isFirst) this._updateEdgeLine(edge, nx, nz, other.x, other.z);
+      else         this._updateEdgeLine(edge, other.x, other.z, nx, nz);
+    }
   }
 
   setActiveZone(zoneId: string): void { this._activeZoneId = zoneId; }
