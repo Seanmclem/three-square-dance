@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { Vec2, Vec3, FloorDef } from "@/types";
+import type { Vec2, Vec3, FloorDef, WallNode } from "@/types";
 
 type PolyFloorState = "IDLE" | "DRAWING";
 
@@ -141,6 +141,9 @@ export class PolygonFloorTool {
     const zone = this._world.zones.get(this._activeZoneId);
     const elevation = zone?.floors.find(f => f.level === this._activeLevel)?.elevation ?? 0;
 
+    const nodes: WallNode[] = this._points.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
+    for (const node of nodes) this._world.addNode(this._activeZoneId, node);
+
     const floor: FloorDef = {
       id:            crypto.randomUUID(),
       level:         this._activeLevel,
@@ -149,6 +152,7 @@ export class PolygonFloorTool {
       floorMesh: {
         shape:   "polygon",
         points:  [...this._points],
+        nodeIds: nodes.map(n => n.id),
         material: this._material,
       },
     };
