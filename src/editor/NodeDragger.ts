@@ -181,7 +181,8 @@ export class NodeDragger {
         if (dot1) dot1.position.set(newX1, 0.12, newZ1);
         if (dot2) dot2.position.set(newX2, 0.12, newZ2);
 
-        this._updateEdgeLine(edge, newX1, newZ1, newX2, newZ2);
+        this._updateEdgeLinesForNode(edge.nodeId1, newX1, newZ1);
+        this._updateEdgeLinesForNode(edge.nodeId2, newX2, newZ2);
       }
       return;
     }
