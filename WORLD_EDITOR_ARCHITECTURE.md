@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 1.8.0** — last updated during active development session
+**Version 2.1.0** — last updated 2026-05-28
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -11,6 +11,9 @@
 - v1.6 — Phase 6 fully specced: dynamic floor tabs, floor creation flow, derived elevation, PropertiesPanel floor view, ceiling toggle, no deletion
 - v1.7 — Phase 4.7 merged corner geometry, Phase 4.8 complete wall interaction model (chain, loop close, node dragging)
 - v1.8 — Phase 4.9 floor system: multi-floor bug fix, Z-fighting offset, auto-floor from loop, polygon floor tool, vertex editing
+- v1.9 — Phase 6.1 transform gizmos: GizmoManager, resize handles, platform Y handle, wall segment move
+- v2.0 — Phase 6.2 scene save/load, Phase 9 full persistence (game save, auto-save, preferences, startup flow), all object types covered
+- v2.1 — **Sync to actual implementation:** wall node graph (startNodeId/endNodeId), wall runs/buildRun(), Rapier colliders replacing mesh colliders, polygon platforms, stair CSG cutter, per-material overrides, updated all builder signatures, ZoneManager internal patterns
 
 ---
 
@@ -52,12 +55,12 @@ All shared types live in `src/types.ts` and are imported across every module. Ne
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "wall" | "platform" | "stair" | "object" | "zone";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -71,60 +74,65 @@ export interface Bounds { x: number; z: number; width: number; depth: number }
 // ─── EventBus typed map ───────────────────────────────────────────────────────
 
 export interface BusEvents {
-  "tool:select":          { tool: ToolId };
-  "floor:select":         { level: number };
-  "object:selected":      SelectedObjectPayload;
-  "object:deselected":    Record<string, never>;
-  "object:updated":       { id: string; zoneId: string; changes: Partial<WorldObject> };
-  "asset:selected":       { assetId: string };
-  "asset:dropped":        { assetId: string; screenPos: { x: number; y: number } };
-  "node:updated":         { zoneId: string; nodeId: string; pos: { x: number; z: number } };
-  "wall:added":           { zoneId: string; wall: WallDef };
-  "wall:updated":         { zoneId: string; wallId: string; changes: Partial<WallDef> };
-  "wall:removed":         { zoneId: string; wallId: string };
-  "floor:added":          { zoneId: string; floor: FloorDef };
-  "floortool:suggest-auto-floor": { points: Vec2[]; level: number };  // prompt user to create floor from closed wall loop
-  "floor:updated":        { zoneId: string; level: number; changes: Partial<FloorDef> };
-  "floor:elevation-changed": { zoneId: string; affectedLevels: number[] };  // cascade rebuild trigger
-  "platform:added":       { zoneId: string; platform: PlatformDef };
-  "platform:updated":     { zoneId: string; id: string; changes: Partial<PlatformDef> };
-  "platform:removed":     { zoneId: string; id: string };
-  "stair:added":          { zoneId: string; stair: StairDef };
-  "stair:removed":        { zoneId: string; id: string };
-  "object:added":         { zoneId: string; object: WorldObject };
-  "object:removed":       { zoneId: string; id: string };
-  "zone:added":           { zone: ZoneDef };
-  "zone:activated":       { zoneId: string };
-  "zone:enter":           { zoneId: string };
-  "transition:added":     { transition: TransitionDef };
-  "preview:start":        Record<string, never>;
-  "preview:stop":         Record<string, never>;
-  "preview:zone-entered": { zoneName: string };
-  "gizmo:dragging":       { isDragging: boolean };
-  "camera:jump":          { x: number; z: number };
-  "character:teleport":   { position: Vec3; facing: number };
-  "character:triggerdoor":{ transitionId: string };
-  "overlay:fade-in":      { color: string; duration: number };
-  "overlay:fade-out":     { duration: number };
-  "scene:save":           Record<string, never>;
-  "scene:load":           { json: unknown };
-  "scene:saved":          { json: SceneFile };
-  "scene:loaded":         { metadata: SceneMetadata };
-  "world:loaded":         { metadata: SceneMetadata };
-  "materials:loaded":     { materials: MaterialDef[] };
-  "assets:loaded":        { assets: AssetDef[] };
-  "script:trigger":       { triggerId: string; context: ScriptContext };
-  "flag:set":             { flag: string; value: boolean };
-  "spawn:set":            { spawn: SpawnPoint };
-  "terrain:sculpt":       { x: number; z: number; radius: number; delta: number };
-  "input:click":          { screenPos: Vec2; worldPos: Vec3; button: number };
-  "input:dblclick":       { screenPos: Vec2; worldPos: Vec3 };
-  "input:mousemove":      { screenPos: Vec2; worldPos: Vec3; delta: Vec2 };
-  "input:mousedown":      { button: number; screenPos: Vec2 };
-  "input:mouseup":        { button: number; screenPos: Vec2 };
-  "input:wheel":          { delta: number };
-  "input:keydown":        { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
-  "input:keyup":          { code: string };
+  "tool:select":           { tool: ToolId };
+  "floor:select":          { level: number };
+  "object:selected":       SelectedObjectPayload;
+  "object:deselected":     Record<string, never>;
+  "object:updated":        { id: string; zoneId: string; changes: Partial<WorldObject> };
+  "asset:selected":        { assetId: string };
+  "asset:dropped":         { assetId: string; screenPos: { x: number; y: number } };
+  "wall:added":            { zoneId: string; wall: WallDef };
+  "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef>; segmentOnly?: boolean };
+  "wall:removed":          { zoneId: string; wallId: string };
+  "wall:rebuilt":          { zoneId: string; wallId: string };
+  "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
+  "floor:added":           { zoneId: string; floor: FloorDef };
+  "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
+  "floortool:suggest-auto-floor": { zoneId: string; level: number; points: Vec2[]; nodeIds: string[] };
+  "platform:added":        { zoneId: string; platform: PlatformDef };
+  "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
+  "platform:removed":      { zoneId: string; id: string };
+  "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
+  "stair:added":           { zoneId: string; stair: StairDef };
+  "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
+  "stair:removed":         { zoneId: string; id: string };
+  "stair:rebuilt":         { zoneId: string; stairId: string };
+  "object:added":          { zoneId: string; object: WorldObject };
+  "object:removed":        { zoneId: string; id: string };
+  "zone:added":            { zone: ZoneDef };
+  "zone:activated":        { zoneId: string };
+  "zone:enter":            { zoneId: string };
+  "transition:added":      { transition: TransitionDef };
+  "preview:start":         Record<string, never>;
+  "preview:stop":          Record<string, never>;
+  "preview:zone-entered":  { zoneName: string };
+  "gizmo:dragging":        { isDragging: boolean };
+  "camera:jump":           { x: number; z: number };
+  "camera:topdown":        Record<string, never>;
+  "character:teleport":    { position: Vec3; facing: number };
+  "character:triggerdoor": { transitionId: string };
+  "overlay:fade-in":       { color: string; duration: number };
+  "overlay:fade-out":      { duration: number };
+  "scene:save":            Record<string, never>;
+  "scene:load":            { json: unknown };
+  "scene:saved":           { json: SceneFile };
+  "scene:loaded":          { metadata: SceneMetadata };
+  "world:loaded":          { metadata: SceneMetadata };
+  "materials:loaded":      { materials: MaterialDef[] };
+  "quality:changed":       { quality: QualityScale };
+  "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
+  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
+  "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
+  "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
+  "input:mousedown":       { button: number; screenPos: ScreenPos };
+  "input:mouseup":         { button: number; screenPos: ScreenPos };
+  "input:wheel":           { delta: number };
+  "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
+  "input:keyup":           { code: string };
+  // ⏳ Phase 7: "assets:loaded": { assets: AssetDef[] };
+  // ⏳ Phase 8: "script:trigger": { triggerId: string; context: ScriptContext };
+  // ⏳ Phase 8: "flag:set": { flag: string; value: boolean };
+  // ⏳ Phase 9: "spawn:set": { spawn: SpawnPoint };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -136,33 +144,33 @@ export interface SelectedObjectPayload {
   id: string;
   type: EditorObjectType;
   zoneId: string;
+  parentId?: string;   // wallId when type === "opening"
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | null;
+  runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
 }
 
 // ─── userData on Three.js meshes ─────────────────────────────────────────────
 
 export interface MeshUserData {
-  editorId:        string;
-  editorType:      EditorObjectType;
-  zoneId:          string;
-  selectable:      boolean;
-  floorLevel:      number;
-  _ownsMaterial:   boolean;
-  _origEmissive?:  number;
+  editorId:                string;
+  editorType:              EditorObjectType;
+  zoneId:                  string;
+  selectable:              boolean;
+  floorLevel:              number;
+  _ownsMaterial:           boolean;
+  _origEmissive?:          number;
   _origEmissiveIntensity?: number;
-  _hoverEmissive?: number;
-  _parentId?:      string;       // set on child meshes of GLTF objects
-  // trigger-specific
-  triggerType?:    "door";
-  transitionId?:   string;
-  openingId?:      string;
-  // wall-specific
-  wallId?:         string;
-  // object-specific
-  assetId?:        string;
+  _hoverEmissive?:         number;
+  _parentId?:              string;
+  triggerType?:            "door";
+  transitionId?:           string;
+  openingId?:              string;
+  wallId?:                 string;
+  assetId?:                string;
+  editorOnly?:             boolean;  // hidden in preview mode (e.g. CSG cutter wireframes)
 }
 
 // ─── Scene file data model ────────────────────────────────────────────────────
@@ -184,29 +192,32 @@ export interface PlayerSettings {
   thirdPersonHeight:    number;
 }
 
+// ⏳ Phase 7 — not yet implemented
 export interface SkyConfig {
-  turbidity:        number;   // atmospheric haze, default 10
-  rayleigh:         number;   // sky blueness, default 3
-  mieCoefficient:   number;   // default 0.005
-  mieDirectionalG:  number;   // default 0.7
-  sunElevation:     number;   // degrees above horizon, default 25
-  sunAzimuth:       number;   // degrees, default 180
+  turbidity:        number;
+  rayleigh:         number;
+  mieCoefficient:   number;
+  mieDirectionalG:  number;
+  sunElevation:     number;
+  sunAzimuth:       number;
 }
 
+// ⏳ Phase 9 — not yet implemented
 export interface SpawnPoint {
   position:  Vec3;
   zoneId:    string;
-  facing:    number;   // degrees
+  facing:    number;
 }
 
 export interface WorldConfig {
   size:           { width: number; depth: number };
   ambientLight:   { color: string; intensity: number };
-  sunLight:       { color: string; intensity: number };  // position derived from sky sun angles
-  sky:            SkyConfig;
-  fogDensity:     number;   // fog color derived from sky at horizon, not hardcoded
+  sunLight:       { color: string; intensity: number; position: Vec3 };
+  skybox:         string;        // sky material id — sky: SkyConfig planned ⏳ Phase 7
+  fogColor:       string;
+  fogDensity:     number;
   playerSettings: PlayerSettings;
-  defaultSpawn:   SpawnPoint;   // where the player starts with no game save
+  // defaultSpawn: SpawnPoint — ⏳ Phase 9
 }
 
 export interface TerrainLayerMaterial {
@@ -227,28 +238,31 @@ export interface TerrainDef {
 export interface FloorMeshDef {
   shape:    "rect" | "polygon";
   points:   Vec2[] | null;
+  nodeIds?: string[];  // if set, points are derived from these wall nodes at build time
   material: string;
 }
 
 export interface FloorDef {
-  level:          number;
-  elevation:      number;    // read-only at runtime — always derived from floors below
-  ceilingHeight:  number | null;  // null = no ceiling (outdoor zones)
-  slabThickness:  number;    // default 0.2m — affects elevation of floor above
-  renderCeiling:  boolean;   // false for outdoor zones
-  floorMesh:      FloorMeshDef;
+  id:                string;
+  level:             number;
+  elevation:         number;
+  ceilingHeight:     number | null;
+  floorMesh:         FloorMeshDef;
   materialOverrides?: MaterialOverrides;
 }
 
 export interface Opening {
-  id:                string;
-  type:              OpeningType;
-  offsetAlongWall:   number;
-  width:             number;
-  height:            number;
-  elevation:         number;
-  linkedZoneId:      string | null;
-  linkedTransitionId:string | null;
+  id:                 string;
+  type:               OpeningType;
+  offsetAlongWall:    number;
+  width:              number;
+  height:             number;
+  elevation:          number;
+  trim?:              boolean;   // default true — false hides the jamb/header/sill
+  innerTileH?:        number;    // tiling scale for top + bottom inner faces (sill/lintel)
+  innerTileV?:        number;    // tiling scale for left + right inner faces (jambs)
+  linkedZoneId:       string | null;
+  linkedTransitionId: string | null;
 }
 
 export interface WallNode {
@@ -257,41 +271,59 @@ export interface WallNode {
   z:  number;
 }
 
+// WallDef references nodes by ID — coordinates come from ZoneDef.nodes at build time
 export interface WallDef {
-  id:           string;
-  startNodeId:  string;
-  endNodeId:    string;
-  floor:            number;
-  height:           number;
-  thickness:        number;
-  material:         string;
-  exteriorMaterial: string;
-  openings:         Opening[];
+  id:                 string;
+  startNodeId:        string;   // was start:{x,z} in early spec — now uses node graph
+  endNodeId:          string;
+  floor:              number;
+  height:             number;
+  thickness:          number;
+  material:           string;
+  exteriorMaterial:   string;
+  openings:           Opening[];
   materialOverrides?: MaterialOverrides;
-  exteriorMaterialOverrides?: MaterialOverrides;
 }
 
 export interface PlatformDef {
-  id:           string;
-  position:     Vec3;
-  size:         { width: number; depth: number };
-  thickness:    number;
-  material:     string;
-  hasRailing:   boolean;
-  railingHeight:number;
-  floorLevel?:  number;
-  materialOverrides?: MaterialOverrides;
+  id:             string;
+  position:       Vec3;
+  size:           { width: number; depth: number };
+  thickness:      number;
+  material:       string;
+  hasRailing:     boolean;
+  railingHeight:  number;
+  floorLevel?:    number;
+  points?:        Vec2[];   // polygon platform — if set, size is ignored
+  nodeIds?:       string[];
+  materialOverrides?:     MaterialOverrides;
+  sideMaterial?:          string;
+  sideMaterialOverrides?: MaterialOverrides;
+}
+
+export interface StairCutterDef {
+  offset:      Vec3;    // relative to stair.end
+  width:       number;
+  depth:       number;
+  height:      number;
+  rotation?:   Vec3;    // degrees (X/Y/Z); Y defaults to stair angle on enable
+  innerTileH?: number;
+  innerTileV?: number;
 }
 
 export interface StairDef {
-  id:         string;
-  start:      Vec3;
-  end:        Vec3;
-  width:      number;
-  style:      StairStyle;
-  material:   string;
-  hasRailing: boolean;
-  materialOverrides?: MaterialOverrides;
+  id:          string;
+  start:       Vec3;
+  end:         Vec3;
+  width:       number;
+  numSteps?:   number;
+  style:       StairStyle;
+  material:    string;
+  hasRailing:  boolean;
+  materialOverrides?:      MaterialOverrides;
+  riserMaterial?:          string;
+  riserMaterialOverrides?: MaterialOverrides;
+  csgCutter?:              StairCutterDef;  // defines a hole cut in the floor/platform above
 }
 
 export interface ObjectProperties {
@@ -317,14 +349,14 @@ export interface ZoneDef {
   name:      string;
   type:      ZoneType;
   bounds:    Bounds;
-  nodes:     WallNode[];
+  nodes:     WallNode[];   // wall node graph — walls reference these by ID
   floors:    FloorDef[];
   walls:     WallDef[];
   platforms: PlatformDef[];
   stairs:    StairDef[];
-  objects:        WorldObject[];
-  scripts:        ScriptDef[];
-  triggerVolumes: TriggerVolume[];
+  objects:   WorldObject[];
+  // scripts: ScriptDef[]        — ⏳ Phase 8
+  // triggerVolumes: TriggerVolume[] — ⏳ Phase 8
 }
 
 export interface TransitionDef {
@@ -359,7 +391,7 @@ export interface ZoneColliders {
   terrain:   import("@dimforge/rapier3d-compat").Collider | null;
 }
 
-// ─── Characters, NPCs, Enemies ───────────────────────────────────────────────
+// ─── Characters, NPCs, Enemies ─────────────────── ⏳ Phase 10 ──────────────
 
 export interface CharacterDef {
   id:                 string;
@@ -434,11 +466,13 @@ export interface MaterialDef {
 export interface MaterialOverrides {
   maps?:              Partial<Record<keyof MaterialDef['maps'], { enabled: boolean }>>;
   tileScale?:         number;
+  tileScaleX?:        number;   // per-axis override (overrides tileScale)
+  tileScaleY?:        number;
   roughnessVal?:      number;
   displacementScale?: number;
 }
 
-// ─── Asset registry ──────────────────────────────────────────────────────────
+// ─── Asset registry ────────────────────────────────── ⏳ Phase 7 ───────────
 
 export type ColliderType = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other';
@@ -460,7 +494,7 @@ export interface AssetManifest {
   assets:   AssetDef[];
 }
 
-// ─── Scripting / Event system ─────────────────────────────────────────────────
+// ─── Scripting / Event system ──────────────────────── ⏳ Phase 8 ───────────
 
 export type TriggerType =
   | 'on_player_enter'   // player enters a trigger volume
@@ -577,12 +611,11 @@ export interface TriggerVolume {
   zoneId:   string;
 }
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
+// ─── Persistence ───────────────────────────────────── ⏳ Phase 9 ───────────
 
-// Scene file — world definition, saved/loaded by user explicitly
-// (already defined as SceneFile — add scripts and triggerVolumes to ZoneDef)
+// Scene file: already implemented as SceneFile above.
+// Game state and editor prefs: planned Phase 9.
 
-// Game state — runtime state, auto-saved separately
 export interface GameSave {
   version:        string;
   timestamp:      string;
@@ -608,26 +641,27 @@ export interface EditorPreferences {
 
 // ─── Builder return types ─────────────────────────────────────────────────────
 
-export interface WallBuildResult {
-  mesh:             THREE.Mesh;
-  trimMeshes:       THREE.Mesh[];
-  collisionMeshes:  THREE.Mesh[];
-  triggerMeshes:    THREE.Mesh[];
+// Actual builder output types (Rapier colliders, not mesh colliders):
+
+export interface WallBuildOutput {
+  mesh:       THREE.Mesh;
+  colliders:  RAPIER.Collider[];  // Rapier physics — no separate collision mesh
+  trimMeshes: THREE.Mesh[];       // door frames, liners, passage trim (includes trigger triggers)
 }
 
-export interface FloorBuildResult {
-  mesh:          THREE.Mesh;
-  collisionMesh: THREE.Mesh;
+export interface FloorBuildOutput {
+  mesh:     THREE.Mesh;
+  collider: RAPIER.Collider;
 }
 
-export interface PlatformBuildResult {
-  meshes:        THREE.Mesh[];
-  collisionMesh: THREE.Mesh;
+export interface PlatformBuildOutput {
+  meshes:   THREE.Mesh[];  // [capMesh, sideMesh, ...innerFaces, ...railings]
+  collider: RAPIER.Collider;
 }
 
-export interface StairBuildResult {
-  meshes:        THREE.Mesh[];
-  collisionMesh: THREE.Mesh;
+export interface StairBuildOutput {
+  meshes:    THREE.Mesh[];
+  colliders: RAPIER.Collider[];  // one per step
 }
 
 // ─── Module interfaces (lifecycle contract) ───────────────────────────────────
@@ -820,14 +854,20 @@ The canonical save/load format. All builders read exclusively from this structur
       "name": "Town Square",
       "type": "outdoor",
       "bounds": { "x": 0, "z": 0, "width": 50, "depth": 50 },
+      "nodes": [
+        { "id": "node_001", "x": 0.0, "z": 0.0 },
+        { "id": "node_002", "x": 10.0, "z": 0.0 }
+      ],
       "floors": [
         {
+          "id": "floor_001",
           "level": 0,
           "elevation": 0.0,
           "ceilingHeight": 3.0,
           "floorMesh": { "shape": "rect", "points": null, "material": "cobblestone" }
         },
         {
+          "id": "floor_002",
           "level": 1,
           "elevation": 3.2,
           "ceilingHeight": 3.0,
@@ -837,8 +877,8 @@ The canonical save/load format. All builders read exclusively from this structur
       "walls": [
         {
           "id": "wall_001",
-          "start": { "x": 0.0, "z": 0.0 },
-          "end":   { "x": 10.0, "z": 0.0 },
+          "startNodeId": "node_001",
+          "endNodeId":   "node_002",
           "floor": 0,
           "height": 3.0,
           "thickness": 0.2,
@@ -989,8 +1029,22 @@ class WorldState {
   updatePlatform(zoneId, id, changes){ /* find + assign + emit 'platform:updated' */ }
   removePlatform(zoneId, id)         { /* filter + emit 'platform:removed' */ }
 
+  // --- Node mutations ---
+  addNode(zoneId, node)              { /* push to zone.nodes */ }
+  updateNode(zoneId, nodeId, pos)    { /* find + update + emit 'node:updated' */ }
+  removeNode(zoneId, nodeId)         { /* filter */ }
+  getNode(zoneId, nodeId)            { /* find + return */ }
+  getWallsAtNode(zoneId, nodeId)     { /* filter walls where startNodeId or endNodeId matches */ }
+
+  // --- Wall mutations (extended) ---
+  updateWallSegment(zoneId, wallId, changes) { /* same as updateWall but emits segmentOnly:true */ }
+  updateOpening(zoneId, wallId, openingId, changes) { /* find opening + assign + emit 'wall:updated' */ }
+  addOpening(zoneId, wallId, opening) { /* push opening + emit 'wall:updated' */ }
+  removeOpening(zoneId, wallId, openingId) { /* filter opening + emit 'wall:updated' */ }
+
   // --- Stair mutations ---
   addStair(zoneId, data)             { /* push + emit 'stair:added' */ }
+  updateStair(zoneId, id, changes)   { /* find + assign + emit 'stair:updated' */ }
   removeStair(zoneId, id)            { /* filter + emit 'stair:removed' */ }
 
   // --- Object mutations ---
@@ -1530,280 +1584,187 @@ Lower floor meshes: set `material.opacity = 0.2`, `material.transparent = true` 
 
 ---
 
-## Wall Generation System (WallBuilder.js)
+## Wall Generation System (WallBuilder.ts)
+
+### Signatures
+
+```ts
+// src/builders/WallBuilder.ts
+
+static async build(
+  wall:  WallDef,
+  zoneId: string,
+  zone:  ZoneDef,
+  nodes: Map<string, WallNode>,
+): Promise<WallBuildOutput>
+
+static async buildRun(
+  walls: WallDef[],   // connected chain, ordered start→end
+  zoneId: string,
+  zone:  ZoneDef,
+  nodes: Map<string, WallNode>,
+): Promise<WallBuildOutput>
+
+export interface WallBuildOutput {
+  mesh:       THREE.Mesh;
+  colliders:  RAPIER.Collider[];
+  trimMeshes: THREE.Mesh[];       // frames, liners, door jambs/headers, passage trim
+}
+```
 
 ### Algorithm
 
 ```
-Input: WallDef { id, start{x,z}, end{x,z}, floor, height, thickness, material, exteriorMaterial, openings[] }
-       zone (for floor elevation lookup)
+Input: WallDef { id, startNodeId, endNodeId, floor, height, thickness, material,
+                 exteriorMaterial, openings[] }
+       nodes Map<id, {x, z}>
 
-Step 1: Geometry
-  length    = hypot(end.x - start.x, end.z - start.z)
-  angle     = atan2(end.z - start.z, end.x - start.x)
-  midpoint  = { x: (start.x+end.x)/2, z: (start.z+end.z)/2 }
-  elevation = zone.floors[wallDef.floor].elevation
-  baseY     = elevation + height / 2
+Step 1: Resolve coordinates
+  start = nodes.get(wall.startNodeId)
+  end   = nodes.get(wall.endNodeId)
+  length = hypot(end.x - start.x, end.z - start.z)
+  angle  = atan2(end.z - start.z, end.x - start.x)
+  elevation = zone.floors[wall.floor].elevation
 
-  geo = BoxGeometry(length, height, thickness)
+Step 2: build() — single wall custom geometry
+  Builds 6-face box geometry directly (not BoxGeometry) for interior + exterior
+  material separation and UV tiling per face.
 
-Step 2: Positioning
-  mesh = new Mesh(geo, material)
-  mesh.position.set(midpoint.x, baseY, midpoint.z)
-  mesh.rotation.y = -angle
+  buildRun() — merged run
+  For a chain of walls sharing nodes, builds one merged mesh with:
+  - Mitered corner joins (each shared node shortens both walls by thickness/2 on their
+    shared end so they meet cleanly at 45°)
+  - UV continuity across the full run length
 
 Step 3: CSG Openings (sorted by offsetAlongWall asc)
-  For each opening:
-    cutterGeo = BoxGeometry(opening.width + 0.05, opening.height + 0.05, thickness + 0.1)
-    posAlongWall = (opening.offsetAlongWall - length/2)  // local X offset
-    cutterY = elevation + opening.elevation + opening.height/2
-    Position cutter at wall-local offset, then transform to world space
-    mesh = csgSubtract(mesh, cutter)
+  csgSubtract() from src/utils/csg.ts
+  Cutter = BoxGeometry(width + 0.05, height + 0.05, thickness + 0.1)
+  Applied to the merged-run mesh; interior + exterior CSG together.
 
-Step 4: UV
-  u-repeat = length / materialDef.tileWidth  (default tileWidth = 1.0m)
-  v-repeat = height / materialDef.tileHeight (default tileHeight = 1.0m)
-  mesh.material.map.repeat.set(u-repeat, v-repeat)
+Step 4: Trim meshes (added to trimMeshes[], never the main mesh)
+  - Door/arch openings: jamb + header liner (passage-style inner face)
+  - Window openings: sill + lintel liner, side jambs
+  - Door trigger volumes: thin sensor mesh tagged { editorType:'trim', triggerType:'door' }
+    (used by TriggerSystem in preview mode)
 
-Step 5: Trim (separate meshes, no CSG)
-  baseboard: BoxGeometry(length, 0.1, thickness + 0.02) at floor level
-  cornice:   BoxGeometry(length, 0.08, thickness + 0.02) at top
-  For each door opening: door frame (4 thin boxes around perimeter)
-  For each window: window frame (4 thin boxes)
+Step 5: Rapier colliders
+  Wall segments between openings → ColliderBuilder.registerWallSegments()
+  Returns RAPIER.Collider[] — no separate collision meshes
 
-Step 6: Collision (simplified, no CSG cost)
-  Divide wall into segments separated by openings
-  Each segment: BoxGeometry(segmentLength, height, thickness)
-  These are invisible (visible = false) and used only by Rapier (registered via ColliderBuilder)
-
-Step 7: Trigger volumes (doors only)
-  For each door opening:
-    triggerGeo = BoxGeometry(opening.width - 0.1, opening.height - 0.1, 0.8)
-    Position centered in opening
-    trigger.visible = false (shown as ghost wireframe in editor only)
-    trigger.userData = { editorType: 'trigger', triggerType: 'door', transitionId, openingId, selectable: false }
-
-Step 8: userData tagging on all meshes
-
-Return {
-  mesh,              // main wall mesh (CSG result if openings)
-  trimMeshes[],
-  collisionMeshes[],
-  triggerMeshes[],
-}
+Step 6: userData tagging
+  Main mesh: selectable: true, editorType: "wall", wallId
+  Trim meshes: selectable: false, editorType: "trim" | "opening"
 ```
 
-### Corner Joining
+### Run System (ZoneManager)
 
-Adjacent walls sharing a corner must be trimmed to avoid overlap:
-1. Query `worldState.zones.get(zoneId).walls` for other walls sharing `start` or `end` point
-2. For each shared corner, shorten this wall by `thickness / 2` at that end
-3. This produces a clean mitered visual join
-4. Implemented by offsetting `start` and `end` inward before computing geometry
-
-### Incremental Rebuild
-
-When `wall:updated` fires on bus:
-1. `ZoneManager` finds the existing mesh group for this wall
-2. Calls `dispose()` on old meshes (geometry + owned materials)
-3. Calls `WallBuilder.build(newWallDef, zone)` for fresh meshes
-4. Adds new meshes to `wallsGroup`
-5. Calls `ColliderBuilder.registerWallSegments()` to re-register Rapier colliders; old collider handles removed from ZoneManager first
+ZoneManager groups connected walls (sharing a node) into `RunEntry`. All walls in a run
+share one merged mesh. `buildRun()` handles corners; `build()` is the single-wall fallback.
+When any wall in a run changes, the entire run is rebuilt atomically via `_rebuildWallBatch()`.
+Queue coalescing (`_queueRebuild()`) prevents rebuild storms on multi-wall changes.
 
 ---
 
 ## FloorBuilder.ts
 
-```js
-static build(floorDef, zoneBounds) {
-  // floorDef: { level, elevation, ceilingHeight, floorMesh: { shape, points, material } }
+```ts
+// src/builders/FloorBuilder.ts
 
-  let geo;
-  if (floorDef.floorMesh.shape === 'rect') {
-    geo = new THREE.PlaneGeometry(zoneBounds.width, zoneBounds.depth, 1, 1);
-  } else {
-    // Polygon floor
-    const shape = new THREE.Shape(floorDef.floorMesh.points.map(p => new THREE.Vector2(p.x, p.z)));
-    geo = new THREE.ShapeGeometry(shape);
-  }
+static async build(
+  floor: FloorDef,
+  bounds: Bounds,
+  zoneId: string,
+  levelIndex = 0,
+  cutterMeshes: THREE.Mesh[] = [],  // world-space CSG cutters from stair csgCutters
+): Promise<FloorBuildOutput>
 
-  const mesh = new THREE.Mesh(geo, assetManager.getMaterial(floorDef.floorMesh.material));
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(
-    zoneBounds.x + zoneBounds.width / 2,
-    floorDef.elevation,
-    zoneBounds.z + zoneBounds.depth / 2
-  );
-  mesh.receiveShadow = true;
-
-  // UV tiling
-  const tileScale = MATERIAL_REGISTRY[floorDef.floorMesh.material]?.tileScale ?? 1.0;
-  mesh.material.map?.repeat.set(zoneBounds.width / tileScale, zoneBounds.depth / tileScale);
-
-  // Tag
-  mesh.userData = {
-    editorId: `floor_${floorDef.level}`,
-    editorType: 'floor',
-    zoneId: zoneBounds.zoneId,
-    floorLevel: floorDef.level,
-    selectable: true,
-    _ownsMaterial: false,
-  };
-
-  // Collision mesh (same geometry)
-  const collisionMesh = new THREE.Mesh(geo.clone());
-  collisionMesh.rotation.x = -Math.PI / 2;
-  collisionMesh.position.copy(mesh.position);
-  collisionMesh.visible = false;
-  collisionMesh.geometry.computeBoundsTree(); // three-mesh-bvh
-
-  return { mesh, collisionMesh };
+export interface FloorBuildOutput {
+  mesh:     THREE.Mesh;
+  collider: RAPIER.Collider;
 }
 ```
+
+**Algorithm:**
+- Rect floor: `PlaneGeometry(bounds.width, bounds.depth)` rotated -90° to XZ plane
+- Polygon floor: `ShapeGeometry` from `floor.floorMesh.points` (or derived from `nodeIds`)
+- UV tiling: world-scale repeat using `materialDef.tileScale`
+- CSG cuts: if `cutterMeshes.length > 0`, translates geo to world space, applies `csgSubtract()` per cutter, result stays in world space
+- Collider: `ColliderBuilder.registerFloor(floor)` → Rapier trimesh (not a visible mesh)
 
 ---
 
 ## PlatformBuilder.ts
 
-```js
-static build(platformDef) {
-  const { position, size, thickness, material, hasRailing, railingHeight } = platformDef;
-  const meshes = [];
+```ts
+// src/builders/PlatformBuilder.ts
 
-  // Main slab
-  const slabGeo = new THREE.BoxGeometry(size.width, thickness, size.depth);
-  const slab = new THREE.Mesh(slabGeo, assetManager.getMaterial(material));
-  slab.position.set(position.x, position.y + thickness / 2, position.z);
-  slab.castShadow = true;
-  slab.receiveShadow = true;
-  slab.userData = { editorId: platformDef.id, editorType: 'platform', selectable: true, floorLevel: platformDef.floorLevel ?? 0 };
-  meshes.push(slab);
+static async build(
+  platform: PlatformDef,
+  zoneId: string,
+  cuts: CutInfo[] = [],  // stair CSG cutter data from ZoneManager
+): Promise<PlatformBuildOutput>
 
-  // Underside trim
-  const trimGeo = new THREE.BoxGeometry(size.width + 0.05, 0.06, size.depth + 0.05);
-  const trim = new THREE.Mesh(trimGeo, assetManager.getMaterial(material));
-  trim.position.set(position.x, position.y, position.z);
-  trim.userData = { editorType: 'trim', selectable: false };
-  meshes.push(trim);
+export interface PlatformBuildOutput {
+  meshes:   THREE.Mesh[];   // [capMesh, sideMesh, ...innerFaceMeshes, ...railings]
+  collider: RAPIER.Collider;
+}
 
-  // Railings (4 sides)
-  if (hasRailing) {
-    const railMat = assetManager.getMaterial(material);
-    const rh = railingHeight ?? 1.0;
-    const rt = 0.08; // railing thickness
-    const sides = [
-      { w: size.width, d: rt,        x: 0,                     z: -size.depth / 2 },  // north
-      { w: size.width, d: rt,        x: 0,                     z:  size.depth / 2 },  // south
-      { w: rt,         d: size.depth, x: -size.width / 2,       z: 0 },               // west
-      { w: rt,         d: size.depth, x:  size.width / 2,       z: 0 },               // east
-    ];
-    for (const side of sides) {
-      const rGeo = new THREE.BoxGeometry(side.w, rh, side.d);
-      const r = new THREE.Mesh(rGeo, railMat);
-      r.position.set(position.x + side.x, position.y + thickness + rh / 2, position.z + side.z);
-      r.userData = { editorType: 'trim', selectable: false };
-      meshes.push(r);
-    }
-  }
-
-  // Collision (slab only)
-  const collisionMesh = new THREE.Mesh(slabGeo.clone());
-  collisionMesh.position.copy(slab.position);
-  collisionMesh.visible = false;
-  collisionMesh.geometry.computeBoundsTree();
-
-  return { meshes, collisionMesh };
+export interface CutInfo {
+  mesh:            THREE.Mesh;   // world-space BoxGeometry for csgSubtract
+  worldX:          number;
+  worldZ:          number;
+  width:           number;
+  depth:           number;
+  rotX:            number;       // radians
+  rotY:            number;
+  rotZ:            number;
+  innerTileH:      number;
+  innerTileV:      number;
+  innerFaceHeight: number;       // = platform.thickness
 }
 ```
+
+**Mesh breakdown:**
+- **capMesh**: top + bottom faces only (custom geometry, not BoxGeometry). Polygon platforms use `ShapeGeometry`. Receives CSG cuts in world space.
+- **sideMesh**: 4 vertical faces. Separate material (`sideMaterial` / `sideMaterialOverrides`).
+- **innerFaceMeshes**: one per `CutInfo`. 4-sided open box covering the slab thickness at each hole — visible from inside. Inward normals so they're front-facing when viewed from the passage.
+- **railings**: 4 `BoxGeometry` posts if `hasRailing: true`.
 
 ---
 
 ## StairBuilder.ts
 
-```js
-static build(stairDef) {
-  const { start, end, width, style, material, hasRailing } = stairDef;
-  const meshes = [];
+```ts
+// src/builders/StairBuilder.ts
 
-  const heightDiff   = end.y - start.y;
-  const horizDist    = Math.hypot(end.x - start.x, end.z - start.z);
-  const angle        = Math.atan2(end.z - start.z, end.x - start.x);
-  const stepHeight   = 0.2;
-  const numSteps     = Math.max(1, Math.round(heightDiff / stepHeight));
-  const stepDepth    = horizDist / numSteps;
-  const mat          = assetManager.getMaterial(material);
+static async build(stair: StairDef, zoneId: string): Promise<StairBuildOutput>
 
-  if (style === 'straight') {
-    for (let i = 0; i < numSteps; i++) {
-      const stepGeo = new THREE.BoxGeometry(width, stepHeight, stepDepth);
-      const step = new THREE.Mesh(stepGeo, mat);
-      const t = (i + 0.5) / numSteps;
-      step.position.set(
-        start.x + (end.x - start.x) * t,
-        start.y + (i + 0.5) * stepHeight,
-        start.z + (end.z - start.z) * t
-      );
-      step.rotation.y = -angle;
-      step.castShadow = true;
-      step.receiveShadow = true;
-      step.userData = { editorId: stairDef.id, editorType: 'stair', selectable: i === 0, _parentId: i > 0 ? stairDef.id : undefined };
-      meshes.push(step);
-    }
-  }
-
-  if (style === 'spiral') {
-    // Central pole
-    const poleGeo = new THREE.CylinderGeometry(0.15, 0.15, heightDiff, 8);
-    const pole = new THREE.Mesh(poleGeo, mat);
-    pole.position.set(start.x, start.y + heightDiff / 2, start.z);
-    meshes.push(pole);
-    // Wedge steps rotating around pole
-    for (let i = 0; i < numSteps; i++) {
-      const angle = (i / numSteps) * Math.PI * 2 * (heightDiff / 4); // ~2 rotations per 4m
-      const stepW = width;
-      const stepGeo = new THREE.BoxGeometry(stepW, stepHeight, stepDepth);
-      const step = new THREE.Mesh(stepGeo, mat);
-      step.position.set(
-        start.x + Math.cos(angle) * stepW / 2,
-        start.y + i * stepHeight,
-        start.z + Math.sin(angle) * stepW / 2
-      );
-      step.rotation.y = -angle;
-      step.userData = { editorId: stairDef.id, editorType: 'stair', selectable: false, _parentId: stairDef.id };
-      meshes.push(step);
-    }
-  }
-
-  // Railings: two handrails running along each side
-  if (hasRailing) {
-    for (const side of [-1, 1]) {
-      const railGeo = new THREE.BoxGeometry(0.05, 0.05, horizDist);
-      const rail = new THREE.Mesh(railGeo, mat);
-      // Position along stair run, offset to side, at handrail height (~0.9m from each step)
-      rail.position.set(
-        (start.x + end.x) / 2 + Math.cos(angle + Math.PI / 2) * (width / 2) * side,
-        (start.y + end.y) / 2 + 0.9,
-        (start.z + end.z) / 2 + Math.sin(angle + Math.PI / 2) * (width / 2) * side
-      );
-      rail.rotation.y = -angle;
-      rail.rotation.z = Math.atan2(heightDiff, horizDist) * -1;
-      rail.userData = { editorType: 'trim', selectable: false };
-      meshes.push(rail);
-    }
-  }
-
-  // Collision: single slanted box approximation
-  const collisionGeo = new THREE.BoxGeometry(width, heightDiff, horizDist);
-  const collision = new THREE.Mesh(collisionGeo);
-  collision.position.set((start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2);
-  collision.rotation.y = -angle;
-  collision.rotation.z = Math.atan2(heightDiff, horizDist) * -1;
-  collision.visible = false;
-  collision.geometry.computeBoundsTree();
-
-  return { meshes, collisionMesh: collision };
+export interface StairBuildOutput {
+  meshes:    THREE.Mesh[];
+  colliders: RAPIER.Collider[];  // one per step — proper step-shaped colliders
 }
 ```
+
+**Mesh breakdown:**
+- **bodyMesh**: single merged custom geometry for all step tops/sides/backs (one mesh per material — body material)
+- **riserMesh**: single merged geometry for all step front faces (`riserMaterial` if set, else falls back to body material)
+- **railing meshes** (2): `BoxGeometry` bars along each side if `hasRailing: true`
+- **CSG cutter wireframe**: `LineSegments` (EdgesGeometry of cutter box) if `stair.csgCutter` is set. Tagged `editorOnly: true` — hidden in preview mode.
+
+**Algorithm (straight style):**
+```
+numSteps  = stair.numSteps ?? round(heightDiff / 0.2)
+stepRise  = heightDiff / numSteps
+stepDepth = horizDist / numSteps
+angle     = atan2(dz, dx)
+
+For each step i:
+  center = start + t*(end-start)  where t = (i + 0.5) / numSteps
+  Build 6-face custom geometry rotated by angle in world space
+  (body faces: top, bottom, left, right, back; riser: front face)
+```
+
+**Colliders:** `ColliderBuilder.registerStairSteps(stair)` → one box collider per step.
 
 ---
 
@@ -1857,105 +1818,77 @@ class ObjectPlacer {
 
 ## ZoneManager.ts
 
-```js
-class ZoneManager {
-  constructor(scene, worldState, assetManager, bus) { ... }
+### Internal Entry Types
 
-  async loadZone(zoneId) {
-    const zone = this._worldState.zones.get(zoneId);
-    if (this._loadedZones.has(zoneId)) return; // already loaded
+```ts
+interface RunEntry {
+  mesh:       THREE.Mesh;
+  colliders:  RAPIER.Collider[];
+  wallIds:    string[];     // all wall IDs in this merged run
+  trimMeshes: THREE.Mesh[];
+}
 
-    const group        = new THREE.Group(); group.name = `zone_${zoneId}`;
-    const floorsGroup  = new THREE.Group(); group.add(floorsGroup);
-    const wallsGroup   = new THREE.Group(); group.add(wallsGroup);
-    const platformsGroup = new THREE.Group(); group.add(platformsGroup);
-    const stairsGroup  = new THREE.Group(); group.add(stairsGroup);
-    const objectsGroup = new THREE.Group(); group.add(objectsGroup);
-    const triggersGroup = new THREE.Group(); group.add(triggersGroup);
+interface PlatformEntry {
+  meshes:   THREE.Mesh[];
+  collider: RAPIER.Collider;
+}
 
-    for (const floor of zone.floors) {
-      const r = FloorBuilder.build(floor, zone.bounds);
-      floorsGroup.add(r.mesh);
-      floorsGroup.add(r.collisionMesh);
-    }
+interface StairEntry {
+  group:     THREE.Group;
+  meshes:    THREE.Mesh[];
+  colliders: RAPIER.Collider[];
+  def:       StairDef;      // kept to detect CSG cutter changes on rebuild
+}
 
-    for (const wall of zone.walls) {
-      const r = WallBuilder.build(wall, zone);
-      wallsGroup.add(r.mesh, ...r.trimMeshes, ...r.collisionMeshes);
-      triggersGroup.add(...r.triggerMeshes);
-    }
-
-    for (const platform of zone.platforms) {
-      const r = PlatformBuilder.build(platform);
-      platformsGroup.add(...r.meshes, r.collisionMesh);
-    }
-
-    for (const stair of zone.stairs) {
-      const r = StairBuilder.build(stair);
-      stairsGroup.add(...r.meshes, r.collisionMesh);
-    }
-
-    for (const obj of zone.objects) {
-      await this._objectPlacer.place(obj, objectsGroup);
-    }
-
-    this._scene.add(group);
-    this._loadedZones.set(zoneId, { group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup, triggersGroup });
-
-    // Listen for incremental updates to this zone
-    this._bus.on('wall:added',      ({ zoneId: zid, wall })       => { if (zid === zoneId) this._rebuildWall(zoneId, wall.id); });
-    this._bus.on('wall:updated',    ({ zoneId: zid, wallId })      => { if (zid === zoneId) this._rebuildWall(zoneId, wallId); });
-    this._bus.on('wall:removed',    ({ zoneId: zid, wallId })      => { if (zid === zoneId) this._removeWall(zoneId, wallId); });
-    this._bus.on('platform:added',  ({ zoneId: zid, platform })    => { if (zid === zoneId) this._rebuildPlatform(zoneId, platform.id); });
-    this._bus.on('platform:removed',({ zoneId: zid, id })          => { if (zid === zoneId) this._removePlatform(zoneId, id); });
-    this._bus.on('floor:added',     ({ zoneId: zid, floor })       => { if (zid === zoneId) this._rebuildFloor(zoneId, floor.level); });
-  }
-
-  unloadZone(zoneId) {
-    const entry = this._loadedZones.get(zoneId);
-    if (!entry) return;
-    this._scene.remove(entry.group);
-    entry.group.traverse(child => {
-      if (child.isMesh) {
-        child.geometry.dispose();
-        if (child.userData._ownsMaterial) child.material.dispose();
-      }
-    });
-    this._loadedZones.delete(zoneId);
-  }
-
-  setActiveFloorLevel(level) {
-    this._activeFloorLevel = level;
-    this._loadedZones.forEach(({ floorsGroup, wallsGroup }) => {
-      [...floorsGroup.children, ...wallsGroup.children].forEach(mesh => {
-        if (!mesh.isMesh) return;
-        const fl = mesh.userData.floorLevel ?? 0;
-        if (!mesh.userData._ownsMaterial) {
-          mesh.material = mesh.material.clone();
-          mesh.userData._ownsMaterial = true;
-        }
-        mesh.material.transparent = fl !== level;
-        mesh.material.opacity = fl === level ? 1.0 : 0.15;
-      });
-    });
-  }
-
-  _rebuildWall(zoneId, wallId) {
-    const { wallsGroup, triggersGroup } = this._loadedZones.get(zoneId);
-    // Remove old meshes tagged with this wallId
-    const toRemove = [];
-    wallsGroup.traverse(m => { if (m.userData.wallId === wallId) toRemove.push(m); });
-    triggersGroup.traverse(m => { if (m.userData.wallId === wallId) toRemove.push(m); });
-    toRemove.forEach(m => { m.geometry?.dispose(); if (m.userData._ownsMaterial) m.material?.dispose(); m.parent?.remove(m); });
-    // Rebuild
-    const wall = this._worldState.zones.get(zoneId).walls.find(w => w.id === wallId);
-    const zone = this._worldState.zones.get(zoneId);
-    const r = WallBuilder.build(wall, zone);
-    wallsGroup.add(r.mesh, ...r.trimMeshes, ...r.collisionMeshes);
-    triggersGroup.add(...r.triggerMeshes);
-  }
+interface ZoneEntry {
+  group:            THREE.Group;
+  floorsGroup:      THREE.Group;
+  wallsGroup:       THREE.Group;
+  platformsGroup:   THREE.Group;
+  stairsGroup:      THREE.Group;
+  floorColliders:   Map<string, RAPIER.Collider>;   // floorId → collider
+  wallData:         Map<string, RunEntry>;           // wallId → run (multiple IDs can map to same RunEntry)
+  platformEntries:  Map<string, PlatformEntry>;
+  stairEntries:     Map<string, StairEntry>;
 }
 ```
+
+### loadZone
+
+```
+1. Build floors (with CSG cuts from any existing stair cutters)
+2. Group walls into runs (chains of walls sharing nodes)
+   → buildRun() for each run, or build() for isolated walls
+3. Build platforms (with CSG cuts)
+4. Build stairs (including cutter wireframes)
+5. Place objects (GLTF via ObjectPlacer)
+6. Second pass: for each stair with csgCutter → _rebuildOverlapping()
+   (needed because floors are built before stairs on initial load)
+7. Apply floor dimming
+```
+
+### Key Patterns
+
+**Wall run system**
+Connected walls (sharing a node) → grouped into `RunEntry`. `wallData` maps every wallId in the run to the same `RunEntry`. On rebuild, the entire run is rebuilt atomically via `_rebuildWallBatch()`.
+
+**Queue-based coalescing**
+`_queueRebuild(zoneId, wallId)` and `_queuePlatformRebuild(zoneId, platformId)` batch changes via `Promise.resolve().then(...)` (microtask). Multiple rapid changes to the same zone merge into a single rebuild pass.
+
+**Token-based staleness (platforms)**
+Each platform rebuild increments a token. Async `PlatformBuilder.build()` captures the token; if it has changed by the time the result arrives, the result is discarded. Prevents stale async results from overwriting newer rebuilds.
+
+**Dimming system**
+`_applyDimming()` clones materials for meshes whose `floorLevel` ≠ active level and sets reduced opacity. `_pruneDimMaterials()` disposes clones that are no longer in use. Materials at the active level are restored to full opacity.
+
+**CSG cutter integration**
+`stair:added/updated/removed` → `_rebuildOverlapping(zoneId, stair)` computes the cutter's world AABB and rebuilds any floor/platform whose bounds overlap.
+- `_getStairCuttersForFloor(zoneId, floor)` → `THREE.Mesh[]` (plain cutter meshes for FloorBuilder)
+- `_getStairCuttersForPlatform(zoneId, platform)` → `CutInfo[]` (includes tiling + inner face data for PlatformBuilder)
+
+**Preview toggle**
+`preview:start` → iterate all stairEntries, set `mesh.visible = false` for any mesh with `userData.editorOnly === true` (CSG wireframes etc.)
+`preview:stop` → restore visibility
 
 ---
 
@@ -2051,10 +1984,13 @@ DRAWING:
   On input:click:
     endPoint = snapped (or angle-snapped if Shift)
     if distance(start, end) < 0.5: ignore
-    wallDef = { id: uuid(), start, end, floor: activeLevel, height: 3.0, thickness: 0.2,
-                material: selectedMaterial, exteriorMaterial: selectedMaterial, openings: [] }
+    Snap to nearby existing node if within snap radius (0.5m)
+    If no existing node at start/end: worldState.addNode(zoneId, newNode)
+    Detect loop close (endNode == chainStartNode) → emit 'floortool:suggest-auto-floor'
+    wallDef = { id: uuid(), startNodeId, endNodeId, floor: activeLevel, height: 3.0,
+                thickness: 0.2, material: selectedMaterial, exteriorMaterial: selectedMaterial, openings: [] }
     worldState.addWall(zoneId, wallDef)
-    startPoint = endPoint  ← chain continues
+    startNodeId = endNodeId  ← chain continues
     Remain in DRAWING
 
   On input:dblclick or input:keydown Enter: finish chain, return to IDLE
@@ -2377,23 +2313,23 @@ class PreviewController {
 
 ### PropertiesPanel.tsx
 
-Subscribes to `object:selected` and `object:deselected` on the EventBus (via React context). Renders different fields based on `type`:
+Subscribes to `object:selected` and `object:deselected`. Renders a view based on `selected.type`:
 
-**wall**: height (number input), thickness (number input), material picker, exterior material picker, openings list (each with type/offset/width/height/elevation), "Add Opening" button, "Delete Wall" button.
+**OpeningView** — type (door/window/arch/passage), offset along wall, width, height, elevation, trim toggle, inner tiling (T+B, L+R). Changes emit `wall:updated`.
 
-**floor**: material picker, ceiling height (number input, for indoor zones).
+**WallView** — height, thickness, interior material + overrides, exterior material. Openings list (add/edit/remove). **SegmentsSection** (when `runWalls.length > 1`): expandable list of run-mate wall segments with per-segment material overrides. Changes emit `wall:updated` or `wall:updated` with `segmentOnly:true`.
 
-**platform**: width, depth, thickness (number inputs), material picker, railing toggle, railing height.
+**FloorView** — elevation, material, material overrides (tile scale, roughness, displacement, map toggles).
 
-**stair**: style selector (straight / l-shape / spiral), width, material, railing toggle.
+**PlatformView** — position XYZ, size (width/depth), thickness, railing toggle + height, two material sections: cap (top/bottom) and side, each with full overrides.
 
-**object**: position X/Y/Z (number inputs), rotation Y (number input), scale (uniform slider), assetId (read-only label), properties sub-section (interactable toggle, NPC spawn toggle).
+**StairView** — start/end vectors, step count, width, railing toggle, body material + overrides, riser material + overrides. **CUT BOX section**: enable/disable toggle; when enabled shows offset XYZ, rotation XYZ (deg), width/depth/height, inner tiling (T+B, L+R). Changes emit `stair:updated`.
 
-**nothing selected**: shows active tool hint text.
+**TransformView** — position XYZ, rotation XYZ, scale XYZ (for selected WorldObjects).
 
-Every input `onChange`: `bus.emit('object:updated', { id, zoneId, changes: { [field]: value } })`.
+**ToolView** — active tool hint text.
 
-Debounce number inputs 150ms before emitting (avoid rebuilding geometry on every keystroke).
+All number inputs: local string state while typing, commit on blur/Enter. Changes emit the appropriate bus event (debounced where needed).
 
 ### ZonePanel.tsx
 
@@ -3491,11 +3427,10 @@ DRAWING:
 
 On close:
   worldState.addFloor(zoneId, {
+    id: uuid(),
     level: activeFloorLevel,
     elevation: activeFloor.elevation,
     ceilingHeight: activeFloor.ceilingHeight,
-    slabThickness: 0.2,
-    renderCeiling: activeFloor.renderCeiling,
     floorMesh: {
       shape: 'polygon',
       points: placedVertices,   // Vec2[] in order placed
@@ -3600,6 +3535,261 @@ If this isn't already implemented from Phase 3, it must be added here.
 - StairTool + StairBuilder: straight style, per-step cuboid colliders registered via `ColliderBuilder`
 - All new geometry assigned to active floor level, colliders positioned at correct world Y
 
+### Phase 6.1 — Transform Gizmos & Object Editing
+
+Adds spatial editing gizmos to all editor objects. Builds on Phase 6 (platforms, stairs exist) and Phase 7 (TransformControls already used for props).
+
+#### Scope
+
+| Object | Translate | Rotate | Resize | Notes |
+|---|---|---|---|---|
+| Platform | XYZ | Y-axis only | width/depth edge handles | Y = change floor height |
+| Stair | XZ only | Y-axis only | — | Resize via endpoint nodes |
+| Placed object | XYZ | all axes | uniform scale | Confirmed from Phase 7 |
+| Wall segment | XZ only | — | — | Moves whole wall, updates both nodes |
+| Floor (rect) | XZ only | — | edge handles | Polygon floors via vertex drag (4.9) |
+
+#### GizmoManager.ts (src/editor/)
+
+Centralises all gizmo logic, replaces ad-hoc TransformControls from Phase 7:
+- `init()` creates `TransformControls`, attaches to scene, subscribes to `object:selected` / `object:deselected`
+- `_attach(id, type, zoneId)` — attaches gizmo to selected mesh, shows/hides axes based on type, attaches resize handles if applicable
+- `_detach()` — detaches gizmo, disposes resize handles
+- On `objectChange`: writes position/rotation back to WorldState (`updatePlatform`, `updateObject`, `updateNode` for walls, `updateFloor` for rect floors)
+- Emits `gizmo:dragging` to suppress camera during drag
+
+Key bindings (only active when something is selected):
+- `G` — translate mode
+- `R` — rotate mode (platforms, stairs, objects only)
+- `S` — scale uniform (objects only)
+- `Alt` + drag — disable snap
+- `Esc` — deselect
+
+#### ResizeHandleGroup.ts (src/editor/)
+
+Four edge handles (N/S/E/W) as thin flat box meshes on platform and rect floor edges. N/S drag changes depth (opposite edge fixed), E/W drag changes width. Minimum 0.5m x 0.5m. On drag end: `worldState.updatePlatform()` or `updateFloor()` triggers mesh + collider rebuild.
+
+#### Platform Y Handle
+
+Vertical arrow handle above platform center. Drag up/down changes `platform.position.y` in 0.2m snap increments (Alt = free). Cleaner than scroll wheel which only works during initial placement.
+
+#### Move Wall as Segment
+
+`G` with a wall selected translates the whole wall — both endpoint nodes shift by the same XZ delta. Distinct from Phase 4.8 node dragging which moves one node and stretches. On translate end: `worldState.updateNode()` called for both `startNodeId` and `endNodeId`.
+
+#### PropertiesPanel Live Fields
+
+While a gizmo is active: X/Y/Z, rotation Y, width/depth (where applicable) update live as the gizmo moves. Typing a value snaps the gizmo to it. All inputs debounced 150ms before WorldState write.
+
+
+
+### Phase 6.2 — Scene Save & Load
+
+You've now built walls, floors, zones, platforms, stairs, and connected wall graphs. Losing all of that on every dev server restart is unacceptable. This phase adds the one thing that makes the editor actually usable day-to-day: save your scene to a JSON file and load it back.
+
+This is intentionally narrow — just the scene file. Game saves, auto-save, editor preferences, and migration logic all stay in Phase 9 where they belong.
+
+#### What Gets Saved
+
+Everything in `WorldState` at the time of saving:
+- All zones with their walls, floors, platforms, stairs, objects, scripts, trigger volumes
+- Wall nodes
+- Zone transitions
+- World config (sky, lighting, player settings, default spawn)
+- Terrain (if present — encoded as base64 Float32Array)
+
+What does NOT get saved here:
+- Game state (flags, player position, inventory) — Phase 9
+- Editor preferences (quality, snap, grid) — Phase 9
+- Asset/material manifests — those live on disk, not in the scene file
+
+#### WorldSerializer.ts
+
+```ts
+export class WorldSerializer {
+  serialize(worldState: WorldState): SceneFile {
+    const raw = worldState.toJSON();
+    // Encode terrain heightData Float32Array → base64 string for JSON
+    if (raw.terrain?.heightData instanceof Float32Array) {
+      raw.terrain.heightData = this._encodeHeightData(raw.terrain.heightData as Float32Array);
+    }
+    return raw as SceneFile;
+  }
+
+  download(worldState: WorldState): void {
+    const json = JSON.stringify(this.serialize(worldState), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href:     url,
+      download: `${worldState.metadata.name || 'world'}.json`,
+    });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  private _encodeHeightData(data: Float32Array): string {
+    return btoa(String.fromCharCode(...new Uint8Array(data.buffer)));
+  }
+}
+```
+
+#### WorldLoader.ts
+
+```ts
+export class WorldLoader {
+  async load(
+    json:         unknown,
+    worldState:   WorldState,
+    zoneManager:  ZoneManager,
+    bus:          EventBus
+  ): Promise<void> {
+    // 1. Basic validation
+    const file = json as Partial<SceneFile>;
+    if (!file.metadata?.version) throw new Error('Invalid scene file — missing metadata.version');
+
+    // 2. Unload all current zones and clear WorldState
+    for (const zoneId of worldState.zones.keys()) {
+      zoneManager.unloadZone(zoneId);
+    }
+
+    // 3. Decode terrain heightData base64 → Float32Array
+    if (file.terrain?.heightData && typeof file.terrain.heightData === 'string') {
+      file.terrain.heightData = this._decodeHeightData(file.terrain.heightData);
+    }
+
+    // 4. Field migration — add missing fields for older scene files
+    this._migrate(file);
+
+    // 5. Load into WorldState
+    worldState.loadFromJSON(file as SceneFile);
+
+    // 6. Build meshes for first zone
+    const firstZone = file.zones?.[0];
+    if (firstZone) await zoneManager.loadZone(firstZone.id);
+
+    // 7. Notify UI
+    bus.emit('scene:loaded', { metadata: file.metadata as SceneMetadata });
+  }
+
+  private _migrate(file: Partial<SceneFile>): void {
+    // Ensure every zone has the fields added in later phases
+    for (const zone of file.zones ?? []) {
+      zone.nodes          ??= [];
+      zone.scripts        ??= [];
+      zone.triggerVolumes ??= [];
+      // Migrate old wall start/end format → node IDs (Phase 4.6)
+      for (const wall of zone.walls ?? []) {
+        if ('start' in wall && !('startNodeId' in wall)) {
+          const w = wall as any;
+          const sNode = { id: uuid(), x: w.start.x, z: w.start.z };
+          const eNode = { id: uuid(), x: w.end.x,   z: w.end.z   };
+          zone.nodes.push(sNode, eNode);
+          (wall as any).startNodeId = sNode.id;
+          (wall as any).endNodeId   = eNode.id;
+          delete w.start;
+          delete w.end;
+        }
+      }
+      // Ensure floors have id field (migration from pre-Phase-6 saves)
+      for (const floor of zone.floors ?? []) {
+        floor.id ??= uuid();
+      }
+    }
+    // Ensure world config has defaultSpawn
+    if (file.world && !file.world.defaultSpawn) {
+      file.world.defaultSpawn = {
+        position: { x: 0, y: 0, z: 0 },
+        zoneId:   file.zones?.[0]?.id ?? '',
+        facing:   0,
+      };
+    }
+  }
+
+  private _decodeHeightData(b64: string): Float32Array {
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Float32Array(bytes.buffer);
+  }
+}
+```
+
+#### SaveLoadPanel.tsx
+
+Shown in the top bar, always visible:
+
+```
+┌──────────────────────────────────────────┐
+│  [💾 Save]   [📂 Load]   My World  [✏️]  │
+│                                          │
+│  last saved: never                       │
+└──────────────────────────────────────────┘
+```
+
+- **Save button** — calls `bus.emit('scene:save', {})` → Three.js side serializes and triggers download
+- **Load button** — opens a hidden `<input type="file" accept=".json">`, on file selected reads text and calls `bus.emit('scene:load', { json: parsed })`
+- **World name** — editable inline, updates `worldState.metadata.name`
+- **Last saved** — updates to current time on each successful save (stored in component state, not WorldState)
+
+On `scene:save` bus event:
+```ts
+// In SceneManager or a SaveLoadController
+bus.on('scene:save', () => {
+  serializer.download(worldState);
+  bus.emit('scene:saved', { json: serializer.serialize(worldState) });
+});
+```
+
+On `scene:load` bus event:
+```ts
+bus.on('scene:load', async ({ json }) => {
+  try {
+    await loader.load(json, worldState, zoneManager, bus);
+  } catch (e) {
+    bus.emit('scene:load-error', { message: (e as Error).message });
+  }
+});
+```
+
+On `scene:load-error`: React shows a brief error toast.
+
+#### Keyboard Shortcut
+
+`Cmd+S` / `Ctrl+S` → save. Intercept in `InputManager`:
+```ts
+if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
+  e.preventDefault();
+  bus.emit('scene:save', {});
+}
+```
+
+#### Error Handling
+
+- Save: only fails if `JSON.stringify` throws (shouldn't happen with valid WorldState). Wrap in try/catch, show error toast on failure.
+- Load: validate version field, catch all errors, show descriptive error toast. Never partially apply a broken scene file — if migration or load throws, WorldState is not mutated.
+- File too large (>50MB): warn before loading, don't block.
+
+#### What This Unlocks
+
+After 6.2 you can:
+- Save your scene at the end of a session
+- Load it back the next day and continue exactly where you left off
+- Share scene files between machines
+- Keep multiple scene files as named snapshots
+
+#### New Bus Events
+
+```ts
+"scene:save-error": { message: string };
+"scene:load-error": { message: string };
+```
+(Add these to BusEvents in types.ts)
+
+
+
 ### Phase 7 — Object Placement
 - ObjectPlacer + GLTF loading via AssetManager
 - Static prop objects get optional simplified Rapier colliders (box approximation from AABB) — toggled by a `collidable` flag in asset registry
@@ -3617,12 +3807,82 @@ If this isn't already implemented from Phase 3, it must be added here.
 - TransitionManager: fade effect (CSS overlay + zone swap)
 - Editor zone jump (camera teleport) on door click
 
-### Phase 9 — Save / Load
-- WorldSerializer: toJSON, download (colliders are not serialised — they are always rebuilt from geometry data on load)
-- WorldLoader: JSON → WorldState → full mesh + collider rebuild
-- SaveLoadPanel UI
-- Auto-save to localStorage (60s interval), restore prompt on startup
-- Encoding/decoding of Float32Array terrain data
+### Phase 9 — Full Persistence
+
+Scene save/load was handled in Phase 6.2. This phase adds everything else: game state persistence, editor preferences, auto-save, and a robust startup restore flow. By the end of this phase, nothing is ever lost.
+
+#### What Phase 6.2 Already Covers (do not re-implement)
+- `WorldSerializer.download()` and `WorldLoader.load()`
+- `WorldLoader._migrate()` — field migration for old scene files
+- Save/Load buttons in SaveLoadPanel, `Cmd+S` shortcut
+- All `scene:*` bus events
+
+#### Auto-Save (Scene File Backup)
+
+A safety net — not a replacement for the explicit Save button:
+
+```ts
+setInterval(() => {
+  const json = serializer.serialize(worldState);
+  localStorage.setItem('worldeditor_autosave', JSON.stringify(json));
+  localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
+}, 60_000); // every 60 seconds
+```
+
+On startup: if autosave exists and is newer than last explicit save, show restore prompt — "Unsaved work found from [X minutes ago]. Restore?" Restore loads the autosave. Discard deletes it.
+
+#### GameStateManager.ts (`src/scripting/`)
+
+Owns all runtime game state — completely separate from the scene file:
+- Tracks player position, current zone, facing, flags, fired one-shots, inventory
+- Auto-saves to `localStorage` (`worldeditor_gamesave`) every 30 seconds during preview mode
+- Also saves on every zone transition
+- `load()` — restores from localStorage on Continue
+- `clear()` — wipes save on New Game
+- Syncs flags from `ScriptEngine` via `flag:set` bus event
+- Syncs player position from `CharacterController` via `character:position-update`
+
+#### PreferencesManager.ts (`src/core/`)
+
+User-specific settings that never belong in the scene file:
+- Quality (texture scale, shadow map size, shadows, fog, antialias)
+- Grid visible, snap enabled, snap unit, camera speed
+- Loaded on app boot before anything else
+- Written to `localStorage` (`worldeditor_prefs`) immediately on every change — no Apply button
+- Emits `prefs:changed` so React UI reflects current state
+
+#### SaveLoadPanel — Full Version
+
+Extends Phase 6.2 panel. Game save controls only visible in preview/play mode:
+
+```
+EDITOR MODE:
+[💾 Save]  [📂 Load]   My World [✏️]   Last saved: 2 min ago   [● Auto-save]
+
+PREVIEW MODE (additional row):
+[▶ New Game]  [↺ Continue]  [✕ Clear Save]   Game save: 3 flags, Zone 2
+```
+
+#### Startup Flow
+
+1. `preferencesManager.load()` — apply quality, snap, grid
+2. Check autosave — if found and recent, show restore prompt
+3. Otherwise start with empty scene or last opened (`preferences.lastOpenedScene`)
+
+#### New Bus Events
+```ts
+"scene:autosave":            Record<string, never>;
+"prefs:changed":             { prefs: EditorPreferences };
+"script:load-save":          { flags: Record<string,boolean>; firedOneShots: string[] };
+"character:position-update": { position: Vec3; zoneId: string; facing: number };
+```
+
+#### New Files
+```
+src/core/PreferencesManager.ts
+src/scripting/GameStateManager.ts
+```
+
 
 ### Phase 10 — Preview Mode (Character Controller)
 The preview camera is for checking the space, not gameplay. The character controller is built on Rapier's `KinematicCharacterController` so it is immediately game-ready.
