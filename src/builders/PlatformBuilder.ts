@@ -11,16 +11,17 @@ export interface PlatformBuildOutput {
 }
 
 export interface CutInfo {
-  mesh:       THREE.Mesh;  // world-space box for CSG
-  worldX:     number;      // cutter center world X
-  worldZ:     number;      // cutter center world Z
-  width:      number;
-  depth:      number;
-  rotX:       number;      // radians
-  rotY:       number;
-  rotZ:       number;
-  innerTileH: number;
-  innerTileV: number;
+  mesh:            THREE.Mesh;  // world-space box for CSG
+  worldX:          number;      // cutter center world X
+  worldZ:          number;      // cutter center world Z
+  width:           number;
+  depth:           number;
+  rotX:            number;      // radians
+  rotY:            number;
+  rotZ:            number;
+  innerTileH:      number;
+  innerTileV:      number;
+  innerFaceHeight: number;      // height of the passage shaft (stair rise + platform thickness)
 }
 
 // ── Shared face helper ────────────────────────────────────────────────────────
@@ -210,10 +211,11 @@ function buildInnerFaceGeo(
   const pos: number[] = [], nrm: number[] = [], uv: number[] = [], idx: number[] = [];
   let vi = 0;
   const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
-  f(pos,nrm,uv,idx,vi,  -hw,hh,hd,   hw,hh,hd,   hw,-hh,hd,  -hw,-hh,hd,  0,0, 1,  width*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,   hw,hh,-hd, -hw,hh,-hd, -hw,-hh,-hd,  hw,-hh,-hd,  0,0,-1,  width*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,   hw,hh,hd,   hw,hh,-hd,  hw,-hh,-hd,  hw,-hh,hd,  1,0, 0,  depth*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,  -hw,hh,-hd, -hw,hh,hd,  -hw,-hh,hd, -hw,-hh,-hd, -1,0, 0,  depth*tileH,height*tileV);
+  // Inward normals: faces visible from inside the hole
+  f(pos,nrm,uv,idx,vi,   hw,hh,hd,  -hw,hh,hd,  -hw,-hh,hd,   hw,-hh,hd,  0,0,-1,  width*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,  -hw,hh,-hd,  hw,hh,-hd,   hw,-hh,-hd, -hw,-hh,-hd, 0,0, 1,  width*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,   hw,hh,-hd,  hw,hh,hd,   hw,-hh,hd,   hw,-hh,-hd, -1,0, 0,  depth*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,  -hw,hh,hd,  -hw,hh,-hd, -hw,-hh,-hd, -hw,-hh,hd,  1,0, 0,  depth*tileH,height*tileV);
   return makeGeo(pos, nrm, uv, idx);
 }
 
@@ -311,10 +313,13 @@ export class PlatformBuilder {
     // ── Inner faces for CSG holes ─────────────────────────────────────────────
     if (capInWorldSpace) {
       for (const cut of cuts) {
-        const innerGeo = buildInnerFaceGeo(cut.width, cut.depth, thickness, cut.innerTileH, cut.innerTileV);
+        const innerH   = cut.innerFaceHeight;
+        const innerCY  = (p.y + thickness) - innerH / 2;  // top of shaft = platform top
+        // expand by the same padding _createCutterMesh adds so inner faces flush with hole edges
+        const innerGeo = buildInnerFaceGeo(cut.width + 0.05, cut.depth + 0.05, innerH, cut.innerTileH, cut.innerTileV);
         const innerMat = (sideMat as THREE.Material).clone();
         const innerMesh = new THREE.Mesh(innerGeo, innerMat);
-        innerMesh.position.set(cut.worldX, slabY, cut.worldZ);
+        innerMesh.position.set(cut.worldX, innerCY, cut.worldZ);
         innerMesh.rotation.set(cut.rotX, cut.rotY, cut.rotZ);
         innerMesh.receiveShadow = true;
         innerMesh.castShadow    = true;

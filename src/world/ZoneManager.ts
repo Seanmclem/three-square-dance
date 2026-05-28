@@ -735,8 +735,9 @@ export class ZoneManager {
         rotX:       (rotation?.x ?? 0) * DEG2RAD,
         rotY:       (rotation?.y ?? 0) * DEG2RAD,
         rotZ:       (rotation?.z ?? 0) * DEG2RAD,
-        innerTileH: stair.csgCutter.innerTileH ?? 1,
-        innerTileV: stair.csgCutter.innerTileV ?? 1,
+        innerTileH:      stair.csgCutter.innerTileH ?? 1,
+        innerTileV:      stair.csgCutter.innerTileV ?? 1,
+        innerFaceHeight: platform.thickness,
       });
     }
     return result;
