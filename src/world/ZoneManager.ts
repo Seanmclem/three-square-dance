@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
-import { PlatformBuilder } from "@/builders/PlatformBuilder";
+import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
@@ -532,7 +532,7 @@ export class ZoneManager {
     if (!entry) return;
     const cutters = this._getStairCuttersForPlatform(zoneId, platform);
     const { meshes, collider } = await PlatformBuilder.build(platform, zoneId, cutters);
-    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
+    for (const c of cutters) { c.mesh.geometry.dispose(); (c.mesh.material as THREE.Material).dispose(); }
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platform.id, { meshes, collider });
     this._applyDimming();
@@ -577,7 +577,7 @@ export class ZoneManager {
 
     // Build the geometry/material (potentially async due to material loading)
     const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId, cutters);
-    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
+    for (const c of cutters) { c.mesh.geometry.dispose(); (c.mesh.material as THREE.Material).dispose(); }
 
     // If a newer rebuild started while we were awaiting, discard this stale result
     if (this._platformBuildTokens.get(platformId) !== myToken) {
@@ -668,10 +668,16 @@ export class ZoneManager {
 
   private _createCutterMesh(stair: StairDef): THREE.Mesh | null {
     if (!stair.csgCutter) return null;
-    const { offset, width, depth, height } = stair.csgCutter;
+    const { offset, width, depth, height, rotation } = stair.csgCutter;
+    const DEG2RAD = Math.PI / 180;
     const geo  = new THREE.BoxGeometry(width + 0.05, height + 0.05, depth + 0.05);
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
     mesh.position.set(stair.end.x + offset.x, stair.end.y + offset.y, stair.end.z + offset.z);
+    mesh.rotation.set(
+      (rotation?.x ?? 0) * DEG2RAD,
+      (rotation?.y ?? 0) * DEG2RAD,
+      (rotation?.z ?? 0) * DEG2RAD,
+    );
     mesh.updateMatrixWorld();
     return mesh;
   }
@@ -702,7 +708,7 @@ export class ZoneManager {
     return result;
   }
 
-  private _getStairCuttersForPlatform(zoneId: string, platform: PlatformDef): THREE.Mesh[] {
+  private _getStairCuttersForPlatform(zoneId: string, platform: PlatformDef): CutInfo[] {
     const zone = this._worldState.zones.get(zoneId);
     if (!zone) return [];
     const pMinX = platform.position.x - platform.size.width  / 2;
@@ -711,15 +717,27 @@ export class ZoneManager {
     const pMaxY = platform.position.y + platform.thickness;
     const pMinZ = platform.position.z - platform.size.depth  / 2;
     const pMaxZ = platform.position.z + platform.size.depth  / 2;
-    const result: THREE.Mesh[] = [];
+    const DEG2RAD = Math.PI / 180;
+    const result: CutInfo[] = [];
     for (const stair of zone.stairs) {
       if (!stair.csgCutter) continue;
-      const { offset, width, depth, height } = stair.csgCutter;
+      const { offset, width, depth, height, rotation } = stair.csgCutter;
       const cx = stair.end.x + offset.x, cy = stair.end.y + offset.y, cz = stair.end.z + offset.z;
       if (cx + width / 2 < pMinX || cx - width / 2 > pMaxX) continue;
       if (cy + height / 2 < pMinY || cy - height / 2 > pMaxY) continue;
       if (cz + depth / 2 < pMinZ || cz - depth / 2 > pMaxZ) continue;
-      result.push(this._createCutterMesh(stair)!);
+      result.push({
+        mesh:       this._createCutterMesh(stair)!,
+        worldX:     cx,
+        worldZ:     cz,
+        width,
+        depth,
+        rotX:       (rotation?.x ?? 0) * DEG2RAD,
+        rotY:       (rotation?.y ?? 0) * DEG2RAD,
+        rotZ:       (rotation?.z ?? 0) * DEG2RAD,
+        innerTileH: stair.csgCutter.innerTileH ?? 1,
+        innerTileV: stair.csgCutter.innerTileV ?? 1,
+      });
     }
     return result;
   }

@@ -10,6 +10,19 @@ export interface PlatformBuildOutput {
   collider:  RAPIER.Collider;
 }
 
+export interface CutInfo {
+  mesh:       THREE.Mesh;  // world-space box for CSG
+  worldX:     number;      // cutter center world X
+  worldZ:     number;      // cutter center world Z
+  width:      number;
+  depth:      number;
+  rotX:       number;      // radians
+  rotY:       number;
+  rotZ:       number;
+  innerTileH: number;
+  innerTileV: number;
+}
+
 // ── Shared face helper ────────────────────────────────────────────────────────
 
 function pushFace(
@@ -187,10 +200,27 @@ function buildPolygonSideGeo(points: Vec2[], cx: number, cz: number, thickness: 
   return makeGeo(pos, nrm, uv, idx);
 }
 
+// ── Inner face geometry (walls of a rectangular hole) ────────────────────────
+
+function buildInnerFaceGeo(
+  width: number, depth: number, height: number,
+  tileH: number, tileV: number,
+): THREE.BufferGeometry {
+  const hw = width / 2, hh = height / 2, hd = depth / 2;
+  const pos: number[] = [], nrm: number[] = [], uv: number[] = [], idx: number[] = [];
+  let vi = 0;
+  const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
+  f(pos,nrm,uv,idx,vi,  -hw,hh,hd,   hw,hh,hd,   hw,-hh,hd,  -hw,-hh,hd,  0,0, 1,  width*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,   hw,hh,-hd, -hw,hh,-hd, -hw,-hh,-hd,  hw,-hh,-hd,  0,0,-1,  width*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,   hw,hh,hd,   hw,hh,-hd,  hw,-hh,-hd,  hw,-hh,hd,  1,0, 0,  depth*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,  -hw,hh,-hd, -hw,hh,hd,  -hw,-hh,hd, -hw,-hh,-hd, -1,0, 0,  depth*tileH,height*tileV);
+  return makeGeo(pos, nrm, uv, idx);
+}
+
 // ── Builder ───────────────────────────────────────────────────────────────────
 
 export class PlatformBuilder {
-  static async build(platform: PlatformDef, zoneId: string, cutterMeshes: THREE.Mesh[] = []): Promise<PlatformBuildOutput> {
+  static async build(platform: PlatformDef, zoneId: string, cuts: CutInfo[] = []): Promise<PlatformBuildOutput> {
     const ovr     = platform.materialOverrides;
     const baseDef = assetManager.getMaterialDef(platform.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
@@ -231,15 +261,15 @@ export class PlatformBuilder {
 
     // Apply CSG cuts — translate cap geo to world space, cut, result stays in world space
     let capInWorldSpace = false;
-    if (cutterMeshes.length > 0) {
+    if (cuts.length > 0) {
       const worldCapGeo = capGeo.clone();
       worldCapGeo.translate(p.x, slabY, p.z);
       let workMesh: THREE.Mesh = new THREE.Mesh(worldCapGeo, new THREE.MeshBasicMaterial());
       workMesh.updateMatrixWorld();
       let prevIsOriginal = true;
-      for (const cutter of cutterMeshes) {
+      for (const cut of cuts) {
         const prev = workMesh;
-        workMesh = csgSubtract(workMesh, cutter);
+        workMesh = csgSubtract(workMesh, cut.mesh);
         workMesh.updateMatrixWorld();
         if (!prevIsOriginal) prev.geometry.dispose();
         prevIsOriginal = false;
@@ -277,6 +307,28 @@ export class PlatformBuilder {
       _ownsMaterial: !!(sideMatId && sideOvr),
     } satisfies MeshUserData;
     meshes.push(sideMesh);
+
+    // ── Inner faces for CSG holes ─────────────────────────────────────────────
+    if (capInWorldSpace) {
+      for (const cut of cuts) {
+        const innerGeo = buildInnerFaceGeo(cut.width, cut.depth, thickness, cut.innerTileH, cut.innerTileV);
+        const innerMat = (sideMat as THREE.Material).clone();
+        const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+        innerMesh.position.set(cut.worldX, slabY, cut.worldZ);
+        innerMesh.rotation.set(cut.rotX, cut.rotY, cut.rotZ);
+        innerMesh.receiveShadow = true;
+        innerMesh.castShadow    = true;
+        innerMesh.userData = {
+          editorId:      platform.id,
+          editorType:    "platform",
+          zoneId,
+          selectable:    false,
+          floorLevel,
+          _ownsMaterial: true,
+        } satisfies MeshUserData;
+        meshes.push(innerMesh);
+      }
+    }
 
     // ── Railings ─────────────────────────────────────────────────────────────
     if (platform.hasRailing) {

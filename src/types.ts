@@ -267,10 +267,13 @@ export interface PlatformDef {
 }
 
 export interface StairCutterDef {
-  offset: Vec3;
-  width:  number;
-  depth:  number;
-  height: number;
+  offset:      Vec3;
+  width:       number;
+  depth:       number;
+  height:      number;
+  rotation?:   Vec3;    // degrees (X/Y/Z); Y defaults to stair angle on enable
+  innerTileH?: number;  // UV tiling along width/depth of inner faces
+  innerTileV?: number;  // UV tiling along thickness of inner faces
 }
 
 export interface StairDef {

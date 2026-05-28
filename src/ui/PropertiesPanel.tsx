@@ -1207,6 +1207,13 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
     y: String(stair?.csgCutter?.offset.y ?? 1.1),
     z: String(stair?.csgCutter?.offset.z ?? 0),
   });
+  const [cutRot,     setCutRot]     = useState({
+    x: String(stair?.csgCutter?.rotation?.x ?? 0),
+    y: String(stair?.csgCutter?.rotation?.y ?? 0),
+    z: String(stair?.csgCutter?.rotation?.z ?? 0),
+  });
+  const [cutInnerH,  setCutInnerH]  = useState(String(stair?.csgCutter?.innerTileH ?? 1));
+  const [cutInnerV,  setCutInnerV]  = useState(String(stair?.csgCutter?.innerTileV ?? 1));
 
   // Full reset when a different stair is selected
   useEffect(() => {
@@ -1226,6 +1233,13 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
       y: String(stair.csgCutter?.offset.y ?? 1.1),
       z: String(stair.csgCutter?.offset.z ?? 0),
     });
+    setCutRot({
+      x: String(stair.csgCutter?.rotation?.x ?? 0),
+      y: String(stair.csgCutter?.rotation?.y ?? 0),
+      z: String(stair.csgCutter?.rotation?.z ?? 0),
+    });
+    setCutInnerH(String(stair.csgCutter?.innerTileH ?? 1));
+    setCutInnerV(String(stair.csgCutter?.innerTileV ?? 1));
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync end/steps UI after a rebuild updates the data
@@ -1288,13 +1302,26 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   const toggleCutter = (checked: boolean) => {
     setHasCutter(checked);
     if (checked) {
-      const w = parseFloat(cutW) || stair.width;
-      const d = parseFloat(cutD) || 1.0;
-      const h = parseFloat(cutH) || 2.2;
+      const w  = parseFloat(cutW)  || stair.width;
+      const d  = parseFloat(cutD)  || 1.0;
+      const h  = parseFloat(cutH)  || 2.2;
       const ox = parseFloat(cutOff.x) || 0;
       const oy = parseFloat(cutOff.y) || h / 2;
       const oz = parseFloat(cutOff.z) || 0;
-      onObjectUpdate({ csgCutter: { offset: { x: ox, y: oy, z: oz }, width: w, depth: d, height: h } } as unknown as Partial<WorldObject>);
+      // Default Y rotation aligns cut box width with stair width direction
+      const angle = Math.atan2(stair.end.z - stair.start.z, stair.end.x - stair.start.x);
+      const defRotY = -(90 + angle * (180 / Math.PI));
+      const rx = parseFloat(cutRot.x) || 0;
+      const ry = parseFloat(cutRot.y) || defRotY;
+      const rz = parseFloat(cutRot.z) || 0;
+      setCutRot({ x: String(rx), y: String(Number(defRotY.toFixed(2))), z: String(rz) });
+      const ih = parseFloat(cutInnerH) || 1;
+      const iv = parseFloat(cutInnerV) || 1;
+      onObjectUpdate({ csgCutter: {
+        offset: { x: ox, y: oy, z: oz }, width: w, depth: d, height: h,
+        rotation: { x: rx, y: ry, z: rz },
+        innerTileH: ih, innerTileV: iv,
+      } } as unknown as Partial<WorldObject>);
     } else {
       onObjectUpdate({ csgCutter: undefined } as unknown as Partial<WorldObject>);
     }
@@ -1314,6 +1341,22 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
     const cur = stair.csgCutter;
     if (!cur) return;
     onObjectUpdate({ csgCutter: { ...cur, offset: { ...cur.offset, [axis]: n } } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitCutterRotation = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const cur = stair.csgCutter;
+    if (!cur) return;
+    onObjectUpdate({ csgCutter: { ...cur, rotation: { ...(cur.rotation ?? { x: 0, y: 0, z: 0 }), [axis]: n } } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitCutterInnerTile = (field: "innerTileH" | "innerTileV", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const cur = stair.csgCutter;
+    if (!cur) return;
+    onObjectUpdate({ csgCutter: { ...cur, [field]: n } } as unknown as Partial<WorldObject>);
   };
 
   const vecRow = (
@@ -1491,6 +1534,49 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
                 </div>
                 <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 3 }}>
                   Y offset = half height puts box bottom at stair end
+                </div>
+              </div>
+
+              <div>
+                <div style={LABEL}>ROTATION (DEG)</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["x", "y", "z"] as const).map((axis, i) => (
+                    <div key={axis} style={{
+                      flex: 1, display: "flex", gap: 3, alignItems: "center",
+                      background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+                      borderRadius: 4, padding: "2px 5px",
+                    }}>
+                      <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
+                      <input
+                        type="number" step={1}
+                        value={cutRot[axis]}
+                        onChange={e => setCutRot(p => ({ ...p, [axis]: e.target.value }))}
+                        onBlur={e => commitCutterRotation(axis, e.target.value)}
+                        onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterRotation(axis, (e.target as HTMLInputElement).value); }}
+                        style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={LABEL}>INNER TILING</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                  {([["T+B", cutInnerH, setCutInnerH, "innerTileH"], ["L+R", cutInnerV, setCutInnerV, "innerTileV"]] as const).map(
+                    ([lbl, val, setter, field]) => (
+                      <div key={field}>
+                        <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                        <input
+                          type="number" step={0.25} min={0.1} value={val}
+                          style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                          onChange={e => setter(e.target.value)}
+                          onBlur={e => commitCutterInnerTile(field, e.target.value)}
+                          onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterInnerTile(field, (e.target as HTMLInputElement).value); }}
+                        />
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
             </>

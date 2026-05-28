@@ -235,6 +235,12 @@ export class StairBuilder {
         new THREE.LineBasicMaterial({ color: 0xffdd00, depthTest: false, transparent: true, opacity: 0.8 }),
       );
       wireframe.position.set(wx, wy, wz);
+      const DEG2RAD = Math.PI / 180;
+      wireframe.rotation.set(
+        (stair.csgCutter.rotation?.x ?? 0) * DEG2RAD,
+        (stair.csgCutter.rotation?.y ?? 0) * DEG2RAD,
+        (stair.csgCutter.rotation?.z ?? 0) * DEG2RAD,
+      );
       wireframe.userData = {
         editorId: stair.id, editorType: "stair", zoneId,
         selectable: false, floorLevel: 0, _ownsMaterial: true, editorOnly: true,
