@@ -220,6 +220,28 @@ export class StairBuilder {
       }
     }
 
+    // ── CSG cutter wireframe ─────────────────────────────────────────────────
+    if (stair.csgCutter) {
+      const { offset, width, depth, height } = stair.csgCutter;
+      const wx = stair.end.x + offset.x;
+      const wy = stair.end.y + offset.y;
+      const wz = stair.end.z + offset.z;
+
+      const boxGeo   = new THREE.BoxGeometry(width, height, depth);
+      const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+      boxGeo.dispose();
+      const wireframe = new THREE.LineSegments(
+        edgesGeo,
+        new THREE.LineBasicMaterial({ color: 0xffdd00, depthTest: false, transparent: true, opacity: 0.8 }),
+      );
+      wireframe.position.set(wx, wy, wz);
+      wireframe.userData = {
+        editorId: stair.id, editorType: "stair", zoneId,
+        selectable: false, floorLevel: 0, _ownsMaterial: true, editorOnly: true,
+      } satisfies MeshUserData;
+      meshes.push(wireframe as unknown as THREE.Mesh);
+    }
+
     const colliders = ColliderBuilder.registerStairSteps(stair);
     return { meshes, colliders };
   }

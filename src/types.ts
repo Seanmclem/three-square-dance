@@ -160,6 +160,7 @@ export interface MeshUserData {
   openingId?:              string;
   wallId?:                 string;
   assetId?:                string;
+  editorOnly?:             boolean;
 }
 
 // ─── Scene file data model ────────────────────────────────────────────────────
@@ -265,6 +266,13 @@ export interface PlatformDef {
   sideMaterialOverrides?: MaterialOverrides;
 }
 
+export interface StairCutterDef {
+  offset: Vec3;
+  width:  number;
+  depth:  number;
+  height: number;
+}
+
 export interface StairDef {
   id:          string;
   start:       Vec3;
@@ -277,6 +285,7 @@ export interface StairDef {
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
+  csgCutter?:              StairCutterDef;
 }
 
 export interface ObjectProperties {

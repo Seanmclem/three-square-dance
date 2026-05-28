@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
+import { csgSubtract } from "@/utils/csg";
 import type { PlatformDef, MeshUserData, Vec2 } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -189,7 +190,7 @@ function buildPolygonSideGeo(points: Vec2[], cx: number, cz: number, thickness: 
 // ── Builder ───────────────────────────────────────────────────────────────────
 
 export class PlatformBuilder {
-  static async build(platform: PlatformDef, zoneId: string): Promise<PlatformBuildOutput> {
+  static async build(platform: PlatformDef, zoneId: string, cutterMeshes: THREE.Mesh[] = []): Promise<PlatformBuildOutput> {
     const ovr     = platform.materialOverrides;
     const baseDef = assetManager.getMaterialDef(platform.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
@@ -219,7 +220,7 @@ export class PlatformBuilder {
 
     const isPolygon = !!(platform.points && platform.points.length >= 3);
 
-    const capGeo  = isPolygon
+    let capGeo  = isPolygon
       ? buildPolygonCapGeo(platform.points!, p.x, p.z, thickness, tileScale)
       : buildSlabCapGeo(size.width, thickness, size.depth, tileScale);
     const sideGeo = isPolygon
@@ -228,8 +229,29 @@ export class PlatformBuilder {
 
     const slabY = p.y + thickness / 2;
 
+    // Apply CSG cuts — translate cap geo to world space, cut, result stays in world space
+    let capInWorldSpace = false;
+    if (cutterMeshes.length > 0) {
+      const worldCapGeo = capGeo.clone();
+      worldCapGeo.translate(p.x, slabY, p.z);
+      let workMesh: THREE.Mesh = new THREE.Mesh(worldCapGeo, new THREE.MeshBasicMaterial());
+      workMesh.updateMatrixWorld();
+      let prevIsOriginal = true;
+      for (const cutter of cutterMeshes) {
+        const prev = workMesh;
+        workMesh = csgSubtract(workMesh, cutter);
+        workMesh.updateMatrixWorld();
+        if (!prevIsOriginal) prev.geometry.dispose();
+        prevIsOriginal = false;
+      }
+      worldCapGeo.dispose();
+      capGeo = workMesh.geometry;
+      capGeo.setAttribute('uv2', capGeo.attributes['uv']?.clone() ?? capGeo.attributes['position'].clone());
+      capInWorldSpace = true;
+    }
+
     const capMesh = new THREE.Mesh(capGeo, mat);
-    capMesh.position.set(p.x, slabY, p.z);
+    capMesh.position.set(capInWorldSpace ? 0 : p.x, capInWorldSpace ? 0 : slabY, capInWorldSpace ? 0 : p.z);
     capMesh.receiveShadow = true;
     capMesh.castShadow    = true;
     capMesh.userData = {

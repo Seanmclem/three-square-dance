@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef,
+  PlatformDef, StairDef, StairCutterDef,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -1198,6 +1198,16 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   const [hasRailing, setHasRailing] = useState(stair?.hasRailing ?? false);
   const [linked,     setLinked]     = useState(false);
 
+  const [hasCutter,  setHasCutter]  = useState(!!(stair?.csgCutter));
+  const [cutW,       setCutW]       = useState(String(stair?.csgCutter?.width  ?? stair?.width ?? 2.5));
+  const [cutD,       setCutD]       = useState(String(stair?.csgCutter?.depth  ?? 1.0));
+  const [cutH,       setCutH]       = useState(String(stair?.csgCutter?.height ?? 2.2));
+  const [cutOff,     setCutOff]     = useState({
+    x: String(stair?.csgCutter?.offset.x ?? 0),
+    y: String(stair?.csgCutter?.offset.y ?? 1.1),
+    z: String(stair?.csgCutter?.offset.z ?? 0),
+  });
+
   // Full reset when a different stair is selected
   useEffect(() => {
     if (!stair) return;
@@ -1207,6 +1217,15 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
     setStepsStr(String(effectiveSteps(stair)));
     setHasRailing(stair.hasRailing);
     setLinked(false);
+    setHasCutter(!!(stair.csgCutter));
+    setCutW(String(stair.csgCutter?.width  ?? stair.width));
+    setCutD(String(stair.csgCutter?.depth  ?? 1.0));
+    setCutH(String(stair.csgCutter?.height ?? 2.2));
+    setCutOff({
+      x: String(stair.csgCutter?.offset.x ?? 0),
+      y: String(stair.csgCutter?.offset.y ?? 1.1),
+      z: String(stair.csgCutter?.offset.z ?? 0),
+    });
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync end/steps UI after a rebuild updates the data
@@ -1264,6 +1283,37 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
   const toggleRailing = (checked: boolean) => {
     setHasRailing(checked);
     onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>);
+  };
+
+  const toggleCutter = (checked: boolean) => {
+    setHasCutter(checked);
+    if (checked) {
+      const w = parseFloat(cutW) || stair.width;
+      const d = parseFloat(cutD) || 1.0;
+      const h = parseFloat(cutH) || 2.2;
+      const ox = parseFloat(cutOff.x) || 0;
+      const oy = parseFloat(cutOff.y) || h / 2;
+      const oz = parseFloat(cutOff.z) || 0;
+      onObjectUpdate({ csgCutter: { offset: { x: ox, y: oy, z: oz }, width: w, depth: d, height: h } } as unknown as Partial<WorldObject>);
+    } else {
+      onObjectUpdate({ csgCutter: undefined } as unknown as Partial<WorldObject>);
+    }
+  };
+
+  const commitCutter = (field: "width" | "depth" | "height", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const cur = stair.csgCutter;
+    if (!cur) return;
+    onObjectUpdate({ csgCutter: { ...cur, [field]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitCutterOffset = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const cur = stair.csgCutter;
+    if (!cur) return;
+    onObjectUpdate({ csgCutter: { ...cur, offset: { ...cur.offset, [axis]: n } } } as unknown as Partial<WorldObject>);
   };
 
   const vecRow = (
@@ -1384,6 +1434,68 @@ function StairView({ selected, materialList, onObjectUpdate, onAddMaterial }: {
           onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
           onAddMaterial={onAddMaterial}
         />
+
+        {/* CUT BOX */}
+        <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox" checked={hasCutter}
+              onChange={e => toggleCutter(e.target.checked)}
+              style={{ accentColor: "#ffdd00", cursor: "pointer" }}
+            />
+            <span style={{ color: hasCutter ? "#ffdd77" : "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>CUT BOX</span>
+          </label>
+
+          {hasCutter && (
+            <>
+              <div>
+                <div style={LABEL}>SIZE (W / D / H)</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+                  {([["W", cutW, setCutW, "width"], ["D", cutD, setCutD, "depth"], ["H", cutH, setCutH, "height"]] as const).map(
+                    ([lbl, val, setter, field]) => (
+                      <div key={field}>
+                        <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                        <input
+                          type="number" step={0.1} min={0.1} value={val}
+                          style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                          onChange={e => setter(e.target.value)}
+                          onBlur={e => commitCutter(field, e.target.value)}
+                          onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutter(field, (e.target as HTMLInputElement).value); }}
+                        />
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <div style={LABEL}>OFFSET FROM END</div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["x", "y", "z"] as const).map((axis, i) => (
+                    <div key={axis} style={{
+                      flex: 1, display: "flex", gap: 3, alignItems: "center",
+                      background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+                      borderRadius: 4, padding: "2px 5px",
+                    }}>
+                      <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
+                      <input
+                        type="number" step={0.1}
+                        value={cutOff[axis]}
+                        onChange={e => setCutOff(p => ({ ...p, [axis]: e.target.value }))}
+                        onBlur={e => commitCutterOffset(axis, e.target.value)}
+                        onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterOffset(axis, (e.target as HTMLInputElement).value); }}
+                        style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 3 }}>
+                  Y offset = half height puts box bottom at stair end
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </>
   );

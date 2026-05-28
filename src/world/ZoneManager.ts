@@ -27,6 +27,7 @@ interface StairEntry {
   group:     THREE.Group;
   meshes:    THREE.Mesh[];
   colliders: RAPIER.Collider[];
+  def:       StairDef;
 }
 
 interface ZoneEntry {
@@ -171,8 +172,12 @@ export class ZoneManager {
         void this._rebuildStair(zoneId, id);
       }),
       this._bus.on("stair:removed", ({ zoneId, id }) => {
+        const oldDef = this._loadedZones.get(zoneId)?.stairEntries.get(id)?.def;
         this._removeStair(zoneId, id);
+        if (oldDef?.csgCutter) void this._rebuildOverlapping(zoneId, oldDef);
       }),
+      this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
+      this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
     );
   }
 
@@ -278,7 +283,7 @@ export class ZoneManager {
       const stairGroup = makeStairGroup(stair.id, zoneId);
       for (const m of meshes) stairGroup.add(m);
       stairsGroup.add(stairGroup);
-      stairEntries.set(stair.id, { group: stairGroup, meshes, colliders });
+      stairEntries.set(stair.id, { group: stairGroup, meshes, colliders, def: stair });
     }
 
     this._scene.add(group);
@@ -286,6 +291,11 @@ export class ZoneManager {
       group, floorsGroup, wallsGroup, platformsGroup, stairsGroup,
       floorColliders, wallData, platformEntries, stairEntries,
     });
+
+    // Second pass: apply CSG cuts from any stairs with cutters
+    for (const stair of zone.stairs) {
+      if (stair.csgCutter) await this._rebuildOverlapping(zoneId, stair);
+    }
 
     // Apply current dimming level after loading
     this._applyDimming();
@@ -326,7 +336,7 @@ export class ZoneManager {
 
     this._scene.remove(entry.group);
     entry.group.traverse(child => {
-      if (child instanceof THREE.Mesh) {
+      if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
         child.geometry.dispose();
         if ((child.userData as { _ownsMaterial?: boolean })._ownsMaterial)
           (child.material as THREE.Material).dispose();
@@ -347,7 +357,9 @@ export class ZoneManager {
 
     const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
     const resolved   = { ...floor, floorMesh: resolveFloorMesh(floor.floorMesh, zone) };
-    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
+    const cutters    = this._getStairCuttersForFloor(zoneId, resolved);
+    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex, cutters);
+    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floor.id, collider);
     this._applyDimming();
@@ -381,7 +393,9 @@ export class ZoneManager {
 
     const levelIndex = zone.floors.filter(f => f.level === floor.level).indexOf(floor);
     const resolved   = { ...floor, floorMesh: resolveFloorMesh(floor.floorMesh, zone) };
-    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex);
+    const cutters    = this._getStairCuttersForFloor(zoneId, resolved);
+    const { mesh, collider } = await FloorBuilder.build(resolved, zone.bounds, zoneId, levelIndex, cutters);
+    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floorId, collider);
     this._applyDimming();
@@ -516,7 +530,9 @@ export class ZoneManager {
   private async _addPlatform(zoneId: string, platform: PlatformDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
-    const { meshes, collider } = await PlatformBuilder.build(platform, zoneId);
+    const cutters = this._getStairCuttersForPlatform(zoneId, platform);
+    const { meshes, collider } = await PlatformBuilder.build(platform, zoneId, cutters);
+    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platform.id, { meshes, collider });
     this._applyDimming();
@@ -556,8 +572,12 @@ export class ZoneManager {
       }
     }
 
+    // Compute cutter meshes before the async gap so we read current stair state
+    const cutters = this._getStairCuttersForPlatform(zoneId, resolved);
+
     // Build the geometry/material (potentially async due to material loading)
-    const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId);
+    const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId, cutters);
+    for (const c of cutters) { c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
 
     // If a newer rebuild started while we were awaiting, discard this stale result
     if (this._platformBuildTokens.get(platformId) !== myToken) {
@@ -607,17 +627,21 @@ export class ZoneManager {
     const stairGroup = makeStairGroup(stair.id, zoneId);
     for (const m of meshes) stairGroup.add(m);
     entry.stairsGroup.add(stairGroup);
-    entry.stairEntries.set(stair.id, { group: stairGroup, meshes, colliders });
+    entry.stairEntries.set(stair.id, { group: stairGroup, meshes, colliders, def: stair });
     this._applyDimming();
+    if (stair.csgCutter) await this._rebuildOverlapping(zoneId, stair);
   }
 
   private async _rebuildStair(zoneId: string, stairId: string): Promise<void> {
     const zone = this._worldState.zones.get(zoneId);
     if (!zone) return;
+    const oldDef = this._loadedZones.get(zoneId)?.stairEntries.get(stairId)?.def;
     this._removeStair(zoneId, stairId);
     const stair = zone.stairs.find(s => s.id === stairId);
     if (!stair) return;
-    await this._addStair(zoneId, stair);
+    await this._addStair(zoneId, stair);  // handles new csgCutter
+    // If old cutter existed but new one doesn't (or moved), rebuild what old cutter covered
+    if (oldDef?.csgCutter) await this._rebuildOverlapping(zoneId, oldDef);
     this._bus.emit("stair:rebuilt", { zoneId, stairId });
   }
 
@@ -638,6 +662,117 @@ export class ZoneManager {
     }
     entry.stairsGroup.remove(se.group);
     entry.stairEntries.delete(stairId);
+  }
+
+  // ── CSG cutter helpers ────────────────────────────────────────────────────
+
+  private _createCutterMesh(stair: StairDef): THREE.Mesh | null {
+    if (!stair.csgCutter) return null;
+    const { offset, width, depth, height } = stair.csgCutter;
+    const geo  = new THREE.BoxGeometry(width + 0.05, height + 0.05, depth + 0.05);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+    mesh.position.set(stair.end.x + offset.x, stair.end.y + offset.y, stair.end.z + offset.z);
+    mesh.updateMatrixWorld();
+    return mesh;
+  }
+
+  private _getStairCuttersForFloor(zoneId: string, floor: FloorDef): THREE.Mesh[] {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return [];
+    const pts  = floor.floorMesh.points ?? [];
+    let fMinX: number, fMaxX: number, fMinZ: number, fMaxZ: number;
+    if (pts.length > 0) {
+      fMinX = Math.min(...pts.map(p => p.x)); fMaxX = Math.max(...pts.map(p => p.x));
+      fMinZ = Math.min(...pts.map(p => p.z)); fMaxZ = Math.max(...pts.map(p => p.z));
+    } else {
+      fMinX = zone.bounds.x;                  fMaxX = zone.bounds.x + zone.bounds.width;
+      fMinZ = zone.bounds.z;                  fMaxZ = zone.bounds.z + zone.bounds.depth;
+    }
+    const fY = floor.elevation;
+    const result: THREE.Mesh[] = [];
+    for (const stair of zone.stairs) {
+      if (!stair.csgCutter) continue;
+      const { offset, width, depth, height } = stair.csgCutter;
+      const cx = stair.end.x + offset.x, cy = stair.end.y + offset.y, cz = stair.end.z + offset.z;
+      if (cx + width / 2  < fMinX || cx - width / 2  > fMaxX) continue;
+      if (cy - height / 2 > fY + 0.1 || cy + height / 2 < fY - 0.1) continue;
+      if (cz + depth / 2  < fMinZ || cz - depth / 2  > fMaxZ) continue;
+      result.push(this._createCutterMesh(stair)!);
+    }
+    return result;
+  }
+
+  private _getStairCuttersForPlatform(zoneId: string, platform: PlatformDef): THREE.Mesh[] {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return [];
+    const pMinX = platform.position.x - platform.size.width  / 2;
+    const pMaxX = platform.position.x + platform.size.width  / 2;
+    const pMinY = platform.position.y;
+    const pMaxY = platform.position.y + platform.thickness;
+    const pMinZ = platform.position.z - platform.size.depth  / 2;
+    const pMaxZ = platform.position.z + platform.size.depth  / 2;
+    const result: THREE.Mesh[] = [];
+    for (const stair of zone.stairs) {
+      if (!stair.csgCutter) continue;
+      const { offset, width, depth, height } = stair.csgCutter;
+      const cx = stair.end.x + offset.x, cy = stair.end.y + offset.y, cz = stair.end.z + offset.z;
+      if (cx + width / 2 < pMinX || cx - width / 2 > pMaxX) continue;
+      if (cy + height / 2 < pMinY || cy - height / 2 > pMaxY) continue;
+      if (cz + depth / 2 < pMinZ || cz - depth / 2 > pMaxZ) continue;
+      result.push(this._createCutterMesh(stair)!);
+    }
+    return result;
+  }
+
+  private async _rebuildOverlapping(zoneId: string, stair: StairDef): Promise<void> {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone || !stair.csgCutter) return;
+    const { offset, width, depth, height } = stair.csgCutter;
+    const cx = stair.end.x + offset.x, cy = stair.end.y + offset.y, cz = stair.end.z + offset.z;
+    const cMinX = cx - width / 2, cMaxX = cx + width / 2;
+    const cMinY = cy - height / 2, cMaxY = cy + height / 2;
+    const cMinZ = cz - depth / 2, cMaxZ = cz + depth / 2;
+
+    for (const floor of zone.floors) {
+      const resolved = resolveFloorMesh(floor.floorMesh, zone);
+      const pts = resolved.points ?? [];
+      let fMinX: number, fMaxX: number, fMinZ: number, fMaxZ: number;
+      if (pts.length > 0) {
+        fMinX = Math.min(...pts.map(p => p.x)); fMaxX = Math.max(...pts.map(p => p.x));
+        fMinZ = Math.min(...pts.map(p => p.z)); fMaxZ = Math.max(...pts.map(p => p.z));
+      } else {
+        fMinX = zone.bounds.x;                  fMaxX = zone.bounds.x + zone.bounds.width;
+        fMinZ = zone.bounds.z;                  fMaxZ = zone.bounds.z + zone.bounds.depth;
+      }
+      if (cMaxX < fMinX || cMinX > fMaxX) continue;
+      if (cMaxY < floor.elevation - 0.1 || cMinY > floor.elevation + 0.1) continue;
+      if (cMaxZ < fMinZ || cMinZ > fMaxZ) continue;
+      await this._rebuildFloor(zoneId, floor.id);
+    }
+
+    for (const platform of zone.platforms) {
+      const pMinX = platform.position.x - platform.size.width  / 2;
+      const pMaxX = platform.position.x + platform.size.width  / 2;
+      const pMinY = platform.position.y;
+      const pMaxY = platform.position.y + platform.thickness;
+      const pMinZ = platform.position.z - platform.size.depth  / 2;
+      const pMaxZ = platform.position.z + platform.size.depth  / 2;
+      if (cMaxX < pMinX || cMinX > pMaxX) continue;
+      if (cMaxY < pMinY || cMinY > pMaxY) continue;
+      if (cMaxZ < pMinZ || cMinZ > pMaxZ) continue;
+      await this._rebuildPlatform(zoneId, platform.id);
+    }
+  }
+
+  private _setEditorOnlyVisible(visible: boolean): void {
+    for (const [, zone] of this._loadedZones) {
+      for (const [, se] of zone.stairEntries) {
+        for (const mesh of se.meshes) {
+          if ((mesh.userData as { editorOnly?: boolean }).editorOnly)
+            mesh.visible = visible;
+        }
+      }
+    }
   }
 
   // ── Floor dimming ─────────────────────────────────────────────────────────

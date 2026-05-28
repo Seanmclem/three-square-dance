@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
+import { csgSubtract } from "@/utils/csg";
 import type { FloorDef, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -15,6 +16,7 @@ export class FloorBuilder {
     _bounds: { x: number; z: number; width: number; depth: number },
     zoneId: string,
     levelIndex = 0,
+    cutterMeshes: THREE.Mesh[] = [],
   ): Promise<FloorBuildOutput> {
     const pts  = floor.floorMesh.points ?? [];
     const yBase = floor.elevation + 0.004 + 0.001 * levelIndex;
@@ -81,6 +83,22 @@ export class FloorBuilder {
       rectGeo.setAttribute('uv2', rectGeo.attributes.uv);
       geo = rectGeo;
       colliderBounds = { x: minX, z: minZ, width: w, depth: d };
+    }
+
+    // Apply CSG cuts — geometry is already in world space (translate was applied above)
+    if (cutterMeshes.length > 0) {
+      let workMesh: THREE.Mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+      workMesh.updateMatrixWorld();
+      let prevIsOriginal = true;
+      for (const cutter of cutterMeshes) {
+        const prev = workMesh;
+        workMesh = csgSubtract(workMesh, cutter);
+        workMesh.updateMatrixWorld();
+        if (!prevIsOriginal) prev.geometry.dispose();
+        prevIsOriginal = false;
+      }
+      geo = workMesh.geometry;
+      geo.setAttribute('uv2', geo.attributes['uv']!.clone());
     }
 
     const mat = ovr
