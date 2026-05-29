@@ -1,9 +1,12 @@
+import { useRef } from "react";
 import { HelpButton } from "@/ui/HelpButton";
 
 interface TopBarProps {
   activeFloor:     number;
   onFloorChange:   (level: number) => void;
   onCameraTopDown: () => void;
+  onSave:          () => void;
+  onLoad:          (json: unknown) => void;
 }
 
 const FLOORS = [
@@ -13,7 +16,25 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown }: TopBarProps) {
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad }: TopBarProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target?.result as string);
+        onLoad(json);
+      } catch {
+        console.error("Invalid scene file — could not parse JSON");
+      }
+      if (fileRef.current) fileRef.current.value = "";
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div style={{
       position: "absolute", top: 0, left: 64, right: 280, height: 48,
@@ -61,18 +82,33 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown }: TopBarPr
       <HelpButton />
       <div style={{ flex: 1 }} />
 
-      {(["Save", "Load"] as const).map(label => (
-        <button
-          key={label}
-          style={{
-            padding: "4px 12px", border: "1px solid rgba(80,120,180,0.3)",
-            borderRadius: 6, background: "transparent", color: "#7a9ab8",
-            fontSize: 11, cursor: "pointer", letterSpacing: 1,
-          }}
-        >
-          {label}
-        </button>
-      ))}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".json"
+        style={{ display: "none" }}
+        onChange={handleFileChange}
+      />
+      <button
+        onClick={onSave}
+        style={{
+          padding: "4px 12px", border: "1px solid rgba(80,120,180,0.3)",
+          borderRadius: 6, background: "transparent", color: "#7a9ab8",
+          fontSize: 11, cursor: "pointer", letterSpacing: 1,
+        }}
+      >
+        Save
+      </button>
+      <button
+        onClick={() => fileRef.current?.click()}
+        style={{
+          padding: "4px 12px", border: "1px solid rgba(80,120,180,0.3)",
+          borderRadius: 6, background: "transparent", color: "#7a9ab8",
+          fontSize: 11, cursor: "pointer", letterSpacing: 1,
+        }}
+      >
+        Load
+      </button>
     </div>
   );
 }

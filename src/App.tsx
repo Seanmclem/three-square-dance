@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
@@ -20,7 +20,8 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile } from "@/types";
+import { migrateWallNodes } from "@/world/WorldLoader";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -43,6 +44,7 @@ export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const busRef    = useRef<EventBus>(new EventBus());
   const worldRef  = useRef<WorldState | null>(null);
+  const zonesRef  = useRef<ZoneManager | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
@@ -67,9 +69,10 @@ export default function App() {
     }).catch(err => console.error("initMaterials failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
+    const zones     = new ZoneManager(scene.scene, world, bus);
+    zonesRef.current = zones;
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
-    const zones     = new ZoneManager(scene.scene, world, bus);
     const floorTool    = new FloorTool(scene.scene, world, bus);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
     const wallTool     = new WallTool(scene.scene, world, bus);
@@ -124,6 +127,7 @@ export default function App() {
 
     return () => {
       worldRef.current = null;
+      zonesRef.current = null;
       unsub.forEach(u => u());
       openingDragger.dispose();
       nodeDragger.dispose();
@@ -158,14 +162,65 @@ export default function App() {
     busRef.current.emit('quality:changed', { quality: q });
   };
 
+  const handleSave = useCallback((): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    const json = JSON.stringify(world.toJSON(), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), {
+      href:     url,
+      download: 'world.json',
+    });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleLoad = useCallback(async (json: unknown): Promise<void> => {
+    const world = worldRef.current;
+    const zones = zonesRef.current;
+    if (!world || !zones) return;
+    try {
+      const file = json as SceneFile;
+      migrateWallNodes(file.zones);
+      await physicsWorld.init(); // no-op if already initialized; ensures colliders won't throw
+      for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
+      world.loadFromJSON(file);
+      setSelected(null);
+      setActiveFloor(0);
+      const activeId = world.activeZoneId;
+      if (activeId) await zones.loadZone(activeId);
+    } catch (e) {
+      console.error('Failed to load scene:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSave]);
+
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
     worldRef.current?.updateWallSegment(selected.zoneId, wallId, changes);
     setSelected(prev => {
-      if (!prev?.runWalls) return prev;
+      if (!prev) return prev;
       return {
         ...prev,
-        runWalls: prev.runWalls.map(w => w.id === wallId ? { ...w, ...changes } : w),
+        data: (prev.data as WallDef | null)?.id === wallId
+          ? { ...(prev.data as WallDef), ...changes }
+          : prev.data,
+        runWalls: prev.runWalls
+          ? prev.runWalls.map(w => w.id === wallId ? { ...w, ...changes } : w)
+          : prev.runWalls,
       };
     });
   };
@@ -180,8 +235,18 @@ export default function App() {
     if (selected.type === "opening") {
       const wallId = selected.parentId;
       if (!wallId) return;
-      worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, changes as unknown as Partial<Opening>);
-      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...changes } } : null);
+      const openingChanges = changes as unknown as Partial<Opening>;
+      let extra: Partial<Opening> = {};
+      if (openingChanges.type && openingChanges.type !== (selected.data as Opening | null)?.type) {
+        if (openingChanges.type === "window" || openingChanges.type === "passage") {
+          extra = { height: 1.0, elevation: 1.0 };
+        } else {
+          extra = { height: 2.1, elevation: 0 };
+        }
+      }
+      const fullChanges = { ...openingChanges, ...extra };
+      worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, fullChanges);
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...fullChanges } } : null);
     } else if (selected.type === "wall") {
       const wallChanges = changes as Partial<WallDef>;
       worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
@@ -237,6 +302,8 @@ export default function App() {
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
+        onSave={handleSave}
+        onLoad={handleLoad}
       />
       <PropertiesPanel
         activeTool={activeTool}

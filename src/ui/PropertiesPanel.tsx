@@ -314,14 +314,18 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWa
   const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
-  const [openings,  setOpenings]  = useState<Opening[]>(wallData?.openings ?? []);
   const debounceRef = useRef<number | null>(null);
+
+  // Aggregate openings from every wall in the run so dragged openings don't vanish.
+  const allWalls = runWalls ?? (wallData ? [wallData] : []);
+  const allOpenings: Array<{ wallId: string; opening: Opening }> = allWalls.flatMap(w =>
+    (w.openings ?? []).map(op => ({ wallId: w.id, opening: op })),
+  );
 
   useEffect(() => {
     if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     setHeight(String(wallData?.height ?? 3));
     setThickness(String(wallData?.thickness ?? 0.2));
-    setOpenings(wallData?.openings ?? []);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
@@ -344,45 +348,47 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWa
   };
 
   const addOpening = () => {
-    const newWidth = 1.0;
-    const rightmost = openings.reduce(
+    if (!wallData) return;
+    const primaryOpenings = wallData.openings ?? [];
+    const rightmost = primaryOpenings.reduce(
       (max, o) => Math.max(max, o.offsetAlongWall + o.width),
       0,
     );
-    const smartOffset = openings.length === 0 ? 0.5 : rightmost + 0.5;
-    const next: Opening[] = [...openings, {
+    const smartOffset = primaryOpenings.length === 0 ? 0.5 : rightmost + 0.5;
+    const newOpening: Opening = {
       id:                 crypto.randomUUID(),
       type:               "door",
       offsetAlongWall:    smartOffset,
-      width:              newWidth,
+      width:              1.0,
       height:             2.1,
       elevation:          0,
       linkedZoneId:       null,
       linkedTransitionId: null,
-    }];
-    setOpenings(next);
-    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
+    };
+    onSegmentUpdate(wallData.id, { openings: [...primaryOpenings, newOpening] });
   };
 
-  const updateOpening = (idx: number, changes: Partial<Opening>) => {
-    // Apply sensible dimension defaults when switching type
+  const updateOpening = (wallId: string, openingId: string, changes: Partial<Opening>) => {
+    const targetWall = allWalls.find(w => w.id === wallId);
+    if (!targetWall) return;
     let extra: Partial<Opening> = {};
-    if (changes.type && changes.type !== openings[idx]?.type) {
+    if (changes.type && changes.type !== targetWall.openings.find(o => o.id === openingId)?.type) {
       if (changes.type === "window" || changes.type === "passage") {
         extra = { height: 1.0, elevation: 1.0 };
       } else {
         extra = { height: 2.1, elevation: 0 };
       }
     }
-    const next = openings.map((op, i) => i === idx ? { ...op, ...changes, ...extra } : op);
-    setOpenings(next);
-    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
+    const updatedOpenings = targetWall.openings.map(o =>
+      o.id === openingId ? { ...o, ...changes, ...extra } : o,
+    );
+    onSegmentUpdate(wallId, { openings: updatedOpenings });
   };
 
-  const deleteOpening = (idx: number) => {
-    const next = openings.filter((_, i) => i !== idx);
-    setOpenings(next);
-    onObjectUpdate({ openings: next } as unknown as Partial<WorldObject>);
+  const deleteOpening = (wallId: string, openingId: string) => {
+    const targetWall = allWalls.find(w => w.id === wallId);
+    if (!targetWall) return;
+    onSegmentUpdate(wallId, { openings: targetWall.openings.filter(o => o.id !== openingId) });
   };
 
   return (
@@ -438,16 +444,16 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWa
             >+ ADD</button>
           </div>
 
-          {openings.length === 0 && (
+          {allOpenings.length === 0 && (
             <div style={{ color: "#2a4a6a", fontSize: 10, fontStyle: "italic" }}>No openings</div>
           )}
 
-          {openings.map((op, idx) => (
+          {allOpenings.map(({ wallId, opening: op }) => (
             <OpeningRow
               key={op.id}
               opening={op}
-              onUpdate={changes => updateOpening(idx, changes)}
-              onDelete={() => deleteOpening(idx)}
+              onUpdate={changes => updateOpening(wallId, op.id, changes)}
+              onDelete={() => deleteOpening(wallId, op.id)}
             />
           ))}
         </div>

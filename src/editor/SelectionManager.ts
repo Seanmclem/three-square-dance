@@ -192,9 +192,9 @@ export class SelectionManager implements IEditorModule {
       if (!newMesh) { this._selected = null; return; }
       this._selected = newMesh;
       this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
-      // Re-emit so PropertiesPanel gets fresh runWalls after splits/merges.
-      // Guard to one emit per batch: only fire when the primary wall's event arrives.
-      if (ud.editorId === wallId) this._emitSelected(newMesh);
+      // Re-emit whenever any wall in this run is rebuilt so openings on non-primary
+      // segments (e.g. after a cross-wall drag) appear in the panel immediately.
+      if (inMyRun) this._emitSelected(newMesh);
     } else if (ud.editorType === "opening" && ud.wallId === wallId) {
       const newMesh = this._findMesh(ud.editorId as string, zoneId);
       if (!newMesh) { this._deselect(); return; }
