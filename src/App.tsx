@@ -15,6 +15,7 @@ import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
+import { GizmoManager } from "@/editor/GizmoManager";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -81,6 +82,7 @@ export default function App() {
     const stairTool          = new StairTool(scene.scene, world, bus);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
+    const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
@@ -104,6 +106,7 @@ export default function App() {
     stairTool.init();
     nodeDragger.init();
     openingDragger.init();
+    gizmoManager.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -129,6 +132,7 @@ export default function App() {
       worldRef.current = null;
       zonesRef.current = null;
       unsub.forEach(u => u());
+      gizmoManager.dispose();
       openingDragger.dispose();
       nodeDragger.dispose();
       stairTool.dispose();

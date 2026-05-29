@@ -53,9 +53,10 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("input:click",     ({ screenPos }) => this._onClick(screenPos)),
       this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
       this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
-      this._bus.on("object:updated",  ({ id, changes }) => this._onExternalUpdate(id, changes)),
-      this._bus.on("wall:rebuilt",    ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
-      this._bus.on("tool:placed",     ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
+      this._bus.on("object:updated",    ({ id, changes }) => this._onExternalUpdate(id, changes)),
+      this._bus.on("wall:rebuilt",     ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
+      this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._onPlatformRebuilt(zoneId, platformId)),
+      this._bus.on("tool:placed",      ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
       this._bus.on("gizmo:dragging",  ({ isDragging }) => {
         if (!isDragging) this._suppressNextClick = true;
       }),
@@ -211,6 +212,16 @@ export class SelectionManager implements IEditorModule {
         data:     this._getDataRecord(newMesh),
       });
     }
+  }
+
+  private _onPlatformRebuilt(zoneId: string, platformId: string): void {
+    if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
+    if (this._selected.userData.editorId !== platformId) return;
+    const newMesh = this._findMesh(platformId, zoneId);
+    if (!newMesh) { this._deselect(); return; }
+    this._selected = newMesh;
+    this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelected(newMesh);
   }
 
   private _selectAfterPlace(id: string, zoneId: string, attempt = 0): void {

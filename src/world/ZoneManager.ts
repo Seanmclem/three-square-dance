@@ -536,6 +536,7 @@ export class ZoneManager {
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platform.id, { meshes, collider });
     this._applyDimming();
+    this._bus.emit("platform:rebuilt", { zoneId, platformId: platform.id });
   }
 
   private async _rebuildPlatform(zoneId: string, platformId: string): Promise<void> {
@@ -597,6 +598,7 @@ export class ZoneManager {
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platformId, { meshes, collider });
     this._applyDimming();
+    this._bus.emit("platform:rebuilt", { zoneId, platformId });
   }
 
   private _removePlatform(zoneId: string, platformId: string): void {

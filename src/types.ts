@@ -86,6 +86,7 @@ export interface BusEvents {
   "platform:added":        { zoneId: string; platform: PlatformDef };
   "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":      { zoneId: string; id: string };
+  "platform:rebuilt":      { zoneId: string; platformId: string };
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
@@ -161,6 +162,7 @@ export interface MeshUserData {
   wallId?:                 string;
   assetId?:                string;
   editorOnly?:             boolean;
+  _hasCsgCuts?:            boolean;  // cap mesh with CSG-cut world-space geometry
 }
 
 // ─── Scene file data model ────────────────────────────────────────────────────
@@ -258,6 +260,7 @@ export interface PlatformDef {
   material:       string;
   hasRailing:     boolean;
   railingHeight:  number;
+  rotation?:      Vec3;       // degrees — Y is yaw around vertical axis
   floorLevel?:    number;
   points?:        Vec2[];
   nodeIds?:       string[];

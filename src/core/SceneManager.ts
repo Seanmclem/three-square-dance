@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { ViewHelper } from "three/addons/helpers/ViewHelper.js";
 import { EditorCamera } from "@/editor/EditorCamera";
 import type { EventBus } from "@/core/EventBus";
 import type { MeshUserData } from "@/types";
@@ -21,7 +22,8 @@ export class SceneManager {
   private _disposed  = false;
   private readonly _onResize: () => void;
 
-  private readonly _sunLight: THREE.DirectionalLight;
+  private readonly _sunLight:    THREE.DirectionalLight;
+  private readonly _viewHelper:  ViewHelper;
 
   constructor(canvas: HTMLCanvasElement, bus: EventBus) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -36,9 +38,10 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
     this.editorCamera = new EditorCamera(this.camera, canvas, bus);
 
-    this._sunLight = this._setupLighting();
+    this._sunLight  = this._setupLighting();
     this._setupSky();
     this._setupGrid();
+    this._viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
 
     this._onResize = this._handleResize.bind(this);
     window.addEventListener("resize", this._onResize);
@@ -136,6 +139,7 @@ export class SceneManager {
     this.editorCamera.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
     this.renderer.render(this.scene, this.camera);
+    this._viewHelper.render(this.renderer);
     this._raf = requestAnimationFrame(this._loop.bind(this));
   }
 

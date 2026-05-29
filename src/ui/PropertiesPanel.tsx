@@ -995,6 +995,7 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 }) {
   const plat = selected.data as PlatformDef | null;
   const [posStr,   setPosStr]   = useState({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
+  const [rotYStr,  setRotYStr]  = useState(String(plat?.rotation?.y ?? 0));
   const [sizeStr,  setSizeStr]  = useState({ w: String(plat?.size.width ?? 2), d: String(plat?.size.depth ?? 2) });
   const [thickStr, setThickStr] = useState(String(plat?.thickness ?? 0.3));
   const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
@@ -1003,6 +1004,7 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 
   useEffect(() => {
     setPosStr({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
+    setRotYStr(String(plat?.rotation?.y ?? 0));
     setSizeStr({ w: String(plat?.size.width ?? 2), d: String(plat?.size.depth ?? 2) });
     setThickStr(String(plat?.thickness ?? 0.3));
     setRailH(String(plat?.railingHeight ?? 1.0));
@@ -1010,6 +1012,17 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => () => { if (posDebounceRef.current !== null) clearTimeout(posDebounceRef.current); }, []);
+
+  // Keep rotY in sync when gizmo commits a rotation rebuild
+  useEffect(() => {
+    setRotYStr(String(plat?.rotation?.y ?? 0));
+  }, [plat?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitRotY = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ rotation: { x: 0, y: n, z: 0 } } as unknown as Partial<WorldObject>);
+  };
 
   const commitPos = (axis: "x" | "y" | "z", val: string) => {
     if (posDebounceRef.current !== null) { clearTimeout(posDebounceRef.current); posDebounceRef.current = null; }
@@ -1087,6 +1100,30 @@ function PlatformView({ selected, materialList, onObjectUpdate, onAddMaterial }:
                 />
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Rotation Y */}
+        <div>
+          <div style={LABEL}>ROTATION Y (deg)</div>
+          <div style={{
+            display: "flex", gap: 4, alignItems: "center",
+            background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)",
+            borderRadius: 4, padding: "2px 6px", width: "fit-content",
+          }}>
+            <span style={{ color: "#6bff8a", fontSize: 9 }}>Y</span>
+            <input
+              type="number" step={15}
+              value={rotYStr}
+              onChange={e => setRotYStr(e.target.value)}
+              onBlur={e => commitRotY(e.target.value)}
+              onKeyDown={e => {
+                if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key))
+                  e.nativeEvent.stopPropagation();
+                if (e.key === "Enter") commitRotY((e.target as HTMLInputElement).value);
+              }}
+              style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+            />
           </div>
         </div>
 

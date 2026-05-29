@@ -293,6 +293,7 @@ export class PlatformBuilder {
       selectable:    true,
       floorLevel,
       _ownsMaterial: !!ovr,
+      _hasCsgCuts:   capInWorldSpace || undefined,
     } satisfies MeshUserData;
     meshes.push(capMesh);
 
@@ -366,6 +367,24 @@ export class PlatformBuilder {
           _ownsMaterial: i === 0,
         } satisfies MeshUserData;
         meshes.push(mesh);
+      }
+    }
+
+    // Apply Y rotation for non-CSG platforms (CSG geometry is baked in world space)
+    if (platform.rotation?.y && !capInWorldSpace) {
+      const angle  = (platform.rotation.y * Math.PI) / 180;
+      const cosA   = Math.cos(angle), sinA = Math.sin(angle);
+      const rotMat = new THREE.Matrix4().makeRotationY(angle);
+      for (const mesh of meshes) {
+        // Orbit mesh position around platform XZ center (p.x, p.z)
+        const dx = mesh.position.x - p.x;
+        const dz = mesh.position.z - p.z;
+        if (Math.abs(dx) > 1e-4 || Math.abs(dz) > 1e-4) {
+          mesh.position.x = p.x + dx * cosA - dz * sinA;
+          mesh.position.z = p.z + dx * sinA + dz * cosA;
+        }
+        // Rotate geometry around its local center for correct normals
+        mesh.geometry.applyMatrix4(rotMat);
       }
     }
 
