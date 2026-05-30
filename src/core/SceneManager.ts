@@ -22,8 +22,9 @@ export class SceneManager {
   private _disposed  = false;
   private readonly _onResize: () => void;
 
-  private readonly _sunLight:    THREE.DirectionalLight;
-  private readonly _viewHelper:  ViewHelper;
+  private readonly _sunLight:     THREE.DirectionalLight;
+  private readonly _viewHelper:   ViewHelper;
+  private readonly _viewHelperEl: HTMLDivElement;
 
   constructor(canvas: HTMLCanvasElement, bus: EventBus) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -32,6 +33,7 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.5;
+    this.renderer.autoClear = false; // ViewHelper needs manual clear control
 
     this.scene = new THREE.Scene();
 
@@ -41,7 +43,13 @@ export class SceneManager {
     this._sunLight  = this._setupLighting();
     this._setupSky();
     this._setupGrid();
-    this._viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
+
+    const helperEl = document.createElement("div");
+    helperEl.style.cssText =
+      "position:absolute;left:0;bottom:0;width:172px;height:128px;pointer-events:none;z-index:1;";
+    canvas.parentElement?.appendChild(helperEl);
+    this._viewHelperEl = helperEl;
+    this._viewHelper = new ViewHelper(this.camera, helperEl as unknown as HTMLCanvasElement);
 
     this._onResize = this._handleResize.bind(this);
     window.addEventListener("resize", this._onResize);
@@ -138,6 +146,7 @@ export class SceneManager {
     const dt = this._clock.getDelta();
     this.editorCamera.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
+    this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     this._viewHelper.render(this.renderer);
     this._raf = requestAnimationFrame(this._loop.bind(this));
@@ -157,6 +166,7 @@ export class SceneManager {
     cancelAnimationFrame(this._raf);
     this.editorCamera.dispose();
     window.removeEventListener("resize", this._onResize);
+    this._viewHelperEl.remove();
     this.renderer.dispose();
   }
 }

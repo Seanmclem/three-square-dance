@@ -92,6 +92,7 @@ export interface BusEvents {
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
   "stair:removed":         { zoneId: string; id: string };
   "stair:rebuilt":         { zoneId: string; stairId: string };
+  "floor:rebuilt":         { zoneId: string; floorId: string };
   "object:added":          { zoneId: string; object: WorldObject };
   "object:removed":        { zoneId: string; id: string };
   "zone:added":            { zone: ZoneDef };

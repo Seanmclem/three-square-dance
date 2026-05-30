@@ -56,6 +56,8 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("object:updated",    ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",     ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
       this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._onPlatformRebuilt(zoneId, platformId)),
+      this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => this._onStairRebuilt(zoneId, stairId)),
+      this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => this._onFloorRebuilt(zoneId, floorId)),
       this._bus.on("tool:placed",      ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
       this._bus.on("gizmo:dragging",  ({ isDragging }) => {
         if (!isDragging) this._suppressNextClick = true;
@@ -218,6 +220,26 @@ export class SelectionManager implements IEditorModule {
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     if (this._selected.userData.editorId !== platformId) return;
     const newMesh = this._findMesh(platformId, zoneId);
+    if (!newMesh) { this._deselect(); return; }
+    this._selected = newMesh;
+    this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelected(newMesh);
+  }
+
+  private _onStairRebuilt(zoneId: string, stairId: string): void {
+    if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
+    if (this._selected.userData.editorId !== stairId) return;
+    const newMesh = this._findMesh(stairId, zoneId);
+    if (!newMesh) { this._deselect(); return; }
+    this._selected = newMesh;
+    this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelected(newMesh);
+  }
+
+  private _onFloorRebuilt(zoneId: string, floorId: string): void {
+    if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
+    if (this._selected.userData.editorId !== floorId) return;
+    const newMesh = this._findMesh(floorId, zoneId);
     if (!newMesh) { this._deselect(); return; }
     this._selected = newMesh;
     this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);

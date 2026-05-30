@@ -73,6 +73,10 @@ export class ZoneManager {
   private readonly _pendingPlatformRebuild = new Map<string, Set<string>>();
   private _platformRebuildScheduled = false;
 
+  // Pending floor rebuild requests — same coalescing pattern
+  private readonly _pendingFloorRebuild = new Map<string, Set<string>>();
+  private _floorRebuildScheduled = false;
+
   // Cancellation tokens — increment on each new build; stale async results are discarded
   private readonly _platformBuildTokens = new Map<string, number>();
 
@@ -149,7 +153,7 @@ export class ZoneManager {
         }
         for (const floor of zone.floors) {
           if (floor.floorMesh.nodeIds?.includes(nodeId))
-            void this._rebuildFloor(zoneId, floor.id);
+            this._queueFloorRebuild(zoneId, floor.id);
         }
         for (const platform of zone.platforms) {
           if (platform.nodeIds?.includes(nodeId))
@@ -211,6 +215,23 @@ export class ZoneManager {
         for (const [zid, ids] of this._pendingPlatformRebuild) {
           this._pendingPlatformRebuild.delete(zid);
           for (const pid of ids) void this._rebuildPlatform(zid, pid);
+        }
+      });
+    }
+  }
+
+  private _queueFloorRebuild(zoneId: string, floorId: string): void {
+    if (!this._pendingFloorRebuild.has(zoneId))
+      this._pendingFloorRebuild.set(zoneId, new Set());
+    this._pendingFloorRebuild.get(zoneId)!.add(floorId);
+
+    if (!this._floorRebuildScheduled) {
+      this._floorRebuildScheduled = true;
+      queueMicrotask(() => {
+        this._floorRebuildScheduled = false;
+        for (const [zid, ids] of this._pendingFloorRebuild) {
+          this._pendingFloorRebuild.delete(zid);
+          for (const fid of ids) void this._rebuildFloor(zid, fid);
         }
       });
     }
@@ -363,6 +384,7 @@ export class ZoneManager {
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floor.id, collider);
     this._applyDimming();
+    this._bus.emit("floor:rebuilt", { zoneId, floorId: floor.id });
   }
 
   private async _rebuildFloor(zoneId: string, floorId: string): Promise<void> {
@@ -399,6 +421,7 @@ export class ZoneManager {
     entry.floorsGroup.add(mesh);
     entry.floorColliders.set(floorId, collider);
     this._applyDimming();
+    this._bus.emit("floor:rebuilt", { zoneId, floorId });
   }
 
   // ── Wall helpers ──────────────────────────────────────────────────────────
