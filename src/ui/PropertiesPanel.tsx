@@ -68,11 +68,12 @@ interface PropertiesPanelProps {
   onQualityChange:     (q: QualityScale) => void;
   onCopyRunToFloor?:   (targetLevel: number) => void;
   onFillRunWithFloor?: () => void;
+  onDelete?:           () => void;
 }
 
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate, onMaterialsReload, onQualityChange,
-  onCopyRunToFloor, onFillRunWithFloor,
+  onCopyRunToFloor, onFillRunWithFloor, onDelete,
 }: PropertiesPanelProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const debounceRef = useRef<number | null>(null);
@@ -156,6 +157,19 @@ export function PropertiesPanel({
                     ? <TransformView selected={selected} draft={draft} commit={commit} />
                     : <ToolView activeTool={activeTool} />}
       </div>
+
+      {onDelete && (
+        <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(180,60,60,0.15)" }}>
+          <button
+            onClick={onDelete}
+            style={{
+              width: "100%", padding: "6px 0", borderRadius: 4, cursor: "pointer",
+              fontFamily: "monospace", fontSize: 11, border: "1px solid rgba(220,80,80,0.35)",
+              background: "rgba(200,60,60,0.1)", color: "#e88",
+            }}
+          >Delete</button>
+        </div>
+      )}
 
       {/* Quality — always visible at panel bottom */}
       <div style={{

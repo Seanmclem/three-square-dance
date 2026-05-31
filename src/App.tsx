@@ -259,7 +259,7 @@ export default function App() {
         endNodeId:   nodeMap.get(w.endNodeId)   ?? w.endNodeId,
         floor:       targetLevel,
         elevation:   targetElevation,
-        openings:    w.openings.map(op => ({ ...op, id: crypto.randomUUID() })),
+        openings:    [],
       });
     }
   };
@@ -298,6 +298,48 @@ export default function App() {
     const nodeIds = resolveRunNodeIds(walls);
     return nodeIds !== null && nodeIds.length > 1 && nodeIds[0] === nodeIds[nodeIds.length - 1];
   };
+
+  const handleDelete = useCallback((): void => {
+    const world = worldRef.current;
+    if (!selected || !world) return;
+    const { type, id, zoneId } = selected;
+
+    if (type === "wall") {
+      const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+      const nodeIds = new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]));
+      for (const w of walls) world.removeWall(zoneId, w.id);
+      for (const nodeId of nodeIds) world.removeNode(zoneId, nodeId);
+      setSelected(null);
+    } else if (type === "floor") {
+      world.removeFloor(zoneId, id);
+      setSelected(null);
+    } else if (type === "platform") {
+      world.removePlatform(zoneId, id);
+      setSelected(null);
+    } else if (type === "stair") {
+      world.removeStair(zoneId, id);
+      setSelected(null);
+    } else if (type === "opening") {
+      const wallId = selected.parentId!;
+      const zone = world.zones.get(zoneId);
+      const wall = zone?.walls.find(w => w.id === wallId);
+      if (!wall) return;
+      world.updateWall(zoneId, wallId, { openings: wall.openings.filter(o => o.id !== id) });
+      setSelected(null);
+    }
+  }, [selected]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      handleDelete();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleDelete]);
 
   const handleMaterialsReload = (): void => {
     assetManager.initMaterials().then(mats => setMaterialList(mats))
@@ -390,6 +432,7 @@ export default function App() {
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
+        onDelete={selected ? handleDelete : undefined}
       />
       <CoordinateDisplay coords={coords} />
 

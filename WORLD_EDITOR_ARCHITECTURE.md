@@ -15,6 +15,7 @@
 - v2.0 — Phase 6.2 scene save/load, Phase 9 full persistence (game save, auto-save, preferences, startup flow), all object types covered
 - v2.1 — **Sync to actual implementation:** wall node graph (startNodeId/endNodeId), wall runs/buildRun(), Rapier colliders replacing mesh colliders, polygon platforms, stair CSG cutter, per-material overrides, updated all builder signatures, ZoneManager internal patterns
 - v2.2 — Phase 6.3 wall-run gizmo extensions + multi-floor wall elevation system
+- v2.3 — Phase 6.4 delete support (Delete key + panel button) + copy-to-floor opening strip
 
 ---
 
@@ -4599,6 +4600,41 @@ export default defineConfig({
   ],
 });
 ```
+
+### Phase 6.4 — Delete Support & Copy-to-Floor Cleanup
+
+Adds the ability to delete any selected object and strips openings from copy-to-floor operations.
+
+#### Scope
+
+- `Delete` / `Backspace` keyboard shortcut deletes the currently selected object (guarded against input-field focus).
+- "Delete" button rendered at the bottom of the Properties Panel for all selectable types.
+- `removeFloor` added to WorldState / `floor:removed` event added to BusEvents (floor deletion was previously missing from the API).
+- `ZoneManager._removeFloor` — removes mesh, disposes geometry/material, removes Rapier collider, re-runs `_applyDimming`.
+- `SelectionManager` auto-deselects when the selected object's removal event fires.
+- Copy-to-Floor: duplicated walls now start with `openings: []` (doors/windows are not copied).
+- Wall deletion also removes orphaned nodes (nodes with no remaining walls) via `WorldState.removeNode`, which guards against removing nodes still referenced by walls.
+
+#### New Event
+
+```typescript
+"floor:removed": { zoneId: string; floorId: string };
+```
+
+#### Delete Handler (App.tsx)
+
+`handleDelete` branches on `selected.type`:
+- `"wall"` — removes all walls in the run, then attempts `removeNode` for all their node IDs (safe: WorldState.removeNode no-ops if node still has walls).
+- `"floor"` / `"platform"` / `"stair"` / `"object"` — direct removal via WorldState.
+- `"opening"` — filters the opening from its parent wall's `openings` array via `updateWall`.
+
+Keyboard listener uses `window.addEventListener("keydown")` with a `useCallback`/`useEffect` pair — re-binds when `selected` changes so the closure is always fresh.
+
+#### PropertiesPanel
+
+`onDelete?: () => void` prop. Rendered as a full-width red-tinted button directly above the Quality section, visible for all non-null selections.
+
+---
 
 ### Prompt template for Claude Code
 

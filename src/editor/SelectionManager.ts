@@ -64,6 +64,11 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("gizmo:dragging",  ({ isDragging }) => {
         if (!isDragging) this._suppressNextClick = true;
       }),
+      this._bus.on("wall:removed",     ({ wallId })  => { if (this._selected?.userData.editorId === wallId)  this._deselect(); }),
+      this._bus.on("floor:removed",    ({ floorId }) => { if (this._selected?.userData.editorId === floorId) this._deselect(); }),
+      this._bus.on("platform:removed", ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
+      this._bus.on("stair:removed",    ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
+      this._bus.on("object:removed",   ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
     );
   }
 

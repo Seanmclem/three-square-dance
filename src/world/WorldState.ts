@@ -48,6 +48,13 @@ export class WorldState {
     this._bus.emit("floor:updated", { zoneId, floorId, changes });
   }
 
+  removeFloor(zoneId: string, floorId: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    zone.floors = zone.floors.filter(f => f.id !== floorId);
+    this._bus.emit("floor:removed", { zoneId, floorId });
+  }
+
   // ─── Node mutations ───────────────────────────────────────────────────────
 
   addNode(zoneId: string, node: WallNode): void {

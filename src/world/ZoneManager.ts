@@ -108,6 +108,9 @@ export class ZoneManager {
       this._bus.on("floor:updated", ({ zoneId, floorId }) => {
         void this._rebuildFloor(zoneId, floorId);
       }),
+      this._bus.on("floor:removed", ({ zoneId, floorId }) => {
+        this._removeFloor(zoneId, floorId);
+      }),
       this._bus.on("wall:added", ({ zoneId, wall }) => {
         this._queueRebuild(zoneId, wall.id);
       }),
@@ -422,6 +425,30 @@ export class ZoneManager {
     entry.floorColliders.set(floorId, collider);
     this._applyDimming();
     this._bus.emit("floor:rebuilt", { zoneId, floorId });
+  }
+
+  private _removeFloor(zoneId: string, floorId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+
+    const toRemove: THREE.Mesh[] = [];
+    entry.floorsGroup.traverse(child => {
+      if (child instanceof THREE.Mesh && child.userData["editorId"] === floorId)
+        toRemove.push(child);
+    });
+    for (const mesh of toRemove) {
+      const origMat = this._dimmedMeshes.get(mesh);
+      if (origMat) { mesh.material = origMat; this._dimmedMeshes.delete(mesh); }
+      mesh.geometry.dispose();
+      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (mesh.material as THREE.Material).dispose();
+      entry.floorsGroup.remove(mesh);
+    }
+
+    const oldCollider = entry.floorColliders.get(floorId);
+    if (oldCollider) { physicsWorld.removeCollider(oldCollider); entry.floorColliders.delete(floorId); }
+
+    this._applyDimming();
   }
 
   // ── Wall helpers ──────────────────────────────────────────────────────────
