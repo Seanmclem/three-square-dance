@@ -463,6 +463,17 @@ export class GizmoManager implements IEditorModule {
               });
             }
           }
+          // Elevate any floors whose nodes are entirely within the moved node set
+          const movedNodes = new Set(this._wallNodeIds);
+          for (const floor of zone.floors) {
+            const fIds = floor.floorMesh.nodeIds;
+            if (!fIds?.length) continue;
+            if (fIds.every(id => movedNodes.has(id))) {
+              this._worldState.updateFloor(this._selZoneId!, floor.id, {
+                elevation: floor.elevation + delta.y,
+              });
+            }
+          }
         }
         break;
       }
