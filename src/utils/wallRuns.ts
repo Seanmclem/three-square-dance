@@ -23,7 +23,9 @@ export function groupWallRuns(zone: ZoneDef, nodes: Map<string, WallNode>): Wall
 
   const canMerge = (w1: WallDef, w2: WallDef, sharedNodeId: string): boolean => {
     if ((nodeWalls.get(sharedNodeId)?.length ?? 0) !== 2) return false;
-    if (w1.material         !== w2.material)        return false;
+    if (w1.floor            !== w2.floor)            return false;
+    if ((w1.elevation ?? 0) !== (w2.elevation ?? 0)) return false;
+    if (w1.material         !== w2.material)         return false;
     if (w1.exteriorMaterial !== w2.exteriorMaterial) return false;
     if (w1.height           !== w2.height)           return false;
     const ov1 = w1.materialOverrides, ov2 = w2.materialOverrides;
