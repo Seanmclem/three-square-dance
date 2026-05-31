@@ -41,6 +41,8 @@ export class GizmoManager implements IEditorModule {
 
   // Stair start/end snapshot taken at the start of each drag (for rotate commit)
   private _stairDragSnapshot: { start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } } | null = null;
+  // Wall-node snapshot taken at the start of each rotate drag
+  private _wallDragSnapshot: Array<{ id: string; x: number; z: number }> | null = null;
   // Polygon platform snapshot taken at the start of each drag (for rotate commit)
   private _polyPlatDragSnapshot: {
     cx: number; cz: number;
@@ -102,7 +104,7 @@ export class GizmoManager implements IEditorModule {
         if (!this._controls || this._selId === null) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
         // Rotate only meaningful for platform / stair
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -200,6 +202,7 @@ export class GizmoManager implements IEditorModule {
     this._wallNodeIds   = [];
     this._wallRunIds    = [];
     this._stairDragSnapshot    = null;
+    this._wallDragSnapshot     = null;
     this._polyPlatDragSnapshot = null;
   }
 
@@ -346,6 +349,14 @@ export class GizmoManager implements IEditorModule {
               points: plat.points ? plat.points.map(p => ({ ...p })) : undefined,
             };
           }
+        }
+      }
+      if (this._selType === "wall") {
+        const zone = this._worldState.zones.get(this._selZoneId!);
+        if (zone) {
+          this._wallDragSnapshot = this._wallNodeIds
+            .map(id => { const n = zone.nodes.find(n => n.id === id); return n ? { id, x: n.x, z: n.z } : null; })
+            .filter((n): n is { id: string; x: number; z: number } => n !== null);
         }
       }
       // Parent tracked objects into the pivot — Three.js handles world-space rotation
@@ -546,9 +557,28 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "wall": {
+        const snap = this._wallDragSnapshot;
+        if (!snap || Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        const rotMat = new THREE.Matrix4().makeRotationY(deltaAngle);
+        const pivot2d = new THREE.Vector3(this._pivot.position.x, 0, this._pivot.position.z);
+        const zone = this._worldState.zones.get(this._selZoneId!);
+        if (zone) {
+          for (const sn of snap) {
+            const node = zone.nodes.find(n => n.id === sn.id);
+            if (node) {
+              const v = new THREE.Vector3(sn.x, 0, sn.z)
+                .sub(pivot2d).applyMatrix4(rotMat).add(pivot2d);
+              this._worldState.updateNode(this._selZoneId!, sn.id, { x: v.x, z: v.z });
+            }
+          }
+        }
+        break;
+      }
     }
 
     this._stairDragSnapshot    = null;
+    this._wallDragSnapshot     = null;
     this._polyPlatDragSnapshot = null;
   }
 
