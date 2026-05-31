@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.1.0** — last updated 2026-05-28
+**Version 2.2.0** — last updated 2026-05-31
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -14,6 +14,7 @@
 - v1.9 — Phase 6.1 transform gizmos: GizmoManager, resize handles, platform Y handle, wall segment move
 - v2.0 — Phase 6.2 scene save/load, Phase 9 full persistence (game save, auto-save, preferences, startup flow), all object types covered
 - v2.1 — **Sync to actual implementation:** wall node graph (startNodeId/endNodeId), wall runs/buildRun(), Rapier colliders replacing mesh colliders, polygon platforms, stair CSG cutter, per-material overrides, updated all builder signatures, ZoneManager internal patterns
+- v2.2 — Phase 6.3 wall-run gizmo extensions + multi-floor wall elevation system
 
 ---
 
@@ -3790,7 +3791,62 @@ After 6.2 you can:
 
 
 
-### Phase 7 — Object Placement
+### Phase 6.3 — Wall-Run Gizmo Extensions & Multi-Floor Wall Elevation
+
+Extends the Phase 6.1 gizmo to fully support wall-runs as first-class spatial objects, and adds a working multi-floor wall elevation system.
+
+#### Wall-Run Gizmo
+
+`GizmoManager._wallRunIds` — tracks every wall ID in the selected run (not just nodes).
+
+**Translate (G):**
+- Y-axis enabled for walls; previously it was locked to XZ only.
+- When the run is moved on Y, `updateWall` is called for every wall in the run with the new `elevation` value.
+- Floors whose node IDs are entirely owned by the moved run are co-elevated (checked via `fIds.every(id => movedNodes.has(id))`).
+- NodeDragger dots and floor edge lines both track elevation via a unified `nodeY` priority map (wall elevation → floor elevation → platform top-face).
+
+**Rotate (R):**
+- `R` key now enabled for walls (previously platforms/stairs only).
+- Uses snapshot + `makeRotationY(deltaAngle)` pattern: node positions captured at drag start (`_wallDragSnapshot`), baked with THREE.js sign convention on release.
+- `deltaAngle = pivot.rotation.y - _rotateStartAngle` — delta-based so repeated drags accumulate correctly.
+- Floors reconstruct automatically because they reference the same nodeIds.
+
+#### WallDef.elevation Field
+
+```typescript
+export interface WallDef {
+  elevation?: number;   // Y offset from ground (default 0)
+  // ... existing fields
+}
+```
+
+`buildRun()` uses `walls[0].elevation ?? 0` as `runElevation`; all Y positions in the run mesh (body, liner, trim, collider) are offset by this value.
+
+`canMerge()` in `wallRuns.ts` checks both `floor` and `elevation` before merging walls into a run — prevents cross-floor walls from merging into a single mesh that jumps between heights.
+
+#### Multi-Floor Wall Placement
+
+When drawing walls, `WallTool` derives elevation from the active floor's stored `elevation`, falling back to `activeLevel * wallHeight` (default 3.0m per floor, not 3.2m — no slab gap).
+
+Same formula used for:
+- Preview mesh Y position during draw
+- Node dot Y position
+- `WallDef.elevation` on commit
+- `FloorTool` floor elevation fallback
+- Auto-floor prompt elevation in App.tsx
+
+This places floor-1 walls starting flush at Y=3.0 (the top of floor-0 walls) with no gap.
+
+#### Wall-Run Properties Panel
+
+Two new controls appear in the properties panel when a wall-run is selected:
+
+**Fill closed loop with floor** — button appears only when the run's walls form a closed polygon (detected via `resolveRunNodeIds(runWalls)` — first and last node IDs are equal). Creates a polygon `FloorDef` from the run's node positions at the correct elevation. Equivalent to the auto-floor toast prompt but available at any time from the panel.
+
+**Copy to Floor (0–3)** — row of buttons, current floor disabled. Duplicates the entire run (all walls + nodes, with new IDs) at the target floor's elevation. Openings are duplicated with fresh IDs. Useful for stacking identical floor plans.
+
+
+
 - ObjectPlacer + GLTF loading via AssetManager
 - Static prop objects get optional simplified Rapier colliders (box approximation from AABB) — toggled by a `collidable` flag in asset registry
 - AssetBrowser: placeholder colored boxes as stand-in assets (real GLTFs in Phase 12)
