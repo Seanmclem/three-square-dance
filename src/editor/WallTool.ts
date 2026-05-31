@@ -175,9 +175,12 @@ export class WallTool {
       const length = Math.hypot(dx, dz) || 0.001;
       const angle  = Math.atan2(dz, dx);
       this._preview.scale.set(length, 1, 1);
+      const previewElevation =
+        this._getActiveZone()?.floors.find(f => f.level === this._activeLevel)?.elevation
+        ?? this._activeLevel * 3.2;
       this._preview.position.set(
         (this._startPoint.x + end.x) / 2,
-        this._height / 2,
+        previewElevation + this._height / 2,
         (this._startPoint.z + end.z) / 2,
       );
       this._preview.rotation.y = -angle;
@@ -291,7 +294,9 @@ export class WallTool {
   private _addNodeDot(node: WallNode): void {
     if (this._nodeDots.has(node.id)) return;
     const dot = makeNodeDot();
-    dot.position.set(node.x, 0.12, node.z);
+    const dotY =
+      (this._getActiveZone()?.floors.find(f => f.level === this._activeLevel)?.elevation ?? this._activeLevel * 3.2) + 0.12;
+    dot.position.set(node.x, dotY, node.z);
     this._scene.add(dot);
     this._nodeDots.set(node.id, dot);
   }
