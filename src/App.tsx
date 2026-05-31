@@ -336,7 +336,7 @@ export default function App() {
             onClick={() => {
               const { zoneId, level, points, nodeIds } = autoFloorPrompt;
               const zone = worldRef.current?.zones.get(zoneId);
-              const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? 0;
+              const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? level * 3.2;
               worldRef.current?.addFloor(zoneId, {
                 id:            crypto.randomUUID(),
                 level,

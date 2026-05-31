@@ -230,11 +230,17 @@ export class WallTool {
     const { nodeId: endNodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
     const isLoopClose = endNodeId === this._chainStartNodeId;
 
+    const zone = this._getActiveZone();
+    const wallElevation =
+      zone?.floors.find(f => f.level === this._activeLevel)?.elevation
+      ?? this._activeLevel * 3.2;
+
     const wall: WallDef = {
       id:               `wall_${crypto.randomUUID().slice(0, 8)}`,
       startNodeId,
       endNodeId,
       floor:            this._activeLevel,
+      elevation:        wallElevation,
       height:           this._height,
       thickness:        this._thickness,
       material:         this._material,
