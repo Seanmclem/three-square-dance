@@ -58,18 +58,21 @@ const LABEL: React.CSSProperties = {
 };
 
 interface PropertiesPanelProps {
-  activeTool:        ToolId;
-  selected:          SelectedObjectPayload | null;
-  materialList:      MaterialDef[];
-  quality:           QualityScale;
-  onObjectUpdate:    (changes: Partial<WorldObject>) => void;
-  onSegmentUpdate:   (wallId: string, changes: Partial<WallDef>) => void;
-  onMaterialsReload: () => void;
-  onQualityChange:   (q: QualityScale) => void;
+  activeTool:          ToolId;
+  selected:            SelectedObjectPayload | null;
+  materialList:        MaterialDef[];
+  quality:             QualityScale;
+  onObjectUpdate:      (changes: Partial<WorldObject>) => void;
+  onSegmentUpdate:     (wallId: string, changes: Partial<WallDef>) => void;
+  onMaterialsReload:   () => void;
+  onQualityChange:     (q: QualityScale) => void;
+  onCopyRunToFloor?:   (targetLevel: number) => void;
+  onFillRunWithFloor?: () => void;
 }
 
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate, onMaterialsReload, onQualityChange,
+  onCopyRunToFloor, onFillRunWithFloor,
 }: PropertiesPanelProps) {
   const [draft, setDraft] = useState<Draft | null>(null);
   const debounceRef = useRef<number | null>(null);
@@ -136,6 +139,8 @@ export function PropertiesPanel({
                   onAddMaterial={openImporter}
                   runWalls={selected.runWalls}
                   onSegmentUpdate={onSegmentUpdate}
+                  onCopyRunToFloor={onCopyRunToFloor}
+                  onFillRunWithFloor={onFillRunWithFloor}
                 />
               : selected && selected.type === "platform"
                 ? <PlatformView
@@ -303,13 +308,15 @@ function TransformView({ selected, draft, commit }: {
 
 // ─── Wall view ────────────────────────────────────────────────────────────────
 
-function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWalls, onSegmentUpdate }: {
-  selected:        SelectedObjectPayload;
-  materialList:    MaterialDef[];
-  onObjectUpdate:  (changes: Partial<WorldObject>) => void;
-  onAddMaterial:   () => void;
-  runWalls?:       WallDef[];
-  onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
+function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWalls, onSegmentUpdate, onCopyRunToFloor, onFillRunWithFloor }: {
+  selected:            SelectedObjectPayload;
+  materialList:        MaterialDef[];
+  onObjectUpdate:      (changes: Partial<WorldObject>) => void;
+  onAddMaterial:       () => void;
+  runWalls?:           WallDef[];
+  onSegmentUpdate:     (wallId: string, changes: Partial<WallDef>) => void;
+  onCopyRunToFloor?:   (targetLevel: number) => void;
+  onFillRunWithFloor?: () => void;
 }) {
   const wallData   = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
@@ -457,6 +464,49 @@ function WallView({ selected, materialList, onObjectUpdate, onAddMaterial, runWa
             />
           ))}
         </div>
+
+        {/* Fill closed loop with floor */}
+        {onFillRunWithFloor && (
+          <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10 }}>
+            <button
+              onClick={onFillRunWithFloor}
+              style={{
+                width: "100%", padding: "6px 10px", borderRadius: 4, cursor: "pointer",
+                background: "rgba(80,180,120,0.1)", border: "1px solid rgba(80,180,120,0.3)",
+                color: "#7acca0", fontSize: 10, fontFamily: "monospace",
+              }}
+            >Fill closed loop with floor</button>
+          </div>
+        )}
+
+        {/* Copy run to another floor */}
+        {onCopyRunToFloor && (
+          <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10 }}>
+            <div style={LABEL}>COPY TO FLOOR</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[0, 1, 2, 3].map(level => {
+                const isCurrent = level === (wallData?.floor ?? 0);
+                return (
+                  <button
+                    key={level}
+                    disabled={isCurrent}
+                    onClick={() => onCopyRunToFloor(level)}
+                    style={{
+                      flex: 1, padding: "4px 0", borderRadius: 4,
+                      cursor: isCurrent ? "default" : "pointer",
+                      fontFamily: "monospace", fontSize: 10, border: "none",
+                      background: isCurrent ? "rgba(20,30,45,0.4)" : "rgba(80,140,255,0.1)",
+                      color: isCurrent ? "#2a4a6a" : "#80aaff",
+                      outline: isCurrent
+                        ? "1px solid rgba(80,120,180,0.1)"
+                        : "1px solid rgba(80,140,255,0.3)",
+                    }}
+                  >{level}</button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {runWalls && runWalls.length > 1 && (
           <SegmentsSection

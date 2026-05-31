@@ -23,6 +23,7 @@ import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile } from "@/types";
 import { migrateWallNodes } from "@/world/WorldLoader";
+import { resolveRunNodeIds } from "@/utils/wallRuns";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -229,6 +230,75 @@ export default function App() {
     });
   };
 
+  const handleCopyRunToFloor = (targetLevel: number): void => {
+    const world = worldRef.current;
+    if (!selected || selected.type !== "wall" || !world) return;
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    if (walls.length === 0) return;
+    const zone = world.zones.get(selected.zoneId);
+    if (!zone) return;
+    const wallHeight = (selected.data as WallDef)?.height ?? 3.0;
+    const targetElevation =
+      zone.floors.find(f => f.level === targetLevel)?.elevation ?? targetLevel * wallHeight;
+    const nodeMap = new Map<string, string>();
+    for (const w of walls) {
+      for (const oldId of [w.startNodeId, w.endNodeId]) {
+        if (nodeMap.has(oldId)) continue;
+        const oldNode = zone.nodes.find(n => n.id === oldId);
+        if (!oldNode) continue;
+        const newNode = { id: crypto.randomUUID(), x: oldNode.x, z: oldNode.z };
+        world.addNode(selected.zoneId, newNode);
+        nodeMap.set(oldId, newNode.id);
+      }
+    }
+    for (const w of walls) {
+      world.addWall(selected.zoneId, {
+        ...w,
+        id: `wall_${crypto.randomUUID().slice(0, 8)}`,
+        startNodeId: nodeMap.get(w.startNodeId) ?? w.startNodeId,
+        endNodeId:   nodeMap.get(w.endNodeId)   ?? w.endNodeId,
+        floor:       targetLevel,
+        elevation:   targetElevation,
+        openings:    w.openings.map(op => ({ ...op, id: crypto.randomUUID() })),
+      });
+    }
+  };
+
+  const handleFillRunWithFloor = (): void => {
+    const world = worldRef.current;
+    if (!selected || selected.type !== "wall" || !world) return;
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    if (walls.length < 3) return;
+    const nodeIds = resolveRunNodeIds(walls);
+    if (!nodeIds || nodeIds[0] !== nodeIds[nodeIds.length - 1]) return;
+    const zone = world.zones.get(selected.zoneId);
+    if (!zone) return;
+    const wallData = selected.data as WallDef;
+    const level = wallData?.floor ?? 0;
+    const wallHeight = wallData?.height ?? 3.0;
+    const elevation = zone.floors.find(f => f.level === level)?.elevation ?? level * wallHeight;
+    const coreNodeIds = nodeIds.slice(0, -1);
+    const points = coreNodeIds.map(id => {
+      const n = zone.nodes.find(nn => nn.id === id);
+      return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
+    });
+    world.addFloor(selected.zoneId, {
+      id:            crypto.randomUUID(),
+      level,
+      elevation,
+      ceilingHeight: null,
+      floorMesh:     { shape: "polygon", points, nodeIds: coreNodeIds, material: "concrete_01" },
+    });
+  };
+
+  const isWallRunClosed = (): boolean => {
+    if (!selected || selected.type !== "wall") return false;
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    if (walls.length < 3) return false;
+    const nodeIds = resolveRunNodeIds(walls);
+    return nodeIds !== null && nodeIds.length > 1 && nodeIds[0] === nodeIds[nodeIds.length - 1];
+  };
+
   const handleMaterialsReload = (): void => {
     assetManager.initMaterials().then(mats => setMaterialList(mats))
       .catch(err => console.error("materials reload failed:", err));
@@ -318,6 +388,8 @@ export default function App() {
         onSegmentUpdate={handleSegmentUpdate}
         onMaterialsReload={handleMaterialsReload}
         onQualityChange={handleQualityChange}
+        onCopyRunToFloor={handleCopyRunToFloor}
+        onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
       />
       <CoordinateDisplay coords={coords} />
 
