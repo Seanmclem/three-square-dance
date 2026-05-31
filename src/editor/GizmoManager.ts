@@ -35,8 +35,9 @@ export class GizmoManager implements IEditorModule {
   private _rotateStartAngle = 0;
   private _rotateAttached   = false;
 
-  // Wall-run node IDs collected at selection time
+  // Wall-run node IDs and wall IDs collected at selection time
   private _wallNodeIds: string[] = [];
+  private _wallRunIds:  string[] = [];
 
   // Stair start/end snapshot taken at the start of each drag (for rotate commit)
   private _stairDragSnapshot: { start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } } | null = null;
@@ -174,6 +175,7 @@ export class GizmoManager implements IEditorModule {
       px = center.x;
       pz = center.z;
       this._wallNodeIds = this._collectWallNodeIds(payload);
+      this._wallRunIds  = this._collectWallRunIds(payload);
 
     } else if (type === "floor") {
       this._wallNodeIds = [];
@@ -196,6 +198,7 @@ export class GizmoManager implements IEditorModule {
     this._selType    = null;
     this._trackedMeshes = [];
     this._wallNodeIds   = [];
+    this._wallRunIds    = [];
     this._stairDragSnapshot    = null;
     this._polyPlatDragSnapshot = null;
   }
@@ -437,17 +440,28 @@ export class GizmoManager implements IEditorModule {
         break;
       }
       case "wall": {
-        // Only XZ is live — Y arrow is hidden
-        if (Math.abs(delta.x) < 1e-4 && Math.abs(delta.z) < 1e-4) break;
+        if (Math.abs(delta.x) < 1e-4 && Math.abs(delta.z) < 1e-4 && Math.abs(delta.y) < 1e-4) break;
         const zone = this._worldState.zones.get(this._selZoneId!);
         if (!zone) break;
-        for (const nodeId of this._wallNodeIds) {
-          const node = zone.nodes.find(n => n.id === nodeId) as WallNode | undefined;
-          if (node) {
-            this._worldState.updateNode(this._selZoneId!, nodeId, {
-              x: node.x + delta.x,
-              z: node.z + delta.z,
-            });
+        if (Math.abs(delta.x) >= 1e-4 || Math.abs(delta.z) >= 1e-4) {
+          for (const nodeId of this._wallNodeIds) {
+            const node = zone.nodes.find(n => n.id === nodeId) as WallNode | undefined;
+            if (node) {
+              this._worldState.updateNode(this._selZoneId!, nodeId, {
+                x: node.x + delta.x,
+                z: node.z + delta.z,
+              });
+            }
+          }
+        }
+        if (Math.abs(delta.y) >= 1e-4) {
+          for (const wallId of this._wallRunIds) {
+            const wall = zone.walls.find(w => w.id === wallId) as WallDef | undefined;
+            if (wall) {
+              this._worldState.updateWall(this._selZoneId!, wallId, {
+                elevation: (wall.elevation ?? 0) + delta.y,
+              });
+            }
           }
         }
         break;
@@ -555,9 +569,9 @@ export class GizmoManager implements IEditorModule {
       this._controls.showY = true;
       this._controls.showZ = true;
     } else {
-      // Floors: elevation only (Y arrow); Walls: XZ only; everything else: all
+      // Floors: elevation only (Y arrow); everything else: all
       this._controls.showX = this._selType !== "floor";
-      this._controls.showY = this._selType !== "wall";
+      this._controls.showY = true;
       this._controls.showZ = this._selType !== "floor";
     }
   }
@@ -569,6 +583,11 @@ export class GizmoManager implements IEditorModule {
     const nodeSet = new Set<string>();
     for (const w of walls) { nodeSet.add(w.startNodeId); nodeSet.add(w.endNodeId); }
     return [...nodeSet];
+  }
+
+  private _collectWallRunIds(payload: SelectedObjectPayload): string[] {
+    const walls = payload.runWalls ?? (payload.data ? [payload.data as WallDef] : []);
+    return walls.map(w => w.id);
   }
 
   private _wallRunCenter(payload: SelectedObjectPayload): { x: number; z: number } {

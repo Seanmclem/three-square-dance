@@ -245,6 +245,7 @@ export interface WallDef {
   startNodeId:        string;
   endNodeId:          string;
   floor:              number;
+  elevation?:         number;   // Y offset from ground, default 0
   height:             number;
   thickness:          number;
   material:           string;

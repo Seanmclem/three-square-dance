@@ -130,6 +130,7 @@ function buildTrimFrame(
   cx: number,
   cz: number,
   angle: number,
+  elevation = 0,
 ): THREE.Mesh[] {
   const TRIM_D = wallThickness + 0.06;
   // passage or trim disabled: clean hole, no trim
@@ -144,7 +145,7 @@ function buildTrimFrame(
   const addPiece = (lx: number, ly: number, w: number, h: number) => {
     const mat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, TRIM_D), mat);
-    mesh.position.set(cx + cos * lx, wallHeight / 2 + ly, cz + sin * lx);
+    mesh.position.set(cx + cos * lx, elevation + wallHeight / 2 + ly, cz + sin * lx);
     mesh.rotation.y = -angle;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -339,7 +340,7 @@ export class WallBuilder {
         const lx     = opening.offsetAlongWall + opening.width / 2 - totalLen / 2;
         const worldY = opening.elevation + opening.height / 2;
 
-        trimMeshes.push(...buildTrimFrame(opening, totalLen, H, T, cx, cz, angle));
+        trimMeshes.push(...buildTrimFrame(opening, totalLen, H, T, cx, cz, angle, wall.elevation ?? 0));
 
         const triggerMesh = new THREE.Mesh(
           new THREE.BoxGeometry(opening.width, opening.height, 0.01),
@@ -350,7 +351,7 @@ export class WallBuilder {
           }),
         );
         triggerMesh.renderOrder = 1;
-        triggerMesh.position.set(cx + cos * lx, worldY, cz + sin * lx);
+        triggerMesh.position.set(cx + cos * lx, (wall.elevation ?? 0) + worldY, cz + sin * lx);
         triggerMesh.rotation.y = -angle;
         triggerMesh.userData = {
           editorId:      opening.id,
@@ -391,7 +392,7 @@ export class WallBuilder {
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
     const mesh = new THREE.Mesh(finalGeo, mat);
-    mesh.position.set(0, 0, 0);
+    mesh.position.set(0, wall.elevation ?? 0, 0);
     mesh.castShadow    = true;
     mesh.receiveShadow = true;
     mesh.userData = {
@@ -410,7 +411,7 @@ export class WallBuilder {
       lm.polygonOffsetFactor = -1;
       lm.polygonOffsetUnits  = -1;
       const linerMesh = new THREE.Mesh(ls.geo, lm);
-      linerMesh.position.set(ls.px, ls.py, ls.pz);
+      linerMesh.position.set(ls.px, (wall.elevation ?? 0) + ls.py, ls.pz);
       linerMesh.rotation.y = ls.ry;
       linerMesh.castShadow    = true;
       linerMesh.receiveShadow = true;
@@ -419,7 +420,7 @@ export class WallBuilder {
     }
 
     const colliders = ColliderBuilder.registerWallSegments(
-      wall, 0,
+      wall, wall.elevation ?? 0,
       { x: rawStart.x, z: rawStart.z },
       { x: rawEnd.x,   z: rawEnd.z   },
     );
@@ -450,10 +451,11 @@ export class WallBuilder {
       return { x: n.x, z: n.z };
     });
 
-    const wall      = walls[0]!;
-    const H         = wall.height;
-    const T         = wall.thickness;
-    const ovr       = wall.materialOverrides;
+    const wall        = walls[0]!;
+    const H           = wall.height;
+    const T           = wall.thickness;
+    const runElevation = wall.elevation ?? 0;
+    const ovr         = wall.materialOverrides;
     const baseDef   = assetManager.getMaterialDef(wall.material);
     const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
     const tileX     = ovr?.tileScaleX ?? tileScale;
@@ -699,7 +701,7 @@ export class WallBuilder {
               const addPiece = (lx: number, ly: number, pw: number, ph: number) => {
                 const tmat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.9 });
                 const pm   = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, TRIM_D), tmat);
-                pm.position.set(kCx + kUx * lx, H / 2 + ly, kCz + kUz * lx);
+                pm.position.set(kCx + kUx * lx, runElevation + H / 2 + ly, kCz + kUz * lx);
                 pm.rotation.y    = -kAng;
                 pm.castShadow    = true;
                 pm.receiveShadow = true;
@@ -725,7 +727,7 @@ export class WallBuilder {
               }),
             );
             triggerMesh.renderOrder = 1;
-            triggerMesh.position.set(kCx + kUx * localX, H / 2 + localY_m, kCz + kUz * localX);
+            triggerMesh.position.set(kCx + kUx * localX, runElevation + H / 2 + localY_m, kCz + kUz * localX);
             triggerMesh.rotation.y = -kAng;
             triggerMesh.userData = {
               editorId:      opening.id,
@@ -772,6 +774,7 @@ export class WallBuilder {
           .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
     const mesh = new THREE.Mesh(finalGeo, mat);
+    mesh.position.set(0, runElevation, 0);
     mesh.castShadow    = true;
     mesh.receiveShadow = true;
     mesh.userData = {
@@ -791,7 +794,7 @@ export class WallBuilder {
       lm.polygonOffsetFactor = -1;
       lm.polygonOffsetUnits  = -1;
       const linerMesh = new THREE.Mesh(ls.geo, lm);
-      linerMesh.position.set(ls.px, ls.py, ls.pz);
+      linerMesh.position.set(ls.px, runElevation + ls.py, ls.pz);
       linerMesh.rotation.y = ls.ry;
       linerMesh.castShadow    = true;
       linerMesh.receiveShadow = true;
@@ -806,7 +809,7 @@ export class WallBuilder {
       const eNode = nodes.get(w.endNodeId)!;
       allColliders.push(
         ...ColliderBuilder.registerWallSegments(
-          w, 0,
+          w, w.elevation ?? 0,
           { x: sNode.x, z: sNode.z },
           { x: eNode.x, z: eNode.z },
         ),

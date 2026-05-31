@@ -134,6 +134,9 @@ export class NodeDragger {
       this._bus.on("floor:updated", () => {
         if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
       }),
+      this._bus.on("wall:rebuilt", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+      }),
     );
   }
 
