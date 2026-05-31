@@ -177,7 +177,7 @@ export class WallTool {
       this._preview.scale.set(length, 1, 1);
       const previewElevation =
         this._getActiveZone()?.floors.find(f => f.level === this._activeLevel)?.elevation
-        ?? this._activeLevel * 3.2;
+        ?? this._activeLevel * this._height;
       this._preview.position.set(
         (this._startPoint.x + end.x) / 2,
         previewElevation + this._height / 2,
@@ -236,7 +236,7 @@ export class WallTool {
     const zone = this._getActiveZone();
     const wallElevation =
       zone?.floors.find(f => f.level === this._activeLevel)?.elevation
-      ?? this._activeLevel * 3.2;
+      ?? this._activeLevel * this._height;
 
     const wall: WallDef = {
       id:               `wall_${crypto.randomUUID().slice(0, 8)}`,
@@ -295,7 +295,7 @@ export class WallTool {
     if (this._nodeDots.has(node.id)) return;
     const dot = makeNodeDot();
     const dotY =
-      (this._getActiveZone()?.floors.find(f => f.level === this._activeLevel)?.elevation ?? this._activeLevel * 3.2) + 0.12;
+      (this._getActiveZone()?.floors.find(f => f.level === this._activeLevel)?.elevation ?? this._activeLevel * this._height) + 0.12;
     dot.position.set(node.x, dotY, node.z);
     this._scene.add(dot);
     this._nodeDots.set(node.id, dot);

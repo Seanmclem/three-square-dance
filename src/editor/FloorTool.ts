@@ -111,7 +111,7 @@ export class FloorTool {
 
     const zone = this._world.zones.get(this._activeZoneId);
     const elevation = zone?.floors.find(f => f.level === this._activeLevel)?.elevation
-      ?? this._activeLevel * 3.2;
+      ?? this._activeLevel * 3.0;
 
     const corners = [
       { x: minX,     z: minZ },
