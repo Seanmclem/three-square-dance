@@ -425,16 +425,31 @@ export class NodeDragger {
     const zone = this._getActiveZone();
     if (!zone) return;
 
-    // Build a lookup: nodeId → platform top-face Y (only for polygon platform nodes)
-    const platformNodeY = new Map<string, number>();
+    // Build a nodeId → world Y lookup. Higher-priority sources overwrite lower ones.
+    // Priority: platform top-face > floor elevation > wall elevation > ground default.
+    const nodeY = new Map<string, number>();
+
+    for (const wall of zone.walls) {
+      const y = (wall.elevation ?? 0) + 0.12;
+      for (const id of [wall.startNodeId, wall.endNodeId]) {
+        if (!nodeY.has(id) || nodeY.get(id)! < y) nodeY.set(id, y);
+      }
+    }
+    for (const floor of zone.floors) {
+      if (!floor.floorMesh.nodeIds) continue;
+      const y = floor.elevation + 0.12;
+      for (const id of floor.floorMesh.nodeIds) {
+        if (!nodeY.has(id) || nodeY.get(id)! < y) nodeY.set(id, y);
+      }
+    }
     for (const platform of zone.platforms) {
       if (!platform.nodeIds?.length) continue;
-      const topY = platform.position.y + platform.thickness + 0.06;
-      for (const id of platform.nodeIds) platformNodeY.set(id, topY);
+      const y = platform.position.y + platform.thickness + 0.06;
+      for (const id of platform.nodeIds) nodeY.set(id, y);
     }
 
     for (const node of zone.nodes) {
-      const y = platformNodeY.get(node.id) ?? 0.12;
+      const y = nodeY.get(node.id) ?? 0.12;
       this._nodeDotY.set(node.id, y);
       const dot = makeNodeDot();
       dot.position.set(node.x, y, node.z);
@@ -445,6 +460,7 @@ export class NodeDragger {
     for (const floor of zone.floors) {
       const ids = floor.floorMesh.nodeIds;
       if (!ids || ids.length < 3) continue;
+      const edgeY = floor.elevation + 0.04;
 
       const isRect = floor.floorMesh.shape === "rect" && ids.length === 4;
       if (isRect) {
@@ -467,9 +483,9 @@ export class NodeDragger {
           else if (Math.abs(n1.x - n2.x) < 0.001) axisConstraint = "lock_z";
         }
 
-        const line = makeEdgeLine(n1.x, n1.z, n2.x, n2.z);
+        const line = makeEdgeLine(n1.x, n1.z, n2.x, n2.z, edgeY);
         this._scene.add(line);
-        this._edgeEntries.set(key, { nodeId1: id1, nodeId2: id2, line, axisConstraint, y: 0.04 });
+        this._edgeEntries.set(key, { nodeId1: id1, nodeId2: id2, line, axisConstraint, y: edgeY });
       }
     }
 
