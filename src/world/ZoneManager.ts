@@ -829,9 +829,6 @@ export class ZoneManager {
     this._dimmedMeshes.clear();
     this._pruneDimMaterials();
 
-    // Only dim when above ground level
-    if (this._activeLevel === 0) return;
-
     for (const [, zoneEntry] of this._loadedZones) {
       zoneEntry.group.traverse(child => {
         if (!(child instanceof THREE.Mesh)) return;

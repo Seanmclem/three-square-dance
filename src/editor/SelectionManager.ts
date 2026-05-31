@@ -31,7 +31,8 @@ export class SelectionManager implements IEditorModule {
   private _selected:          THREE.Object3D | null = null;
   private _hovered:           THREE.Object3D | null = null;
   private _activeTool:        ToolId = "select";
-  private _suppressNextClick = false;
+  private _suppressNextClick  = false;
+  private _activeFloorLevel   = 0;
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -53,6 +54,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("input:click",     ({ screenPos }) => this._onClick(screenPos)),
       this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
       this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
+      this._bus.on("floor:select",    ({ level })     => { this._activeFloorLevel = level; }),
       this._bus.on("object:updated",    ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",     ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
       this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._onPlatformRebuilt(zoneId, platformId)),
@@ -105,7 +107,12 @@ export class SelectionManager implements IEditorModule {
     this._raycaster.setFromCamera(this._mouse, this._camera);
     return this._raycaster
       .intersectObjects(this._scene.children, true)
-      .filter(h => h.object.userData.selectable === true);
+      .filter(h => {
+        const ud = h.object.userData;
+        if (!ud.selectable) return false;
+        if (ud.editorType === "floor" && ud.floorLevel !== this._activeFloorLevel) return false;
+        return true;
+      });
   }
 
   private _pickByPriority(hits: THREE.Intersection[]): THREE.Intersection {
