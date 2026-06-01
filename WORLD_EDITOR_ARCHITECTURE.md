@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.2.0** — last updated 2026-05-31
+**Version 2.3.0** — last updated 2026-05-31
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -14,6 +14,9 @@
 - v1.9 — Phase 6.1 transform gizmos: GizmoManager, resize handles, platform Y handle, wall segment move
 - v2.0 — Phase 6.2 scene save/load, Phase 9 full persistence (game save, auto-save, preferences, startup flow), all object types covered
 - v2.1 — **Sync to actual implementation:** wall node graph (startNodeId/endNodeId), wall runs/buildRun(), Rapier colliders replacing mesh colliders, polygon platforms, stair CSG cutter, per-material overrides, updated all builder signatures, ZoneManager internal patterns
+- v2.1.1 — Restored orphaned Phase 7 header and content (was floating inside Phase 6.3)
+- v2.2 — Phase 6.5 properties panel navigation redesign: drilldown stack, fixed header, per-type screen mapping
+- v2.3 — Phase 6.5 refined: Actions as expanded-by-default accordion on root, Quality moved to Material screen, no Actions drilldown screen
 - v2.2 — Phase 6.3 wall-run gizmo extensions + multi-floor wall elevation system
 - v2.3 — Phase 6.4 delete support (Delete key + panel button) + copy-to-floor opening strip
 
@@ -3846,14 +3849,259 @@ Two new controls appear in the properties panel when a wall-run is selected:
 
 **Copy to Floor (0–3)** — row of buttons, current floor disabled. Duplicates the entire run (all walls + nodes, with new IDs) at the target floor's elevation. Openings are duplicated with fresh IDs. Useful for stacking identical floor plans.
 
+### Phase 6.5 — Properties Panel Navigation Redesign
+
+Replaces the flat vertical properties panel with a drilldown navigation system. The panel has a fixed header and a scrollable content area. The root screen shows a list of category rows. Tapping a row pushes a detail screen. A back button in the fixed header returns to the previous screen.
+
+This phase touches only `src/ui/PropertiesPanel.tsx` and its sub-components. No Three.js, no WorldState, no bus events change. All existing data bindings remain — only the presentation layer changes.
+
+---
+
+#### Layout Structure
+
+The panel is split into two parts:
+
+**Fixed header** — never scrolls, always visible:
+```
+┌─────────────────────────────────┐
+│ PROPERTIES              ← back  │  ← top bar: label left, back button right
+├─────────────────────────────────┤
+│ wall_91bfd929                   │  ← object name (updates per screen)
+│ WALL · LEVEL 0                  │  ← object subtitle (updates per screen)
+└─────────────────────────────────┘
+```
+
+**Scrollable body** — content area below the fixed header, `overflow-y: auto`, `max-height` fills remaining panel space.
+
+The back button is hidden on the root screen and shown on all detail screens. It sits in the top bar row alongside the "PROPERTIES" label — label on the left, back button on the right.
+
+---
+
+#### Navigation Model
+
+A `stack: string[]` state array drives all navigation. Each entry is a screen ID string.
+
+```tsx
+const [stack, setStack] = useState<string[]>([]);
+
+const push = (screenId: string) =>
+  setStack(prev => [...prev, screenId]);
+
+const pop = () =>
+  setStack(prev => prev.slice(0, -1));
+
+const currentScreen = stack.length > 0 ? stack[stack.length - 1] : 'root';
+const isRoot = stack.length === 0;
+```
+
+There is no animation — screens swap instantly on push/pop. The scroll position of the body resets to 0 on every navigation (use a `key` prop on the scrollable container or an effect).
+
+---
+
+#### Root Screen
+
+A vertical list of category rows. Each row is a `<button>` spanning the full panel width:
+
+```
+Category name                  summary text  ›
+```
+
+- Left: category label — font-weight 500, full text color
+- Right: summary string (compact one-liner of current values) — muted color, smaller size
+- Rightmost: chevron-right icon
+- Bottom border separating rows
+- On click: `push(screenId)`
+
+**Category rows and their summary strings:**
+
+| Screen ID | Label | Summary string |
+|---|---|---|
+| `geo` | Geometry | `h {height} · t {thickness}` |
+| `mat` | Material | `{materialName} · {n} maps` |
+| `open` | Openings | `{count} openings` or `none` |
+| `seg` | Segments | `{count} walls` |
+
+Actions are **not** a drilldown screen. They render directly on the root screen as a collapsible accordion below the Segments row (see Actions Accordion section below).
+
+Quality is **not** on the root screen. It renders at the bottom of the Material screen, below the Maps section, separated by a divider.
+
+The summary string is computed from current props/state at render time. It is read-only — tapping the row opens the detail screen where values are edited.
+
+Below the category rows, on the root screen only, render an **Actions accordion** — expanded by default, collapsible. Contains:
+- Fill closed loop with floor (object-type-specific, shown when applicable)
+- Copy to Floor (floor number buttons, current floor disabled)
+- Delete button
+
+The accordion header row follows the same style as the drilldown rows (label left, chevron right) but toggles instead of navigating. Chevron points down when expanded, right when collapsed. Content has `gap: 12px` between items and generous button padding (`9px`) so actions don't feel cramped.
+
+The **Quality selector** lives inside the **Material screen**, below the Maps section, separated by a divider. It is not on the root screen.
+
+---
+
+#### Actions Accordion (Root Screen)
+
+The Actions accordion sits on the root screen, below the last drilldown row, above nothing else. It is expanded by default on first render. The user can collapse it by clicking the header.
+
+**Header row:** same visual style as drilldown rows — label "Actions" on the left, chevron on the right. Chevron rotates 180° when expanded. Does not navigate anywhere on click — toggles expanded state.
+
+**Content** (when expanded, `gap: 12px` between items, `padding: 9px` on full-width buttons):
+- Object-specific action buttons (e.g. "Fill closed loop with floor" for walls) — shown/hidden based on object type and current state
+- "Copy to Floor" — label above a row of floor number buttons (G/1/2/3). Current floor is disabled/greyed
+- "Delete" button — danger style, always last
+
+**Collapsed state:** accordion header row only, content hidden. Chevron points right.
+**Expanded state:** default. Chevron points down.
+
+Accordion open/closed state is held in local React component state (`useState<boolean>(true)`). It resets to open whenever a new object is selected (i.e. when the panel receives a new `object:selected` event).
+
+#### Detail Screens
+
+Each screen ID maps to a dedicated sub-component:
+
+```tsx
+const SCREENS: Record<string, React.FC<DetailProps>> = {
+  geo:  GeometryScreen,
+  mat:  MaterialScreen,
+  open: OpeningsScreen,
+  seg:  SegmentsScreen,
+  act:  ActionsScreen,
+};
+```
+
+`DetailProps` is a subset of what `PropertiesPanel` already receives — whichever slice of the selected object's data that screen needs. Pass only what's needed, not the entire selection payload.
+
+Each screen renders its own content freely — inputs, lists, toggles, buttons — with no awareness of the navigation wrapper.
+
+---
+
+#### Header Title Updates
+
+The fixed header title and subtitle update based on current screen:
+
+```tsx
+const headerTitle    = isRoot ? selectedObject.id    : SCREEN_TITLES[currentScreen];
+const headerSubtitle = isRoot ? objectTypeLabel      : SCREEN_SUBTITLES[currentScreen];
+```
+
+```tsx
+const SCREEN_TITLES: Record<string, string> = {
+  geo:  'Geometry',
+  mat:  'Material',
+  open: 'Openings',
+  seg:  'Segments',
+  act:  'Actions',
+};
+
+const SCREEN_SUBTITLES: Record<string, string> = {
+  geo:  'HEIGHT · THICKNESS',
+  mat:  'MATERIAL · MAPS',
+  open: 'OPENINGS',
+  seg:  'WALL SEGMENTS',
+  act:  'ACTIONS',
+};
+```
+
+---
+
+#### Object Type → Screen Mapping
+
+Different object types expose different screens. The root screen's category list is derived from a config map:
+
+```tsx
+type ScreenId = 'geo' | 'mat' | 'open' | 'seg' | 'act' | 'vert';
+
+const OBJECT_SCREENS: Record<EditorObjectType, ScreenId[]> = {
+  wall:     ['geo', 'mat', 'open', 'seg'],
+  floor:    ['mat', 'vert'],           // vert = polygon vertex list
+  platform: ['geo', 'mat'],
+  stair:    ['geo', 'mat'],
+  object:   ['geo', 'mat'],
+  opening:  ['geo', 'mat'],
+  terrain:  ['mat'],
+  trigger:  [],
+};
+// Actions accordion always appears on root screen for all object types.
+// Quality selector always appears at the bottom of the Material screen.
+```
+
+When `selectedObject` changes (bus event `object:selected`), reset `stack` to `[]` so the panel always opens at root for the new selection.
+
+---
+
+#### Scroll Reset
+
+Reset scroll position when navigating:
+
+```tsx
+const bodyRef = useRef<HTMLDivElement>(null);
+
+useEffect(() => {
+  if (bodyRef.current) bodyRef.current.scrollTop = 0;
+}, [currentScreen]);
+```
+
+---
+
+#### Component Structure
+
+```
+PropertiesPanel.tsx
+  ├── PanelHeader.tsx          ← fixed header: back row (← Properties, detail screens only), title, subtitle
+  ├── PanelRoot.tsx            ← root screen: drilldown rows + ActionsAccordion
+  ├── ActionsAccordion.tsx     ← expanded-by-default collapsible: object actions + copy-to-floor + delete
+  ├── screens/
+  │   ├── GeometryScreen.tsx
+  │   ├── MaterialScreen.tsx   ← includes Quality selector at bottom
+  │   ├── OpeningsScreen.tsx
+  │   └── SegmentsScreen.tsx
+  └── CategoryRow.tsx          ← reusable row: label + summary + chevron
+```
+
+All existing form logic (inputs, material picker, map toggles, copy-to-floor buttons etc.) moves verbatim into the appropriate screen component. No logic changes — only restructuring into these files.
+
+---
+
+#### What Does Not Change
+
+- The panel's position in the layout (right side, fixed height)
+- All existing bus event subscriptions (`object:selected`, `object:deselected`, `object:updated`)
+- How values are read from and written to the bus — all `onChange` handlers remain identical
+- The Quality selector and Delete button behavior
+- Any existing TypeScript types
+
+---
+
+#### Implementation Order
+
+1. Create `PanelHeader.tsx` — static layout, back button hidden/shown via prop
+2. Create `CategoryRow.tsx` — reusable row component
+3. Create `PanelRoot.tsx` — assembles category rows from `OBJECT_SCREENS` config, renders quality + delete below
+4. Move existing screen content into individual screen components under `screens/`
+5. Rewrite `PropertiesPanel.tsx` to own the `stack` state, render `PanelHeader` + scrollable body that switches between `PanelRoot` and the active detail screen
+6. Test: select each object type, verify correct screens appear, verify back navigation works, verify scroll resets, verify all existing inputs still write to bus correctly
 
 
-- ObjectPlacer + GLTF loading via AssetManager
-- Static prop objects get optional simplified Rapier colliders (box approximation from AABB) — toggled by a `collidable` flag in asset registry
-- AssetBrowser: placeholder colored boxes as stand-in assets (real GLTFs in Phase 12)
-- ObjectTool: place (Mode A), G/R/S transform (Mode B)
-- TransformControls gizmo, `gizmo:dragging` suppresses camera
-- On object move: collider position updated via `physicsWorld.setColliderTranslation(handle, newPos)`
+
+### Phase 7 — Object Placement + Model Importer
+
+**Model manifest system:**
+- `public/assets/models/manifest.json` — same pattern as material manifest
+- `AssetManager.initAssets()` fetches manifest on startup, populates asset registry, emits `assets:loaded`
+- `AssetBrowser` renders asset grid from manifest — no hardcoded assets anywhere
+
+**Model importer (in-editor):**
+- "Add model" button at top of asset list in AssetBrowser
+- Opens `ModelImporterModal.tsx` — same UX pattern as material importer
+- User picks a `.glb` file, fills in label/category/collidable/tags
+- Copies `.glb` to `public/assets/models/<id>.glb`, auto-generates thumbnail, writes manifest entry
+- `AssetManager.initAssets()` reloads manifest — model appears in browser immediately, no page reload
+
+**Object placement:**
+- `ObjectPlacer` + GLTF loading via `AssetManager`
+- Static prop objects get optional Rapier box collider from AABB (when `collidable: true`)
+- `ObjectTool`: place (Mode A), G/R/S transform (Mode B)
+- `TransformControls` gizmo, `gizmo:dragging` suppresses camera
+- On object move: collider position updated via Rapier body translation
 - Objects stored in WorldState, selectable, editable in PropertiesPanel
 
 ### Phase 8 — Zones & Transitions
