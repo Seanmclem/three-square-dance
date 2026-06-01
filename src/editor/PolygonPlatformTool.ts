@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { HistoryManager } from "@/editor/HistoryManager";
 import type { Vec2, Vec3, PlatformDef, WallNode } from "@/types";
 
 type PolyPlatState = "IDLE" | "DRAWING";
@@ -45,9 +46,10 @@ export class PolygonPlatformTool {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene: THREE.Scene,
-    private readonly _world: WorldState,
-    private readonly _bus:   EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -154,7 +156,10 @@ export class PolygonPlatformTool {
     const bboxD = Math.max(...zs) - Math.min(...zs);
     const elev  = this._getElevation();
 
-    const nodes: WallNode[] = this._points.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
+    const pts = [...this._points];
+
+    this._history.beginBatch("add platform");
+    const nodes: WallNode[] = pts.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
     for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 
     const platform: PlatformDef = {
@@ -166,12 +171,13 @@ export class PolygonPlatformTool {
       hasRailing:    false,
       railingHeight: 1.0,
       floorLevel:    this._activeLevel,
-      points:        [...this._points],
+      points:        pts,
       nodeIds:       nodes.map(n => n.id),
     };
 
     this._world.addPlatform(this._activeZoneId, platform);
     this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
+    this._history.commitBatch();
     this._reset();
   }
 

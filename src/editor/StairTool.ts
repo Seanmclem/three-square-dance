@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { HistoryManager } from "@/editor/HistoryManager";
 import type { IEditorModule, Vec3, StairDef } from "@/types";
 
 type StairState = "IDLE" | "PLACING";
@@ -46,9 +47,10 @@ export class StairTool implements IEditorModule {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene: THREE.Scene,
-    private readonly _world: WorldState,
-    private readonly _bus:   EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -150,8 +152,10 @@ export class StairTool implements IEditorModule {
       hasRailing: this._hasRailing,
     };
 
-    this._world.addStair(this._activeZoneId, stair);
-    this._bus.emit("tool:placed", { type: "stair", id: stair.id, zoneId: this._activeZoneId });
+    this._history.record("add stair", () => {
+      this._world.addStair(this._activeZoneId, stair);
+      this._bus.emit("tool:placed", { type: "stair", id: stair.id, zoneId: this._activeZoneId });
+    });
     this._reset();
   }
 

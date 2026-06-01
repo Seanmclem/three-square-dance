@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { HistoryManager } from "@/editor/HistoryManager";
 import type { Vec2, Vec3, WallDef, WallNode } from "@/types";
 
 
@@ -63,9 +64,10 @@ export class WallTool {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene: THREE.Scene,
-    private readonly _world: WorldState,
-    private readonly _bus:   EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -230,13 +232,18 @@ export class WallTool {
     const epSnapped = this._calcEnd(worldPos);
     if (Math.hypot(epSnapped.x - sp.x, epSnapped.z - sp.z) < GRID) { this._reset(); return; }
 
-    const { nodeId: endNodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
-    const isLoopClose = endNodeId === this._chainStartNodeId;
-
     const zone = this._getActiveZone();
     const wallElevation =
       zone?.floors.find(f => f.level === this._activeLevel)?.elevation
       ?? this._activeLevel * this._height;
+
+    let endNodeId!: string;
+    let isLoopClose = false;
+
+    this._history.beginBatch("add wall");
+    const { nodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
+    endNodeId   = nodeId;
+    isLoopClose = endNodeId === this._chainStartNodeId;
 
     const wall: WallDef = {
       id:               `wall_${crypto.randomUUID().slice(0, 8)}`,
@@ -252,6 +259,8 @@ export class WallTool {
     };
 
     this._world.addWall(this._activeZoneId, wall);
+    this._history.commitBatch();
+
     this._lastWallId = wall.id;
     this._chainNodeIds.push(endNodeId);
 

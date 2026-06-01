@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.3.0** — last updated 2026-05-31
+**Version 2.5.0** — last updated 2026-06-01
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -19,6 +19,8 @@
 - v2.3 — Phase 6.5 refined: Actions as expanded-by-default accordion on root, Quality moved to Material screen, no Actions drilldown screen
 - v2.2 — Phase 6.3 wall-run gizmo extensions + multi-floor wall elevation system
 - v2.3 — Phase 6.4 delete support (Delete key + panel button) + copy-to-floor opening strip
+- v2.4 — Phase 6.6 input UX & floor fixes: EditorCamera focus guard, universal live debounce hook, floor gizmo centroid, floor elevation default, wall-run stale rebuild fix
+- v2.5 — Phase 6.7 snapshot-based undo/redo: HistoryManager, `history:restore` event, Cmd+Z/Cmd+Y shortcuts, toolbar buttons, all placement tools and App.tsx mutation handlers wrapped
 
 ---
 
@@ -711,6 +713,7 @@ world-editor/
 │   │   └── ObjectPlacer.ts
 │   ├── editor/
 │   │   ├── EditorCamera.ts
+│   │   ├── HistoryManager.ts      ← snapshot-based undo/redo (Phase 6.7)
 │   │   ├── SelectionManager.ts
 │   │   ├── WallTool.ts
 │   │   ├── FloorTool.ts
@@ -1446,6 +1449,7 @@ class EventBus {
 | `input:wheel` | InputManager → all | `{ delta }` |
 | `input:keydown` | InputManager → all | `{ code, key, shift, ctrl, alt }` |
 | `input:keyup` | InputManager → all | `{ code }` |
+| `history:restore` | internal | `{}` — fired after undo/redo; ZoneManager reloads active zone |
 
 ---
 
@@ -1575,6 +1579,8 @@ update(dt) {
 ```
 
 Disable all camera inputs when `gizmo:dragging` = true (subscribe to bus).
+
+Both `_handleKeyDown` and `_handleKeyUp` also guard against input-field focus via `_isTypingTarget(e)` — identical to the same guard in `InputManager`. This prevents Arrow/WASD keys typed inside any `<input>`, `<select>`, or `<textarea>` from moving the camera.
 
 ### Floor Clip Plane
 
@@ -1883,6 +1889,9 @@ Connected walls (sharing a node) → grouped into `RunEntry`. `wallData` maps ev
 **Token-based staleness (platforms)**
 Each platform rebuild increments a token. Async `PlatformBuilder.build()` captures the token; if it has changed by the time the result arrives, the result is discarded. Prevents stale async results from overwriting newer rebuilds.
 
+**Wall-run stale rebuild fix**
+`_removeWall` computes the surviving run synchronously, then calls `await WallBuilder.buildRun()`. After the await, it checks that at least one wall from the run still exists in `zone.walls`. If not (rapid multi-delete emptied the run), the freshly-built mesh and colliders are disposed immediately and discarded — no ghost mesh is added to the scene.
+
 **Dimming system**
 `_applyDimming()` clones materials for meshes whose `floorLevel` ≠ active level and sets reduced opacity. `_pruneDimMaterials()` disposes clones that are no longer in use. Materials at the active level are restored to full opacity.
 
@@ -1894,6 +1903,9 @@ Each platform rebuild increments a token. Async `PlatformBuilder.build()` captur
 **Preview toggle**
 `preview:start` → iterate all stairEntries, set `mesh.visible = false` for any mesh with `userData.editorOnly === true` (CSG wireframes etc.)
 `preview:stop` → restore visibility
+
+**History restore**
+`history:restore` → `unloadZone(activeZoneId)` then `loadZone(activeZoneId)`. Called by ZoneManager after `HistoryManager` calls `world.loadFromJSON(snapshot)` to rebuild all scene geometry from the restored WorldState. Identical code path to `scene:load`, so it is proven and safe. Selection is cleared via `object:deselected` emitted immediately before `history:restore`.
 
 ---
 
@@ -1961,8 +1973,10 @@ PLACING:
   On input:click (left): create floor
     bounds = normalizeRect(startPoint, endPoint)  // ensure positive width/depth
     if bounds.width < 0.5 or bounds.depth < 0.5: ignore
-    floorDef = { level: activeLevel, elevation: activeFloor.elevation, shape: 'rect',
+    floorDef = { level: activeLevel, elevation: activeLevel * 3.0, shape: 'rect',
                  material: selectedMaterial, ... }
+    // elevation always defaults to activeLevel * 3.0 — same formula as WallTool.
+    // Never copied from an existing floor at that level (would inherit user overrides).
     worldState.addFloor(zoneId, floorDef)
     Remove preview mesh
     Return to IDLE
@@ -3561,6 +3575,7 @@ Centralises all gizmo logic, replaces ad-hoc TransformControls from Phase 7:
 - `_attach(id, type, zoneId)` — attaches gizmo to selected mesh, shows/hides axes based on type, attaches resize handles if applicable
 - `_detach()` — detaches gizmo, disposes resize handles
 - On `objectChange`: writes position/rotation back to WorldState (`updatePlatform`, `updateObject`, `updateNode` for walls, `updateFloor` for rect floors)
+- For `"floor"` selections: gizmo is positioned at the **centroid of `floorMesh.points`** (Y = `elevation + 0.3`). Floor meshes sit at world origin in Three.js (geometry is world-space baked), so the mesh position cannot be used directly. Rect floors with no points fall back to the zone bounds center.
 - Emits `gizmo:dragging` to suppress camera during drag
 
 Key bindings (only active when something is selected):
@@ -3585,6 +3600,8 @@ Vertical arrow handle above platform center. Drag up/down changes `platform.posi
 #### PropertiesPanel Live Fields
 
 While a gizmo is active: X/Y/Z, rotation Y, width/depth (where applicable) update live as the gizmo moves. Typing a value snaps the gizmo to it. All inputs debounced 150ms before WorldState write.
+
+All numeric inputs across every sub-component use the shared `useFieldDebounce` hook (300 ms, 150 ms for ObjectGeoView). The pattern is `onChange → schedule(commit)`, `onBlur/Enter → flush(commit)`. This ensures every field updates the canvas live while typing and commits immediately on blur or Enter. Covered components: WallGeoView, PlatformGeoView, StairGeoView, ObjectGeoView, VertScreen (elevation), MaterialSection (tile scale/X/Y, roughness, displacement), OpeningRow (offset/width/height/elevation, inner tiles H/V), WallSegmentRow (tile scale). Select elements commit immediately on `onChange` and are excluded.
 
 
 
@@ -4375,7 +4392,7 @@ Auto-saves every 30 seconds during preview mode and on every zone transition.
 - L-shape and spiral stair styles in StairBuilder (each with correct per-step colliders)
 - Outline post-process selection highlight (EffectComposer + OutlinePass, replaces emissive tint)
 - Wall exterior material (material array on BoxGeometry for inside/outside faces)
-- Undo/redo stack (WorldState mutation log, last 50 operations — each undo removes/re-adds colliders correctly)
+- ~~Undo/redo stack~~ — implemented as snapshot-based HistoryManager in **Phase 6.7**
 - Real GLTF prop assets in AssetBrowser with authored collision shapes in asset registry
 - Ambient/sun light controls in PropertiesPanel
 - Node drag — select a wall node and drag to stretch all connected walls simultaneously
@@ -4881,6 +4898,224 @@ Keyboard listener uses `window.addEventListener("keydown")` with a `useCallback`
 #### PropertiesPanel
 
 `onDelete?: () => void` prop. Rendered as a full-width red-tinted button directly above the Quality section, visible for all non-null selections.
+
+---
+
+### Phase 6.6 — Input UX & Floor Fixes
+
+A collection of correctness and usability fixes applied after Phase 6.4.
+
+#### 1. EditorCamera keyboard focus guard
+
+**Problem:** Arrow keys typed inside any `<input>`, `<select>`, or `<textarea>` were still triggering camera movement because `EditorCamera._handleKeyDown/Up` had no focus guard. `InputManager` had an identical guard but `EditorCamera` is a separate listener on `window`.
+
+**Fix:** Added `_isTypingTarget(e: KeyboardEvent): boolean` to `EditorCamera` (mirrors the identical method in `InputManager`). Both key handlers bail out early when the event target is an input-like element:
+
+```typescript
+private _handleKeyDown(e: KeyboardEvent): void {
+  if (this._isTypingTarget(e)) return;
+  this._keys[e.code] = true;
+}
+private _handleKeyUp(e: KeyboardEvent): void {
+  if (this._isTypingTarget(e)) return;
+  delete this._keys[e.code];
+}
+private _isTypingTarget(e: KeyboardEvent): boolean {
+  const el = e.target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+}
+```
+
+#### 2. Universal live-debounce hook in PropertiesPanel
+
+**Problem:** Most `<input>` fields in `PropertiesPanel.tsx` committed their value only on `blur`. Only three components (WallGeoView, PlatformGeoView, ObjectGeoView) had any live update, and each rolled its own debounce timer independently.
+
+**Fix:** Extracted a shared `useFieldDebounce` hook placed at module scope, before all component definitions:
+
+```typescript
+function useFieldDebounce(delayMs = 300) {
+  const ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (ref.current !== null) clearTimeout(ref.current); }, []);
+  const schedule = (fn: () => void) => {
+    if (ref.current !== null) clearTimeout(ref.current);
+    ref.current = setTimeout(() => { ref.current = null; fn(); }, delayMs);
+  };
+  const flush = (fn: () => void) => {
+    if (ref.current !== null) { clearTimeout(ref.current); ref.current = null; }
+    fn();
+  };
+  return { schedule, flush };
+}
+```
+
+Every component that owns numeric inputs now calls `useFieldDebounce(300)` (ObjectGeoView uses 150 ms). The pattern applied to every field:
+
+```tsx
+// onChange: update local display state + schedule a deferred commit
+onChange={e => { setVal(e.target.value); schedule(() => commitFoo(e.target.value)); }}
+// onBlur: flush (cancel timer, commit immediately)
+onBlur={e => flush(() => commitFoo(e.target.value))}
+// onKeyDown Enter: same as blur
+onKeyDown={e => { if (e.key === "Enter") flush(() => commitFoo(e.target.value)); }}
+```
+
+**Components updated:** WallGeoView, PlatformGeoView, StairGeoView, ObjectGeoView, VertScreen (elevation), MaterialSection (all five tiling/roughness/displacement fields), OpeningRow (offset/width/height/elevation + inner tile H/V), WallSegmentRow (tile scale).
+
+`VertScreen` elevation input was also changed from `type="text" inputMode="decimal"` to `type="number" step={0.001}` so browser spinner arrows appear.
+
+Select elements (`OpeningRow` type select, `WallSegmentRow` material select) commit immediately on `onChange` and require no debounce.
+
+#### 3. Floor gizmo centroid
+
+**Problem:** When a floor was selected, the transform gizmo appeared at world origin (0, 0.3, 0) because floor meshes have `position = (0,0,0)` in Three.js — their geometry vertices encode world coordinates directly (there is no mesh-level translation).
+
+**Fix:** `GizmoManager._onSelect` now computes the gizmo position from the floor data for the `"floor"` selection type:
+
+```typescript
+} else if (type === "floor") {
+  this._wallNodeIds = [];
+  const floorDef = payload.data as FloorDef | null;
+  if (floorDef) {
+    py = floorDef.elevation + 0.3;
+    const pts = floorDef.floorMesh.points;
+    if (pts && pts.length > 0) {
+      px = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+      pz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+    } else {
+      const zone = this._worldState.zones.get(payload.zoneId);
+      if (zone) {
+        px = zone.bounds.x + zone.bounds.width  / 2;
+        pz = zone.bounds.z + zone.bounds.depth  / 2;
+      }
+    }
+  }
+}
+```
+
+- Polygon floors: centroid of `floorMesh.points` array.
+- Rect floors (points may be empty): center of `zone.bounds`.
+- Y: `floorDef.elevation + 0.3` so the gizmo floats just above the surface.
+
+#### 4. Floor elevation default
+
+**Problem:** Both `FloorTool` and `PolygonFloorTool` were deriving the new floor's elevation from the first existing floor at the active level. This caused a new floor to inherit any user-modified elevation instead of defaulting to the level's natural position.
+
+**Fix:** Both tools now always use `this._activeLevel * 3.0` (same formula WallTool uses), with no reference to existing floors:
+
+```typescript
+// FloorTool._commit and PolygonFloorTool._commit
+const elevation = this._activeLevel * 3.0;
+```
+
+Level 0 → elevation 0 m, Level 1 → 3 m, Level 2 → 6 m, etc. The user can then override elevation in the Properties Panel.
+
+#### 5. ZoneManager wall-run stale rebuild fix
+
+**Problem:** `ZoneManager._removeWall` computed a wall run synchronously (the set of walls that share the same run as the deleted wall), then called `await WallBuilder.buildRun()`. If the user deleted all walls in a run before the async build completed (e.g. rapid multi-delete), the newly-built mesh would be added to the scene even though none of its source walls still existed — leaving a ghost mesh.
+
+**Fix:** After `await WallBuilder.buildRun()`, a stale check verifies that at least one wall from the rebuilt run still exists in `zone.walls`. If not, the output mesh and colliders are disposed and the loop continues without adding anything:
+
+```typescript
+if (!run.some(w => zone.walls.some(zw => zw.id === w.id))) {
+  output.mesh.geometry.dispose();
+  if ((output.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+    (output.mesh.material as THREE.Material).dispose();
+  for (const tm of output.trimMeshes) tm.geometry.dispose();
+  output.colliders.forEach(c => physicsWorld.removeCollider(c));
+  continue;
+}
+```
+
+---
+
+### Phase 6.7 — Undo / Redo
+
+Adds Cmd+Z / Cmd+Y keyboard shortcuts and two toolbar buttons (↩ / ↪) that undo and redo any WorldState mutation — placements, deletes, property edits, and everything that gets saved.
+
+#### Approach: Snapshot-based HistoryManager
+
+Before each logical action: deep-clone `world.toJSON()` → `before`.
+After: deep-clone again → `after`.
+Store `{ label, before, after }` on the undo stack (max 50 entries).
+
+Undo: pop entry, call `world.loadFromJSON(entry.before)`, emit `history:restore`.
+Redo: same with `entry.after`.
+
+`history:restore` causes ZoneManager to do `unloadZone` + `loadZone` for the active zone — identical to the scene-load path. Selection is cleared automatically via `object:deselected` emitted just before `history:restore`.
+
+No command pattern or inverse-method approach is needed. All WorldState mutations are synchronous, so before/after snapshots are always correct. Compound mutations (e.g. wall delete removes nodes too) are captured as a single step automatically.
+
+#### HistoryManager API (`src/editor/HistoryManager.ts`)
+
+```typescript
+class HistoryManager {
+  // Single-mutation actions
+  record(label: string, fn: () => void): void
+  // Multi-step batches (e.g. WallTool: addNode + addWall)
+  beginBatch(label: string): void
+  commitBatch(): void
+  cancelBatch(): void   // for aborted operations
+  // Undo / redo
+  undo(): void
+  redo(): void
+  get canUndo(): boolean
+  get canRedo(): boolean
+  // Clear on scene:load / world:loaded
+  clear(): void
+}
+```
+
+`record()` is a no-op wrapper when `_batching` is true — inner tool calls during a batch just run their fn directly without capturing intermediate snapshots.
+
+#### Integration points
+
+**`src/types.ts`** — `BusEvents` gains:
+```typescript
+"history:restore": Record<string, never>;
+```
+
+**`src/world/ZoneManager.ts`** — in `init()`:
+```typescript
+this._bus.on("history:restore", () => {
+  const zoneId = this._worldState.activeZoneId;
+  if (!zoneId) return;
+  this.unloadZone(zoneId);
+  void this.loadZone(zoneId);
+}),
+```
+
+**`src/App.tsx`**:
+- `historyRef = useRef<HistoryManager | null>(null)` — holds the instance outside React state
+- `const [canUndo, setCanUndo] = useState(false)` / `canRedo`
+- `syncHistory()` helper calls `setCanUndo / setCanRedo` after every undo/redo/record
+- `bus.on("scene:loaded", ...)` and `bus.on("world:loaded", ...)` → `history.clear(); syncHistory()`
+- Cmd+Z and Cmd+Shift+Z / Cmd+Y intercepted in the keyboard `useEffect`
+- `handleUndo` / `handleRedo` also emit `tool:select → "select"` to reset all tools before restoring
+- `handleDelete` wrapped with `history.beginBatch(…)` / `history.commitBatch()`
+- All branches of `handleObjectUpdate` wrapped with `history.record(…)`
+- `handleSegmentUpdate`, `handleCopyRunToFloor`, `handleFillRunWithFloor`, auto-floor prompt wrapped
+
+**Placement tools** — all receive `HistoryManager` as the 4th constructor argument:
+
+| Tool | Pattern |
+|---|---|
+| `FloorTool` | `record("add floor", fn)` |
+| `PolygonFloorTool` | `record("add floor", fn)` |
+| `WallTool` | `beginBatch("add wall")` … `commitBatch()` (addNode + addWall) |
+| `PlatformTool` | `record("add platform", fn)` |
+| `PolygonPlatformTool` | `beginBatch("add platform")` … `commitBatch()` (addNodes + addPlatform) |
+| `StairTool` | `record("add stair", fn)` |
+
+**`src/ui/Toolbar.tsx`** — new props `onUndo`, `onRedo`, `canUndo`, `canRedo`. Two buttons above the tool list, disabled and visually dimmed when the corresponding stack is empty.
+
+#### Behaviour guarantees
+
+- Undo stack cleared on every `scene:load` — you cannot undo across scene loads.
+- Max 50 undo entries; oldest are shifted off when the limit is reached.
+- Redo stack is wiped whenever a new action is recorded.
+- Batch `cancelBatch()` leaves WorldState unmodified and pushes nothing onto either stack.
 
 ---
 

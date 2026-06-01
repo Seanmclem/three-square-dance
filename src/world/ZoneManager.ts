@@ -185,6 +185,12 @@ export class ZoneManager {
       }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
+      this._bus.on("history:restore", () => {
+        const zoneId = this._worldState.activeZoneId;
+        if (!zoneId) return;
+        this.unloadZone(zoneId);
+        void this.loadZone(zoneId);
+      }),
     );
   }
 
@@ -561,6 +567,15 @@ export class ZoneManager {
         const output = run.length > 1
           ? await WallBuilder.buildRun(run, zoneId, zone, nodesMap)
           : await WallBuilder.build(run[0]!, zoneId, zone, nodesMap);
+        // Stale check: walls may have been removed from WorldState while awaiting rebuild
+        if (!run.some(w => zone.walls.some(zw => zw.id === w.id))) {
+          output.mesh.geometry.dispose();
+          if ((output.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+            (output.mesh.material as THREE.Material).dispose();
+          for (const tm of output.trimMeshes) tm.geometry.dispose();
+          output.colliders.forEach(c => physicsWorld.removeCollider(c));
+          continue;
+        }
         const newEntry: RunEntry = {
           mesh:       output.mesh,
           colliders:  output.colliders,

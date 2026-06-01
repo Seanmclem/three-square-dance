@@ -181,6 +181,21 @@ export class GizmoManager implements IEditorModule {
 
     } else if (type === "floor") {
       this._wallNodeIds = [];
+      const floorDef = payload.data as FloorDef | null;
+      if (floorDef) {
+        py = floorDef.elevation + 0.3;
+        const pts = floorDef.floorMesh.points;
+        if (pts && pts.length > 0) {
+          px = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+          pz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+        } else {
+          const zone = this._worldState.zones.get(payload.zoneId);
+          if (zone) {
+            px = zone.bounds.x + zone.bounds.width  / 2;
+            pz = zone.bounds.z + zone.bounds.depth  / 2;
+          }
+        }
+      }
     }
 
     this._pivot.position.set(px, py, pz);

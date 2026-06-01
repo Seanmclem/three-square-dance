@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { HistoryManager } from "@/editor/HistoryManager";
 import type { IEditorModule, Vec3, PlatformDef } from "@/types";
 
 type PlatformState = "IDLE" | "PLACING";
@@ -36,9 +37,10 @@ export class PlatformTool implements IEditorModule {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene: THREE.Scene,
-    private readonly _world: WorldState,
-    private readonly _bus:   EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -137,8 +139,10 @@ export class PlatformTool implements IEditorModule {
       floorLevel:    this._activeLevel,
     };
 
-    this._world.addPlatform(this._activeZoneId, platform);
-    this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
+    this._history.record("add platform", () => {
+      this._world.addPlatform(this._activeZoneId, platform);
+      this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
+    });
     this._reset();
   }
 

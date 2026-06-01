@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import type { HistoryManager } from "@/editor/HistoryManager";
 import type { Vec3, FloorDef, WallNode } from "@/types";
 
 type FloorToolState = "IDLE" | "PLACING";
@@ -39,9 +40,10 @@ export class FloorTool {
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
-    private readonly _scene:  THREE.Scene,
-    private readonly _world:  WorldState,
-    private readonly _bus:    EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -109,9 +111,7 @@ export class FloorTool {
 
     if (w < GRID || d < GRID) { this._reset(); return; }
 
-    const zone = this._world.zones.get(this._activeZoneId);
-    const elevation = zone?.floors.find(f => f.level === this._activeLevel)?.elevation
-      ?? this._activeLevel * 3.0;
+    const elevation = this._activeLevel * 3.0;
 
     const corners = [
       { x: minX,     z: minZ },
@@ -119,24 +119,27 @@ export class FloorTool {
       { x: minX + w, z: minZ + d },
       { x: minX,     z: minZ + d },
     ];
-    const nodes: WallNode[] = corners.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
-    for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 
-    const floor: FloorDef = {
-      id:            crypto.randomUUID(),
-      level:         this._activeLevel,
-      elevation,
-      ceilingHeight: null,
-      floorMesh: {
-        shape:    "rect",
-        points:   corners,
-        nodeIds:  nodes.map(n => n.id),
-        material: this._material,
-      },
-    };
+    this._history.record("add floor", () => {
+      const nodes: WallNode[] = corners.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
+      for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 
-    this._world.addFloor(this._activeZoneId, floor);
-    this._bus.emit("tool:placed", { type: "floor", id: floor.id, zoneId: this._activeZoneId });
+      const floor: FloorDef = {
+        id:            crypto.randomUUID(),
+        level:         this._activeLevel,
+        elevation,
+        ceilingHeight: null,
+        floorMesh: {
+          shape:    "rect",
+          points:   corners,
+          nodeIds:  nodes.map(n => n.id),
+          material: this._material,
+        },
+      };
+
+      this._world.addFloor(this._activeZoneId, floor);
+      this._bus.emit("tool:placed", { type: "floor", id: floor.id, zoneId: this._activeZoneId });
+    });
     this._reset();
   }
 

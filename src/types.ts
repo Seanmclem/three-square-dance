@@ -126,6 +126,7 @@ export interface BusEvents {
   "input:wheel":           { delta: number };
   "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
   "input:keyup":           { code: string };
+  "history:restore":       Record<string, never>;
 }
 
 export type BusEventName = keyof BusEvents;

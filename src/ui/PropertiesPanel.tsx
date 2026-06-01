@@ -88,10 +88,21 @@ function effectiveSteps(stair: StairDef): number {
   return stair.numSteps ?? Math.max(1, Math.round((stair.end.y - stair.start.y) / STAIR_STEP_H));
 }
 
-const STAIR_ARROW_STOP = (e: React.KeyboardEvent) => {
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key))
-    e.nativeEvent.stopPropagation();
-};
+// ── Shared debounce hook ──────────────────────────────────────────────────────
+
+function useFieldDebounce(delayMs = 300) {
+  const ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (ref.current !== null) clearTimeout(ref.current); }, []);
+  const schedule = (fn: () => void) => {
+    if (ref.current !== null) clearTimeout(ref.current);
+    ref.current = setTimeout(() => { ref.current = null; fn(); }, delayMs);
+  };
+  const flush = (fn: () => void) => {
+    if (ref.current !== null) { clearTimeout(ref.current); ref.current = null; }
+    fn();
+  };
+  return { schedule, flush };
+}
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
@@ -463,28 +474,14 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
   const wallData = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
-  const debounceRef = useRef<number | null>(null);
+  const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
-    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     setHeight(String(wallData?.height ?? 3));
     setThickness(String(wallData?.thickness ?? 0.2));
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
-
-  const schedule = (field: "height" | "thickness", val: string) => {
-    const n = parseFloat(val);
-    if (!Number.isFinite(n) || n <= 0) return;
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => {
-      onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
-      debounceRef.current = null;
-    }, 300);
-  };
-
-  const flush = (field: "height" | "thickness", val: string) => {
-    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+  const commit = (field: "height" | "thickness", val: string) => {
     const n = parseFloat(val);
     if (!Number.isFinite(n) || n <= 0) return;
     onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
@@ -495,15 +492,15 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
       <div>
         <div style={LABEL}>HEIGHT</div>
         <input type="number" value={height} step={0.5} min={0.5} style={NUM_INPUT}
-          onChange={e => { setHeight(e.target.value); schedule("height", e.target.value); }}
-          onBlur={e => flush("height", e.target.value)}
+          onChange={e => { setHeight(e.target.value); schedule(() => commit("height", e.target.value)); }}
+          onBlur={e => flush(() => commit("height", e.target.value))}
         />
       </div>
       <div>
         <div style={LABEL}>THICKNESS</div>
         <input type="number" value={thickness} step={0.1} min={0.1} style={NUM_INPUT}
-          onChange={e => { setThickness(e.target.value); schedule("thickness", e.target.value); }}
-          onBlur={e => flush("thickness", e.target.value)}
+          onChange={e => { setThickness(e.target.value); schedule(() => commit("thickness", e.target.value)); }}
+          onBlur={e => flush(() => commit("thickness", e.target.value))}
         />
       </div>
     </div>
@@ -520,7 +517,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   const [thickStr, setThickStr] = useState(String(plat?.thickness ?? 0.3));
   const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
   const [hasRail,  setHasRail]  = useState(plat?.hasRailing ?? false);
-  const posDebounceRef = useRef<number | null>(null);
+  const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
     setPosStr({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
@@ -532,34 +529,13 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setRotYStr(String(plat?.rotation?.y ?? 0)); }, [plat?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => { if (posDebounceRef.current !== null) clearTimeout(posDebounceRef.current); }, []);
 
-  const commitPos = (axis: "x" | "y" | "z", val: string) => {
-    if (posDebounceRef.current !== null) { clearTimeout(posDebounceRef.current); posDebounceRef.current = null; }
-    const n = parseFloat(val);
-    if (!Number.isFinite(n)) return;
-    onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
-  };
-
-  const schedulePos = (axis: "x" | "y" | "z", val: string) => {
-    const n = parseFloat(val);
-    if (!Number.isFinite(n)) return;
-    if (posDebounceRef.current !== null) clearTimeout(posDebounceRef.current);
-    posDebounceRef.current = window.setTimeout(() => {
-      onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
-      posDebounceRef.current = null;
-    }, 100);
-  };
-
+  const commitPos   = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>); };
   const commitRotY  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ rotation: { x: 0, y: n, z: 0 } } as unknown as Partial<WorldObject>); };
   const commitSize  = (dim: "width" | "depth", val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ size: { ...(plat?.size ?? { width: 2, depth: 2 }), [dim]: n } } as unknown as Partial<WorldObject>); };
   const commitThick = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ thickness: n } as unknown as Partial<WorldObject>); };
   const commitRailH = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ railingHeight: n } as unknown as Partial<WorldObject>); };
   const toggleRail  = (checked: boolean) => { setHasRail(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
-
-  const stopArrow = (e: React.KeyboardEvent) => {
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.nativeEvent.stopPropagation();
-  };
 
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -571,9 +547,9 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
             <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px" }}>
               <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
               <input type="number" step={0.5} value={posStr[axis]}
-                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedulePos(axis, e.target.value); }}
-                onBlur={e => commitPos(axis, e.target.value)}
-                onKeyDown={e => { stopArrow(e); if (e.key === "Enter") commitPos(axis, (e.target as HTMLInputElement).value); }}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
                 style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
               />
             </div>
@@ -587,9 +563,9 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
         <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px", width: "fit-content" }}>
           <span style={{ color: "#6bff8a", fontSize: 9 }}>Y</span>
           <input type="number" step={15} value={rotYStr}
-            onChange={e => setRotYStr(e.target.value)}
-            onBlur={e => commitRotY(e.target.value)}
-            onKeyDown={e => { stopArrow(e); if (e.key === "Enter") commitRotY((e.target as HTMLInputElement).value); }}
+            onChange={e => { setRotYStr(e.target.value); schedule(() => commitRotY(e.target.value)); }}
+            onBlur={e => flush(() => commitRotY(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitRotY((e.target as HTMLInputElement).value)); }}
             style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
           />
         </div>
@@ -605,8 +581,8 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
               <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
               <input type="number" step={0.5} min={0.5} value={val}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                onChange={e => setter(e.target.value)}
-                onBlur={e => commitSize(dim as "width" | "depth", e.target.value)}
+                onChange={e => { setter(e.target.value); schedule(() => commitSize(dim as "width" | "depth", e.target.value)); }}
+                onBlur={e => flush(() => commitSize(dim as "width" | "depth", e.target.value))}
               />
             </div>
           ))}
@@ -617,8 +593,8 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       <div>
         <div style={LABEL}>THICKNESS</div>
         <input type="number" step={0.05} min={0.05} value={thickStr} style={{ ...NUM_INPUT, width: 90 }}
-          onChange={e => setThickStr(e.target.value)}
-          onBlur={e => commitThick(e.target.value)}
+          onChange={e => { setThickStr(e.target.value); schedule(() => commitThick(e.target.value)); }}
+          onBlur={e => flush(() => commitThick(e.target.value))}
         />
       </div>
 
@@ -632,8 +608,8 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
           <div>
             <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>RAILING HEIGHT</div>
             <input type="number" step={0.1} min={0.3} value={railH} style={{ ...NUM_INPUT, width: 90 }}
-              onChange={e => setRailH(e.target.value)}
-              onBlur={e => commitRailH(e.target.value)}
+              onChange={e => { setRailH(e.target.value); schedule(() => commitRailH(e.target.value)); }}
+              onBlur={e => flush(() => commitRailH(e.target.value))}
             />
           </div>
         )}
@@ -687,6 +663,8 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   }, [stair?.end.x, stair?.end.y, stair?.end.z, stair?.numSteps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!stair) return null;
+
+  const { schedule, flush } = useFieldDebounce(300);
 
   const rise = stair.end.y - stair.start.y;
   const curSteps = effectiveSteps(stair);
@@ -790,9 +768,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
           <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px" }}>
             <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
             <input type="number" step={0.5} value={vals[axis]}
-              onChange={e => setter(p => ({ ...p, [axis]: e.target.value }))}
-              onBlur={e => commitVec(field, axis, e.target.value)}
-              onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitVec(field, axis, (e.target as HTMLInputElement).value); }}
+              onChange={e => { setter(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitVec(field, axis, e.target.value)); }}
+              onBlur={e => flush(() => commitVec(field, axis, e.target.value))}
+              onKeyDown={e => { if (e.key === "Enter") flush(() => commitVec(field, axis, (e.target as HTMLInputElement).value)); }}
               style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
             />
           </div>
@@ -810,18 +788,18 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
         <div>
           <div style={LABEL}>STEPS</div>
           <input type="number" step={1} min={1} value={stepsStr}
-            onChange={e => setStepsStr(e.target.value)}
-            onBlur={e => commitSteps(e.target.value)}
-            onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitSteps((e.target as HTMLInputElement).value); }}
+            onChange={e => { setStepsStr(e.target.value); schedule(() => commitSteps(e.target.value)); }}
+            onBlur={e => flush(() => commitSteps(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitSteps((e.target as HTMLInputElement).value)); }}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
           />
         </div>
         <div>
           <div style={LABEL}>WIDTH</div>
           <input type="number" step={0.5} min={0.5} value={widthStr}
-            onChange={e => setWidthStr(e.target.value)}
-            onBlur={e => commitWidth(e.target.value)}
-            onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitWidth((e.target as HTMLInputElement).value); }}
+            onChange={e => { setWidthStr(e.target.value); schedule(() => commitWidth(e.target.value)); }}
+            onBlur={e => flush(() => commitWidth(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitWidth((e.target as HTMLInputElement).value)); }}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
           />
         </div>
@@ -857,9 +835,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                     <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.1} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                      onChange={e => setter(e.target.value)}
-                      onBlur={e => commitCutter(field, e.target.value)}
-                      onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutter(field, (e.target as HTMLInputElement).value); }}
+                      onChange={e => { setter(e.target.value); schedule(() => commitCutter(field, e.target.value)); }}
+                      onBlur={e => flush(() => commitCutter(field, e.target.value))}
+                      onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutter(field, (e.target as HTMLInputElement).value)); }}
                     />
                   </div>
                 ))}
@@ -872,9 +850,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                   <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 5px" }}>
                     <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
                     <input type="number" step={0.1} value={cutOff[axis]}
-                      onChange={e => setCutOff(p => ({ ...p, [axis]: e.target.value }))}
-                      onBlur={e => commitCutterOffset(axis, e.target.value)}
-                      onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterOffset(axis, (e.target as HTMLInputElement).value); }}
+                      onChange={e => { setCutOff(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitCutterOffset(axis, e.target.value)); }}
+                      onBlur={e => flush(() => commitCutterOffset(axis, e.target.value))}
+                      onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutterOffset(axis, (e.target as HTMLInputElement).value)); }}
                       style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
                     />
                   </div>
@@ -889,9 +867,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                   <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 5px" }}>
                     <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
                     <input type="number" step={1} value={cutRot[axis]}
-                      onChange={e => setCutRot(p => ({ ...p, [axis]: e.target.value }))}
-                      onBlur={e => commitCutterRotation(axis, e.target.value)}
-                      onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterRotation(axis, (e.target as HTMLInputElement).value); }}
+                      onChange={e => { setCutRot(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitCutterRotation(axis, e.target.value)); }}
+                      onBlur={e => flush(() => commitCutterRotation(axis, e.target.value))}
+                      onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutterRotation(axis, (e.target as HTMLInputElement).value)); }}
                       style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
                     />
                   </div>
@@ -906,9 +884,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                     <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.25} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                      onChange={e => setter(e.target.value)}
-                      onBlur={e => commitCutterInnerTile(field, e.target.value)}
-                      onKeyDown={e => { STAIR_ARROW_STOP(e); if (e.key === "Enter") commitCutterInnerTile(field, (e.target as HTMLInputElement).value); }}
+                      onChange={e => { setter(e.target.value); schedule(() => commitCutterInnerTile(field, e.target.value)); }}
+                      onBlur={e => flush(() => commitCutterInnerTile(field, e.target.value))}
+                      onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutterInnerTile(field, (e.target as HTMLInputElement).value)); }}
                     />
                   </div>
                 ))}
@@ -929,24 +907,17 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     rotation: toStr(selected.rotation),
     scale:    toStr(selected.scale),
   });
-  const debounceRef = useRef<number | null>(null);
+  const { schedule } = useFieldDebounce(150);
 
   useEffect(() => {
-    if (debounceRef.current !== null) { clearTimeout(debounceRef.current); debounceRef.current = null; }
     setDraft({ position: toStr(selected.position), rotation: toStr(selected.rotation), scale: toStr(selected.scale) });
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => () => { if (debounceRef.current !== null) clearTimeout(debounceRef.current); }, []);
 
   const commit = (group: GroupKey, axis: "x" | "y" | "z", raw: string): void => {
     setDraft(prev => {
       const next: Draft = { ...prev, [group]: { ...prev[group], [axis]: raw } };
       const g = next[group];
-      if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-      debounceRef.current = window.setTimeout(() => {
-        onObjectUpdate({ [group]: { x: toNum(g.x), y: toNum(g.y), z: toNum(g.z) } } as Partial<WorldObject>);
-        debounceRef.current = null;
-      }, 150);
+      schedule(() => onObjectUpdate({ [group]: { x: toNum(g.x), y: toNum(g.y), z: toNum(g.z) } } as Partial<WorldObject>));
       return next;
     });
   };
@@ -1227,6 +1198,8 @@ function VertScreen({ selected, onObjectUpdate }: {
     setElevStr(String(floorData?.elevation ?? 0));
   }, [selected.id, floorData?.elevation]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const { schedule, flush } = useFieldDebounce(300);
+
   const commitElev = (raw: string) => {
     const n = parseFloat(raw);
     if (Number.isFinite(n)) onObjectUpdate({ elevation: n } as unknown as Partial<WorldObject>);
@@ -1236,11 +1209,11 @@ function VertScreen({ selected, onObjectUpdate }: {
     <div style={{ padding: "14px 16px" }}>
       <div style={LABEL}>ELEVATION</div>
       <input
-        type="text" inputMode="decimal"
+        type="number" step={0.001}
         value={elevStr}
-        onChange={e => setElevStr(e.target.value)}
-        onBlur={e => commitElev(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter") commitElev((e.target as HTMLInputElement).value); }}
+        onChange={e => { setElevStr(e.target.value); schedule(() => commitElev(e.target.value)); }}
+        onBlur={e => flush(() => commitElev(e.target.value))}
+        onKeyDown={e => { if (e.key === "Enter") flush(() => commitElev((e.target as HTMLInputElement).value)); }}
         style={{ ...NUM_INPUT, width: 80 }}
       />
       <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 4 }}>
@@ -1295,6 +1268,8 @@ function MaterialSection({
   const toggleMap = (key: MapKey) => {
     onOverridesChange({ ...overrides, maps: { ...(overrides?.maps ?? {}), [key]: { enabled: !effectiveEnabled(key) } } });
   };
+
+  const { schedule, flush } = useFieldDebounce(300);
 
   const commitTile  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScale: n, tileScaleX: undefined, tileScaleY: undefined }); };
   const commitTileX = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScaleX: n }); };
@@ -1353,16 +1328,16 @@ function MaterialSection({
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE X</div>
             <input type="number" step={0.1} min={0.1} value={tileXStr}
-              onChange={e => setTileXStr(e.target.value)}
-              onBlur={e => commitTileX(e.target.value)}
+              onChange={e => { setTileXStr(e.target.value); schedule(() => commitTileX(e.target.value)); }}
+              onBlur={e => flush(() => commitTileX(e.target.value))}
               style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
             />
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE Y</div>
             <input type="number" step={0.1} min={0.1} value={tileYStr}
-              onChange={e => setTileYStr(e.target.value)}
-              onBlur={e => commitTileY(e.target.value)}
+              onChange={e => { setTileYStr(e.target.value); schedule(() => commitTileY(e.target.value)); }}
+              onBlur={e => flush(() => commitTileY(e.target.value))}
               style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
             />
           </div>
@@ -1371,8 +1346,8 @@ function MaterialSection({
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>TILE</div>
           <input type="number" step={0.1} min={0.1} value={tileStr}
-            onChange={e => setTileStr(e.target.value)}
-            onBlur={e => commitTile(e.target.value)}
+            onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(e.target.value)); }}
+            onBlur={e => flush(() => commitTile(e.target.value))}
             style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
           />
         </div>
@@ -1403,15 +1378,15 @@ function MaterialSection({
                 </span>
                 {key === "roughness" && !roughEnabled && (
                   <input type="number" step={0.05} min={0} max={1} value={roughStr}
-                    onChange={e => setRoughStr(e.target.value)}
-                    onBlur={e => commitRough(e.target.value)}
+                    onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
+                    onBlur={e => flush(() => commitRough(e.target.value))}
                     style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
                   />
                 )}
                 {key === "displacement" && dispEnabled && (
                   <input type="number" step={0.005} min={0} value={dispStr}
-                    onChange={e => setDispStr(e.target.value)}
-                    onBlur={e => commitDisp(e.target.value)}
+                    onChange={e => { setDispStr(e.target.value); schedule(() => commitDisp(e.target.value)); }}
+                    onBlur={e => flush(() => commitDisp(e.target.value))}
                     style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
                   />
                 )}
@@ -1453,12 +1428,14 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
     setElevStr(String(opening.elevation));
   }, [opening.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const blurNum = (val: string, min: number, field: keyof Opening) => {
+  const { schedule, flush } = useFieldDebounce(300);
+
+  const commitNum = (val: string, min: number, field: keyof Opening) => {
     const n = parseFloat(val);
     if (Number.isFinite(n) && n >= min) onUpdate({ [field]: n } as Partial<Opening>);
   };
 
-  const blurInnerTile = (val: string, field: "innerTileH" | "innerTileV") => {
+  const commitInnerTile = (val: string, field: "innerTileH" | "innerTileV") => {
     if (val === "" || val === undefined) { onUpdate({ [field]: undefined }); return; }
     const n = parseFloat(val);
     if (Number.isFinite(n) && n > 0) onUpdate({ [field]: n });
@@ -1501,8 +1478,8 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
             <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
             <input type="number" step={0.1} min={min} value={val}
               style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-              onChange={e => setter(e.target.value)}
-              onBlur={e => blurNum(e.target.value, min, field)}
+              onChange={e => { setter(e.target.value); schedule(() => commitNum(e.target.value, min, field)); }}
+              onBlur={e => flush(() => commitNum(e.target.value, min, field))}
             />
           </div>
         ))}
@@ -1511,16 +1488,16 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER T+B</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerHStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-            onChange={e => setInnerHStr(e.target.value)}
-            onBlur={e => blurInnerTile(e.target.value, "innerTileH")}
+            onChange={e => { setInnerHStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileH")); }}
+            onBlur={e => flush(() => commitInnerTile(e.target.value, "innerTileH"))}
           />
         </div>
         <div>
           <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER L+R</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerVStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-            onChange={e => setInnerVStr(e.target.value)}
-            onBlur={e => blurInnerTile(e.target.value, "innerTileV")}
+            onChange={e => { setInnerVStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileV")); }}
+            onBlur={e => flush(() => commitInnerTile(e.target.value, "innerTileV"))}
           />
         </div>
       </div>
@@ -1543,15 +1520,13 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
     setTileStr(String(wall.materialOverrides?.tileScale ?? ""));
   }, [wall.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const { schedule, flush } = useFieldDebounce(300);
+
   const commitTile = (val: string) => {
     const trimmed = val.trim();
     if (trimmed === "") { onUpdate({ materialOverrides: undefined }); return; }
     const n = parseFloat(trimmed);
     if (Number.isFinite(n) && n > 0) onUpdate({ materialOverrides: { ...(wall.materialOverrides ?? {}), tileScale: n } });
-  };
-
-  const STOP = (e: React.KeyboardEvent) => {
-    if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.nativeEvent.stopPropagation();
   };
 
   return (
@@ -1572,9 +1547,8 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
         <div style={{ color: "#3a5a7a", fontSize: 9, flexShrink: 0 }}>TILE</div>
         <input type="number" step={0.1} min={0.1} placeholder="default" value={tileStr}
           style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-          onChange={e => setTileStr(e.target.value)}
-          onBlur={e => commitTile(e.target.value)}
-          onKeyDown={STOP}
+          onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(e.target.value)); }}
+          onBlur={e => flush(() => commitTile(e.target.value))}
         />
       </div>
     </div>

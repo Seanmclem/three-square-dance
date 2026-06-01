@@ -22,6 +22,7 @@ import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile } from "@/types";
+import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 
@@ -43,10 +44,11 @@ function createDemoZone(): ZoneDef {
 }
 
 export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const busRef    = useRef<EventBus>(new EventBus());
-  const worldRef  = useRef<WorldState | null>(null);
-  const zonesRef  = useRef<ZoneManager | null>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const busRef      = useRef<EventBus>(new EventBus());
+  const worldRef    = useRef<WorldState | null>(null);
+  const zonesRef    = useRef<ZoneManager | null>(null);
+  const historyRef  = useRef<HistoryManager | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
@@ -57,6 +59,13 @@ export default function App() {
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
   const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const syncHistory = useCallback((): void => {
+    setCanUndo(historyRef.current?.canUndo ?? false);
+    setCanRedo(historyRef.current?.canRedo  ?? false);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -73,14 +82,18 @@ export default function App() {
     worldRef.current = world;
     const zones     = new ZoneManager(scene.scene, world, bus);
     zonesRef.current = zones;
+    const history   = new HistoryManager(world, bus);
+    historyRef.current = history;
+    bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
+    bus.on("scene:loaded",  () => { history.clear(); syncHistory(); });
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
-    const floorTool    = new FloorTool(scene.scene, world, bus);
-    const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus);
-    const wallTool     = new WallTool(scene.scene, world, bus);
-    const platformTool       = new PlatformTool(scene.scene, world, bus);
-    const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus);
-    const stairTool          = new StairTool(scene.scene, world, bus);
+    const floorTool    = new FloorTool(scene.scene, world, bus, history);
+    const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus, history);
+    const wallTool     = new WallTool(scene.scene, world, bus, history);
+    const platformTool       = new PlatformTool(scene.scene, world, bus, history);
+    const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus, history);
+    const stairTool          = new StairTool(scene.scene, world, bus, history);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
@@ -123,6 +136,7 @@ export default function App() {
       bus.on("tool:placed", () => {
         setActiveTool("select");
         bus.emit("tool:select", { tool: "select" });
+        syncHistory();
       }),
     ];
 
@@ -202,20 +216,45 @@ export default function App() {
     }
   }, []);
 
+  const handleUndo = useCallback((): void => {
+    historyRef.current?.undo();
+    setActiveTool("select");
+    busRef.current.emit("tool:select", { tool: "select" });
+    syncHistory();
+  }, [syncHistory]);
+
+  const handleRedo = useCallback((): void => {
+    historyRef.current?.redo();
+    setActiveTool("select");
+    busRef.current.emit("tool:select", { tool: "select" });
+    syncHistory();
+  }, [syncHistory]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
         e.preventDefault();
         handleSave();
       }
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey))) {
+        e.preventDefault();
+        handleRedo();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave]);
+  }, [handleSave, handleUndo, handleRedo]);
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
-    worldRef.current?.updateWallSegment(selected.zoneId, wallId, changes);
+    historyRef.current?.record("update wall segment", () => {
+      worldRef.current?.updateWallSegment(selected.zoneId, wallId, changes);
+    });
+    syncHistory();
     setSelected(prev => {
       if (!prev) return prev;
       return {
@@ -240,6 +279,7 @@ export default function App() {
     const wallHeight = (selected.data as WallDef)?.height ?? 3.0;
     const targetElevation =
       zone.floors.find(f => f.level === targetLevel)?.elevation ?? targetLevel * wallHeight;
+    historyRef.current?.beginBatch("copy walls to floor");
     const nodeMap = new Map<string, string>();
     for (const w of walls) {
       for (const oldId of [w.startNodeId, w.endNodeId]) {
@@ -262,6 +302,8 @@ export default function App() {
         openings:    [],
       });
     }
+    historyRef.current?.commitBatch();
+    syncHistory();
   };
 
   const handleFillRunWithFloor = (): void => {
@@ -282,13 +324,16 @@ export default function App() {
       const n = zone.nodes.find(nn => nn.id === id);
       return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
     });
-    world.addFloor(selected.zoneId, {
-      id:            crypto.randomUUID(),
-      level,
-      elevation,
-      ceilingHeight: null,
-      floorMesh:     { shape: "polygon", points, nodeIds: coreNodeIds, material: "concrete_01" },
+    historyRef.current?.record("fill run with floor", () => {
+      world.addFloor(selected.zoneId, {
+        id:            crypto.randomUUID(),
+        level,
+        elevation,
+        ceilingHeight: null,
+        floorMesh:     { shape: "polygon", points, nodeIds: coreNodeIds, material: "concrete_01" },
+      });
     });
+    syncHistory();
   };
 
   const isWallRunClosed = (): boolean => {
@@ -300,34 +345,34 @@ export default function App() {
   };
 
   const handleDelete = useCallback((): void => {
-    const world = worldRef.current;
+    const world   = worldRef.current;
+    const history = historyRef.current;
     if (!selected || !world) return;
     const { type, id, zoneId } = selected;
 
+    history?.beginBatch(`delete ${type}`);
     if (type === "wall") {
       const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
       const nodeIds = new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]));
       for (const w of walls) world.removeWall(zoneId, w.id);
       for (const nodeId of nodeIds) world.removeNode(zoneId, nodeId);
-      setSelected(null);
     } else if (type === "floor") {
       world.removeFloor(zoneId, id);
-      setSelected(null);
     } else if (type === "platform") {
       world.removePlatform(zoneId, id);
-      setSelected(null);
     } else if (type === "stair") {
       world.removeStair(zoneId, id);
-      setSelected(null);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
       const wall = zone?.walls.find(w => w.id === wallId);
-      if (!wall) return;
+      if (!wall) { history?.cancelBatch(); return; }
       world.updateWall(zoneId, wallId, { openings: wall.openings.filter(o => o.id !== id) });
-      setSelected(null);
     }
-  }, [selected]);
+    history?.commitBatch();
+    syncHistory();
+    setSelected(null);
+  }, [selected, syncHistory]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -348,6 +393,7 @@ export default function App() {
 
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
+    const history = historyRef.current;
     if (selected.type === "opening") {
       const wallId = selected.parentId;
       if (!wallId) return;
@@ -361,11 +407,17 @@ export default function App() {
         }
       }
       const fullChanges = { ...openingChanges, ...extra };
-      worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, fullChanges);
+      history?.record("update opening", () => {
+        worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, fullChanges);
+      });
+      syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...fullChanges } } : null);
     } else if (selected.type === "wall") {
       const wallChanges = changes as Partial<WallDef>;
-      worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
+      history?.record("update wall", () => {
+        worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
+      });
+      syncHistory();
       setSelected(prev => {
         if (!prev) return null;
         // Mirror sync keys locally so segment rows update before the async rebuild arrives.
@@ -377,8 +429,11 @@ export default function App() {
       });
     } else if (selected.type === "floor") {
       const floorDef = selected.data as FloorDef;
-      worldRef.current?.updateFloor(selected.zoneId, floorDef.id, changes as unknown as Partial<FloorDef>);
       const floorChanges = changes as unknown as Partial<FloorDef>;
+      history?.record("update floor", () => {
+        worldRef.current?.updateFloor(selected.zoneId, floorDef.id, floorChanges);
+      });
+      syncHistory();
       setSelected(prev => {
         if (!prev) return null;
         const current = prev.data as FloorDef;
@@ -395,11 +450,17 @@ export default function App() {
       });
     } else if (selected.type === "platform") {
       const platChanges = changes as unknown as Partial<PlatformDef>;
-      worldRef.current?.updatePlatform(selected.zoneId, selected.id, platChanges);
+      history?.record("update platform", () => {
+        worldRef.current?.updatePlatform(selected.zoneId, selected.id, platChanges);
+      });
+      syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as PlatformDef), ...platChanges } } : null);
     } else if (selected.type === "stair") {
       const stairChanges = changes as unknown as Partial<StairDef>;
-      worldRef.current?.updateStair(selected.zoneId, selected.id, stairChanges);
+      history?.record("update stair", () => {
+        worldRef.current?.updateStair(selected.zoneId, selected.id, stairChanges);
+      });
+      syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
     } else {
       busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
@@ -413,7 +474,14 @@ export default function App() {
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
       />
 
-      <Toolbar         activeTool={activeTool}   onToolSelect={handleToolSelect} />
+      <Toolbar
+        activeTool={activeTool}
+        onToolSelect={handleToolSelect}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
+      />
       <TopBar
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
@@ -452,13 +520,16 @@ export default function App() {
               const { zoneId, level, points, nodeIds } = autoFloorPrompt;
               const zone = worldRef.current?.zones.get(zoneId);
               const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? level * 3.0;
-              worldRef.current?.addFloor(zoneId, {
-                id:            crypto.randomUUID(),
-                level,
-                elevation,
-                ceilingHeight: null,
-                floorMesh: { shape: "polygon", points, nodeIds, material: "concrete_01" },
+              historyRef.current?.record("auto-fill floor", () => {
+                worldRef.current?.addFloor(zoneId, {
+                  id:            crypto.randomUUID(),
+                  level,
+                  elevation,
+                  ceilingHeight: null,
+                  floorMesh: { shape: "polygon", points, nodeIds, material: "concrete_01" },
+                });
               });
+              syncHistory();
               setAutoFloorPrompt(null);
             }}
             style={{
