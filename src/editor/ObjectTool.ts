@@ -83,13 +83,16 @@ export class ObjectTool implements IEditorModule {
     try {
       this._ghost = await this._assetManager.loadModel(assetId);
       this._ghost.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          const mat = (child.material as THREE.Material).clone() as THREE.MeshStandardMaterial;
-          mat.transparent = true;
-          mat.opacity     = 0.5;
-          mat.depthWrite  = false;
-          child.material  = mat;
-        }
+        if (!(child instanceof THREE.Mesh)) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        const ghostMats = mats.map(m => {
+          const c = (m as THREE.Material).clone() as THREE.MeshStandardMaterial;
+          c.transparent = true;
+          c.opacity     = 0.5;
+          c.depthWrite  = false;
+          return c;
+        });
+        child.material = Array.isArray(child.material) ? ghostMats : ghostMats[0]!;
       });
       this._ghost.visible = false;
       this._scene.add(this._ghost);

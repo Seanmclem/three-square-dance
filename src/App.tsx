@@ -267,6 +267,12 @@ export default function App() {
         e.preventDefault();
         handleRedo();
       }
+      if (e.code === 'Escape') {
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          busRef.current.emit('object:deselected', {});
+        }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
