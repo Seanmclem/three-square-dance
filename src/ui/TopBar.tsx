@@ -7,6 +7,10 @@ interface TopBarProps {
   onCameraTopDown: () => void;
   onSave:          () => void;
   onLoad:          (json: unknown) => void;
+  onUndo:          () => void;
+  onRedo:          () => void;
+  canUndo:         boolean;
+  canRedo:         boolean;
 }
 
 const FLOORS = [
@@ -16,7 +20,7 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad }: TopBarProps) {
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onUndo, onRedo, canUndo, canRedo }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +85,29 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       <div style={{ width: 1, height: 20, background: "rgba(80,120,180,0.2)" }} />
       <HelpButton />
       <div style={{ flex: 1 }} />
+
+      {([
+        { label: "↩", title: "Undo (Cmd+Z)", onClick: onUndo, enabled: canUndo },
+        { label: "↪", title: "Redo (Cmd+Y)", onClick: onRedo, enabled: canRedo },
+      ] as const).map(btn => (
+        <button
+          key={btn.title}
+          title={btn.title}
+          onClick={btn.onClick}
+          disabled={!btn.enabled}
+          style={{
+            width: 28, height: 28, border: "none", borderRadius: 6,
+            background: btn.enabled ? "rgba(80,120,180,0.15)" : "transparent",
+            color: btn.enabled ? "#7090c0" : "rgba(80,120,180,0.25)",
+            fontSize: 14, cursor: btn.enabled ? "pointer" : "default",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.15s",
+          }}
+        >
+          {btn.label}
+        </button>
+      ))}
+      <div style={{ width: 1, height: 20, background: "rgba(80,120,180,0.2)" }} />
 
       <input
         ref={fileRef}

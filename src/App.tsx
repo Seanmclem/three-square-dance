@@ -13,6 +13,7 @@ import { WallTool } from "@/editor/WallTool";
 import { PlatformTool } from "@/editor/PlatformTool";
 import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
+import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -21,7 +22,9 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile } from "@/types";
+import { LeftPanel } from "@/ui/LeftPanel";
+import { ModelImporterModal } from "@/ui/ModelImporterModal";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -61,6 +64,11 @@ export default function App() {
   const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [leftPanel,       setLeftPanel]        = useState<LeftPanelId>(null);
+  const [assets,          setAssets]           = useState<AssetDef[]>([]);
+  const [selectedAssetId, setSelectedAssetId]  = useState<string | null>(null);
+  const [showImporter,    setShowImporter]     = useState(false);
+  const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
 
   const syncHistory = useCallback((): void => {
     setCanUndo(historyRef.current?.canUndo ?? false);
@@ -78,6 +86,10 @@ export default function App() {
       setMaterialList(mats);
       bus.emit("materials:loaded", { materials: mats });
     }).catch(err => console.error("initMaterials failed:", err));
+    assetManager.initAssets().then(defs => {
+      setAssets(defs);
+      bus.emit("assets:loaded", { assets: defs });
+    }).catch(err => console.error("initAssets failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
     const zones     = new ZoneManager(scene.scene, world, bus);
@@ -94,6 +106,7 @@ export default function App() {
     const platformTool       = new PlatformTool(scene.scene, world, bus, history);
     const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus, history);
     const stairTool          = new StairTool(scene.scene, world, bus, history);
+    const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
@@ -118,6 +131,7 @@ export default function App() {
     platformTool.init();
     polyPlatformTool.init();
     stairTool.init();
+    objectTool.init();
     nodeDragger.init();
     openingDragger.init();
     gizmoManager.init();
@@ -133,11 +147,14 @@ export default function App() {
       bus.on("object:selected",   payload       => setSelected(payload)),
       bus.on("object:deselected", ()            => setSelected(null)),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
-      bus.on("tool:placed", () => {
-        setActiveTool("select");
-        bus.emit("tool:select", { tool: "select" });
+      bus.on("tool:placed", ({ type }) => {
+        if (type !== "object") {
+          setActiveTool("select");
+          bus.emit("tool:select", { tool: "select" });
+        }
         syncHistory();
       }),
+      bus.on("assets:loaded", ({ assets: defs }) => setAssets(defs)),
     ];
 
     // Init physics async — not blocking render
@@ -150,6 +167,7 @@ export default function App() {
       gizmoManager.dispose();
       openingDragger.dispose();
       nodeDragger.dispose();
+      objectTool.dispose();
       stairTool.dispose();
       polyPlatformTool.dispose();
       platformTool.dispose();
@@ -167,6 +185,11 @@ export default function App() {
   const handleToolSelect = (tool: ToolId): void => {
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
+    if (tool === "object") {
+      setLeftPanel("assets");
+    } else {
+      setLeftPanel(null);
+    }
   };
 
   const handleFloorChange = (level: number): void => {
@@ -362,6 +385,8 @@ export default function App() {
       world.removePlatform(zoneId, id);
     } else if (type === "stair") {
       world.removeStair(zoneId, id);
+    } else if (type === "object") {
+      world.removeObject(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
@@ -389,6 +414,18 @@ export default function App() {
   const handleMaterialsReload = (): void => {
     assetManager.initMaterials().then(mats => setMaterialList(mats))
       .catch(err => console.error("materials reload failed:", err));
+  };
+
+  const handleAssetsReload = (): void => {
+    assetManager.initAssets().then(defs => {
+      setAssets(defs);
+      busRef.current.emit("assets:loaded", { assets: defs });
+    }).catch(err => console.error("assets reload failed:", err));
+  };
+
+  const handleAssetSelect = (id: string | null): void => {
+    setSelectedAssetId(id);
+    if (id) busRef.current.emit("asset:selected", { assetId: id });
   };
 
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
@@ -477,10 +514,15 @@ export default function App() {
       <Toolbar
         activeTool={activeTool}
         onToolSelect={handleToolSelect}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        canUndo={canUndo}
-        canRedo={canRedo}
+      />
+      <LeftPanel
+        panelId={leftPanel}
+        assets={assets}
+        selectedAssetId={selectedAssetId}
+        onAssetSelect={handleAssetSelect}
+        onImport={() => setShowImporter(true)}
+        onClose={() => setLeftPanel(null)}
+        assetManager={assetManager}
       />
       <TopBar
         activeFloor={activeFloor}
@@ -488,6 +530,10 @@ export default function App() {
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
         onSave={handleSave}
         onLoad={handleLoad}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
       />
       <PropertiesPanel
         activeTool={activeTool}
@@ -555,6 +601,19 @@ export default function App() {
       }}>
 SquareDance
       </div>
+
+      {showImporter && (
+        <ModelImporterModal
+          modelsDir={modelsDir}
+          onModelsDirSet={dir => setModelsDir(dir)}
+          onComplete={imported => {
+            handleAssetsReload();
+            setShowImporter(false);
+            if (imported.length === 1) handleAssetSelect(imported[0]!.id);
+          }}
+          onClose={() => setShowImporter(false)}
+        />
+      )}
     </div>
   );
 }

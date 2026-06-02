@@ -40,6 +40,30 @@ export interface MaterialOverrides {
 
 export type QualityScale = 'low' | 'medium' | 'high';
 
+// ─── Asset types ──────────────────────────────────────────────────────────────
+
+export type ColliderType  = 'box' | 'mesh' | 'none';
+export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other';
+export type LeftPanelId   = 'assets' | 'zones' | 'scripts' | null;
+
+export interface AssetDef {
+  id:           string;
+  label:        string;
+  category:     AssetCategory;
+  path:         string;
+  mtlPath?:     string;   // OBJ only — companion .mtl file path
+  thumbnail?:   string;
+  collidable:   boolean;
+  colliderType: ColliderType;
+  tags:         string[];
+  dateAdded:    string;
+}
+
+export interface AssetManifest {
+  version: string;
+  assets:  AssetDef[];
+}
+
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
 export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone";
@@ -127,6 +151,9 @@ export interface BusEvents {
   "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
   "input:keyup":           { code: string };
   "history:restore":       Record<string, never>;
+  "assets:loaded":         { assets: AssetDef[] };
+  "leftpanel:open":        { panelId: LeftPanelId };
+  "leftpanel:close":       Record<string, never>;
 }
 
 export type BusEventName = keyof BusEvents;

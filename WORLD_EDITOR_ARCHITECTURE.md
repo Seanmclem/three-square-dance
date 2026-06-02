@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.5.0** — last updated 2026-06-01
+**Version 2.6.0** — last updated 2026-06-01
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -21,6 +21,7 @@
 - v2.3 — Phase 6.4 delete support (Delete key + panel button) + copy-to-floor opening strip
 - v2.4 — Phase 6.6 input UX & floor fixes: EditorCamera focus guard, universal live debounce hook, floor gizmo centroid, floor elevation default, wall-run stale rebuild fix
 - v2.5 — Phase 6.7 snapshot-based undo/redo: HistoryManager, `history:restore` event, Cmd+Z/Cmd+Y shortcuts, toolbar buttons, all placement tools and App.tsx mutation handlers wrapped
+- v2.6 — Phase 7 redesigned: LeftPanel generic slot system, AssetBrowser in left panel, Model Importer modal, manifest system, object placement wired to GizmoManager
 
 ---
 
@@ -136,7 +137,9 @@ export interface BusEvents {
   "input:wheel":           { delta: number };
   "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
   "input:keyup":           { code: string };
-  // ⏳ Phase 7: "assets:loaded": { assets: AssetDef[] };
+  "assets:loaded":    { assets: AssetDef[] };        // implemented Phase 7
+  "leftpanel:open":   { panelId: LeftPanelId };
+  "leftpanel:close":  Record<string, never>;
   // ⏳ Phase 8: "script:trigger": { triggerId: string; context: ScriptContext };
   // ⏳ Phase 8: "flag:set": { flag: string; value: boolean };
   // ⏳ Phase 9: "spawn:set": { spawn: SpawnPoint };
@@ -4101,25 +4104,212 @@ All existing form logic (inputs, material picker, map toggles, copy-to-floor but
 
 ### Phase 7 — Object Placement + Model Importer
 
-**Model manifest system:**
-- `public/assets/models/manifest.json` — same pattern as material manifest
-- `AssetManager.initAssets()` fetches manifest on startup, populates asset registry, emits `assets:loaded`
-- `AssetBrowser` renders asset grid from manifest — no hardcoded assets anywhere
+#### Left Secondary Panel (new UI system)
 
-**Model importer (in-editor):**
-- "Add model" button at top of asset list in AssetBrowser
-- Opens `ModelImporterModal.tsx` — same UX pattern as material importer
-- User picks a `.glb` file, fills in label/category/collidable/tags
-- Copies `.glb` to `public/assets/models/<id>.glb`, auto-generates thumbnail, writes manifest entry
-- `AssetManager.initAssets()` reloads manifest — model appears in browser immediately, no page reload
+The editor layout gains a **secondary panel** that slides in from the left, just to the right of the existing toolbar strip. It is dynamic — the panel slot is generic and can host any left-side sub-panel content. Phase 7 introduces it with the Asset Browser as its first occupant. Future phases can add other left panels (e.g. Zone list, Script list) by registering a new panel ID.
 
-**Object placement:**
+**Layout:**
+```
+┌──────┬──────────────┬───────────────────────────┬─────────────────┐
+│      │              │                           │                 │
+│Toolbar│ Left Panel  │       Canvas              │ Properties Panel│
+│ 64px │  240px       │     (flex: 1)             │    280px        │
+│      │ (when open)  │                           │                 │
+└──────┴──────────────┴───────────────────────────┴─────────────────┘
+```
+
+The left panel has `width: 0` when closed and animates to `240px` when open (CSS transition). The canvas flex-shrinks naturally — no layout recalculation needed.
+
+**`LeftPanelManager` (React state, owned by `App.tsx`):**
+```tsx
+type LeftPanelId = 'assets' | 'zones' | 'scripts' | null;
+
+const [leftPanel, setLeftPanel] = useState<LeftPanelId>(null);
+
+// Toggling the same tool closes the panel
+// Switching to a different tool opens that panel
+function setLeftPanelForTool(tool: ToolId): void {
+  if (tool === 'object') setLeftPanel(prev => prev === 'assets' ? null : 'assets');
+  else setLeftPanel(null);
+}
+```
+
+Panel opens automatically when the Object tool is selected. Closes when any other tool is selected or when the user clicks the active tool button again.
+
+**`LeftPanel.tsx`** — the generic shell component:
+```tsx
+interface LeftPanelProps {
+  panelId: LeftPanelId;
+  onClose: () => void;
+}
+
+// Renders the correct sub-panel based on panelId
+// Handles open/close animation via CSS class
+// Has a consistent header with title + close button
+function LeftPanel({ panelId, onClose }: LeftPanelProps) {
+  return (
+    <div className={`left-panel ${panelId ? 'open' : ''}`}>
+      <div className="left-panel-header">
+        <span>{PANEL_TITLES[panelId ?? '']}</span>
+        <button onClick={onClose}>✕</button>
+      </div>
+      <div className="left-panel-body">
+        {panelId === 'assets' && <AssetBrowser />}
+        {panelId === 'zones'  && <ZonePanel />}
+        {/* future panels registered here */}
+      </div>
+    </div>
+  );
+}
+```
+
+**CSS:**
+```css
+.left-panel {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.2s ease;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+.left-panel.open { width: 240px; }
+```
+
+---
+
+#### Asset Browser (`src/ui/AssetBrowser.tsx`)
+
+Lives inside the left panel when `panelId === 'assets'`.
+
+**Layout:**
+```
+┌─────────────────────────────────────┐
+│ [search…………………………] [+ Import]       │
+├─────────────────────────────────────┤
+│ All  Furniture  Props  Structures … │  ← category tabs
+├─────────────────────────────────────┤
+│ ┌────┐ ┌────┐ ┌────┐               │
+│ │    │ │    │ │    │  3-col grid    │
+│ └────┘ └────┘ └────┘               │
+│  name   name   name                 │
+│ ┌────┐ ┌────┐ ┌────┐               │
+│ │    │ │    │ │    │               │
+│ └────┘ └────┘ └────┘               │
+└─────────────────────────────────────┘
+```
+
+- Search input filters by label and id, live
+- Category tabs: All, Furniture, Props, Structures, Lights, Characters, Vegetation, Other — derived from manifest, not hardcoded
+- Asset grid: 3 columns, thumbnail + name + file size, collidable badge when `collidable: true`
+- Clicking an asset selects it (highlighted border) and puts `ObjectTool` into placement mode
+- Clicking the selected asset again deselects, exits placement mode
+- On `assets:loaded` bus event: re-render grid from `assetManager.getMaterialList()`
+
+**Thumbnail:** auto-generated PNG at import time (`/assets/models/thumbnails/<id>.png`). If absent (e.g. first import), show a coloured SVG placeholder derived from the asset's category.
+
+---
+
+#### Model Manifest System
+
+`public/assets/models/manifest.json` — same pattern as material manifest:
+
+```json
+{
+  "version": "1.0",
+  "assets": [
+    {
+      "id": "prop_bench_01",
+      "label": "Wooden Bench",
+      "category": "Furniture",
+      "path": "/assets/models/prop_bench_01.glb",
+      "thumbnail": "/assets/models/thumbnails/prop_bench_01.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": ["outdoor", "seating"],
+      "dateAdded": "2026-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+`AssetManager.initAssets()` fetches this on startup, populates registry, emits `assets:loaded`. No hardcoded assets anywhere — if the file doesn't exist, the browser shows empty with only the Import button.
+
+---
+
+#### Model Importer Modal (`src/ui/ModelImporterModal.tsx`)
+
+Opened by the "+ Import model" button in the AssetBrowser header. Uses File System Access API (`showOpenFilePicker`) — Chrome/Edge only, same as material importer. Shows a browser check on open.
+
+**Three-step flow:**
+
+**Step 1 — File pick:**
+- Drop zone or click to browse — accepts `.glb`, `.gltf`
+- On file selected: show filename, file size, enable Step 2
+
+**Step 2 — Metadata:**
+- Label (text input)
+- ID (auto-derived from label, editable, monospace — `my label` → `my_label_01`)
+- Category (dropdown)
+- Collidable toggle (default on)
+- Collider type: Box / Mesh hull / None
+- Tags (chip input — type and press Enter)
+
+**Step 3 — Import (on confirm):**
+1. Copy `.glb` to `public/assets/models/<id>.glb`
+2. Generate thumbnail: spawn offscreen `THREE.WebGLRenderer` (128×128), load model, orbit camera to frame it, render one frame, export as PNG → `public/assets/models/thumbnails/<id>.png`
+3. Read existing manifest (or create empty), merge new entry, write back
+4. Call `AssetManager.initAssets()` to reload — asset appears in browser immediately
+5. Show success state with "Import another" / "Done" buttons
+
+Progress log shows each step with status. On error: show message, allow retry.
+
+---
+
+#### Object Placement
+
 - `ObjectPlacer` + GLTF loading via `AssetManager`
-- Static prop objects get optional Rapier box collider from AABB (when `collidable: true`)
-- `ObjectTool`: place (Mode A), G/R/S transform (Mode B)
-- `TransformControls` gizmo, `gizmo:dragging` suppresses camera
-- On object move: collider position updated via Rapier body translation
-- Objects stored in WorldState, selectable, editable in PropertiesPanel
+- `ObjectTool` Mode A (placing): ghost model follows mouse snapped to nearest floor/platform surface, click to place
+- `ObjectTool` Mode B (transform): G/R/S keys, delegates to `GizmoManager` (Phase 6.1)
+- Static props with `collidable: true` get Rapier box collider from AABB
+- On object move: Rapier body translation updated
+- Objects stored in `WorldState`, selectable, PropertiesPanel shows Geometry and Material screens
+- Placed object thumbnail shown in PropertiesPanel header for quick identification
+
+---
+
+#### New Bus Events
+
+```ts
+"assets:loaded":    { assets: AssetDef[] };   // remove ⏳ marker — now implemented
+
+"leftpanel:close":  Record<string, never>;
+```
+
+#### New Files
+
+```
+src/
+  ui/
+    LeftPanel.tsx           ← generic left panel shell with open/close animation
+    AssetBrowser.tsx        ← asset grid, search, tabs, selection
+    ModelImporterModal.tsx  ← file pick → metadata → import flow
+```
+
+#### Add to `src/types.ts`
+
+```ts
+export type LeftPanelId = 'assets' | 'zones' | 'scripts' | null;
+```
+
+#### Notes for Claude Code
+
+- `LeftPanel` is the only component that knows about the open/close animation. `AssetBrowser` and other sub-panels have no knowledge of the panel system — they just render their content.
+- The panel width (240px) is a CSS variable `--left-panel-w` so it can be adjusted without hunting through code.
+- `ObjectTool` must listen to `assets:selected` bus event (emitted by `AssetBrowser` on asset click) to enter placement mode, and deactivate when `assets:deselected` is emitted.
+- Thumbnail generation uses an offscreen renderer — never the main scene renderer. Dispose it after each thumbnail is generated.
+- File System Access API availability check: `if (!('showOpenFilePicker' in window))` → show "Use Chrome or Edge" message, disable the import button.
 
 ### Phase 8 — Zones & Transitions
 - ZoneTool: rect draw, naming dialog, zone list population

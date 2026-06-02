@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest } from "@/types";
 
 export type { MaterialDef };
 
@@ -11,6 +11,7 @@ export class AssetManager {
   private _gltfLoader: unknown    = null;
   private _renderer: THREE.WebGLRenderer | null = null;
   private _materialRegistry: Record<string, MaterialDef> = {};
+  private _assetRegistry:   Record<string, AssetDef>    = {};
   private _quality: QualityScale = 'high';
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
@@ -54,6 +55,33 @@ export class AssetManager {
 
   getMaterialList(): MaterialDef[] {
     return Object.values(this._materialRegistry);
+  }
+
+  /** Fetch models/manifest.json, populate the asset registry, return the list. */
+  async initAssets(): Promise<AssetDef[]> {
+    try {
+      const res = await fetch('/assets/models/manifest.json');
+      if (!res.ok) {
+        console.warn('AssetManager: no model manifest found');
+        this._assetRegistry = {};
+        return [];
+      }
+      const manifest: AssetManifest = await res.json();
+      this._assetRegistry = Object.fromEntries(manifest.assets.map(a => [a.id, a]));
+      return manifest.assets;
+    } catch (err) {
+      console.warn('AssetManager: failed to load model manifest', err);
+      this._assetRegistry = {};
+      return [];
+    }
+  }
+
+  getAssetDef(id: string): AssetDef | undefined {
+    return this._assetRegistry[id];
+  }
+
+  getAssetList(): AssetDef[] {
+    return Object.values(this._assetRegistry);
   }
 
   async loadTexture(url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace): Promise<THREE.Texture> {
@@ -145,6 +173,40 @@ export class AssetManager {
     return new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
   }
 
+  /** Load any supported model format and return a cloned, scene-ready Object3D. */
+  async loadModel(assetId: string): Promise<THREE.Object3D> {
+    const def  = this._assetRegistry[assetId];
+    const path = def?.path ?? `/assets/models/${assetId}.glb`;
+    if (/\.obj$/i.test(path)) {
+      return this._loadOBJ(assetId, path, def?.mtlPath);
+    }
+    const gltf = await this.loadGLTF(assetId) as { scene: THREE.Object3D };
+    return gltf.scene.clone();
+  }
+
+  private async _loadOBJ(assetId: string, path: string, mtlPath?: string): Promise<THREE.Object3D> {
+    const cached = this._gltfCache.get(`obj:${assetId}`);
+    if (cached) return (cached as THREE.Object3D).clone();
+
+    const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
+    const loader = new OBJLoader();
+
+    if (mtlPath) {
+      try {
+        const { MTLLoader } = await import("three/addons/loaders/MTLLoader.js");
+        const materials = await new MTLLoader().loadAsync(mtlPath) as { preload(): void };
+        materials.preload();
+        loader.setMaterials(materials as Parameters<typeof loader.setMaterials>[0]);
+      } catch (err) {
+        console.warn("AssetManager: failed to load MTL", err);
+      }
+    }
+
+    const obj = await loader.loadAsync(path);
+    this._gltfCache.set(`obj:${assetId}`, obj);
+    return obj.clone();
+  }
+
   async loadGLTF(assetId: string): Promise<unknown> {
     const cached = this._gltfCache.get(assetId);
     if (cached) return cached;
@@ -153,7 +215,9 @@ export class AssetManager {
       this._gltfLoader = new GLTFLoader();
     }
     const loader = this._gltfLoader as { loadAsync: (url: string) => Promise<unknown> };
-    const gltf = await loader.loadAsync(`/assets/models/${assetId}.glb`);
+    const def  = this._assetRegistry[assetId];
+    const url  = def?.path ?? `/assets/models/${assetId}.glb`;
+    const gltf = await loader.loadAsync(url);
     this._gltfCache.set(assetId, gltf);
     return gltf;
   }

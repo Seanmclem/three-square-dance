@@ -5,9 +5,10 @@ import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
+import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -36,12 +37,14 @@ interface ZoneEntry {
   wallsGroup:     THREE.Group;
   platformsGroup: THREE.Group;
   stairsGroup:    THREE.Group;
+  objectsGroup:   THREE.Group;
   // keyed by floor.id
   floorColliders: Map<string, RAPIER.Collider>;
   // Multiple wallIds can map to the same RunEntry (all walls in a merged run)
   wallData:       Map<string, RunEntry>;
   platformEntries: Map<string, PlatformEntry>;
   stairEntries:    Map<string, StairEntry>;
+  objectMeshes:    Map<string, THREE.Object3D>;
 }
 
 
@@ -183,6 +186,12 @@ export class ZoneManager {
         this._removeStair(zoneId, id);
         if (oldDef?.csgCutter) void this._rebuildOverlapping(zoneId, oldDef);
       }),
+      this._bus.on("object:added", ({ zoneId, object }) => {
+        void this._addObject(zoneId, object);
+      }),
+      this._bus.on("object:removed", ({ zoneId, id }) => {
+        this._removeObject(zoneId, id);
+      }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
       this._bus.on("history:restore", () => {
@@ -257,12 +266,14 @@ export class ZoneManager {
     const wallsGroup     = new THREE.Group();
     const platformsGroup = new THREE.Group();
     const stairsGroup    = new THREE.Group();
-    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup);
+    const objectsGroup   = new THREE.Group();
+    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup);
 
     const floorColliders  = new Map<string, RAPIER.Collider>();
     const wallData        = new Map<string, RunEntry>();
     const platformEntries = new Map<string, PlatformEntry>();
     const stairEntries    = new Map<string, StairEntry>();
+    const objectMeshes    = new Map<string, THREE.Object3D>();
 
     // ── Floors ────────────────────────────────────────────────────────────
     const floorsByLevel = new Map<number, typeof zone.floors>();
@@ -316,10 +327,16 @@ export class ZoneManager {
       stairEntries.set(stair.id, { group: stairGroup, meshes, colliders, def: stair });
     }
 
+    // ── Objects ───────────────────────────────────────────────────────────
+    for (const obj of zone.objects) {
+      const mesh = await this._loadObjectMesh(obj, zoneId);
+      if (mesh) { objectsGroup.add(mesh); objectMeshes.set(obj.id, mesh); }
+    }
+
     this._scene.add(group);
     this._loadedZones.set(zoneId, {
-      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup,
-      floorColliders, wallData, platformEntries, stairEntries,
+      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup,
+      floorColliders, wallData, platformEntries, stairEntries, objectMeshes,
     });
 
     // Second pass: apply CSG cuts from any stairs with cutters
@@ -729,6 +746,61 @@ export class ZoneManager {
     }
     entry.stairsGroup.remove(se.group);
     entry.stairEntries.delete(stairId);
+  }
+
+  // ── Object helpers ────────────────────────────────────────────────────────
+
+  private async _loadObjectMesh(obj: WorldObject, zoneId: string): Promise<THREE.Object3D | null> {
+    try {
+      const mesh = await assetManager.loadModel(obj.assetId);
+      mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
+      const DEG2RAD = Math.PI / 180;
+      mesh.rotation.set(obj.rotation.x * DEG2RAD, obj.rotation.y * DEG2RAD, obj.rotation.z * DEG2RAD);
+      mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+      mesh.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor };
+      mesh.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          child.userData = { ...mesh.userData };
+          child.castShadow    = true;
+          child.receiveShadow = true;
+        }
+      });
+      return mesh;
+    } catch (err) {
+      console.warn(`ZoneManager: failed to load model for asset "${obj.assetId}"`, err);
+      // Fallback placeholder box
+      const geo  = new THREE.BoxGeometry(1, 1, 1);
+      const mat  = new THREE.MeshStandardMaterial({ color: 0xff6600, wireframe: true });
+      const box  = new THREE.Mesh(geo, mat);
+      box.position.set(obj.position.x, obj.position.y, obj.position.z);
+      box.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor, _ownsMaterial: true };
+      return box;
+    }
+  }
+
+  private async _addObject(zoneId: string, obj: WorldObject): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const mesh = await this._loadObjectMesh(obj, zoneId);
+    if (!mesh) return;
+    entry.objectsGroup.add(mesh);
+    entry.objectMeshes.set(obj.id, mesh);
+  }
+
+  private _removeObject(zoneId: string, objectId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const mesh = entry.objectMeshes.get(objectId);
+    if (!mesh) return;
+    entry.objectsGroup.remove(mesh);
+    mesh.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if ((child.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+          (child.material as THREE.Material).dispose();
+      }
+    });
+    entry.objectMeshes.delete(objectId);
   }
 
   // ── CSG cutter helpers ────────────────────────────────────────────────────

@@ -1,0 +1,225 @@
+{
+  "version": "1.0",
+  "assets": [
+    {
+      "id": "door1",
+      "label": "Door1",
+      "category": "Furniture",
+      "path": "/assets/models/door1.obj",
+      "mtlPath": "/assets/models/door1.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "closet",
+      "label": "Closet",
+      "category": "Furniture",
+      "path": "/assets/models/closet.obj",
+      "mtlPath": "/assets/models/closet.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "sofa3",
+      "label": "Sofa3",
+      "category": "Furniture",
+      "path": "/assets/models/sofa3.obj",
+      "mtlPath": "/assets/models/sofa3.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "beddouble",
+      "label": "BedDouble",
+      "category": "Furniture",
+      "path": "/assets/models/beddouble.obj",
+      "mtlPath": "/assets/models/beddouble.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "bedtwin",
+      "label": "BedTwin",
+      "category": "Furniture",
+      "path": "/assets/models/bedtwin.obj",
+      "mtlPath": "/assets/models/bedtwin.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "shortcloset",
+      "label": "ShortCloset",
+      "category": "Furniture",
+      "path": "/assets/models/shortcloset.obj",
+      "mtlPath": "/assets/models/shortcloset.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "sofa",
+      "label": "Sofa",
+      "category": "Furniture",
+      "path": "/assets/models/sofa.obj",
+      "mtlPath": "/assets/models/sofa.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "chair",
+      "label": "Chair",
+      "category": "Furniture",
+      "path": "/assets/models/chair.obj",
+      "mtlPath": "/assets/models/chair.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "desk",
+      "label": "Desk",
+      "category": "Furniture",
+      "path": "/assets/models/desk.obj",
+      "mtlPath": "/assets/models/desk.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "bookcase_books",
+      "label": "Bookcase Books",
+      "category": "Furniture",
+      "path": "/assets/models/bookcase_books.obj",
+      "mtlPath": "/assets/models/bookcase_books.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "bookcase",
+      "label": "Bookcase",
+      "category": "Furniture",
+      "path": "/assets/models/bookcase.obj",
+      "mtlPath": "/assets/models/bookcase.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "sofa_individual",
+      "label": "Sofa individual",
+      "category": "Furniture",
+      "path": "/assets/models/sofa_individual.obj",
+      "mtlPath": "/assets/models/sofa_individual.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "table",
+      "label": "Table",
+      "category": "Furniture",
+      "path": "/assets/models/table.obj",
+      "mtlPath": "/assets/models/table.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "door2",
+      "label": "Door2",
+      "category": "Furniture",
+      "path": "/assets/models/door2.obj",
+      "mtlPath": "/assets/models/door2.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "table2",
+      "label": "Table2",
+      "category": "Furniture",
+      "path": "/assets/models/table2.obj",
+      "mtlPath": "/assets/models/table2.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "officechair",
+      "label": "OfficeChair",
+      "category": "Furniture",
+      "path": "/assets/models/officechair.obj",
+      "mtlPath": "/assets/models/officechair.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "sofa2",
+      "label": "Sofa2",
+      "category": "Furniture",
+      "path": "/assets/models/sofa2.obj",
+      "mtlPath": "/assets/models/sofa2.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "door3",
+      "label": "Door3",
+      "category": "Furniture",
+      "path": "/assets/models/door3.obj",
+      "mtlPath": "/assets/models/door3.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "stool",
+      "label": "Stool",
+      "category": "Furniture",
+      "path": "/assets/models/stool.obj",
+      "mtlPath": "/assets/models/stool.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "nightstand",
+      "label": "NightStand",
+      "category": "Furniture",
+      "path": "/assets/models/nightstand.obj",
+      "mtlPath": "/assets/models/nightstand.mtl",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    }
+  ]
+}

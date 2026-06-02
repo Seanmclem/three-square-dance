@@ -18,13 +18,9 @@ const TOOLS: ToolDef[] = [
 interface ToolbarProps {
   activeTool:   ToolId;
   onToolSelect: (tool: ToolId) => void;
-  onUndo:       () => void;
-  onRedo:       () => void;
-  canUndo:      boolean;
-  canRedo:      boolean;
 }
 
-export function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, canUndo, canRedo }: ToolbarProps) {
+export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
@@ -33,29 +29,6 @@ export function Toolbar({ activeTool, onToolSelect, onUndo, onRedo, canUndo, can
       display: "flex", flexDirection: "column", alignItems: "center",
       paddingTop: 56, gap: 2, zIndex: 10,
     }}>
-      <div style={{ display: "flex", gap: 2, marginBottom: 4 }}>
-        {([
-          { label: "↩", title: "Undo (Cmd+Z)", onClick: onUndo, enabled: canUndo },
-          { label: "↪", title: "Redo (Cmd+Y)", onClick: onRedo, enabled: canRedo },
-        ] as const).map(btn => (
-          <button
-            key={btn.title}
-            title={btn.title}
-            onClick={btn.onClick}
-            disabled={!btn.enabled}
-            style={{
-              width: 28, height: 28, border: "none", borderRadius: 6,
-              background: btn.enabled ? "rgba(80,120,180,0.15)" : "transparent",
-              color: btn.enabled ? "#7090c0" : "rgba(80,120,180,0.25)",
-              fontSize: 14, cursor: btn.enabled ? "pointer" : "default",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s",
-            }}
-          >
-            {btn.label}
-          </button>
-        ))}
-      </div>
 
       {TOOLS.map(tool => {
         const active = activeTool === tool.id;
