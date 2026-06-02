@@ -23,8 +23,8 @@ const OVERLAY: React.CSSProperties = {
 };
 
 const MODAL: React.CSSProperties = {
-  background: "rgba(10,14,22,0.98)",
-  border: "1px solid rgba(80,120,180,0.3)",
+  background: "rgba(28,28,28,0.98)",
+  border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 8,
   width: 440,
   maxHeight: "85vh",
@@ -33,27 +33,27 @@ const MODAL: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 18,
-  color: "#9ab8d4",
+  color: "#c0c0c0",
   fontFamily: "monospace",
   fontSize: 12,
 };
 
 const INPUT_STYLE: React.CSSProperties = {
-  width: "100%", background: "rgba(20,30,45,0.9)",
-  border: "1px solid rgba(80,120,180,0.25)", borderRadius: 4,
-  color: "#9ab8d4", fontFamily: "monospace", fontSize: 12,
+  width: "100%", background: "rgba(46,46,46,0.9)",
+  border: "1px solid rgba(255,255,255,0.09)", borderRadius: 4,
+  color: "#c0c0c0", fontFamily: "monospace", fontSize: 12,
   padding: "5px 8px", outline: "none", boxSizing: "border-box",
 };
 
 const BTN = (active = true): React.CSSProperties => ({
   padding: "7px 14px", borderRadius: 4, cursor: active ? "pointer" : "default",
   fontFamily: "monospace", fontSize: 11, border: "none",
-  background: active ? "rgba(80,140,255,0.2)" : "rgba(40,50,70,0.6)",
-  color: active ? "#80aaff" : "#4a6a8a",
+  background: active ? "rgba(80,140,255,0.2)" : "rgba(55,55,55,0.7)",
+  color: active ? "#80aaff" : "#646464",
 });
 
 const STEP_LABEL: React.CSSProperties = {
-  color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 8,
+  color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 8,
 };
 
 function autoLabel(id: string): string {
@@ -159,8 +159,8 @@ export function MaterialImporterModal({
           {texturesDir
             ? <div style={{ color: "#6bff8a", fontSize: 11 }}>📁 {texturesDir.name}</div>
             : <>
-                <div style={{ color: "#4a6a8a", fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
-                  Navigate to <span style={{ color: "#9ab8d4" }}>public/assets/textures/</span> inside this project.
+                <div style={{ color: "#646464", fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
+                  Navigate to <span style={{ color: "#c0c0c0" }}>public/assets/textures/</span> inside this project.
                   This is where imported files will be written. Only needed once per session.
                 </div>
                 <button style={BTN(true)} onClick={pickTexturesDir}>
@@ -187,7 +187,7 @@ export function MaterialImporterModal({
               onChange={e => setLabel(e.target.value)}
             />
             {materialId && (
-              <div style={{ color: "#4a6a8a", fontSize: 10, marginTop: 4 }}>
+              <div style={{ color: "#646464", fontSize: 10, marginTop: 4 }}>
                 folder: /assets/textures/{materialId.trim().replace(/\s+/g, "_").toLowerCase()}/
               </div>
             )}
@@ -206,12 +206,12 @@ export function MaterialImporterModal({
                   const found = detectedMaps[key];
                   return (
                     <div key={key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      <span style={{ color: found ? "#6bff8a" : "#3a5a6a", width: 14, fontSize: 11 }}>
+                      <span style={{ color: found ? "#6bff8a" : "#505060", width: 14, fontSize: 11 }}>
                         {found ? "●" : "○"}
                       </span>
-                      <span style={{ color: "#6a90b8", width: 80 }}>{key}</span>
+                      <span style={{ color: "#909090", width: 80 }}>{key}</span>
                       <span style={{
-                        color: "#4a6a8a", fontSize: 10,
+                        color: "#646464", fontSize: 10,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
                       }}>
                         {found ? found.srcName : "—"}

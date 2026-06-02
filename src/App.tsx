@@ -522,7 +522,6 @@ export default function App() {
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
         onClose={() => setLeftPanel(null)}
-        assetManager={assetManager}
       />
       <TopBar
         activeFloor={activeFloor}

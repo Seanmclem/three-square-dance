@@ -32,6 +32,7 @@ export class ObjectTool implements IEditorModule {
   private _ghostBox: THREE.Mesh | null = null;
   private _activeZoneId = "demo";
   private _activeLevel  = 0;
+  private _lastWorldPos: Vec3 | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -56,6 +57,7 @@ export class ObjectTool implements IEditorModule {
         void this._beginPlacing(assetId);
       }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
+        this._lastWorldPos = worldPos;
         if (this._active && this._state === "PLACING") this._onMouseMove(worldPos);
       }),
       this._bus.on("input:click", ({ worldPos, button }) => {
@@ -89,14 +91,17 @@ export class ObjectTool implements IEditorModule {
           child.material  = mat;
         }
       });
+      this._ghost.visible = false;
       this._scene.add(this._ghost);
     } catch {
       // Fallback: simple box ghost
       this._ghostBox = makeGhostMesh();
+      this._ghostBox.visible = false;
       this._scene.add(this._ghostBox);
     }
     this._state = "PLACING";
     document.body.style.cursor = "crosshair";
+    if (this._lastWorldPos) this._onMouseMove(this._lastWorldPos);
   }
 
   private _onMouseMove(worldPos: Vec3): void {
@@ -104,7 +109,10 @@ export class ObjectTool implements IEditorModule {
     const z = snap(worldPos.z);
     const y = this._getElevation();
     const target = this._ghost ?? this._ghostBox;
-    if (target) target.position.set(x, y, z);
+    if (target) {
+      target.position.set(x, y, z);
+      target.visible = true;
+    }
   }
 
   private _getElevation(): number {

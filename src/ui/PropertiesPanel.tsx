@@ -10,24 +10,24 @@ import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
 const PANEL_STYLE: React.CSSProperties = {
   position: "absolute", right: 0, top: 0, bottom: 0, width: 280,
-  background: "rgba(10,14,22,0.97)", borderLeft: "1px solid rgba(80,120,180,0.2)",
+  background: "rgba(28,28,28,0.97)", borderLeft: "1px solid rgba(255,255,255,0.08)",
   display: "flex", flexDirection: "column", zIndex: 10,
 };
 
 const NUM_INPUT: React.CSSProperties = {
-  width: "100%", border: "1px solid rgba(80,120,180,0.2)", borderRadius: 4,
-  background: "rgba(20,30,45,0.8)", color: "#9ab8d4", fontSize: 11,
+  width: "100%", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4,
+  background: "rgba(46,46,46,0.9)", color: "#c0c0c0", fontSize: 11,
   fontFamily: "monospace", padding: "4px 8px", outline: "none",
 };
 
 const LABEL: React.CSSProperties = {
-  color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginBottom: 4,
+  color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 4,
 };
 
 const ROW_BASE: React.CSSProperties = {
   width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
   padding: "10px 16px", background: "none", border: "none",
-  borderBottom: "1px solid rgba(80,120,180,0.08)", cursor: "pointer", textAlign: "left",
+  borderBottom: "1px solid rgba(255,255,255,0.05)", cursor: "pointer", textAlign: "left",
 };
 
 // ── Tool info ─────────────────────────────────────────────────────────────────
@@ -274,7 +274,7 @@ export function PropertiesPanel({
   return (
     <div style={PANEL_STYLE}>
       {/* Fixed header */}
-      <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(80,120,180,0.15)" }}>
+      <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ padding: "11px 16px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</span>
           {!isRoot && (
@@ -285,10 +285,10 @@ export function PropertiesPanel({
         </div>
         {selected && (
           <div style={{ padding: "0 16px 10px" }}>
-            <div style={{ color: "#9ab8d4", fontSize: 12, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {headerTitle}
             </div>
-            <div style={{ color: "#4a6a8a", fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
+            <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
               {headerSubtitle}
             </div>
           </div>
@@ -364,10 +364,10 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <span style={{ color: "#c8d8e8", fontSize: 12, fontWeight: 500 }}>{label}</span>
+      <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>{label}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "#4a6a8a", fontSize: 10, fontFamily: "monospace" }}>{summary}</span>
-        <span style={{ color: "#3a5a7a", fontSize: 14, lineHeight: 1 }}>›</span>
+        <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>{summary}</span>
+        <span style={{ color: "#505060", fontSize: 14, lineHeight: 1 }}>›</span>
       </span>
     </button>
   );
@@ -390,16 +390,16 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
     <div>
       <button
         onClick={onToggle}
-        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(80,120,180,0.08)" }}
+        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.05)" }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <span style={{ color: "#c8d8e8", fontSize: 12, fontWeight: 500 }}>Actions</span>
-        <span style={{ color: "#3a5a7a", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
+        <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>Actions</span>
+        <span style={{ color: "#505060", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
       </button>
 
       {open && (
-        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(80,120,180,0.08)" }}>
+        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
           {onFillRunWithFloor && (
             <button
               onClick={onFillRunWithFloor}
@@ -426,9 +426,9 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
                         flex: 1, padding: "5px 0", borderRadius: 4,
                         cursor: isCurrent ? "default" : "pointer",
                         fontFamily: "monospace", fontSize: 11, border: "none",
-                        background: isCurrent ? "rgba(20,30,45,0.4)" : "rgba(80,140,255,0.1)",
-                        color: isCurrent ? "#2a4a6a" : "#80aaff",
-                        outline: isCurrent ? "1px solid rgba(80,120,180,0.1)" : "1px solid rgba(80,140,255,0.3)",
+                        background: isCurrent ? "rgba(46,46,46,0.4)" : "rgba(80,140,255,0.1)",
+                        color: isCurrent ? "#404050" : "#80aaff",
+                        outline: isCurrent ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(80,140,255,0.3)",
                       }}
                     >{level === 0 ? "G" : String(level)}</button>
                   );
@@ -544,13 +544,13 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
         <div style={LABEL}>POSITION</div>
         <div style={{ display: "flex", gap: 4 }}>
           {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
-            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px" }}>
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
               <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
               <input type="number" step={0.5} value={posStr[axis]}
                 onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
                 onBlur={e => flush(() => commitPos(axis, e.target.value))}
                 onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
-                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
               />
             </div>
           ))}
@@ -560,13 +560,13 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       {/* Rotation Y */}
       <div>
         <div style={LABEL}>ROTATION Y (deg)</div>
-        <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px", width: "fit-content" }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px", width: "fit-content" }}>
           <span style={{ color: "#6bff8a", fontSize: 9 }}>Y</span>
           <input type="number" step={15} value={rotYStr}
             onChange={e => { setRotYStr(e.target.value); schedule(() => commitRotY(e.target.value)); }}
             onBlur={e => flush(() => commitRotY(e.target.value))}
             onKeyDown={e => { if (e.key === "Enter") flush(() => commitRotY((e.target as HTMLInputElement).value)); }}
-            style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+            style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
           />
         </div>
       </div>
@@ -578,7 +578,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
           {([["W","width",sizeStr.w,(v: string) => setSizeStr(p => ({ ...p, w: v })),"width"],
              ["D","depth", sizeStr.d,(v: string) => setSizeStr(p => ({ ...p, d: v })),"depth"]] as const).map(([lbl,,val,setter,dim]) => (
             <div key={dim}>
-              <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
               <input type="number" step={0.5} min={0.5} value={val}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                 onChange={e => { setter(e.target.value); schedule(() => commitSize(dim as "width" | "depth", e.target.value)); }}
@@ -602,11 +602,11 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasRail} onChange={e => toggleRail(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
         </label>
         {hasRail && (
           <div>
-            <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>RAILING HEIGHT</div>
+            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAILING HEIGHT</div>
             <input type="number" step={0.1} min={0.3} value={railH} style={{ ...NUM_INPUT, width: 90 }}
               onChange={e => { setRailH(e.target.value); schedule(() => commitRailH(e.target.value)); }}
               onBlur={e => flush(() => commitRailH(e.target.value))}
@@ -765,13 +765,13 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
       <div style={LABEL}>{label}</div>
       <div style={{ display: "flex", gap: 4 }}>
         {(["x","y","z"] as const).map((axis, i) => (
-          <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px" }}>
+          <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
             <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
             <input type="number" step={0.5} value={vals[axis]}
               onChange={e => { setter(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitVec(field, axis, e.target.value)); }}
               onBlur={e => flush(() => commitVec(field, axis, e.target.value))}
               onKeyDown={e => { if (e.key === "Enter") flush(() => commitVec(field, axis, (e.target as HTMLInputElement).value)); }}
-              style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+              style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
             />
           </div>
         ))}
@@ -807,23 +807,23 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
         <input type="checkbox" checked={linked} onChange={e => setLinked(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer", flexShrink: 0 }} />
-        <span style={{ color: linked ? "#80aaff" : "#4a6a8a", fontSize: 10, userSelect: "none" }}>Link end-Y to step count</span>
+        <span style={{ color: linked ? "#80aaff" : "#646464", fontSize: 10, userSelect: "none" }}>Link end-Y to step count</span>
       </label>
 
-      <div style={{ color: "#2a4a6a", fontSize: 9 }}>
+      <div style={{ color: "#404050", fontSize: 9 }}>
         Rise: {rise.toFixed(2)} m · Step H: {stepH.toFixed(3)} m
       </div>
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
         <input type="checkbox" checked={hasRailing} onChange={e => toggleRailing(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-        <span style={{ color: "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+        <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
       </label>
 
       {/* Cut box */}
-      <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasCutter} onChange={e => toggleCutter(e.target.checked)} style={{ accentColor: "#ffdd00", cursor: "pointer" }} />
-          <span style={{ color: hasCutter ? "#ffdd77" : "#5a7a9a", fontSize: 10, letterSpacing: 1 }}>CUT BOX</span>
+          <span style={{ color: hasCutter ? "#ffdd77" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>CUT BOX</span>
         </label>
         {hasCutter && (
           <>
@@ -832,7 +832,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
                 {([["W",cutW,setCutW,"width"],["D",cutD,setCutD,"depth"],["H",cutH,setCutH,"height"]] as const).map(([lbl,val,setter,field]) => (
                   <div key={field}>
-                    <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                    <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.1} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                       onChange={e => { setter(e.target.value); schedule(() => commitCutter(field, e.target.value)); }}
@@ -847,30 +847,30 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <div style={LABEL}>OFFSET FROM END</div>
               <div style={{ display: "flex", gap: 4 }}>
                 {(["x","y","z"] as const).map((axis, i) => (
-                  <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 5px" }}>
+                  <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 5px" }}>
                     <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
                     <input type="number" step={0.1} value={cutOff[axis]}
                       onChange={e => { setCutOff(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitCutterOffset(axis, e.target.value)); }}
                       onBlur={e => flush(() => commitCutterOffset(axis, e.target.value))}
                       onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutterOffset(axis, (e.target as HTMLInputElement).value)); }}
-                      style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                      style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
                     />
                   </div>
                 ))}
               </div>
-              <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 3 }}>Y offset = half height puts box bottom at stair end</div>
+              <div style={{ color: "#404050", fontSize: 9, marginTop: 3 }}>Y offset = half height puts box bottom at stair end</div>
             </div>
             <div>
               <div style={LABEL}>ROTATION (DEG)</div>
               <div style={{ display: "flex", gap: 4 }}>
                 {(["x","y","z"] as const).map((axis, i) => (
-                  <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 5px" }}>
+                  <div key={axis} style={{ flex: 1, display: "flex", gap: 3, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 5px" }}>
                     <span style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i], fontSize: 9 }}>{axis.toUpperCase()}</span>
                     <input type="number" step={1} value={cutRot[axis]}
                       onChange={e => { setCutRot(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitCutterRotation(axis, e.target.value)); }}
                       onBlur={e => flush(() => commitCutterRotation(axis, e.target.value))}
                       onKeyDown={e => { if (e.key === "Enter") flush(() => commitCutterRotation(axis, (e.target as HTMLInputElement).value)); }}
-                      style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                      style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
                     />
                   </div>
                 ))}
@@ -881,7 +881,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
                 {([["T+B",cutInnerH,setCutInnerH,"innerTileH"],["L+R",cutInnerV,setCutInnerV,"innerTileV"]] as const).map(([lbl,val,setter,field]) => (
                   <div key={field}>
-                    <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                    <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.25} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                       onChange={e => { setter(e.target.value); schedule(() => commitCutterInnerTile(field, e.target.value)); }}
@@ -929,11 +929,11 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           <div style={{ ...LABEL, marginBottom: 4 }}>{label}</div>
           <div style={{ display: "flex", gap: 4 }}>
             {AXES.map(({ axis, color }) => (
-              <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "2px 6px" }}>
+              <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
                 <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
                 <input type="text" inputMode="decimal" value={draft[key][axis]} step={step}
                   onChange={e => commit(key, axis, e.target.value)}
-                  style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#9ab8d4", fontSize: 10, fontFamily: "monospace" }}
+                  style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
                 />
               </div>
             ))}
@@ -980,16 +980,16 @@ function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, qual
         {type === "platform" && <PlatformMatView selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "stair"    && <StairMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
       </div>
-      <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(80,120,180,0.1)", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={LABEL}>QUALITY</div>
         <div style={{ display: "flex", gap: 6 }}>
           {(["low", "medium", "high"] as QualityScale[]).map(q => (
             <button key={q} onClick={() => onQualityChange(q)} style={{
               flex: 1, padding: "4px 0", borderRadius: 4, cursor: "pointer",
               fontFamily: "monospace", fontSize: 10, border: "none",
-              background: quality === q ? "rgba(80,140,255,0.25)" : "rgba(20,30,45,0.8)",
-              color: quality === q ? "#80aaff" : "#4a6a8a",
-              outline: quality === q ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(80,120,180,0.12)",
+              background: quality === q ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+              color: quality === q ? "#80aaff" : "#646464",
+              outline: quality === q ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
             }}>{q}</button>
           ))}
         </div>
@@ -1141,7 +1141,7 @@ function OpeningsScreen({ selected, onSegmentUpdate }: {
       </div>
 
       {allOpenings.length === 0 && (
-        <div style={{ color: "#2a4a6a", fontSize: 11, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>
+        <div style={{ color: "#404050", fontSize: 11, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>
           No openings
         </div>
       )}
@@ -1216,7 +1216,7 @@ function VertScreen({ selected, onObjectUpdate }: {
         onKeyDown={e => { if (e.key === "Enter") flush(() => commitElev((e.target as HTMLInputElement).value)); }}
         style={{ ...NUM_INPUT, width: 80 }}
       />
-      <div style={{ color: "#2a4a6a", fontSize: 9, marginTop: 4 }}>
+      <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
         Adjust to layer overlapping floors (+0.001 per step)
       </div>
     </div>
@@ -1299,9 +1299,9 @@ function MaterialSection({
 
       <button
         onClick={onAddMaterial}
-        style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(80,120,180,0.3)", color: "#4a6a8a", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
+        style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#646464", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
         onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; e.currentTarget.style.color = "#80aaff"; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(80,120,180,0.3)"; e.currentTarget.style.color = "#4a6a8a"; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#646464"; }}
       >
         + add ambientcg material
       </button>
@@ -1312,9 +1312,9 @@ function MaterialSection({
           return (
             <div key={mat.id} onClick={() => onMaterialChange(mat.id)} style={{
               padding: "5px 10px",
-              background: active ? "rgba(80,140,255,0.15)" : "rgba(20,30,45,0.8)",
-              border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(80,120,180,0.12)"}`,
-              borderRadius: 4, color: active ? "#80aaff" : "#5a7a9a",
+              background: active ? "rgba(80,140,255,0.15)" : "rgba(46,46,46,0.9)",
+              border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
+              borderRadius: 4, color: active ? "#80aaff" : "#7a7a7a",
               fontSize: 11, fontFamily: "monospace", cursor: "pointer",
             }}>
               {mat.label}
@@ -1357,12 +1357,12 @@ function MaterialSection({
         <input type="checkbox" id="split-tile" checked={splitTile} onChange={toggleSplitTile}
           style={{ cursor: "pointer", accentColor: "#4d8cff", margin: 0 }}
         />
-        <label htmlFor="split-tile" style={{ color: "#4a6a8a", fontSize: 10, cursor: "pointer", userSelect: "none" }}>
+        <label htmlFor="split-tile" style={{ color: "#646464", fontSize: 10, cursor: "pointer", userSelect: "none" }}>
           split X / Y
         </label>
       </div>
 
-      <div style={{ borderTop: "1px solid rgba(80,120,180,0.1)", paddingTop: 8 }}>
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>
         <div style={{ ...LABEL, marginBottom: 6 }}>MAPS</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {MAP_ROWS.map(({ key, label: mapLabel }) => {
@@ -1373,7 +1373,7 @@ function MaterialSection({
                 <input type="checkbox" checked={enabled} onChange={() => toggleMap(key)}
                   style={{ accentColor: "#80aaff", cursor: "pointer", flexShrink: 0 }}
                 />
-                <span style={{ color: ov ? "#9ab8d4" : "#5a7a9a", fontSize: 10, fontFamily: "monospace", flex: 1, fontStyle: ov ? "italic" : "normal" }}>
+                <span style={{ color: ov ? "#c0c0c0" : "#7a7a7a", fontSize: 10, fontFamily: "monospace", flex: 1, fontStyle: ov ? "italic" : "normal" }}>
                   {mapLabel}{ov ? "*" : ""}
                 </span>
                 {key === "roughness" && !roughEnabled && (
@@ -1442,7 +1442,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
   };
 
   return (
-    <div style={{ background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.15)", borderRadius: 4, padding: "6px 8px", marginBottom: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "6px 8px", marginBottom: 6, display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <select
           value={opening.type}
@@ -1458,7 +1458,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           {opening.type !== "passage" && (
             <label style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
               <input type="checkbox" checked={opening.trim !== false} onChange={e => onUpdate({ trim: e.target.checked })} style={{ cursor: "pointer", accentColor: "#4d8cff" }} />
-              <span style={{ color: "#3a5a7a", fontSize: 9, userSelect: "none" }}>TRIM</span>
+              <span style={{ color: "#505060", fontSize: 9, userSelect: "none" }}>TRIM</span>
             </label>
           )}
           {!hideDelete && (
@@ -1475,7 +1475,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           ["ELEV",   elevStr,   setElevStr,   0,   "elevation"],
         ] as const).map(([lbl, val, setter, min, field]) => (
           <div key={field}>
-            <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
             <input type="number" step={0.1} min={min} value={val}
               style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
               onChange={e => { setter(e.target.value); schedule(() => commitNum(e.target.value, min, field)); }}
@@ -1485,7 +1485,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
         ))}
 
         <div>
-          <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER T+B</div>
+          <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>INNER T+B</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerHStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
             onChange={e => { setInnerHStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileH")); }}
@@ -1493,7 +1493,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           />
         </div>
         <div>
-          <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>INNER L+R</div>
+          <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>INNER L+R</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerVStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
             onChange={e => { setInnerVStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileV")); }}
@@ -1530,11 +1530,11 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
   };
 
   return (
-    <div style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(80,120,180,0.1)", borderRadius: 4, padding: "6px 8px", marginBottom: 4 }}>
-      <div style={{ color: "#4a6a8a", fontSize: 9, letterSpacing: 1, marginBottom: 5 }}>SEG {index}</div>
+    <div style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 4, padding: "6px 8px", marginBottom: 4 }}>
+      <div style={{ color: "#646464", fontSize: 9, letterSpacing: 1, marginBottom: 5 }}>SEG {index}</div>
 
       <div style={{ marginBottom: 4 }}>
-        <div style={{ color: "#3a5a7a", fontSize: 9, marginBottom: 2 }}>MATERIAL</div>
+        <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>MATERIAL</div>
         <select value={wall.material} onChange={e => onUpdate({ material: e.target.value, materialOverrides: undefined })}
           style={{ ...NUM_INPUT, padding: "2px 4px", cursor: "pointer" }}
         >
@@ -1544,7 +1544,7 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
       </div>
 
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <div style={{ color: "#3a5a7a", fontSize: 9, flexShrink: 0 }}>TILE</div>
+        <div style={{ color: "#505060", fontSize: 9, flexShrink: 0 }}>TILE</div>
         <input type="number" step={0.1} min={0.1} placeholder="default" value={tileStr}
           style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
           onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(e.target.value)); }}
@@ -1561,9 +1561,9 @@ function ToolView({ activeTool }: { activeTool: ToolId }) {
   const info = TOOL_INFO[activeTool];
   return (
     <>
-      <div style={{ padding: "10px 16px 0", color: "#4a6a8a", fontSize: 11 }}>{info.desc}</div>
-      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(80,120,180,0.1)" }}>
-        <div style={{ padding: "8px 12px", background: "rgba(80,140,255,0.06)", border: "1px solid rgba(80,140,255,0.15)", borderRadius: 6, color: "#6a90b8", fontSize: 11 }}>
+      <div style={{ padding: "10px 16px 0", color: "#646464", fontSize: 11 }}>{info.desc}</div>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ padding: "8px 12px", background: "rgba(80,140,255,0.06)", border: "1px solid rgba(80,140,255,0.15)", borderRadius: 6, color: "#909090", fontSize: 11 }}>
           {info.hint}
         </div>
       </div>
@@ -1571,9 +1571,9 @@ function ToolView({ activeTool }: { activeTool: ToolId }) {
         <div style={{ ...LABEL, marginBottom: 8 }}>ASSETS</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
           {PLACEHOLDER_ASSETS.map(name => (
-            <div key={name} style={{ padding: "8px 6px", background: "rgba(20,30,45,0.8)", border: "1px solid rgba(80,120,180,0.12)", borderRadius: 6, color: "#5a7a9a", fontSize: 10, textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}
+            <div key={name} style={{ padding: "8px 6px", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, color: "#7a7a7a", fontSize: 10, textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.3)"; e.currentTarget.style.color = "#80aaff"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(80,120,180,0.12)"; e.currentTarget.style.color = "#5a7a9a"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#7a7a7a"; }}
             >
               {name}
             </div>

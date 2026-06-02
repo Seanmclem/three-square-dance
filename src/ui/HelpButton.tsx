@@ -47,15 +47,15 @@ function ShortcutRow({ keys, action }: ShortcutEntry) {
       <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
         {keys.map(k => (
           <span key={k} style={{
-            background: "rgba(80,120,180,0.15)",
-            border: "1px solid rgba(80,120,180,0.35)",
+            background: "rgba(255,255,255,0.07)",
+            border: "1px solid rgba(255,255,255,0.13)",
             borderRadius: 4, padding: "1px 5px",
-            fontSize: 9, color: "#7a9ab8", fontFamily: "monospace",
+            fontSize: 9, color: "#a0a0a0", fontFamily: "monospace",
             whiteSpace: "nowrap",
           }}>{k}</span>
         ))}
       </div>
-      <span style={{ color: "#4a6a8a", fontSize: 10 }}>{action}</span>
+      <span style={{ color: "#646464", fontSize: 10 }}>{action}</span>
     </div>
   );
 }
@@ -70,10 +70,10 @@ export function HelpButton() {
         onClick={() => setOpen(v => !v)}
         style={{
           width: 26, height: 26,
-          border: `1px solid ${open ? "rgba(80,140,255,0.5)" : "rgba(80,120,180,0.3)"}`,
+          border: `1px solid ${open ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.1)"}`,
           borderRadius: 6,
           background: open ? "rgba(80,140,255,0.15)" : "transparent",
-          color: open ? "#80aaff" : "#5a7a9a",
+          color: open ? "#80aaff" : "#7a7a7a",
           fontSize: 13, fontWeight: 600, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "serif", lineHeight: 1,
@@ -87,8 +87,8 @@ export function HelpButton() {
       {open && (
         <div style={{
           position: "absolute", top: 54, left: 70,
-          background: "rgba(10,14,22,0.97)",
-          border: "1px solid rgba(80,120,180,0.3)",
+          background: "rgba(28,28,28,0.97)",
+          border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 8, padding: "12px 14px",
           zIndex: 50, minWidth: 230,
           boxShadow: "0 8px 24px rgba(0,0,0,0.5)",

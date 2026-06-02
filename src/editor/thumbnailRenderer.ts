@@ -8,7 +8,7 @@ export function renderModelThumbnail(root: THREE.Object3D): string | null {
     renderer.setPixelRatio(1);
 
     const scene  = new THREE.Scene();
-    scene.background = new THREE.Color(0x141e2c);
+    scene.background = new THREE.Color(0x1e1e1e);
     const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 10000);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));

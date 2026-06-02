@@ -24,8 +24,8 @@ export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
-      background: "rgba(10,14,22,0.95)",
-      borderRight: "1px solid rgba(80,120,180,0.2)",
+      background: "rgba(28,28,28,0.95)",
+      borderRight: "1px solid rgba(255,255,255,0.08)",
       display: "flex", flexDirection: "column", alignItems: "center",
       paddingTop: 56, gap: 2, zIndex: 10,
     }}>
@@ -33,7 +33,7 @@ export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
       {TOOLS.map(tool => {
         const active = activeTool === tool.id;
         const Icon = TOOL_ICONS[tool.id];
-        const color = active ? "#80aaff" : "#5a7a9a";
+        const color = active ? "#80aaff" : "#7a7a7a";
         return (
           <button
             key={tool.id}
@@ -59,7 +59,7 @@ export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
       })}
 
       <div style={{ flex: 1 }} />
-      <div style={{ width: 40, height: 1, background: "rgba(80,120,180,0.2)", marginBottom: 4 }} />
+      <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 
       <button
         title="Preview (P)"

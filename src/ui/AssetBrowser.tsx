@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import type { AssetDef, AssetCategory } from "@/types";
-import type { AssetManager } from "@/core/AssetManager";
-import { renderModelThumbnail } from "@/editor/thumbnailRenderer";
 
 const CATEGORIES: AssetCategory[] = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
@@ -11,7 +9,7 @@ const CAT_BTN = (active: boolean): React.CSSProperties => ({
   fontSize: 11, padding: "4px 8px", borderRadius: 4,
   border: "none", cursor: "pointer",
   background: active ? "rgba(80,140,255,0.25)" : "rgba(255,255,255,0.04)",
-  color: active ? "#80aaff" : "#6080a0",
+  color: active ? "#80aaff" : "#808080",
   letterSpacing: 0.3, whiteSpace: "nowrap",
   transition: "background 0.1s, color 0.1s",
 });
@@ -21,19 +19,15 @@ interface AssetBrowserProps {
   selectedAssetId: string | null;
   onSelect:        (id: string | null) => void;
   onImport:        () => void;
-  assetManager?:   AssetManager;
 }
 
-export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, assetManager }: AssetBrowserProps) {
+export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: AssetBrowserProps) {
   const [search,   setSearch]   = useState("");
   const [category, setCategory] = useState<AssetCategory | "All">("All");
   const [popoutOpen, setPopoutOpen] = useState(false);
   // Most recently selected named categories, newest last
   const [recent, setRecent] = useState<AssetCategory[]>([]);
   const popoutRef  = useRef<HTMLDivElement>(null);
-  // Lazily-generated thumbnails keyed by assetId
-  const [thumbCache, setThumbCache] = useState<Record<string, string>>({});
-  const generating = useRef<Set<string>>(new Set());
 
   // Close popout on outside click
   useEffect(() => {
@@ -45,21 +39,6 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [popoutOpen]);
-
-  // Lazy thumbnail generation for assets without a manifest thumbnail
-  useEffect(() => {
-    if (!assetManager) return;
-    for (const asset of assets) {
-      if (asset.thumbnail) continue;
-      if (thumbCache[asset.id]) continue;
-      if (generating.current.has(asset.id)) continue;
-      generating.current.add(asset.id);
-      assetManager.loadModel(asset.id).then(obj => {
-        const url = renderModelThumbnail(obj);
-        if (url) setThumbCache(prev => ({ ...prev, [asset.id]: url }));
-      }).catch(() => { /* model load failed — leave placeholder */ });
-    }
-  }, [assets, assetManager, thumbCache]);
 
   const selectCategory = (cat: AssetCategory | "All") => {
     setCategory(cat);
@@ -103,8 +82,8 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
           onChange={e => setSearch(e.currentTarget.value)}
           style={{
             width: "100%", boxSizing: "border-box",
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(80,120,180,0.2)",
-            borderRadius: 4, color: "#c0d0e0", fontSize: 11, padding: "4px 6px",
+            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 4, color: "#d8d8d8", fontSize: 11, padding: "4px 6px",
             outline: "none",
           }}
         />
@@ -159,8 +138,8 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
             ref={popoutRef}
             style={{
               position: "absolute", top: "100%", right: 6, zIndex: 20,
-              background: "rgba(10,14,22,0.98)",
-              border: "1px solid rgba(80,120,180,0.25)",
+              background: "rgba(28,28,28,0.98)",
+              border: "1px solid rgba(255,255,255,0.09)",
               borderRadius: 4, padding: "4px 0",
               minWidth: 120, maxHeight: 200, overflowY: "auto",
               boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
@@ -174,7 +153,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
                   display: "block", width: "100%", textAlign: "left",
                   background: category === cat ? "rgba(80,140,255,0.2)" : "transparent",
                   border: "none", cursor: "pointer",
-                  color: category === cat ? "#80aaff" : "#6080a0",
+                  color: category === cat ? "#80aaff" : "#808080",
                   fontSize: 11, padding: "6px 12px",
                   letterSpacing: 0.4, transition: "background 0.1s, color 0.1s",
                 }}
@@ -187,7 +166,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
                 onMouseLeave={e => {
                   if (category !== cat) {
                     e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#6080a0";
+                    e.currentTarget.style.color = "#808080";
                   }
                 }}
               >
@@ -231,7 +210,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
       }}>
         {filtered.length === 0 ? (
           <div style={{
-            gridColumn: "1/-1", color: "#3a5070", fontSize: 10,
+            gridColumn: "1/-1", color: "#505050", fontSize: 10,
             textAlign: "center", paddingTop: 20,
           }}>
             {assets.length === 0 ? "No assets yet — import a model to get started." : "No results."}
@@ -246,28 +225,28 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, asse
                 onClick={() => onSelect(sel ? null : asset.id)}
                 style={{
                   background: sel ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
-                  border: sel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(80,120,180,0.1)",
+                  border: sel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 4, cursor: "pointer", padding: 2,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                   overflow: "hidden",
                 }}
               >
-                {(asset.thumbnail ?? thumbCache[asset.id]) ? (
+                {asset.thumbnail ? (
                   <img
-                    src={asset.thumbnail ?? thumbCache[asset.id]}
+                    src={asset.thumbnail}
                     alt={asset.label}
                     style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 3 }}
                   />
                 ) : (
                   <div style={{
                     width: "100%", aspectRatio: "1",
-                    background: "rgba(40,60,100,0.4)", borderRadius: 3,
+                    background: "rgba(55,55,55,0.5)", borderRadius: 3,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18, color: "#3a5070",
+                    fontSize: 18, color: "#505050",
                   }}>◻</div>
                 )}
                 <span style={{
-                  fontSize: 8, color: sel ? "#80aaff" : "#6080a0",
+                  fontSize: 8, color: sel ? "#80aaff" : "#808080",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   width: "100%", textAlign: "center",
                 }}>

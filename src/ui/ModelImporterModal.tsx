@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { AssetDef, AssetCategory, AssetManifest } from "@/types";
 import { renderModelThumbnail } from "@/editor/thumbnailRenderer";
 
@@ -15,7 +15,8 @@ const CATEGORIES: AssetCategory[] = [
   "Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other",
 ];
 
-const MODEL_EXTS = new Set([".glb", ".gltf", ".obj"]);
+const MODEL_EXTS   = new Set([".glb", ".gltf", ".obj"]);
+const TEXTURE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".tga", ".bmp"]);
 
 function getExt(name: string): string {
   return name.slice(name.lastIndexOf(".")).toLowerCase();
@@ -55,8 +56,10 @@ function dataURLtoArrayBuffer(dataUrl: string): ArrayBuffer {
 async function generateThumbnail(
   handle: FileSystemFileHandle,
   ext: string,
+  mtlHandle?: FileSystemFileHandle | null,
 ): Promise<string | null> {
   let blobUrl: string | null = null;
+  let mtlBlobUrl: string | null = null;
   try {
     const file = await handle.getFile();
     blobUrl = URL.createObjectURL(file);
@@ -64,7 +67,23 @@ async function generateThumbnail(
     let root: import("three").Object3D;
     if (ext === ".obj") {
       const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
-      root = await new OBJLoader().loadAsync(blobUrl);
+      const loader = new OBJLoader();
+
+      if (mtlHandle) {
+        const { MTLLoader } = await import("three/addons/loaders/MTLLoader.js");
+        const { LoadingManager } = await import("three");
+        const manager = new LoadingManager();
+        manager.onError = () => {}; // silently ignore missing texture images
+        const mtlFile = await mtlHandle.getFile();
+        mtlBlobUrl = URL.createObjectURL(mtlFile);
+        const mtlLoader = new MTLLoader(manager);
+        mtlLoader.setResourcePath(""); // textures won't resolve, but colors parse fine
+        const materials = await mtlLoader.loadAsync(mtlBlobUrl);
+        materials.preload();
+        loader.setMaterials(materials);
+      }
+
+      root = await loader.loadAsync(blobUrl);
     } else if (ext === ".glb" || ext === ".gltf") {
       const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
       const gltf = await new GLTFLoader().loadAsync(blobUrl) as { scene: import("three").Object3D };
@@ -79,6 +98,7 @@ async function generateThumbnail(
     return null;
   } finally {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
+    if (mtlBlobUrl) URL.revokeObjectURL(mtlBlobUrl);
   }
 }
 
@@ -88,25 +108,25 @@ const OVERLAY: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "center",
 };
 const MODAL: React.CSSProperties = {
-  background: "rgba(10,14,22,0.98)",
-  border: "1px solid rgba(80,120,180,0.3)",
+  background: "rgba(28,28,28,0.98)",
+  border: "1px solid rgba(255,255,255,0.1)",
   borderRadius: 8, width: 480, maxHeight: "85vh",
   display: "flex", flexDirection: "column",
-  color: "#9ab8d4", fontFamily: "monospace", fontSize: 12,
+  color: "#c0c0c0", fontFamily: "monospace", fontSize: 12,
 };
 const INPUT: React.CSSProperties = {
-  background: "rgba(20,30,45,0.9)", border: "1px solid rgba(80,120,180,0.25)",
-  borderRadius: 4, color: "#9ab8d4", fontFamily: "monospace", fontSize: 11,
+  background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.09)",
+  borderRadius: 4, color: "#c0c0c0", fontFamily: "monospace", fontSize: 11,
   padding: "4px 7px", outline: "none", boxSizing: "border-box",
 };
 const BTN = (active = true): React.CSSProperties => ({
   padding: "7px 14px", borderRadius: 4, cursor: active ? "pointer" : "default",
   fontFamily: "monospace", fontSize: 11, border: "none",
-  background: active ? "rgba(80,140,255,0.2)" : "rgba(40,50,70,0.6)",
-  color: active ? "#80aaff" : "#4a6a8a",
+  background: active ? "rgba(80,140,255,0.2)" : "rgba(55,55,55,0.7)",
+  color: active ? "#80aaff" : "#646464",
 });
 const STEP_LABEL: React.CSSProperties = {
-  color: "#4a6a8a", fontSize: 10, letterSpacing: 1,
+  color: "#646464", fontSize: 10, letterSpacing: 1,
 };
 
 export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onClose }: Props) {
@@ -116,6 +136,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
   const [progress,   setProgress]   = useState("");
   const [error,      setError]      = useState<string | null>(null);
   const [results,    setResults]    = useState<AssetDef[]>([]);
+  const textureHandlesRef = useRef<FileSystemFileHandle[]>([]);
 
   function updateEntry(id: string, patch: Partial<ModelEntry>): void {
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
@@ -125,13 +146,14 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
     try {
       const handles = await (window as unknown as FSPicker).showOpenFilePicker({
         multiple: true,
-        types: [{ description: "3D Models & Materials", accept: { "model/*": [".glb", ".gltf", ".obj"], "text/plain": [".mtl"] } }],
+        types: [{ description: "3D Models, Materials & Textures", accept: { "model/*": [".glb", ".gltf", ".obj"], "text/plain": [".mtl"], "image/*": [".png", ".jpg", ".jpeg", ".webp", ".bmp"] } }],
       });
       if (!handles.length) return;
 
-      // Separate models from mtl files
-      const models = handles.filter(h => MODEL_EXTS.has(getExt(h.name)));
-      const mtls   = handles.filter(h => getExt(h.name) === ".mtl");
+      // Separate models, mtl, and texture files
+      const models   = handles.filter(h => MODEL_EXTS.has(getExt(h.name)));
+      const mtls     = handles.filter(h => getExt(h.name) === ".mtl");
+      const textures = handles.filter(h => TEXTURE_EXTS.has(getExt(h.name)));
 
       if (!models.length) return;
 
@@ -147,6 +169,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
         showNewCat:  false,
       }));
 
+      textureHandlesRef.current = textures;
       setEntries(newEntries);
       setPhase("meta");
     } catch { /* cancelled */ }
@@ -189,6 +212,11 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
       manifest = JSON.parse(await (await mh.getFile()).text()) as AssetManifest;
     } catch { /* new manifest */ }
 
+    // Copy any texture images first (flat copy — MTL references them by filename)
+    for (const texHandle of textureHandlesRef.current) {
+      try { await copyFile(texHandle, modelsDir, texHandle.name); } catch { /* skip */ }
+    }
+
     const imported: AssetDef[] = [];
 
     for (let i = 0; i < entries.length; i++) {
@@ -209,7 +237,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
         // Generate thumbnail
         setProgress(`Generating thumbnail ${i + 1} of ${entries.length}: ${entry.modelHandle.name}`);
         let destThumb: string | undefined;
-        const thumbDataUrl = await generateThumbnail(entry.modelHandle, modelExt);
+        const thumbDataUrl = await generateThumbnail(entry.modelHandle, modelExt, entry.mtlHandle);
         if (thumbDataUrl) {
           destThumb = `${base}_thumb.png`;
           const thumbHandle = await modelsDir.getFileHandle(destThumb, { create: true });
@@ -261,9 +289,9 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
       <div style={MODAL}>
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(80,120,180,0.15)", flexShrink: 0 }}>
-          <span style={{ fontSize: 13, color: "#c0d0e0", letterSpacing: 1 }}>IMPORT MODELS</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#4060a0", fontSize: 16 }}>✕</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
+          <span style={{ fontSize: 13, color: "#d8d8d8", letterSpacing: 1 }}>IMPORT MODELS</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#585870", fontSize: 16 }}>✕</button>
         </div>
 
         {/* Scrollable body */}
@@ -273,9 +301,10 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
           {phase === "pick" && (
             <>
               <p style={STEP_LABEL}>SELECT FILES</p>
-              <div style={{ fontSize: 10, color: "#5a7a9a", lineHeight: 1.7 }}>
+              <div style={{ fontSize: 10, color: "#7a7a7a", lineHeight: 1.7 }}>
                 Supported: <span style={{ color: "#80aaff" }}>.glb .gltf .obj</span>
                 — select multiple files at once. Pair <span style={{ color: "#80aaff" }}>.obj + .mtl</span> by selecting both; they're matched by base name.
+                Also select any <span style={{ color: "#80aaff" }}>texture images</span> (.png .jpg …) referenced by the MTL — they'll be copied alongside the model.
               </div>
               {!modelsDir && (
                 <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c09050" }}>
@@ -295,13 +324,16 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
           {(phase === "meta" || phase === "importing") && (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <p style={STEP_LABEL}>{entries.length} MODEL{entries.length !== 1 ? "S" : ""} DETECTED</p>
+                <p style={STEP_LABEL}>
+                  {entries.length} MODEL{entries.length !== 1 ? "S" : ""}
+                  {textureHandlesRef.current.length > 0 && ` · ${textureHandlesRef.current.length} TEXTURE${textureHandlesRef.current.length !== 1 ? "S" : ""}`}
+                </p>
                 <button style={{ ...BTN(), padding: "3px 8px", fontSize: 10 }} onClick={() => setPhase("pick")}>← Change files</button>
               </div>
 
               {/* Set all categories */}
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "#5a7a9a", whiteSpace: "nowrap" }}>Set all to</span>
+                <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
                 <select
                   style={{ ...INPUT, flex: 1, cursor: "pointer" }}
                   defaultValue=""
@@ -322,7 +354,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
               {entries.map(entry => {
                 const isOBJ = getExt(entry.modelHandle.name) === ".obj";
                 return (
-                  <div key={entry.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(80,120,180,0.12)", borderRadius: 5, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div key={entry.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 5, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
                     {/* File row */}
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                       <span style={{ fontSize: 10, color: "#80aaff" }}>📄 {entry.modelHandle.name}</span>
@@ -381,7 +413,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
                 </div>
               )}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
-              {phase === "importing" && <div style={{ color: "#6080a0", fontSize: 10 }}>{progress}</div>}
+              {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress}</div>}
             </>
           )}
 
@@ -391,8 +423,8 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
               <p style={STEP_LABEL}>DONE</p>
               <div style={{ color: "#80cc90", fontSize: 11 }}>✓ &nbsp;{results.length} model{results.length !== 1 ? "s" : ""} imported.</div>
               {results.map(r => (
-                <div key={r.id} style={{ fontSize: 10, color: "#6080a0" }}>
-                  {r.label} — <span style={{ color: "#4a6a8a" }}>{r.path}</span>
+                <div key={r.id} style={{ fontSize: 10, color: "#808080" }}>
+                  {r.label} — <span style={{ color: "#646464" }}>{r.path}</span>
                 </div>
               ))}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
@@ -402,7 +434,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
 
         {/* Footer */}
         {(phase === "meta" || phase === "done") && (
-          <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(80,120,180,0.15)", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
             {phase === "meta" && (
               <button
                 style={BTN(!!modelsDir)}

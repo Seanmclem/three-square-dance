@@ -203,6 +203,24 @@ export class AssetManager {
     }
 
     const obj = await loader.loadAsync(path);
+    // MeshPhongMaterial doesn't use the scene env map; convert to Standard so IBL applies.
+    obj.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      const converted = mats.map(m => {
+        if (!(m instanceof THREE.MeshPhongMaterial)) return m;
+        const std = new THREE.MeshStandardMaterial({
+          color:     m.color,
+          map:       m.map,
+          roughness: 0.75,
+          metalness: 0.0,
+          side:      m.side,
+        });
+        m.dispose();
+        return std;
+      });
+      child.material = Array.isArray(child.material) ? converted : converted[0]!;
+    });
     this._gltfCache.set(`obj:${assetId}`, obj);
     return obj.clone();
   }
