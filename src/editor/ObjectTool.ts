@@ -160,10 +160,11 @@ export class ObjectTool implements IEditorModule {
     if (this._ghost) {
       this._scene.remove(this._ghost);
       this._ghost.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          (child.material as THREE.Material).dispose();
-        }
+        if (!(child instanceof THREE.Mesh)) return;
+        // Dispose only the ghost's cloned materials — geometry is shared with the
+        // asset cache and must NOT be disposed here.
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach(m => (m as THREE.Material).dispose());
       });
       this._ghost = null;
     }

@@ -51,7 +51,7 @@ export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onI
             </button>
           </div>
 
-          <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             {panelId === "assets" && (
               <AssetBrowser
                 assets={assets}

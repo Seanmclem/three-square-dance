@@ -760,7 +760,9 @@ export class ZoneManager {
       mesh.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor };
       mesh.traverse(child => {
         if (child instanceof THREE.Mesh) {
-          child.userData = { ...mesh.userData };
+          // _parentId tells SelectionManager._resolveRoot to walk up to the root group,
+          // so _selected is the root (world-space transform) not a local-space child mesh.
+          child.userData = { ...mesh.userData, _parentId: obj.id };
           child.castShadow    = true;
           child.receiveShadow = true;
         }

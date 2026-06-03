@@ -132,7 +132,8 @@ const STEP_LABEL: React.CSSProperties = {
 export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onClose }: Props) {
   const [phase,      setPhase]      = useState<Phase>("pick");
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
-  const [collidable, setCollidable] = useState(true);
+  const [collidable,    setCollidable]    = useState(true);
+  const [bulkNewCat,    setBulkNewCat]    = useState<string | null>(null);
   const [progress,   setProgress]   = useState("");
   const [error,      setError]      = useState<string | null>(null);
   const [results,    setResults]    = useState<AssetDef[]>([]);
@@ -332,22 +333,43 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
               </div>
 
               {/* Set all categories */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
-                <select
-                  style={{ ...INPUT, flex: 1, cursor: "pointer" }}
-                  defaultValue=""
-                  onChange={e => {
-                    const val = e.currentTarget.value;
-                    if (!val) return;
-                    setEntries(prev => prev.map(en => ({ ...en, category: val, showNewCat: val === "__new__" })));
-                    e.currentTarget.value = "";
-                  }}
-                >
-                  <option value="" disabled>Category…</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  <option value="__new__">New category…</option>
-                </select>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
+                  <select
+                    style={{ ...INPUT, flex: 1, cursor: "pointer" }}
+                    defaultValue=""
+                    onChange={e => {
+                      const val = e.currentTarget.value;
+                      if (!val) return;
+                      if (val === "__new__") {
+                        setBulkNewCat("");
+                        setEntries(prev => prev.map(en => ({ ...en, category: "__new__", showNewCat: false })));
+                      } else {
+                        setBulkNewCat(null);
+                        setEntries(prev => prev.map(en => ({ ...en, category: val, showNewCat: false })));
+                      }
+                      e.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="" disabled>Category…</option>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">New category…</option>
+                  </select>
+                </div>
+                {bulkNewCat !== null && (
+                  <input
+                    style={{ ...INPUT, width: "100%", boxSizing: "border-box" }}
+                    placeholder="New category name (applies to all)"
+                    autoFocus
+                    value={bulkNewCat}
+                    onChange={e => {
+                      const val = e.currentTarget.value;
+                      setBulkNewCat(val);
+                      setEntries(prev => prev.map(en => ({ ...en, category: val || "__new__" })));
+                    }}
+                  />
+                )}
               </div>
 
               {/* Entry list */}
@@ -380,15 +402,22 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
                       />
                       <select
                         style={{ ...INPUT, width: 110, cursor: "pointer" }}
-                        value={entry.category}
-                        onChange={e => updateEntry(entry.id, { category: e.currentTarget.value, showNewCat: e.currentTarget.value === "__new__" })}
+                        value={CATEGORIES.includes(entry.category as AssetCategory) ? entry.category : "__new__"}
+                        onChange={e => {
+                          setBulkNewCat(null);
+                          updateEntry(entry.id, { category: e.currentTarget.value, showNewCat: e.currentTarget.value === "__new__" });
+                        }}
                       >
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        <option value="__new__">New…</option>
+                        <option value="__new__">
+                          {!CATEGORIES.includes(entry.category as AssetCategory) && entry.category && entry.category !== "__new__"
+                            ? entry.category
+                            : "New…"}
+                        </option>
                       </select>
                     </div>
 
-                    {entry.showNewCat && (
+                    {entry.showNewCat && bulkNewCat === null && (
                       <input
                         style={INPUT}
                         placeholder="Category name"

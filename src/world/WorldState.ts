@@ -205,6 +205,14 @@ export class WorldState {
     this._bus.emit("object:added", { zoneId, object });
   }
 
+  updateObject(zoneId: string, id: string, changes: Partial<WorldObject>): void {
+    const zone = this.zones.get(zoneId);
+    const obj  = zone?.objects.find(o => o.id === id);
+    if (!obj) return;
+    Object.assign(obj, changes);
+    this._bus.emit("object:updated", { id, zoneId, changes });
+  }
+
   removeObject(zoneId: string, id: string): void {
     const zone = this.zones.get(zoneId);
     if (!zone) return;

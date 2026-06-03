@@ -69,6 +69,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("platform:removed", ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
       this._bus.on("stair:removed",    ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
       this._bus.on("object:removed",   ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
+      this._bus.on("object:deselected", ()           => { if (this._selected) this._restore(this._selected); this._selected = null; }),
     );
   }
 

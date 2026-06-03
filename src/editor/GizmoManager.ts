@@ -4,10 +4,10 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, SelectedObjectPayload,
-  PlatformDef, StairDef, FloorDef, WallDef, WallNode,
+  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject,
 } from "@/types";
 
-type GizmoType = "platform" | "stair" | "floor" | "wall";
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -49,6 +49,8 @@ export class GizmoManager implements IEditorModule {
     nodes: Array<{ id: string; x: number; z: number }>;
     points?: Array<{ x: number; z: number }>;
   } | null = null;
+
+  private _objInitialScale = new THREE.Vector3(1, 1, 1);
 
   private _unsubs: Array<() => void> = [];
 
@@ -103,9 +105,12 @@ export class GizmoManager implements IEditorModule {
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._controls || this._selId === null) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        // Rotate only meaningful for platform / stair
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object")) {
           this._controls.setMode("rotate");
+          this._syncAxisVisibility();
+        }
+        if (code === "KeyS" && this._selType === "object") {
+          this._controls.setMode("scale");
           this._syncAxisVisibility();
         }
       }),
@@ -130,7 +135,7 @@ export class GizmoManager implements IEditorModule {
 
   private _onSelect(payload: SelectedObjectPayload): void {
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object"].includes(type)) {
       this._detach(); return;
     }
 
@@ -178,6 +183,16 @@ export class GizmoManager implements IEditorModule {
       pz = center.z;
       this._wallNodeIds = this._collectWallNodeIds(payload);
       this._wallRunIds  = this._collectWallRunIds(payload);
+
+    } else if (type === "object") {
+      const obj = this._getObject();
+      if (obj) {
+        px = obj.position.x;
+        py = obj.position.y;
+        pz = obj.position.z;
+        rotY = THREE.MathUtils.degToRad(obj.rotation.y);
+        this._objInitialScale.set(obj.scale.x, obj.scale.y, obj.scale.z);
+      }
 
     } else if (type === "floor") {
       this._wallNodeIds = [];
@@ -231,9 +246,14 @@ export class GizmoManager implements IEditorModule {
       if (obj.userData["editorId"] !== this._selId) return;
       if (obj.userData["zoneId"]   !== this._selZoneId) return;
       if ((obj.userData as { _hasCsgCuts?: boolean })._hasCsgCuts) return;
-      // Skip children whose parent group already carries the same editorId —
-      // they move as part of that parent (e.g. stair body/riser inside stairGroup)
-      if (obj.parent?.userData["editorId"] === this._selId) return;
+      // Skip if ANY ancestor carries the same editorId — it will move as part of that ancestor.
+      // Walk the full chain (not just direct parent) to handle OBJ's deeper group hierarchy:
+      // rootGroup(editorId) → namedGroup(no editorId) → Mesh(editorId) — the mesh must be skipped.
+      let anc = obj.parent;
+      while (anc) {
+        if (anc.userData["editorId"] === this._selId) return;
+        anc = anc.parent;
+      }
       obj.getWorldPosition(worldPos);
       this._trackedMeshes.push({
         obj,
@@ -272,8 +292,12 @@ export class GizmoManager implements IEditorModule {
           if (obj.userData["editorId"] !== this._selId) return;
           if (obj.userData["zoneId"]   !== this._selZoneId) return;
           if ((obj.userData as { _hasCsgCuts?: boolean })._hasCsgCuts) return;
-          if (obj.parent?.userData["editorId"] === this._selId) return;
           if (obj.parent === this._pivot) return; // already in pivot — skip stale mesh
+          let anc = obj.parent;
+          while (anc) {
+            if (anc.userData["editorId"] === this._selId) return;
+            anc = anc.parent;
+          }
           obj.getWorldPosition(wPos);
           candidates.push({
             obj,
@@ -386,11 +410,22 @@ export class GizmoManager implements IEditorModule {
 
   private _onObjectChange(): void {
     if (!this._controls?.dragging) return;
-    if (this._controls.getMode() !== "translate") return;
-    // Rotate is handled by the pivot-attach hierarchy — no manual orbit needed.
-    const pivotPos = this._pivot.position;
-    for (const { obj, offset } of this._trackedMeshes) {
-      obj.position.copy(pivotPos).add(offset);
+    const mode = this._controls.getMode();
+    if (mode === "translate") {
+      // Rotate is handled by the pivot-attach hierarchy — no manual orbit needed.
+      const pivotPos = this._pivot.position;
+      for (const { obj, offset } of this._trackedMeshes) {
+        obj.position.copy(pivotPos).add(offset);
+      }
+    } else if (mode === "scale" && this._selType === "object") {
+      const ps = this._pivot.scale;
+      for (const { obj } of this._trackedMeshes) {
+        obj.scale.set(
+          this._objInitialScale.x * ps.x,
+          this._objInitialScale.y * ps.y,
+          this._objInitialScale.z * ps.z,
+        );
+      }
     }
   }
 
@@ -402,6 +437,8 @@ export class GizmoManager implements IEditorModule {
       this._commitTranslate();
     } else if (mode === "rotate") {
       this._commitRotate();
+    } else if (mode === "scale") {
+      this._commitScale();
     }
   }
 
@@ -452,6 +489,19 @@ export class GizmoManager implements IEditorModule {
         this._worldState.updateStair(this._selZoneId!, this._selId!, {
           start: { x: stair.start.x + delta.x, y: stair.start.y + delta.y, z: stair.start.z + delta.z },
           end:   { x: stair.end.x   + delta.x, y: stair.end.y   + delta.y, z: stair.end.z   + delta.z },
+        });
+        break;
+      }
+      case "object": {
+        if (delta.lengthSq() < 1e-6) break;
+        const obj = this._getObject();
+        if (!obj) break;
+        this._worldState.updateObject(this._selZoneId!, this._selId!, {
+          position: {
+            x: obj.position.x + delta.x,
+            y: obj.position.y + delta.y,
+            z: obj.position.z + delta.z,
+          },
         });
         break;
       }
@@ -590,11 +640,37 @@ export class GizmoManager implements IEditorModule {
         }
         break;
       }
+      case "object": {
+        if (Math.abs(deltaAngle) < 0.0001 && !this._rotateAttached) { this._resetLiveRotate(); break; }
+        const mesh = this._trackedMeshes[0]?.obj;
+        if (!mesh) break;
+        const DEG = THREE.MathUtils.radToDeg;
+        this._worldState.updateObject(this._selZoneId!, this._selId!, {
+          rotation: {
+            x: DEG(mesh.rotation.x),
+            y: DEG(mesh.rotation.y),
+            z: DEG(mesh.rotation.z),
+          },
+        });
+        break;
+      }
     }
 
     this._stairDragSnapshot    = null;
     this._wallDragSnapshot     = null;
     this._polyPlatDragSnapshot = null;
+  }
+
+  private _commitScale(): void {
+    if (this._selType !== "object") return;
+    const mesh = this._trackedMeshes[0]?.obj;
+    if (!mesh) return;
+    this._worldState.updateObject(this._selZoneId!, this._selId!, {
+      scale: { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z },
+    });
+    // Reset pivot scale so the next drag starts clean
+    this._pivot.scale.set(1, 1, 1);
+    this._objInitialScale.copy(mesh.scale);
   }
 
   private _detachFromPivot(): void {
@@ -673,5 +749,10 @@ export class GizmoManager implements IEditorModule {
   private _getFloor(): FloorDef | undefined {
     return this._worldState.zones.get(this._selZoneId ?? "")
       ?.floors.find(f => f.id === this._selId);
+  }
+
+  private _getObject(): WorldObject | undefined {
+    return this._worldState.zones.get(this._selZoneId ?? "")
+      ?.objects.find(o => o.id === this._selId);
   }
 }

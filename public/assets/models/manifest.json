@@ -240,6 +240,215 @@
       "colliderType": "box",
       "tags": [],
       "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rock_2",
+      "label": "Rock 2",
+      "category": "Nature",
+      "path": "/assets/models/rock_2.gltf",
+      "thumbnail": "/assets/models/rock_2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "fruit",
+      "label": "Fruit",
+      "category": "Nature",
+      "path": "/assets/models/fruit.gltf",
+      "thumbnail": "/assets/models/fruit_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatforms_2",
+      "label": "RockPlatforms 2",
+      "category": "Nature",
+      "path": "/assets/models/rockplatforms_2.gltf",
+      "thumbnail": "/assets/models/rockplatforms_2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "tree_fruit",
+      "label": "Tree Fruit",
+      "category": "Nature",
+      "path": "/assets/models/tree_fruit.gltf",
+      "thumbnail": "/assets/models/tree_fruit_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "cloud_3",
+      "label": "Cloud 3",
+      "category": "Nature",
+      "path": "/assets/models/cloud_3.gltf",
+      "thumbnail": "/assets/models/cloud_3_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rock_1",
+      "label": "Rock 1",
+      "category": "Nature",
+      "path": "/assets/models/rock_1.gltf",
+      "thumbnail": "/assets/models/rock_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "cloud_1",
+      "label": "Cloud 1",
+      "category": "Nature",
+      "path": "/assets/models/cloud_1.gltf",
+      "thumbnail": "/assets/models/cloud_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatforms_large",
+      "label": "RockPlatforms Large",
+      "category": "Nature",
+      "path": "/assets/models/rockplatforms_large.gltf",
+      "thumbnail": "/assets/models/rockplatforms_large_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "tree",
+      "label": "Tree",
+      "category": "Nature",
+      "path": "/assets/models/tree.gltf",
+      "thumbnail": "/assets/models/tree_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "cloud_2",
+      "label": "Cloud 2",
+      "category": "Nature",
+      "path": "/assets/models/cloud_2.gltf",
+      "thumbnail": "/assets/models/cloud_2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "bush",
+      "label": "Bush",
+      "category": "Nature",
+      "path": "/assets/models/bush.gltf",
+      "thumbnail": "/assets/models/bush_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatform_tall",
+      "label": "RockPlatform Tall",
+      "category": "Nature",
+      "path": "/assets/models/rockplatform_tall.gltf",
+      "thumbnail": "/assets/models/rockplatform_tall_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "grass_2",
+      "label": "Grass 2",
+      "category": "Nature",
+      "path": "/assets/models/grass_2.gltf",
+      "thumbnail": "/assets/models/grass_2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "bush_fruit",
+      "label": "Bush Fruit",
+      "category": "Nature",
+      "path": "/assets/models/bush_fruit.gltf",
+      "thumbnail": "/assets/models/bush_fruit_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatforms_1",
+      "label": "RockPlatforms 1",
+      "category": "Nature",
+      "path": "/assets/models/rockplatforms_1.gltf",
+      "thumbnail": "/assets/models/rockplatforms_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "grass_3",
+      "label": "Grass 3",
+      "category": "Nature",
+      "path": "/assets/models/grass_3.gltf",
+      "thumbnail": "/assets/models/grass_3_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatforms_3",
+      "label": "RockPlatforms 3",
+      "category": "Nature",
+      "path": "/assets/models/rockplatforms_3.gltf",
+      "thumbnail": "/assets/models/rockplatforms_3_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "rockplatforms_medium",
+      "label": "RockPlatforms Medium",
+      "category": "Nature",
+      "path": "/assets/models/rockplatforms_medium.gltf",
+      "thumbnail": "/assets/models/rockplatforms_medium_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "grass_1",
+      "label": "Grass 1",
+      "category": "Nature",
+      "path": "/assets/models/grass_1.gltf",
+      "thumbnail": "/assets/models/grass_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-02"
     }
   ]
 }

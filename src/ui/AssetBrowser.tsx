@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { AssetDef, AssetCategory } from "@/types";
 
-const CATEGORIES: AssetCategory[] = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
+const KNOWN_ORDER = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
 
 const CAT_BTN = (active: boolean): React.CSSProperties => ({
@@ -27,6 +27,14 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
   const [popoutOpen, setPopoutOpen] = useState(false);
   // Most recently selected named categories, newest last
   const [recent, setRecent] = useState<AssetCategory[]>([]);
+
+  // All categories present in the asset list, sorted: known order first, then custom alphabetically
+  const CATEGORIES: AssetCategory[] = [
+    ...KNOWN_ORDER.filter(c => assets.some(a => a.category === c)),
+    ...[...new Set(assets.map(a => a.category))]
+      .filter(c => !KNOWN_ORDER.includes(c))
+      .sort(),
+  ];
   const popoutRef  = useRef<HTMLDivElement>(null);
 
   // Close popout on outside click
@@ -71,7 +79,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
       {/* Search bar */}
       <div style={{ padding: "8px 8px 6px", flexShrink: 0 }}>
@@ -204,7 +212,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
 
       {/* Grid */}
       <div style={{
-        flex: 1, overflowY: "auto", padding: "4px 8px",
+        flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 8px",
         display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4,
         alignContent: "start",
       }}>
@@ -228,7 +236,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
                   border: sel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 4, cursor: "pointer", padding: 2,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                  overflow: "hidden",
+                  overflow: "hidden", minHeight: 80,
                 }}
               >
                 {asset.thumbnail ? (

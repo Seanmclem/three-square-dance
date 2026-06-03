@@ -43,7 +43,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 // ─── Asset types ──────────────────────────────────────────────────────────────
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
-export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other';
+export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
 export type LeftPanelId   = 'assets' | 'zones' | 'scripts' | null;
 
 export interface AssetDef {
