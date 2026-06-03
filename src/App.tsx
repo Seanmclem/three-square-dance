@@ -108,7 +108,7 @@ export default function App() {
     const stairTool          = new StairTool(scene.scene, world, bus, history);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
-    const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus);
+    const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
 
     // Seed world with the demo zone

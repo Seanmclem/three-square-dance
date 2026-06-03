@@ -3,6 +3,7 @@ import { groupWallRuns, resolveRunNodeIds, buildNodesMap } from "@/utils/wallRun
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, Opening, WallDef, SelectedObjectPayload, ScreenPos } from "@/types";
+import type { HistoryManager } from "@/editor/HistoryManager";
 
 // ─── Run topology (computed once at drag-start) ───────────────────────────────
 
@@ -162,11 +163,12 @@ export class OpeningDragHandler implements IEditorModule {
   private readonly _unsubs:   Array<() => void> = [];
 
   constructor(
-    private readonly _scene:  THREE.Scene,
-    private readonly _cam:    THREE.PerspectiveCamera,
-    private readonly _dom:    HTMLCanvasElement,
-    private readonly _world:  WorldState,
-    private readonly _bus:    EventBus,
+    private readonly _scene:   THREE.Scene,
+    private readonly _cam:     THREE.PerspectiveCamera,
+    private readonly _dom:     HTMLCanvasElement,
+    private readonly _world:   WorldState,
+    private readonly _bus:     EventBus,
+    private readonly _history: HistoryManager,
   ) {}
 
   init(): void {
@@ -315,21 +317,25 @@ export class OpeningDragHandler implements IEditorModule {
 
     if (newWallId !== drag.origWallId) {
       // Opening migrated to a different wall segment
+      this._history.beginBatch("move opening");
       this._world.removeOpening(drag.zoneId, drag.origWallId, drag.openingId);
       this._world.addOpening(drag.zoneId, newWallId, {
         ...drag.opening,
         offsetAlongWall: newOffset,
         elevation:       newElev,
       });
+      this._history.commitBatch();
       // SelectionManager will handle re-selection via the wall:rebuilt chain.
       // Deselect here so there's no stale selection on the old wall while rebuilding.
       this._bus.emit("object:deselected", {});
     } else {
       // Same wall — updateOpening triggers wall:updated → ZoneManager rebuild →
       // wall:rebuilt → SelectionManager re-emits object:selected automatically.
-      this._world.updateOpening(drag.zoneId, drag.origWallId, drag.openingId, {
-        offsetAlongWall: newOffset,
-        elevation:       newElev,
+      this._history.record("move opening", () => {
+        this._world.updateOpening(drag.zoneId, drag.origWallId, drag.openingId, {
+          offsetAlongWall: newOffset,
+          elevation:       newElev,
+        });
       });
     }
 
