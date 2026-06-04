@@ -17,6 +17,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
+import { ZoneTool } from "@/editor/ZoneTool";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -24,7 +25,8 @@ import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId } from "@/types";
+import { ZoneNamingDialog } from "@/ui/ZoneNamingDialog";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -69,6 +71,9 @@ export default function App() {
   const [selectedAssetId, setSelectedAssetId]  = useState<string | null>(null);
   const [showImporter,    setShowImporter]     = useState(false);
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
+  const [zones,           setZones]            = useState<ZoneDef[]>([]);
+  const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
+  const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
 
   const syncHistory = useCallback((): void => {
     setCanUndo(historyRef.current?.canUndo ?? false);
@@ -110,9 +115,11 @@ export default function App() {
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
+    const zoneTool       = new ZoneTool(scene.scene, bus);
 
     // Seed world with the demo zone
     world.addZone(createDemoZone());
+    setZones([...world.zones.values()]);
 
     if (import.meta.env.DEV) {
       const g = window as unknown as Record<string, unknown>;
@@ -135,6 +142,7 @@ export default function App() {
     nodeDragger.init();
     openingDragger.init();
     gizmoManager.init();
+    zoneTool.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -154,7 +162,14 @@ export default function App() {
         }
         syncHistory();
       }),
-      bus.on("assets:loaded", ({ assets: defs }) => setAssets(defs)),
+      bus.on("assets:loaded",   ({ assets: defs }) => setAssets(defs)),
+      bus.on("zone:added",      ()               => setZones([...world.zones.values()])),
+      bus.on("zone:activated",  ({ zoneId })     => setActiveZoneId(zoneId)),
+      bus.on("world:loaded",    ()               => {
+        setZones([...world.zones.values()]);
+        setActiveZoneId(world.activeZoneId);
+      }),
+      bus.on("zonetool:awaiting-name", ({ bounds }) => setPendingZone(bounds)),
     ];
 
     // Init physics async — not blocking render
@@ -164,6 +179,7 @@ export default function App() {
       worldRef.current = null;
       zonesRef.current = null;
       unsub.forEach(u => u());
+      zoneTool.dispose();
       gizmoManager.dispose();
       openingDragger.dispose();
       nodeDragger.dispose();
@@ -185,11 +201,40 @@ export default function App() {
   const handleToolSelect = (tool: ToolId): void => {
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
-    if (tool === "object") {
-      setLeftPanel("assets");
-    } else {
-      setLeftPanel(null);
-    }
+    if (tool === "object") setLeftPanel("assets");
+    else if (tool === "zone") setLeftPanel("zones");
+    else setLeftPanel(null);
+  };
+
+  const handleEnterZone = (zoneId: string): void => {
+    busRef.current.emit("zone:enter", { zoneId });
+  };
+
+  const handleZoneConfirm = (name: string, type: ZoneType): void => {
+    const bounds = pendingZone;
+    setPendingZone(null);
+    if (!bounds) return;
+    const world = worldRef.current;
+    if (!world) return;
+    const newZone: ZoneDef = {
+      id:        crypto.randomUUID(),
+      name,
+      type,
+      bounds,
+      nodes:     [],
+      floors:    [],
+      walls:     [],
+      platforms: [],
+      stairs:    [],
+      objects:   [],
+    };
+    historyRef.current?.record("add zone", () => {
+      world.addZone(newZone);
+      world.setActiveZone(newZone.id);
+    });
+    syncHistory();
+    // Switch to select tool after creating zone
+    handleToolSelect("select");
   };
 
   const handleFloorChange = (level: number): void => {
@@ -457,14 +502,24 @@ export default function App() {
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...fullChanges } } : null);
     } else if (selected.type === "wall") {
       const wallChanges = changes as Partial<WallDef>;
-      history?.record("update wall", () => {
-        worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
-      });
+      if (wallChanges.floor !== undefined) {
+        // Floor level applies to every wall in the run.
+        const runWalls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+        history?.beginBatch("update wall floor");
+        runWalls.forEach(w => {
+          worldRef.current?.updateWall(selected.zoneId, w.id, { floor: wallChanges.floor });
+        });
+        history?.commitBatch();
+      } else {
+        history?.record("update wall", () => {
+          worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
+        });
+      }
       syncHistory();
       setSelected(prev => {
         if (!prev) return null;
         // Mirror sync keys locally so segment rows update before the async rebuild arrives.
-        const syncKeys = ["material", "exteriorMaterial", "height", "materialOverrides"] as const;
+        const syncKeys = ["material", "exteriorMaterial", "height", "materialOverrides", "floor"] as const;
         const updRunWalls = prev.runWalls
           ? prev.runWalls.map(w => ({ ...w, ...Object.fromEntries(syncKeys.filter(k => k in wallChanges).map(k => [k, (wallChanges as Record<string, unknown>)[k]])) }))
           : prev.runWalls;
@@ -528,6 +583,10 @@ export default function App() {
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
         onClose={() => setLeftPanel(null)}
+        zones={zones}
+        activeZoneId={activeZoneId}
+        onEnterZone={handleEnterZone}
+        onNewZone={() => handleToolSelect("zone")}
       />
       <TopBar
         activeFloor={activeFloor}
@@ -552,6 +611,8 @@ export default function App() {
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
         onDelete={selected ? handleDelete : undefined}
+        zones={zones}
+        activeZoneId={activeZoneId}
       />
       <CoordinateDisplay coords={coords} />
 
@@ -617,6 +678,13 @@ SquareDance
             if (imported.length === 1) handleAssetSelect(imported[0]!.id);
           }}
           onClose={() => setShowImporter(false)}
+        />
+      )}
+
+      {pendingZone && (
+        <ZoneNamingDialog
+          onConfirm={handleZoneConfirm}
+          onCancel={() => setPendingZone(null)}
         />
       )}
     </div>

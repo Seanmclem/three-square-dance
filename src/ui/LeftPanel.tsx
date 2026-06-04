@@ -1,5 +1,6 @@
-import type { LeftPanelId, AssetDef } from "@/types";
+import type { LeftPanelId, AssetDef, ZoneDef } from "@/types";
 import { AssetBrowser } from "@/ui/AssetBrowser";
+import { ZonePanel } from "@/ui/ZonePanel";
 
 interface LeftPanelProps {
   panelId:         LeftPanelId;
@@ -8,9 +9,13 @@ interface LeftPanelProps {
   onAssetSelect:   (id: string | null) => void;
   onImport:        () => void;
   onClose:         () => void;
+  zones:           ZoneDef[];
+  activeZoneId:    string | null;
+  onEnterZone:     (zoneId: string) => void;
+  onNewZone:       () => void;
 }
 
-export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose }: LeftPanelProps) {
+export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose, zones, activeZoneId, onEnterZone, onNewZone }: LeftPanelProps) {
   const open = panelId !== null;
 
   return (
@@ -58,6 +63,14 @@ export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onI
                 selectedAssetId={selectedAssetId}
                 onSelect={onAssetSelect}
                 onImport={onImport}
+              />
+            )}
+            {panelId === "zones" && (
+              <ZonePanel
+                zones={zones}
+                activeZoneId={activeZoneId}
+                onEnterZone={onEnterZone}
+                onNewZone={onNewZone}
               />
             )}
           </div>

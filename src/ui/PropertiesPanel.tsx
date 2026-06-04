@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef,
+  PlatformDef, StairDef, ZoneDef, ZoneType,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -102,6 +102,25 @@ function useFieldDebounce(delayMs = 300) {
     fn();
   };
   return { schedule, flush };
+}
+
+// ── LevelStepper ─────────────────────────────────────────────────────────────
+
+const STEP_BTN: React.CSSProperties = {
+  width: 22, height: 22, border: "1px solid rgba(255,255,255,0.10)", borderRadius: 3,
+  background: "rgba(46,46,46,0.9)", color: "#909090", fontSize: 14, lineHeight: 1,
+  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  flexShrink: 0,
+};
+
+function LevelStepper({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <button style={STEP_BTN} onClick={() => onChange(value - 1)}>−</button>
+      <span style={{ minWidth: 24, textAlign: "center", fontFamily: "monospace", fontSize: 12, color: "#c0c0c0" }}>{value}</span>
+      <button style={STEP_BTN} onClick={() => onChange(value + 1)}>+</button>
+    </div>
+  );
 }
 
 // ── Screen config ─────────────────────────────────────────────────────────────
@@ -233,6 +252,8 @@ interface PropertiesPanelProps {
   onCopyRunToFloor?:   (targetLevel: number) => void;
   onFillRunWithFloor?: () => void;
   onDelete?:           () => void;
+  zones?:              ZoneDef[];
+  activeZoneId?:       string | null;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -240,6 +261,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
+  zones = [], activeZoneId,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -330,7 +352,7 @@ export function PropertiesPanel({
             onQualityChange={onQualityChange}
           />
         ) : currentScreen === "open" ? (
-          <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} />
+          <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
           <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={openImporter} onSegmentUpdate={onSegmentUpdate} />
         ) : currentScreen === "vert" ? (
@@ -474,11 +496,13 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
   const wallData = selected.data as WallDef | null;
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
+  const [floorLvl,  setFloorLvl]  = useState(wallData?.floor ?? 0);
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
     setHeight(String(wallData?.height ?? 3));
     setThickness(String(wallData?.thickness ?? 0.2));
+    setFloorLvl(wallData?.floor ?? 0);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = (field: "height" | "thickness", val: string) => {
@@ -503,6 +527,13 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
           onBlur={e => flush(() => commit("thickness", e.target.value))}
         />
       </div>
+      <div>
+        <div style={LABEL}>FLOOR LEVEL</div>
+        <LevelStepper value={floorLvl} onChange={n => {
+          setFloorLvl(n);
+          onObjectUpdate({ floor: n } as unknown as Partial<WorldObject>);
+        }} />
+      </div>
     </div>
   );
 }
@@ -517,6 +548,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   const [thickStr, setThickStr] = useState(String(plat?.thickness ?? 0.3));
   const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
   const [hasRail,  setHasRail]  = useState(plat?.hasRailing ?? false);
+  const [floorLvl, setFloorLvl] = useState(plat?.floorLevel ?? 0);
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
@@ -526,6 +558,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
     setThickStr(String(plat?.thickness ?? 0.3));
     setRailH(String(plat?.railingHeight ?? 1.0));
     setHasRail(plat?.hasRailing ?? false);
+    setFloorLvl(plat?.floorLevel ?? 0);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setRotYStr(String(plat?.rotation?.y ?? 0)); }, [plat?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -613,6 +646,15 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
             />
           </div>
         )}
+      </div>
+
+      {/* Floor level */}
+      <div>
+        <div style={LABEL}>FLOOR LEVEL</div>
+        <LevelStepper value={floorLvl} onChange={n => {
+          setFloorLvl(n);
+          onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
+        }} />
       </div>
     </div>
   );
@@ -902,15 +944,18 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
 // ── ObjectGeoView ─────────────────────────────────────────────────────────────
 
 function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void }) {
+  const objData = selected.data as WorldObject | null;
   const [draft, setDraft] = useState<Draft>({
     position: toStr(selected.position),
     rotation: toStr(selected.rotation),
     scale:    toStr(selected.scale),
   });
+  const [floorLvl, setFloorLvl] = useState(objData?.floor ?? 0);
   const { schedule } = useFieldDebounce(150);
 
   useEffect(() => {
     setDraft({ position: toStr(selected.position), rotation: toStr(selected.rotation), scale: toStr(selected.scale) });
+    setFloorLvl((selected.data as WorldObject | null)?.floor ?? 0);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commit = (group: GroupKey, axis: "x" | "y" | "z", raw: string): void => {
@@ -940,6 +985,13 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           </div>
         </div>
       ))}
+      <div>
+        <div style={LABEL}>FLOOR LEVEL</div>
+        <LevelStepper value={floorLvl} onChange={n => {
+          setFloorLvl(n);
+          onObjectUpdate({ floor: n });
+        }} />
+      </div>
     </div>
   );
 }
@@ -1080,9 +1132,11 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 
 // ── OpeningsScreen ────────────────────────────────────────────────────────────
 
-function OpeningsScreen({ selected, onSegmentUpdate }: {
+function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
   selected:        SelectedObjectPayload;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
+  zones:           ZoneDef[];
+  activeZoneId:    string | null;
 }) {
   const wallData = selected.data as WallDef | null;
   const allWalls = selected.runWalls ?? (wallData ? [wallData] : []);
@@ -1150,6 +1204,8 @@ function OpeningsScreen({ selected, onSegmentUpdate }: {
         <OpeningRow
           key={op.id}
           opening={op}
+          zones={zones}
+          activeZoneId={activeZoneId}
           onUpdate={changes => updateOpening(wallId, op.id, changes)}
           onDelete={() => deleteOpening(wallId, op.id)}
         />
@@ -1192,11 +1248,13 @@ function VertScreen({ selected, onObjectUpdate }: {
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
 }) {
   const floorData = selected.data as FloorDef | null;
-  const [elevStr, setElevStr] = useState(String(floorData?.elevation ?? 0));
+  const [elevStr,  setElevStr]  = useState(String(floorData?.elevation ?? 0));
+  const [floorLvl, setFloorLvl] = useState(floorData?.level ?? 0);
 
   useEffect(() => {
     setElevStr(String(floorData?.elevation ?? 0));
-  }, [selected.id, floorData?.elevation]); // eslint-disable-line react-hooks/exhaustive-deps
+    setFloorLvl(floorData?.level ?? 0);
+  }, [selected.id, floorData?.elevation, floorData?.level]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { schedule, flush } = useFieldDebounce(300);
 
@@ -1206,18 +1264,27 @@ function VertScreen({ selected, onObjectUpdate }: {
   };
 
   return (
-    <div style={{ padding: "14px 16px" }}>
-      <div style={LABEL}>ELEVATION</div>
-      <input
-        type="number" step={0.001}
-        value={elevStr}
-        onChange={e => { setElevStr(e.target.value); schedule(() => commitElev(e.target.value)); }}
-        onBlur={e => flush(() => commitElev(e.target.value))}
-        onKeyDown={e => { if (e.key === "Enter") flush(() => commitElev((e.target as HTMLInputElement).value)); }}
-        style={{ ...NUM_INPUT, width: 80 }}
-      />
-      <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
-        Adjust to layer overlapping floors (+0.001 per step)
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>FLOOR LEVEL</div>
+        <LevelStepper value={floorLvl} onChange={n => {
+          setFloorLvl(n);
+          onObjectUpdate({ level: n } as unknown as Partial<WorldObject>);
+        }} />
+      </div>
+      <div>
+        <div style={LABEL}>ELEVATION</div>
+        <input
+          type="number" step={0.001}
+          value={elevStr}
+          onChange={e => { setElevStr(e.target.value); schedule(() => commitElev(e.target.value)); }}
+          onBlur={e => flush(() => commitElev(e.target.value))}
+          onKeyDown={e => { if (e.key === "Enter") flush(() => commitElev((e.target as HTMLInputElement).value)); }}
+          style={{ ...NUM_INPUT, width: 80 }}
+        />
+        <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
+          Adjust to layer overlapping floors (+0.001 per step)
+        </div>
       </div>
     </div>
   );
@@ -1401,11 +1468,13 @@ function MaterialSection({
 
 // ── OpeningRow ────────────────────────────────────────────────────────────────
 
-function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
-  opening:     Opening;
-  onUpdate:    (changes: Partial<Opening>) => void;
-  onDelete:    () => void;
-  hideDelete?: boolean;
+function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activeZoneId }: {
+  opening:      Opening;
+  onUpdate:     (changes: Partial<Opening>) => void;
+  onDelete:     () => void;
+  hideDelete?:  boolean;
+  zones?:       ZoneDef[];
+  activeZoneId?: string | null;
 }) {
   const [offsetStr,  setOffsetStr]  = useState(String(opening.offsetAlongWall));
   const [widthStr,   setWidthStr]   = useState(String(opening.width));
@@ -1413,6 +1482,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
   const [elevStr,    setElevStr]    = useState(String(opening.elevation));
   const [innerHStr,  setInnerHStr]  = useState(String(opening.innerTileH ?? ""));
   const [innerVStr,  setInnerVStr]  = useState(String(opening.innerTileV ?? ""));
+  const [zonePickerOpen, setZonePickerOpen] = useState(false);
 
   useEffect(() => {
     setOffsetStr(String(opening.offsetAlongWall));
@@ -1501,6 +1571,57 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete }: {
           />
         </div>
       </div>
+
+      {(opening.type === "door" || opening.type === "arch") && (
+        <div style={{ marginTop: 4 }}>
+          <div style={{ color: "#505060", fontSize: 9, marginBottom: 4 }}>ZONE LINK</div>
+          {!zonePickerOpen ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ flex: 1, fontSize: 10, color: opening.linkedZoneId ? "#80aaff" : "#404050", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {opening.linkedZoneId
+                  ? (zones.find(z => z.id === opening.linkedZoneId)?.name ?? "unknown zone")
+                  : "not linked"}
+              </span>
+              <button
+                onClick={() => setZonePickerOpen(true)}
+                style={{ background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.25)", borderRadius: 3, color: "#80aaff", fontSize: 9, cursor: "pointer", padding: "2px 8px", fontFamily: "monospace", flexShrink: 0 }}
+              >
+                {opening.linkedZoneId ? "change" : "link"}
+              </button>
+              {opening.linkedZoneId && (
+                <button
+                  onClick={() => onUpdate({ linkedZoneId: null })}
+                  style={{ background: "transparent", border: "none", color: "#ff6b6b", cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
+                  title="Unlink zone"
+                >×</button>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {zones.filter(z => z.id !== activeZoneId).map(z => (
+                <button
+                  key={z.id}
+                  onClick={() => { onUpdate({ linkedZoneId: z.id }); setZonePickerOpen(false); }}
+                  style={{
+                    background: z.id === opening.linkedZoneId ? "rgba(80,140,255,0.15)" : "rgba(40,40,40,0.8)",
+                    border: `1px solid ${z.id === opening.linkedZoneId ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
+                    borderRadius: 3, color: z.id === opening.linkedZoneId ? "#80aaff" : "#909090",
+                    fontSize: 10, cursor: "pointer", padding: "3px 8px",
+                    fontFamily: "monospace", textAlign: "left",
+                  }}
+                >{z.name}</button>
+              ))}
+              {zones.filter(z => z.id !== activeZoneId).length === 0 && (
+                <div style={{ color: "#404050", fontSize: 10, fontStyle: "italic" }}>No other zones</div>
+              )}
+              <button
+                onClick={() => setZonePickerOpen(false)}
+                style={{ background: "none", border: "none", color: "#585870", cursor: "pointer", fontSize: 9, padding: "2px 0", textAlign: "left" }}
+              >cancel</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

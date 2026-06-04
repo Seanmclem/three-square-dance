@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.6.0** — last updated 2026-06-01
+**Version 2.8.0** — last updated 2026-06-03
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -22,6 +22,8 @@
 - v2.4 — Phase 6.6 input UX & floor fixes: EditorCamera focus guard, universal live debounce hook, floor gizmo centroid, floor elevation default, wall-run stale rebuild fix
 - v2.5 — Phase 6.7 snapshot-based undo/redo: HistoryManager, `history:restore` event, Cmd+Z/Cmd+Y shortcuts, toolbar buttons, all placement tools and App.tsx mutation handlers wrapped
 - v2.6 — Phase 7 redesigned: LeftPanel generic slot system, AssetBrowser in left panel, Model Importer modal, manifest system, object placement wired to GizmoManager
+- v2.7 — Phase 8 fully specced: zones vs floors guidance, stair zone links, ZonePanel always browse-only, transition linking in PropertiesPanel only, HelpTooltip component
+- v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
 
 ---
 
@@ -321,6 +323,11 @@ export interface StairCutterDef {
   innerTileV?: number;
 }
 
+export interface StairOpening {
+  linkedZoneId:        string | null;
+  linkedTransitionId:  string | null;
+}
+
 export interface StairDef {
   id:          string;
   start:       Vec3;
@@ -334,6 +341,8 @@ export interface StairDef {
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
   csgCutter?:              StairCutterDef;  // defines a hole cut in the floor/platform above
+  topOpening?:             StairOpening;    // optional zone link at top of stair
+  bottomOpening?:          StairOpening;    // optional zone link at bottom of stair
 }
 
 export interface ObjectProperties {
@@ -4312,12 +4321,263 @@ export type LeftPanelId = 'assets' | 'zones' | 'scripts' | null;
 - File System Access API availability check: `if (!('showOpenFilePicker' in window))` → show "Use Chrome or Edge" message, disable the import button.
 
 ### Phase 8 — Zones & Transitions
-- ZoneTool: rect draw, naming dialog, zone list population
-- ZonePanel UI fully functional
-- ZoneManager: multi-zone load/unload — on unload, ALL colliders for that zone are removed from Rapier world
-- TransitionTool: link door openings between zones
-- TransitionManager: fade effect (CSS overlay + zone swap)
-- Editor zone jump (camera teleport) on door click
+
+#### What Zones Are For
+
+A zone is a self-contained region of the world. Think of it as a room, a building interior, an outdoor area, or a dungeon floor — any space that has its own walls, floors, objects, and scripts.
+
+The practical reason zones exist is **performance and organisation**. Only one zone is loaded into the Three.js scene and Rapier physics world at a time. When you walk through a door into a building, the outdoor zone is unloaded (meshes disposed, colliders removed) and the indoor zone is loaded in its place. This means you can build a world with dozens of large detailed spaces without them all being in memory simultaneously.
+
+Zones also define **transition boundaries**. A door opening linked to another zone is how the player moves between spaces — the door triggers a fade, the zone swap happens, and the player appears at a spawn point in the new zone. This is the same pattern used in classic RPGs, The Sims, and most games with interior/exterior spaces.
+
+In the editor: zones are how you organise your work. You draw zone boundaries, name them, assign them a type (outdoor / indoor / dungeon), and switch between them using the Zone Panel. Everything you place — walls, floors, objects, scripts — belongs to whichever zone is currently active.
+
+---
+
+#### ZoneTool
+
+Draws a new zone boundary rectangle on the ground plane:
+
+```
+IDLE:
+  Show existing zone boundaries as dashed outlines on the canvas
+  On click: record start point
+
+PLACING:
+  Drag to define rect
+  On release: open New Zone dialog
+
+New Zone dialog (modal):
+  Name input (text)
+  Type selector: outdoor / indoor / dungeon (pill buttons)
+  Cancel / Create zone buttons
+
+On Create:
+  worldState.addZone(zoneDef)
+  Set as active zone
+  Zone appears in Zone Panel immediately
+```
+
+---
+
+#### Zone Panel (`src/ui/ZonePanel.tsx`)
+
+Lives in the left panel slot (`panelId === 'zones'`). Opens automatically when the Zone tool is active. This panel is for **world-level navigation** — seeing and switching between zones — not for inspecting a selected object (that belongs in the Properties Panel).
+
+**Browse mode (default — always):**
+
+```
+┌──────────────────────────────────────┐
+│ ZONES                        [+ New] │
+├──────────────────────────────────────┤
+│ Town Square              outdoor     │  ← active zone, blue tint, no Enter
+│ editing                              │
+├──────────────────────────────────────┤
+│ Tavern Interior          indoor      │
+│ 8 walls · 2 floors      [Enter ›]   │
+├──────────────────────────────────────┤
+│ Dungeon Level 1          dungeon     │
+│ 12 walls · 1 floor      [Enter ›]   │
+└──────────────────────────────────────┘
+```
+
+- Active zone: blue left border, blue name, "editing" label instead of Enter button
+- Other zones: Enter button triggers `zone:enter { zoneId }` → ZoneManager swap with fade
+- Type badges: outdoor (grey), indoor (blue), dungeon (red)
+- "+ New" button opens New Zone dialog
+
+**The Zone Panel never enters a "link picker" mode.** Transition linking is handled entirely inside the Properties Panel (see below). The Zone Panel always stays in browse mode.
+
+---
+
+#### Transition Linking — Properties Panel Flow
+
+When a door opening is selected, the Properties Panel shows a "Zone link" row in the opening's root screen. The entire linking flow is a drill-down within the Properties Panel:
+
+```
+Opening root screen
+  ├── Geometry  ›
+  └── Zone link ›          ← shows "none" or "✓ Zone name"
+
+Zone link screen (drill-down):
+  LINKED ZONE
+  [No zone linked]         ← or green pill showing linked zone name + unlink button
+  
+  [Spawn point]  x:1 · y:0 · z:1 · 180°   ← shown when linked
+  [Effect]       Fade · 0.3s               ← shown when linked
+  
+  [Link to zone… / Change linked zone…]    ← button always present
+
+Pick zone screen (drill-down from Link button):
+  "Choose the zone this door leads to:"
+  
+  Town Square    outdoor   ← greyed out, "current zone — cannot link to itself"
+  Tavern Interior indoor   ← clickable, selects and confirms immediately
+  Dungeon Level 1 dungeon  ← clickable
+```
+
+Selecting a zone in the picker immediately confirms the link and navigates back to the Zone link screen showing the new linked zone. No separate confirm step needed — selection is confirmation.
+
+The left Zone Panel is completely unaffected during this entire flow.
+
+---
+
+#### ZoneManager
+
+Manages which zone's meshes and colliders are in the scene at any time:
+
+- `loadZone(zoneId)` — builds all meshes and registers all Rapier colliders for a zone
+- `unloadZone(zoneId)` — disposes all meshes, removes ALL Rapier colliders for that zone (walls, floors, platforms, stairs, sensors)
+- Only one zone loaded at a time in play/preview mode
+- In editor mode: active zone fully loaded, other zones shown as ghost outlines only (dashed boundary lines, no geometry)
+- On `zone:enter { zoneId }`: ZoneManager triggers TransitionManager
+
+---
+
+#### TransitionManager
+
+Handles the actual zone swap:
+
+```
+1. Fade screen to black (CSS overlay, 0.3s)
+2. ZoneManager.unloadZone(fromZone)
+3. ZoneManager.loadZone(toZone)
+4. Teleport player/camera to transition.spawnPoint
+5. Fade back in (0.3s)
+6. Emit preview:zone-entered { zoneName }
+```
+
+In editor mode (no character): clicking a linked door opening in the Properties Panel triggers an editor jump — same fade, same zone swap, camera moves to the new zone center. No character involved.
+
+---
+
+#### New Bus Events
+
+```ts
+"zone:enter":       { zoneId: string };           // user clicks Enter in Zone Panel
+"zone:jump":        { zoneId: string };            // editor camera jump (no character)
+"transition:fired": { transitionId: string };      // character walked through door
+```
+
+---
+
+#### Zones vs Floors — When to Use Each
+
+Both zones and floors handle vertical multi-level spaces, but they serve different purposes:
+
+**Use floors within a zone when:**
+- The levels are always loaded together (a small 2-floor shop)
+- The player can see between levels (open mezzanine, balcony)
+- Performance is not a concern at that scale
+
+**Use separate zones per level when:**
+- The levels are large enough that you don't want them all in memory simultaneously (a 10-floor dungeon tower)
+- Each level has a distinct feel that benefits from a full load/unload transition
+- You want a loading screen / fade effect between floors
+
+**Stair openings can link zones** the same way door openings do. A stair with a `linkedZoneId` triggers a zone transition when the player reaches the top or bottom — the current zone unloads, the destination zone loads, and the player spawns at the stair's arrival point in the new zone. This is identical to a door transition, just vertical.
+
+In `StairDef`, openings at the top and bottom work the same as `Opening` on a wall:
+```ts
+// Addition to StairDef
+topOpening?:    StairOpening;   // zone link at top of stair
+bottomOpening?: StairOpening;   // zone link at bottom of stair
+
+export interface StairOpening {
+  linkedZoneId:       string | null;
+  linkedTransitionId: string | null;
+}
+```
+
+There is no right answer — it's a design decision per space. The editor supports both. The Zone Panel shows floor count per zone as a hint (`8 walls · 2 floors`) so you can see at a glance how a zone is structured.
+
+---
+
+#### Help Tooltips (`?` buttons)
+
+Several places in the UI have concepts that benefit from a brief explanation. Add a small `?` button next to section headers or labels in these locations. Clicking it shows a non-blocking tooltip (not a modal — a small popover that dismisses on click-outside).
+
+**Locations and copy:**
+
+| Location | Trigger | Tooltip text |
+|---|---|---|
+| Zone Panel header | `?` next to "ZONES" label | "Zones are separate areas of your world — outdoor spaces, building interiors, dungeon floors. Only one zone is loaded at a time. Use the Floor selector inside a zone for multi-level spaces that should always be in memory together." |
+| New Zone dialog title | `?` next to "New zone" | "Each zone is an independently loaded space. A small building might be one zone with multiple floors. A large dungeon tower might use one zone per floor so levels load and unload as the player moves through them." |
+| Zone link screen in Properties Panel | `?` next to "LINKED ZONE" | "Linking a door or stair to another zone creates a transition — when the player walks through, the current zone unloads and the destination zone loads. Set the spawn point to where the player should appear in the new zone." |
+| Floor level selector (G/1/2/3 tabs) | `?` next to "FLOOR" label | "Floors are levels within this zone. Use floors when the levels should always be loaded together. For large spaces where you want levels to load independently, create separate zones and link them via stair openings." |
+
+**`HelpTooltip` component (`src/ui/HelpTooltip.tsx`):**
+
+```tsx
+interface HelpTooltipProps {
+  text: string;
+}
+
+function HelpTooltip({ text }: HelpTooltipProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: 16, height: 16,
+          borderRadius: '50%',
+          border: '1px solid var(--border)',
+          background: 'none',
+          color: 'var(--muted)',
+          fontSize: 10,
+          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 600,
+          lineHeight: 1,
+        }}
+        aria-label="Help"
+      >?</button>
+      {open && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+          />
+          <div style={{
+            position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%',
+            transform: 'translateX(-50%)',
+            width: 220, padding: '8px 10px',
+            background: 'var(--raised)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r)', fontSize: 11, lineHeight: 1.6,
+            color: 'var(--muted)', zIndex: 50,
+            boxShadow: '0 4px 12px rgba(0,0,0,.3)',
+          }}>
+            {text}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+Usage:
+```tsx
+<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+  <span className="lp-title">ZONES</span>
+  <HelpTooltip text="Zones are separate areas of your world..." />
+</div>
+```
+
+---
+
+#### New Files
+
+```
+src/
+  ui/
+    ZonePanel.tsx           ← zone list, browse mode only, lives in left panel slot
+    ZoneNamingDialog.tsx    ← new zone modal (name + type)
+    HelpTooltip.tsx         ← reusable ? popover component
+  editor/
+    ZoneTool.ts             ← rect draw on canvas → opens ZoneNamingDialog
+```
 
 ### Phase 9 — Full Persistence
 

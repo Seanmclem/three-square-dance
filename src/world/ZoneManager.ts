@@ -200,6 +200,13 @@ export class ZoneManager {
         this.unloadZone(zoneId);
         void this.loadZone(zoneId);
       }),
+      this._bus.on("zone:enter", ({ zoneId }) => {
+        const current = this._worldState.activeZoneId;
+        if (zoneId === current) return;
+        if (current) this.unloadZone(current);
+        this._worldState.setActiveZone(zoneId);
+        void this.loadZone(zoneId);
+      }),
     );
   }
 

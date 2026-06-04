@@ -154,6 +154,9 @@ export interface BusEvents {
   "assets:loaded":         { assets: AssetDef[] };
   "leftpanel:open":        { panelId: LeftPanelId };
   "leftpanel:close":       Record<string, never>;
+  "zonetool:awaiting-name": { bounds: Bounds };
+  "zonetool:name-confirmed": { name: string; type: ZoneType };
+  "zone:jump":             { zoneId: string };
 }
 
 export type BusEventName = keyof BusEvents;
