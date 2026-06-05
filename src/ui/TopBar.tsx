@@ -5,12 +5,14 @@ interface TopBarProps {
   activeFloor:     number;
   onFloorChange:   (level: number) => void;
   onCameraTopDown: () => void;
-  onSave:          () => void;
+  onSave:          () => Promise<void>;
   onLoad:          (json: unknown) => void;
+  onLoadFSA?:      () => Promise<void>;
   onUndo:          () => void;
   onRedo:          () => void;
   canUndo:         boolean;
   canRedo:         boolean;
+  isDirty?:        boolean;
 }
 
 const FLOORS = [
@@ -20,7 +22,7 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onUndo, onRedo, canUndo, canRedo }: TopBarProps) {
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onUndo, onRedo, canUndo, canRedo, isDirty }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,6 +41,14 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
     reader.readAsText(file);
   };
 
+  const handleLoadClick = () => {
+    if (onLoadFSA && 'showOpenFilePicker' in window) {
+      void onLoadFSA();
+    } else {
+      fileRef.current?.click();
+    }
+  };
+
   return (
     <div style={{
       position: "absolute", top: 0, left: 64, right: 280, height: 48,
@@ -48,7 +58,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       padding: "0 16px", zIndex: 10,
     }}>
       <span style={{ color: "#80aaff", fontFamily: "monospace", fontSize: 13, letterSpacing: 2, opacity: 0.8 }}>
-        SquareDance
+        SquareDance{isDirty ? <span style={{ color: "#ffcc66", marginLeft: 2 }}>*</span> : null}
       </span>
       <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />
 
@@ -117,7 +127,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         onChange={handleFileChange}
       />
       <button
-        onClick={onSave}
+        onClick={() => void onSave()}
         style={{
           padding: "4px 12px", border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 6, background: "transparent", color: "#a0a0a0",
@@ -127,7 +137,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         Save
       </button>
       <button
-        onClick={() => fileRef.current?.click()}
+        onClick={handleLoadClick}
         style={{
           padding: "4px 12px", border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 6, background: "transparent", color: "#a0a0a0",

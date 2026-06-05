@@ -74,10 +74,16 @@ export default function App() {
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
+  const [isDirty,         setIsDirty]          = useState(false);
+  const [restorePrompt,   setRestorePrompt]    = useState<{ ageMin: number; json: unknown } | null>(null);
+  const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
   const syncHistory = useCallback((): void => {
-    setCanUndo(historyRef.current?.canUndo ?? false);
-    setCanRedo(historyRef.current?.canRedo  ?? false);
+    const hu = historyRef.current?.canUndo ?? false;
+    const hr = historyRef.current?.canRedo ?? false;
+    setCanUndo(hu);
+    setCanRedo(hr);
+    if (hu) setIsDirty(true);
   }, []);
 
   useEffect(() => {
@@ -148,6 +154,30 @@ export default function App() {
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
 
+    // Autosave to localStorage every 60 seconds
+    const autosaveTimer = setInterval(() => {
+      if (!worldRef.current) return;
+      const json = JSON.stringify(worldRef.current.toJSON());
+      localStorage.setItem('worldeditor_autosave', json);
+      localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
+    }, 60_000);
+
+    // Offer to restore autosave if one exists from the last 24 hours
+    const savedJson = localStorage.getItem('worldeditor_autosave');
+    const savedTs   = localStorage.getItem('worldeditor_autosave_ts');
+    if (savedJson && savedTs) {
+      const ageMs = Date.now() - parseInt(savedTs, 10);
+      if (ageMs < 24 * 60 * 60_000) {
+        try {
+          const parsed = JSON.parse(savedJson);
+          setRestorePrompt({ ageMin: Math.max(1, Math.round(ageMs / 60_000)), json: parsed });
+        } catch { /* ignore corrupt autosave */ }
+      } else {
+        localStorage.removeItem('worldeditor_autosave');
+        localStorage.removeItem('worldeditor_autosave_ts');
+      }
+    }
+
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
 
@@ -177,6 +207,7 @@ export default function App() {
     physicsWorld.init().catch(err => console.error("PhysicsWorld init failed:", err));
 
     return () => {
+      clearInterval(autosaveTimer);
       worldRef.current = null;
       zonesRef.current = null;
       unsub.forEach(u => u());
@@ -266,39 +297,94 @@ export default function App() {
     busRef.current.emit('quality:changed', { quality: q });
   };
 
-  const handleSave = useCallback((): void => {
-    const world = worldRef.current;
-    if (!world) return;
-    const json = JSON.stringify(world.toJSON(), null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), {
-      href:     url,
-      download: 'world.json',
-    });
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, []);
-
-  const handleLoad = useCallback(async (json: unknown): Promise<void> => {
+  const handleLoadFromJSON = useCallback(async (json: unknown): Promise<void> => {
     const world = worldRef.current;
     const zones = zonesRef.current;
     if (!world || !zones) return;
     try {
       const file = json as SceneFile;
       migrateWallNodes(file.zones);
-      await physicsWorld.init(); // no-op if already initialized; ensures colliders won't throw
+      await physicsWorld.init();
       for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
       world.loadFromJSON(file);
       setSelected(null);
       setActiveFloor(0);
+      fileHandleRef.current = null; // loaded file replaces any existing handle association
+      setIsDirty(false);
       const activeId = world.activeZoneId;
       if (activeId) await zones.loadZone(activeId);
     } catch (e) {
       console.error('Failed to load scene:', e);
     }
+  }, []);
+
+  // Kept for TopBar's <input type="file"> fallback path
+  const handleLoad = useCallback((json: unknown): void => {
+    void handleLoadFromJSON(json);
+  }, [handleLoadFromJSON]);
+
+  const handleLoadFSA = useCallback(async (): Promise<void> => {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'World JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      fileHandleRef.current = handle;
+      const file = await handle.getFile();
+      const text = await file.text();
+      await handleLoadFromJSON(JSON.parse(text));
+    } catch (e: unknown) {
+      if ((e as DOMException).name !== 'AbortError') console.error('Load failed:', e);
+    }
+  }, [handleLoadFromJSON]);
+
+  const handleSave = useCallback(async (): Promise<void> => {
+    const world = worldRef.current;
+    if (!world) return;
+    const json = JSON.stringify(world.toJSON(), null, 2);
+    const name = world.toJSON().metadata?.name ?? 'world';
+
+    try {
+      if (!fileHandleRef.current && 'showSaveFilePicker' in window) {
+        fileHandleRef.current = await window.showSaveFilePicker({
+          suggestedName: `${name}.json`,
+          types: [{ description: 'World JSON', accept: { 'application/json': ['.json'] } }],
+        });
+      }
+
+      if (fileHandleRef.current) {
+        const writable = await fileHandleRef.current.createWritable();
+        await writable.write(json);
+        await writable.close();
+      } else {
+        // FSA not available — blob download fallback
+        const blob = new Blob([json], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        Object.assign(document.createElement('a'), { href: url, download: `${name}.json` }).click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e: unknown) {
+      if ((e as DOMException).name !== 'AbortError') console.error('Save failed:', e);
+      return; // user cancelled picker — don't update state
+    }
+
+    localStorage.setItem('worldeditor_autosave', json);
+    localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
+    setIsDirty(false);
+  }, []);
+
+  const handleRestoreConfirm = useCallback((): void => {
+    const prompt = restorePrompt;
+    setRestorePrompt(null);
+    if (!prompt) return;
+    void handleLoadFromJSON(prompt.json);
+    localStorage.removeItem('worldeditor_autosave');
+    localStorage.removeItem('worldeditor_autosave_ts');
+  }, [restorePrompt, handleLoadFromJSON]);
+
+  const handleRestoreDismiss = useCallback((): void => {
+    setRestorePrompt(null);
+    localStorage.removeItem('worldeditor_autosave');
+    localStorage.removeItem('worldeditor_autosave_ts');
   }, []);
 
   const handleUndo = useCallback((): void => {
@@ -319,7 +405,7 @@ export default function App() {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
         e.preventDefault();
-        handleSave();
+        void handleSave();
       }
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault();
@@ -612,10 +698,12 @@ export default function App() {
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
         onSave={handleSave}
         onLoad={handleLoad}
+        onLoadFSA={handleLoadFSA}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
         canRedo={canRedo}
+        isDirty={isDirty}
       />
       <PropertiesPanel
         activeTool={activeTool}
@@ -633,6 +721,30 @@ export default function App() {
         activeZoneId={activeZoneId}
       />
       <CoordinateDisplay coords={coords} />
+
+      {restorePrompt && (
+        <div style={{
+          position: "absolute", top: 56, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(10,14,22,0.97)", border: "1px solid rgba(255,180,60,0.4)",
+          borderRadius: 8, padding: "10px 16px", zIndex: 30,
+          display: "flex", alignItems: "center", gap: 12,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+        }}>
+          <span style={{ color: "#ffcc66", fontSize: 11 }}>
+            Unsaved work from {restorePrompt.ageMin < 60
+              ? `${restorePrompt.ageMin} min ago`
+              : `${Math.round(restorePrompt.ageMin / 60)} hr ago`}
+          </span>
+          <button
+            onClick={handleRestoreConfirm}
+            style={{ background: "rgba(255,180,60,0.15)", border: "1px solid rgba(255,180,60,0.4)", borderRadius: 4, color: "#ffcc66", fontSize: 10, cursor: "pointer", padding: "3px 10px", fontFamily: "monospace" }}
+          >Restore</button>
+          <button
+            onClick={handleRestoreDismiss}
+            style={{ background: "none", border: "none", color: "#585870", cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 }}
+          >✕</button>
+        </div>
+      )}
 
       {autoFloorPrompt && (
         <div style={{
