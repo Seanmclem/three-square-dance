@@ -117,8 +117,9 @@ export default function App() {
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
     const zoneTool       = new ZoneTool(scene.scene, bus);
 
-    // Seed world with the demo zone
+    // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
+    world.setActiveZone(DEMO_ZONE_ID);
     setZones([...world.zones.values()]);
 
     if (import.meta.env.DEV) {
@@ -199,11 +200,25 @@ export default function App() {
   }, []);
 
   const handleToolSelect = (tool: ToolId): void => {
+    if (tool === "zone") {
+      // Z = toggle zones browser; cancel draw mode if it was active
+      if (activeTool === "zone") {
+        setActiveTool("select");
+        busRef.current.emit("tool:select", { tool: "select" });
+      }
+      setLeftPanel(p => p === "zones" ? null : "zones");
+      return;
+    }
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
     if (tool === "object") setLeftPanel("assets");
-    else if (tool === "zone") setLeftPanel("zones");
     else setLeftPanel(null);
+  };
+
+  const handleStartZoneDraw = (): void => {
+    setActiveTool("zone");
+    busRef.current.emit("tool:select", { tool: "zone" });
+    setLeftPanel("zones");
   };
 
   const handleEnterZone = (zoneId: string): void => {
@@ -233,8 +248,10 @@ export default function App() {
       world.setActiveZone(newZone.id);
     });
     syncHistory();
-    // Switch to select tool after creating zone
-    handleToolSelect("select");
+    // Return to select tool, keep zones panel open so user sees the new zone
+    setActiveTool("select");
+    busRef.current.emit("tool:select", { tool: "select" });
+    setLeftPanel("zones");
   };
 
   const handleFloorChange = (level: number): void => {
@@ -574,6 +591,7 @@ export default function App() {
 
       <Toolbar
         activeTool={activeTool}
+        openPanel={leftPanel}
         onToolSelect={handleToolSelect}
       />
       <LeftPanel
@@ -586,7 +604,7 @@ export default function App() {
         zones={zones}
         activeZoneId={activeZoneId}
         onEnterZone={handleEnterZone}
-        onNewZone={() => handleToolSelect("zone")}
+        onNewZone={handleStartZoneDraw}
       />
       <TopBar
         activeFloor={activeFloor}

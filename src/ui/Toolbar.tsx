@@ -1,4 +1,4 @@
-import type { ToolId } from "@/types";
+import type { ToolId, LeftPanelId } from "@/types";
 import { TOOL_ICONS, IconPlay } from "@/ui/icons";
 
 interface ToolDef { id: ToolId; label: string; shortcut: string }
@@ -17,10 +17,11 @@ const TOOLS: ToolDef[] = [
 
 interface ToolbarProps {
   activeTool:   ToolId;
+  openPanel:    LeftPanelId;
   onToolSelect: (tool: ToolId) => void;
 }
 
-export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect }: ToolbarProps) {
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
@@ -31,7 +32,9 @@ export function Toolbar({ activeTool, onToolSelect }: ToolbarProps) {
     }}>
 
       {TOOLS.map(tool => {
-        const active = activeTool === tool.id;
+        const active = activeTool === tool.id
+          || (tool.id === "zone"   && openPanel === "zones")
+          || (tool.id === "object" && openPanel === "assets");
         const Icon = TOOL_ICONS[tool.id];
         const color = active ? "#80aaff" : "#7a7a7a";
         return (
