@@ -18,8 +18,9 @@ export class SceneManager {
 
   private readonly _clock:           THREE.Clock;
   private readonly _updateCallbacks: UpdateCallback[] = [];
-  private _raf:      number = 0;
-  private _disposed  = false;
+  private _raf:             number = 0;
+  private _disposed         = false;
+  private _previewCamera:   THREE.PerspectiveCamera | null = null;
   private readonly _onResize: () => void;
 
   private readonly _sunLight:     THREE.DirectionalLight;
@@ -141,14 +142,32 @@ export class SceneManager {
     this._updateCallbacks.push(cb);
   }
 
+  offUpdate(cb: UpdateCallback): void {
+    const idx = this._updateCallbacks.indexOf(cb);
+    if (idx !== -1) this._updateCallbacks.splice(idx, 1);
+  }
+
+  setPreviewCamera(cam: THREE.PerspectiveCamera | null): void {
+    this._previewCamera = cam;
+    this.editorCamera.enabled = (cam === null);
+    this._viewHelperEl.style.display = cam ? "none" : "";
+    if (cam === null) {
+      // Restore editor camera aspect
+      const w = this.renderer.domElement.clientWidth;
+      const h = this.renderer.domElement.clientHeight;
+      this.camera.aspect = w / h;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
   private _loop(): void {
     if (this._disposed) return;
     const dt = this._clock.getDelta();
-    this.editorCamera.update(dt);
+    if (!this._previewCamera) this.editorCamera.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
     this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
-    this._viewHelper.render(this.renderer);
+    this.renderer.render(this.scene, this._previewCamera ?? this.camera);
+    if (!this._previewCamera) this._viewHelper.render(this.renderer);
     this._raf = requestAnimationFrame(this._loop.bind(this));
   }
 

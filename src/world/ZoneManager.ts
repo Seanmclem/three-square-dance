@@ -206,6 +206,8 @@ export class ZoneManager {
         if (current) this.unloadZone(current);
         this._worldState.setActiveZone(zoneId);
         void this.loadZone(zoneId);
+        const zone = this._worldState.zones.get(zoneId);
+        if (zone) this._bus.emit("preview:zone-entered", { zoneName: zone.name });
       }),
     );
   }

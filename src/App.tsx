@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
+import { PreviewController } from "@/preview/PreviewController";
 import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
@@ -21,6 +22,7 @@ import { ZoneTool } from "@/editor/ZoneTool";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
+import { PreviewHUD } from "@/ui/PreviewHUD";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
@@ -54,6 +56,8 @@ export default function App() {
   const worldRef    = useRef<WorldState | null>(null);
   const zonesRef    = useRef<ZoneManager | null>(null);
   const historyRef  = useRef<HistoryManager | null>(null);
+  const sceneRef    = useRef<SceneManager | null>(null);
+  const previewRef  = useRef<PreviewController | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
@@ -76,6 +80,7 @@ export default function App() {
   const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
   const [isDirty,         setIsDirty]          = useState(false);
   const [restorePrompt,   setRestorePrompt]    = useState<{ ageMin: number; json: unknown } | null>(null);
+  const [isPreview,       setIsPreview]        = useState(false);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
   const syncHistory = useCallback((): void => {
@@ -92,6 +97,7 @@ export default function App() {
     const bus = busRef.current;
 
     const scene     = new SceneManager(canvas, bus);
+    sceneRef.current = scene;
     assetManager.init(scene.renderer);
     assetManager.initMaterials().then(mats => {
       setMaterialList(mats);
@@ -109,6 +115,9 @@ export default function App() {
     historyRef.current = history;
     bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
     bus.on("scene:loaded",  () => { history.clear(); syncHistory(); });
+
+    const preview = new PreviewController(bus, world, scene);
+    previewRef.current = preview;
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const floorTool    = new FloorTool(scene.scene, world, bus, history);
@@ -182,6 +191,8 @@ export default function App() {
     scene.onUpdate(dt => physicsWorld.step(dt));
 
     const unsub = [
+      bus.on("preview:start", () => setIsPreview(true)),
+      bus.on("preview:stop",  () => setIsPreview(false)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected",   payload       => setSelected(payload)),
       bus.on("object:deselected", ()            => setSelected(null)),
@@ -208,8 +219,11 @@ export default function App() {
 
     return () => {
       clearInterval(autosaveTimer);
-      worldRef.current = null;
-      zonesRef.current = null;
+      previewRef.current?.exit();
+      previewRef.current  = null;
+      sceneRef.current    = null;
+      worldRef.current    = null;
+      zonesRef.current    = null;
       unsub.forEach(u => u());
       zoneTool.dispose();
       gizmoManager.dispose();
@@ -387,6 +401,10 @@ export default function App() {
     localStorage.removeItem('worldeditor_autosave_ts');
   }, []);
 
+  const handlePreviewEnter = useCallback((): void => {
+    previewRef.current?.enter("preview");
+  }, []);
+
   const handleUndo = useCallback((): void => {
     historyRef.current?.undo();
     setActiveTool("select");
@@ -403,6 +421,18 @@ export default function App() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape') {
+        if (previewRef.current?.isActive) {
+          previewRef.current.exit();
+          return;
+        }
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          busRef.current.emit('object:deselected', {});
+        }
+        return;
+      }
+      if (previewRef.current?.isActive) return;
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyS') {
         e.preventDefault();
         void handleSave();
@@ -414,12 +444,6 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey))) {
         e.preventDefault();
         handleRedo();
-      }
-      if (e.code === 'Escape') {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-          busRef.current.emit('object:deselected', {});
-        }
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -679,6 +703,8 @@ export default function App() {
         activeTool={activeTool}
         openPanel={leftPanel}
         onToolSelect={handleToolSelect}
+        onPreview={handlePreviewEnter}
+        isPreview={isPreview}
       />
       <LeftPanel
         panelId={leftPanel}
@@ -790,6 +816,8 @@ export default function App() {
           >No</button>
         </div>
       )}
+
+      {isPreview && <PreviewHUD bus={busRef.current} />}
 
       <div style={{
         position: "absolute", bottom: 16, right: 296,

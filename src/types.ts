@@ -130,6 +130,8 @@ export interface BusEvents {
   "gizmo:dragging":        { isDragging: boolean };
   "camera:jump":           { x: number; z: number };
   "camera:topdown":        Record<string, never>;
+  "character:interact":       { objectId: string };
+  "character:interact-range": { objectId: string; label: string } | null;
   "character:teleport":    { position: Vec3; facing: number };
   "character:triggerdoor": { transitionId: string };
   "overlay:fade-in":       { color: string; duration: number };
@@ -208,6 +210,11 @@ export interface SceneMetadata {
   lastModified: string;
 }
 
+export interface SpawnDef {
+  position:  Vec3;
+  facingDeg: number;
+}
+
 export interface PlayerSettings {
   cameraMode:          CameraMode;
   moveSpeed:           number;
@@ -218,13 +225,14 @@ export interface PlayerSettings {
 }
 
 export interface WorldConfig {
-  size:           { width: number; depth: number };
-  ambientLight:   { color: string; intensity: number };
-  sunLight:       { color: string; intensity: number; position: Vec3 };
-  skybox:         string;
-  fogColor:       string;
-  fogDensity:     number;
-  playerSettings: PlayerSettings;
+  size:            { width: number; depth: number };
+  ambientLight:    { color: string; intensity: number };
+  sunLight:        { color: string; intensity: number; position: Vec3 };
+  skybox:          string;
+  fogColor:        string;
+  fogDensity:      number;
+  playerSettings:  PlayerSettings;
+  defaultSpawn?:   SpawnDef;
 }
 
 export interface TerrainLayerMaterial {

@@ -19,9 +19,11 @@ interface ToolbarProps {
   activeTool:   ToolId;
   openPanel:    LeftPanelId;
   onToolSelect: (tool: ToolId) => void;
+  onPreview?:   () => void;
+  isPreview?:   boolean;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, isPreview }: ToolbarProps) {
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
@@ -65,14 +67,18 @@ export function Toolbar({ activeTool, openPanel, onToolSelect }: ToolbarProps) {
       <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 
       <button
-        title="Preview (P)"
+        title="Preview (G)"
+        onClick={onPreview}
         style={{
-          width: 48, height: 48, border: "1px solid rgba(80,200,120,0.3)",
+          width: 48, height: 48,
+          border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
           borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(80,200,120,0.08)", cursor: "pointer", marginBottom: 8,
+          background: isPreview ? "rgba(80,200,120,0.25)" : "rgba(80,200,120,0.08)",
+          cursor: "pointer", marginBottom: 8,
+          outline: isPreview ? "1px solid rgba(80,200,120,0.45)" : "none",
         }}
       >
-        <IconPlay color="#80cc90" />
+        <IconPlay color={isPreview ? "#60ee80" : "#80cc90"} />
       </button>
     </div>
   );

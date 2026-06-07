@@ -16,6 +16,7 @@ export class EditorCamera {
   private _isPanning  = false;
   private _keys:       Record<string, boolean> = {};
   private _gizmoDragging = false;
+  private _enabled       = true;
 
   private readonly _onMouseDown: (e: MouseEvent) => void;
   private readonly _onMouseMove: (e: MouseEvent) => void;
@@ -97,12 +98,17 @@ export class EditorCamera {
     this.targetSpherical.radius = Math.max(3, Math.min(80, this.targetSpherical.radius + e.deltaY * 0.05));
   }
 
+  set enabled(v: boolean) {
+    this._enabled = v;
+    if (!v) this._keys = {};
+  }
+
   private _handleKeyDown(e: KeyboardEvent): void {
-    if (this._isTypingTarget(e)) return;
+    if (!this._enabled || this._isTypingTarget(e)) return;
     this._keys[e.code] = true;
   }
   private _handleKeyUp(e: KeyboardEvent): void {
-    if (this._isTypingTarget(e)) return;
+    if (!this._enabled || this._isTypingTarget(e)) return;
     delete this._keys[e.code];
   }
   private _isTypingTarget(e: KeyboardEvent): boolean {
@@ -113,7 +119,7 @@ export class EditorCamera {
   }
 
   update(dt: number): void {
-    if (this._gizmoDragging) return;
+    if (!this._enabled || this._gizmoDragging) return;
     const speed = this.spherical.radius * 0.02;
     const angle = this.spherical.theta;
 
