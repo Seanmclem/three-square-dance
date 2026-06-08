@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening,
+  SceneFile, Opening, SpawnDef,
 } from "@/types";
 
 export class WorldState {
@@ -218,6 +218,19 @@ export class WorldState {
     if (!zone) return;
     zone.objects = zone.objects.filter(o => o.id !== id);
     this._bus.emit("object:removed", { zoneId, id });
+  }
+
+  setDefaultSpawn(spawn: SpawnDef): void {
+    if (!this.world) {
+      this.world = {
+        size: { width: 200, depth: 200 },
+        ambientLight: { color: "#aabbcc", intensity: 1.2 },
+        sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
+        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
+      };
+    }
+    this.world.defaultSpawn = spawn;
   }
 
   // ─── Transition mutations ─────────────────────────────────────────────────

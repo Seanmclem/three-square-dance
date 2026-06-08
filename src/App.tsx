@@ -19,6 +19,7 @@ import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
 import { ZoneTool } from "@/editor/ZoneTool";
+import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -130,7 +131,8 @@ export default function App() {
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
-    const zoneTool       = new ZoneTool(scene.scene, bus);
+    const zoneTool        = new ZoneTool(scene.scene, bus);
+    const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
 
     // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
@@ -159,6 +161,7 @@ export default function App() {
     openingDragger.init();
     gizmoManager.init();
     zoneTool.init();
+    spawnPointTool.init();
 
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
@@ -225,6 +228,7 @@ export default function App() {
       worldRef.current    = null;
       zonesRef.current    = null;
       unsub.forEach(u => u());
+      spawnPointTool.dispose();
       zoneTool.dispose();
       gizmoManager.dispose();
       openingDragger.dispose();
@@ -403,6 +407,10 @@ export default function App() {
 
   const handlePreviewEnter = useCallback((): void => {
     previewRef.current?.enter("preview");
+  }, []);
+
+  const handleStartGame = useCallback((): void => {
+    previewRef.current?.enter("game");
   }, []);
 
   const handleUndo = useCallback((): void => {
@@ -704,6 +712,7 @@ export default function App() {
         openPanel={leftPanel}
         onToolSelect={handleToolSelect}
         onPreview={handlePreviewEnter}
+        onStartGame={handleStartGame}
         isPreview={isPreview}
       />
       <LeftPanel

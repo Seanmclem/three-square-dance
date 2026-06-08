@@ -92,6 +92,14 @@ export const IconPlay = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconSpawn = ({ color }: IconProps) => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <line x1="10" y1="16" x2="10" y2="5" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    <polygon points="10,3 7,8 13,8" fill={color}/>
+    <circle cx="10" cy="17" r="1.8" fill={color} fillOpacity="0.7"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   floor:            IconFloor,
@@ -102,4 +110,5 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   stair:            IconStair,
   object:           IconObject,
   zone:             IconZone,
+  spawnpoint:       IconSpawn,
 };

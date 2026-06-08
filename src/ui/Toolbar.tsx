@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
 import { TOOL_ICONS, IconPlay } from "@/ui/icons";
 
@@ -13,17 +14,20 @@ const TOOLS: ToolDef[] = [
   { id: "stair",           label: "Stair",     shortcut: "T" },
   { id: "object",     label: "Object",   shortcut: "O" },
   { id: "zone",       label: "Zone",     shortcut: "Z" },
+  { id: "spawnpoint", label: "Spawn",    shortcut: "N" },
 ];
 
 interface ToolbarProps {
-  activeTool:   ToolId;
-  openPanel:    LeftPanelId;
-  onToolSelect: (tool: ToolId) => void;
-  onPreview?:   () => void;
-  isPreview?:   boolean;
+  activeTool:    ToolId;
+  openPanel:     LeftPanelId;
+  onToolSelect:  (tool: ToolId) => void;
+  onPreview?:    () => void;
+  onStartGame?:  () => void;
+  isPreview?:    boolean;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, isPreview }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, onStartGame, isPreview }: ToolbarProps) {
+  const [showGameMenu, setShowGameMenu] = useState(false);
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
@@ -66,20 +70,61 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, isPrev
       <div style={{ flex: 1 }} />
       <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 
-      <button
-        title="Preview (G)"
-        onClick={onPreview}
-        style={{
-          width: 48, height: 48,
-          border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
-          borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-          background: isPreview ? "rgba(80,200,120,0.25)" : "rgba(80,200,120,0.08)",
-          cursor: "pointer", marginBottom: 8,
-          outline: isPreview ? "1px solid rgba(80,200,120,0.45)" : "none",
-        }}
-      >
-        <IconPlay color={isPreview ? "#60ee80" : "#80cc90"} />
-      </button>
+      {/* Play row: Preview button + dropdown caret */}
+      <div style={{ position: "relative", display: "flex", gap: 2, marginBottom: 8 }}>
+        <button
+          title="Preview (G)"
+          onClick={onPreview}
+          style={{
+            width: 36, height: 36,
+            border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
+            borderRadius: "8px 0 0 8px", display: "flex", alignItems: "center", justifyContent: "center",
+            background: isPreview ? "rgba(80,200,120,0.25)" : "rgba(80,200,120,0.08)",
+            cursor: "pointer",
+          }}
+        >
+          <IconPlay color={isPreview ? "#60ee80" : "#80cc90"} />
+        </button>
+        <button
+          title="More play options"
+          onClick={() => setShowGameMenu(v => !v)}
+          style={{
+            width: 14, height: 36,
+            border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
+            borderLeft: "none",
+            borderRadius: "0 8px 8px 0", display: "flex", alignItems: "center", justifyContent: "center",
+            background: isPreview ? "rgba(80,200,120,0.25)" : "rgba(80,200,120,0.08)",
+            cursor: "pointer", fontSize: 8, color: isPreview ? "#60ee80" : "#80cc90",
+          }}
+        >▾</button>
+
+        {showGameMenu && (
+          <div style={{
+            position: "absolute", bottom: "100%", left: 0, marginBottom: 4,
+            background: "rgba(28,28,28,0.97)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 6, padding: "4px 0", minWidth: 120, zIndex: 100,
+          }}>
+            <button
+              onClick={() => { setShowGameMenu(false); onPreview?.(); }}
+              style={{
+                width: "100%", padding: "6px 12px", background: "none", border: "none",
+                color: "#ccc", cursor: "pointer", textAlign: "left", fontSize: 12,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+            >▶ Preview</button>
+            <button
+              onClick={() => { setShowGameMenu(false); onStartGame?.(); }}
+              style={{
+                width: "100%", padding: "6px 12px", background: "none", border: "none",
+                color: "#ccc", cursor: "pointer", textAlign: "left", fontSize: 12,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+            >▶ Start Game</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

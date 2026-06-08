@@ -44,6 +44,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   stair:       { desc: "Click bottom point, then top point of staircase.",         hint: "Click bottom of stair" },
   object:      { desc: "Choose an asset below, click to place.",                   hint: "Select an asset first" },
   zone:        { desc: "Draw a zone boundary to group rooms.",                     hint: "Click to define zone area" },
+  spawnpoint:  { desc: "Click to place the player spawn point.",                   hint: "Click to set spawn location" },
 };
 
 const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;
