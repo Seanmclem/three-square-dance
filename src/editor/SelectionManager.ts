@@ -6,7 +6,7 @@ import type {
   SelectedObjectPayload, WorldObject, WallDef,
 } from "@/types";
 
-const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor"];
+const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor", "spawn"];
 
 const SELECT_EMISSIVE  = 0x3366ff;
 const SELECT_INTENSITY = 0.25;

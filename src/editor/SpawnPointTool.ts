@@ -46,8 +46,14 @@ export class SpawnPointTool {
     const origin = new THREE.Vector3(x, y, z);
     const dir    = new THREE.Vector3(0, 1, 0);
     const arrow  = new THREE.ArrowHelper(dir, origin, 1.8, 0xffcc44, 0.55, 0.28);
-    arrow.userData = { editorOnly: true };
-    arrow.traverse(child => { child.userData.editorOnly = true; });
+    arrow.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
+    arrow.traverse(child => {
+      child.userData.editorOnly = true;
+      child.userData.editorId   = "__spawn__";
+      child.userData.editorType = "spawn";
+      child.userData.selectable = true;
+      child.userData.zoneId     = "";
+    });
     this._scene.add(arrow);
     this._marker = arrow;
 

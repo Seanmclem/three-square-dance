@@ -288,8 +288,8 @@ export function PropertiesPanel({
   const isRoot        = !currentScreen;
   const screens       = selected ? (OBJECT_SCREENS[selected.type] ?? []) : [];
 
-  const headerTitle    = !selected ? "" : isRoot ? selected.id            : SCREEN_LABELS[currentScreen!];
-  const headerSubtitle = !selected ? "" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
+  const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? selected.id            : SCREEN_LABELS[currentScreen!];
+  const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const openImporter = () => {
     setDirError(null);
@@ -323,10 +323,10 @@ export function PropertiesPanel({
 
       {/* Scrollable body */}
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto" }}>
-        {!selected ? (
-          activeTool === "spawnpoint" && playerSettings && onPlayerSettingsChange
-            ? <SpawnSettingsView settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange} />
-            : <ToolView activeTool={activeTool} />
+        {selected?.id === "__spawn__" && playerSettings && onPlayerSettingsChange ? (
+          <SpawnSettingsView settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange} />
+        ) : !selected ? (
+          <ToolView activeTool={activeTool} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
