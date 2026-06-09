@@ -29,7 +29,7 @@ import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { ZoneNamingDialog } from "@/ui/ZoneNamingDialog";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType, PlayerSettings } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -117,7 +117,7 @@ export default function App() {
     bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
     bus.on("scene:loaded",  () => { history.clear(); syncHistory(); });
 
-    const preview = new PreviewController(bus, world, scene);
+    const preview = new PreviewController(bus, world, scene, zones);
     previewRef.current = preview;
     const input     = new InputManager(canvas, scene.camera, bus);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
@@ -413,6 +413,15 @@ export default function App() {
     previewRef.current?.enter("game");
   }, []);
 
+  const handlePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
+    const world = worldRef.current;
+    if (!world?.world) return;
+    historyRef.current?.record("update player settings", () => {
+      Object.assign(world.world!.playerSettings, changes);
+    });
+    syncHistory();
+  }, [syncHistory]);
+
   const handleUndo = useCallback((): void => {
     historyRef.current?.undo();
     setActiveTool("select");
@@ -696,7 +705,14 @@ export default function App() {
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
     } else {
-      busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
+      if (changes.properties !== undefined) {
+        historyRef.current?.record("update object properties", () => {
+          worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
+        });
+        syncHistory();
+      } else {
+        busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
+      }
     }
   };
 
@@ -754,6 +770,9 @@ export default function App() {
         onDelete={selected ? handleDelete : undefined}
         zones={zones}
         activeZoneId={activeZoneId}
+        playerSettings={worldRef.current?.world?.playerSettings}
+        assets={assets}
+        onPlayerSettingsChange={handlePlayerSettingsChange}
       />
       <CoordinateDisplay coords={coords} />
 
@@ -826,7 +845,12 @@ export default function App() {
         </div>
       )}
 
-      {isPreview && <PreviewHUD bus={busRef.current} />}
+      {isPreview && (
+        <PreviewHUD
+          bus={busRef.current}
+          activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
+        />
+      )}
 
       <div style={{
         position: "absolute", bottom: 16, right: 296,

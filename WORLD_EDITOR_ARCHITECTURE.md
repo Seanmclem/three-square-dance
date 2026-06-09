@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 2.8.0** — last updated 2026-06-03
+**Version 3.1.0** — last updated 2026-06-03
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -23,6 +23,9 @@
 - v2.5 — Phase 6.7 snapshot-based undo/redo: HistoryManager, `history:restore` event, Cmd+Z/Cmd+Y shortcuts, toolbar buttons, all placement tools and App.tsx mutation handlers wrapped
 - v2.6 — Phase 7 redesigned: LeftPanel generic slot system, AssetBrowser in left panel, Model Importer modal, manifest system, object placement wired to GizmoManager
 - v2.7 — Phase 8 fully specced: zones vs floors guidance, stair zone links, ZonePanel always browse-only, transition linking in PropertiesPanel only, HelpTooltip component
+- v2.9 — Phase 10 & 10.5 rewritten into uploaded doc: character model option, capsule-only mode, interact system, trigger volume editor, Script Panel full spec, all action implementations
+- v3.0 — Phase 10.6 added: EntityRegistry, index-based ScriptEngine, ActionDispatcher, animation clip discovery, per-entity Scripts tab in PropertiesPanel
+- v3.1 — Phase 10.7 added: Animations tab in PropertiesPanel, editor-mode clip preview, auto-play animation on placed objects, WorldObject.autoPlayAnimation field
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
 
 ---
@@ -353,14 +356,15 @@ export interface ObjectProperties {
 }
 
 export interface WorldObject {
-  id:         string;
-  assetId:    string;
-  position:   Vec3;
-  rotation:   Euler3;
-  scale:      Scale3;
-  floor:      number;
-  zoneId?:    string;
-  properties: ObjectProperties;
+  id:                  string;
+  assetId:             string;
+  position:            Vec3;
+  rotation:            Euler3;
+  scale:               Scale3;
+  floor:               number;
+  zoneId?:             string;
+  properties:          ObjectProperties;
+  autoPlayAnimation?:  string | null;    // clip name to loop on load, null = none
 }
 
 export interface ZoneDef {
@@ -657,6 +661,16 @@ export interface EditorPreferences {
   cameraSpeed:      number;
   theme:            'dark';               // only dark for now
 }
+
+// ─── Entity / scripting infrastructure ────────────────────────────────────────
+
+export interface EntityCapabilities {
+  emits:    TriggerType[];
+  receives: ActionType[];
+}
+
+// Added to AssetDef (Phase 10.6):
+// animations?: string[];   // clip names discovered at import time
 
 // ─── Builder return types ─────────────────────────────────────────────────────
 
@@ -4656,177 +4670,890 @@ src/scripting/GameStateManager.ts
 ```
 
 
-### Phase 10 — Preview Mode (Character Controller)
-The preview camera is for checking the space, not gameplay. The character controller is built on Rapier's `KinematicCharacterController` so it is immediately game-ready.
+### Phase 10 — Preview Mode + Character Controller
 
-**`CharacterBody.ts`** — wraps Rapier KCC:
+The world becomes walkable. The character is built on Rapier's `KinematicCharacterController` from day one — not a prototype, game-ready physics from the start.
+
+---
+
+#### Character Setup
+
+The character has two valid configurations. Both use the same `CharacterBody` and `CharacterController` — only the visual representation differs.
+
+**Option A — Capsule only (default)**
+No mesh attached. The physics capsule moves through the world invisibly. The camera is attached directly to the capsule position. Good for FPS testing, top-down games, or when you just want to walk around without worrying about a character model.
+
+**Option B — Capsule + GLTF model**
+A GLTF model loaded via `AssetManager` is attached to the capsule as a child `THREE.Group`. The model follows the physics body. The camera is separate — it reads position from `CharacterBody` and applies its own offset (FPS: at eye level, third-person: behind/above). In FPS mode the model is hidden. In third-person the model is visible.
+
+Both options set via `CharacterDef.modelAssetId`:
 ```ts
-// Init
-const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased();
-this._body = world.createRigidBody(bodyDesc);
-const colliderDesc = RAPIER.ColliderDesc.capsule(height / 2 - radius, radius);
-this._collider = world.createCollider(colliderDesc, this._body);
-this._kcc = world.createCharacterController(0.01); // 1cm offset
-this._kcc.enableAutostep(0.5, 0.2, true);          // max step height 0.5m
-this._kcc.enableSnapToGround(0.3);
-this._kcc.setSlideEnabled(true);
-
-// Per frame
-const corrected = this._kcc.computeColliderMovement(this._collider, desiredMovement);
-const newPos = this._body.translation();
-newPos.x += corrected.x; newPos.y += corrected.y; newPos.z += corrected.z;
-this._body.setNextKinematicTranslation(newPos);
+modelAssetId?: string | null;  // null = capsule only, no mesh
 ```
 
-**`CharacterController.ts`** — input + camera, delegates to CharacterBody:
-- Reads WASD + mouse look
-- Computes `desiredMovement` vector (includes gravity accumulation)
-- Passes to `CharacterBody.move(desiredMovement)`
-- Reads corrected position back from `CharacterBody.position` and updates Three.js camera
+Character settings (accessible from SpawnPointTool properties in PropertiesPanel):
+- Camera mode: FPS / Third-person
+- Model: None (capsule) / asset picker from manifest
+- Move speed, jump height, FOV (FPS), third-person distance
 
-**`TriggerSystem.ts`** — door detection:
-- Each door opening has a Rapier sensor collider (registered in Phase 5)
-- Each frame: `world.intersectionsWith(characterCollider, (other) => { ... })`
-- When character sensor overlaps door sensor: emit `character:triggerdoor { transitionId }`
+Stored in `worldConfig.playerSettings`, persists in scene file.
 
-**`PreviewController.ts`**:
-- `enter()`: pointer lock, spawn CharacterBody at editor camera focus, register update callback
-- `exit()`: pointer lock release, remove CharacterBody from Rapier world, restore editor camera
-- Camera modes (FPS / third-person) both read position from CharacterBody — configurable from `playerSettings`
+---
 
-**PreviewHUD**: crosshair, zone name toast, floor indicator, Esc hint
+#### CharacterBody.ts
 
-**Spawn Point Tool (`SpawnPointTool.ts`):**
-- Places a visible spawn marker in the editor (arrow/character icon at ground level)
-- Only one default spawn exists per world — placing a new one moves the existing one
-- Marker shows facing direction as an arrow
-- Stored as `worldConfig.defaultSpawn` in WorldState
-- Editable in PropertiesPanel when selected: position XYZ, facing degrees
-- Visible in editor, invisible in preview/play mode
+```ts
+export class CharacterBody {
+  readonly capsuleRadius     = 0.3;
+  readonly capsuleHalfHeight = 0.6;
 
-**Preview vs Start Game — two distinct modes:**
+  init(spawnPosition: THREE.Vector3): void {
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
+      .setTranslation(spawnPosition.x, spawnPosition.y, spawnPosition.z);
+    this._body     = physicsWorld.world.createRigidBody(bodyDesc);
+    this._collider = physicsWorld.world.createCollider(
+      RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius), this._body
+    );
+    this._kcc = physicsWorld.world.createCharacterController(0.01);
+    this._kcc.enableAutostep(0.5, 0.2, true);
+    this._kcc.enableSnapToGround(0.3);
+    this._kcc.setSlideEnabled(true);
+    this._kcc.setMaxSlopeClimbAngle(45 * Math.PI / 180);
+  }
+
+  move(desired: THREE.Vector3): void {
+    this._kcc.computeColliderMovement(this._collider, desired);
+    const mv  = this._kcc.computedMovement();
+    const pos = this._body.translation();
+    this._body.setNextKinematicTranslation({
+      x: pos.x + mv.x, y: pos.y + mv.y, z: pos.z + mv.z
+    });
+  }
+
+  get position(): THREE.Vector3 { ... }
+  get isGrounded(): boolean { return this._kcc.computedGrounded(); }
+  dispose(): void { ... }
+}
+```
+
+---
+
+#### CharacterController.ts
+
+Reads input, computes movement, delegates physics to `CharacterBody`, updates camera and optional model mesh.
+
+```ts
+update(dt: number): void {
+  // 1. Read WASD → local direction
+  // 2. Rotate by yaw → world direction
+  // 3. Apply move speed
+  // 4. Accumulate gravity (velocity.y -= 20 * dt unless grounded)
+  // 5. Jump (Space, grounded only)
+  // 6. CharacterBody.move(desiredMovement)
+  // 7. Update camera from CharacterBody.position
+  // 8. If model attached: update model position/rotation
+  // 9. Check interact ray (see Interact section)
+  // 10. TriggerSystem.update()
+}
+```
+
+**Mouse look** (pointer lock):
+- `dx` → yaw, `dy` → pitch (clamped ±80°)
+- FPS: camera rotation = yaw + pitch directly
+- Third-person: camera orbits character at `thirdPersonDistance` + `thirdPersonHeight`
+
+---
+
+#### Character Model (Option B)
+
+```ts
+// On spawn:
+const gltf = await assetManager.loadGLTF(modelAssetId);
+this._modelRoot = gltf.scene.clone();
+this._mixer     = new THREE.AnimationMixer(this._modelRoot);
+scene.add(this._modelRoot);
+
+// On update:
+this._modelRoot.position.copy(feetPosition);  // body.position.y - capsuleHalfHeight - capsuleRadius
+this._modelRoot.rotation.y = this._yaw;
+this._modelRoot.visible = (settings.cameraMode === 'thirdperson');
+```
+
+**Animations** — play clips by convention name: `idle`, `walk`, `run`, `jump`.
+- Crossfade with `mixer.clipAction(clip).fadeIn(0.15)`
+- Missing clips silently skipped — not every model has all four
+- Animation support is best-effort: if no animations exist, character still works
+
+---
+
+#### Interact System
+
+Player presses `E` to interact with nearby objects — foundation for NPC conversations, item pickups, door triggers, levers.
+
+**Detection:**
+- Each frame: ray cast from camera in look direction, max 2.5m
+- Hits mesh with `userData.interactable === true` → show HUD prompt `[E] {label}`
+- On `E` press: `scriptEngine.fire('on_interact', hitMesh.userData.editorId, context)`
+
+**Making an object interactable:**
+- "Interactable" toggle in PropertiesPanel object properties
+- Optional `interactLabel` field: "Open", "Talk", "Pick up" etc. — shown in HUD
+
+```ts
+// Additions to ObjectProperties
+export interface ObjectProperties {
+  interactable:    boolean;
+  interactLabel?:  string;       // HUD prompt label, default "Interact"
+  npcSpawn:        boolean;
+  lootTableId:     string | null;
+  triggerEventId:  string | null;
+}
+```
+
+---
+
+#### TriggerSystem.ts
+
+Detects Rapier sensor overlaps each frame. Handles door sensors (Phase 5) and trigger volume sensors (Phase 10.5):
+
+```ts
+update(_dt: number): void {
+  if (!this._characterCollider) return;
+  this._currentOverlaps.clear();
+  physicsWorld.world.intersectionsWith(this._characterCollider, (other) => {
+    this._currentOverlaps.add(other.handle);
+    // Door sensor
+    const transitionId = this._doorSensorMap.get(other.handle);
+    if (transitionId) bus.emit('character:triggerdoor', { transitionId });
+    // Trigger volume — fire on_player_enter on first overlap
+    const volumeId = this._volumeSensorMap.get(other.handle);
+    if (volumeId && !this._activeVolumes.has(other.handle)) {
+      this._activeVolumes.add(other.handle);
+      scriptEngine.fire('on_player_enter', volumeId, {});
+    }
+  });
+  // on_player_exit — was active, no longer overlapping
+  for (const handle of this._activeVolumes) {
+    if (!this._currentOverlaps.has(handle)) {
+      this._activeVolumes.delete(handle);
+      const volumeId = this._volumeSensorMap.get(handle);
+      if (volumeId) scriptEngine.fire('on_player_exit', volumeId, {});
+    }
+  }
+}
+```
+
+---
+
+#### SpawnPointTool
+
+- Arrow + character silhouette icon in editor, invisible in preview
+- One per world — placing a new one moves the existing one
+- Stored as `worldConfig.defaultSpawn`
+- PropertiesPanel shows: position XYZ, facing (degrees), camera mode, model asset picker, move speed, jump height, FOV
+
+---
+
+#### Preview vs Start Game
 
 | | Preview | Start Game |
 |---|---|---|
-| Spawn position | Editor camera focus point | `worldConfig.defaultSpawn` |
-| Game save | Ignored | Loaded if exists, else fresh |
-| Flags | All cleared | Restored from game save |
+| Spawn position | Editor camera focus | `worldConfig.defaultSpawn` |
+| Game save | Ignored | Loaded if exists |
+| Flags | Cleared | Restored |
 | Scripts | Active | Active |
-| Purpose | Test geometry/feel quickly | Test actual game flow |
+| Purpose | Quick geometry check | Full game flow test |
 
-The Play button in the toolbar has two states:
-- Single click → **Preview** (drop at camera, no game save involvement)
-- Long press or dropdown → **Start Game** (proper spawn, load/create game save)
+Play button: single click = Preview, long press / dropdown = Start Game.
+`PreviewController.enter(mode: 'preview' | 'game')`
 
-`PreviewController.enter(mode: 'preview' | 'game')` handles both — in `'game'` mode it reads `worldConfig.defaultSpawn` for position and calls `GameStateManager.load()` before spawning the character.
+---
+
+#### PreviewHUD
+
+- Centred crosshair (FPS) or none (third-person)
+- Interact prompt: `[E] {label}` — fades in when interactable in range, fades out when not
+- Zone name toast: fades in on zone transition, fades out after 3s
+- Top-left: current zone name
+- Bottom-right: `Esc to exit`
+
+---
+
+#### New Files
+
+```
+src/
+  preview/
+    CharacterBody.ts        ← Rapier KCC wrapper
+    CharacterController.ts  ← input + camera + model + interact ray
+    TriggerSystem.ts        ← sensor overlap detection, enter/exit events
+    PreviewController.ts    ← enter/exit preview mode, pointer lock
+  ui/
+    PreviewHUD.tsx          ← crosshair, interact prompt, zone toast, Esc hint
+  editor/
+    SpawnPointTool.ts       ← place/move default spawn marker
+```
+
+---
 
 ### Phase 10.5 — Scripting / Event System
 
-Sits after preview mode (Phase 10) because scripts need a character to trigger them. Before terrain (Phase 11) because terrain zones need scripts too.
+Sits after Phase 10 because scripts need a character to trigger them.
 
-**`ScriptEngine.ts`** — runtime execution, lives in `src/scripting/`:
+---
+
+#### Trigger Volumes — Editor Experience
+
+**TriggerVolumeTool.ts** — state machine:
+
+```
+IDLE:
+  Show existing trigger volumes as amber dashed wireframe boxes
+  Label floats above each volume showing its name
+  On click (free space): record start point → enter PLACING
+
+PLACING:
+  Drag to define box footprint (XZ, same as FloorTool)
+  Scroll wheel: adjust height (default 2.5m)
+  On release: create TriggerVolume → IDLE
+
+Selected (Select tool):
+  Solid amber wireframe + resize handles (same as PlatformTool)
+  PropertiesPanel shows trigger volume properties
+```
+
+**Trigger volumes:**
+- Editor mode: amber dashed wireframe, name label floating above
+- Preview/game mode: invisible (`userData.editorOnly = true`)
+- Selected: solid amber wireframe + resize handles
+
+**Trigger volume PropertiesPanel:**
+
+```
+trigger_vol_a1b2
+TRIGGER VOLUME
+
+Name       [Entry Hall Trigger  ]
+Size       W [4.0]  H [2.5]  D [3.0]
+Position   X [0.0]  Y [0.0]  Z [0.0]
+
+SCRIPTS USING THIS VOLUME
+  on_enter: Play music            ›
+  on_exit:  Stop music            ›
+  [+ Add script using this volume]
+
+[Delete]
+```
+
+"Scripts using this volume" lists any `ScriptDef` in the zone whose trigger references this volume ID. Clicking one navigates to it in the Script Panel.
+
+---
+
+#### Script Panel — Full Spec
+
+Lives in left panel slot (`panelId === 'scripts'`). Opens via toolbar "Scripts" button or automatically when TriggerVolumeTool is active.
+
+**List view:**
+```
+┌─────────────────────────────────────┐
+│ SCRIPTS                    [+ New]  │
+├─────────────────────────────────────┤
+│ Play entry music          enabled ● │
+│ on_player_enter · 1 action      ›   │
+├─────────────────────────────────────┤
+│ Open gate when lever pulled   ● ›   │
+│ on_interact · 2 conditions · 3 acts │
+├─────────────────────────────────────┤
+│ Boss spawn                disabled  │
+│ on_flag_set · 1 action          ›   │
+└─────────────────────────────────────┘
+```
+
+**Script editor (drill-down):**
+```
+← Scripts
+Script: "Play entry music"
+
+TRIGGER
+  Type      [on_player_enter ▾]
+  Target    [Entry Hall Trigger ▾]  ← picks from trigger volumes in zone
+  Delay     [0s]
+  One-shot  [□]
+
+CONDITIONS  [+ Add]
+  (none)
+
+ACTIONS     [+ Add]
+  1  play_sound
+     Sound  [ambient_music_01 ▾]
+     [×]
+
+[Enable/Disable]  [Delete script]
+```
+
+`run_script` action shows a monospace textarea for the JS body.
+
+---
+
+#### ScriptEngine.ts
+
+Key behaviours:
+- `loadZone(zone)` called by ZoneManager on zone load
+- `fire(triggerType, targetId, context)` called by TriggerSystem, CharacterController (interact), TransitionManager
+- **Inactive in editor mode** — no triggers fire while editing
+- **Active in preview/game mode**
+- `on_game_start` fires once when `PreviewController.enter('game')` is called
+
+---
+
+#### Interact Trigger
+
+`on_interact` fires when player presses E near an object with `interactable: true`. The `targetId` is the object's `editorId`. Scripts reference it by that ID in their trigger config.
+
+---
+
+#### Action Implementations
+
+| Action | Implementation |
+|---|---|
+| `play_sound` | `bus.emit('audio:play', { id, position })` |
+| `show_dialogue` | `bus.emit('dialogue:show', { speaker, lines })` |
+| `move_object` | Find mesh by editorId, tween to target position |
+| `play_animation` | Find mixer by editorId, play named clip |
+| `spawn_npc` | `bus.emit('npc:spawn', { npcId, position })` — Phase 13 |
+| `despawn_object` | `bus.emit('object:despawn', { id })` |
+| `change_material` | `worldState.updateObject()` → ZoneManager rebuilds |
+| `open_door` | Play open animation or remove door collider |
+| `close_door` | Reverse of open_door |
+| `set_flag` | `scriptEngine.setFlag(flag)` |
+| `clear_flag` | `scriptEngine.clearFlag(flag)` |
+| `fire_event` | `scriptEngine.fire('on_flag_set', eventId, {})` |
+| `fade_screen` | `bus.emit('overlay:fade-in', { color, duration })` |
+| `teleport_player` | `bus.emit('character:teleport', { position, facing })` |
+| `show_ui` | `bus.emit('ui:show', { elementId })` |
+| `give_item` | `gameStateManager.addItem(itemId)` |
+| `run_script` | Sandboxed `new Function('ctx', body)(ctx)` |
+
+---
+
+#### New Files
+
+```
+src/
+  scripting/
+    ScriptEngine.ts         ← runtime execution, flag system
+    GameStateManager.ts     ← game save, auto-save
+  ui/
+    ScriptPanel.tsx         ← script list + editor, in left panel slot
+    DialogueOverlay.tsx     ← in-game dialogue display
+  editor/
+    TriggerVolumeTool.ts    ← place/resize trigger volumes
+```
+
+---
+
+#### Updated Bus Events
 
 ```ts
-export class ScriptEngine {
-  private _flags:      Record<string, boolean> = {};
-  private _firedOnce:  Set<string> = new Set();
-  private _scripts:    ScriptDef[] = [];
+// Phase 10
+"character:interact":       { objectId: string };
+"character:interact-range": { objectId: string; label: string } | null;
 
-  // Load scripts from active zone
-  loadZone(zone: ZoneDef): void {
-    this._scripts = zone.scripts.filter(s => s.enabled);
+// Phase 10.5
+"audio:play":               { id: string; position?: Vec3 };
+"dialogue:show":            { speaker: string; lines: string[] };
+"object:despawn":           { id: string };
+"npc:spawn":                { npcId: string; position: Vec3 };
+"ui:show":                  { elementId: string };
+  "entity:registered":        { entityType: string; caps: EntityCapabilities };  // dev/debug only
+```
+
+
+
+### Phase 10.6 — Entity Event System
+
+Sits immediately after Phase 10.5. Refactors `ScriptEngine` from a zone-level script runner into a proper entity-aware event router. No changes to the `ScriptDef` data format — scenes saved in 10.5 load correctly in 10.6. The change is entirely internal to the engine and the editor UI.
+
+---
+
+#### The Problem with 10.5's Approach
+
+In Phase 10.5, `ScriptEngine` holds a flat list of scripts from the active zone and loops through them on every `fire()` call. This works for a small zone with a handful of scripts, but:
+
+- Lookup is O(n) over all scripts every time any trigger fires
+- New entity types (NPCs, enemies, items) require special-case handling in the engine
+- The Script Panel is zone-level only — there's no way to see "what scripts affect this specific object" without reading through all of them
+- Timer triggers require polling
+- No entity knows what events it can emit or receive — action dropdowns are flat lists of all possible types regardless of what makes sense for the target
+
+---
+
+#### EntityRegistry
+
+Every entity type registers its capabilities once, at startup:
+
+```ts
+interface EntityCapabilities {
+  emits:    TriggerType[];    // events this entity type can fire
+  receives: ActionType[];     // actions this entity type can handle
+}
+
+class EntityRegistry {
+  private _caps: Map<EditorObjectType | 'player' | 'volume', EntityCapabilities> = new Map();
+
+  register(type: string, caps: EntityCapabilities): void {
+    this._caps.set(type, caps);
   }
 
-  // Called by TriggerSystem, CharacterController, NPC controllers etc.
+  emits(type: string): TriggerType[]   { return this._caps.get(type)?.emits   ?? []; }
+  receives(type: string): ActionType[] { return this._caps.get(type)?.receives ?? []; }
+}
+
+export const entityRegistry = new EntityRegistry();
+```
+
+Registrations happen in each system's `init()` — not hardcoded in the engine:
+
+```ts
+// In ObjectPlacer.init():
+entityRegistry.register('object', {
+  emits:    ['on_interact'],
+  receives: ['play_animation', 'move_object', 'change_material', 'despawn_object', 'show_dialogue'],
+});
+
+// In TransitionManager.init():
+entityRegistry.register('door', {
+  emits:    ['on_interact', 'on_open', 'on_close'],
+  receives: ['open_door', 'close_door', 'play_animation'],
+});
+
+// In CharacterController.init():
+entityRegistry.register('player', {
+  emits:    ['on_player_enter', 'on_player_exit', 'on_interact'],
+  receives: ['teleport_player', 'give_item', 'fade_screen', 'show_dialogue', 'show_ui'],
+});
+
+// In TriggerVolumeTool / TriggerSystem:
+entityRegistry.register('volume', {
+  emits:    ['on_player_enter', 'on_player_exit'],
+  receives: [],
+});
+
+// Phase 13 — NPC system registers itself:
+entityRegistry.register('npc', {
+  emits:    ['on_interact', 'on_health_zero', 'on_player_detected', 'on_dialogue_end'],
+  receives: ['spawn_npc', 'despawn_object', 'play_animation', 'show_dialogue', 'move_object'],
+});
+
+// Phase 13 — Enemy:
+entityRegistry.register('enemy', {
+  emits:    ['on_health_zero', 'on_player_detected', 'on_attack'],
+  receives: ['despawn_object', 'play_animation', 'move_object'],
+});
+```
+
+New entity types in Phase 13+ just call `entityRegistry.register()` in their own `init()`. ScriptEngine does not change.
+
+---
+
+#### ScriptEngine — Index-Based Routing
+
+Replace the flat script loop with a two-level index keyed by `(triggerType, targetId)`:
+
+```ts
+type ScriptIndex = Map<TriggerType, Map<string, ScriptDef[]>>;
+//                       ↑               ↑
+//                  trigger type     target entity ID
+
+class ScriptEngine {
+  private _index: ScriptIndex = new Map();
+  private _timers: TimerEntry[] = [];
+
+  loadZone(zone: ZoneDef): void {
+    this._index.clear();
+    this._timers = [];
+
+    for (const script of zone.scripts.filter(s => s.enabled)) {
+      // Index by trigger type + target ID
+      const { type, targetId = '*' } = script.trigger;
+      if (!this._index.has(type)) this._index.set(type, new Map());
+      const byTarget = this._index.get(type)!;
+      if (!byTarget.has(targetId)) byTarget.set(targetId, []);
+      byTarget.get(targetId)!.push(script);
+
+      // Register timer triggers
+      if (type === 'on_timer') {
+        this._timers.push({ script, elapsed: 0, interval: script.trigger.interval ?? 5 });
+      }
+    }
+  }
+
   fire(triggerType: TriggerType, targetId: string, context: Partial<ScriptContext>): void {
-    for (const script of this._scripts) {
-      if (script.trigger.type !== triggerType) continue;
-      if (script.trigger.targetId && script.trigger.targetId !== targetId) continue;
+    const byTarget = this._index.get(triggerType);
+    if (!byTarget) return;
+
+    // Scripts targeting this specific entity
+    const specific = byTarget.get(targetId) ?? [];
+    // Scripts targeting any entity of this trigger type (wildcard)
+    const wildcard = byTarget.get('*') ?? [];
+
+    for (const script of [...specific, ...wildcard]) {
       if (script.oneShot && this._firedOnce.has(script.id)) continue;
       if (!this._checkConditions(script.conditions)) continue;
-      this._executeActions(script.actions, context);
+      this._executeActions(script.actions, { ...context, objectId: targetId });
       if (script.oneShot) this._firedOnce.add(script.id);
     }
   }
 
-  // Flag accessors
-  setFlag(flag: string): void   { this._flags[flag] = true;  this._bus.emit('flag:set', { flag, value: true }); }
-  clearFlag(flag: string): void { this._flags[flag] = false; this._bus.emit('flag:set', { flag, value: false }); }
-  hasFlag(flag: string): boolean { return !!this._flags[flag]; }
-
-  // Persistence
-  exportGameSave(): Partial<GameSave> {
-    return { flags: { ...this._flags }, firedOneShots: [...this._firedOnce] };
+  update(dt: number): void {
+    // Timer triggers — priority queue would be ideal; array is fine for small counts
+    for (const entry of this._timers) {
+      entry.elapsed += dt;
+      if (entry.elapsed >= entry.interval) {
+        entry.elapsed = entry.script.trigger.repeat ? 0 : Infinity;
+        this.fire('on_timer', entry.script.id, {});
+      }
+    }
   }
-  loadGameSave(save: Partial<GameSave>): void {
-    this._flags     = save.flags      ?? {};
-    this._firedOnce = new Set(save.firedOneShots ?? []);
-  }
-
-  private _checkConditions(conditions: ScriptCondition[]): boolean { ... }
-  private _executeActions(actions: ScriptAction[], context: Partial<ScriptContext>): void { ... }
 }
 ```
 
-**JavaScript escape hatch — sandboxed execution:**
+Lookup is now O(1) for specific-target scripts, O(k) where k is the number of matching scripts — not O(n) over all scripts in the zone.
 
-When an action has `type: 'run_script'` and a `script` string:
+---
+
+#### Action Dispatch — Entity-Aware
+
+Actions are dispatched through a typed handler registry, not a switch statement:
+
 ```ts
-const fn = new Function('ctx', action.script);
-fn({
-  setFlag:        (f: string) => this.setFlag(f),
-  clearFlag:      (f: string) => this.clearFlag(f),
-  hasFlag:        (f: string) => this.hasFlag(f),
-  playSound:      (id: string) => this._bus.emit('audio:play', { id }),
-  showDialogue:   (speaker: string, lines: string[]) => this._bus.emit('dialogue:show', { speaker, lines }),
-  teleportPlayer: (pos: Vec3) => this._bus.emit('character:teleport', { position: pos, facing: 0 }),
-  despawnObject:  (id: string) => this._bus.emit('object:despawn', { id }),
-  fireEvent:      (eventId: string) => this.fire('on_flag_set', eventId, {}),
-  objectId:       context.objectId ?? '',
-  flags:          { ...this._flags },
+type ActionHandler = (action: ScriptAction, context: Partial<ScriptContext>) => void;
+
+class ActionDispatcher {
+  private _handlers: Map<ActionType, ActionHandler> = new Map();
+
+  register(type: ActionType, handler: ActionHandler): void {
+    this._handlers.set(type, handler);
+  }
+
+  dispatch(action: ScriptAction, context: Partial<ScriptContext>): void {
+    const handler = this._handlers.get(action.type);
+    if (!handler) { console.warn(`No handler for action: ${action.type}`); return; }
+    handler(action, context);
+  }
+}
+
+export const actionDispatcher = new ActionDispatcher();
+```
+
+Each system registers its own action handlers in `init()`:
+
+```ts
+// ObjectPlacer registers:
+actionDispatcher.register('play_animation', (action, ctx) => {
+  const mixer = this._mixers.get(action.targetId!);
+  if (!mixer) return;
+  const clip = this._clips.get(action.targetId!)?.get(action.animation!);
+  if (!clip) return;
+  mixer.clipAction(clip).reset().fadeIn(0.15).play();
+});
+
+actionDispatcher.register('move_object', (action, ctx) => {
+  // tween object to action.position
+});
+
+// TransitionManager registers:
+actionDispatcher.register('open_door', (action, ctx) => { ... });
+actionDispatcher.register('close_door', (action, ctx) => { ... });
+
+// CharacterController registers:
+actionDispatcher.register('teleport_player', (action, ctx) => { ... });
+actionDispatcher.register('give_item', (action, ctx) => {
+  gameStateManager.addItem(action.itemId!);
 });
 ```
 
-The script runs in a `new Function()` scope — no access to `window`, `document`, Three.js, or Rapier. Only the explicitly provided `ctx` methods. This is the intended constraint.
+ScriptEngine calls `actionDispatcher.dispatch(action, context)` — it has no knowledge of what any action does. Adding a new action type means registering a handler in the relevant system. No ScriptEngine changes ever.
 
-**Trigger volumes in editor:**
+---
 
-New `TriggerVolumeTool.ts` — places invisible box volumes in the scene:
-- Shown as dashed wireframe boxes in editor (not visible in preview)
-- Rapier sensor collider registered via `ColliderBuilder` (same as door sensors)
-- `TriggerSystem` maps collider handles to trigger volume IDs
-- When character enters/exits: `scriptEngine.fire('on_player_enter', volumeId, context)`
+#### Animation Clips — Stored at Import, Managed at Placement
 
-**Script Panel UI (`ScriptPanel.tsx`):**
-
-New panel accessible from a "Scripts" tab in the editor sidebar:
-- Lists all scripts in active zone
-- Each script: collapsible card showing trigger → conditions → actions
-- "Add script" button creates a new empty ScriptDef
-- Trigger picker: dropdown of TriggerType values
-- Condition builder: add/remove conditions, each with type + value fields
-- Action builder: add/remove actions, each with type + relevant fields
-- `run_script` action shows a small code textarea for the JS body
-- Enable/disable toggle per script
-- Scripts stored in `zone.scripts[]` in WorldState, serialised in scene file
-
-**New bus events added:**
-- `audio:play` `{ id: string }`
-- `dialogue:show` `{ speaker: string; lines: string[] }`
-- `object:despawn` `{ id: string }`
-- `flag:set` `{ flag: string; value: boolean }` (already in types)
-
-**`GameStateManager.ts`** (`src/world/`):
-
-Owns the `GameSave` — player position, flags, inventory, fired one-shots:
+**At import time** (`ModelImporterModal`):
 ```ts
-class GameStateManager {
-  save(): void   { localStorage.setItem('worldeditor_gamesave', JSON.stringify(this._buildSave())); }
-  load(): void   { const raw = localStorage.getItem('worldeditor_gamesave'); if (raw) this._applySave(JSON.parse(raw)); }
-  clear(): void  { localStorage.removeItem('worldeditor_gamesave'); }
+// After loading GLTF to generate thumbnail:
+const clips = gltf.animations.map(a => a.name);
+manifestEntry.animations = clips;   // stored in manifest.json
+```
+
+**At placement time** (`ObjectPlacer.place()`):
+```ts
+const asset = assetManager.getAsset(assetId);
+if (asset.animations?.length) {
+  const mixer = new THREE.AnimationMixer(mesh);
+  const clipMap = new Map<string, THREE.AnimationClip>();
+  gltf.animations.forEach(clip => clipMap.set(clip.name, clip));
+  this._mixers.set(editorId, mixer);
+  this._clips.set(editorId, clipMap);
 }
 ```
-Auto-saves every 30 seconds during preview mode and on every zone transition.
+
+**In ScriptEngine update loop** — `ObjectPlacer.update(dt)` calls `mixer.update(dt)` for all active mixers.
+
+**In the script action editor** — `play_animation` target picker shows objects in the zone. Once a target is selected, the clip name field becomes a dropdown populated from `assetDef.animations[]`. If the asset has no animations, the field shows "No animations available" and the action is disabled.
+
+---
+
+#### Per-Entity Scripts Tab in PropertiesPanel
+
+Every entity in the Properties Panel gets a "Scripts" drilldown screen added to its `OBJECT_SCREENS` entry:
+
+```ts
+const OBJECT_SCREENS: Record<string, ScreenId[]> = {
+  wall:     ['geo', 'mat', 'open', 'seg', 'scripts'],
+  floor:    ['mat', 'vert', 'scripts'],
+  platform: ['geo', 'mat', 'scripts'],
+  object:   ['geo', 'mat', 'scripts'],
+  door:     ['geo', 'mat', 'scripts'],
+  volume:   ['scripts'],              // trigger volumes: scripts is the main screen
+  npc:      ['geo', 'scripts'],       // Phase 13
+  enemy:    ['geo', 'scripts'],       // Phase 13
+};
+```
+
+**Scripts screen for a selected entity:**
+
+```
+← Properties
+Scripts
+SCRIPTS FOR this object
+
+  on_interact → Open gate    ›   (fires when player interacts with this object)
+  on_interact → Show hint    ›   (fires when player interacts with this object)
+  
+  [+ Add script for this object]
+
+SCRIPTS TARGETING this object
+
+  flag:gate_opened → Change material ›  (targets this object as an action target)
+
+```
+
+"Add script for this object" creates a new `ScriptDef` in `zone.scripts[]` with the trigger's `targetId` pre-filled with this entity's `editorId`, and the zone's Script Panel is opened with the new script focused.
+
+The zone-level Script Panel still exists as a global view — the per-entity Scripts tab is a filtered view of the same data.
+
+---
+
+#### What This Enables for Phase 13+
+
+When NPCs and enemies arrive, they call `entityRegistry.register('npc', caps)` and `actionDispatcher.register('...', handler)` in their own `init()`. The ScriptEngine, ActionDispatcher, PropertiesPanel Scripts tab, and Script Panel all work immediately with no changes. An NPC's `on_health_zero` trigger routes through the same index, fires the same condition checks, dispatches the same action handlers.
+
+This is the expandability guarantee — new entity types are self-contained additions, not modifications to existing systems.
+
+---
+
+#### Files Modified / Added
+
+```
+src/
+  scripting/
+    ScriptEngine.ts         ← replace flat loop with index-based routing, add update() for timers
+    ActionDispatcher.ts     ← new — typed handler registry, each system registers its own handlers
+    EntityRegistry.ts       ← new — capability registration, drives UI dropdowns
+  ui/
+    screens/
+      ScriptsScreen.tsx     ← new — per-entity Scripts tab content, used in PropertiesPanel
+```
+
+Files NOT changed: `ScriptDef`, `TriggerType`, `ActionType`, `ScriptPanel.tsx`, `TriggerVolumeTool.ts`. Data format is unchanged — existing scenes load correctly.
+
+
+
+### Phase 10.7 — Object Animation Editor
+
+Sits after Phase 10.6 (where mixers and clip discovery are built) and before Phase 11 (terrain). Adds editor-mode animation preview and auto-play configuration to placed objects that have animation clips.
+
+---
+
+#### What This Phase Adds
+
+Two things missing from the animation system after 10.6:
+
+1. **Editor-mode clip preview** — click a placed object, see its clips, hit play without entering preview mode
+2. **Auto-play configuration** — specify which clip (if any) loops automatically when the object exists in the scene
+
+---
+
+#### Animations Screen in PropertiesPanel
+
+Added to `OBJECT_SCREENS` for any object type whose asset has `animations.length > 0`:
+
+```ts
+const OBJECT_SCREENS: Record<string, ScreenId[]> = {
+  object: ['geo', 'mat', 'scripts', 'animations'],  // animations only shown if asset has clips
+  npc:    ['geo', 'scripts', 'animations'],          // Phase 13
+  enemy:  ['geo', 'scripts', 'animations'],          // Phase 13
+};
+```
+
+The `animations` screen ID is only added to the root screen's drilldown list if `assetDef.animations?.length > 0`. Objects with no clips show no Animations row.
+
+**Animations screen layout:**
+
+```
+← Properties
+Animations
+CLIPS — prop_door_01
+
+AUTO-PLAY
+  [None ▾]     ← dropdown: None / idle / open / close / shake
+
+CLIPS
+  idle         [▶ Preview]   2.4s   loop
+  open         [▶ Preview]   0.8s   once
+  close        [▶ Preview]   0.8s   once
+  shake        [▶ Preview]   1.2s   once
+```
+
+**Auto-play field:**
+- Dropdown populated from `assetDef.animations[]`
+- Default: None
+- When set: stored as `WorldObject.autoPlayAnimation: string | null`
+- When the object is placed or the scene loads, `ObjectPlacer` checks this field and starts the clip looping if set
+- Changing it in the editor takes effect immediately on the mesh in the scene
+
+**Preview buttons:**
+- Clicking `▶ Preview` on a clip plays it once on the mesh in the editor scene — no preview mode needed
+- While a clip is previewing: button changes to `■ Stop`, other clip buttons disabled
+- On completion (or Stop): mesh returns to auto-play clip if one is set, or bind pose if none
+- Only one clip previews at a time across all objects — previewing a clip on a second object stops any currently playing preview
+
+---
+
+#### WorldObject — New Field
+
+```ts
+// Addition to WorldObject in types.ts
+export interface WorldObject {
+  id:               string;
+  assetId:          string;
+  position:         Vec3;
+  rotation:         Vec3;
+  scale:            Vec3;
+  materialOverrides?: MaterialOverrides;
+  properties:       ObjectProperties;
+  autoPlayAnimation?: string | null;    // ← new — clip name or null
+}
+```
+
+---
+
+#### ObjectPlacer — Auto-Play on Load
+
+```ts
+// In ObjectPlacer.place() and ObjectPlacer.loadFromWorldState():
+if (object.autoPlayAnimation && asset.animations?.includes(object.autoPlayAnimation)) {
+  const mixer  = this._mixers.get(object.id);
+  const clipMap = this._clips.get(object.id);
+  const clip   = clipMap?.get(object.autoPlayAnimation);
+  if (mixer && clip) {
+    mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+  }
+}
+```
+
+Auto-play is active in both editor mode and preview/game mode. It is the "resting state" of the object.
+
+---
+
+#### Editor Preview — ObjectPlacer.previewClip()
+
+```ts
+previewClip(objectId: string, clipName: string): void {
+  // Stop any currently previewing clip across all objects
+  if (this._previewingId) this._stopPreview(this._previewingId);
+
+  const mixer  = this._mixers.get(objectId);
+  const clipMap = this._clips.get(objectId);
+  const clip   = clipMap?.get(clipName);
+  if (!mixer || !clip) return;
+
+  this._previewingId = objectId;
+  const action = mixer.clipAction(clip)
+    .setLoop(THREE.LoopOnce, 1)
+    .reset()
+    .play();
+  action.clampWhenFinished = true;
+
+  // On finish: restore auto-play or bind pose
+  mixer.addEventListener('finished', () => {
+    this._stopPreview(objectId);
+  });
+
+  bus.emit('animation:preview-start', { objectId, clipName });
+}
+
+private _stopPreview(objectId: string): void {
+  const mixer   = this._mixers.get(objectId);
+  const obj     = worldState.getObject(objectId);
+  if (!mixer) return;
+  mixer.stopAllAction();
+  // Restore auto-play if set
+  if (obj?.autoPlayAnimation) {
+    const clip = this._clips.get(objectId)?.get(obj.autoPlayAnimation);
+    if (clip) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+  }
+  this._previewingId = null;
+  bus.emit('animation:preview-stop', { objectId });
+}
+```
+
+---
+
+#### Manifest Migration (extends Phase 10.6 migration)
+
+Phase 10.6 adds a migration pass to discover clips for existing manifest entries. Phase 10.7 adds `autoPlayAnimation` defaulting to `null` for all existing `WorldObject` entries in scene files that predate this field. `WorldLoader._migrate()` handles this:
+
+```ts
+// In WorldLoader._migrate():
+for (const zone of file.zones ?? []) {
+  for (const obj of zone.objects ?? []) {
+    if (!('autoPlayAnimation' in obj)) {
+      (obj as any).autoPlayAnimation = null;
+    }
+  }
+}
+```
+
+---
+
+#### New Bus Events
+
+```ts
+"animation:preview-start": { objectId: string; clipName: string };
+"animation:preview-stop":  { objectId: string };
+"animation:auto-play-changed": { objectId: string; clipName: string | null };
+```
+
+---
+
+#### Files Modified
+
+```
+src/
+  ui/
+    screens/
+      AnimationsScreen.tsx    ← new — clip list, auto-play picker, preview buttons
+  preview/
+    ObjectPlacer.ts           ← add autoPlayAnimation on load, previewClip(), _stopPreview()
+  world/
+    WorldLoader.ts            ← migration for autoPlayAnimation field
+types.ts                      ← autoPlayAnimation on WorldObject
+```
+
+No changes to ScriptEngine, ActionDispatcher, or EntityRegistry.
+
 
 ### Phase 11 — Terrain
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)

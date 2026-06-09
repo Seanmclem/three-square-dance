@@ -3,6 +3,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
+import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { assetManager } from "@/core/AssetManager";
@@ -67,6 +68,12 @@ function resolveFloorMesh(floorMesh: FloorMeshDef, zone: ZoneDef): FloorMeshDef 
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
   private readonly _unsubs: Array<() => void> = [];
+
+  // Door sensor colliders for preview mode proximity detection
+  private readonly _doorSensors   = new Map<number, string>();           // handle → linkedZoneId
+  private readonly _doorColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
+
+  get doorSensorMap(): ReadonlyMap<number, string> { return this._doorSensors; }
 
   // Pending wall rebuild requests — coalesced per microtask to avoid concurrent async races
   private readonly _pendingRebuild = new Map<string, Set<string>>();
@@ -191,6 +198,19 @@ export class ZoneManager {
       }),
       this._bus.on("object:removed", ({ zoneId, id }) => {
         this._removeObject(zoneId, id);
+      }),
+      this._bus.on("object:updated", ({ id, zoneId, changes }) => {
+        if (!changes.properties) return;
+        const mesh = this._loadedZones.get(zoneId)?.objectMeshes.get(id);
+        if (!mesh) return;
+        const interactable = changes.properties.interactable;
+        const interactLabel = changes.properties.interactLabel ?? "Interact";
+        mesh.userData["interactable"] = interactable;
+        mesh.userData["interactLabel"] = interactLabel;
+        mesh.traverse(child => {
+          child.userData["interactable"] = interactable;
+          child.userData["interactLabel"] = interactLabel;
+        });
       }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
@@ -348,6 +368,8 @@ export class ZoneManager {
       floorColliders, wallData, platformEntries, stairEntries, objectMeshes,
     });
 
+    this._registerDoorSensors(zoneId);
+
     // Second pass: apply CSG cuts from any stairs with cutters
     for (const stair of zone.stairs) {
       if (stair.csgCutter) await this._rebuildOverlapping(zoneId, stair);
@@ -360,6 +382,8 @@ export class ZoneManager {
   unloadZone(zoneId: string): void {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
+
+    this._removeDoorSensors(zoneId);
 
     entry.floorColliders.forEach(c => physicsWorld.removeCollider(c));
     entry.floorColliders.clear();
@@ -552,6 +576,7 @@ export class ZoneManager {
       for (const w of run) entry.wallData.set(w.id, newEntry);
     }
 
+    this._registerDoorSensors(zoneId);
     this._applyDimming();
     for (const wallId of wallIds) this._bus.emit("wall:rebuilt", { zoneId, wallId });
   }
@@ -766,7 +791,8 @@ export class ZoneManager {
       const DEG2RAD = Math.PI / 180;
       mesh.rotation.set(obj.rotation.x * DEG2RAD, obj.rotation.y * DEG2RAD, obj.rotation.z * DEG2RAD);
       mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
-      mesh.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor };
+      mesh.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor,
+        interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact" };
       mesh.traverse(child => {
         if (child instanceof THREE.Mesh) {
           // _parentId tells SelectionManager._resolveRoot to walk up to the root group,
@@ -779,12 +805,12 @@ export class ZoneManager {
       return mesh;
     } catch (err) {
       console.warn(`ZoneManager: failed to load model for asset "${obj.assetId}"`, err);
-      // Fallback placeholder box
       const geo  = new THREE.BoxGeometry(1, 1, 1);
       const mat  = new THREE.MeshStandardMaterial({ color: 0xff6600, wireframe: true });
       const box  = new THREE.Mesh(geo, mat);
       box.position.set(obj.position.x, obj.position.y, obj.position.z);
-      box.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor, _ownsMaterial: true };
+      box.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor,
+        _ownsMaterial: true, interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact" };
       return box;
     }
   }
@@ -992,6 +1018,42 @@ export class ZoneManager {
       }
     }
     void inUse; // suppress unused warning
+  }
+
+  // ── Door sensor helpers ───────────────────────────────────────────────────
+
+  private _registerDoorSensors(zoneId: string): void {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return;
+    this._removeDoorSensors(zoneId);
+    const colliders: RAPIER.Collider[] = [];
+    for (const wall of zone.walls) {
+      const startNode = zone.nodes.find(n => n.id === wall.startNodeId);
+      const endNode   = zone.nodes.find(n => n.id === wall.endNodeId);
+      if (!startNode || !endNode) continue;
+      for (const opening of wall.openings) {
+        if (!opening.linkedZoneId) continue;
+        if (opening.type !== "door" && opening.type !== "arch") continue;
+        const c = ColliderBuilder.registerDoorSensor(
+          wall, opening, wall.elevation ?? 0,
+          { x: startNode.x, z: startNode.z },
+          { x: endNode.x, z: endNode.z },
+        );
+        this._doorSensors.set(c.handle, opening.linkedZoneId);
+        colliders.push(c);
+      }
+    }
+    if (colliders.length > 0) this._doorColliders.set(zoneId, colliders);
+  }
+
+  private _removeDoorSensors(zoneId: string): void {
+    const colliders = this._doorColliders.get(zoneId);
+    if (!colliders) return;
+    for (const c of colliders) {
+      this._doorSensors.delete(c.handle);
+      physicsWorld.removeCollider(c);
+    }
+    this._doorColliders.delete(zoneId);
   }
 
   dispose(): void {

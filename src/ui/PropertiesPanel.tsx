@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, ZoneDef, ZoneType,
+  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -242,19 +242,22 @@ function getSubtitle(screen: ScreenId, type: string): string {
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface PropertiesPanelProps {
-  activeTool:          ToolId;
-  selected:            SelectedObjectPayload | null;
-  materialList:        MaterialDef[];
-  quality:             QualityScale;
-  onObjectUpdate:      (changes: Partial<WorldObject>) => void;
-  onSegmentUpdate:     (wallId: string, changes: Partial<WallDef>) => void;
-  onMaterialsReload:   () => void;
-  onQualityChange:     (q: QualityScale) => void;
-  onCopyRunToFloor?:   (targetLevel: number) => void;
-  onFillRunWithFloor?: () => void;
-  onDelete?:           () => void;
-  zones?:              ZoneDef[];
-  activeZoneId?:       string | null;
+  activeTool:               ToolId;
+  selected:                 SelectedObjectPayload | null;
+  materialList:             MaterialDef[];
+  quality:                  QualityScale;
+  onObjectUpdate:           (changes: Partial<WorldObject>) => void;
+  onSegmentUpdate:          (wallId: string, changes: Partial<WallDef>) => void;
+  onMaterialsReload:        () => void;
+  onQualityChange:          (q: QualityScale) => void;
+  onCopyRunToFloor?:        (targetLevel: number) => void;
+  onFillRunWithFloor?:      () => void;
+  onDelete?:                () => void;
+  zones?:                   ZoneDef[];
+  activeZoneId?:            string | null;
+  playerSettings?:          PlayerSettings;
+  assets?:                  AssetDef[];
+  onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -262,7 +265,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
-  zones = [], activeZoneId,
+  zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -321,7 +324,9 @@ export function PropertiesPanel({
       {/* Scrollable body */}
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto" }}>
         {!selected ? (
-          <ToolView activeTool={activeTool} />
+          activeTool === "spawnpoint" && playerSettings && onPlayerSettingsChange
+            ? <SpawnSettingsView settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange} />
+            : <ToolView activeTool={activeTool} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -992,6 +997,32 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           setFloorLvl(n);
           onObjectUpdate({ floor: n });
         }} />
+      </div>
+      <div>
+        <div style={LABEL}>INTERACTABLE</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 4 }}>
+          <input
+            type="checkbox"
+            checked={objData?.properties.interactable ?? false}
+            onChange={e => onObjectUpdate({ properties: { ...(objData?.properties ?? { npcSpawn: false, lootTableId: null, triggerEventId: null }), interactable: e.target.checked } } as Partial<WorldObject>)}
+          />
+          <span style={{ fontSize: 10, color: "#9090a0" }}>Enable</span>
+        </label>
+        {objData?.properties.interactable && (
+          <input
+            type="text"
+            placeholder="Interact"
+            defaultValue={objData.properties.interactLabel ?? ""}
+            key={objData.id + "-label"}
+            onBlur={e => onObjectUpdate({ properties: { ...objData.properties, interactLabel: e.target.value } } as Partial<WorldObject>)}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4,
+              background: "rgba(40,40,40,0.9)", color: "#c0c0c0",
+              fontSize: 10, fontFamily: "monospace", padding: "3px 6px", outline: "none",
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -1672,6 +1703,72 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
           onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(e.target.value)); }}
           onBlur={e => flush(() => commitTile(e.target.value))}
         />
+      </div>
+    </div>
+  );
+}
+
+// ── SpawnSettingsView ─────────────────────────────────────────────────────────
+
+function SpawnSettingsView({
+  settings, assets, onChange,
+}: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void }) {
+  const numField = (label: string, key: keyof PlayerSettings, step = 0.1) => (
+    <div key={key}>
+      <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
+      <input
+        type="number" step={step}
+        defaultValue={settings[key] as number}
+        key={String(settings[key])}
+        onBlur={e => { const n = parseFloat(e.target.value); if (Number.isFinite(n)) onChange({ [key]: n }); }}
+        style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "3px 6px", outline: "none" }}
+      />
+    </div>
+  );
+
+  const modelAssets = assets.filter(a => a.category === "Characters" || a.category === "Props" || a.category === "Other");
+
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ color: "#646464", fontSize: 11, marginBottom: 2 }}>Player settings for this world.</div>
+
+      <div>
+        <div style={{ ...LABEL, marginBottom: 4 }}>CAMERA MODE</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {(["fps", "thirdperson"] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => onChange({ cameraMode: mode })}
+              style={{
+                flex: 1, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
+                fontSize: 10, fontFamily: "monospace",
+                background: settings.cameraMode === mode ? "rgba(80,140,255,0.25)" : "rgba(40,40,40,0.9)",
+                border: `1px solid ${settings.cameraMode === mode ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                color: settings.cameraMode === mode ? "#80aaff" : "#9090a0",
+              }}
+            >{mode === "fps" ? "FPS" : "3rd Person"}</button>
+          ))}
+        </div>
+      </div>
+
+      {numField("MOVE SPEED", "moveSpeed", 0.5)}
+      {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
+      {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
+      {settings.cameraMode === "thirdperson" && numField("3RD PERSON DISTANCE", "thirdPersonDistance", 0.5)}
+      {settings.cameraMode === "thirdperson" && numField("3RD PERSON HEIGHT", "thirdPersonHeight", 0.5)}
+
+      <div>
+        <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER MODEL</div>
+        <select
+          value={settings.modelAssetId ?? ""}
+          onChange={e => onChange({ modelAssetId: e.target.value || null })}
+          style={{ width: "100%", background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "4px 6px" }}
+        >
+          <option value="">None (capsule only)</option>
+          {modelAssets.map(a => (
+            <option key={a.id} value={a.id}>{a.label}</option>
+          ))}
+        </select>
       </div>
     </div>
   );

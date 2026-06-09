@@ -222,6 +222,7 @@ export interface PlayerSettings {
   fov:                 number;
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
+  modelAssetId?:       string | null;
 }
 
 export interface WorldConfig {
@@ -338,6 +339,7 @@ export interface StairDef {
 
 export interface ObjectProperties {
   interactable:   boolean;
+  interactLabel?: string;
   npcSpawn:       boolean;
   lootTableId:    string | null;
   triggerEventId: string | null;

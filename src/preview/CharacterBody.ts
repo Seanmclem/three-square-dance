@@ -41,9 +41,8 @@ export class CharacterBody {
     return new THREE.Vector3(t.x, t.y, t.z);
   }
 
-  get isGrounded(): boolean {
-    return this._kcc.computedGrounded();
-  }
+  get collider(): RAPIER.Collider { return this._collider; }
+  get isGrounded(): boolean      { return this._kcc.computedGrounded(); }
 
   dispose(): void {
     physicsWorld.world.removeCharacterController(this._kcc);

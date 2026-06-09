@@ -1,26 +1,43 @@
 import { useEffect, useRef, useState } from "react";
 import type { EventBus } from "@/core/EventBus";
 
-interface Props { bus: EventBus }
+interface Props { bus: EventBus; activeZoneName?: string }
 
-export function PreviewHUD({ bus }: Props) {
-  const [zoneName, setZoneName] = useState<string | null>(null);
+export function PreviewHUD({ bus, activeZoneName }: Props) {
+  const [zoneName,      setZoneName]      = useState<string | null>(null);
+  const [interactLabel, setInteractLabel] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const unsub = bus.on("preview:zone-entered", ({ zoneName: name }) => {
-      setZoneName(name);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setZoneName(null), 3000);
-    });
+    const unsubs = [
+      bus.on("preview:zone-entered", ({ zoneName: name }) => {
+        setZoneName(name);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => setZoneName(null), 3000);
+      }),
+      bus.on("character:interact-range", payload => {
+        setInteractLabel(payload ? payload.label : null);
+      }),
+    ];
     return () => {
-      unsub();
+      unsubs.forEach(u => u());
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [bus]);
 
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50 }}>
+
+      {/* Top-left: current zone name */}
+      {activeZoneName && (
+        <div style={{
+          position: "absolute", top: 16, left: 80,
+          color: "rgba(200,216,255,0.55)", fontSize: 11,
+          fontFamily: "monospace", letterSpacing: 1,
+        }}>
+          {activeZoneName}
+        </div>
+      )}
 
       {/* Crosshair */}
       <div style={{
@@ -37,6 +54,19 @@ export function PreviewHUD({ bus }: Props) {
           background: "rgba(255,255,255,0.75)", transform: "translateX(-50%)",
         }} />
       </div>
+
+      {/* Interact prompt */}
+      {interactLabel && (
+        <div style={{
+          position: "absolute", top: "calc(50% + 24px)", left: "50%",
+          transform: "translateX(-50%)",
+          color: "rgba(255,255,255,0.85)", fontSize: 12,
+          fontFamily: "monospace", letterSpacing: 1,
+          background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 8px",
+        }}>
+          [E] {interactLabel}
+        </div>
+      )}
 
       {/* Zone name toast */}
       {zoneName && (
