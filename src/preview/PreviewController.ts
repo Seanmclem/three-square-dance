@@ -38,7 +38,9 @@ export class PreviewController {
     let facingDeg = 0;
     if (mode === "game" && this._world.world?.defaultSpawn) {
       const s = this._world.world.defaultSpawn;
-      spawnPos = new THREE.Vector3(s.position.x, s.position.y, s.position.z);
+      // s.position is at foot/floor level; body origin is at capsule center
+      const capsuleBottom = 0.6 + 0.3; // halfHeight + radius
+      spawnPos = new THREE.Vector3(s.position.x, s.position.y + capsuleBottom, s.position.z);
       facingDeg = s.facingDeg;
     } else {
       const f = this._scene.editorCamera.focus;
