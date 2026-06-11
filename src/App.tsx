@@ -80,7 +80,7 @@ export default function App() {
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
   const [isDirty,         setIsDirty]          = useState(false);
-  const [restorePrompt,   setRestorePrompt]    = useState<{ ageMin: number; json: unknown } | null>(null);
+  const [restoredBanner,  setRestoredBanner]   = useState<{ ageMin: number } | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -174,7 +174,7 @@ export default function App() {
       localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
     }, 60_000);
 
-    // Offer to restore autosave if one exists from the last 24 hours
+    // Auto-restore autosave if one exists from the last 24 hours
     const savedJson = localStorage.getItem('worldeditor_autosave');
     const savedTs   = localStorage.getItem('worldeditor_autosave_ts');
     if (savedJson && savedTs) {
@@ -182,7 +182,8 @@ export default function App() {
       if (ageMs < 24 * 60 * 60_000) {
         try {
           const parsed = JSON.parse(savedJson);
-          setRestorePrompt({ ageMin: Math.max(1, Math.round(ageMs / 60_000)), json: parsed });
+          void handleLoadFromJSON(parsed);
+          setRestoredBanner({ ageMin: Math.max(1, Math.round(ageMs / 60_000)) });
         } catch { /* ignore corrupt autosave */ }
       } else {
         localStorage.removeItem('worldeditor_autosave');
@@ -390,19 +391,24 @@ export default function App() {
     setIsDirty(false);
   }, []);
 
-  const handleRestoreConfirm = useCallback((): void => {
-    const prompt = restorePrompt;
-    setRestorePrompt(null);
-    if (!prompt) return;
-    void handleLoadFromJSON(prompt.json);
+  const handleNew = useCallback((): void => {
+    const world = worldRef.current;
+    const zones = zonesRef.current;
+    if (!world || !zones) return;
+    for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
+    void handleLoadFromJSON({ metadata: { version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, world: {}, terrain: null, zones: [], transitions: [] });
     localStorage.removeItem('worldeditor_autosave');
     localStorage.removeItem('worldeditor_autosave_ts');
-  }, [restorePrompt, handleLoadFromJSON]);
+    setRestoredBanner(null);
+  }, [handleLoadFromJSON]);
 
-  const handleRestoreDismiss = useCallback((): void => {
-    setRestorePrompt(null);
-    localStorage.removeItem('worldeditor_autosave');
-    localStorage.removeItem('worldeditor_autosave_ts');
+  const handleRestoredDiscard = useCallback((): void => {
+    setRestoredBanner(null);
+    handleNew();
+  }, [handleNew]);
+
+  const handleRestoredDismiss = useCallback((): void => {
+    setRestoredBanner(null);
   }, []);
 
   const handlePreviewEnter = useCallback((): void => {
@@ -750,6 +756,7 @@ export default function App() {
         onSave={handleSave}
         onLoad={handleLoad}
         onLoadFSA={handleLoadFSA}
+        onNew={handleNew}
         onUndo={handleUndo}
         onRedo={handleRedo}
         canUndo={canUndo}
@@ -776,7 +783,7 @@ export default function App() {
       />
       <CoordinateDisplay coords={coords} />
 
-      {restorePrompt && (
+      {restoredBanner && (
         <div style={{
           position: "absolute", top: 56, left: "50%", transform: "translateX(-50%)",
           background: "rgba(10,14,22,0.97)", border: "1px solid rgba(255,180,60,0.4)",
@@ -785,16 +792,16 @@ export default function App() {
           boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
         }}>
           <span style={{ color: "#ffcc66", fontSize: 11 }}>
-            Unsaved work from {restorePrompt.ageMin < 60
-              ? `${restorePrompt.ageMin} min ago`
-              : `${Math.round(restorePrompt.ageMin / 60)} hr ago`}
+            Restored autosave from {restoredBanner.ageMin < 60
+              ? `${restoredBanner.ageMin} min ago`
+              : `${Math.round(restoredBanner.ageMin / 60)} hr ago`}
           </span>
           <button
-            onClick={handleRestoreConfirm}
-            style={{ background: "rgba(255,180,60,0.15)", border: "1px solid rgba(255,180,60,0.4)", borderRadius: 4, color: "#ffcc66", fontSize: 10, cursor: "pointer", padding: "3px 10px", fontFamily: "monospace" }}
-          >Restore</button>
+            onClick={handleRestoredDiscard}
+            style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#585870", fontSize: 10, cursor: "pointer", padding: "3px 10px", fontFamily: "monospace" }}
+          >Discard</button>
           <button
-            onClick={handleRestoreDismiss}
+            onClick={handleRestoredDismiss}
             style={{ background: "none", border: "none", color: "#585870", cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 }}
           >✕</button>
         </div>

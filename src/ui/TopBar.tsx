@@ -8,6 +8,7 @@ interface TopBarProps {
   onSave:          () => Promise<void>;
   onLoad:          (json: unknown) => void;
   onLoadFSA?:      () => Promise<void>;
+  onNew?:          () => void;
   onUndo:          () => void;
   onRedo:          () => void;
   canUndo:         boolean;
@@ -22,7 +23,7 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onUndo, onRedo, canUndo, canRedo, isDirty }: TopBarProps) {
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,6 +127,18 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         style={{ display: "none" }}
         onChange={handleFileChange}
       />
+      {onNew && (
+        <button
+          onClick={onNew}
+          style={{
+            padding: "4px 12px", border: "1px solid rgba(255,255,255,0.07)",
+            borderRadius: 6, background: "transparent", color: "#585870",
+            fontSize: 11, cursor: "pointer", letterSpacing: 1,
+          }}
+        >
+          New
+        </button>
+      )}
       <button
         onClick={() => void onSave()}
         style={{
