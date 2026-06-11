@@ -7,7 +7,7 @@ import type {
   PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject,
 } from "@/types";
 
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object";
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -135,7 +135,7 @@ export class GizmoManager implements IEditorModule {
 
   private _onSelect(payload: SelectedObjectPayload): void {
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object", "spawn"].includes(type)) {
       this._detach(); return;
     }
 
@@ -501,6 +501,20 @@ export class GizmoManager implements IEditorModule {
             x: obj.position.x + delta.x,
             y: obj.position.y + delta.y,
             z: obj.position.z + delta.z,
+          },
+        });
+        break;
+      }
+      case "spawn": {
+        if (delta.lengthSq() < 1e-6) break;
+        const spawn = this._worldState.world?.defaultSpawn;
+        if (!spawn) break;
+        this._worldState.setDefaultSpawn({
+          ...spawn,
+          position: {
+            x: spawn.position.x + delta.x,
+            y: spawn.position.y + delta.y,
+            z: spawn.position.z + delta.z,
           },
         });
         break;

@@ -124,6 +124,7 @@ export interface BusEvents {
   "zone:activated":        { zoneId: string };
   "zone:enter":            { zoneId: string };
   "transition:added":      { transition: TransitionDef };
+  "spawn:updated":         { position: Vec3 };
   "preview:start":         Record<string, never>;
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };

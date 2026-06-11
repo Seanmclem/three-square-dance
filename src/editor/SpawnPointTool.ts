@@ -28,9 +28,11 @@ export class SpawnPointTool {
       this._bus.on("preview:stop", () => {
         if (this._marker) this._marker.visible = true;
       }),
-      // Restore marker after scene load if a defaultSpawn was saved
-      this._bus.on("world:loaded", () => this._restoreFromWorld()),
-      this._bus.on("scene:loaded", () => this._restoreFromWorld()),
+      this._bus.on("world:loaded",   () => this._restoreFromWorld()),
+      this._bus.on("scene:loaded",   () => this._restoreFromWorld()),
+      this._bus.on("spawn:updated",  ({ position }) => {
+        if (this._marker) this._marker.position.set(position.x, position.y, position.z);
+      }),
     );
   }
 
@@ -54,6 +56,15 @@ export class SpawnPointTool {
       child.userData.selectable = true;
       child.userData.zoneId     = "";
     });
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.22, 0.38, 32),
+      new THREE.MeshBasicMaterial({ color: 0xffcc44, side: THREE.DoubleSide, opacity: 0.6, transparent: true }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
+    arrow.add(ring);
+
     this._scene.add(arrow);
     this._marker = arrow;
 

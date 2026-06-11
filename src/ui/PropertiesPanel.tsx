@@ -258,6 +258,7 @@ interface PropertiesPanelProps {
   playerSettings?:          PlayerSettings;
   assets?:                  AssetDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
+  onSpawnPositionChange?:   (pos: Vec3) => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -265,7 +266,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
-  zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange,
+  zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -324,7 +325,10 @@ export function PropertiesPanel({
       {/* Scrollable body */}
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto" }}>
         {selected?.id === "__spawn__" && playerSettings && onPlayerSettingsChange ? (
-          <SpawnSettingsView settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange} />
+          <SpawnSettingsView
+            settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange}
+            position={selected.position} onPositionChange={onSpawnPositionChange}
+          />
         ) : !selected ? (
           <ToolView activeTool={activeTool} />
         ) : isRoot ? (
@@ -1711,8 +1715,8 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
 // ── SpawnSettingsView ─────────────────────────────────────────────────────────
 
 function SpawnSettingsView({
-  settings, assets, onChange,
-}: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void }) {
+  settings, assets, onChange, position, onPositionChange,
+}: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void; position?: Vec3; onPositionChange?: (pos: Vec3) => void }) {
   const numField = (label: string, key: keyof PlayerSettings, step = 0.1) => (
     <div key={key}>
       <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
@@ -1728,8 +1732,33 @@ function SpawnSettingsView({
 
   const modelAssets = assets.filter(a => a.category === "Characters" || a.category === "Props" || a.category === "Other");
 
+  const posField = (axis: "x" | "y" | "z") => (
+    <div key={axis} style={{ flex: 1 }}>
+      <div style={{ ...LABEL, marginBottom: 2 }}>{axis.toUpperCase()}</div>
+      <input
+        type="number" step={0.5}
+        defaultValue={position ? Math.round(position[axis] * 100) / 100 : 0}
+        key={position ? Math.round(position[axis] * 100) / 100 : 0}
+        onBlur={e => {
+          const n = parseFloat(e.target.value);
+          if (!Number.isFinite(n) || !position || !onPositionChange) return;
+          onPositionChange({ ...position, [axis]: n });
+        }}
+        style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "3px 6px", outline: "none" }}
+      />
+    </div>
+  );
+
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      {position && (
+        <div>
+          <div style={{ ...LABEL, marginBottom: 4 }}>POSITION</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {posField("x")}{posField("y")}{posField("z")}
+          </div>
+        </div>
+      )}
       <div style={{ color: "#646464", fontSize: 11, marginBottom: 2 }}>Player settings for this world.</div>
 
       <div>

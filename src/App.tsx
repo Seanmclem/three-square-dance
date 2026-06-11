@@ -426,6 +426,17 @@ export default function App() {
     syncHistory();
   }, [syncHistory]);
 
+  const handleSpawnPositionChange = useCallback((pos: Vec3): void => {
+    const world = worldRef.current;
+    if (!world?.world?.defaultSpawn) return;
+    const spawn = world.world.defaultSpawn;
+    historyRef.current?.record("move spawn point", () => {
+      world.setDefaultSpawn({ ...spawn, position: pos });
+    });
+    busRef.current.emit("spawn:updated", { position: pos });
+    syncHistory();
+  }, [syncHistory]);
+
   const handleUndo = useCallback((): void => {
     historyRef.current?.undo();
     setActiveTool("select");
@@ -779,6 +790,7 @@ export default function App() {
         playerSettings={worldRef.current?.world?.playerSettings}
         assets={assets}
         onPlayerSettingsChange={handlePlayerSettingsChange}
+        onSpawnPositionChange={handleSpawnPositionChange}
       />
       <CoordinateDisplay coords={coords} />
 
