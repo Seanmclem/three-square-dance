@@ -391,8 +391,10 @@ export default function App() {
       return; // user cancelled picker — don't update state
     }
 
+    const ts = Date.now();
     localStorage.setItem('worldeditor_autosave', json);
-    localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
+    localStorage.setItem('worldeditor_autosave_ts', ts.toString());
+    setLastAutosaveAt(ts);
     setIsDirty(false);
   }, []);
 
