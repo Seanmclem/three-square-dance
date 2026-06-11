@@ -80,7 +80,6 @@ export default function App() {
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
   const [isDirty,         setIsDirty]          = useState(false);
-  const [restoredBanner,  setRestoredBanner]   = useState<{ ageMin: number } | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -183,7 +182,6 @@ export default function App() {
         try {
           const parsed = JSON.parse(savedJson);
           void handleLoadFromJSON(parsed);
-          setRestoredBanner({ ageMin: Math.max(1, Math.round(ageMs / 60_000)) });
         } catch { /* ignore corrupt autosave */ }
       } else {
         localStorage.removeItem('worldeditor_autosave');
@@ -399,17 +397,8 @@ export default function App() {
     void handleLoadFromJSON({ metadata: { version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, world: {}, terrain: null, zones: [], transitions: [] });
     localStorage.removeItem('worldeditor_autosave');
     localStorage.removeItem('worldeditor_autosave_ts');
-    setRestoredBanner(null);
   }, [handleLoadFromJSON]);
 
-  const handleRestoredDiscard = useCallback((): void => {
-    setRestoredBanner(null);
-    handleNew();
-  }, [handleNew]);
-
-  const handleRestoredDismiss = useCallback((): void => {
-    setRestoredBanner(null);
-  }, []);
 
   const handlePreviewEnter = useCallback((): void => {
     previewRef.current?.enter("preview");
@@ -783,29 +772,6 @@ export default function App() {
       />
       <CoordinateDisplay coords={coords} />
 
-      {restoredBanner && (
-        <div style={{
-          position: "absolute", top: 56, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(10,14,22,0.97)", border: "1px solid rgba(255,180,60,0.4)",
-          borderRadius: 8, padding: "10px 16px", zIndex: 30,
-          display: "flex", alignItems: "center", gap: 12,
-          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-        }}>
-          <span style={{ color: "#ffcc66", fontSize: 11 }}>
-            Restored autosave from {restoredBanner.ageMin < 60
-              ? `${restoredBanner.ageMin} min ago`
-              : `${Math.round(restoredBanner.ageMin / 60)} hr ago`}
-          </span>
-          <button
-            onClick={handleRestoredDiscard}
-            style={{ background: "none", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#585870", fontSize: 10, cursor: "pointer", padding: "3px 10px", fontFamily: "monospace" }}
-          >Discard</button>
-          <button
-            onClick={handleRestoredDismiss}
-            style={{ background: "none", border: "none", color: "#585870", cursor: "pointer", fontSize: 13, padding: "0 2px", lineHeight: 1 }}
-          >✕</button>
-        </div>
-      )}
 
       {autoFloorPrompt && (
         <div style={{
