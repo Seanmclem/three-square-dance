@@ -80,6 +80,7 @@ export default function App() {
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
   const [isDirty,         setIsDirty]          = useState(false);
+  const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
 
@@ -168,8 +169,10 @@ export default function App() {
     const writeAutosave = () => {
       if (!worldRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
+      const ts = Date.now();
       localStorage.setItem('worldeditor_autosave', json);
-      localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
+      localStorage.setItem('worldeditor_autosave_ts', ts.toString());
+      setLastAutosaveAt(ts);
     };
 
     // Autosave to localStorage every 60 seconds and on page unload
@@ -755,6 +758,7 @@ export default function App() {
         canUndo={canUndo}
         canRedo={canRedo}
         isDirty={isDirty}
+        lastAutosaveAt={lastAutosaveAt}
       />
       <PropertiesPanel
         activeTool={activeTool}

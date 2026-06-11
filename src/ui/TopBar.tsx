@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { HelpButton } from "@/ui/HelpButton";
 
 interface TopBarProps {
@@ -14,6 +14,7 @@ interface TopBarProps {
   canUndo:         boolean;
   canRedo:         boolean;
   isDirty?:        boolean;
+  lastAutosaveAt?: number | null;
 }
 
 const FLOORS = [
@@ -23,8 +24,24 @@ const FLOORS = [
   { level: 3, label: "3" },
 ];
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty }: TopBarProps) {
+function useAutosaveLabel(lastAutosaveAt: number | null | undefined): string | null {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!lastAutosaveAt) return;
+    const id = setInterval(() => setTick(t => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, [lastAutosaveAt]);
+  if (!lastAutosaveAt) return null;
+  const sec = Math.floor((Date.now() - lastAutosaveAt) / 1000);
+  if (sec < 10)  return "autosaved just now";
+  if (sec < 60)  return `autosaved ${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  return `autosaved ${min}m ago`;
+}
+
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const autosaveLabel = useAutosaveLabel(lastAutosaveAt);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,6 +78,11 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       <span style={{ color: "#80aaff", fontFamily: "monospace", fontSize: 13, letterSpacing: 2, opacity: 0.8 }}>
         SquareDance{isDirty ? <span style={{ color: "#ffcc66", marginLeft: 2 }}>*</span> : null}
       </span>
+      {autosaveLabel && (
+        <span style={{ color: "#3a3a50", fontSize: 10, fontFamily: "monospace", letterSpacing: 0.5 }}>
+          {autosaveLabel}
+        </span>
+      )}
       <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />
 
       <span style={{ color: "#7a7a7a", fontSize: 11, letterSpacing: 1 }}>FLOOR</span>
