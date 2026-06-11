@@ -165,13 +165,16 @@ export default function App() {
     // Register the demo zone so ZoneManager can rebuild floors on placement
     zones.loadZone(DEMO_ZONE_ID);
 
-    // Autosave to localStorage every 60 seconds
-    const autosaveTimer = setInterval(() => {
+    const writeAutosave = () => {
       if (!worldRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
       localStorage.setItem('worldeditor_autosave', json);
       localStorage.setItem('worldeditor_autosave_ts', Date.now().toString());
-    }, 60_000);
+    };
+
+    // Autosave to localStorage every 60 seconds and on page unload
+    const autosaveTimer = setInterval(writeAutosave, 60_000);
+    window.addEventListener('beforeunload', writeAutosave);
 
     // Auto-restore autosave if one exists from the last 24 hours
     const savedJson = localStorage.getItem('worldeditor_autosave');
@@ -221,6 +224,7 @@ export default function App() {
 
     return () => {
       clearInterval(autosaveTimer);
+      window.removeEventListener('beforeunload', writeAutosave);
       previewRef.current?.exit();
       previewRef.current  = null;
       sceneRef.current    = null;
