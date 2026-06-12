@@ -1123,7 +1123,7 @@ export class ZoneManager {
     const vol  = zone?.triggerVolumes?.find(v => v.id === volumeId);
     if (!vol) return;
     this._removeSingleVolume(zoneId, volumeId);
-    this._addTriggerVolume(zoneId, { ...vol, ...changes });
+    this._addTriggerVolume(zoneId, vol);
   }
 
   private _setVolumeHighlight(zoneId: string, activeId: string | null, mode: "hover" | "selected"): void {

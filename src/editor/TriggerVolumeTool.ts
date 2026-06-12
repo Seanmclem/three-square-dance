@@ -20,13 +20,6 @@ function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   return new THREE.LineSegments(geo, mat);
 }
 
-function hitTestVolume(pos: Vec3, vol: TriggerVolume): boolean {
-  return (
-    Math.abs(pos.x - vol.position.x) <= vol.size.x / 2 &&
-    Math.abs(pos.z - vol.position.z) <= vol.size.z / 2
-  );
-}
-
 export class TriggerVolumeTool {
   private _state:       State  = "IDLE";
   private _active       = false;
@@ -35,8 +28,10 @@ export class TriggerVolumeTool {
   private _preview:     THREE.LineSegments | null = null;
   private _activeZoneId = "demo";
   private _lastWorldPos: Vec3 = { x: 0, y: 0, z: 0 };
+  private _lastScreenPos: { x: number; y: number } = { x: 0, y: 0 };
   private _hoveredId:   string | null = null;
   private _selectedId:  string | null = null;
+  private _raycaster = new THREE.Raycaster();
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -45,6 +40,8 @@ export class TriggerVolumeTool {
     private readonly _world:   WorldState,
     private readonly _bus:     EventBus,
     private readonly _history: HistoryManager,
+    private readonly _camera:  THREE.PerspectiveCamera,
+    private readonly _canvas:  HTMLCanvasElement,
   ) {}
 
   init(): void {
@@ -61,13 +58,14 @@ export class TriggerVolumeTool {
 
       // Hover detection is always on (not gated by _active) so volumes are
       // visually responsive regardless of which tool is active.
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        this._lastWorldPos = worldPos;
+      this._bus.on("input:mousemove", ({ worldPos, screenPos }) => {
+        this._lastWorldPos  = worldPos;
+        this._lastScreenPos = screenPos;
         if (this._state === "PLACING") {
           this._updatePreview(worldPos);
           return;
         }
-        const vol = this._findVolumeAt(worldPos);
+        const vol = this._findVolumeAt(screenPos);
         const id  = vol?.id ?? null;
         if (id !== this._hoveredId) {
           this._hoveredId = id;
@@ -92,7 +90,7 @@ export class TriggerVolumeTool {
       // (which deselects on empty-space clicks via the same event).
       this._bus.on("input:click", ({ button }) => {
         if (button !== 0 || this._state === "PLACING") return;
-        const vol = this._findVolumeAt(this._lastWorldPos);
+        const vol = this._findVolumeAt(this._lastScreenPos);
         if (vol) {
           this._selectedId = vol.id;
           this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: vol.id });
@@ -151,9 +149,22 @@ export class TriggerVolumeTool {
     );
   }
 
-  private _findVolumeAt(worldPos: Vec3): TriggerVolume | undefined {
+  private _findVolumeAt(screenPos: { x: number; y: number }): TriggerVolume | undefined {
     const zone = this._world.zones.get(this._activeZoneId);
-    return zone?.triggerVolumes?.find(v => hitTestVolume(worldPos, v));
+    if (!zone?.triggerVolumes?.length) return undefined;
+    const rect  = this._canvas.getBoundingClientRect();
+    const ndcX  =  ((screenPos.x - rect.left) / rect.width)  * 2 - 1;
+    const ndcY  = -((screenPos.y - rect.top)  / rect.height) * 2 + 1;
+    this._raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this._camera);
+    const target = new THREE.Vector3();
+    for (const vol of zone.triggerVolumes) {
+      const box = new THREE.Box3(
+        new THREE.Vector3(vol.position.x - vol.size.x / 2, vol.position.y,                vol.position.z - vol.size.z / 2),
+        new THREE.Vector3(vol.position.x + vol.size.x / 2, vol.position.y + vol.size.y,  vol.position.z + vol.size.z / 2),
+      );
+      if (this._raycaster.ray.intersectBox(box, target)) return vol;
+    }
+    return undefined;
   }
 
   private _clearHover(): void {

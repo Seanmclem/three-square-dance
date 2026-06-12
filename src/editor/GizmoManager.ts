@@ -4,10 +4,10 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, SelectedObjectPayload,
-  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject,
+  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume,
 } from "@/types";
 
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn";
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -101,6 +101,9 @@ export class GizmoManager implements IEditorModule {
       this._bus.on("floor:rebuilt", ({ zoneId, floorId }) => {
         if (floorId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
       }),
+      this._bus.on("triggervolume:updated", ({ zoneId, id }) => {
+        if (id === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+      }),
 
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._controls || this._selId === null) return;
@@ -135,7 +138,7 @@ export class GizmoManager implements IEditorModule {
 
   private _onSelect(payload: SelectedObjectPayload): void {
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object", "spawn"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume"].includes(type)) {
       this._detach(); return;
     }
 
@@ -210,6 +213,13 @@ export class GizmoManager implements IEditorModule {
             pz = zone.bounds.z + zone.bounds.depth  / 2;
           }
         }
+      }
+    } else if (type === "trigger-volume") {
+      const vol = payload.data as TriggerVolume | null;
+      if (vol) {
+        px = vol.position.x;
+        py = vol.position.y + vol.size.y / 2;
+        pz = vol.position.z;
       }
     }
 
@@ -355,6 +365,14 @@ export class GizmoManager implements IEditorModule {
           Math.max(stair.start.y, stair.end.y) + 0.3,
           (stair.start.z + stair.end.z) / 2,
         );
+        this._pivot.rotation.set(0, 0, 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
+    } else if (type === "trigger-volume") {
+      const zone = this._worldState.zones.get(this._selZoneId!);
+      const vol  = zone?.triggerVolumes?.find(v => v.id === this._selId);
+      if (vol) {
+        this._pivot.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
         this._pivot.rotation.set(0, 0, 0);
         this._pivotStart.copy(this._pivot.position);
       }
@@ -565,6 +583,20 @@ export class GizmoManager implements IEditorModule {
             }
           }
         }
+        break;
+      }
+      case "trigger-volume": {
+        if (delta.lengthSq() < 1e-6) break;
+        const zone = this._worldState.zones.get(this._selZoneId!);
+        const vol  = zone?.triggerVolumes?.find(v => v.id === this._selId) as TriggerVolume | undefined;
+        if (!vol) break;
+        this._worldState.updateTriggerVolume(this._selZoneId!, this._selId!, {
+          position: {
+            x: vol.position.x + delta.x,
+            y: vol.position.y + delta.y,
+            z: vol.position.z + delta.z,
+          },
+        });
         break;
       }
     }

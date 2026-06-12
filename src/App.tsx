@@ -146,7 +146,7 @@ export default function App() {
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
     const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
-    const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history);
+    const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
     const scriptEngine    = new ScriptEngine(bus, world);
     scriptEngineRef.current = scriptEngine;
 
