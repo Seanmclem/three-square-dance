@@ -1,21 +1,23 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 
 export class PhysicsWorld {
-  private _world!: RAPIER.World;
-  private _initialized  = false;
-  private _initializing = false;
-  public  debugDraw     = false;
+  private _world!:       RAPIER.World;
+  private _initialized = false;
+  private _initPromise: Promise<void> | null = null;
+  public  debugDraw    = false;
 
   async init(): Promise<void> {
-    // If already initialized or init is in-flight (Strict Mode double-call), skip.
-    // The in-flight init will complete and leave _initialized = true for the active RAF.
-    if (this._initialized || this._initializing) return;
-    this._initializing = true;
-    // Pass empty object to satisfy rapier 0.19 new init() signature (no-arg form is deprecated)
-    await (RAPIER.init as (opts?: object) => Promise<void>)({});
-    this._world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
-    this._initialized  = true;
-    this._initializing = false;
+    if (this._initialized) return;
+    // Return the in-flight Promise so concurrent callers (React StrictMode double-mount)
+    // wait for the real WASM load rather than continuing with a null _world.
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      // Pass empty object to satisfy rapier 0.19 new init() signature (no-arg form is deprecated)
+      await (RAPIER.init as (opts?: object) => Promise<void>)({});
+      this._world       = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+      this._initialized = true;
+    })();
+    return this._initPromise;
   }
 
   get world(): RAPIER.World     { return this._world; }
@@ -44,10 +46,11 @@ export class PhysicsWorld {
   dispose(): void {
     if (this._initialized) {
       this._world.free();
-      this._initialized  = false;
-      // Leave _initializing alone — if a concurrent init() is in flight, let it finish
-      // (it will find _initialized = false and re-create the world for the next mount).
+      this._initialized = false;
+      this._initPromise = null;  // allow re-init after a real dispose
     }
+    // If init is still in-flight (_initPromise set but _initialized still false),
+    // leave _initPromise alone so the next mount's init() awaits the same Promise.
   }
 }
 

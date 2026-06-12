@@ -33,6 +33,7 @@ import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, F
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
+import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
 const DEMO_ZONE_ID = "demo";
 
@@ -82,7 +83,8 @@ export default function App() {
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
-  const fileHandleRef = useRef<FileSystemFileHandle | null>(null);
+  const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
+  const restoringRef   = useRef(false);
 
   const syncHistory = useCallback((): void => {
     const hu = historyRef.current?.canUndo ?? false;
@@ -100,7 +102,10 @@ export default function App() {
     const scene     = new SceneManager(canvas, bus);
     sceneRef.current = scene;
     assetManager.init(scene.renderer);
-    assetManager.initMaterials().then(mats => {
+    // Store the promise so the init IIFE can await it before building geometry.
+    // initMaterials() races against physicsWorld.init() (WASM instantiation) and can
+    // lose, leaving _materialRegistry empty when WallBuilder.build calls getMaterial().
+    const materialsReady = assetManager.initMaterials().then(mats => {
       setMaterialList(mats);
       bus.emit("materials:loaded", { materials: mats });
     }).catch(err => console.error("initMaterials failed:", err));
@@ -163,11 +168,8 @@ export default function App() {
     zoneTool.init();
     spawnPointTool.init();
 
-    // Register the demo zone so ZoneManager can rebuild floors on placement
-    zones.loadZone(DEMO_ZONE_ID);
-
     const writeAutosave = () => {
-      if (!worldRef.current) return;
+      if (!worldRef.current || restoringRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
       const ts = Date.now();
       localStorage.setItem('worldeditor_autosave', json);
@@ -179,21 +181,51 @@ export default function App() {
     const autosaveTimer = setInterval(writeAutosave, 60_000);
     window.addEventListener('beforeunload', writeAutosave);
 
-    // Auto-restore autosave if one exists from the last 24 hours
-    const savedJson = localStorage.getItem('worldeditor_autosave');
-    const savedTs   = localStorage.getItem('worldeditor_autosave_ts');
-    if (savedJson && savedTs) {
-      const ageMs = Date.now() - parseInt(savedTs, 10);
-      if (ageMs < 24 * 60 * 60_000) {
-        try {
-          const parsed = JSON.parse(savedJson);
-          void handleLoadFromJSON(parsed);
-        } catch { /* ignore corrupt autosave */ }
-      } else {
-        localStorage.removeItem('worldeditor_autosave');
-        localStorage.removeItem('worldeditor_autosave_ts');
+    // active flag: set to false in cleanup so StrictMode's first-mount IIFE exits after
+    // its first await rather than racing the second-mount IIFE on shared singletons.
+    let active = true;
+
+    // Sequenced init: restore autosave first; fall back to demo zone if nothing to restore.
+    // Using an async IIFE so we never run both loadZone(DEMO) and handleLoadFromJSON concurrently
+    // (concurrent loads hit a ZoneManager._loadedZones guard race that silently drops geometry).
+    void (async () => {
+      // Wait for physics (WASM) and material registry together. physicsWorld.init() wins the
+      // race against initMaterials() on fast hardware, leaving _materialRegistry empty when
+      // WallBuilder.build first calls getMaterial() — walls render gray. Awaiting both fixes it.
+      await Promise.all([physicsWorld.init(), materialsReady]);
+      if (!active) return; // StrictMode first mount: cleanup already fired, bail out
+
+      const savedJson = localStorage.getItem('worldeditor_autosave');
+      const savedTs   = localStorage.getItem('worldeditor_autosave_ts');
+      let restored = false;
+
+      if (savedJson && savedTs) {
+        const ageMs = Date.now() - parseInt(savedTs, 10);
+        if (ageMs < 24 * 60 * 60_000) {
+          try {
+            restoringRef.current = true;
+            await handleLoadFromJSON(JSON.parse(savedJson));
+            restored = true;
+          } catch { /* corrupt autosave — fall through to demo zone */ } finally {
+            restoringRef.current = false;
+          }
+        } else {
+          localStorage.removeItem('worldeditor_autosave');
+          localStorage.removeItem('worldeditor_autosave_ts');
+        }
       }
-    }
+
+      if (!restored) await zones.loadZone(DEMO_ZONE_ID);
+
+      // After loading, try to recover the last file handle so Ctrl+S saves in-place
+      try {
+        const storedHandle = await idbGet<FileSystemFileHandle>('lastFileHandle');
+        if (storedHandle && fileHandleRef.current === null) {
+          const perm = await (storedHandle as FileSystemFileHandle & { queryPermission(d: { mode: string }): Promise<PermissionState> }).queryPermission({ mode: 'readwrite' });
+          if (perm === 'granted') fileHandleRef.current = storedHandle;
+        }
+      } catch { /* IDB or FSA not available */ }
+    })();
 
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
@@ -222,10 +254,8 @@ export default function App() {
       bus.on("zonetool:awaiting-name", ({ bounds }) => setPendingZone(bounds)),
     ];
 
-    // Init physics async — not blocking render
-    physicsWorld.init().catch(err => console.error("PhysicsWorld init failed:", err));
-
     return () => {
+      active = false; // tell in-flight IIFE this mount is stale
       clearInterval(autosaveTimer);
       window.removeEventListener('beforeunload', writeAutosave);
       previewRef.current?.exit();
@@ -391,6 +421,8 @@ export default function App() {
       return; // user cancelled picker — don't update state
     }
 
+    if (fileHandleRef.current) void idbSet('lastFileHandle', fileHandleRef.current);
+
     const ts = Date.now();
     localStorage.setItem('worldeditor_autosave', json);
     localStorage.setItem('worldeditor_autosave_ts', ts.toString());
@@ -399,13 +431,22 @@ export default function App() {
   }, []);
 
   const handleNew = useCallback((): void => {
-    const world = worldRef.current;
-    const zones = zonesRef.current;
-    if (!world || !zones) return;
-    for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
-    void handleLoadFromJSON({ metadata: { version: 1, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, world: {}, terrain: null, zones: [], transitions: [] });
     localStorage.removeItem('worldeditor_autosave');
     localStorage.removeItem('worldeditor_autosave_ts');
+    const freshScene: SceneFile = {
+      metadata: { name: "New World", version: "1.0", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() },
+      world: {
+        size: { width: 200, depth: 200 },
+        ambientLight: { color: "#aabbcc", intensity: 1.2 },
+        sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
+        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
+      },
+      terrain: null,
+      zones: [createDemoZone()],
+      transitions: [],
+    };
+    void handleLoadFromJSON(freshScene);
   }, [handleLoadFromJSON]);
 
 
