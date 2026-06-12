@@ -50,11 +50,13 @@ export class SpawnPointTool {
     const arrow  = new THREE.ArrowHelper(dir, origin, 1.8, 0xffcc44, 0.55, 0.28);
     arrow.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
     arrow.traverse(child => {
+      if (child === arrow) return;
       child.userData.editorOnly = true;
       child.userData.editorId   = "__spawn__";
       child.userData.editorType = "spawn";
       child.userData.selectable = true;
       child.userData.zoneId     = "";
+      child.userData._parentId  = "__spawn__";
     });
 
     const ring = new THREE.Mesh(
@@ -62,7 +64,7 @@ export class SpawnPointTool {
       new THREE.MeshBasicMaterial({ color: 0xffcc44, side: THREE.DoubleSide, opacity: 0.6, transparent: true }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
+    ring.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "", _parentId: "__spawn__" };
     arrow.add(ring);
 
     this._scene.add(arrow);
