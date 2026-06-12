@@ -689,6 +689,8 @@ export default function App() {
       world.removeStair(zoneId, id);
     } else if (type === "object") {
       world.removeObject(zoneId, id);
+    } else if (type === "trigger-volume") {
+      world.removeTriggerVolume(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);

@@ -186,7 +186,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
 }
 

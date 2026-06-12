@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef,
+  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -232,6 +232,7 @@ function objectTypeLabel(selected: SelectedObjectPayload): string {
     const d = selected.data as Opening | null;
     return `${(d?.type ?? "").toUpperCase()} OPENING`;
   }
+  if (type === "trigger-volume") return "TRIGGER VOLUME";
   return type.toUpperCase();
 }
 
@@ -332,6 +333,8 @@ export function PropertiesPanel({
           />
         ) : !selected ? (
           <ToolView activeTool={activeTool} />
+        ) : selected.type === "trigger-volume" ? (
+          <TriggerVolumeView selected={selected} onDelete={onDelete} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -1800,6 +1803,56 @@ function SpawnSettingsView({
           ))}
         </select>
       </div>
+    </div>
+  );
+}
+
+// ── TriggerVolumeView ─────────────────────────────────────────────────────────
+
+function TriggerVolumeView({ selected, onDelete }: { selected: SelectedObjectPayload; onDelete?: () => void }) {
+  const vol = selected.data as TriggerVolume | null;
+  if (!vol) return null;
+  const fmt = (n: number) => n.toFixed(2);
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div>
+        <div style={LABEL}>LABEL</div>
+        <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>{vol.label}</div>
+      </div>
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 12 }}>
+          {(["x", "y", "z"] as const).map((axis, i) => (
+            <div key={axis} style={{ flex: 1 }}>
+              <div style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i]!, fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{axis.toUpperCase()}</div>
+              <div style={{ ...NUM_INPUT, color: "#909090" }}>{fmt(vol.position[axis])}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={LABEL}>SIZE</div>
+        <div style={{ display: "flex", gap: 12 }}>
+          {([["x","W"],["y","H"],["z","D"]] as const).map(([axis, lbl]) => (
+            <div key={axis} style={{ flex: 1 }}>
+              <div style={{ color: "#666", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
+              <div style={{ ...NUM_INPUT, color: "#909090" }}>{fmt(vol.size[axis])}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          style={{
+            marginTop: 4, padding: "6px 0", width: "100%",
+            background: "rgba(200,60,60,0.12)", border: "1px solid rgba(200,60,60,0.3)",
+            borderRadius: 5, color: "#cc6666", fontSize: 11, cursor: "pointer", fontFamily: "monospace",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(200,60,60,0.22)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(200,60,60,0.12)"; }}
+        >Delete Volume</button>
+      )}
     </div>
   );
 }
