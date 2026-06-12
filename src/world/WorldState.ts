@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening, SpawnDef,
+  SceneFile, Opening, SpawnDef, TriggerVolume,
 } from "@/types";
 
 export class WorldState {
@@ -231,6 +231,31 @@ export class WorldState {
       };
     }
     this.world.defaultSpawn = spawn;
+  }
+
+  // ─── Trigger volume mutations ─────────────────────────────────────────────
+
+  addTriggerVolume(zoneId: string, volume: TriggerVolume): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.triggerVolumes) zone.triggerVolumes = [];
+    zone.triggerVolumes.push(volume);
+    this._bus.emit("triggervolume:added", { zoneId, volume });
+  }
+
+  updateTriggerVolume(zoneId: string, id: string, changes: Partial<TriggerVolume>): void {
+    const zone   = this.zones.get(zoneId);
+    const volume = zone?.triggerVolumes?.find(v => v.id === id);
+    if (!volume) return;
+    Object.assign(volume, changes);
+    this._bus.emit("triggervolume:updated", { zoneId, id, changes });
+  }
+
+  removeTriggerVolume(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    zone.triggerVolumes = (zone.triggerVolumes ?? []).filter(v => v.id !== id);
+    this._bus.emit("triggervolume:removed", { zoneId, id });
   }
 
   // ─── Transition mutations ─────────────────────────────────────────────────

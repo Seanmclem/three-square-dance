@@ -1,32 +1,34 @@
 import { useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconTriggerVolume } from "@/ui/icons";
 
 interface ToolDef { id: ToolId; label: string; shortcut: string }
 
 const TOOLS: ToolDef[] = [
-  { id: "select",     label: "Select",   shortcut: "V" },
-  { id: "floor",      label: "Floor",    shortcut: "F" },
-  { id: "poly-floor", label: "Poly Flr", shortcut: "P" },
-  { id: "wall",       label: "Wall",     shortcut: "W" },
+  { id: "select",          label: "Select",   shortcut: "V" },
+  { id: "floor",           label: "Floor",    shortcut: "F" },
+  { id: "poly-floor",      label: "Poly Flr", shortcut: "P" },
+  { id: "wall",            label: "Wall",     shortcut: "W" },
   { id: "platform",        label: "Platform", shortcut: "L" },
   { id: "poly-platform",   label: "Poly Plat", shortcut: "K" },
   { id: "stair",           label: "Stair",     shortcut: "T" },
-  { id: "object",     label: "Object",   shortcut: "O" },
-  { id: "zone",       label: "Zone",     shortcut: "Z" },
-  { id: "spawnpoint", label: "Spawn",    shortcut: "N" },
+  { id: "object",          label: "Object",   shortcut: "O" },
+  { id: "zone",            label: "Zone",     shortcut: "Z" },
+  { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
+  { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
 ];
 
 interface ToolbarProps {
   activeTool:    ToolId;
   openPanel:     LeftPanelId;
   onToolSelect:  (tool: ToolId) => void;
+  onPanelToggle: (panelId: LeftPanelId) => void;
   onPreview?:    () => void;
   onStartGame?:  () => void;
   isPreview?:    boolean;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, onStartGame, isPreview }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onStartGame, isPreview }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
   return (
     <div style={{
@@ -39,8 +41,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, onStar
 
       {TOOLS.map(tool => {
         const active = activeTool === tool.id
-          || (tool.id === "zone"   && openPanel === "zones")
-          || (tool.id === "object" && openPanel === "assets");
+          || (tool.id === "zone"            && openPanel === "zones")
+          || (tool.id === "object"          && openPanel === "assets")
+          || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
         const Icon = TOOL_ICONS[tool.id];
         const color = active ? "#80aaff" : "#7a7a7a";
         return (
@@ -68,6 +71,34 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPreview, onStar
       })}
 
       <div style={{ flex: 1 }} />
+
+      {/* Scripts panel button */}
+      {(() => {
+        const scriptsActive = openPanel === "scripts";
+        return (
+          <button
+            title="Scripts (S)"
+            onClick={() => onPanelToggle(scriptsActive ? null : "scripts")}
+            style={{
+              width: 48, height: 36, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: scriptsActive ? "rgba(255,170,0,0.2)" : "transparent",
+              outline: scriptsActive ? "1px solid rgba(255,170,0,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!scriptsActive) e.currentTarget.style.background = "rgba(255,170,0,0.08)"; }}
+            onMouseLeave={e => { if (!scriptsActive) e.currentTarget.style.background = "transparent"; }}
+          >
+            <IconTriggerVolume color={scriptsActive ? "#ffaa00" : "#7a7a7a"} />
+            <span style={{ fontSize: 7, letterSpacing: 0.8, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
+                           opacity: 0.85, fontFamily: "monospace" }}>
+              SCR
+            </span>
+          </button>
+        );
+      })()}
+
       <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 
       {/* Play row: Preview button + dropdown caret */}

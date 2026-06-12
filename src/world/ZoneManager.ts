@@ -9,7 +9,7 @@ import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject, TriggerVolume } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -73,7 +73,13 @@ export class ZoneManager {
   private readonly _doorSensors   = new Map<number, string>();           // handle → linkedZoneId
   private readonly _doorColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
 
-  get doorSensorMap(): ReadonlyMap<number, string> { return this._doorSensors; }
+  // Trigger volume sensors
+  private readonly _volumeSensors   = new Map<number, string>();           // handle → volumeId
+  private readonly _volumeColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
+  private readonly _volumeMeshes    = new Map<string, THREE.LineSegments[]>(); // zoneId → wireframes
+
+  get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
+  get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
 
   // Pending wall rebuild requests — coalesced per microtask to avoid concurrent async races
   private readonly _pendingRebuild = new Map<string, Set<string>>();
@@ -211,6 +217,15 @@ export class ZoneManager {
           child.userData["interactable"] = interactable;
           child.userData["interactLabel"] = interactLabel;
         });
+      }),
+      this._bus.on("triggervolume:added", ({ zoneId, volume }) => {
+        this._addTriggerVolume(zoneId, volume);
+      }),
+      this._bus.on("triggervolume:updated", ({ zoneId, id, changes }) => {
+        this._updateTriggerVolume(zoneId, id, changes);
+      }),
+      this._bus.on("triggervolume:removed", ({ zoneId, id }) => {
+        this._removeSingleVolume(zoneId, id);
       }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
@@ -369,6 +384,7 @@ export class ZoneManager {
     });
 
     this._registerDoorSensors(zoneId);
+    this._buildTriggerVolumes(zoneId, zone, group);
 
     // Second pass: apply CSG cuts from any stairs with cutters
     for (const stair of zone.stairs) {
@@ -384,6 +400,7 @@ export class ZoneManager {
     if (!entry) return;
 
     this._removeDoorSensors(zoneId);
+    this._removeTriggerVolumes(zoneId);
 
     entry.floorColliders.forEach(c => physicsWorld.removeCollider(c));
     entry.floorColliders.clear();
@@ -1018,6 +1035,93 @@ export class ZoneManager {
       }
     }
     void inUse; // suppress unused warning
+  }
+
+  // ── Trigger volume helpers ────────────────────────────────────────────────
+
+  private _buildTriggerVolumes(zoneId: string, zone: ZoneDef, group: THREE.Group): void {
+    for (const vol of zone.triggerVolumes ?? []) {
+      this._buildVolumeMesh(zoneId, vol, group);
+      this._buildVolumeCollider(zoneId, vol);
+    }
+  }
+
+  private _buildVolumeMesh(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
+    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z));
+    const mat = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
+    const wire = new THREE.LineSegments(geo, mat);
+    wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false };
+    group.add(wire);
+    const arr = this._volumeMeshes.get(zoneId) ?? [];
+    arr.push(wire);
+    this._volumeMeshes.set(zoneId, arr);
+  }
+
+  private _buildVolumeCollider(zoneId: string, vol: TriggerVolume): void {
+    const collider = ColliderBuilder.registerVolumeSensor(vol);
+    this._volumeSensors.set(collider.handle, vol.id);
+    const arr = this._volumeColliders.get(zoneId) ?? [];
+    arr.push(collider);
+    this._volumeColliders.set(zoneId, arr);
+  }
+
+  private _removeTriggerVolumes(zoneId: string): void {
+    const colliders = this._volumeColliders.get(zoneId);
+    if (colliders) {
+      for (const c of colliders) {
+        this._volumeSensors.delete(c.handle);
+        physicsWorld.removeCollider(c);
+      }
+      this._volumeColliders.delete(zoneId);
+    }
+    const meshes = this._volumeMeshes.get(zoneId);
+    if (meshes) {
+      for (const m of meshes) {
+        m.parent?.remove(m);
+        m.geometry.dispose();
+        (m.material as THREE.Material).dispose();
+      }
+      this._volumeMeshes.delete(zoneId);
+    }
+  }
+
+  private _removeSingleVolume(zoneId: string, volumeId: string): void {
+    // Remove wireframe
+    const meshArr = this._volumeMeshes.get(zoneId) ?? [];
+    const idx = meshArr.findIndex(m => m.userData["editorId"] === volumeId);
+    if (idx !== -1) {
+      const m = meshArr[idx]!;
+      m.parent?.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+      meshArr.splice(idx, 1);
+    }
+    // Remove collider
+    const colArr = this._volumeColliders.get(zoneId) ?? [];
+    const cIdx = colArr.findIndex(c => this._volumeSensors.get(c.handle) === volumeId);
+    if (cIdx !== -1) {
+      const c = colArr[cIdx]!;
+      this._volumeSensors.delete(c.handle);
+      physicsWorld.removeCollider(c);
+      colArr.splice(cIdx, 1);
+    }
+  }
+
+  private _addTriggerVolume(zoneId: string, vol: TriggerVolume): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    this._buildVolumeMesh(zoneId, vol, entry.group);
+    this._buildVolumeCollider(zoneId, vol);
+  }
+
+  private _updateTriggerVolume(zoneId: string, volumeId: string, changes: Partial<TriggerVolume>): void {
+    // Rebuild mesh: remove + re-add with updated data
+    const zone = this._worldState.zones.get(zoneId);
+    const vol  = zone?.triggerVolumes?.find(v => v.id === volumeId);
+    if (!vol) return;
+    this._removeSingleVolume(zoneId, volumeId);
+    this._addTriggerVolume(zoneId, { ...vol, ...changes });
   }
 
   // ── Door sensor helpers ───────────────────────────────────────────────────

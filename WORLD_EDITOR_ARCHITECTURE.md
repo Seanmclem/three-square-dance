@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.1.0** — last updated 2026-06-03
+**Version 3.5.0** — last updated 2026-06-11
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -26,6 +26,10 @@
 - v2.9 — Phase 10 & 10.5 rewritten into uploaded doc: character model option, capsule-only mode, interact system, trigger volume editor, Script Panel full spec, all action implementations
 - v3.0 — Phase 10.6 added: EntityRegistry, index-based ScriptEngine, ActionDispatcher, animation clip discovery, per-entity Scripts tab in PropertiesPanel
 - v3.1 — Phase 10.7 added: Animations tab in PropertiesPanel, editor-mode clip preview, auto-play animation on placed objects, WorldObject.autoPlayAnimation field
+- v3.2 — Phase 12 updated: Brush primitive stub with local-space architecture requirement and world-space anti-pattern warning
+- v3.3 — Phase 10.8 added: world-space UV generation, UVUtils.ts, consistent texture density across all builders, uvVersion migration
+- v3.4 — Three-level script architecture: object scripts on WorldObject, zone scripts on ZoneDef, world scripts on WorldConfig. ScriptEngine manages all three independently. Script Panel has World/Zone/Object tabs.
+- v3.5 — **Phase 10.5 implemented:** ScriptEngine, GameStateManager, TriggerVolumeTool, ScriptPanel, DialogueOverlay, TriggerSystem volume sensors, ZoneManager volume wireframes + colliders, ColliderBuilder.registerVolumeSensor(), WorldState triggerVolume mutations, App.tsx fully wired.
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
 
 ---
@@ -196,6 +200,7 @@ export interface SceneMetadata {
   author:       string;
   created:      string;
   lastModified: string;
+  uvVersion?:   number;   // 1 = world-space UVs (Phase 10.8+), absent = legacy tileScale behaviour
 }
 
 export interface PlayerSettings {
@@ -365,6 +370,7 @@ export interface WorldObject {
   zoneId?:             string;
   properties:          ObjectProperties;
   autoPlayAnimation?:  string | null;    // clip name to loop on load, null = none
+  scripts:             ScriptDef[];      // scripts that belong to this object — loaded/unloaded with it
 }
 
 export interface ZoneDef {
@@ -491,6 +497,8 @@ export interface MaterialOverrides {
   tileScale?:         number;
   tileScaleX?:        number;   // per-axis override (overrides tileScale)
   tileScaleY?:        number;
+  offsetX?:           number;   // UV offset U axis (0.0–1.0, wraps) — shifts all maps together
+  offsetY?:           number;   // UV offset V axis (0.0–1.0, wraps) — shifts all maps together
   roughnessVal?:      number;
   displacementScale?: number;
 }
@@ -747,14 +755,16 @@ world-editor/
 │   │   ├── StairTool.ts
 │   │   ├── ObjectTool.ts
 │   │   ├── ZoneTool.ts
+│   │   ├── SpawnPointTool.ts
+│   │   ├── TriggerVolumeTool.ts    ← amber wireframe drag-to-size, IDLE→PLACING state machine
 │   │   └── TransitionTool.ts
 │   ├── physics/
 │   │   ├── PhysicsWorld.ts         ← Rapier world singleton, step loop, debug draw
 │   │   ├── ColliderBuilder.ts      ← mesh → Rapier collider (called by every builder)
 │   │   └── CharacterBody.ts        ← Rapier KinematicCharacterController wrapper
 │   ├── scripting/
-│   │   ├── ScriptEngine.ts         ← Runtime script execution, flag system
-│   │   └── GameStateManager.ts     ← GameSave persistence, auto-save
+│   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch, flag system
+│   │   └── GameStateManager.ts     ← Item inventory singleton (give_item / player_has_item)
 │   ├── preview/
 │   │   ├── PreviewController.ts
 │   │   ├── CharacterController.ts  ← input + camera; delegates physics to CharacterBody
@@ -766,6 +776,8 @@ world-editor/
 │   │   ├── FloorLevelSelector.tsx
 │   │   ├── ZonePanel.tsx
 │   │   ├── AssetBrowser.tsx
+│   │   ├── ScriptPanel.tsx         ← World/Zone/Object tabs, script list + editor drill-down
+│   │   ├── DialogueOverlay.tsx     ← in-game dialogue bar (speaker + lines, E to advance)
 │   │   ├── SaveLoadPanel.tsx
 │   │   └── PreviewHUD.tsx
 │   ├── assets/
@@ -4896,6 +4908,7 @@ src/
 
 ---
 
+
 ### Phase 10.5 — Scripting / Event System
 
 Sits after Phase 10 because scripts need a character to trigger them.
@@ -4952,6 +4965,18 @@ SCRIPTS USING THIS VOLUME
 #### Script Panel — Full Spec
 
 Lives in left panel slot (`panelId === 'scripts'`). Opens via toolbar "Scripts" button or automatically when TriggerVolumeTool is active.
+
+The Script Panel has three tabs reflecting the three script levels:
+
+```
+[World]  [Zone]  [Object]
+```
+
+- **World tab** — scripts on `worldConfig.scripts[]`. Always active. For quest logic, global timers, cross-zone reactions.
+- **Zone tab** — scripts on the active `zone.scripts[]`. For room-specific logic, ambient triggers, zone-wide traps.
+- **Object tab** — scripts on a selected object's `scripts[]`. Only shown when an object is selected. For per-object behaviour like interact responses, animations, dialogue.
+
+Adding a script from any tab creates it in the correct collection. The PropertiesPanel Scripts screen (Phase 10.6) opens the Script Panel on the Object tab pre-filtered to the selected object.
 
 **List view:**
 ```
@@ -5326,22 +5351,21 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
 ```
 ← Properties
 Scripts
-SCRIPTS FOR this object
+OBJECT SCRIPTS  (stored on this object, travel with it)
 
-  on_interact → Open gate    ›   (fires when player interacts with this object)
-  on_interact → Show hint    ›   (fires when player interacts with this object)
-  
-  [+ Add script for this object]
+  on_interact → Open gate    ›
+  on_interact → Show hint    ›
+  [+ Add object script]
 
-SCRIPTS TARGETING this object
+ALSO TARGETING THIS OBJECT  (zone or world scripts that reference this object as a target)
 
-  flag:gate_opened → Change material ›  (targets this object as an action target)
-
+  flag:gate_opened → Change material ›   (zone script)
+  on_game_start → play_animation     ›   (world script)
 ```
 
-"Add script for this object" creates a new `ScriptDef` in `zone.scripts[]` with the trigger's `targetId` pre-filled with this entity's `editorId`, and the zone's Script Panel is opened with the new script focused.
+"Add object script" creates a new `ScriptDef` in `WorldObject.scripts[]` — stored directly on the object, not on the zone. The trigger's `targetId` is pre-filled with this entity's `editorId`.
 
-The zone-level Script Panel still exists as a global view — the per-entity Scripts tab is a filtered view of the same data.
+"Also targeting this object" is a read-only list of zone and world scripts that reference this object as an action target — useful for understanding what affects this object without having to search manually.
 
 ---
 
@@ -5555,6 +5579,222 @@ types.ts                      ← autoPlayAnimation on WorldObject
 No changes to ScriptEngine, ActionDispatcher, or EntityRegistry.
 
 
+
+
+### Phase 10.8 — World-Space UV Generation
+
+Fixes texture density inconsistency across all builders. After this phase, the same `tileScale` value produces visually identical results on a 1m wall and a 10m wall — one texture repeat per meter at default scale, everywhere, on everything.
+
+---
+
+#### The Problem
+
+Three.js geometry primitives (`PlaneGeometry`, `BoxGeometry`, `ExtrudeGeometry`) generate UVs from 0→1 across the entire face regardless of physical size. A 1m floor and a 10m floor both get UVs 0→1. When the same `tileScale` is applied to both via `texture.repeat`, the texture scales differently on each — larger surfaces look stretched or over-tiled compared to smaller ones. Every time you place a surface of a different size you have to manually tweak `tileScale` to compensate. This is the bug.
+
+---
+
+#### The Fix — World-Space UV Generation
+
+Every builder generates UVs manually, proportional to the physical size of each face. The rule is simple:
+
+```
+UV coordinate = physical dimension (in meters) / tileScale
+```
+
+At `tileScale: 1.0` the texture repeats once per meter on every surface. At `tileScale: 0.5` it repeats twice per meter. At `tileScale: 2.0` it repeats once every two meters. The value is consistent and intuitive regardless of object size.
+
+**Core utility function** — add to `src/builders/UVUtils.ts`:
+
+```ts
+/**
+ * Generate world-space UVs for a flat rectangular face.
+ * UVs are proportional to physical dimensions so texture density
+ * is consistent regardless of face size.
+ *
+ * @param geometry  Target BufferGeometry (must have position attribute)
+ * @param width     Physical width of the face in meters
+ * @param height    Physical height of the face in meters
+ * @param tileScaleX  Meters per texture repeat, U axis (default 1.0)
+ * @param tileScaleY  Meters per texture repeat, V axis (default tileScaleX)
+ */
+export function applyWorldSpaceUVs(
+  geometry:    THREE.BufferGeometry,
+  width:       number,
+  height:      number,
+  tileScaleX = 1.0,
+  tileScaleY = tileScaleX,
+): void {
+  const uRepeat = width  / tileScaleX;
+  const vRepeat = height / tileScaleY;
+  const uvAttr   = geometry.attributes.uv as THREE.BufferAttribute;
+
+  // Standard quad vertex order: BL, BR, TL, TR
+  uvAttr.setXY(0, 0,       0);
+  uvAttr.setXY(1, uRepeat, 0);
+  uvAttr.setXY(2, 0,       vRepeat);
+  uvAttr.setXY(3, uRepeat, vRepeat);
+  uvAttr.needsUpdate = true;
+}
+
+/**
+ * Apply UV offset to all coordinates in a geometry.
+ * Call after applyWorldSpaceUVs or applyProjectedUVs.
+ * All maps (albedo, normal, roughness etc.) share UV channel 0
+ * so offsetting once shifts everything in sync.
+ *
+ * @param offsetX  U axis shift (0.0–1.0, wraps)
+ * @param offsetY  V axis shift (0.0–1.0, wraps)
+ */
+export function applyUVOffset(
+  geometry: THREE.BufferGeometry,
+  offsetX:  number,
+  offsetY:  number,
+): void {
+  if (offsetX === 0 && offsetY === 0) return;
+  const uvAttr = geometry.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < uvAttr.count; i++) {
+    uvAttr.setXY(i, uvAttr.getX(i) + offsetX, uvAttr.getY(i) + offsetY);
+  }
+  uvAttr.needsUpdate = true;
+}
+
+/**
+ * Generate world-space UVs for arbitrary polygon geometry
+ * by projecting vertex positions onto the XZ plane (for floors/caps)
+ * or onto the wall plane (for vertical faces).
+ *
+ * Used for polygon floors, polygon platforms, wall runs, stair faces.
+ */
+export function applyProjectedUVs(
+  geometry:    THREE.BufferGeometry,
+  axis:        'xz' | 'xy' | 'zy',   // which plane to project onto
+  tileScaleX = 1.0,
+  tileScaleY = tileScaleX,
+): void {
+  const positions = geometry.attributes.position as THREE.BufferAttribute;
+  const uvAttr    = geometry.attributes.uv as THREE.BufferAttribute;
+  const count     = positions.count;
+
+  for (let i = 0; i < count; i++) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+    let u: number, v: number;
+    if (axis === 'xz') { u = x / tileScaleX; v = z / tileScaleY; }
+    else if (axis === 'xy') { u = x / tileScaleX; v = y / tileScaleY; }
+    else                    { u = z / tileScaleX; v = y / tileScaleY; }
+    uvAttr.setXY(i, u, v);
+  }
+  uvAttr.needsUpdate = true;
+}
+```
+
+**UV offset** — after calling `applyWorldSpaceUVs` or `applyProjectedUVs`, each builder checks `materialOverrides.offsetX` / `offsetY` and calls `applyUVOffset(geometry, offsetX, offsetY)` if either is non-zero. One call covers all maps.
+
+**Remove `texture.repeat` as the scaling mechanism.** After this phase, `texture.repeat` is always `(1, 1)`. All tiling is baked into UVs at build time. This is more correct — `texture.repeat` applies globally to the texture object which can cause conflicts when the same material is shared across surfaces of different sizes.
+
+---
+
+#### Builder Changes
+
+**WallBuilder:**
+- Rect wall faces: `applyWorldSpaceUVs(faceGeo, wallLength, wallHeight, tileScaleX, tileScaleY)`
+- Wall run merged mesh: `applyProjectedUVs(runGeo, 'zy', tileScaleX, tileScaleY)` — projects along the wall plane so UV continuity is maintained around corners
+- Trim meshes (door/window reveals): `applyWorldSpaceUVs` with reveal width × reveal height
+
+**FloorBuilder:**
+- Rect floor: `applyWorldSpaceUVs(geo, boundsWidth, boundsDepth, tileScaleX, tileScaleY)`
+- Polygon floor: `applyProjectedUVs(geo, 'xz', tileScaleX, tileScaleY)` — projects down onto XZ plane
+
+**PlatformBuilder:**
+- Cap (top/bottom faces): `applyProjectedUVs(capGeo, 'xz', tileScaleX, tileScaleY)`
+- Side faces: `applyWorldSpaceUVs(sideFaceGeo, edgeLength, platformHeight, tileScaleX, tileScaleY)` per edge
+- Polygon platform sides: `applyProjectedUVs` along each edge's local plane
+
+**StairBuilder:**
+- Tread faces (horizontal): `applyWorldSpaceUVs(treadGeo, stairWidth, treadDepth, tileScaleX, tileScaleY)`
+- Riser faces (vertical): `applyWorldSpaceUVs(riserGeo, stairWidth, riserHeight, tileScaleX, tileScaleY)`
+- Railing faces: `applyWorldSpaceUVs` with physical railing dimensions
+
+---
+
+#### Future Builders — Required Convention
+
+Any builder added after this phase **must** use `applyWorldSpaceUVs` or `applyProjectedUVs` from `UVUtils.ts`. Never use Three.js default UV generation for any textured face. Never use `texture.repeat` for tiling. This applies to:
+
+- `BrushBuilder` (Phase 12) — use `applyProjectedUVs` per face based on face normal direction
+- Any terrain geometry builder (Phase 11) — use `applyProjectedUVs('xz')` for the heightmap mesh
+- Any future NPC/character mesh builder
+
+**The rule stated plainly:** if a face is 3m wide and the tile scale is 1.0, the UV U range must be 0→3. Always. No exceptions.
+
+---
+
+#### tileScaleX / tileScaleY Split
+
+`MaterialOverrides.tileScaleX` and `tileScaleY` already exist in `types.ts`. This phase makes them meaningful:
+
+- `tileScaleX` controls horizontal repeat (U axis)
+- `tileScaleY` controls vertical repeat (V axis)
+- When `splitXY` is false: `tileScaleY = tileScaleX` (single uniform scale)
+- When `splitXY` is true: X and Y scale independently — useful for brick textures where you want different horizontal and vertical density
+- `offsetX` / `offsetY` shift all UV coordinates after scaling — moves the texture position on the face
+
+The "Split X/Y" checkbox in the Material screen of PropertiesPanel was already specced in Phase 6.5. This phase makes it actually do something.
+
+**Material screen layout addition** — below the Tile row:
+```
+TILE    [1.0]       SPLIT X/Y [□]
+OFFSET  X [0.0]     Y [0.0]
+```
+
+Offset values from 0.0 to 1.0 represent one full texture width/height of shift. Values outside that range wrap — 1.1 is the same as 0.1. Negative values work. Default is 0.0 for both axes.
+
+---
+
+#### tileScale Meaning After This Phase
+
+| Value | Effect |
+|---|---|
+| `1.0` (default) | One texture repeat per meter — consistent everywhere |
+| `0.5` | One repeat per 0.5m — texture appears larger/more detailed |
+| `2.0` | One repeat per 2m — texture appears smaller |
+| `0.25` | One repeat per 0.25m — very large detailed texture |
+
+The value is now physically meaningful and consistent. The same `tileScale: 1.0` on a 1m wall and a 20m wall produces the same brick size in both.
+
+---
+
+#### Migration
+
+Existing scenes built before this phase will have `tileScale` values tuned to compensate for the old inconsistent behaviour. After this fix those values will produce different results. Two options:
+
+1. **Reset all tileScale values to 1.0** in `WorldLoader._migrate()` for scenes missing a `uvVersion` field — accept that existing scenes need re-tweaking. Simple, clean.
+2. **Leave existing values** and only apply world-space UVs to newly created surfaces — existing surfaces keep old behaviour. Complex, messy.
+
+Option 1 is correct. Add `uvVersion: 1` to `SceneFile` metadata. `WorldLoader._migrate()` resets tileScale to 1.0 on any file without `uvVersion`. After this phase all new scenes get `uvVersion: 1` written automatically.
+
+---
+
+#### New File
+
+```
+src/
+  builders/
+    UVUtils.ts    ← applyWorldSpaceUVs(), applyProjectedUVs() — imported by all builders
+```
+
+#### Files Modified
+
+```
+src/builders/WallBuilder.ts
+src/builders/FloorBuilder.ts
+src/builders/PlatformBuilder.ts
+src/builders/StairBuilder.ts
+src/world/WorldLoader.ts    ← uvVersion migration
+types.ts                    ← add uvVersion to SceneMetadata
+```
+
 ### Phase 11 — Terrain
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)
 - Terrain Rapier collider: `ColliderDesc.heightfield(res, res, heightData, { x: worldSize, y: maxHeight, z: worldSize })`
@@ -5577,6 +5817,14 @@ No changes to ScriptEngine, ActionDispatcher, or EntityRegistry.
 - Snap-merge tool — merge two nearby nodes that aren't exactly equal
 
 **Future systems (to be specced when needed):**
+
+- **Brush primitive (BSP-style editable solid)** — A freeform convex solid with direct vertex/edge/face editing. Move top and bottom vertices independently to create diagonals and wedges. Split faces and extrude. Distinct from platforms which are parametric. Closer to UE5 Modeling Mode or Quake-style brush editing.
+
+  **Critical architecture requirement:** Brush vertices must be stored in **local space** relative to the brush's own origin, not in world space. The brush has a `position`, `rotation`, and `scale` as a separate transform. Moving the brush updates `position` only — vertices don't change. Rotating updates `rotation` only — vertices don't change. Only vertex editing touches vertex data. `BrushBuilder` always builds geometry in local space, then Three.js applies the mesh transform on top. Rapier collider is rebuilt from final world-space positions (local vertices × transform) on any change.
+
+  This is the correct architecture to avoid the rotation/move/corner-snapping bugs that affect the current platform and wall tools — those bugs happen because world-space coordinate storage means the mesh transform and the data get out of sync. Local-space storage keeps them permanently in sync. **Do not repeat the world-space storage pattern from platforms/floors/walls.**
+
+  Collision: static Rapier convex hull or trimesh collider (player walks over it correctly, slopes handled by KCC max climb angle). Dynamic movement not supported — brushes are static scenery.
 
 - **Item system** — `ItemDef` type, item registry/manifest, item pickup objects, inventory UI panel, equippable/consumable/stackable flags, item icons. Currently stubbed as string IDs in `GameSave.inventory` and script actions `give_item` / `player_has_item`.
 - **Dialogue system** — branching dialogue trees, NPC conversation UI, dialogue editor panel. Currently stubbed as linear `lines[]` array in `DialogueDef`.

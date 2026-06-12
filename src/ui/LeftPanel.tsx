@@ -1,6 +1,7 @@
-import type { LeftPanelId, AssetDef, ZoneDef } from "@/types";
+import type { LeftPanelId, AssetDef, ZoneDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { ZonePanel } from "@/ui/ZonePanel";
+import { ScriptPanel } from "@/ui/ScriptPanel";
 
 interface LeftPanelProps {
   panelId:         LeftPanelId;
@@ -13,9 +14,25 @@ interface LeftPanelProps {
   activeZoneId:    string | null;
   onEnterZone:     (zoneId: string) => void;
   onNewZone:       () => void;
+  // scripts panel
+  worldScripts:         ScriptDef[];
+  zoneScripts:          ScriptDef[];
+  objectScripts:        ScriptDef[] | null;
+  selectedObjectId:     string | null;
+  triggerVolumes:       TriggerVolume[];
+  zoneObjects:          WorldObject[];
+  onWorldScriptsChange: (scripts: ScriptDef[]) => void;
+  onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
+  onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
 }
 
-export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose, zones, activeZoneId, onEnterZone, onNewZone }: LeftPanelProps) {
+export function LeftPanel({
+  panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose,
+  zones, activeZoneId, onEnterZone, onNewZone,
+  worldScripts, zoneScripts, objectScripts, selectedObjectId,
+  triggerVolumes, zoneObjects,
+  onWorldScriptsChange, onZoneScriptsChange, onObjectScriptsChange,
+}: LeftPanelProps) {
   const open = panelId !== null;
 
   return (
@@ -71,6 +88,20 @@ export function LeftPanel({ panelId, assets, selectedAssetId, onAssetSelect, onI
                 activeZoneId={activeZoneId}
                 onEnterZone={onEnterZone}
                 onNewZone={onNewZone}
+              />
+            )}
+            {panelId === "scripts" && (
+              <ScriptPanel
+                worldScripts={worldScripts}
+                zoneScripts={zoneScripts}
+                objectScripts={objectScripts}
+                selectedObjectId={selectedObjectId}
+                activeZoneId={activeZoneId}
+                triggerVolumes={triggerVolumes}
+                zoneObjects={zoneObjects}
+                onWorldScriptsChange={onWorldScriptsChange}
+                onZoneScriptsChange={onZoneScriptsChange}
+                onObjectScriptsChange={onObjectScriptsChange}
               />
             )}
           </div>

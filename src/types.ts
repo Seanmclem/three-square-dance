@@ -66,12 +66,12 @@ export interface AssetManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -160,6 +160,15 @@ export interface BusEvents {
   "zonetool:awaiting-name": { bounds: Bounds };
   "zonetool:name-confirmed": { name: string; type: ZoneType };
   "zone:jump":             { zoneId: string };
+  "audio:play":            { id: string; position?: Vec3 };
+  "dialogue:show":         { speaker: string; lines: string[]; portrait?: string };
+  "object:despawn":        { id: string };
+  "ui:show":               { elementId: string };
+  "trigger:volume-enter":  { volumeId: string };
+  "trigger:volume-exit":   { volumeId: string };
+  "triggervolume:added":   { zoneId: string; volume: TriggerVolume };
+  "triggervolume:updated": { zoneId: string; id: string; changes: Partial<TriggerVolume> };
+  "triggervolume:removed": { zoneId: string; id: string };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -235,6 +244,7 @@ export interface WorldConfig {
   fogDensity:      number;
   playerSettings:  PlayerSettings;
   defaultSpawn?:   SpawnDef;
+  scripts?:        ScriptDef[];
 }
 
 export interface TerrainLayerMaterial {
@@ -355,19 +365,22 @@ export interface WorldObject {
   floor:      number;
   zoneId?:    string;
   properties: ObjectProperties;
+  scripts?:   ScriptDef[];
 }
 
 export interface ZoneDef {
-  id:        string;
-  name:      string;
-  type:      ZoneType;
-  bounds:    Bounds;
-  nodes:     WallNode[];
-  floors:    FloorDef[];
-  walls:     WallDef[];
-  platforms: PlatformDef[];
-  stairs:    StairDef[];
-  objects:   WorldObject[];
+  id:              string;
+  name:            string;
+  type:            ZoneType;
+  bounds:          Bounds;
+  nodes:           WallNode[];
+  floors:          FloorDef[];
+  walls:           WallDef[];
+  platforms:       PlatformDef[];
+  stairs:          StairDef[];
+  objects:         WorldObject[];
+  scripts?:        ScriptDef[];
+  triggerVolumes?: TriggerVolume[];
 }
 
 export interface TransitionDef {
@@ -420,4 +433,105 @@ export interface IEditorModule {
   init():          void;
   update(dt: number): void;
   dispose():       void;
+}
+
+// ─── Scripting / Event System ─────────────────────────────────────────────────
+
+export type TriggerType =
+  | 'on_player_enter'
+  | 'on_player_exit'
+  | 'on_interact'
+  | 'on_timer'
+  | 'on_health_zero'
+  | 'on_flag_set'
+  | 'on_flag_cleared'
+  | 'on_zone_enter'
+  | 'on_game_start';
+
+export type ConditionType =
+  | 'flag_set'
+  | 'flag_not_set'
+  | 'player_has_item'
+  | 'npc_alive'
+  | 'npc_dead';
+
+export type ActionType =
+  | 'play_sound'
+  | 'show_dialogue'
+  | 'move_object'
+  | 'play_animation'
+  | 'spawn_npc'
+  | 'despawn_object'
+  | 'change_material'
+  | 'open_door'
+  | 'close_door'
+  | 'set_flag'
+  | 'clear_flag'
+  | 'fire_event'
+  | 'fade_screen'
+  | 'teleport_player'
+  | 'show_ui'
+  | 'give_item'
+  | 'run_script';
+
+export interface ScriptTrigger {
+  type:       TriggerType;
+  targetId?:  string;
+  delay?:     number;
+  repeat?:    boolean;
+  interval?:  number;
+}
+
+export interface ScriptCondition {
+  type:    ConditionType;
+  flag?:   string;
+  itemId?: string;
+  npcId?:  string;
+}
+
+export interface DialogueDef {
+  speaker:   string;
+  lines:     string[];
+  portrait?: string;
+}
+
+export interface ScriptAction {
+  type:          ActionType;
+  targetId?:     string;
+  animation?:    string;
+  sound?:        string;
+  dialogue?:     DialogueDef;
+  material?:     string;
+  position?:     Vec3;
+  flag?:         string;
+  eventId?:      string;
+  itemId?:       string;
+  fadeColor?:    string;
+  fadeDuration?: number;
+  uiElementId?:  string;
+  script?:       string;
+}
+
+export interface ScriptDef {
+  id:         string;
+  label:      string;
+  zoneId:     string;
+  enabled:    boolean;
+  trigger:    ScriptTrigger;
+  conditions: ScriptCondition[];
+  actions:    ScriptAction[];
+  oneShot:    boolean;
+}
+
+export interface TriggerVolume {
+  id:       string;
+  label:    string;
+  position: Vec3;
+  size:     Vec3;
+  zoneId:   string;
+}
+
+export interface EntityCapabilities {
+  emits:    TriggerType[];
+  receives: ActionType[];
 }

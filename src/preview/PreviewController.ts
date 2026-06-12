@@ -52,6 +52,7 @@ export class PreviewController {
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);
     triggers.setCharacterCollider(controller.body.collider);
+    triggers.setVolumeSensors(this._zones.volumeSensorMap);
 
     this._scene.setPreviewCamera(controller.camera);
 

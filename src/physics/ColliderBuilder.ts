@@ -1,6 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "./PhysicsWorld";
-import type { WallDef, Vec2, PlatformDef, StairDef, Opening } from "@/types";
+import type { WallDef, Vec2, PlatformDef, StairDef, Opening, TriggerVolume } from "@/types";
 
 export class ColliderBuilder {
   static registerFloor(
@@ -92,6 +92,12 @@ export class ColliderBuilder {
         start.z + Math.sin(angle) * (opening.offsetAlongWall + opening.width / 2),
       )
       .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
+    return physicsWorld.createSensorCollider(desc);
+  }
+
+  static registerVolumeSensor(vol: TriggerVolume): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2)
+      .setTranslation(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
     return physicsWorld.createSensorCollider(desc);
   }
 

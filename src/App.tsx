@@ -20,6 +20,9 @@ import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
 import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
+import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
+import { ScriptEngine } from "@/scripting/ScriptEngine";
+import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -29,7 +32,7 @@ import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { ZoneNamingDialog } from "@/ui/ZoneNamingDialog";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType, PlayerSettings } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType, PlayerSettings, ScriptDef, TriggerVolume } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -54,12 +57,13 @@ function createDemoZone(): ZoneDef {
 
 export default function App() {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const busRef      = useRef<EventBus>(new EventBus());
-  const worldRef    = useRef<WorldState | null>(null);
-  const zonesRef    = useRef<ZoneManager | null>(null);
-  const historyRef  = useRef<HistoryManager | null>(null);
-  const sceneRef    = useRef<SceneManager | null>(null);
-  const previewRef  = useRef<PreviewController | null>(null);
+  const busRef           = useRef<EventBus>(new EventBus());
+  const worldRef         = useRef<WorldState | null>(null);
+  const zonesRef         = useRef<ZoneManager | null>(null);
+  const historyRef       = useRef<HistoryManager | null>(null);
+  const sceneRef         = useRef<SceneManager | null>(null);
+  const previewRef       = useRef<PreviewController | null>(null);
+  const scriptEngineRef  = useRef<ScriptEngine | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
@@ -83,6 +87,10 @@ export default function App() {
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
+  const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
+  const [worldScripts,    setWorldScripts]     = useState<ScriptDef[]>([]);
+  const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
+  const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
 
@@ -138,6 +146,9 @@ export default function App() {
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
     const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
+    const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history);
+    const scriptEngine    = new ScriptEngine(bus, world);
+    scriptEngineRef.current = scriptEngine;
 
     // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
@@ -167,6 +178,7 @@ export default function App() {
     gizmoManager.init();
     zoneTool.init();
     spawnPointTool.init();
+    triggerVolumeTool.init();
 
     const writeAutosave = () => {
       if (!worldRef.current || restoringRef.current) return;
@@ -231,8 +243,15 @@ export default function App() {
     scene.onUpdate(dt => physicsWorld.step(dt));
 
     const unsub = [
-      bus.on("preview:start", () => setIsPreview(true)),
-      bus.on("preview:stop",  () => setIsPreview(false)),
+      bus.on("preview:start", () => {
+        setIsPreview(true);
+        scriptEngine.activate();
+      }),
+      bus.on("preview:stop",  () => {
+        setIsPreview(false);
+        scriptEngine.deactivate();
+      }),
+      bus.on("dialogue:show", payload => setDialogueState(payload)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected",   payload       => setSelected(payload)),
       bus.on("object:deselected", ()            => setSelected(null)),
@@ -246,10 +265,34 @@ export default function App() {
       }),
       bus.on("assets:loaded",   ({ assets: defs }) => setAssets(defs)),
       bus.on("zone:added",      ()               => setZones([...world.zones.values()])),
-      bus.on("zone:activated",  ({ zoneId })     => setActiveZoneId(zoneId)),
+      bus.on("zone:activated",  ({ zoneId })     => {
+        setActiveZoneId(zoneId);
+        const z = world.zones.get(zoneId);
+        setZoneScripts(z?.scripts ?? []);
+        setTriggerVolumes(z?.triggerVolumes ?? []);
+        scriptEngine.clearIndex();
+        scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
+        if (z) scriptEngine.loadZone(z);
+      }),
       bus.on("world:loaded",    ()               => {
         setZones([...world.zones.values()]);
         setActiveZoneId(world.activeZoneId);
+        setWorldScripts(world.world?.scripts ?? []);
+        const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
+        setZoneScripts(z?.scripts ?? []);
+        setTriggerVolumes(z?.triggerVolumes ?? []);
+      }),
+      bus.on("triggervolume:added",   () => {
+        const z = world.zones.get(world.activeZoneId ?? "");
+        setTriggerVolumes(z?.triggerVolumes ?? []);
+      }),
+      bus.on("triggervolume:updated", () => {
+        const z = world.zones.get(world.activeZoneId ?? "");
+        setTriggerVolumes(z?.triggerVolumes ?? []);
+      }),
+      bus.on("triggervolume:removed", () => {
+        const z = world.zones.get(world.activeZoneId ?? "");
+        setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
       bus.on("zonetool:awaiting-name", ({ bounds }) => setPendingZone(bounds)),
     ];
@@ -265,6 +308,8 @@ export default function App() {
       zonesRef.current    = null;
       unsub.forEach(u => u());
       spawnPointTool.dispose();
+      triggerVolumeTool.dispose();
+      scriptEngineRef.current = null;
       zoneTool.dispose();
       gizmoManager.dispose();
       openingDragger.dispose();
@@ -297,6 +342,7 @@ export default function App() {
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
     if (tool === "object") setLeftPanel("assets");
+    else if (tool === "trigger-volume") setLeftPanel("scripts");
     else setLeftPanel(null);
   };
 
@@ -304,6 +350,10 @@ export default function App() {
     setActiveTool("zone");
     busRef.current.emit("tool:select", { tool: "zone" });
     setLeftPanel("zones");
+  };
+
+  const handlePanelToggle = (panelId: LeftPanelId): void => {
+    setLeftPanel(p => p === panelId ? null : panelId);
   };
 
   const handleEnterZone = (zoneId: string): void => {
@@ -456,6 +506,7 @@ export default function App() {
 
   const handleStartGame = useCallback((): void => {
     previewRef.current?.enter("game");
+    scriptEngineRef.current?.onGameStart();
   }, []);
 
   const handlePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
@@ -772,6 +823,37 @@ export default function App() {
     }
   };
 
+  const handleWorldScriptsChange = (scripts: ScriptDef[]): void => {
+    const world = worldRef.current;
+    if (!world?.world) return;
+    world.world.scripts = scripts;
+    setWorldScripts(scripts);
+    setIsDirty(true);
+  };
+
+  const handleZoneScriptsChange = (scripts: ScriptDef[]): void => {
+    const world = worldRef.current;
+    if (!activeZoneId || !world) return;
+    const zone = world.zones.get(activeZoneId);
+    if (!zone) return;
+    zone.scripts = scripts;
+    setZoneScripts(scripts);
+    setIsDirty(true);
+  };
+
+  const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
+    if (!selected) return;
+    historyRef.current?.record("update object scripts", () => {
+      worldRef.current?.updateObject(selected.zoneId, objectId, { scripts });
+    });
+    syncHistory();
+  };
+
+  const zoneObjects = zones.find(z => z.id === activeZoneId)?.objects ?? [];
+  const objectScripts = selected?.type === "object"
+    ? ((selected.data as WorldObject)?.scripts ?? [])
+    : null;
+
   return (
     <div style={{ width: "100vw", height: "100vh", background: "#0a0e16", position: "relative", overflow: "hidden" }}>
       <canvas
@@ -783,6 +865,7 @@ export default function App() {
         activeTool={activeTool}
         openPanel={leftPanel}
         onToolSelect={handleToolSelect}
+        onPanelToggle={handlePanelToggle}
         onPreview={handlePreviewEnter}
         onStartGame={handleStartGame}
         isPreview={isPreview}
@@ -798,6 +881,15 @@ export default function App() {
         activeZoneId={activeZoneId}
         onEnterZone={handleEnterZone}
         onNewZone={handleStartZoneDraw}
+        worldScripts={worldScripts}
+        zoneScripts={zoneScripts}
+        objectScripts={objectScripts}
+        selectedObjectId={selected?.type === "object" ? selected.id : null}
+        triggerVolumes={triggerVolumes}
+        zoneObjects={zoneObjects}
+        onWorldScriptsChange={handleWorldScriptsChange}
+        onZoneScriptsChange={handleZoneScriptsChange}
+        onObjectScriptsChange={handleObjectScriptsChange}
       />
       <TopBar
         activeFloor={activeFloor}
@@ -914,6 +1006,10 @@ SquareDance
           onCancel={() => setPendingZone(null)}
         />
       )}
+      <DialogueOverlay
+        dialogue={dialogueState}
+        onClose={() => setDialogueState(null)}
+      />
     </div>
   );
 }

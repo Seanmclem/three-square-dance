@@ -100,6 +100,13 @@ export const IconSpawn = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconTriggerVolume = ({ color }: IconProps) => (
+  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+    <rect x="3" y="5" width="14" height="10" rx="1" stroke={color} strokeWidth="1.5" strokeDasharray="3 2"/>
+    <circle cx="10" cy="10" r="2" fill={color} fillOpacity="0.6"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   floor:            IconFloor,
@@ -111,4 +118,5 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   object:           IconObject,
   zone:             IconZone,
   spawnpoint:       IconSpawn,
+  "trigger-volume": IconTriggerVolume,
 };
