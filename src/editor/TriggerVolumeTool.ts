@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
-import type { Vec3 } from "@/types";
+import type { TriggerVolume, Vec3 } from "@/types";
 
 type State = "IDLE" | "PLACING";
 
@@ -18,6 +18,13 @@ function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   return new THREE.LineSegments(geo, mat);
 }
 
+function hitTestVolume(pos: Vec3, vol: TriggerVolume): boolean {
+  return (
+    Math.abs(pos.x - vol.position.x) <= vol.size.x / 2 &&
+    Math.abs(pos.z - vol.position.z) <= vol.size.z / 2
+  );
+}
+
 export class TriggerVolumeTool {
   private _state:         State  = "IDLE";
   private _active         = false;
@@ -25,7 +32,9 @@ export class TriggerVolumeTool {
   private _start:         THREE.Vector3 | null = null;
   private _preview:       THREE.LineSegments | null = null;
   private _activeZoneId   = "demo";
-  private _lastWorldPos: { x: number; y: number; z: number } = { x: 0, y: 0, z: 0 };
+  private _lastWorldPos:  Vec3 = { x: 0, y: 0, z: 0 };
+  private _hoveredId:     string | null = null;
+  private _selectedId:    string | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -40,20 +49,50 @@ export class TriggerVolumeTool {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._active = tool === "trigger-volume";
-        if (!this._active) this._reset();
+        if (!this._active) {
+          this._clearHover();
+          this._clearSelect();
+          this._reset();
+        }
       }),
-      this._bus.on("zone:activated", ({ zoneId }) => { this._activeZoneId = zoneId; }),
+      this._bus.on("zone:activated", ({ zoneId }) => {
+        this._activeZoneId = zoneId;
+        this._clearHover();
+        this._clearSelect();
+      }),
+      this._bus.on("input:mousemove", ({ worldPos }) => {
+        this._lastWorldPos = worldPos;
+        if (!this._active) return;
+        if (this._state === "PLACING") {
+          this._updatePreview(worldPos);
+          return;
+        }
+        // IDLE: hover detection
+        const vol = this._findVolumeAt(worldPos);
+        const id  = vol?.id ?? null;
+        if (id !== this._hoveredId) {
+          this._hoveredId = id;
+          this._bus.emit("triggervolume:hover", { zoneId: this._activeZoneId, id });
+        }
+      }),
       this._bus.on("input:mousedown", ({ button }) => {
         if (!this._active || button !== 0) return;
-        if (this._state === "IDLE") this._beginPlace(this._lastWorldPos);
+        if (this._state === "IDLE") {
+          const vol = this._findVolumeAt(this._lastWorldPos);
+          if (vol) {
+            // Click on existing volume → select it
+            this._selectedId = vol.id;
+            this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: vol.id });
+          } else {
+            // Click on empty space → start placing
+            this._clearSelect();
+            this._beginPlace(this._lastWorldPos);
+          }
+        }
       }),
       this._bus.on("input:mouseup", ({ button }) => {
         if (!this._active || button !== 0) return;
         if (this._state === "PLACING") this._finishPlace(this._lastWorldPos);
-      }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        this._lastWorldPos = worldPos;
-        if (this._active && this._state === "PLACING") this._updatePreview(worldPos);
       }),
       this._bus.on("input:wheel", ({ delta }) => {
         if (!this._active || this._state !== "PLACING") return;
@@ -62,9 +101,40 @@ export class TriggerVolumeTool {
           this._refreshPreviewGeometry(this._preview, 0.1, this._height, 0.1);
       }),
       this._bus.on("input:keydown", ({ code }) => {
-        if (this._active && code === "Escape") this._reset();
+        if (!this._active) return;
+        if (code === "Escape") {
+          if (this._state === "PLACING") this._reset();
+          else { this._clearSelect(); }
+        }
+        if ((code === "Delete" || code === "Backspace") && this._selectedId) {
+          const id      = this._selectedId;
+          const zoneId  = this._activeZoneId;
+          this._clearSelect();
+          this._history.record("delete trigger volume", () => {
+            this._world.removeTriggerVolume(zoneId, id);
+          });
+        }
       }),
     );
+  }
+
+  private _findVolumeAt(worldPos: Vec3): TriggerVolume | undefined {
+    const zone = this._world.zones.get(this._activeZoneId);
+    return zone?.triggerVolumes?.find(v => hitTestVolume(worldPos, v));
+  }
+
+  private _clearHover(): void {
+    if (this._hoveredId !== null) {
+      this._hoveredId = null;
+      this._bus.emit("triggervolume:hover", { zoneId: this._activeZoneId, id: null });
+    }
+  }
+
+  private _clearSelect(): void {
+    if (this._selectedId !== null) {
+      this._selectedId = null;
+      this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: null });
+    }
   }
 
   private _beginPlace(worldPos: Vec3): void {
@@ -105,10 +175,10 @@ export class TriggerVolumeTool {
     const cx = (this._start.x + ex) / 2;
     const cz = (this._start.z + ez) / 2;
 
-    // Require a minimum size to avoid accidental single-click creates
+    // Require minimum size to avoid accidental single-click creates
     if (w < GRID && d < GRID) { this._reset(); return; }
 
-    const vol = {
+    const vol: TriggerVolume = {
       id:       `vol_${crypto.randomUUID().slice(0, 8)}`,
       label:    "Trigger Volume",
       position: { x: cx, y: 0, z: cz },

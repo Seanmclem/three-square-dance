@@ -227,6 +227,8 @@ export class ZoneManager {
       this._bus.on("triggervolume:removed", ({ zoneId, id }) => {
         this._removeSingleVolume(zoneId, id);
       }),
+      this._bus.on("triggervolume:hover",  ({ zoneId, id }) => { this._setVolumeHighlight(zoneId, id, "hover");    }),
+      this._bus.on("triggervolume:select", ({ zoneId, id }) => { this._setVolumeHighlight(zoneId, id, "selected"); }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
       this._bus.on("history:restore", () => {
@@ -1122,6 +1124,22 @@ export class ZoneManager {
     if (!vol) return;
     this._removeSingleVolume(zoneId, volumeId);
     this._addTriggerVolume(zoneId, { ...vol, ...changes });
+  }
+
+  private _setVolumeHighlight(zoneId: string, activeId: string | null, mode: "hover" | "selected"): void {
+    const meshes = this._volumeMeshes.get(zoneId);
+    if (!meshes) return;
+    for (const m of meshes) {
+      const mat = m.material as THREE.LineBasicMaterial;
+      const id  = m.userData["editorId"] as string;
+      if (id === activeId) {
+        mat.color.setHex(mode === "selected" ? 0xffffff : 0xffdd44);
+        mat.opacity = 1.0;
+      } else {
+        mat.color.setHex(0xffaa00);
+        mat.opacity = 0.45;
+      }
+    }
   }
 
   // ── Door sensor helpers ───────────────────────────────────────────────────

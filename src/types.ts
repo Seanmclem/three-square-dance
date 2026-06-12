@@ -169,6 +169,8 @@ export interface BusEvents {
   "triggervolume:added":   { zoneId: string; volume: TriggerVolume };
   "triggervolume:updated": { zoneId: string; id: string; changes: Partial<TriggerVolume> };
   "triggervolume:removed": { zoneId: string; id: string };
+  "triggervolume:hover":   { zoneId: string; id: string | null };
+  "triggervolume:select":  { zoneId: string; id: string | null };
 }
 
 export type BusEventName = keyof BusEvents;

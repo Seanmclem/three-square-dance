@@ -53,19 +53,32 @@
 
 ## 4. Runtime: Trigger Volume → Dialogue
 
-- [ ] Place a trigger volume
-- [ ] Create a zone script: trigger = `on_player_enter`, target = the volume's ID, action = `show_dialogue` with speaker "NPC" and line "Hello!"
-- [ ] Enter preview mode (G or Preview button)
+**Setup (do this first):**
+1. Press **U** to activate the trigger-volume tool
+2. Drag on the floor to place one trigger volume — amber wireframe appears
+3. Press **S** to open the Scripts panel
+4. Click the **Zone** tab
+5. Click **+ New** — a new script row appears
+6. Click the row to open the editor
+7. Set trigger type to **on_player_enter**
+8. In the target dropdown, select the volume you just placed
+9. Click **+ Add** under Actions
+10. Set action type to **show_dialogue**
+11. Fill in Speaker: `NPC` and Lines: `Hello!`
+12. Click **← Scripts** to save and return to the list
+
+**Test:**
+- [ ] Press **G** to enter preview mode
 - [ ] Walk the character into the trigger volume
 - [ ] Dialogue overlay appears at the bottom of the screen
-- [ ] Speaker name shown in amber, line text shown in white
-- [ ] Press **E** — dialogue advances or closes
-- [ ] Click — same as E (advance/close)
-- [ ] Multi-line dialogue: all lines cycle correctly; line counter (e.g. 1/3) is shown
-- [ ] After last line — dialogue closes, overlay disappears
-- [ ] Walk out of volume, then back in — dialogue fires again (not one-shot)
-- [ ] Make script one-shot — dialogue fires only once per preview session
-- [ ] Exit preview (Esc) — dialogue overlay gone
+- [ ] Speaker name shown in amber (`NPC`), line text shown in white (`Hello!`)
+- [ ] Press **E** — overlay closes (single-line dialogue)
+- [ ] Click anywhere — same as E (advance/close)
+- [ ] Add a second line to the dialogue (re-open editor, edit the action) — enter preview again, E cycles to line 2, line counter `1/2` shows
+- [ ] After last line — overlay disappears
+- [ ] Walk out of volume, then back in — dialogue fires again (not one-shot by default)
+- [ ] In script editor: check **One-shot** — re-enter preview, dialogue fires once only
+- [ ] Press **Esc** to exit preview — overlay is gone
 
 ---
 
