@@ -5095,6 +5095,24 @@ src/
 
 
 
+#### Phase 10.5 — Stub / Planned-Phase Index
+
+Actions and triggers that are registered but not yet implemented, and where they land:
+
+| Stub | Status | Planned phase |
+|---|---|---|
+| `play_animation` | console.warn | Phase 10.6 (ActionDispatcher + animation clip discovery) |
+| `on_timer` | never fires | Phase 10.6 (ScriptEngine timer loop) |
+| `play_sound` | bus event only, no audio | Phase 12 (Audio system — sound asset manifest, positional audio) |
+| `open_door` / `close_door` | console.warn | Phase 13 (NPC + door animation system) |
+| `spawn_npc` | console.warn | Phase 13 (NPC system) |
+| `on_health_zero` | never fires | Phase 13 (NPC/enemy health system) |
+| `fade_screen` | bus event fires, no visual | Unassigned — needs a `<FadeOverlay>` React component listening to `overlay:fade-in` |
+| `change_material` | console.warn | Unassigned — small (call `worldState.updateObject` with new material) |
+| Branching dialogue | linear `lines[]` only | Phase 12 (Dialogue system redesign) |
+
+---
+
 ### Phase 10.6 — Entity Event System
 
 Sits immediately after Phase 10.5. Refactors `ScriptEngine` from a zone-level script runner into a proper entity-aware event router. No changes to the `ScriptDef` data format — scenes saved in 10.5 load correctly in 10.6. The change is entirely internal to the engine and the editor UI.

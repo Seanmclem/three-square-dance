@@ -141,6 +141,7 @@ export class TriggerVolumeTool {
           const id     = this._selectedId;
           const zoneId = this._activeZoneId;
           this._clearSelect();
+          this._bus.emit("object:deselected", {});
           this._history.record("delete trigger volume", () => {
             this._world.removeTriggerVolume(zoneId, id);
           });

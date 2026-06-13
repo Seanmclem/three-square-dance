@@ -77,6 +77,8 @@ export class ZoneManager {
   private readonly _volumeSensors   = new Map<number, string>();           // handle → volumeId
   private readonly _volumeColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
   private readonly _volumeMeshes    = new Map<string, THREE.LineSegments[]>(); // zoneId → wireframes
+  private readonly _hoveredVolumeId  = new Map<string, string | null>();   // zoneId → hovered id
+  private readonly _selectedVolumeId = new Map<string, string | null>();   // zoneId → selected id
 
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
@@ -227,8 +229,14 @@ export class ZoneManager {
       this._bus.on("triggervolume:removed", ({ zoneId, id }) => {
         this._removeSingleVolume(zoneId, id);
       }),
-      this._bus.on("triggervolume:hover",  ({ zoneId, id }) => { this._setVolumeHighlight(zoneId, id, "hover");    }),
-      this._bus.on("triggervolume:select", ({ zoneId, id }) => { this._setVolumeHighlight(zoneId, id, "selected"); }),
+      this._bus.on("triggervolume:hover",  ({ zoneId, id }) => {
+        this._hoveredVolumeId.set(zoneId, id);
+        this._refreshVolumeHighlights(zoneId);
+      }),
+      this._bus.on("triggervolume:select", ({ zoneId, id }) => {
+        this._selectedVolumeId.set(zoneId, id);
+        this._refreshVolumeHighlights(zoneId);
+      }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
       this._bus.on("history:restore", () => {
@@ -1086,6 +1094,8 @@ export class ZoneManager {
       }
       this._volumeMeshes.delete(zoneId);
     }
+    this._hoveredVolumeId.delete(zoneId);
+    this._selectedVolumeId.delete(zoneId);
   }
 
   private _removeSingleVolume(zoneId: string, volumeId: string): void {
@@ -1126,17 +1136,22 @@ export class ZoneManager {
     this._addTriggerVolume(zoneId, vol);
   }
 
-  private _setVolumeHighlight(zoneId: string, activeId: string | null, mode: "hover" | "selected"): void {
-    const meshes = this._volumeMeshes.get(zoneId);
+  private _refreshVolumeHighlights(zoneId: string): void {
+    const meshes     = this._volumeMeshes.get(zoneId);
     if (!meshes) return;
+    const hoveredId  = this._hoveredVolumeId.get(zoneId)  ?? null;
+    const selectedId = this._selectedVolumeId.get(zoneId) ?? null;
     for (const m of meshes) {
       const mat = m.material as THREE.LineBasicMaterial;
       const id  = m.userData["editorId"] as string;
-      if (id === activeId) {
-        mat.color.setHex(mode === "selected" ? 0xffffff : 0xffdd44);
+      if (id === selectedId) {
+        mat.color.setHex(0x00ffff); // cyan — selected
+        mat.opacity = 1.0;
+      } else if (id === hoveredId) {
+        mat.color.setHex(0xffdd44); // light yellow — hover
         mat.opacity = 1.0;
       } else {
-        mat.color.setHex(0xffaa00);
+        mat.color.setHex(0xffaa00); // amber — idle
         mat.opacity = 0.45;
       }
     }
