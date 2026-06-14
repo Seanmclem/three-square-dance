@@ -1851,6 +1851,12 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
+        An invisible 3D detection box. Scripts fire when the player walks in or out.
+        Trigger volumes are independent of map zones — they can run any action.
+      </div>
       <div>
         <div style={LABEL}>LABEL</div>
         <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>{vol.label}</div>
@@ -1881,19 +1887,19 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
       {/* Scripts section */}
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={LABEL}>SCRIPTS</div>
+          <div style={LABEL}>ENTRY / EXIT SCRIPTS</div>
           {onScriptsChange && (
             <div style={{ display: "flex", gap: 4 }}>
               <button
                 onClick={() => addScript("on_player_enter")}
-                title="Add On Enter script"
+                title="Add a script that fires when the player walks in"
                 style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
                          background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
                          borderRadius: 3, color: "#44ccaa" }}
               >+ Enter</button>
               <button
                 onClick={() => addScript("on_player_exit")}
-                title="Add On Exit script"
+                title="Add a script that fires when the player walks out"
                 style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
                          background: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.25)",
                          borderRadius: 3, color: "#ccaa44" }}

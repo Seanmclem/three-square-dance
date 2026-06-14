@@ -255,7 +255,10 @@ export default function App() {
       }),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
-      bus.on("object:selected",   payload       => setSelected(payload)),
+      bus.on("object:selected", payload => {
+        setSelected(payload);
+        if (payload.type === "trigger-volume") setLeftPanel("scripts");
+      }),
       bus.on("object:deselected", ()            => setSelected(null)),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
       bus.on("tool:placed", ({ type }) => {
@@ -287,6 +290,23 @@ export default function App() {
       bus.on("triggervolume:added",   () => {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
+      }),
+      bus.on("triggervolume:placed", ({ vol }) => {
+        // After drawing, switch back to select, auto-select the new volume, and open scripts panel
+        setActiveTool("select");
+        bus.emit("tool:select", { tool: "select" });
+        bus.emit("triggervolume:select", { zoneId: vol.zoneId, id: vol.id });
+        bus.emit("object:selected", {
+          id:       vol.id,
+          type:     "trigger-volume",
+          zoneId:   vol.zoneId,
+          position: vol.position,
+          rotation: { x: 0, y: 0, z: 0 },
+          scale:    { x: 1, y: 1, z: 1 },
+          data:     vol,
+        });
+        setLeftPanel("scripts");
+        syncHistory();
       }),
       bus.on("triggervolume:updated", ({ id }) => {
         const z = world.zones.get(world.activeZoneId ?? "");
@@ -352,7 +372,7 @@ export default function App() {
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
     if (tool === "object") setLeftPanel("assets");
-    else if (tool === "trigger-volume") setLeftPanel("scripts");
+    // trigger-volume: no left panel auto-open; draw first, then select to see scripts
     else setLeftPanel(null);
   };
 

@@ -77,7 +77,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         const scriptsActive = openPanel === "scripts";
         return (
           <button
-            title="Scripts (S)"
+            title="Scripts &amp; Triggers panel (S)"
             onClick={() => onPanelToggle(scriptsActive ? null : "scripts")}
             style={{
               width: 48, height: 36, border: "none", cursor: "pointer",
@@ -91,9 +91,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseLeave={e => { if (!scriptsActive) e.currentTarget.style.background = "transparent"; }}
           >
             <IconTriggerVolume color={scriptsActive ? "#ffaa00" : "#7a7a7a"} />
-            <span style={{ fontSize: 7, letterSpacing: 0.8, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
+            <span style={{ fontSize: 6, letterSpacing: 0.5, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
                            opacity: 0.85, fontFamily: "monospace" }}>
-              SCR
+              SCRIPTS
             </span>
           </button>
         );

@@ -18,6 +18,8 @@ export class InputManager implements IEditorModule {
   private readonly _hit          = new THREE.Vector3();
   private _suppress = false;
   private _unsub: Array<() => void> = [];
+  private _mouseDownScreenPos: { x: number; y: number } | null = null;
+  private readonly _DRAG_THRESHOLD = 5; // pixels — moves beyond this are drags, not clicks
 
   private readonly _onMouseDown:   (e: MouseEvent) => void;
   private readonly _onMouseMove:   (e: MouseEvent) => void;
@@ -93,6 +95,7 @@ export class InputManager implements IEditorModule {
   }
 
   private _handleMouseDown(e: MouseEvent): void {
+    this._mouseDownScreenPos = { x: e.clientX, y: e.clientY };
     if (this._suppress) return;
     this._bus.emit("input:mousedown", { button: e.button, screenPos: { x: e.clientX, y: e.clientY } });
   }
@@ -113,6 +116,11 @@ export class InputManager implements IEditorModule {
 
   private _handleClick(e: MouseEvent): void {
     if (this._suppress) return;
+    if (this._mouseDownScreenPos) {
+      const dx = e.clientX - this._mouseDownScreenPos.x;
+      const dy = e.clientY - this._mouseDownScreenPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > this._DRAG_THRESHOLD) return;
+    }
     this._bus.emit("input:click", {
       screenPos: { x: e.clientX, y: e.clientY },
       worldPos:  this._worldPos(e),

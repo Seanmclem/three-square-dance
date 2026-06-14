@@ -171,6 +171,7 @@ export interface BusEvents {
   "triggervolume:removed": { zoneId: string; id: string };
   "triggervolume:hover":   { zoneId: string; id: string | null };
   "triggervolume:select":  { zoneId: string; id: string | null };
+  "triggervolume:placed":  { vol: TriggerVolume };
 }
 
 export type BusEventName = keyof BusEvents;

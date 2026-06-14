@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
   TriggerType, ActionType, ConditionType,
@@ -97,8 +97,13 @@ export function ScriptPanel({
   activeZoneId, triggerVolumes, zoneObjects,
   onWorldScriptsChange, onZoneScriptsChange, onObjectScriptsChange,
 }: ScriptPanelProps) {
-  const [tab,        setTab]        = useState<TabId>("zone");
-  const [editingId,  setEditingId]  = useState<string | null>(null);
+  const [tab,       setTab]       = useState<TabId>("world");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Auto-switch to SELECTED tab when a trigger volume or object is selected
+  useEffect(() => {
+    if (selectedObjectId) { setTab("object"); setEditingId(null); }
+  }, [selectedObjectId]);
 
   const currentScripts: ScriptDef[] =
     tab === "world"  ? worldScripts :
@@ -151,11 +156,17 @@ export function ScriptPanel({
             key={t}
             style={S.tab(tab === t)}
             onClick={() => { setTab(t); setEditingId(null); }}
-            disabled={t === "object" && !selectedObjectId}
           >
-            {t.toUpperCase()}
+            {t === "world" ? "GLOBAL" : t === "zone" ? "LEVEL" : "SELECTED"}
           </button>
         ))}
+      </div>
+
+      {/* Per-tab description */}
+      <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "5px 10px 0", lineHeight: 1.4 }}>
+        {tab === "world"  && "Game-wide events (e.g. on game start). Not attached to any object."}
+        {tab === "zone"   && "Scripts for this entire map level. Rarely needed — use trigger volumes instead."}
+        {tab === "object" && "Scripts on the selected trigger volume or object."}
       </div>
 
       {editing ? (
@@ -169,6 +180,10 @@ export function ScriptPanel({
           onChange={updateScript}
           onDelete={() => deleteScript(editing.id)}
         />
+      ) : tab === "object" && !selectedObjectId ? (
+        <div style={{ color: "#555", fontSize: 11, fontStyle: "italic", textAlign: "center", marginTop: 40, lineHeight: 1.6 }}>
+          Select a trigger volume or object<br/>to see its scripts here.
+        </div>
       ) : (
         <ScriptList
           scripts={currentScripts}

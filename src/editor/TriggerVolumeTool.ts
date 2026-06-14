@@ -86,12 +86,14 @@ export class TriggerVolumeTool {
         if (this._state === "PLACING") this._finishPlace(this._lastWorldPos);
       }),
 
-      // Volume selection uses input:click so it runs after SelectionManager
-      // (which deselects on empty-space clicks via the same event).
+      // Volume selection uses input:click. SelectionManager runs first (registered earlier)
+      // and may have already tinted the floor/wall behind the volume. Emitting
+      // object:deselected before our object:selected clears SelectionManager's highlight.
       this._bus.on("input:click", ({ button }) => {
         if (button !== 0 || this._state === "PLACING") return;
         const vol = this._findVolumeAt(this._lastScreenPos);
         if (vol) {
+          this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint
           this._selectedId = vol.id;
           this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: vol.id });
           this._bus.emit("object:selected", {
@@ -109,17 +111,15 @@ export class TriggerVolumeTool {
       // Clear our selection when something else gets selected or when
       // SelectionManager deselects on an empty-space click.
       this._bus.on("object:deselected", () => {
-        // Don't clear immediately — input:click may re-select a volume
-        // right after this fires. Use a microtask to let click handlers run first.
-        Promise.resolve().then(() => {
-          if (this._selectedId !== null) {
-            this._selectedId = null;
-            this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: null });
-          }
-        });
+        if (this._selectedId !== null) {
+          this._selectedId = null;
+          this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: null });
+        }
       }),
-      this._bus.on("object:selected", ({ type }) => {
-        if (type !== "trigger-volume" && this._selectedId !== null) {
+      this._bus.on("object:selected", ({ type, id }) => {
+        if (type === "trigger-volume") {
+          this._selectedId = id;
+        } else if (this._selectedId !== null) {
           this._selectedId = null;
           this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: null });
         }
@@ -232,6 +232,7 @@ export class TriggerVolumeTool {
       this._world.addTriggerVolume(this._activeZoneId, vol);
     });
     this._reset();
+    this._bus.emit("triggervolume:placed", { vol });
   }
 
   private _reset(): void {
