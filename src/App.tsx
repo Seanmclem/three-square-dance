@@ -723,6 +723,7 @@ export default function App() {
     history?.commitBatch();
     syncHistory();
     setSelected(null);
+    busRef.current.emit("object:deselected", {});
   }, [selected, syncHistory]);
 
   useEffect(() => {
@@ -914,7 +915,8 @@ export default function App() {
     <div style={{ width: "100vw", height: "100vh", background: "#0a0e16", position: "relative", overflow: "hidden" }}>
       <canvas
         ref={canvasRef}
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
+                 cursor: activeTool === "trigger-volume" ? "crosshair" : "default" }}
       />
 
       <Toolbar
@@ -984,6 +986,16 @@ export default function App() {
       />
       <CoordinateDisplay coords={coords} />
 
+      {activeTool === "trigger-volume" && !isPreview && (
+        <div style={{
+          position: "absolute", bottom: 64, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(10,14,22,0.92)", border: "1px solid rgba(0,255,200,0.3)",
+          borderRadius: 8, padding: "7px 16px", zIndex: 30, pointerEvents: "none",
+          color: "#44ccaa", fontSize: 11, fontFamily: "monospace", whiteSpace: "nowrap",
+        }}>
+          Click &amp; drag on floor to place trigger volume · Scroll to adjust height
+        </div>
+      )}
 
       {autoFloorPrompt && (
         <div style={{
