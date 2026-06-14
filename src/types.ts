@@ -44,7 +44,12 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'zones' | 'scripts' | null;
+export type LeftPanelId   = 'assets' | 'groups' | 'scripts' | null;
+
+export interface GroupDef {
+  id:   string;
+  name: string;
+}
 
 export interface AssetDef {
   id:           string;
@@ -172,6 +177,9 @@ export interface BusEvents {
   "triggervolume:hover":   { zoneId: string; id: string | null };
   "triggervolume:select":  { zoneId: string; id: string | null };
   "triggervolume:placed":  { vol: TriggerVolume };
+  "group:added":           { group: GroupDef };
+  "group:removed":         { id: string };
+  "group:updated":         { id: string; name: string };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -279,6 +287,7 @@ export interface FloorDef {
   ceilingHeight:     number | null;
   floorMesh:         FloorMeshDef;
   materialOverrides?: MaterialOverrides;
+  groupIds?:         string[];
 }
 
 export interface Opening {
@@ -307,6 +316,7 @@ export interface WallDef {
   exteriorMaterial:   string;
   openings:           Opening[];
   materialOverrides?: MaterialOverrides;
+  groupIds?:         string[];
 }
 
 export interface PlatformDef {
@@ -324,6 +334,7 @@ export interface PlatformDef {
   materialOverrides?:     MaterialOverrides;
   sideMaterial?:          string;
   sideMaterialOverrides?: MaterialOverrides;
+  groupIds?:              string[];
 }
 
 export interface StairCutterDef {
@@ -349,6 +360,7 @@ export interface StairDef {
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
   csgCutter?:              StairCutterDef;
+  groupIds?:               string[];
 }
 
 export interface ObjectProperties {
@@ -369,6 +381,7 @@ export interface WorldObject {
   zoneId?:    string;
   properties: ObjectProperties;
   scripts?:   ScriptDef[];
+  groupIds?:  string[];
 }
 
 export interface ZoneDef {
@@ -404,6 +417,7 @@ export interface SceneFile {
   terrain:     TerrainDef | null;
   zones:       ZoneDef[];
   transitions: TransitionDef[];
+  groups?:     GroupDef[];
 }
 
 // ─── Builder return types ─────────────────────────────────────────────────────
@@ -531,8 +545,9 @@ export interface TriggerVolume {
   label:    string;
   position: Vec3;
   size:     Vec3;
-  zoneId:   string;
-  scripts?: ScriptDef[];
+  zoneId:    string;
+  scripts?:  ScriptDef[];
+  groupIds?: string[];
 }
 
 export interface EntityCapabilities {

@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening, SpawnDef, TriggerVolume,
+  SceneFile, Opening, SpawnDef, TriggerVolume, GroupDef,
 } from "@/types";
 
 export class WorldState {
@@ -13,8 +13,28 @@ export class WorldState {
   readonly zones       = new Map<string, ZoneDef>();
   readonly transitions = new Map<string, TransitionDef>();
   activeZoneId: string | null = null;
+  groups: GroupDef[] = [];
 
   constructor(private readonly _bus: EventBus) {}
+
+  // ─── Group mutations ──────────────────────────────────────────────────────
+
+  addGroup(group: GroupDef): void {
+    this.groups.push(group);
+    this._bus.emit("group:added", { group });
+  }
+
+  removeGroup(id: string): void {
+    this.groups = this.groups.filter(g => g.id !== id);
+    this._bus.emit("group:removed", { id });
+  }
+
+  updateGroup(id: string, name: string): void {
+    const g = this.groups.find(g => g.id === id);
+    if (!g) return;
+    g.name = name;
+    this._bus.emit("group:updated", { id, name });
+  }
 
   // ─── Zone mutations ───────────────────────────────────────────────────────
 
@@ -274,6 +294,7 @@ export class WorldState {
       terrain:     this.terrain  ?? null,
       zones:       [...this.zones.values()],
       transitions: [...this.transitions.values()],
+      groups:      this.groups,
     };
   }
 
@@ -285,6 +306,7 @@ export class WorldState {
     this.transitions.clear();
     for (const zone of file.zones)        this.zones.set(zone.id, zone);
     for (const trans of file.transitions) this.transitions.set(trans.id, trans);
+    this.groups       = file.groups ?? [];
     this.activeZoneId = file.zones[0]?.id ?? null;
     this._bus.emit("world:loaded", { metadata: file.metadata });
   }

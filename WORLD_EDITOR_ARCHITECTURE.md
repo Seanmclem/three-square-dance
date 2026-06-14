@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.5.0** — last updated 2026-06-11
+**Version 3.6.0** — last updated 2026-06-14
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -30,6 +30,7 @@
 - v3.3 — Phase 10.8 added: world-space UV generation, UVUtils.ts, consistent texture density across all builders, uvVersion migration
 - v3.4 — Three-level script architecture: object scripts on WorldObject, zone scripts on ZoneDef, world scripts on WorldConfig. ScriptEngine manages all three independently. Script Panel has World/Zone/Object tabs.
 - v3.5 — **Phase 10.5 implemented:** ScriptEngine, GameStateManager, TriggerVolumeTool, ScriptPanel, DialogueOverlay, TriggerSystem volume sensors, ZoneManager volume wireframes + colliders, ColliderBuilder.registerVolumeSensor(), WorldState triggerVolume mutations, App.tsx fully wired.
+- v3.6 — **Phase 10.6 Groups system:** Zones redesigned as Groups (named labels, no spatial bounds). GroupPanel replaces ZonePanel, Z key toggles groups panel, GroupDef/groupIds added to all entity types, WorldState group CRUD with bus events, ScriptPanel tabs renamed GLOBAL/LEVEL/SELECTED with per-tab descriptions, TriggerVolumeTool auto-selects after placement, click-through fix via InputManager drag threshold.
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
 
 ---
@@ -6559,6 +6560,85 @@ this._bus.on("history:restore", () => {
 - Max 50 undo entries; oldest are shifted off when the limit is reached.
 - Redo stack is wiped whenever a new action is recorded.
 - Batch `cancelBatch()` leaves WorldState unmodified and pushes nothing onto either stack.
+
+---
+
+---
+
+## Phase 10.6 — Groups System
+
+**Motivation:** The original "zone" concept was confusing — zones looked like physical areas with drawn bounds (like Unity scenes), but the single-JSON-per-level design means there is really only one implicit geometry container. User-facing zones were repurposed as **Groups**: lightweight named labels with no spatial component.
+
+### What changed (user-facing)
+
+| Old | New |
+|---|---|
+| Zone drawing tool (Z key → draw bounds on canvas) | Removed |
+| ZonePanel with zone list + "Enter ›" | GroupPanel: flat name list + "+ New" |
+| ZoneNamingDialog (name + outdoor/indoor/dungeon type) | Inline rename (click label, Enter confirms) |
+| No group concept in entity properties | *Future: GROUPS section in every entity's PropertiesPanel* |
+| Script panel tabs: WORLD / ZONE / OBJECT | GLOBAL / LEVEL / SELECTED |
+
+### What stayed the same (internal)
+
+- `ZoneDef` still exists as the internal geometry container (one demo zone, always active)
+- `ZoneManager`, `activeZoneId`, all `zone:*` bus events — untouched
+- Persistence: `SceneFile.zones[]` still works; demo zone still has floors/walls/objects
+- `ZoneType` still on `ZoneDef` for backward-compatible JSON reading; unused in UI
+
+### Data model additions (`src/types.ts`)
+
+```ts
+export interface GroupDef {
+  id:   string;
+  name: string;
+}
+```
+
+`GroupDef[]` added as optional `groups?` field on `SceneFile`.
+
+`groupIds?: string[]` added to `FloorDef`, `WallDef`, `PlatformDef`, `StairDef`, `WorldObject`, `TriggerVolume` for future multi-group assignment.
+
+Bus events added: `group:added`, `group:removed`, `group:updated`.
+
+### `src/world/WorldState.ts`
+
+`groups: GroupDef[] = []` field. Methods `addGroup`, `removeGroup`, `updateGroup` emit the new bus events. `toJSON` includes `groups`; `loadFromJSON` reads `file.groups ?? []`.
+
+### `src/ui/GroupPanel.tsx` (new file)
+
+Flat list of groups, each with an inline-rename click target and a × remove button. "+ New" button at the top.
+
+### `src/ui/LeftPanel.tsx`
+
+Renders `<GroupPanel>` when `panelId === "groups"`. Props: `groups`, `onGroupAdd`, `onGroupRemove`, `onGroupRename`.
+
+### `src/App.tsx`
+
+- `groups` state replaces `zones`/`pendingZone` state for the left panel.
+- `handleAddGroup`, `handleRemoveGroup`, `handleRenameGroup` handlers wire to `WorldState`.
+- Z key toggles the groups panel (no tool activation).
+- `ZoneNamingDialog` removed.
+- Group bus listeners update `groups` state.
+- `world:loaded` listener syncs `groups` from `world.groups`.
+
+### `src/ui/Toolbar.tsx`
+
+Zone button label changed from "Zone" to "Groups". Active state triggered by `openPanel === "groups"` instead of `"zones"`.
+
+### Backward compatibility
+
+- Old saves load fine; `groups` defaults to `[]`.
+- Old saves with multiple zones still render (all zone geometry loads, only the first zone is actively editable).
+- `groupIds` is optional on all entity types — existing entities behave as if in no groups.
+
+---
+
+## Future: Scene Loader
+
+Each JSON file is one complete level. A future **Scene Loader** will manage loading different level JSONs and passing player state (inventory, flags, spawn position) between them. This replaces the current concept of multiple geographic zones within one file.
+
+The current `ZoneDef` / `ZoneManager` will be retained as the per-level geometry container. The Scene Loader will be responsible for unloading one `ZoneDef`-based level and loading another, preserving cross-scene game state via a separate persistence layer.
 
 ---
 

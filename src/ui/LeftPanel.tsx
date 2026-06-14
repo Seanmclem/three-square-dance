@@ -1,6 +1,6 @@
-import type { LeftPanelId, AssetDef, ZoneDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
+import type { LeftPanelId, AssetDef, GroupDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
 import { AssetBrowser } from "@/ui/AssetBrowser";
-import { ZonePanel } from "@/ui/ZonePanel";
+import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
 
 interface LeftPanelProps {
@@ -10,10 +10,11 @@ interface LeftPanelProps {
   onAssetSelect:   (id: string | null) => void;
   onImport:        () => void;
   onClose:         () => void;
-  zones:           ZoneDef[];
+  groups:          GroupDef[];
+  onGroupAdd:      () => void;
+  onGroupRemove:   (id: string) => void;
+  onGroupRename:   (id: string, name: string) => void;
   activeZoneId:    string | null;
-  onEnterZone:     (zoneId: string) => void;
-  onNewZone:       () => void;
   // scripts panel
   worldScripts:         ScriptDef[];
   zoneScripts:          ScriptDef[];
@@ -28,9 +29,9 @@ interface LeftPanelProps {
 
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose,
-  zones, activeZoneId, onEnterZone, onNewZone,
+  groups, onGroupAdd, onGroupRemove, onGroupRename,
   worldScripts, zoneScripts, objectScripts, selectedObjectId,
-  triggerVolumes, zoneObjects,
+  activeZoneId, triggerVolumes, zoneObjects,
   onWorldScriptsChange, onZoneScriptsChange, onObjectScriptsChange,
 }: LeftPanelProps) {
   const open = panelId !== null;
@@ -82,12 +83,12 @@ export function LeftPanel({
                 onImport={onImport}
               />
             )}
-            {panelId === "zones" && (
-              <ZonePanel
-                zones={zones}
-                activeZoneId={activeZoneId}
-                onEnterZone={onEnterZone}
-                onNewZone={onNewZone}
+            {panelId === "groups" && (
+              <GroupPanel
+                groups={groups}
+                onAdd={onGroupAdd}
+                onRemove={onGroupRemove}
+                onRename={onGroupRename}
               />
             )}
             {panelId === "scripts" && (

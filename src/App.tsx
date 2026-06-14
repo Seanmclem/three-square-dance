@@ -31,9 +31,8 @@ import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
-import { ZoneNamingDialog } from "@/ui/ZoneNamingDialog";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType, PlayerSettings, ScriptDef, TriggerVolume } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -84,7 +83,7 @@ export default function App() {
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
-  const [pendingZone,     setPendingZone]      = useState<Bounds | null>(null);
+  const [groups,          setGroups]           = useState<GroupDef[]>([]);
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
@@ -282,6 +281,7 @@ export default function App() {
       bus.on("world:loaded",    ()               => {
         setZones([...world.zones.values()]);
         setActiveZoneId(world.activeZoneId);
+        setGroups([...world.groups]);
         setWorldScripts(world.world?.scripts ?? []);
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
@@ -324,7 +324,9 @@ export default function App() {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
-      bus.on("zonetool:awaiting-name", ({ bounds }) => setPendingZone(bounds)),
+      bus.on("group:added",   () => setGroups([...world.groups])),
+      bus.on("group:removed", () => setGroups([...world.groups])),
+      bus.on("group:updated", () => setGroups([...world.groups])),
     ];
 
     return () => {
@@ -361,12 +363,8 @@ export default function App() {
 
   const handleToolSelect = (tool: ToolId): void => {
     if (tool === "zone") {
-      // Z = toggle zones browser; cancel draw mode if it was active
-      if (activeTool === "zone") {
-        setActiveTool("select");
-        busRef.current.emit("tool:select", { tool: "select" });
-      }
-      setLeftPanel(p => p === "zones" ? null : "zones");
+      // Z key = toggle groups panel
+      setLeftPanel(p => p === "groups" ? null : "groups");
       return;
     }
     setActiveTool(tool);
@@ -376,47 +374,22 @@ export default function App() {
     else setLeftPanel(null);
   };
 
-  const handleStartZoneDraw = (): void => {
-    setActiveTool("zone");
-    busRef.current.emit("tool:select", { tool: "zone" });
-    setLeftPanel("zones");
-  };
-
   const handlePanelToggle = (panelId: LeftPanelId): void => {
     setLeftPanel(p => p === panelId ? null : panelId);
   };
 
-  const handleEnterZone = (zoneId: string): void => {
-    busRef.current.emit("zone:enter", { zoneId });
-  };
-
-  const handleZoneConfirm = (name: string, type: ZoneType): void => {
-    const bounds = pendingZone;
-    setPendingZone(null);
-    if (!bounds) return;
+  const handleAddGroup = (): void => {
     const world = worldRef.current;
     if (!world) return;
-    const newZone: ZoneDef = {
-      id:        crypto.randomUUID(),
-      name,
-      type,
-      bounds,
-      nodes:     [],
-      floors:    [],
-      walls:     [],
-      platforms: [],
-      stairs:    [],
-      objects:   [],
-    };
-    historyRef.current?.record("add zone", () => {
-      world.addZone(newZone);
-      world.setActiveZone(newZone.id);
-    });
-    syncHistory();
-    // Return to select tool, keep zones panel open so user sees the new zone
-    setActiveTool("select");
-    busRef.current.emit("tool:select", { tool: "select" });
-    setLeftPanel("zones");
+    world.addGroup({ id: crypto.randomUUID(), name: "New Group" });
+  };
+
+  const handleRemoveGroup = (id: string): void => {
+    worldRef.current?.removeGroup(id);
+  };
+
+  const handleRenameGroup = (id: string, name: string): void => {
+    worldRef.current?.updateGroup(id, name);
   };
 
   const handleFloorChange = (level: number): void => {
@@ -955,10 +928,11 @@ export default function App() {
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
         onClose={() => setLeftPanel(null)}
-        zones={zones}
+        groups={groups}
+        onGroupAdd={handleAddGroup}
+        onGroupRemove={handleRemoveGroup}
+        onGroupRename={handleRenameGroup}
         activeZoneId={activeZoneId}
-        onEnterZone={handleEnterZone}
-        onNewZone={handleStartZoneDraw}
         worldScripts={worldScripts}
         zoneScripts={zoneScripts}
         objectScripts={objectScripts}
@@ -1089,12 +1063,6 @@ SquareDance
         />
       )}
 
-      {pendingZone && (
-        <ZoneNamingDialog
-          onConfirm={handleZoneConfirm}
-          onCancel={() => setPendingZone(null)}
-        />
-      )}
       {deletePrompt && (
         <ScriptDetachDialog
           scriptCount={deletePrompt.scripts.length}

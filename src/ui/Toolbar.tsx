@@ -13,7 +13,7 @@ const TOOLS: ToolDef[] = [
   { id: "poly-platform",   label: "Poly Plat", shortcut: "K" },
   { id: "stair",           label: "Stair",     shortcut: "T" },
   { id: "object",          label: "Object",   shortcut: "O" },
-  { id: "zone",            label: "Zone",     shortcut: "Z" },
+  { id: "zone",            label: "Groups",   shortcut: "Z" },
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
   { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
 ];
@@ -41,7 +41,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
 
       {TOOLS.map(tool => {
         const active = activeTool === tool.id
-          || (tool.id === "zone"            && openPanel === "zones")
+          || (tool.id === "zone"            && openPanel === "groups")
           || (tool.id === "object"          && openPanel === "assets")
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
         const Icon = TOOL_ICONS[tool.id];
