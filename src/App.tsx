@@ -32,6 +32,7 @@ import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { ZoneNamingDialog } from "@/ui/ZoneNamingDialog";
+import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, Bounds, ZoneType, PlayerSettings, ScriptDef, TriggerVolume } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes } from "@/world/WorldLoader";
@@ -91,6 +92,7 @@ export default function App() {
   const [worldScripts,    setWorldScripts]     = useState<ScriptDef[]>([]);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
+  const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
 
@@ -286,9 +288,17 @@ export default function App() {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
-      bus.on("triggervolume:updated", () => {
+      bus.on("triggervolume:updated", ({ id }) => {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
+        // If this volume is selected, update selected.data so PropertiesPanel sees new scripts
+        setSelected(prev => {
+          if (prev?.type === "trigger-volume" && prev.id === id) {
+            const vol = z?.triggerVolumes?.find(v => v.id === id);
+            return vol ? { ...prev, data: vol } : prev;
+          }
+          return prev;
+        });
       }),
       bus.on("triggervolume:removed", () => {
         const z = world.zones.get(world.activeZoneId ?? "");
@@ -688,8 +698,20 @@ export default function App() {
     } else if (type === "stair") {
       world.removeStair(zoneId, id);
     } else if (type === "object") {
+      const obj = world.zones.get(zoneId)?.objects.find(o => o.id === id);
+      if (obj?.scripts?.length) {
+        setDeletePrompt({ type: "object", id, zoneId, scripts: obj.scripts });
+        history?.cancelBatch();
+        return;
+      }
       world.removeObject(zoneId, id);
     } else if (type === "trigger-volume") {
+      const vol = world.zones.get(zoneId)?.triggerVolumes?.find(v => v.id === id);
+      if (vol?.scripts?.length) {
+        setDeletePrompt({ type: "volume", id, zoneId, scripts: vol.scripts });
+        history?.cancelBatch();
+        return;
+      }
       world.removeTriggerVolume(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
@@ -845,15 +867,47 @@ export default function App() {
 
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
-    historyRef.current?.record("update object scripts", () => {
-      worldRef.current?.updateObject(selected.zoneId, objectId, { scripts });
-    });
+    if (selected.type === "trigger-volume") {
+      historyRef.current?.record("update volume scripts", () => {
+        worldRef.current?.updateTriggerVolume(selected.zoneId, objectId, { scripts });
+      });
+    } else {
+      historyRef.current?.record("update object scripts", () => {
+        worldRef.current?.updateObject(selected.zoneId, objectId, { scripts });
+      });
+    }
     syncHistory();
   };
 
+  const handleDeleteConfirm = (keepScripts: boolean): void => {
+    const prompt = deletePrompt;
+    setDeletePrompt(null);
+    if (!prompt) return;
+    const { type, id, zoneId, scripts } = prompt;
+    const world = worldRef.current;
+    if (!world) return;
+    historyRef.current?.record(`delete ${type}`, () => {
+      if (keepScripts) {
+        const zone = world.zones.get(zoneId)!;
+        zone.scripts = [...(zone.scripts ?? []), ...scripts];
+        setZoneScripts([...(zone.scripts)]);
+      }
+      if (type === "volume") world.removeTriggerVolume(zoneId, id);
+      else world.removeObject(zoneId, id);
+    });
+    syncHistory();
+    setSelected(null);
+    busRef.current.emit("object:deselected", {});
+  };
+
   const zoneObjects = zones.find(z => z.id === activeZoneId)?.objects ?? [];
-  const objectScripts = selected?.type === "object"
-    ? ((selected.data as WorldObject)?.scripts ?? [])
+  const objectScripts =
+    selected?.type === "object"         ? ((selected.data as WorldObject)?.scripts     ?? [])
+    : selected?.type === "trigger-volume" ? ((selected.data as TriggerVolume)?.scripts ?? [])
+    : null;
+  const selectedObjectId =
+    selected?.type === "object"          ? selected.id
+    : selected?.type === "trigger-volume" ? selected.id
     : null;
 
   return (
@@ -886,7 +940,7 @@ export default function App() {
         worldScripts={worldScripts}
         zoneScripts={zoneScripts}
         objectScripts={objectScripts}
-        selectedObjectId={selected?.type === "object" ? selected.id : null}
+        selectedObjectId={selectedObjectId}
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
         onWorldScriptsChange={handleWorldScriptsChange}
@@ -920,6 +974,7 @@ export default function App() {
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
         onDelete={selected ? handleDelete : undefined}
+        onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         zones={zones}
         activeZoneId={activeZoneId}
         playerSettings={worldRef.current?.world?.playerSettings}
@@ -1006,6 +1061,15 @@ SquareDance
         <ZoneNamingDialog
           onConfirm={handleZoneConfirm}
           onCancel={() => setPendingZone(null)}
+        />
+      )}
+      {deletePrompt && (
+        <ScriptDetachDialog
+          scriptCount={deletePrompt.scripts.length}
+          entityLabel={deletePrompt.type === "volume" ? "trigger volume" : "object"}
+          onDeleteAll={() => handleDeleteConfirm(false)}
+          onKeepScripts={() => handleDeleteConfirm(true)}
+          onCancel={() => setDeletePrompt(null)}
         />
       )}
       <DialogueOverlay

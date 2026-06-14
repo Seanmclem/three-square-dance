@@ -61,6 +61,15 @@ export class ScriptEngine {
     for (const obj of zone.objects) {
       for (const s of obj.scripts ?? []) this._indexScript(s);
     }
+    for (const vol of zone.triggerVolumes ?? []) {
+      for (const s of vol.scripts ?? []) {
+        // inject targetId = vol.id so the index key matches trigger:volume-enter events
+        const effective: ScriptDef = s.trigger.targetId
+          ? s
+          : { ...s, trigger: { ...s.trigger, targetId: vol.id } };
+        this._indexScript(effective);
+      }
+    }
   }
 
   loadWorld(world: WorldConfig): void {

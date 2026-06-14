@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume,
+  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
 } from "@/types";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
@@ -255,6 +255,7 @@ interface PropertiesPanelProps {
   onCopyRunToFloor?:        (targetLevel: number) => void;
   onFillRunWithFloor?:      () => void;
   onDelete?:                () => void;
+  onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
   zones?:                   ZoneDef[];
   activeZoneId?:            string | null;
   playerSettings?:          PlayerSettings;
@@ -268,6 +269,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
+  onVolumeScriptsChange,
   zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
@@ -334,7 +336,7 @@ export function PropertiesPanel({
         ) : !selected ? (
           <ToolView activeTool={activeTool} />
         ) : selected.type === "trigger-volume" ? (
-          <TriggerVolumeView selected={selected} onDelete={onDelete} />
+          <TriggerVolumeView selected={selected} onDelete={onDelete} onScriptsChange={onVolumeScriptsChange} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -1809,10 +1811,44 @@ function SpawnSettingsView({
 
 // ── TriggerVolumeView ─────────────────────────────────────────────────────────
 
-function TriggerVolumeView({ selected, onDelete }: { selected: SelectedObjectPayload; onDelete?: () => void }) {
+function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter" | "on_player_exit"): ScriptDef {
+  return {
+    id:         `scr_${crypto.randomUUID().slice(0, 8)}`,
+    label:      type === "on_player_enter" ? "On Enter" : "On Exit",
+    zoneId,
+    enabled:    true,
+    trigger:    { type, targetId: volId },
+    conditions: [],
+    actions:    [],
+    oneShot:    false,
+  };
+}
+
+function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
+  selected:         SelectedObjectPayload;
+  onDelete?:        () => void;
+  onScriptsChange?: (scripts: ScriptDef[]) => void;
+}) {
   const vol = selected.data as TriggerVolume | null;
   if (!vol) return null;
-  const fmt = (n: number) => n.toFixed(2);
+  const fmt     = (n: number) => n.toFixed(2);
+  const scripts = vol.scripts ?? [];
+
+  function addScript(type: "on_player_enter" | "on_player_exit"): void {
+    if (!onScriptsChange) return;
+    onScriptsChange([...scripts, blankVolumeScript(vol!.zoneId, vol!.id, type)]);
+  }
+
+  function toggleScript(id: string): void {
+    if (!onScriptsChange) return;
+    onScriptsChange(scripts.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+  }
+
+  function deleteScript(id: string): void {
+    if (!onScriptsChange) return;
+    onScriptsChange(scripts.filter(s => s.id !== id));
+  }
+
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
@@ -1841,6 +1877,71 @@ function TriggerVolumeView({ selected, onDelete }: { selected: SelectedObjectPay
           ))}
         </div>
       </div>
+
+      {/* Scripts section */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={LABEL}>SCRIPTS</div>
+          {onScriptsChange && (
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={() => addScript("on_player_enter")}
+                title="Add On Enter script"
+                style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                         background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
+                         borderRadius: 3, color: "#44ccaa" }}
+              >+ Enter</button>
+              <button
+                onClick={() => addScript("on_player_exit")}
+                title="Add On Exit script"
+                style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                         background: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.25)",
+                         borderRadius: 3, color: "#ccaa44" }}
+              >+ Exit</button>
+            </div>
+          )}
+        </div>
+        {scripts.length === 0 && (
+          <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>
+            No scripts — add Entry or Exit above
+          </div>
+        )}
+        {scripts.map(s => (
+          <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
+                                    background: "rgba(255,255,255,0.03)", borderRadius: 4,
+                                    padding: "4px 8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+            <div
+              onClick={() => toggleScript(s.id)}
+              title={s.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+              style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
+                       background: s.enabled ? "#44cc88" : "#444" }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: "#b0b0b0", fontSize: 11, fontFamily: "monospace",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.label}
+              </div>
+              <div style={{ color: "#00ffcc", fontSize: 9, opacity: 0.7 }}>
+                {s.trigger.type} · {s.actions.length} action{s.actions.length !== 1 ? "s" : ""}
+              </div>
+            </div>
+            {onScriptsChange && (
+              <button
+                onClick={() => deleteScript(s.id)}
+                title="Remove script from this volume"
+                style={{ background: "none", border: "none", color: "#664444", fontSize: 13,
+                         cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+              >×</button>
+            )}
+          </div>
+        ))}
+        {scripts.length > 0 && (
+          <div style={{ color: "#444", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
+            Edit actions in the Scripts panel →
+          </div>
+        )}
+      </div>
+
       {onDelete && (
         <button
           onClick={onDelete}

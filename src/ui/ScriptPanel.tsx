@@ -119,6 +119,9 @@ export function ScriptPanel({
 
   function addScript(): void {
     const s = blankScript(currentZoneId);
+    if (tab === "object" && selectedObjectId) {
+      s.trigger.targetId = selectedObjectId;
+    }
     const next = [...currentScripts, s];
     save(next);
     setEditingId(s.id);
@@ -160,6 +163,8 @@ export function ScriptPanel({
           script={editing}
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
+          ownerIsEntity={tab === "object"}
+          selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
           onChange={updateScript}
           onDelete={() => deleteScript(editing.id)}
@@ -224,10 +229,12 @@ function ScriptList({ scripts, onSelect, onToggle, onAdd }: {
 
 // ── ScriptEditor ──────────────────────────────────────────────────────────────
 
-function ScriptEditor({ script, triggerVolumes, zoneObjects, onBack, onChange, onDelete }: {
-  script:         ScriptDef;
-  triggerVolumes: TriggerVolume[];
-  zoneObjects:    WorldObject[];
+function ScriptEditor({ script, triggerVolumes, zoneObjects, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
+  script:           ScriptDef;
+  triggerVolumes:   TriggerVolume[];
+  zoneObjects:      WorldObject[];
+  ownerIsEntity:    boolean;
+  selectedObjectId: string | null;
   onBack:   () => void;
   onChange: (s: ScriptDef) => void;
   onDelete: () => void;
@@ -283,7 +290,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, onBack, onChange, o
             {TRIGGER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
 
-          {needsTarget && (
+          {needsTarget && !ownerIsEntity && (
             <TargetPicker
               triggerType={script.trigger.type}
               targetId={script.trigger.targetId ?? ""}
@@ -291,6 +298,11 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, onBack, onChange, o
               zoneObjects={zoneObjects}
               onChange={id => setTrigger({ targetId: id })}
             />
+          )}
+          {needsTarget && ownerIsEntity && (
+            <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0" }}>
+              Target: this {selectedObjectId?.startsWith("vol_") ? "volume" : "object"} (implicit)
+            </div>
           )}
 
           {script.trigger.type === "on_timer" && (

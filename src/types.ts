@@ -531,6 +531,7 @@ export interface TriggerVolume {
   position: Vec3;
   size:     Vec3;
   zoneId:   string;
+  scripts?: ScriptDef[];
 }
 
 export interface EntityCapabilities {
