@@ -164,8 +164,8 @@ export function ScriptPanel({
 
       {/* Per-tab description */}
       <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "5px 10px 0", lineHeight: 1.4 }}>
-        {tab === "world"  && "Game-wide events (e.g. on game start). Not attached to any object."}
-        {tab === "zone"   && "Scripts for this entire map level. Rarely needed — use trigger volumes instead."}
+        {tab === "world"  && "Attached to the whole game (WorldConfig). Fires on game-wide events like on_game_start. There is one world, so one set of these — they run regardless of which zone is loaded."}
+        {tab === "zone"   && "Attached to this specific zone/room. Would fire on zone-scoped events, but no on_zone_load trigger exists yet. Most zone logic is better handled by a trigger volume at the zone entrance. Rarely needed."}
         {tab === "object" && "Scripts on the selected trigger volume or object."}
       </div>
 
