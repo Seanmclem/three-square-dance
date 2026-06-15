@@ -76,28 +76,26 @@ function blankScript(zoneId: string): ScriptDef {
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface ScriptPanelProps {
-  worldScripts:    ScriptDef[];
   zoneScripts:     ScriptDef[];
   objectScripts:   ScriptDef[] | null;
   selectedObjectId: string | null;
   activeZoneId:    string | null;
   triggerVolumes:  TriggerVolume[];
   zoneObjects:     WorldObject[];
-  onWorldScriptsChange:   (scripts: ScriptDef[]) => void;
   onZoneScriptsChange:    (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:  (objectId: string, scripts: ScriptDef[]) => void;
 }
 
-type TabId = "world" | "zone" | "object";
+type TabId = "level" | "object";
 
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
 export function ScriptPanel({
-  worldScripts, zoneScripts, objectScripts, selectedObjectId,
+  zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
-  onWorldScriptsChange, onZoneScriptsChange, onObjectScriptsChange,
+  onZoneScriptsChange, onObjectScriptsChange,
 }: ScriptPanelProps) {
-  const [tab,       setTab]       = useState<TabId>("world");
+  const [tab,       setTab]       = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Auto-switch to SELECTED tab when a trigger volume or object is selected
@@ -106,18 +104,12 @@ export function ScriptPanel({
   }, [selectedObjectId]);
 
   const currentScripts: ScriptDef[] =
-    tab === "world"  ? worldScripts :
-    tab === "zone"   ? zoneScripts  :
-    (objectScripts ?? []);
+    tab === "level" ? zoneScripts : (objectScripts ?? []);
 
-  const currentZoneId =
-    tab === "world" ? "" :
-    tab === "zone"  ? (activeZoneId ?? "") :
-    (activeZoneId ?? "");
+  const currentZoneId = activeZoneId ?? "";
 
   function save(updated: ScriptDef[]): void {
-    if (tab === "world")  onWorldScriptsChange(updated);
-    if (tab === "zone")   onZoneScriptsChange(updated);
+    if (tab === "level")  onZoneScriptsChange(updated);
     if (tab === "object" && selectedObjectId)
       onObjectScriptsChange(selectedObjectId, updated);
   }
@@ -151,22 +143,21 @@ export function ScriptPanel({
     <div style={S.root}>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["world","zone","object"] as TabId[]).map(t => (
+        {(["level","object"] as TabId[]).map(t => (
           <button
             key={t}
             style={S.tab(tab === t)}
             onClick={() => { setTab(t); setEditingId(null); }}
           >
-            {t === "world" ? "GLOBAL" : t === "zone" ? "LEVEL" : "SELECTED"}
+            {t === "level" ? "LEVEL" : "SELECTED"}
           </button>
         ))}
       </div>
 
       {/* Per-tab description */}
       <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "5px 10px 0", lineHeight: 1.4 }}>
-        {tab === "world"  && "Attached to the whole game (WorldConfig). Fires on game-wide events like on_game_start. There is one world, so one set of these — they run regardless of which zone is loaded."}
-        {tab === "zone"   && "Attached to this specific zone/room. Would fire on zone-scoped events, but no on_zone_load trigger exists yet. Most zone logic is better handled by a trigger volume at the zone entrance. Rarely needed."}
-        {tab === "object" && "Scripts on the selected trigger volume or object."}
+        {tab === "level"  && "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
+        {tab === "object" && "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
       </div>
 
       {editing ? (

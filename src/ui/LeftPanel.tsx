@@ -16,13 +16,11 @@ interface LeftPanelProps {
   onGroupRename:   (id: string, name: string) => void;
   activeZoneId:    string | null;
   // scripts panel
-  worldScripts:         ScriptDef[];
   zoneScripts:          ScriptDef[];
   objectScripts:        ScriptDef[] | null;
   selectedObjectId:     string | null;
   triggerVolumes:       TriggerVolume[];
   zoneObjects:          WorldObject[];
-  onWorldScriptsChange: (scripts: ScriptDef[]) => void;
   onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
 }
@@ -30,9 +28,9 @@ interface LeftPanelProps {
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose,
   groups, onGroupAdd, onGroupRemove, onGroupRename,
-  worldScripts, zoneScripts, objectScripts, selectedObjectId,
+  zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
-  onWorldScriptsChange, onZoneScriptsChange, onObjectScriptsChange,
+  onZoneScriptsChange, onObjectScriptsChange,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -93,14 +91,12 @@ export function LeftPanel({
             )}
             {panelId === "scripts" && (
               <ScriptPanel
-                worldScripts={worldScripts}
                 zoneScripts={zoneScripts}
                 objectScripts={objectScripts}
                 selectedObjectId={selectedObjectId}
                 activeZoneId={activeZoneId}
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
-                onWorldScriptsChange={onWorldScriptsChange}
                 onZoneScriptsChange={onZoneScriptsChange}
                 onObjectScriptsChange={onObjectScriptsChange}
               />

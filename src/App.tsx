@@ -88,7 +88,6 @@ export default function App() {
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
-  const [worldScripts,    setWorldScripts]     = useState<ScriptDef[]>([]);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
@@ -282,7 +281,6 @@ export default function App() {
         setZones([...world.zones.values()]);
         setActiveZoneId(world.activeZoneId);
         setGroups([...world.groups]);
-        setWorldScripts(world.world?.scripts ?? []);
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
@@ -841,14 +839,6 @@ export default function App() {
     }
   };
 
-  const handleWorldScriptsChange = (scripts: ScriptDef[]): void => {
-    const world = worldRef.current;
-    if (!world?.world) return;
-    world.world.scripts = scripts;
-    setWorldScripts(scripts);
-    setIsDirty(true);
-  };
-
   const handleZoneScriptsChange = (scripts: ScriptDef[]): void => {
     const world = worldRef.current;
     if (!activeZoneId || !world) return;
@@ -933,13 +923,11 @@ export default function App() {
         onGroupRemove={handleRemoveGroup}
         onGroupRename={handleRenameGroup}
         activeZoneId={activeZoneId}
-        worldScripts={worldScripts}
         zoneScripts={zoneScripts}
         objectScripts={objectScripts}
         selectedObjectId={selectedObjectId}
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
-        onWorldScriptsChange={handleWorldScriptsChange}
         onZoneScriptsChange={handleZoneScriptsChange}
         onObjectScriptsChange={handleObjectScriptsChange}
       />
