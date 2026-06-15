@@ -41,7 +41,7 @@ export class ScriptEngine {
     sub("trigger:volume-enter",  ({ volumeId })  => this.fire("on_player_enter", volumeId));
     sub("trigger:volume-exit",   ({ volumeId })  => this.fire("on_player_exit",  volumeId));
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
-    sub("zone:enter",            ({ zoneId })    => this.fire("on_zone_enter",   zoneId));
+    sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
   }
 
   deactivate(): void {

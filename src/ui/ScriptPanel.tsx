@@ -46,7 +46,7 @@ const S = {
 
 const TRIGGER_TYPES: TriggerType[] = [
   "on_player_enter","on_player_exit","on_interact","on_timer",
-  "on_flag_set","on_flag_cleared","on_zone_enter","on_game_start","on_health_zero",
+  "on_flag_set","on_flag_cleared","on_level_load","on_game_start","on_health_zero",
 ];
 
 const CONDITION_TYPES: ConditionType[] = [
@@ -258,8 +258,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, ownerIsEntity, sele
     script.trigger.type === "on_player_exit"  ||
     script.trigger.type === "on_interact"      ||
     script.trigger.type === "on_flag_set"      ||
-    script.trigger.type === "on_flag_cleared"  ||
-    script.trigger.type === "on_zone_enter"
+    script.trigger.type === "on_flag_cleared"
   );
 
   return (

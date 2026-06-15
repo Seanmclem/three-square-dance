@@ -462,7 +462,7 @@ export type TriggerType =
   | 'on_health_zero'
   | 'on_flag_set'
   | 'on_flag_cleared'
-  | 'on_zone_enter'
+  | 'on_level_load'
   | 'on_game_start';
 
 export type ConditionType =
