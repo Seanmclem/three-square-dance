@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.9.0** — last updated 2026-06-16
+**Version 3.9.1** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -35,6 +35,7 @@
 - v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.material` added for `change_material`; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6a").
 - v3.8 — **Phase 10.7 reconciled to reality:** `ObjectPlacer` documented as new/extracted from `ZoneManager._loadObjectMesh` (not an edit to an existing file); stale `WorldObject` interface snippet + Files Modified corrected; `loadModel`/`SkeletonUtils.clone` animation caveats added. Phase 10.9 `change_material` field renamed `materialOverride`→`material`; object-mesh actions (material swap, play_animation) routed through `ObjectPlacer` instead of `ZoneManager`.
 - v3.9 — **Phase 10.6b — Local-Space Geometry Storage** added (before Phase 10.7): local-space vertex storage for platforms + polygon floors fixes rotation snap-back / corner-drag; `FloorDef.position` added (`PlatformDef.rotation` already existed); `WorldLoader` local-space migration runs before the 10.8 UV migration; Phase 10.7 ObjectPlacer + Phase 10.8 migration-ordering notes added. Groups name-list foundation relabeled **10.6a** to free the 10.6b slot (10.6 cluster: 10.6 Entity Event System / 10.6a Groups / 10.6b Local-Space).
+- v3.9.1 — **10.6a/10.6b/10.7/10.8 coherence pass:** synced canonical `FloorDef`/`PlatformDef` type blocks to reality (`PlatformDef.rotation` + `groupIds` from 10.6a; `FloorDef.groupIds` + new `FloorDef.position`), resolving a contradiction where 10.6b claimed `PlatformDef.rotation` existed but the type block omitted it; clarified that platforms/floors have no `scale` transform; presented the 10.6b migration as the named `_migrateToLocalSpace()` method referenced by 10.8; fixed 10.7 intro to follow 10.6b.
 
 ---
 
@@ -272,7 +273,9 @@ export interface FloorDef {
   elevation:         number;
   ceilingHeight:     number | null;
   floorMesh:         FloorMeshDef;
+  position?:         Vec3;     // Phase 10.6b — local-space origin for polygon floors (XZ centre, Y = elevation)
   materialOverrides?: MaterialOverrides;
+  groupIds?:         string[]; // Phase 10.6a
 }
 
 export interface Opening {
@@ -317,12 +320,14 @@ export interface PlatformDef {
   material:       string;
   hasRailing:     boolean;
   railingHeight:  number;
+  rotation?:      Vec3;     // degrees, Y = yaw — stored transform, applied by mesh (Phase 10.6b)
   floorLevel?:    number;
   points?:        Vec2[];   // polygon platform — if set, size is ignored
   nodeIds?:       string[];
   materialOverrides?:     MaterialOverrides;
   sideMaterial?:          string;
   sideMaterialOverrides?: MaterialOverrides;
+  groupIds?:              string[];   // Phase 10.6a
 }
 
 export interface StairCutterDef {
@@ -5411,7 +5416,7 @@ Platforms and polygon floors store their vertex positions in world space — abs
 
 Every geometry object stores its shape in **local space** (relative to its own origin) and keeps world position/rotation/scale as a separate transform.
 
-- `position` / `rotation` / `scale` — updated by the gizmos; **never** affect vertex data.
+- `position` / `rotation` — the stored transform, updated by the translate/rotate gizmos; **never** affect vertex data. (Platforms and polygon floors have no `scale` field today — resizing changes shape data, not a scale transform; `scale` is listed here only as the general rule that also covers the future Brush primitive.)
 - `points[]` / `size` / `width` / `depth` — the shape, defined in local space around origin (0,0,0); only changed by vertex editing or resize handles.
 
 The builder always builds geometry at local origin, then Three.js applies `mesh.position/rotation/scale` on top. The Rapier collider is rebuilt from final world-space positions (local vertices × transform matrix) on any change. This is the same local-space rule mandated for the future Brush primitive (Phase 12) — applied here to the existing platform/floor tools.
@@ -5452,8 +5457,10 @@ The builder always builds geometry at local origin, then Three.js applies `mesh.
 
 Old scene files store polygon points in world space. On load, migrate to local space by subtracting the origin from each point. **This must run BEFORE the Phase 10.8 UV migration** (UV dimensions derive from local-space shape data):
 
+`_migrate()` calls `this._migrateToLocalSpace(file)` **before** `this._migrateUVVersion(file)` (see Phase 10.8 § Migration). The `_localSpaceMigrated` flags below are transient guards, not persisted fields:
+
 ```ts
-// In WorldLoader._migrate() — run BEFORE the uvVersion migration:
+private _migrateToLocalSpace(file: Partial<SceneFile>): void {
 for (const zone of file.zones ?? []) {
   for (const platform of zone.platforms ?? []) {
     if (platform.points && !platform._localSpaceMigrated) {
@@ -5473,6 +5480,7 @@ for (const zone of file.zones ?? []) {
       floor._localSpaceMigrated = true;
     }
   }
+}
 }
 ```
 
@@ -5500,7 +5508,7 @@ src/world/WorldLoader.ts        ← local-space migration runs before UV migrati
 
 ### Phase 10.7 — Object Animation Editor
 
-Sits after Phase 10.6 and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
+Sits after Phase 10.6b and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
 
 > **Architecture note — this phase creates `ObjectPlacer`.** Object mesh instantiation currently lives inline in `ZoneManager._loadObjectMesh()` (`src/world/ZoneManager.ts:814-843`); there is no `ObjectPlacer.ts` today. This phase **extracts** that logic into a new `src/preview/ObjectPlacer.ts` that owns the object mesh lifecycle — placement, the `_mixers`/`_clips` maps, `update(dt)`, and `previewClip()`. `ZoneManager` delegates to it (loadZone step 5 + the `object:added` handler) and keeps the meshes registered for selection/colliders. The snippets below assume that extraction. (NPCs/enemies in Phase 13 reuse the same object-mixer subsystem; the player's own mixer in `CharacterController` is separate and unaffected.)
 >
