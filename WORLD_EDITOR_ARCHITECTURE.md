@@ -5321,33 +5321,6 @@ ScriptEngine calls `actionDispatcher.dispatch(action, context)` — it has no kn
 
 ---
 
-#### Animation Clips — Stored at Import, Managed at Placement
-
-**At import time** (`ModelImporterModal`):
-```ts
-// After loading GLTF to generate thumbnail:
-const clips = gltf.animations.map(a => a.name);
-manifestEntry.animations = clips;   // stored in manifest.json
-```
-
-**At placement time** (`ObjectPlacer.place()`):
-```ts
-const asset = assetManager.getAsset(assetId);
-if (asset.animations?.length) {
-  const mixer = new THREE.AnimationMixer(mesh);
-  const clipMap = new Map<string, THREE.AnimationClip>();
-  gltf.animations.forEach(clip => clipMap.set(clip.name, clip));
-  this._mixers.set(editorId, mixer);
-  this._clips.set(editorId, clipMap);
-}
-```
-
-**In ScriptEngine update loop** — `ObjectPlacer.update(dt)` calls `mixer.update(dt)` for all active mixers.
-
-**In the script action editor** — `play_animation` target picker shows objects in the zone. Once a target is selected, the clip name field becomes a dropdown populated from `assetDef.animations[]`. If the asset has no animations, the field shows "No animations available" and the action is disabled.
-
----
-
 #### Per-Entity Scripts Tab in PropertiesPanel
 
 Every entity in the Properties Panel gets a "Scripts" drilldown screen added to its `OBJECT_SCREENS` entry:
@@ -5415,16 +5388,43 @@ Files NOT changed: `ScriptDef`, `TriggerType`, `ActionType`, `ScriptPanel.tsx`, 
 
 ### Phase 10.7 — Object Animation Editor
 
-Sits after Phase 10.6 (where mixers and clip discovery are built) and before Phase 11 (terrain). Adds editor-mode animation preview and auto-play configuration to placed objects that have animation clips.
+Sits after Phase 10.6 and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
 
 ---
 
 #### What This Phase Adds
 
-Two things missing from the animation system after 10.6:
+1. **Animation clip discovery** — extract and store clip names from GLTF assets at import time
+2. **Mixer setup at placement** — build `AnimationMixer` and clip map when an animated object is placed
+3. **Editor-mode clip preview** — click a placed object, see its clips, hit play without entering preview mode
+4. **Auto-play configuration** — specify which clip (if any) loops automatically when the object exists in the scene
 
-1. **Editor-mode clip preview** — click a placed object, see its clips, hit play without entering preview mode
-2. **Auto-play configuration** — specify which clip (if any) loops automatically when the object exists in the scene
+---
+
+#### Animation Clips — Stored at Import, Managed at Placement
+
+**At import time** (`ModelImporterModal`):
+```ts
+// After loading GLTF to generate thumbnail:
+const clips = gltf.animations.map(a => a.name);
+manifestEntry.animations = clips;   // stored in manifest.json
+```
+
+**At placement time** (`ObjectPlacer.place()`):
+```ts
+const asset = assetManager.getAsset(assetId);
+if (asset.animations?.length) {
+  const mixer = new THREE.AnimationMixer(mesh);
+  const clipMap = new Map<string, THREE.AnimationClip>();
+  gltf.animations.forEach(clip => clipMap.set(clip.name, clip));
+  this._mixers.set(editorId, mixer);
+  this._clips.set(editorId, clipMap);
+}
+```
+
+**In the update loop** — `ObjectPlacer.update(dt)` calls `mixer.update(dt)` for all active mixers.
+
+**In the script action editor** — `play_animation` target picker shows objects in the zone. Once a target is selected, the clip name field becomes a dropdown populated from `assetDef.animations[]`. If the asset has no animations, the field shows "No animations available" and the action is disabled.
 
 ---
 
