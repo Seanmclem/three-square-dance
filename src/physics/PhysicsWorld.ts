@@ -35,7 +35,10 @@ export class PhysicsWorld {
   }
 
   createSensorCollider(desc: RAPIER.ColliderDesc): RAPIER.Collider {
-    desc.setSensor(true);
+    desc.setSensor(true)
+      .setActiveCollisionTypes(
+        RAPIER.ActiveCollisionTypes.DEFAULT | RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED,
+      );
     const body = this._world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     return this._world.createCollider(desc, body);
   }
