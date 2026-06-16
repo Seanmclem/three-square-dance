@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.9.2** — last updated 2026-06-16
+**Version 3.9.3** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -37,6 +37,7 @@
 - v3.9 — **Phase 10.6b — Local-Space Geometry Storage** added (before Phase 10.7): local-space vertex storage for platforms + polygon floors fixes rotation snap-back / corner-drag; `FloorDef.position` added (`PlatformDef.rotation` already existed); `WorldLoader` local-space migration runs before the 10.8 UV migration; Phase 10.7 ObjectPlacer + Phase 10.8 migration-ordering notes added. Groups name-list foundation relabeled **10.6a** to free the 10.6b slot (10.6 cluster: 10.6 Entity Event System / 10.6a Groups / 10.6b Local-Space).
 - v3.9.1 — **10.6a/10.6b/10.7/10.8 coherence pass:** synced canonical `FloorDef`/`PlatformDef` type blocks to reality (`PlatformDef.rotation` + `groupIds` from 10.6a; `FloorDef.groupIds` + new `FloorDef.position`), resolving a contradiction where 10.6b claimed `PlatformDef.rotation` existed but the type block omitted it; clarified that platforms/floors have no `scale` transform; presented the 10.6b migration as the named `_migrateToLocalSpace()` method referenced by 10.8; fixed 10.7 intro to follow 10.6b.
 - v3.9.2 — Synced remaining entity interface blocks to the shipped 10.6a `groupIds` field: added `groupIds?: string[]` to the canonical `WallDef`, `StairDef`, `WorldObject`, `TriggerVolume` doc blocks (already present in `types.ts`; doc had only updated `FloorDef`/`PlatformDef`).
+- v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 
 ---
 
@@ -5135,16 +5136,22 @@ Actions and triggers that are registered but not yet implemented, and where they
 
 Sits immediately after Phase 10.5. Refactors `ScriptEngine` from a zone-level script runner into a proper entity-aware event router. No changes to the `ScriptDef` data format — scenes saved in 10.5 load correctly in 10.6. The change is entirely internal to the engine and the editor UI.
 
+> **Status — partially shipped; remainder deferred to Phase 13.** The *engine-routing* half of this phase is already live in `src/scripting/ScriptEngine.ts`:
+> - **Index-based routing — done.** `fire()` does an O(1) `_index.get("type:targetId")` lookup (+ wildcard bucket), not an O(n) scan. The shipped index is a flat composite-key `Map`; this section's nested `Map<type, Map<targetId, …>>` is an equivalent alternative, not a requirement.
+> - **Timer triggers — done.** `on_timer` shipped in Phase 10.9 via `setInterval`/`setTimeout` in `_startTimers()` (no polling), instead of the accumulator `update(dt)` design drawn below.
+>
+> The **unbuilt** remainder is `EntityRegistry` (capability discovery) and `ActionDispatcher` (handler registry). Their entire purpose is to let *entity types register their own emitted triggers / received actions / action handlers* — which only has consumers once NPCs and enemies exist. **Build these as part of Phase 13**, not as a standalone phase. At that point: `ActionDispatcher` lets systems (e.g. `ObjectPlacer` for `change_material`/`play_animation`) register handlers instead of extending the `_dispatch` switch, and `EntityRegistry` lets the Script Panel show only triggers/actions valid for the selected entity. Neither adds functional capability over what's already shipped/planned in 10.9 — they are decoupling + capability-aware UI for the multi-entity world of Phase 13.
+
 ---
 
 #### The Problem with 10.5's Approach
 
-In Phase 10.5, `ScriptEngine` holds a flat list of scripts from the active zone and loops through them on every `fire()` call. This works for a small zone with a handful of scripts, but:
+In Phase 10.5, `ScriptEngine` held a flat list of scripts and looped through them on every `fire()` call. The first two points below are **already addressed** (indexed routing + non-polling timers, see status banner); the rest are the EntityRegistry/ActionDispatcher motivation, realised in Phase 13:
 
-- Lookup is O(n) over all scripts every time any trigger fires
+- ~~Lookup is O(n) over all scripts every time any trigger fires~~ — fixed: indexed `fire()` lookup
 - New entity types (NPCs, enemies, items) require special-case handling in the engine
 - The Script Panel is zone-level only — there's no way to see "what scripts affect this specific object" without reading through all of them
-- Timer triggers require polling
+- ~~Timer triggers require polling~~ — fixed: `setInterval`/`setTimeout` in `_startTimers()`
 - No entity knows what events it can emit or receive — action dropdowns are flat lists of all possible types regardless of what makes sense for the target
 
 ---
