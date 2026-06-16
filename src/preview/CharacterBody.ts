@@ -26,7 +26,7 @@ export class CharacterBody {
   }
 
   move(desired: THREE.Vector3): void {
-    this._kcc.computeColliderMovement(this._collider, desired);
+    this._kcc.computeColliderMovement(this._collider, desired, RAPIER.QueryFilterFlags.EXCLUDE_SENSORS);
     const mv  = this._kcc.computedMovement();
     const pos = this._body.translation();
     this._body.setNextKinematicTranslation({
