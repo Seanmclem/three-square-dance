@@ -245,6 +245,12 @@ export default function App() {
     const unsub = [
       bus.on("preview:start", () => {
         setIsPreview(true);
+        // Re-index from current world state — zone:activated fires at startup before
+        // any volumes/scripts exist in the editor, so the index is always stale by preview time.
+        const activeZone = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
+        scriptEngine.clearIndex();
+        scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
+        if (activeZone) scriptEngine.loadZone(activeZone);
         scriptEngine.activate();
       }),
       bus.on("preview:stop",  () => {
