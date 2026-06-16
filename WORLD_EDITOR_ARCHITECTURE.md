@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.7.0** — last updated 2026-06-16
+**Version 3.8.0** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -32,7 +32,8 @@
 - v3.5 — **Phase 10.5 implemented:** ScriptEngine, GameStateManager, TriggerVolumeTool, ScriptPanel, DialogueOverlay, TriggerSystem volume sensors, ZoneManager volume wireframes + colliders, ColliderBuilder.registerVolumeSensor(), WorldState triggerVolume mutations, App.tsx fully wired.
 - v3.6 — **Phase 10.6 Groups system:** Zones redesigned as Groups (named labels, no spatial bounds). GroupPanel replaces ZonePanel, Z key toggles groups panel, GroupDef/groupIds added to all entity types, WorldState group CRUD with bus events, ScriptPanel tabs renamed GLOBAL/LEVEL/SELECTED with per-tab descriptions, TriggerVolumeTool auto-selects after placement, click-through fix via InputManager drag threshold.
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
-- v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.materialOverride` added; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6b").
+- v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.material` added for `change_material`; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6b").
+- v3.8 — **Phase 10.7 reconciled to reality:** `ObjectPlacer` documented as new/extracted from `ZoneManager._loadObjectMesh` (not an edit to an existing file); stale `WorldObject` interface snippet + Files Modified corrected; `loadModel`/`SkeletonUtils.clone` animation caveats added. Phase 10.9 `change_material` field renamed `materialOverride`→`material`; object-mesh actions (material swap, play_animation) routed through `ObjectPlacer` instead of `ZoneManager`.
 
 ---
 
@@ -1820,6 +1821,8 @@ For each step i:
 ---
 
 ## ObjectPlacer.ts
+
+> **Status: not yet implemented.** This class is specced but no source file exists. Object instantiation currently lives inline in `ZoneManager._loadObjectMesh()` (`src/world/ZoneManager.ts:814-843`). **Phase 10.7** creates `src/preview/ObjectPlacer.ts`, migrates that logic into `ObjectPlacer.place(obj)`, and adds the animation-mixer subsystem (`_mixers`/`_clips`/`update(dt)`/`previewClip`). `ZoneManager` then delegates to it (loadZone step 5 + the `object:added` handler) instead of building object meshes itself.
 
 ```js
 class ObjectPlacer {
@@ -5049,7 +5052,7 @@ Key behaviours:
 | `play_animation` | Find mixer by editorId, play named clip |
 | `spawn_npc` | `bus.emit('npc:spawn', { npcId, position })` — Phase 13 |
 | `despawn_object` | `bus.emit('object:despawn', { id })` |
-| `change_material` | emit `object:updated` with `{ materialOverride }` → ZoneManager swaps the mesh material (Phase 10.9; requires `WorldObject.materialOverride`) |
+| `change_material` | emit `object:updated` with `{ material }` → ObjectPlacer swaps the mesh material (Phase 10.9; requires `WorldObject.material`) |
 | `open_door` | Play open animation or remove door collider |
 | `close_door` | Reverse of open_door |
 | `set_flag` | `scriptEngine.setFlag(flag)` |
@@ -5105,7 +5108,7 @@ Actions and triggers that are registered but not yet implemented, and where they
 |---|---|---|
 | `on_timer` | **implemented** | Phase 10.9 — shipped (ScriptEngine `_startTimers()` loop) |
 | `play_animation` | console.warn | Phase 10.9 (wire to the Phase 10.7 mixer/clip system) |
-| `change_material` | console.warn | Phase 10.9 (needs `WorldObject.materialOverride` + runtime mesh swap — see note below) |
+| `change_material` | console.warn | Phase 10.9 (needs `WorldObject.material` + runtime mesh swap — see note below) |
 | `fade_screen` | bus event fires, no visual | Phase 10.9 (`<FadeOverlay>` component listening to `overlay:fade-in`) |
 | `play_sound` | bus event only, no audio | Phase 12 (Audio system — sound asset manifest, positional audio) |
 | `open_door` / `close_door` | console.warn | Phase 13 (NPC + door animation system) |
@@ -5113,7 +5116,7 @@ Actions and triggers that are registered but not yet implemented, and where they
 | `on_health_zero` | never fires | Phase 13 (NPC/enemy health system) |
 | Branching dialogue | linear `lines[]` only | Phase 12 (Dialogue system redesign) |
 
-> **Note on `change_material`:** the original "small — call `worldState.updateObject`" note was wrong. `WorldObject` has no material field (objects are GLTF assets via `assetId`), so the action needs a new `materialOverride` field plus runtime mesh-swap plumbing in `ZoneManager`. Specced in Phase 10.9.
+> **Note on `change_material`:** the original "small — call `worldState.updateObject`" note was wrong. `WorldObject` has no material field (objects are GLTF assets via `assetId`), so the action needs a new `material?: string` field (registry reference, matching `WallDef.material`; not the plural `MaterialOverrides`) plus runtime mesh-swap plumbing in `ObjectPlacer`. Specced in Phase 10.9.
 
 ---
 
@@ -5395,6 +5398,10 @@ Files NOT changed: `ScriptDef`, `TriggerType`, `ActionType`, `ScriptPanel.tsx`, 
 
 Sits after Phase 10.6 and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
 
+> **Architecture note — this phase creates `ObjectPlacer`.** Object mesh instantiation currently lives inline in `ZoneManager._loadObjectMesh()` (`src/world/ZoneManager.ts:814-843`); there is no `ObjectPlacer.ts` today. This phase **extracts** that logic into a new `src/preview/ObjectPlacer.ts` that owns the object mesh lifecycle — placement, the `_mixers`/`_clips` maps, `update(dt)`, and `previewClip()`. `ZoneManager` delegates to it (loadZone step 5 + the `object:added` handler) and keeps the meshes registered for selection/colliders. The snippets below assume that extraction. (NPCs/enemies in Phase 13 reuse the same object-mixer subsystem; the player's own mixer in `CharacterController` is separate and unaffected.)
+>
+> **Implementation caveats:** `assetManager.loadModel()` returns `gltf.scene.clone()` *without* animations (`src/core/AssetManager.ts:177-184`) — `ObjectPlacer` must call `loadGLTF(assetId)` to read `gltf.animations`. Animated/skinned props need `SkeletonUtils.clone(gltf.scene)`, **not** plain `.clone()`, so the `AnimationMixer` binds to correctly-named cloned nodes.
+
 ---
 
 #### What This Phase Adds
@@ -5482,16 +5489,21 @@ CLIPS
 #### WorldObject — New Field
 
 ```ts
-// Addition to WorldObject in types.ts
+// WorldObject in types.ts — this phase ADDS only `autoPlayAnimation`.
+// (Shown with the real current fields so the addition is unambiguous.)
 export interface WorldObject {
-  id:               string;
-  assetId:          string;
-  position:         Vec3;
-  rotation:         Vec3;
-  scale:            Vec3;
-  materialOverrides?: MaterialOverrides;
-  properties:       ObjectProperties;
-  autoPlayAnimation?: string | null;    // ← new — clip name or null
+  id:                 string;
+  assetId:            string;
+  position:           Vec3;
+  rotation:           Euler3;
+  scale:              Scale3;
+  floor:              number;
+  zoneId?:            string;
+  properties:         ObjectProperties;
+  scripts?:           ScriptDef[];
+  groupIds?:          string[];
+  autoPlayAnimation?: string | null;    // ← new (Phase 10.7) — clip name or null
+  // material?: string;                  // ← added separately in Phase 10.9 (change_material)
 }
 ```
 
@@ -5595,13 +5607,19 @@ for (const zone of file.zones ?? []) {
 
 ```
 src/
+  preview/
+    ObjectPlacer.ts           ← NEW — extracted from ZoneManager._loadObjectMesh; owns object
+                                 mesh lifecycle + _mixers/_clips, update(dt), previewClip(), _stopPreview()
+    PreviewController.ts      ← call objectPlacer.update(dt) in the RAF loop (or SceneManager)
+  world/
+    ZoneManager.ts            ← delegate object placement to ObjectPlacer; drop inline _loadObjectMesh;
+                                 keep objectMeshes registered for selection/colliders
+    WorldLoader.ts            ← migration for autoPlayAnimation field
   ui/
     screens/
-      AnimationsScreen.tsx    ← new — clip list, auto-play picker, preview buttons
-  preview/
-    ObjectPlacer.ts           ← add autoPlayAnimation on load, previewClip(), _stopPreview()
-  world/
-    WorldLoader.ts            ← migration for autoPlayAnimation field
+      AnimationsScreen.tsx    ← NEW — clip list, auto-play picker, preview buttons
+  core/
+    AssetManager.ts           ← expose gltf.animations (loadModel returns a clone without clips today)
 types.ts                      ← autoPlayAnimation on WorldObject
 ```
 
@@ -5860,13 +5878,13 @@ Implemented in `src/scripting/ScriptEngine.ts`:
 
 #### `change_material` — implemented
 
-- `materialOverride?: string` added to `WorldObject` (`src/types.ts`).
-- `change_material` emits `object:updated` with `changes: { materialOverride }`. `ZoneManager`'s `object:updated` handler traverses the object's GLTF meshes and applies the material from the material registry.
+- `material?: string` added to `WorldObject` (`src/types.ts`) — a registry material reference, matching the `WallDef.material: string` convention. Distinct from the plural `MaterialOverrides` type (per-texture-map tweaks on built geometry): `material` selects *which* registry material overrides the prop's baked materials when `change_material` fires.
+- `change_material` emits `object:updated` with `changes: { material }`. The handler in **`ObjectPlacer`** (which owns object meshes after the Phase 10.7 extraction) traverses the object's GLTF meshes and applies the material from the registry.
 - Works with group targets via `_resolveTargets`.
 
 #### `play_animation` — implemented
 
-- Wired to the Phase 10.7 animation mixer/clip system: emits `object:play-animation { id, clip }`. The preview/object owner plays the named clip on that object's `AnimationMixer`.
+- Wired to the Phase 10.7 animation mixer/clip system owned by **`ObjectPlacer`**: emits `object:play-animation { id, clip }`; ObjectPlacer plays the named clip on that object's `AnimationMixer`.
 
 #### `fade_screen` visual — implemented
 
@@ -5878,10 +5896,13 @@ Implemented in `src/scripting/ScriptEngine.ts`:
 src/scripting/ScriptEngine.ts   ← on_timer loop, _resolveTargets, change_material/play_animation dispatch
 src/ui/PropertiesPanel.tsx      ← GROUPS assignment section
 src/ui/GroupPanel.tsx           ← visibility toggle + bulk operations
-src/world/ZoneManager.ts        ← group:visibility, materialOverride swap, object:play-animation listeners
+src/preview/ObjectPlacer.ts     ← material swap + object:play-animation (owns object meshes/mixers, Phase 10.7)
+src/world/ZoneManager.ts        ← group:visibility for built geometry (floors/walls/platforms/stairs)
 src/preview/FadeOverlay.tsx     ← new — overlay:fade-in renderer
-src/types.ts                    ← WorldObject.materialOverride; bus events group:visibility, object:play-animation
+src/types.ts                    ← WorldObject.material; bus events group:visibility, object:play-animation
 ```
+
+> **Object-mesh actions route through `ObjectPlacer`** (the Phase 10.7 owner of object meshes + mixers), not `ZoneManager`. Group *visibility* spans all entity types, so it stays split: `ObjectPlacer` toggles object meshes, `ZoneManager` toggles built geometry.
 
 ### Phase 11 — Terrain
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)
