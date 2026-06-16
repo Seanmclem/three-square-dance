@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.8.0** — last updated 2026-06-16
+**Version 3.9.0** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -32,8 +32,9 @@
 - v3.5 — **Phase 10.5 implemented:** ScriptEngine, GameStateManager, TriggerVolumeTool, ScriptPanel, DialogueOverlay, TriggerSystem volume sensors, ZoneManager volume wireframes + colliders, ColliderBuilder.registerVolumeSensor(), WorldState triggerVolume mutations, App.tsx fully wired.
 - v3.6 — **Phase 10.6 Groups system:** Zones redesigned as Groups (named labels, no spatial bounds). GroupPanel replaces ZonePanel, Z key toggles groups panel, GroupDef/groupIds added to all entity types, WorldState group CRUD with bus events, ScriptPanel tabs renamed GLOBAL/LEVEL/SELECTED with per-tab descriptions, TriggerVolumeTool auto-selects after placement, click-through fix via InputManager drag threshold.
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
-- v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.material` added for `change_material`; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6b").
+- v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.material` added for `change_material`; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6a").
 - v3.8 — **Phase 10.7 reconciled to reality:** `ObjectPlacer` documented as new/extracted from `ZoneManager._loadObjectMesh` (not an edit to an existing file); stale `WorldObject` interface snippet + Files Modified corrected; `loadModel`/`SkeletonUtils.clone` animation caveats added. Phase 10.9 `change_material` field renamed `materialOverride`→`material`; object-mesh actions (material swap, play_animation) routed through `ObjectPlacer` instead of `ZoneManager`.
+- v3.9 — **Phase 10.6b — Local-Space Geometry Storage** added (before Phase 10.7): local-space vertex storage for platforms + polygon floors fixes rotation snap-back / corner-drag; `FloorDef.position` added (`PlatformDef.rotation` already existed); `WorldLoader` local-space migration runs before the 10.8 UV migration; Phase 10.7 ObjectPlacer + Phase 10.8 migration-ordering notes added. Groups name-list foundation relabeled **10.6a** to free the 10.6b slot (10.6 cluster: 10.6 Entity Event System / 10.6a Groups / 10.6b Local-Space).
 
 ---
 
@@ -5394,6 +5395,109 @@ Files NOT changed: `ScriptDef`, `TriggerType`, `ActionType`, `ScriptPanel.tsx`, 
 
 
 
+### Phase 10.6b — Local-Space Geometry Storage
+
+Fixes the rotation snap-back and corner-drag bugs on platforms and polygon floors. Must be implemented before Phase 10.7 and Phase 10.8 — both build on geometry construction and should inherit correct local-space storage from day one. (Unrelated to Phase 10.6a Groups; shares the 10.6 cluster only by numbering.)
+
+---
+
+#### The Problem
+
+Platforms and polygon floors store their vertex positions in world space — absolute scene coordinates. When the gizmo moves or rotates an object, the Three.js mesh transform changes visually, but the stored data (`points[]`, `position`, `size`) keeps its original world-space values. On any rebuild (material change, opening added, floor-level change, undo/redo) the builder reconstructs geometry from the stored world-space data and ignores the current mesh transform — so the object snaps back to its original position and rotation. The same staleness makes corner nodes lag behind during drags.
+
+---
+
+#### The Fix — Local-Space Storage
+
+Every geometry object stores its shape in **local space** (relative to its own origin) and keeps world position/rotation/scale as a separate transform.
+
+- `position` / `rotation` / `scale` — updated by the gizmos; **never** affect vertex data.
+- `points[]` / `size` / `width` / `depth` — the shape, defined in local space around origin (0,0,0); only changed by vertex editing or resize handles.
+
+The builder always builds geometry at local origin, then Three.js applies `mesh.position/rotation/scale` on top. The Rapier collider is rebuilt from final world-space positions (local vertices × transform matrix) on any change. This is the same local-space rule mandated for the future Brush primitive (Phase 12) — applied here to the existing platform/floor tools.
+
+---
+
+#### Changes Required
+
+**`PlatformDef`** — already has `rotation?: Vec3` (degrees, Y=yaw), `position: Vec3`, `size: { width; depth }` + separate `thickness`, and `points?: Vec2[]`. No new field needed; the change is *behavioral* — the builder must stop baking `position` into vertices.
+
+**`PlatformBuilder.build()`:**
+- Build geometry centered at local origin (0,0,0); do NOT add `platform.position` to any vertex.
+- After building: apply `mesh.position.set(...)` and `mesh.rotation.set(...)` (degrees→radians).
+- Rapier collider: transform local vertices through the mesh matrix to world space before passing to Rapier.
+
+**`FloorDef` polygon floors** — `FloorDef` currently has **no `position`**; polygon points live in `floorMesh.points`. This phase **adds `FloorDef.position?: Vec3`** (world XZ center; Y = elevation). `points[]` become local-space relative to that origin. `FloorBuilder` builds `ShapeGeometry` at local origin and applies position via the mesh transform.
+
+**`GizmoManager` on translate/rotate drag end:**
+- Write `position` / `rotation` back to WorldState; do NOT trigger a geometry rebuild (only transform changed).
+- Update the Rapier collider only (recompute world-space from local × new transform).
+- Geometry rebuild happens only when shape data changes (resize handles, vertex edit).
+
+**`WorldState.updatePlatform()` / `updateFloor()`:**
+- Detect transform-only (`position`/`rotation`) vs shape change (`points`/`size`).
+- Transform-only → update mesh transform + collider, skip geometry rebuild. Shape change → full rebuild.
+
+---
+
+#### What This Fixes
+
+- Rotate/move a platform → stays put after any rebuild (material change, undo/redo). No snap-back.
+- Drag a polygon-floor vertex → shape updates, position unchanged.
+- Copy a platform to another zone → explicit position + local shape → correct placement.
+
+---
+
+#### Migration in WorldLoader
+
+Old scene files store polygon points in world space. On load, migrate to local space by subtracting the origin from each point. **This must run BEFORE the Phase 10.8 UV migration** (UV dimensions derive from local-space shape data):
+
+```ts
+// In WorldLoader._migrate() — run BEFORE the uvVersion migration:
+for (const zone of file.zones ?? []) {
+  for (const platform of zone.platforms ?? []) {
+    if (platform.points && !platform._localSpaceMigrated) {
+      platform.points = platform.points.map((p: Vec2) => ({
+        x: p.x - platform.position.x,
+        z: p.z - platform.position.z,
+      }));
+      platform._localSpaceMigrated = true;
+    }
+  }
+  for (const floor of zone.floors ?? []) {
+    if (floor.floorMesh?.shape === 'polygon' && floor.floorMesh.points && !floor._localSpaceMigrated) {
+      const cx = floor.floorMesh.points.reduce((a: number, p: Vec2) => a + p.x, 0) / floor.floorMesh.points.length;
+      const cz = floor.floorMesh.points.reduce((a: number, p: Vec2) => a + p.z, 0) / floor.floorMesh.points.length;
+      floor.floorMesh.points = floor.floorMesh.points.map((p: Vec2) => ({ x: p.x - cx, z: p.z - cz }));
+      floor.position = { x: cx, y: floor.elevation, z: cz };  // FloorDef.position is added by this phase
+      floor._localSpaceMigrated = true;
+    }
+  }
+}
+```
+
+---
+
+#### Relationship to Phase 10.7 and 10.8
+
+- **Phase 10.7** — `WorldObject` props already follow this convention (`ObjectPlacer` sets `mesh.position`/`mesh.rotation` from the stored transform, never bakes world position into geometry). 10.6b makes platforms/floors consistent with what objects already do. See the note in Phase 10.7's ObjectPlacer section.
+- **Phase 10.8** — `applyWorldSpaceUVs` / `applyProjectedUVs` work correctly on local-space geometry because dimensions come from shape data. The 10.8 UV migration must run AFTER the local-space migration. See Phase 10.8's Migration section.
+
+---
+
+#### Files Modified
+
+```
+src/types.ts                    ← add FloorDef.position?: Vec3 (PlatformDef.rotation already exists)
+src/builders/PlatformBuilder.ts ← build at local origin, apply transform via mesh
+src/builders/FloorBuilder.ts    ← polygon floor build at local origin
+src/editor/GizmoManager.ts      ← translate/rotate writes transform only, no rebuild
+src/world/WorldState.ts         ← detect transform-only vs shape change in update methods
+src/world/WorldLoader.ts        ← local-space migration runs before UV migration
+```
+
+---
+
 ### Phase 10.7 — Object Animation Editor
 
 Sits after Phase 10.6 and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
@@ -5510,6 +5614,8 @@ export interface WorldObject {
 ---
 
 #### ObjectPlacer — Auto-Play on Load
+
+> **Local-space convention (Phase 10.6b):** `ObjectPlacer` sets mesh position and rotation from `WorldObject.position` / `WorldObject.rotation` via `mesh.position.set(...)` / `mesh.rotation.set(...)` after building, and never bakes world position into vertex coordinates. Objects already worked this way (a GLTF prop is a root transform); 10.6b brings platforms and polygon floors onto the same convention. This complements the extraction note above — ObjectPlacer owns the object transform, ZoneManager just registers the mesh.
 
 ```ts
 // In ObjectPlacer.place() and ObjectPlacer.loadFromWorldState():
@@ -5814,12 +5920,19 @@ The value is now physically meaningful and consistent. The same `tileScale: 1.0`
 
 #### Migration
 
-Existing scenes built before this phase will have `tileScale` values tuned to compensate for the old inconsistent behaviour. After this fix those values will produce different results. Two options:
+Existing scenes built before this phase have `tileScale` values tuned to compensate for the old inconsistent behaviour, so after this fix those values produce different results. **Option 1 (reset tileScale)** is correct: accept that existing scenes need re-tweaking. Add `uvVersion: 1` to `SceneFile` metadata; `WorldLoader._migrate()` resets `tileScale` to 1.0 on any file without `uvVersion`, and all new scenes get `uvVersion: 1` written automatically.
 
-1. **Reset all tileScale values to 1.0** in `WorldLoader._migrate()` for scenes missing a `uvVersion` field — accept that existing scenes need re-tweaking. Simple, clean.
-2. **Leave existing values** and only apply world-space UVs to newly created surfaces — existing surfaces keep old behaviour. Complex, messy.
+**Migration ordering in `WorldLoader._migrate()` — order matters:**
 
-Option 1 is correct. Add `uvVersion: 1` to `SceneFile` metadata. `WorldLoader._migrate()` resets tileScale to 1.0 on any file without `uvVersion`. After this phase all new scenes get `uvVersion: 1` written automatically.
+```ts
+this._migrateToLocalSpace(file);   // Phase 10.6b — always first
+this._migrateUVVersion(file);      // Phase 10.8 — always second
+```
+
+1. **Local-space migration first** (Phase 10.6b) — converts world-space `points[]` on platforms and polygon floors to local-space coordinates. Must run before the UV migration because UV dimensions are derived from local-space shape data.
+2. **UV version migration second** (Phase 10.8) — resets `tileScale` to 1.0 on scenes missing `uvVersion: 1`, computed from the already-corrected local coordinates.
+
+(The Phase 10.7 `autoPlayAnimation` defaulting migration is independent of geometry and unaffected by this ordering.)
 
 ---
 
@@ -5846,7 +5959,7 @@ types.ts                    ← add uvVersion to SceneMetadata
 
 Two threads land together here:
 
-1. **Make Groups real.** Phase 10.6b shipped Groups as a name-list manager with dormant `groupIds` fields. This phase makes those fields live — entities can be assigned to groups, groups can be hidden, bulk-operated on, and targeted by scripts.
+1. **Make Groups real.** Phase 10.6a shipped Groups as a name-list manager with dormant `groupIds` fields. This phase makes those fields live — entities can be assigned to groups, groups can be hidden, bulk-operated on, and targeted by scripts.
 2. **Clear the scripting backlog.** `on_timer` (shipped), `play_animation`, `change_material`, and `fade_screen`'s visual were either unassigned or tagged to phases that shipped without them. They get implemented here.
 
 #### `on_timer` — shipped
@@ -6655,9 +6768,9 @@ this._bus.on("history:restore", () => {
 
 ---
 
-## Phase 10.6b — Groups (name-list foundation)
+## Phase 10.6a — Groups (name-list foundation)
 
-> Numbering note: the label "Phase 10.6" was used twice — the engine refactor ("Phase 10.6 — Entity Event System", above) and this Groups work. This section is retitled **10.6b** to disambiguate. The actual group *functionality* (assigning entities to groups and acting on them) ships in **Phase 10.9 — Group Functionality** below; this phase only builds the name-list manager and the dormant `groupIds` data fields.
+> Numbering note: the label "Phase 10.6" was used for multiple things — the engine refactor ("Phase 10.6 — Entity Event System"), this Groups work, and the Local-Space Geometry Storage phase. To disambiguate the cluster: **10.6** = Entity Event System, **10.6a** = Groups (this section), **10.6b** = Local-Space Geometry Storage (before Phase 10.7). The actual group *functionality* (assigning entities to groups and acting on them) ships in **Phase 10.9 — Group Functionality** below; this phase only builds the name-list manager and the dormant `groupIds` data fields.
 
 **Motivation:** The original "zone" concept was confusing — zones looked like physical areas with drawn bounds (like Unity scenes), but the single-JSON-per-level design means there is really only one implicit geometry container. User-facing zones were repurposed as **Groups**: lightweight named labels with no spatial component.
 
@@ -6689,7 +6802,7 @@ export interface GroupDef {
 
 `GroupDef[]` added as optional `groups?` field on `SceneFile`.
 
-`groupIds?: string[]` added to `FloorDef`, `WallDef`, `PlatformDef`, `StairDef`, `WorldObject`, `TriggerVolume` for multi-group assignment. **In 10.6b these fields are dormant** — nothing reads or writes them yet. The assignment UI that makes them live ships in Phase 10.9.
+`groupIds?: string[]` added to `FloorDef`, `WallDef`, `PlatformDef`, `StairDef`, `WorldObject`, `TriggerVolume` for multi-group assignment. **In 10.6a these fields are dormant** — nothing reads or writes them yet. The assignment UI that makes them live ships in Phase 10.9.
 
 Bus events added: `group:added`, `group:removed`, `group:updated`.
 
