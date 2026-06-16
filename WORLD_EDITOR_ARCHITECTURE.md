@@ -5554,9 +5554,14 @@ private _stopPreview(objectId: string): void {
 
 ---
 
-#### Manifest Migration (extends Phase 10.6 migration)
+#### Manifest Migration
 
-Phase 10.6 adds a migration pass to discover clips for existing manifest entries. Phase 10.7 adds `autoPlayAnimation` defaulting to `null` for all existing `WorldObject` entries in scene files that predate this field. `WorldLoader._migrate()` handles this:
+This phase adds two migration passes:
+
+1. **Clip discovery for existing manifest entries** — on first load after upgrading, inspect each model's GLTF and populate `animations[]` on its manifest entry if missing.
+2. **`autoPlayAnimation` defaulting to `null`** — for existing `WorldObject` entries in scene files that predate this field.
+
+`WorldLoader._migrate()` handles this:
 
 ```ts
 // In WorldLoader._migrate():
