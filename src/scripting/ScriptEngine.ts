@@ -13,6 +13,7 @@ export class ScriptEngine {
   private _firedOneShots = new Set<string>();
   private _flags        = new Map<string, boolean>();
   private _timers: ReturnType<typeof setTimeout>[] = [];
+  private _intervals: ReturnType<typeof setInterval>[] = [];
 
   // bound listeners so we can remove them on deactivate
   private _unsubscribers: (() => void)[] = [];
@@ -42,6 +43,8 @@ export class ScriptEngine {
     sub("trigger:volume-exit",   ({ volumeId })  => this.fire("on_player_exit",  volumeId));
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
+
+    this._startTimers();
   }
 
   deactivate(): void {
@@ -50,6 +53,8 @@ export class ScriptEngine {
     this._unsubscribers = [];
     for (const t of this._timers) clearTimeout(t);
     this._timers = [];
+    for (const i of this._intervals) clearInterval(i);
+    this._intervals = [];
   }
 
   onGameStart(): void { this.fire("on_game_start", null); }
@@ -95,18 +100,36 @@ export class ScriptEngine {
       ...(this._index.get(key)      ?? []),
       ...(key !== wildcard ? (this._index.get(wildcard) ?? []) : []),
     ];
-    for (const s of scripts) {
-      if (!s.enabled) continue;
-      if (this._firedOneShots.has(s.id)) continue;
-      if (!this._checkConditions(s.conditions)) continue;
-      const run = () => this._runActions(s);
-      if (s.trigger.delay && s.trigger.delay > 0) {
-        const t = setTimeout(run, s.trigger.delay * 1000);
-        this._timers.push(t);
-      } else {
-        run();
+    for (const s of scripts) this._evalAndRun(s);
+  }
+
+  /** Evaluate one script's guards and run it (honouring delay/oneShot). Shared by fire() and the timer loop. */
+  private _evalAndRun(s: ScriptDef): void {
+    if (!s.enabled) return;
+    if (this._firedOneShots.has(s.id)) return;
+    if (!this._checkConditions(s.conditions)) return;
+    const run = () => this._runActions(s);
+    if (s.trigger.delay && s.trigger.delay > 0) {
+      const t = setTimeout(run, s.trigger.delay * 1000);
+      this._timers.push(t);
+    } else {
+      run();
+    }
+    if (s.oneShot) this._firedOneShots.add(s.id);
+  }
+
+  /** Schedule every indexed `on_timer` script. Repeating timers use setInterval, one-shots use setTimeout. */
+  private _startTimers(): void {
+    for (const bucket of this._index.values()) {
+      for (const s of bucket) {
+        if (s.trigger.type !== "on_timer") continue;
+        const ms = (s.trigger.interval ?? 5) * 1000;
+        if (s.trigger.repeat) {
+          this._intervals.push(setInterval(() => this._evalAndRun(s), ms));
+        } else {
+          this._timers.push(setTimeout(() => this._evalAndRun(s), ms));
+        }
       }
-      if (s.oneShot) this._firedOneShots.add(s.id);
     }
   }
 

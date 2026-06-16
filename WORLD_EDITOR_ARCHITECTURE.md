@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.6.0** — last updated 2026-06-14
+**Version 3.7.0** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -32,6 +32,7 @@
 - v3.5 — **Phase 10.5 implemented:** ScriptEngine, GameStateManager, TriggerVolumeTool, ScriptPanel, DialogueOverlay, TriggerSystem volume sensors, ZoneManager volume wireframes + colliders, ColliderBuilder.registerVolumeSensor(), WorldState triggerVolume mutations, App.tsx fully wired.
 - v3.6 — **Phase 10.6 Groups system:** Zones redesigned as Groups (named labels, no spatial bounds). GroupPanel replaces ZonePanel, Z key toggles groups panel, GroupDef/groupIds added to all entity types, WorldState group CRUD with bus events, ScriptPanel tabs renamed GLOBAL/LEVEL/SELECTED with per-tab descriptions, TriggerVolumeTool auto-selects after placement, click-through fix via InputManager drag threshold.
 - v2.8 — **Sync to actual implementation (Phases 6.8 + 8):** LevelStepper in PropertiesPanel (wall/platform/object/floor); AssetCategory widened to allow custom strings; OpeningDragHandler adds opening moves to undo history; SelectionManager clears selected on object:deselected (gizmo reattach fix); Phase 8 implemented: ZoneTool, ZonePanel, ZoneNamingDialog, HelpTooltip, zone:enter wired in ZoneManager, door opening zone-link picker in PropertiesPanel
+- v3.7 — **Phase 10.9 — Group Functionality + Scripting Cleanup:** `on_timer` implemented (ScriptEngine timer loop, shipped); `play_animation`/`change_material`/`fade_screen` re-homed from "Unassigned"/stale-10.6 tags into Phase 10.9; Groups gains real functionality (assignment UI in PropertiesPanel, group visibility toggle, bulk operations, group scripting targets); `WorldObject.materialOverride` added; duplicate "Phase 10.6" label resolved (Groups foundation retitled "Phase 10.6b").
 
 ---
 
@@ -5048,7 +5049,7 @@ Key behaviours:
 | `play_animation` | Find mixer by editorId, play named clip |
 | `spawn_npc` | `bus.emit('npc:spawn', { npcId, position })` — Phase 13 |
 | `despawn_object` | `bus.emit('object:despawn', { id })` |
-| `change_material` | `worldState.updateObject()` → ZoneManager rebuilds |
+| `change_material` | emit `object:updated` with `{ materialOverride }` → ZoneManager swaps the mesh material (Phase 10.9; requires `WorldObject.materialOverride`) |
 | `open_door` | Play open animation or remove door collider |
 | `close_door` | Reverse of open_door |
 | `set_flag` | `scriptEngine.setFlag(flag)` |
@@ -5102,15 +5103,17 @@ Actions and triggers that are registered but not yet implemented, and where they
 
 | Stub | Status | Planned phase |
 |---|---|---|
-| `play_animation` | console.warn | Phase 10.6 (ActionDispatcher + animation clip discovery) |
-| `on_timer` | never fires | Phase 10.6 (ScriptEngine timer loop) |
+| `on_timer` | **implemented** | Phase 10.9 — shipped (ScriptEngine `_startTimers()` loop) |
+| `play_animation` | console.warn | Phase 10.9 (wire to the Phase 10.7 mixer/clip system) |
+| `change_material` | console.warn | Phase 10.9 (needs `WorldObject.materialOverride` + runtime mesh swap — see note below) |
+| `fade_screen` | bus event fires, no visual | Phase 10.9 (`<FadeOverlay>` component listening to `overlay:fade-in`) |
 | `play_sound` | bus event only, no audio | Phase 12 (Audio system — sound asset manifest, positional audio) |
 | `open_door` / `close_door` | console.warn | Phase 13 (NPC + door animation system) |
 | `spawn_npc` | console.warn | Phase 13 (NPC system) |
 | `on_health_zero` | never fires | Phase 13 (NPC/enemy health system) |
-| `fade_screen` | bus event fires, no visual | Unassigned — needs a `<FadeOverlay>` React component listening to `overlay:fade-in` |
-| `change_material` | console.warn | Unassigned — small (call `worldState.updateObject` with new material) |
 | Branching dialogue | linear `lines[]` only | Phase 12 (Dialogue system redesign) |
+
+> **Note on `change_material`:** the original "small — call `worldState.updateObject`" note was wrong. `WorldObject` has no material field (objects are GLTF assets via `assetId`), so the action needs a new `materialOverride` field plus runtime mesh-swap plumbing in `ZoneManager`. Specced in Phase 10.9.
 
 ---
 
@@ -5263,6 +5266,8 @@ class ScriptEngine {
 ```
 
 Lookup is now O(1) for specific-target scripts, O(k) where k is the number of matching scripts — not O(n) over all scripts in the zone.
+
+> **Status:** this nested-Map EntityRegistry refactor (including the accumulator-based `update(dt)` timer above) has **not** shipped. `on_timer` was instead implemented in **Phase 10.9** against the *current* flat-index engine, using `setInterval`/`setTimeout` in `_startTimers()` rather than a per-frame `update(dt)`. This section remains the target design for the eventual refactor.
 
 ---
 
@@ -5817,6 +5822,65 @@ src/builders/PlatformBuilder.ts
 src/builders/StairBuilder.ts
 src/world/WorldLoader.ts    ← uvVersion migration
 types.ts                    ← add uvVersion to SceneMetadata
+```
+
+### Phase 10.9 — Group Functionality + Scripting Cleanup
+
+Two threads land together here:
+
+1. **Make Groups real.** Phase 10.6b shipped Groups as a name-list manager with dormant `groupIds` fields. This phase makes those fields live — entities can be assigned to groups, groups can be hidden, bulk-operated on, and targeted by scripts.
+2. **Clear the scripting backlog.** `on_timer` (shipped), `play_animation`, `change_material`, and `fade_screen`'s visual were either unassigned or tagged to phases that shipped without them. They get implemented here.
+
+#### `on_timer` — shipped
+
+Implemented in `src/scripting/ScriptEngine.ts`:
+
+- The per-script execution logic in `fire()` was extracted into `_evalAndRun(s)` so the timer path and event path share identical guard semantics (`enabled` / oneShot / conditions / delay).
+- `_startTimers()` is called at the end of `activate()` (after the index is built). It walks every indexed `on_timer` script and schedules it: `setInterval` when `trigger.repeat`, else `setTimeout`, at `(trigger.interval ?? 5) * 1000` ms. Each callback runs `_evalAndRun(s)` directly — **not** `fire("on_timer", id)`, which would resolve by index key and run every timer script sharing the key.
+- Handles are tracked in a new `_intervals` array; `deactivate()` clears both `_timers` and `_intervals`.
+
+#### Groups — assignment UI
+
+- New **GROUPS** section in `src/ui/PropertiesPanel.tsx` for the selected entity: a checklist of existing groups. Toggling a group writes/removes its id in the entity's `groupIds`, persisted via the existing mutators (`WorldState.updateObject` / `updateTriggerVolume`, and the floor/wall/platform/stair equivalents).
+- This is the first reader/writer of `groupIds`.
+
+#### Groups — visibility toggle
+
+- Eye icon per group in `src/ui/GroupPanel.tsx`. Hiding a group sets `mesh.visible = false` on every Three.js mesh whose entity's `groupIds` includes that id.
+- New `group:visibility` bus event; `ZoneManager` listens and toggles visibility. **Editor-only** — does not mutate saved data or affect preview/runtime.
+
+#### Groups — bulk operations
+
+- In `GroupPanel`: "Select all", "Delete", "Duplicate", "Move" acting on every member of a group. Reuses the existing `SelectionManager` multi-select and the existing delete/duplicate code paths rather than new logic.
+
+#### Groups — scripting targets
+
+- In `ScriptEngine._dispatch`, a new `_resolveTargets(targetId): string[]` helper: if `targetId` matches a `GroupDef.id`, it resolves to all entity ids whose `groupIds` includes it (iterating the active zone's entities in `_state`); otherwise it returns `[targetId]`.
+- The per-object actions (`despawn_object`, `move_object`, `change_material`, `show_ui`) loop over `_resolveTargets(action.targetId)` and emit per member — so a single script action can act on a whole group.
+
+#### `change_material` — implemented
+
+- `materialOverride?: string` added to `WorldObject` (`src/types.ts`).
+- `change_material` emits `object:updated` with `changes: { materialOverride }`. `ZoneManager`'s `object:updated` handler traverses the object's GLTF meshes and applies the material from the material registry.
+- Works with group targets via `_resolveTargets`.
+
+#### `play_animation` — implemented
+
+- Wired to the Phase 10.7 animation mixer/clip system: emits `object:play-animation { id, clip }`. The preview/object owner plays the named clip on that object's `AnimationMixer`.
+
+#### `fade_screen` visual — implemented
+
+- New `src/preview/FadeOverlay.tsx` listening to `overlay:fade-in`: a full-screen colored div that animates opacity over `duration`. The action's bus event already fires (Phase 10.5); this adds the missing renderer.
+
+#### Files Modified
+
+```
+src/scripting/ScriptEngine.ts   ← on_timer loop, _resolveTargets, change_material/play_animation dispatch
+src/ui/PropertiesPanel.tsx      ← GROUPS assignment section
+src/ui/GroupPanel.tsx           ← visibility toggle + bulk operations
+src/world/ZoneManager.ts        ← group:visibility, materialOverride swap, object:play-animation listeners
+src/preview/FadeOverlay.tsx     ← new — overlay:fade-in renderer
+src/types.ts                    ← WorldObject.materialOverride; bus events group:visibility, object:play-animation
 ```
 
 ### Phase 11 — Terrain
@@ -6570,7 +6634,9 @@ this._bus.on("history:restore", () => {
 
 ---
 
-## Phase 10.6 — Groups System
+## Phase 10.6b — Groups (name-list foundation)
+
+> Numbering note: the label "Phase 10.6" was used twice — the engine refactor ("Phase 10.6 — Entity Event System", above) and this Groups work. This section is retitled **10.6b** to disambiguate. The actual group *functionality* (assigning entities to groups and acting on them) ships in **Phase 10.9 — Group Functionality** below; this phase only builds the name-list manager and the dormant `groupIds` data fields.
 
 **Motivation:** The original "zone" concept was confusing — zones looked like physical areas with drawn bounds (like Unity scenes), but the single-JSON-per-level design means there is really only one implicit geometry container. User-facing zones were repurposed as **Groups**: lightweight named labels with no spatial component.
 
@@ -6581,7 +6647,7 @@ this._bus.on("history:restore", () => {
 | Zone drawing tool (Z key → draw bounds on canvas) | Removed |
 | ZonePanel with zone list + "Enter ›" | GroupPanel: flat name list + "+ New" |
 | ZoneNamingDialog (name + outdoor/indoor/dungeon type) | Inline rename (click label, Enter confirms) |
-| No group concept in entity properties | *Future: GROUPS section in every entity's PropertiesPanel* |
+| No group concept in entity properties | GROUPS section in every entity's PropertiesPanel — **shipped in Phase 10.9** |
 | Script panel tabs: WORLD / ZONE / OBJECT | GLOBAL / LEVEL / SELECTED |
 
 ### What stayed the same (internal)
@@ -6602,7 +6668,7 @@ export interface GroupDef {
 
 `GroupDef[]` added as optional `groups?` field on `SceneFile`.
 
-`groupIds?: string[]` added to `FloorDef`, `WallDef`, `PlatformDef`, `StairDef`, `WorldObject`, `TriggerVolume` for future multi-group assignment.
+`groupIds?: string[]` added to `FloorDef`, `WallDef`, `PlatformDef`, `StairDef`, `WorldObject`, `TriggerVolume` for multi-group assignment. **In 10.6b these fields are dormant** — nothing reads or writes them yet. The assignment UI that makes them live ships in Phase 10.9.
 
 Bus events added: `group:added`, `group:removed`, `group:updated`.
 
