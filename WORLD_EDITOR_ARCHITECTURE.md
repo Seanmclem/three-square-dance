@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.9.1** — last updated 2026-06-16
+**Version 3.9.2** — last updated 2026-06-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -36,6 +36,7 @@
 - v3.8 — **Phase 10.7 reconciled to reality:** `ObjectPlacer` documented as new/extracted from `ZoneManager._loadObjectMesh` (not an edit to an existing file); stale `WorldObject` interface snippet + Files Modified corrected; `loadModel`/`SkeletonUtils.clone` animation caveats added. Phase 10.9 `change_material` field renamed `materialOverride`→`material`; object-mesh actions (material swap, play_animation) routed through `ObjectPlacer` instead of `ZoneManager`.
 - v3.9 — **Phase 10.6b — Local-Space Geometry Storage** added (before Phase 10.7): local-space vertex storage for platforms + polygon floors fixes rotation snap-back / corner-drag; `FloorDef.position` added (`PlatformDef.rotation` already existed); `WorldLoader` local-space migration runs before the 10.8 UV migration; Phase 10.7 ObjectPlacer + Phase 10.8 migration-ordering notes added. Groups name-list foundation relabeled **10.6a** to free the 10.6b slot (10.6 cluster: 10.6 Entity Event System / 10.6a Groups / 10.6b Local-Space).
 - v3.9.1 — **10.6a/10.6b/10.7/10.8 coherence pass:** synced canonical `FloorDef`/`PlatformDef` type blocks to reality (`PlatformDef.rotation` + `groupIds` from 10.6a; `FloorDef.groupIds` + new `FloorDef.position`), resolving a contradiction where 10.6b claimed `PlatformDef.rotation` existed but the type block omitted it; clarified that platforms/floors have no `scale` transform; presented the 10.6b migration as the named `_migrateToLocalSpace()` method referenced by 10.8; fixed 10.7 intro to follow 10.6b.
+- v3.9.2 — Synced remaining entity interface blocks to the shipped 10.6a `groupIds` field: added `groupIds?: string[]` to the canonical `WallDef`, `StairDef`, `WorldObject`, `TriggerVolume` doc blocks (already present in `types.ts`; doc had only updated `FloorDef`/`PlatformDef`).
 
 ---
 
@@ -310,6 +311,7 @@ export interface WallDef {
   exteriorMaterial:   string;
   openings:           Opening[];
   materialOverrides?: MaterialOverrides;
+  groupIds?:          string[];   // Phase 10.6a
 }
 
 export interface PlatformDef {
@@ -360,6 +362,7 @@ export interface StairDef {
   csgCutter?:              StairCutterDef;  // defines a hole cut in the floor/platform above
   topOpening?:             StairOpening;    // optional zone link at top of stair
   bottomOpening?:          StairOpening;    // optional zone link at bottom of stair
+  groupIds?:               string[];        // Phase 10.6a
 }
 
 export interface ObjectProperties {
@@ -380,6 +383,7 @@ export interface WorldObject {
   properties:          ObjectProperties;
   autoPlayAnimation?:  string | null;    // clip name to loop on load, null = none
   scripts:             ScriptDef[];      // scripts that belong to this object — loaded/unloaded with it
+  groupIds?:           string[];         // Phase 10.6a
 }
 
 export interface ZoneDef {
@@ -649,6 +653,7 @@ export interface TriggerVolume {
   position: Vec3;
   size:     Vec3;             // width, height, depth
   zoneId:   string;
+  groupIds?: string[];        // Phase 10.6a
 }
 
 // ─── Persistence ───────────────────────────────────── ⏳ Phase 9 ───────────
