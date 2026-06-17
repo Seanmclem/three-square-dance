@@ -125,6 +125,35 @@ Setup: a rect platform intersected by a stair (so it gets a CSG hole), with `rot
       drag a corner node (NodeDragger) — geometry tracks the nodes, as before. No rotation
       gizmo on floors. Behavior identical to pre-10.6b (this phase did not touch them).
 
+## 6b. Orphaned-node cleanup (separate pre-existing bug, fixed alongside)
+
+Deleting a node-backed polygon platform/floor used to leave its corner nodes in
+`zone.nodes`, which `NodeDragger` kept drawing as scattered dots + edge lines.
+
+Data-layer check (console):
+
+```js
+const w = window.__world, z = w.activeZoneId, zone = w.zones.get(z);
+const mk=(x,zz)=>({id:crypto.randomUUID(),x,z:zz});
+const a=mk(0,0),b=mk(2,0),c=mk(1,2); [a,b,c].forEach(n=>w.addNode(z,n));
+const pid='plat_'+crypto.randomUUID().slice(0,8);
+w.addPlatform(z,{id:pid,position:{x:1,y:0,z:0.67},size:{width:2,depth:2},thickness:0.3,
+  material:zone.platforms[0]?.material??'concrete',hasRailing:false,railingHeight:1,
+  points:[{x:0,z:0},{x:2,z:0},{x:1,z:2}],nodeIds:[a.id,b.id,c.id]});
+const before=zone.nodes.length;
+w.removePlatform(z,pid);
+console.log('pruned', before-zone.nodes.length, 'expect 3');
+```
+
+- [ ] Deleting a polygon platform/floor prunes its corner nodes (count drops).
+- [ ] A node still referenced by a wall (or another floor/platform) is **kept**.
+- [ ] **MANUAL:** in Select mode, create a polygon platform → corner dots appear; delete it →
+      dots **and** edge lines disappear immediately (no leftover scattered dots).
+- [ ] Reloading an old scene with orphan nodes (autosave-restore or file-open) clears them
+      via the load-time sweep — scattered dots are gone after reload.
+
+---
+
 ## 7. Always
 
 - [ ] `npm run build` and `npm run typecheck` → 0 errors.

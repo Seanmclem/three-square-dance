@@ -34,7 +34,7 @@ import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
-import { migrateWallNodes } from "@/world/WorldLoader";
+import { migrateWallNodes, pruneOrphanNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
@@ -415,6 +415,7 @@ export default function App() {
     try {
       const file = json as SceneFile;
       migrateWallNodes(file.zones);
+      for (const zone of file.zones) pruneOrphanNodes(zone);  // reap orphaned polygon nodes from old saves
       await physicsWorld.init();
       for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
       world.loadFromJSON(file);

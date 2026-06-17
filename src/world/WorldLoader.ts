@@ -1,5 +1,24 @@
 import type { ZoneDef, WallNode } from "@/types";
 
+/**
+ * Remove nodes not referenced by any wall, floor, or platform. Returns count pruned.
+ *
+ * Polygon platforms/floors are node-backed (corners live in `zone.nodes`), but
+ * `removePlatform`/`removeFloor` only drop the entity — their nodes are orphaned and
+ * `NodeDragger` keeps drawing a dot + edge line for each. This reaps those orphans;
+ * shared nodes (still referenced elsewhere) are kept.
+ */
+export function pruneOrphanNodes(zone: ZoneDef): number {
+  if (!zone.nodes?.length) return 0;
+  const ref = new Set<string>();
+  for (const w of zone.walls)     { ref.add(w.startNodeId); ref.add(w.endNodeId); }
+  for (const f of zone.floors)    f.floorMesh.nodeIds?.forEach(id => ref.add(id));
+  for (const p of zone.platforms) p.nodeIds?.forEach(id => ref.add(id));
+  const before = zone.nodes.length;
+  zone.nodes = zone.nodes.filter(n => ref.has(n.id));
+  return before - zone.nodes.length;
+}
+
 /** Migrates a parsed scene JSON from old `start`/`end` wall format to node-based. */
 export function migrateWallNodes(zones: ZoneDef[]): void {
   for (const zone of zones) {

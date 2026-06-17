@@ -1,4 +1,5 @@
 import type { EventBus } from "@/core/EventBus";
+import { pruneOrphanNodes } from "@/world/WorldLoader";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
@@ -72,6 +73,7 @@ export class WorldState {
     const zone = this.zones.get(zoneId);
     if (!zone) return;
     zone.floors = zone.floors.filter(f => f.id !== floorId);
+    pruneOrphanNodes(zone);  // drop the deleted polygon floor's now-unreferenced corner nodes
     this._bus.emit("floor:removed", { zoneId, floorId });
   }
 
@@ -189,6 +191,7 @@ export class WorldState {
     const zone = this.zones.get(zoneId);
     if (!zone) return;
     zone.platforms = zone.platforms.filter(p => p.id !== id);
+    pruneOrphanNodes(zone);  // drop the deleted polygon platform's now-unreferenced corner nodes
     this._bus.emit("platform:removed", { zoneId, id });
   }
 

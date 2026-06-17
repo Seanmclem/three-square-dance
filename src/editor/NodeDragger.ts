@@ -134,6 +134,14 @@ export class NodeDragger {
       this._bus.on("floor:updated", () => {
         if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
       }),
+      // Deleting a node-backed polygon prunes its nodes (WorldState); refresh so the
+      // stale dots + edge lines for those nodes are cleared from the scene.
+      this._bus.on("platform:removed", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+      }),
+      this._bus.on("floor:removed", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+      }),
       this._bus.on("wall:rebuilt", () => {
         if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
       }),
