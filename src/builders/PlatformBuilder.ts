@@ -370,25 +370,27 @@ export class PlatformBuilder {
       }
     }
 
-    // Apply Y rotation for non-CSG platforms (CSG geometry is baked in world space)
+    // Apply Y rotation for non-CSG platforms as a mesh transform (Phase 10.6b).
+    // Rotation lives on mesh.rotation — never baked into vertices — so it survives
+    // rebuilds and the collider can mirror it. CSG platforms bake geometry in world
+    // space and cannot carry a separate transform, so they keep rotation disabled.
     if (platform.rotation?.y && !capInWorldSpace) {
-      const angle  = (platform.rotation.y * Math.PI) / 180;
-      const cosA   = Math.cos(angle), sinA = Math.sin(angle);
-      const rotMat = new THREE.Matrix4().makeRotationY(angle);
+      const angle = (platform.rotation.y * Math.PI) / 180;
+      const cosA  = Math.cos(angle), sinA = Math.sin(angle);
       for (const mesh of meshes) {
-        // Orbit mesh position around platform XZ center (p.x, p.z)
+        // Orbit off-center meshes (railings) around the platform XZ center (p.x, p.z);
+        // each mesh's centered geometry then rotates about its own (orbited) center.
         const dx = mesh.position.x - p.x;
         const dz = mesh.position.z - p.z;
         if (Math.abs(dx) > 1e-4 || Math.abs(dz) > 1e-4) {
           mesh.position.x = p.x + dx * cosA - dz * sinA;
           mesh.position.z = p.z + dx * sinA + dz * cosA;
         }
-        // Rotate geometry around its local center for correct normals
-        mesh.geometry.applyMatrix4(rotMat);
+        mesh.rotation.y = angle;
       }
     }
 
-    const collider = ColliderBuilder.registerPlatform(platform);
+    const collider = ColliderBuilder.registerPlatform(platform, !capInWorldSpace);
     return { meshes, collider };
   }
 }

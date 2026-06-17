@@ -169,7 +169,7 @@ export class GizmoManager implements IEditorModule {
       // On fresh selections (sameObject = false), reset to 0 (no stored angle).
       const isPolyPlat = !!(plat?.nodeIds?.length);
       rotY = (isPolyPlat && sameObject)
-        ? this._pivot.rotation.y
+        ? this._pivotYaw()
         : (plat?.rotation?.y ? THREE.MathUtils.degToRad(plat.rotation.y) : 0);
 
     } else if (type === "stair") {
@@ -351,7 +351,7 @@ export class GizmoManager implements IEditorModule {
         // Rect platforms use the stored plat.rotation.y.
         const isPolyPlat = !!(plat.nodeIds?.length);
         const rotY = isPolyPlat
-          ? this._pivot.rotation.y
+          ? this._pivotYaw()
           : (plat.rotation?.y ? THREE.MathUtils.degToRad(plat.rotation.y) : 0);
         this._pivot.position.set(plat.position.x, plat.position.y + plat.thickness / 2 + 0.3, plat.position.z);
         this._pivot.rotation.set(0, rotY, 0);
@@ -387,7 +387,7 @@ export class GizmoManager implements IEditorModule {
 
   private _onDragStart(): void {
     if (this._controls?.getMode() === "rotate") {
-      this._rotateStartAngle = this._pivot.rotation.y;
+      this._rotateStartAngle = this._pivotYaw();
       if (this._selType === "stair") {
         const stair = this._getStair();
         if (stair) this._stairDragSnapshot = { start: { ...stair.start }, end: { ...stair.end } };
@@ -606,7 +606,7 @@ export class GizmoManager implements IEditorModule {
 
   private _commitRotate(): void {
     this._detachFromPivot();
-    const deltaAngle = this._pivot.rotation.y - this._rotateStartAngle;
+    const deltaAngle = this._pivotYaw() - this._rotateStartAngle;
 
     switch (this._selType) {
       case "platform": {
@@ -643,8 +643,8 @@ export class GizmoManager implements IEditorModule {
             ...(newPoints ? { points: newPoints } : {}),
           });
         } else {
-          // Rect platform: store rotation.y; PlatformBuilder bakes it into geometry.
-          const rotY = THREE.MathUtils.radToDeg(this._pivot.rotation.y);
+          // Rect platform: store rotation.y as a mesh transform (applied by PlatformBuilder).
+          const rotY = THREE.MathUtils.radToDeg(this._pivotYaw());
           this._worldState.updatePlatform(this._selZoneId!, this._selId!, {
             rotation: { x: 0, y: rotY, z: 0 },
           });
@@ -735,6 +735,17 @@ export class GizmoManager implements IEditorModule {
       obj.position.copy(origLocalPos);
       obj.rotation.copy(origLocalRot);
     }
+  }
+
+  /**
+   * Gimbal-safe yaw (Y rotation) of the pivot, extracted from its quaternion.
+   * TransformControls rotates the pivot's quaternion; reading `pivot.rotation.y`
+   * (Euler, XYZ order) flips past ±90° (e.g. a 135° drag reads as 45°, a 180°
+   * drag reads as 0°), which is what made rotate commits snap back on release.
+   */
+  private _pivotYaw(): number {
+    const q = this._pivot.quaternion;
+    return Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.x * q.x));
   }
 
   // ─── Axis visibility ──────────────────────────────────────────────────────

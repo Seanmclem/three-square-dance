@@ -46,7 +46,7 @@ export class ColliderBuilder {
     });
   }
 
-  static registerPlatform(platform: PlatformDef): RAPIER.Collider {
+  static registerPlatform(platform: PlatformDef, applyRotation = true): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(
       platform.size.width / 2,
       platform.thickness / 2,
@@ -56,6 +56,11 @@ export class ColliderBuilder {
       platform.position.y + platform.thickness / 2,
       platform.position.z,
     );
+    // Mirror the mesh's Y rotation (Phase 10.6b). Three.js and Rapier share a
+    // right-handed Y-up frame, so a +angle mesh rotation maps to a +angle quaternion.
+    // Skipped for CSG platforms, whose geometry is baked unrotated (see PlatformBuilder).
+    const angle = applyRotation ? ((platform.rotation?.y ?? 0) * Math.PI) / 180 : 0;
+    if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
     return physicsWorld.createStaticCollider(desc);
   }
 

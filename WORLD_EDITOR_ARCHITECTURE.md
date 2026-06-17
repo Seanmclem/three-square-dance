@@ -37,6 +37,7 @@
 - v3.9 — **Phase 10.6b — Local-Space Geometry Storage** added (before Phase 10.7): local-space vertex storage for platforms + polygon floors fixes rotation snap-back / corner-drag; `FloorDef.position` added (`PlatformDef.rotation` already existed); `WorldLoader` local-space migration runs before the 10.8 UV migration; Phase 10.7 ObjectPlacer + Phase 10.8 migration-ordering notes added. Groups name-list foundation relabeled **10.6a** to free the 10.6b slot (10.6 cluster: 10.6 Entity Event System / 10.6a Groups / 10.6b Local-Space).
 - v3.9.1 — **10.6a/10.6b/10.7/10.8 coherence pass:** synced canonical `FloorDef`/`PlatformDef` type blocks to reality (`PlatformDef.rotation` + `groupIds` from 10.6a; `FloorDef.groupIds` + new `FloorDef.position`), resolving a contradiction where 10.6b claimed `PlatformDef.rotation` existed but the type block omitted it; clarified that platforms/floors have no `scale` transform; presented the 10.6b migration as the named `_migrateToLocalSpace()` method referenced by 10.8; fixed 10.7 intro to follow 10.6b.
 - v3.9.2 — Synced remaining entity interface blocks to the shipped 10.6a `groupIds` field: added `groupIds?: string[]` to the canonical `WallDef`, `StairDef`, `WorldObject`, `TriggerVolume` doc blocks (already present in `types.ts`; doc had only updated `FloorDef`/`PlatformDef`).
+- v3.9.4 — **Phase 10.6b implemented + scope corrected to match the code.** Investigation found the original "local-space storage for platforms + polygon floors" premise false: polygon floors/platforms are node-backed (`points[]` is a cache regenerated from world-space `zone.nodes` each build), so they never snap back and a `points[]`→local migration would be a no-op (and `FloorDef.position` actively harmful — double offset). The real user-visible bug was a **gimbal flip in `GizmoManager`**: rotate commits read `pivot.rotation.y` (Euler), which wraps past ±90° (135°→45°, 180°→0°), so rotating a platform/room past 90° snapped to a wrong angle on release — affecting rect platforms *and* node-backed polygons (and distorting polygon shape via the AABB `size` recompute). Fixed with a `_pivotYaw()` quaternion-based yaw helper routing all four pivot-yaw reads. Also shipped (separate, smaller): rect Y rotation via `mesh.rotation` instead of baked geometry (`PlatformBuilder`) + collider quaternion mirroring it, CSG-guarded (`ColliderBuilder.registerPlatform`) — fixes the previously un-rotated collider. Reverted the speculative doc additions: removed `FloorDef.position` from the type block and the `_migrateToLocalSpace` migration-ordering note (no geometry migration added). Skip-rebuild optimization deferred (perf-only). Section retitled "Rect Platform Rotation as a Mesh Transform."
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 
 ---
@@ -275,7 +276,6 @@ export interface FloorDef {
   elevation:         number;
   ceilingHeight:     number | null;
   floorMesh:         FloorMeshDef;
-  position?:         Vec3;     // Phase 10.6b — local-space origin for polygon floors (XZ centre, Y = elevation)
   materialOverrides?: MaterialOverrides;
   groupIds?:         string[]; // Phase 10.6a
 }
@@ -5412,108 +5412,54 @@ Files NOT changed: `ScriptDef`, `TriggerType`, `ActionType`, `ScriptPanel.tsx`, 
 
 
 
-### Phase 10.6b — Local-Space Geometry Storage
+### Phase 10.6b — Rect Platform Rotation as a Mesh Transform
 
-Fixes the rotation snap-back and corner-drag bugs on platforms and polygon floors. Must be implemented before Phase 10.7 and Phase 10.8 — both build on geometry construction and should inherit correct local-space storage from day one. (Unrelated to Phase 10.6a Groups; shares the 10.6 cluster only by numbering.)
+Moves the rect platform's Y rotation off the baked geometry and onto `mesh.rotation`, and makes the Rapier collider mirror that rotation. (Unrelated to Phase 10.6a Groups; shares the 10.6 cluster only by numbering.)
 
----
-
-#### The Problem
-
-Platforms and polygon floors store their vertex positions in world space — absolute scene coordinates. When the gizmo moves or rotates an object, the Three.js mesh transform changes visually, but the stored data (`points[]`, `position`, `size`) keeps its original world-space values. On any rebuild (material change, opening added, floor-level change, undo/redo) the builder reconstructs geometry from the stored world-space data and ignores the current mesh transform — so the object snaps back to its original position and rotation. The same staleness makes corner nodes lag behind during drags.
+> **Scope note — verified against the code, not the original spec.** This phase was originally specced as a broad "local-space geometry storage" change for platforms *and* polygon floors, on the premise that polygon floors/platforms store world-space vertices in `points[]` that go stale on rebuild. Reading the actual code showed that premise is false, so the phase was narrowed to the one genuine defect (rect platform rotation + collider). The investigation findings are recorded below so the next reader doesn't re-derive them.
 
 ---
 
-#### The Fix — Local-Space Storage
+#### What the code actually does (and why most of the original scope was moot)
 
-Every geometry object stores its shape in **local space** (relative to its own origin) and keeps world position/rotation/scale as a separate transform.
-
-- `position` / `rotation` — the stored transform, updated by the translate/rotate gizmos; **never** affect vertex data. (Platforms and polygon floors have no `scale` field today — resizing changes shape data, not a scale transform; `scale` is listed here only as the general rule that also covers the future Brush primitive.)
-- `points[]` / `size` / `width` / `depth` — the shape, defined in local space around origin (0,0,0); only changed by vertex editing or resize handles.
-
-The builder always builds geometry at local origin, then Three.js applies `mesh.position/rotation/scale` on top. The Rapier collider is rebuilt from final world-space positions (local vertices × transform matrix) on any change. This is the same local-space rule mandated for the future Brush primitive (Phase 12) — applied here to the existing platform/floor tools.
+- **Polygon floors and polygon platforms are node-backed.** `PolygonFloorTool` and `PolygonPlatformTool` both create dedicated `nodeIds` and push the nodes into `zone.nodes`. At build time `resolveFloorMesh()` / `_rebuildPlatform()` **regenerate `points[]` from the live world-space node positions**, overwriting whatever is stored in `points[]`. So the world-space source of truth is the shared nodes; `points[]` is just a derived cache. `NodeDragger` edits those nodes directly.
+  - Consequence: these primitives **do not snap back** — every rebuild re-derives geometry from current world nodes, so move (all nodes shift) and vertex-drag (one node moves) are already reflected. There is no stored transform to go stale.
+  - Consequence: a `points[]`→local migration would be a **no-op** (overwritten from nodes on the next build), and adding a separate `FloorDef.position` would be **actively harmful** (double offset: local-mode math applied to node-derived world points). So neither was added.
+- **The pure-points polygon platform fallback** (a `PlatformDef` with `points` but no `nodeIds`, used for copy/paste) bakes rotation into `points[]` about the centroid and resets `rotation` to 0 on commit — also self-consistent, no snap-back.
+- **Rect platforms** store `rotation.y` and were the only real defect:
+  1. `PlatformBuilder` baked the Y rotation into the geometry (`geometry.applyMatrix4`) with `mesh.rotation` left at 0. Rotation *was* preserved across rebuilds (re-baked from `platform.rotation.y`), but it violated the mesh-transform convention the rest of the editor uses.
+  2. `ColliderBuilder.registerPlatform` ignored rotation entirely, so a rotated rect platform had an **un-rotated physics collider** — a genuine bug.
 
 ---
 
-#### Changes Required
+#### The Fix
 
-**`PlatformDef`** — already has `rotation?: Vec3` (degrees, Y=yaw), `position: Vec3`, `size: { width; depth }` + separate `thickness`, and `points?: Vec2[]`. No new field needed; the change is *behavioral* — the builder must stop baking `position` into vertices.
+**`PlatformBuilder.build()`** — for non-CSG rect platforms, apply the Y rotation as `mesh.rotation.y` on each built mesh instead of baking it into vertices. Off-center meshes (railings) are still orbited around the platform XZ center for position; their centered geometry then rotates about its own (orbited) center via the mesh transform. CSG platforms keep rotation disabled (their geometry is baked unrotated in world space and cannot carry a separate transform — a pre-existing limitation, unchanged).
 
-**`PlatformBuilder.build()`:**
-- Build geometry centered at local origin (0,0,0); do NOT add `platform.position` to any vertex.
-- After building: apply `mesh.position.set(...)` and `mesh.rotation.set(...)` (degrees→radians).
-- Rapier collider: transform local vertices through the mesh matrix to world space before passing to Rapier.
+**`ColliderBuilder.registerPlatform(platform, applyRotation = true)`** — set the cuboid collider's quaternion from `platform.rotation.y` (Three.js and Rapier share a right-handed Y-up frame, so a `+angle` mesh rotation maps to `{ y: sin(angle/2), w: cos(angle/2) }`). `PlatformBuilder` passes `applyRotation = !capInWorldSpace`, so CSG platforms (mesh not rotated) keep an un-rotated collider and stay mesh/collider-consistent. Node-backed polygon platforms have `rotation.y === 0` (baked into nodes), so the quaternion is identity for them — unchanged behavior.
 
-**`FloorDef` polygon floors** — `FloorDef` currently has **no `position`**; polygon points live in `floorMesh.points`. This phase **adds `FloorDef.position?: Vec3`** (world XZ center; Y = elevation). `points[]` become local-space relative to that origin. `FloorBuilder` builds `ShapeGeometry` at local origin and applies position via the mesh transform.
+**`GizmoManager` — gimbal-safe yaw extraction (the real snap-back fix).** This was the actual cause of the user-visible "rotate, looks fine during the drag, then snaps to a wrong rotation on release — only past ~90°" bug, on rect platforms *and* node-backed polygon platforms/rooms. `TransformControls` rotates the pivot's **quaternion**; the commit code read `pivot.rotation.y` — an **Euler** angle (XYZ order) — which gimbal-flips past ±90° (a 135° drag reads as 45°, a 180° drag reads as 0° → full snap-back). The same Euler read fed the `deltaAngle` used by the polygon-platform/stair/wall rotate commits, so large rotations corrupted those too (and, for polygons, distorted the shape because `size` is recomputed as the AABB of the wrongly-rotated points). Fix: a `_pivotYaw()` helper reads yaw from the quaternion — `atan2(2(wy+xz), 1−2(y²+x²))` — and all four pivot-yaw reads (`_onSelect`, `_reattachMeshes`, `_onDragStart` start angle, `_commitRotate` delta + rect absolute) route through it. The `object` rotate branch is unchanged: it stores all three Euler components and re-applies the same Euler, so it round-trips correctly.
 
-**`GizmoManager` on translate/rotate drag end:**
-- Write `position` / `rotation` back to WorldState; do NOT trigger a geometry rebuild (only transform changed).
-- Update the Rapier collider only (recompute world-space from local × new transform).
-- Geometry rebuild happens only when shape data changes (resize handles, vertex edit).
+No type changes (`PlatformDef.rotation?: Vec3` already existed). No `FloorDef.position`, no migration, no `FloorBuilder`/`WorldState` changes — see the scope note above.
 
-**`WorldState.updatePlatform()` / `updateFloor()`:**
-- Detect transform-only (`position`/`rotation`) vs shape change (`points`/`size`).
-- Transform-only → update mesh transform + collider, skip geometry rebuild. Shape change → full rebuild.
+The transform-only **skip-geometry-rebuild** optimization from the original spec was intentionally deferred: snap-back is fixed by the gimbal correction plus a transform-preserving rebuild, and skipping the rebuild would require reworking GizmoManager's `*:rebuilt`-driven reattach machinery (high regression risk for a perf-only gain).
 
 ---
 
 #### What This Fixes
 
-- Rotate/move a platform → stays put after any rebuild (material change, undo/redo). No snap-back.
-- Drag a polygon-floor vertex → shape updates, position unchanged.
-- Copy a platform to another zone → explicit position + local shape → correct placement.
-
----
-
-#### Migration in WorldLoader
-
-Old scene files store polygon points in world space. On load, migrate to local space by subtracting the origin from each point. **This must run BEFORE the Phase 10.8 UV migration** (UV dimensions derive from local-space shape data):
-
-`_migrate()` calls `this._migrateToLocalSpace(file)` **before** `this._migrateUVVersion(file)` (see Phase 10.8 § Migration). The `_localSpaceMigrated` flags below are transient guards, not persisted fields:
-
-```ts
-private _migrateToLocalSpace(file: Partial<SceneFile>): void {
-for (const zone of file.zones ?? []) {
-  for (const platform of zone.platforms ?? []) {
-    if (platform.points && !platform._localSpaceMigrated) {
-      platform.points = platform.points.map((p: Vec2) => ({
-        x: p.x - platform.position.x,
-        z: p.z - platform.position.z,
-      }));
-      platform._localSpaceMigrated = true;
-    }
-  }
-  for (const floor of zone.floors ?? []) {
-    if (floor.floorMesh?.shape === 'polygon' && floor.floorMesh.points && !floor._localSpaceMigrated) {
-      const cx = floor.floorMesh.points.reduce((a: number, p: Vec2) => a + p.x, 0) / floor.floorMesh.points.length;
-      const cz = floor.floorMesh.points.reduce((a: number, p: Vec2) => a + p.z, 0) / floor.floorMesh.points.length;
-      floor.floorMesh.points = floor.floorMesh.points.map((p: Vec2) => ({ x: p.x - cx, z: p.z - cz }));
-      floor.position = { x: cx, y: floor.elevation, z: cz };  // FloorDef.position is added by this phase
-      floor._localSpaceMigrated = true;
-    }
-  }
-}
-}
-```
-
----
-
-#### Relationship to Phase 10.7 and 10.8
-
-- **Phase 10.7** — `WorldObject` props already follow this convention (`ObjectPlacer` sets `mesh.position`/`mesh.rotation` from the stored transform, never bakes world position into geometry). 10.6b makes platforms/floors consistent with what objects already do. See the note in Phase 10.7's ObjectPlacer section.
-- **Phase 10.8** — `applyWorldSpaceUVs` / `applyProjectedUVs` work correctly on local-space geometry because dimensions come from shape data. The 10.8 UV migration must run AFTER the local-space migration. See Phase 10.8's Migration section.
+- Rotate a rect platform or polygon room/platform past 90°/180° with the R gizmo → the committed rotation matches the drag; **no snap-back on release** (the gimbal fix).
+- Rotate a rect platform → `meshes[0].rotation.y` carries the angle (mesh-transform convention); survives material-change / undo-redo rebuilds.
+- A rotated rect platform's collider now matches its visual orientation (player can stand on the rotated slab correctly).
 
 ---
 
 #### Files Modified
 
 ```
-src/types.ts                    ← add FloorDef.position?: Vec3 (PlatformDef.rotation already exists)
-src/builders/PlatformBuilder.ts ← build at local origin, apply transform via mesh
-src/builders/FloorBuilder.ts    ← polygon floor build at local origin
-src/editor/GizmoManager.ts      ← translate/rotate writes transform only, no rebuild
-src/world/WorldState.ts         ← detect transform-only vs shape change in update methods
-src/world/WorldLoader.ts        ← local-space migration runs before UV migration
+src/builders/PlatformBuilder.ts ← rect Y rotation applied via mesh.rotation, not baked geometry
+src/physics/ColliderBuilder.ts  ← registerPlatform mirrors rotation.y on the collider (CSG-guarded)
+src/editor/GizmoManager.ts      ← _pivotYaw() gimbal-safe yaw; fixes rotate snap-back past ±90°
 ```
 
 ---
@@ -5635,7 +5581,7 @@ export interface WorldObject {
 
 #### ObjectPlacer — Auto-Play on Load
 
-> **Local-space convention (Phase 10.6b):** `ObjectPlacer` sets mesh position and rotation from `WorldObject.position` / `WorldObject.rotation` via `mesh.position.set(...)` / `mesh.rotation.set(...)` after building, and never bakes world position into vertex coordinates. Objects already worked this way (a GLTF prop is a root transform); 10.6b brings platforms and polygon floors onto the same convention. This complements the extraction note above — ObjectPlacer owns the object transform, ZoneManager just registers the mesh.
+> **Local-space convention (Phase 10.6b):** `ObjectPlacer` sets mesh position and rotation from `WorldObject.position` / `WorldObject.rotation` via `mesh.position.set(...)` / `mesh.rotation.set(...)` after building, and never bakes world position into vertex coordinates. Objects already worked this way (a GLTF prop is a root transform); 10.6b brings the rect platform's Y rotation onto the same convention (polygon floors/platforms are node-backed and already derive their transform from world-space nodes — see Phase 10.6b). This complements the extraction note above — ObjectPlacer owns the object transform, ZoneManager just registers the mesh.
 
 ```ts
 // In ObjectPlacer.place() and ObjectPlacer.loadFromWorldState():
@@ -5942,17 +5888,7 @@ The value is now physically meaningful and consistent. The same `tileScale: 1.0`
 
 Existing scenes built before this phase have `tileScale` values tuned to compensate for the old inconsistent behaviour, so after this fix those values produce different results. **Option 1 (reset tileScale)** is correct: accept that existing scenes need re-tweaking. Add `uvVersion: 1` to `SceneFile` metadata; `WorldLoader._migrate()` resets `tileScale` to 1.0 on any file without `uvVersion`, and all new scenes get `uvVersion: 1` written automatically.
 
-**Migration ordering in `WorldLoader._migrate()` — order matters:**
-
-```ts
-this._migrateToLocalSpace(file);   // Phase 10.6b — always first
-this._migrateUVVersion(file);      // Phase 10.8 — always second
-```
-
-1. **Local-space migration first** (Phase 10.6b) — converts world-space `points[]` on platforms and polygon floors to local-space coordinates. Must run before the UV migration because UV dimensions are derived from local-space shape data.
-2. **UV version migration second** (Phase 10.8) — resets `tileScale` to 1.0 on scenes missing `uvVersion: 1`, computed from the already-corrected local coordinates.
-
-(The Phase 10.7 `autoPlayAnimation` defaulting migration is independent of geometry and unaffected by this ordering.)
+`WorldLoader._migrate()` resets `tileScale` to 1.0 on scenes missing `uvVersion: 1`. (Phase 10.6b added no geometry migration — see its section for why polygon primitives are node-backed and need none — so there is no local-space migration to order against. The Phase 10.7 `autoPlayAnimation` defaulting migration is independent of geometry.)
 
 ---
 
@@ -6790,7 +6726,7 @@ this._bus.on("history:restore", () => {
 
 ## Phase 10.6a — Groups (name-list foundation)
 
-> Numbering note: the label "Phase 10.6" was used for multiple things — the engine refactor ("Phase 10.6 — Entity Event System"), this Groups work, and the Local-Space Geometry Storage phase. To disambiguate the cluster: **10.6** = Entity Event System, **10.6a** = Groups (this section), **10.6b** = Local-Space Geometry Storage (before Phase 10.7). The actual group *functionality* (assigning entities to groups and acting on them) ships in **Phase 10.9 — Group Functionality** below; this phase only builds the name-list manager and the dormant `groupIds` data fields.
+> Numbering note: the label "Phase 10.6" was used for multiple things — the engine refactor ("Phase 10.6 — Entity Event System"), this Groups work, and the Local-Space Geometry Storage phase. To disambiguate the cluster: **10.6** = Entity Event System, **10.6a** = Groups (this section), **10.6b** = Rect Platform Rotation as a Mesh Transform (before Phase 10.7). The actual group *functionality* (assigning entities to groups and acting on them) ships in **Phase 10.9 — Group Functionality** below; this phase only builds the name-list manager and the dormant `groupIds` data fields.
 
 **Motivation:** The original "zone" concept was confusing — zones looked like physical areas with drawn bounds (like Unity scenes), but the single-JSON-per-level design means there is really only one implicit geometry container. User-facing zones were repurposed as **Groups**: lightweight named labels with no spatial component.
 
