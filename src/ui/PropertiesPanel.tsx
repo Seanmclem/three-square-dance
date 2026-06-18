@@ -1183,7 +1183,7 @@ function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, qual
   const { type } = selected;
   return (
     <div>
-      <div style={{ padding: "14px 16px" }}>
+      <div style={{ paddingTop: 4 }}>
         {type === "wall"     && <WallMatView     selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "floor"    && <FloorMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "platform" && <PlatformMatView selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
@@ -1211,6 +1211,7 @@ function WallMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: 
   const wallData = selected.data as WallDef | null;
   return (
     <MaterialSection
+      key={selected.id}
       materialList={materialList}
       currentMaterialId={wallData?.material ?? "brick_01"}
       overrides={wallData?.materialOverrides}
@@ -1225,6 +1226,7 @@ function FloorMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
   const floorData = selected.data as FloorDef | null;
   return (
     <MaterialSection
+      key={selected.id}
       materialList={materialList}
       currentMaterialId={floorData?.floorMesh.material ?? "concrete_01"}
       overrides={floorData?.materialOverrides}
@@ -1238,9 +1240,11 @@ function FloorMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 function PlatformMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
   const plat = selected.data as PlatformDef | null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <>
       <MaterialSection
+        key={selected.id + ":top"}
         label="TOP / BOTTOM"
+        defaultExpanded={false}
         materialList={materialList}
         currentMaterialId={plat?.material ?? "concrete_01"}
         overrides={plat?.materialOverrides}
@@ -1249,7 +1253,9 @@ function PlatformMatView({ selected, materialList, onObjectUpdate, onAddMaterial
         onAddMaterial={onAddMaterial}
       />
       <MaterialSection
+        key={selected.id + ":sides"}
         label="SIDES"
+        defaultExpanded={false}
         materialList={materialList}
         currentMaterialId={plat?.sideMaterial ?? plat?.material ?? "concrete_01"}
         overrides={plat?.sideMaterialOverrides}
@@ -1257,16 +1263,18 @@ function PlatformMatView({ selected, materialList, onObjectUpdate, onAddMaterial
         onOverridesChange={ov => onObjectUpdate({ sideMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
       />
-    </div>
+    </>
   );
 }
 
 function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
   const stair = selected.data as StairDef | null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <>
       <MaterialSection
+        key={selected.id + ":body"}
         label="BODY"
+        defaultExpanded={false}
         materialList={materialList}
         currentMaterialId={stair?.material ?? "concrete_01"}
         overrides={stair?.materialOverrides}
@@ -1275,7 +1283,9 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onAddMaterial={onAddMaterial}
       />
       <MaterialSection
+        key={selected.id + ":risers"}
         label="RISERS"
+        defaultExpanded={false}
         materialList={materialList}
         currentMaterialId={stair?.riserMaterial ?? stair?.material ?? "concrete_01"}
         overrides={stair?.riserMaterialOverrides}
@@ -1283,7 +1293,7 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
       />
-    </div>
+    </>
   );
 }
 
@@ -1449,11 +1459,70 @@ function VertScreen({ selected, onObjectUpdate }: {
 
 // ── MaterialSection ───────────────────────────────────────────────────────────
 
+const MAT_CAT_ORDER = ["Stone", "Wood", "Metal", "Fabric", "Ground", "Concrete", "Brick", "Plaster", "Other"];
+const MAT_PILL_VISIBLE = 4; // category pills shown inline beside "All" before overflow
+
+function MaterialCategoryPills({ categories, active, onSelect }: {
+  categories: string[];   // ordered, includes "All" first
+  active:     string;
+  onSelect:   (c: string) => void;
+}) {
+  const [popout, setPopout] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!popout) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setPopout(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [popout]);
+
+  const rest = categories.slice(1);
+  let inline = rest.slice(0, MAT_PILL_VISIBLE);
+  let overflow = rest.slice(MAT_PILL_VISIBLE);
+  if (active !== "All" && overflow.includes(active)) {  // keep the active category visible inline
+    inline = [...inline, active];
+    overflow = overflow.filter(c => c !== active);
+  }
+
+  const pillStyle = (c: string): React.CSSProperties => ({
+    flexShrink: 0, fontSize: 10, padding: "3px 7px", borderRadius: 4, border: "none", cursor: "pointer",
+    background: active === c ? "rgba(80,140,255,0.25)" : "rgba(255,255,255,0.04)",
+    color: active === c ? "#80aaff" : "#808080", whiteSpace: "nowrap",
+  });
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "flex", gap: 3, flexWrap: "wrap" }}>
+      <button onClick={() => onSelect("All")} style={pillStyle("All")}>All</button>
+      {inline.map(c => <button key={c} onClick={() => onSelect(c)} style={pillStyle(c)}>{c}</button>)}
+      {overflow.length > 0 && (
+        <button onClick={() => setPopout(v => !v)} style={pillStyle("__more__")}>More ▾</button>
+      )}
+      {popout && overflow.length > 0 && (
+        <div style={{
+          position: "absolute", top: "100%", left: 0, zIndex: 20,
+          background: "rgba(28,28,28,0.98)", border: "1px solid rgba(255,255,255,0.09)",
+          borderRadius: 4, padding: "4px 0", minWidth: 110, maxHeight: 180, overflowY: "auto",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
+        }}>
+          {overflow.map(c => (
+            <button key={c} onClick={() => { onSelect(c); setPopout(false); }} style={{
+              display: "block", width: "100%", textAlign: "left", border: "none", cursor: "pointer",
+              background: active === c ? "rgba(80,140,255,0.2)" : "transparent",
+              color: active === c ? "#80aaff" : "#808080", fontSize: 10, padding: "5px 12px",
+            }}>{c}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MaterialSection({
-  label = "MATERIAL",
+  label = "MATERIAL", defaultExpanded = true,
   materialList, currentMaterialId, overrides, onMaterialChange, onOverridesChange, onAddMaterial,
 }: {
   label?:            string;
+  defaultExpanded?:  boolean;
   materialList:      MaterialDef[];
   currentMaterialId: string;
   overrides:         MaterialOverrides | undefined;
@@ -1462,6 +1531,34 @@ function MaterialSection({
   onAddMaterial:     () => void;
 }) {
   const baseDef = materialList.find(m => m.id === currentMaterialId);
+  const [open,    setOpen]    = useState(defaultExpanded);
+  const [matCat,  setMatCat]  = useState<string>("All");
+  const [hovered, setHovered] = useState(false);
+
+  const catOf = (m: MaterialDef) => m.category ?? "Other";
+  const present = [...new Set(materialList.map(catOf))];
+  const orderedCats = ["All",
+    ...MAT_CAT_ORDER.filter(c => present.includes(c)),
+    ...present.filter(c => !MAT_CAT_ORDER.includes(c)).sort(),
+  ];
+  const inCategory = materialList.filter(m => matCat === "All" || catOf(m) === matCat);
+  // When the applied material isn't in the active category, pin it above the list (set apart).
+  const pinnedCurrent = baseDef && !inCategory.some(m => m.id === baseDef.id) ? baseDef : null;
+
+  const renderTile = (mat: MaterialDef) => {
+    const active = mat.id === currentMaterialId;
+    return (
+      <div key={mat.id} onClick={() => onMaterialChange(mat.id)} style={{
+        padding: "5px 10px",
+        background: active ? "rgba(80,140,255,0.15)" : "rgba(46,46,46,0.9)",
+        border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
+        borderRadius: 4, color: active ? "#80aaff" : "#7a7a7a",
+        fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+      }}>
+        {mat.label}
+      </div>
+    );
+  };
   const hasSplitInit = !!(overrides?.tileScaleX !== undefined || overrides?.tileScaleY !== undefined);
   const [tileStr,   setTileStr]   = useState(String(overrides?.tileScale         ?? baseDef?.tileScale         ?? 1.0));
   const [tileXStr,  setTileXStr]  = useState(String(overrides?.tileScaleX        ?? overrides?.tileScale        ?? baseDef?.tileScale ?? 1.0));
@@ -1517,35 +1614,55 @@ function MaterialSection({
   const roughEnabled = effectiveEnabled("roughness");
   const dispEnabled  = effectiveEnabled("displacement");
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={LABEL}>{label}</div>
+  const currentLabel = baseDef?.label ?? currentMaterialId;
 
+  return (
+    <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
       <button
-        onClick={onAddMaterial}
-        style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#646464", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
-        onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; e.currentTarget.style.color = "#80aaff"; }}
-        onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#646464"; }}
+        onClick={() => setOpen(o => !o)}
+        style={{ ...ROW_BASE, padding: "9px 16px", boxSizing: "border-box",
+          borderLeft: "3px solid rgba(80,140,255,0.6)",
+          background: hovered ? "rgba(80,140,255,0.12)" : "rgba(80,140,255,0.05)",
+          borderBottom: open ? "1px solid rgba(255,255,255,0.07)" : "none" }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
-        + add ambientcg material
+        <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <span style={{ color: "#acc4ee", fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>{label}</span>
+          {!open && (
+            <span style={{ color: "#707070", fontSize: 10, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {currentLabel}
+            </span>
+          )}
+        </span>
+        <span style={{ color: "#6b86b8", fontSize: 14, lineHeight: 1, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
       </button>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: 130, overflowY: "auto" }}>
-        {materialList.map(mat => {
-          const active = mat.id === currentMaterialId;
-          return (
-            <div key={mat.id} onClick={() => onMaterialChange(mat.id)} style={{
-              padding: "5px 10px",
-              background: active ? "rgba(80,140,255,0.15)" : "rgba(46,46,46,0.9)",
-              border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
-              borderRadius: 4, color: active ? "#80aaff" : "#7a7a7a",
-              fontSize: 11, fontFamily: "monospace", cursor: "pointer",
-            }}>
-              {mat.label}
-            </div>
-          );
-        })}
-      </div>
+      {open && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px 14px" }}>
+          <button
+            onClick={onAddMaterial}
+            style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#646464", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; e.currentTarget.style.color = "#80aaff"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#646464"; }}
+          >
+            + add material
+          </button>
+
+          <MaterialCategoryPills categories={orderedCats} active={matCat} onSelect={setMatCat} />
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: "min(52vh, 520px)", overflowY: "auto" }}>
+            {pinnedCurrent && (
+              <>
+                <div style={{ color: "#646464", fontSize: 9, letterSpacing: 1, padding: "0 2px" }}>
+                  CURRENT · {pinnedCurrent.category ?? "Other"}
+                </div>
+                {renderTile(pinnedCurrent)}
+                <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "3px 0" }} />
+              </>
+            )}
+            {inCategory.map(renderTile)}
+          </div>
 
       {splitTile ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1619,6 +1736,8 @@ function MaterialSection({
           })}
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,9 +7,12 @@ export interface MaterialMapConfig {
   path:    string;
 }
 
+export type MaterialCategory = 'Stone' | 'Wood' | 'Metal' | 'Fabric' | 'Ground' | 'Concrete' | 'Brick' | 'Plaster' | 'Other' | (string & {});
+
 export interface MaterialDef {
   id:                string;
   label:             string;
+  category?:         MaterialCategory;
   tileScale:         number;
   roughnessVal:      number;
   metalnessVal:      number;

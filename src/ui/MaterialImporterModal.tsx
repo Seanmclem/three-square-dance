@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { materialImporter } from "@/editor/MaterialImporter";
 import type { DetectedMaps, ImportResult } from "@/editor/MaterialImporter";
-import type { MaterialDef } from "@/types";
+import type { MaterialDef, MaterialCategory } from "@/types";
+
+const MATERIAL_CATEGORIES: MaterialCategory[] = [
+  "Stone", "Wood", "Metal", "Fabric", "Ground", "Concrete", "Brick", "Plaster", "Other",
+];
 
 interface Props {
   texturesDir:      FileSystemDirectoryHandle | null;
@@ -65,6 +69,7 @@ export function MaterialImporterModal({
 }: Props) {
   const [materialId,   setMaterialId]   = useState("");
   const [label,        setLabel]        = useState("");
+  const [category,     setCategory]     = useState<MaterialCategory>("Other");
   const [sourceDir,    setSourceDir]    = useState<FileSystemDirectoryHandle | null>(null);
   const [detectedMaps, setDetectedMaps] = useState<DetectedMaps | null>(null);
   const [phase,        setPhase]        = useState<Phase>("input");
@@ -109,7 +114,7 @@ export function MaterialImporterModal({
     setPhase("importing");
     setError(null);
     try {
-      const res = await materialImporter.importMaterial(id, effectiveLabel, texturesDir, detectedMaps);
+      const res = await materialImporter.importMaterial(id, effectiveLabel, category, texturesDir, detectedMaps);
       setResult(res);
       setPhase("done");
     } catch (e) {
@@ -122,7 +127,7 @@ export function MaterialImporterModal({
     const id = materialId.trim().replace(/\s+/g, "_").toLowerCase();
     const base = `/assets/textures/${id}`;
     const def: MaterialDef = {
-      id, label: effectiveLabel,
+      id, label: effectiveLabel, category,
       tileScale: 1.0, roughnessVal: 0.85, metalnessVal: 0.0, displacementScale: 0.03,
       maps: {
         albedo:       { enabled: true,                             path: `${base}/albedo.jpg` },
@@ -137,7 +142,7 @@ export function MaterialImporterModal({
   };
 
   const handleImportAnother = () => {
-    setMaterialId(""); setLabel(""); setSourceDir(null);
+    setMaterialId(""); setLabel(""); setCategory("Other"); setSourceDir(null);
     setDetectedMaps(null); setPhase("input"); setResult(null); setError(null);
   };
 
@@ -148,9 +153,14 @@ export function MaterialImporterModal({
       <div style={MODAL}>
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ color: "#80aaff", fontSize: 13, letterSpacing: 1 }}>ADD AMBIENTCG MATERIAL</div>
-          <button onClick={onClose} style={{ ...BTN(true), padding: "2px 8px", fontSize: 14 }}>✕</button>
+        <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ color: "#80aaff", fontSize: 13, letterSpacing: 1 }}>ADD MATERIAL</div>
+            <button onClick={onClose} style={{ ...BTN(true), padding: "2px 8px", fontSize: 14 }}>✕</button>
+          </div>
+          <div style={{ color: "#646464", fontSize: 10, marginTop: 4 }}>
+            Compatible with ambientCG texture sets (albedo / normal / roughness / ao / displacement maps).
+          </div>
         </div>
 
         {/* Step 0 — destination folder (one-time per session) */}
@@ -191,6 +201,13 @@ export function MaterialImporterModal({
                 folder: /assets/textures/{materialId.trim().replace(/\s+/g, "_").toLowerCase()}/
               </div>
             )}
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value as MaterialCategory)}
+              style={{ ...INPUT_STYLE, marginTop: 6 }}
+            >
+              {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
 
           {/* Step 2 — source folder */}
