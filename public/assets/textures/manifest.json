@@ -238,6 +238,41 @@
           "path": "/assets/textures/tester_123/displacement.jpg"
         }
       }
+    },
+    {
+      "id": "tiny_paving_stones",
+      "label": "Tiny Paving Stones",
+      "category": "Ground",
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": true,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/tiny_paving_stones/{quality}/displacement.jpg"
+        }
+      }
     }
   ]
 }
