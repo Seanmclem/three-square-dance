@@ -57,9 +57,10 @@ async function generateThumbnail(
   handle: FileSystemFileHandle,
   ext: string,
   mtlHandle?: FileSystemFileHandle | null,
-): Promise<string | null> {
+): Promise<{ thumb: string | null; animations: string[] }> {
   let blobUrl: string | null = null;
   let mtlBlobUrl: string | null = null;
+  let animations: string[] = [];
   try {
     const file = await handle.getFile();
     blobUrl = URL.createObjectURL(file);
@@ -86,16 +87,20 @@ async function generateThumbnail(
       root = await loader.loadAsync(blobUrl);
     } else if (ext === ".glb" || ext === ".gltf") {
       const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
-      const gltf = await new GLTFLoader().loadAsync(blobUrl) as { scene: import("three").Object3D };
+      const gltf = await new GLTFLoader().loadAsync(blobUrl) as {
+        scene: import("three").Object3D;
+        animations: { name: string }[];
+      };
       root = gltf.scene;
+      animations = gltf.animations.map(a => a.name);
     } else {
-      return null;
+      return { thumb: null, animations };
     }
 
-    return renderModelThumbnail(root);
+    return { thumb: renderModelThumbnail(root), animations };
   } catch (err) {
     console.warn("Thumbnail generation failed:", err);
-    return null;
+    return { thumb: null, animations };
   } finally {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     if (mtlBlobUrl) URL.revokeObjectURL(mtlBlobUrl);
@@ -238,7 +243,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
         // Generate thumbnail
         setProgress(`Generating thumbnail ${i + 1} of ${entries.length}: ${entry.modelHandle.name}`);
         let destThumb: string | undefined;
-        const thumbDataUrl = await generateThumbnail(entry.modelHandle, modelExt, entry.mtlHandle);
+        const { thumb: thumbDataUrl, animations } = await generateThumbnail(entry.modelHandle, modelExt, entry.mtlHandle);
         if (thumbDataUrl) {
           destThumb = `${base}_thumb.png`;
           const thumbHandle = await modelsDir.getFileHandle(destThumb, { create: true });
@@ -260,6 +265,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
           colliderType: "box",
           tags:         [],
           dateAdded:    new Date().toISOString().slice(0, 10),
+          ...(animations.length ? { animations } : {}),
         };
 
         manifest.assets = manifest.assets.filter(a => a.id !== asset.id);

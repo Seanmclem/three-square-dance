@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.9.3** — last updated 2026-06-16
+**Version 3.9.6** — last updated 2026-06-18
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -39,6 +39,7 @@
 - v3.9.2 — Synced remaining entity interface blocks to the shipped 10.6a `groupIds` field: added `groupIds?: string[]` to the canonical `WallDef`, `StairDef`, `WorldObject`, `TriggerVolume` doc blocks (already present in `types.ts`; doc had only updated `FloorDef`/`PlatformDef`).
 - v3.9.5 — **Orphaned-node cleanup (pre-existing bug, surfaced during 10.6b testing).** `removePlatform`/`removeFloor` never deleted a node-backed polygon primitive's corner nodes, so deleted polygons left orphan nodes in `zone.nodes` that `NodeDragger` kept drawing as scattered dots + edge lines (and they persisted after delete). Added `pruneOrphanNodes(zone)` to `WorldLoader` (reaps nodes not referenced by any wall/floor/platform; shared nodes kept); called from `removePlatform`/`removeFloor` and from the load path (`handleLoadFromJSON`, covering both file-open and autosave-restore, so old saves self-clean). `NodeDragger` now also `_refresh()`es on `platform:removed`/`floor:removed` so stale dots clear immediately. Not part of 10.6b's geometry work; tracked here for history.
 - v3.9.4 — **Phase 10.6b implemented + scope corrected to match the code.** Investigation found the original "local-space storage for platforms + polygon floors" premise false: polygon floors/platforms are node-backed (`points[]` is a cache regenerated from world-space `zone.nodes` each build), so they never snap back and a `points[]`→local migration would be a no-op (and `FloorDef.position` actively harmful — double offset). The real user-visible bug was a **gimbal flip in `GizmoManager`**: rotate commits read `pivot.rotation.y` (Euler), which wraps past ±90° (135°→45°, 180°→0°), so rotating a platform/room past 90° snapped to a wrong angle on release — affecting rect platforms *and* node-backed polygons (and distorting polygon shape via the AABB `size` recompute). Fixed with a `_pivotYaw()` quaternion-based yaw helper routing all four pivot-yaw reads. Also shipped (separate, smaller): rect Y rotation via `mesh.rotation` instead of baked geometry (`PlatformBuilder`) + collider quaternion mirroring it, CSG-guarded (`ColliderBuilder.registerPlatform`) — fixes the previously un-rotated collider. Reverted the speculative doc additions: removed `FloorDef.position` from the type block and the `_migrateToLocalSpace` migration-ordering note (no geometry migration added). Skip-rebuild optimization deferred (perf-only). Section retitled "Rect Platform Rotation as a Mesh Transform."
+- v3.9.6 — **Phase 10.7 — Object Animation Editor implemented (Option B: full extraction), spec corrected to match the code.** Created `src/preview/ObjectPlacer.ts` owning the full placed-object domain — mesh build (transform + userData + `SkeletonUtils.clone` for skinned/animated GLTFs + fallback box) and the animation subsystem (`AnimationMixer`/clip map per object, `update(dt)`, `previewClip`/`stopPreview`, auto-play, lazy back-fill of `assetDef.animations`). `ZoneManager` no longer builds object meshes: `_loadObjectMesh` removed, `loadZone`/`_addObject`/`_removeObject`/`unloadZone` now delegate to `ObjectPlacer` and keep only `objectsGroup`/`objectMeshes` registration for selection; the now-unused `assetManager` import was dropped. `App.tsx` instantiates `ObjectPlacer`, passes it to `ZoneManager`, and registers `scene.onUpdate(dt => objectPlacer.update(dt))` (runs in editor + preview). Three stale spec assumptions corrected: (1) **no `src/ui/screens/` folder** — screens are inline `PropertiesPanel.tsx` components, so `AnimationsScreen` is inline and `"animations"` is appended to an object's `ScreenId[]` only when its asset has clips; (2) **no `WorldLoader._migrate()`** — `autoPlayAnimation?` is optional so old files need no migration, and pre-existing assets' clip names are lazily back-filled by `ObjectPlacer` (plus stored in `manifest.json` at import via `ModelImporterModal`); (3) `worldState.getObject`/`assetManager.getAsset` don't exist (used `assetManager.getAssetDef` + an internal auto-play map). Added `AssetDef.animations?`, `WorldObject.autoPlayAnimation?`, and `animation:preview-start`/`preview-stop`/`auto-play-changed` bus events to `types.ts`. Verified: `npm run typecheck`/`build` clean; data-layer add/remove and sync ZoneManager delegation verified in-browser; async asset-load path could not be exercised in the automation tab (background tabs freeze `fetch`/timers) and needs a foreground tab + an animated GLB for the full preview/auto-play visual check.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 
 ---
@@ -1835,49 +1836,39 @@ For each step i:
 
 ## ObjectPlacer.ts
 
-> **Status: not yet implemented.** This class is specced but no source file exists. Object instantiation currently lives inline in `ZoneManager._loadObjectMesh()` (`src/world/ZoneManager.ts:814-843`). **Phase 10.7** creates `src/preview/ObjectPlacer.ts`, migrates that logic into `ObjectPlacer.place(obj)`, and adds the animation-mixer subsystem (`_mixers`/`_clips`/`update(dt)`/`previewClip`). `ZoneManager` then delegates to it (loadZone step 5 + the `object:added` handler) instead of building object meshes itself.
+> **Status: implemented (Phase 10.7, Option B full extraction).** `src/preview/ObjectPlacer.ts`
+> owns the placed-object domain. The old inline `ZoneManager._loadObjectMesh()` was removed;
+> `ZoneManager` now calls `objectPlacer.build(obj, zoneId)` (in `loadZone` + the `object:added`
+> handler) and `objectPlacer.remove(objectId)` (in `_removeObject` + `unloadZone`), keeping only
+> `objectsGroup`/`objectMeshes` registration so SelectionManager/disposal still work. `App.tsx`
+> constructs it (`new ObjectPlacer(bus)`), injects it into `ZoneManager`, and drives mixers via
+> `scene.onUpdate(dt => objectPlacer.update(dt))` (active in editor **and** preview).
+>
+> `build()` uses `assetManager.loadGLTF` + `SkeletonUtils.clone` for GLTF assets (skeleton-safe
+> for skinned/animated props; static meshes clone identically) and `assetManager.loadModel` for
+> OBJ. It lazily back-fills `assetDef.animations` the first time it loads a GLTF, so assets
+> imported before clip discovery existed still get clip names. On load failure it returns the
+> orange wireframe fallback box (same as before). The player mixer in `CharacterController` is
+> separate and unaffected; Phase 13 NPCs/enemies reuse this subsystem.
 
-```js
+```ts
 class ObjectPlacer {
-  constructor(scene, assetManager, worldState, bus) { ... }
+  // mixers/clips/auto-play/preview state keyed by objectId
+  constructor(bus: EventBus) {}
 
-  async place(objectDef, parentGroup) {
-    const gltf = await this._assetManager.loadGLTF(objectDef.assetId);
-    const root = gltf.scene.clone();
-
-    root.position.set(objectDef.position.x, objectDef.position.y, objectDef.position.z);
-    root.rotation.set(
-      THREE.MathUtils.degToRad(objectDef.rotation.x ?? 0),
-      THREE.MathUtils.degToRad(objectDef.rotation.y ?? 0),
-      THREE.MathUtils.degToRad(objectDef.rotation.z ?? 0)
-    );
-    root.scale.set(objectDef.scale.x, objectDef.scale.y, objectDef.scale.z);
-
-    root.userData = {
-      editorId: objectDef.id,
-      editorType: 'object',
-      assetId: objectDef.assetId,
-      zoneId: objectDef.zoneId,
-      floorLevel: objectDef.floor,
-      selectable: true,
-    };
-
-    root.traverse(child => {
-      if (child.isMesh) {
-        child.userData = {
-          editorId: objectDef.id,
-          editorType: 'object',
-          selectable: true,
-          _parentId: objectDef.id,
-        };
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-
-    (parentGroup || this._objectGroup).add(root);
-    return root;
+  async build(obj: WorldObject, zoneId: string): Promise<THREE.Object3D> {
+    // GLTF → loadGLTF + SkeletonUtils.clone (+ read gltf.animations, back-fill assetDef.animations)
+    // OBJ  → assetManager.loadModel
+    // sets position/rotation(deg→rad)/scale + userData (editorId/_parentId for selection),
+    // castShadow/receiveShadow; if clips exist, builds an AnimationMixer + clip map and
+    // starts obj.autoPlayAnimation looping. Returns the root (ZoneManager parents it).
   }
+
+  remove(objectId: string): void {}              // tear down mixer/clips/preview (geometry: ZoneManager)
+  update(dt: number): void {}                     // advance all mixers — registered on SceneManager RAF
+  previewClip(objectId, clipName): void {}        // play once in the editor; only one preview at a time
+  stopPreview(objectId): void {}                  // restore auto-play clip or bind pose
+  setAutoPlay(objectId, clipName | null): void {} // change resting-state loop; takes effect immediately
 }
 ```
 
@@ -5469,9 +5460,24 @@ src/editor/GizmoManager.ts      ← _pivotYaw() gimbal-safe yaw; fixes rotate sn
 
 Sits after Phase 10.6b and before Phase 11 (terrain). Covers the full animation pipeline: clip discovery at import, mixer setup at placement, and editor-mode preview + auto-play configuration.
 
-> **Architecture note — this phase creates `ObjectPlacer`.** Object mesh instantiation currently lives inline in `ZoneManager._loadObjectMesh()` (`src/world/ZoneManager.ts:814-843`); there is no `ObjectPlacer.ts` today. This phase **extracts** that logic into a new `src/preview/ObjectPlacer.ts` that owns the object mesh lifecycle — placement, the `_mixers`/`_clips` maps, `update(dt)`, and `previewClip()`. `ZoneManager` delegates to it (loadZone step 5 + the `object:added` handler) and keeps the meshes registered for selection/colliders. The snippets below assume that extraction. (NPCs/enemies in Phase 13 reuse the same object-mixer subsystem; the player's own mixer in `CharacterController` is separate and unaffected.)
+> **Architecture note — IMPLEMENTED (Option B full extraction).** This phase created
+> `src/preview/ObjectPlacer.ts` and removed the inline `ZoneManager._loadObjectMesh()`.
+> `ObjectPlacer` owns the object mesh lifecycle (build/remove) **and** the animation subsystem
+> (`_mixers`/`_clips`/`update(dt)`/`previewClip`/`stopPreview`/`setAutoPlay`). `ZoneManager`
+> delegates: `build()` in loadZone + the `object:added` handler, `remove()` in `_removeObject`
+> + `unloadZone`, keeping only `objectsGroup`/`objectMeshes` registration for selection/disposal.
+> See the `## ObjectPlacer.ts` file-level section for the real API. NPCs/enemies in Phase 13
+> reuse this subsystem; the player's own mixer in `CharacterController` is separate.
 >
-> **Implementation caveats:** `assetManager.loadModel()` returns `gltf.scene.clone()` *without* animations (`src/core/AssetManager.ts:177-184`) — `ObjectPlacer` must call `loadGLTF(assetId)` to read `gltf.animations`. Animated/skinned props need `SkeletonUtils.clone(gltf.scene)`, **not** plain `.clone()`, so the `AnimationMixer` binds to correctly-named cloned nodes.
+> The snippets below predate implementation and use illustrative names (`place()`,
+> `worldState.getObject`, `assetManager.getAsset`) that **do not match the shipped code** —
+> the real methods are `build()`/`remove()`, auto-play state is an internal map, and the asset
+> lookup is `assetManager.getAssetDef`. Treat them as intent, not signatures.
+>
+> **Implementation caveats (confirmed):** `assetManager.loadModel()` returns `gltf.scene.clone()`
+> *without* animations — `ObjectPlacer.build()` calls `loadGLTF(assetId)` to read `gltf.animations`.
+> Animated/skinned props use `SkeletonUtils.clone(gltf.scene)`, **not** plain `.clone()`, so the
+> `AnimationMixer` binds to correctly-named cloned nodes.
 
 ---
 
@@ -5513,17 +5519,23 @@ if (asset.animations?.length) {
 
 #### Animations Screen in PropertiesPanel
 
-Added to `OBJECT_SCREENS` for any object type whose asset has `animations.length > 0`:
+`AnimationsScreen` is an **inline component in `PropertiesPanel.tsx`** (there is no
+`src/ui/screens/` folder — every screen, `GeoScreen`/`MatScreen`/etc., is inline and switched
+in the render via the `ScreenId` union). The static `OBJECT_SCREENS` map keeps `object: ['geo','mat']`;
+`"animations"` is appended to the object's screen list **at render time, only when the asset has
+clips** (so the row never appears for static props):
 
 ```ts
-const OBJECT_SCREENS: Record<string, ScreenId[]> = {
-  object: ['geo', 'mat', 'scripts', 'animations'],  // animations only shown if asset has clips
-  npc:    ['geo', 'scripts', 'animations'],          // Phase 13
-  enemy:  ['geo', 'scripts', 'animations'],          // Phase 13
-};
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations";
+
+// in PropertiesPanel render:
+const hasClips = !!assets.find(a => a.id === objAssetId)?.animations?.length;
+const screens = selected
+  ? [...(OBJECT_SCREENS[selected.type] ?? []), ...(hasClips ? ["animations" as ScreenId] : [])]
+  : [];
 ```
 
-The `animations` screen ID is only added to the root screen's drilldown list if `assetDef.animations?.length > 0`. Objects with no clips show no Animations row.
+(There is no separate `scripts` screen — object scripts live in their own section, not a `ScreenId`.)
 
 **Animations screen layout:**
 
@@ -5644,25 +5656,18 @@ private _stopPreview(objectId: string): void {
 
 ---
 
-#### Manifest Migration
+#### Migration — none needed (corrected)
 
-This phase adds two migration passes:
+The spec originally called for a `WorldLoader._migrate()` pass. **There is no `_migrate()`**
+(`WorldLoader` only has `migrateWallNodes`), and none is required:
 
-1. **Clip discovery for existing manifest entries** — on first load after upgrading, inspect each model's GLTF and populate `animations[]` on its manifest entry if missing.
-2. **`autoPlayAnimation` defaulting to `null`** — for existing `WorldObject` entries in scene files that predate this field.
-
-`WorldLoader._migrate()` handles this:
-
-```ts
-// In WorldLoader._migrate():
-for (const zone of file.zones ?? []) {
-  for (const obj of zone.objects ?? []) {
-    if (!('autoPlayAnimation' in obj)) {
-      (obj as any).autoPlayAnimation = null;
-    }
-  }
-}
-```
+1. **`autoPlayAnimation`** is an optional field (`autoPlayAnimation?: string | null`). Old scene
+   files simply lack it → it reads as `undefined`, which `ObjectPlacer` treats as "no auto-play."
+   No defaulting pass.
+2. **Clip discovery for pre-existing assets** is handled **lazily**, not by a startup migration:
+   `ObjectPlacer.build()` reads `gltf.animations` whenever it loads a GLTF and back-fills
+   `assetDef.animations` if it was `undefined`. New imports also persist clip names into
+   `manifest.json` (`ModelImporterModal`). This avoids re-inspecting every model at startup.
 
 ---
 
@@ -5681,22 +5686,24 @@ for (const zone of file.zones ?? []) {
 ```
 src/
   preview/
-    ObjectPlacer.ts           ← NEW — extracted from ZoneManager._loadObjectMesh; owns object
-                                 mesh lifecycle + _mixers/_clips, update(dt), previewClip(), _stopPreview()
-    PreviewController.ts      ← call objectPlacer.update(dt) in the RAF loop (or SceneManager)
+    ObjectPlacer.ts           ← NEW — full object lifecycle (build/remove) + _mixers/_clips,
+                                 update(dt), previewClip()/stopPreview()/setAutoPlay(), auto-play,
+                                 SkeletonUtils.clone, lazy assetDef.animations back-fill
   world/
-    ZoneManager.ts            ← delegate object placement to ObjectPlacer; drop inline _loadObjectMesh;
-                                 keep objectMeshes registered for selection/colliders
-    WorldLoader.ts            ← migration for autoPlayAnimation field
+    ZoneManager.ts            ← removed inline _loadObjectMesh; loadZone/_addObject/_removeObject/
+                                 unloadZone delegate to ObjectPlacer; dropped unused assetManager import
   ui/
-    screens/
-      AnimationsScreen.tsx    ← NEW — clip list, auto-play picker, preview buttons
-  core/
-    AssetManager.ts           ← expose gltf.animations (loadModel returns a clone without clips today)
-types.ts                      ← autoPlayAnimation on WorldObject
+    PropertiesPanel.tsx       ← AnimationsScreen added INLINE (no screens/ folder); "animations"
+                                 ScreenId appended for objects with clips; clip list + preview + auto-play
+    ModelImporterModal.tsx    ← capture gltf.animations at import, write AssetDef.animations to manifest
+App.tsx                       ← instantiate ObjectPlacer, inject into ZoneManager, scene.onUpdate(update)
+types.ts                      ← AssetDef.animations?, WorldObject.autoPlayAnimation?, 3 animation:* bus events
 ```
 
-No changes to ScriptEngine, ActionDispatcher, or EntityRegistry.
+Not done (spec was wrong): no new `src/ui/screens/AnimationsScreen.tsx` file, no
+`WorldLoader._migrate()`, no `AssetManager.loadModel` change (the skinned clone lives in
+`ObjectPlacer`, leaving `loadModel`'s other callers — player, ghost — untouched). No changes to
+ScriptEngine, ActionDispatcher, or EntityRegistry.
 
 
 

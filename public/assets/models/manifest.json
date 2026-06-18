@@ -449,6 +449,36 @@
       "colliderType": "box",
       "tags": [],
       "dateAdded": "2026-06-02"
+    },
+    {
+      "id": "character",
+      "label": "Character",
+      "category": "Other",
+      "path": "/assets/models/character.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-06-18",
+      "animations": [
+        "Death",
+        "Duck",
+        "HitReact",
+        "Idle",
+        "Idle_Gun",
+        "Idle_Shoot",
+        "Jump",
+        "Jump_Idle",
+        "Jump_Land",
+        "No",
+        "Punch",
+        "Run",
+        "Run_Gun",
+        "Run_Shoot",
+        "Walk",
+        "Walk_Gun",
+        "Wave",
+        "Yes"
+      ]
     }
   ]
 }

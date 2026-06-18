@@ -62,6 +62,7 @@ export interface AssetDef {
   colliderType: ColliderType;
   tags:         string[];
   dateAdded:    string;
+  animations?:  string[];   // GLTF clip names, populated at import (Phase 10.7)
 }
 
 export interface AssetManifest {
@@ -125,6 +126,9 @@ export interface BusEvents {
   "floor:rebuilt":         { zoneId: string; floorId: string };
   "object:added":          { zoneId: string; object: WorldObject };
   "object:removed":        { zoneId: string; id: string };
+  "animation:preview-start":     { objectId: string; clipName: string };
+  "animation:preview-stop":      { objectId: string };
+  "animation:auto-play-changed": { objectId: string; clipName: string | null };
   "zone:added":            { zone: ZoneDef };
   "zone:activated":        { zoneId: string };
   "zone:enter":            { zoneId: string };
@@ -382,6 +386,7 @@ export interface WorldObject {
   properties: ObjectProperties;
   scripts?:   ScriptDef[];
   groupIds?:  string[];
+  autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
 }
 
 export interface ZoneDef {

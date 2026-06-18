@@ -4,6 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
 } from "@/types";
+import type { EventBus } from "@/core/EventBus";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -127,10 +128,11 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
+  animations: "Animations",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -139,6 +141,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   open: "OPENINGS",
   seg:  "WALL SEGMENTS",
   vert: "ELEVATION",
+  animations: "CLIPS · AUTO-PLAY",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -171,7 +174,7 @@ function getActiveMapCount(overrides: MaterialOverrides | undefined, baseDef: Ma
   }).length;
 }
 
-function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: MaterialDef[]): string {
+function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: MaterialDef[], assets: AssetDef[]): string {
   const { type } = selected;
   const wallData  = type === "wall"     ? selected.data as WallDef     : null;
   const floorData = type === "floor"    ? selected.data as FloorDef    : null;
@@ -207,6 +210,11 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     }
     case "vert":
       return `elev ${floorData?.elevation ?? 0}`;
+    case "animations": {
+      const assetId = (selected.data as WorldObject | null)?.assetId;
+      const n = assets.find(a => a.id === assetId)?.animations?.length ?? 0;
+      return `${n} clip${n !== 1 ? "s" : ""}`;
+    }
   }
 }
 
@@ -262,6 +270,10 @@ interface PropertiesPanelProps {
   assets?:                  AssetDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
+  bus?:                     EventBus;
+  onPreviewClip?:           (objectId: string, clipName: string) => void;
+  onStopPreview?:           (objectId: string) => void;
+  onAutoPlayChange?:        (objectId: string, clipName: string | null) => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -271,6 +283,7 @@ export function PropertiesPanel({
   onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
+  bus, onPreviewClip, onStopPreview, onAutoPlayChange,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -291,7 +304,11 @@ export function PropertiesPanel({
 
   const currentScreen = stack.length > 0 ? stack[stack.length - 1] : null;
   const isRoot        = !currentScreen;
-  const screens       = selected ? (OBJECT_SCREENS[selected.type] ?? []) : [];
+  const objAssetId    = selected?.type === "object" ? (selected.data as WorldObject | null)?.assetId : undefined;
+  const hasClips      = !!assets.find(a => a.id === objAssetId)?.animations?.length;
+  const screens: ScreenId[] = selected
+    ? [...(OBJECT_SCREENS[selected.type] ?? []), ...(hasClips ? ["animations" as ScreenId] : [])]
+    : [];
 
   const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? selected.id            : SCREEN_LABELS[currentScreen!];
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
@@ -343,7 +360,7 @@ export function PropertiesPanel({
               <CategoryRow
                 key={s}
                 label={SCREEN_LABELS[s]}
-                summary={summaryFor(s, selected, materialList)}
+                summary={summaryFor(s, selected, materialList, assets)}
                 onPress={() => push(s)}
               />
             ))}
@@ -371,6 +388,15 @@ export function PropertiesPanel({
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
           <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={openImporter} onSegmentUpdate={onSegmentUpdate} />
+        ) : currentScreen === "animations" ? (
+          <AnimationsScreen
+            selected={selected}
+            assets={assets}
+            bus={bus}
+            onPreviewClip={onPreviewClip}
+            onStopPreview={onStopPreview}
+            onAutoPlayChange={onAutoPlayChange}
+          />
         ) : currentScreen === "vert" ? (
           <VertScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : null}
@@ -1033,6 +1059,95 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
             }}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── AnimationsScreen ──────────────────────────────────────────────────────────
+
+function AnimationsScreen({ selected, assets, bus, onPreviewClip, onStopPreview, onAutoPlayChange }: {
+  selected:         SelectedObjectPayload;
+  assets:           AssetDef[];
+  bus?:             EventBus;
+  onPreviewClip?:    (objectId: string, clipName: string) => void;
+  onStopPreview?:    (objectId: string) => void;
+  onAutoPlayChange?: (objectId: string, clipName: string | null) => void;
+}) {
+  const obj   = selected.data as WorldObject | null;
+  const clips = assets.find(a => a.id === obj?.assetId)?.animations ?? [];
+  const [autoPlay,   setAutoPlay]   = useState<string | null>(obj?.autoPlayAnimation ?? null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAutoPlay((selected.data as WorldObject | null)?.autoPlayAnimation ?? null);
+    setPreviewing(null);
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset the Preview/Stop button when a clip finishes on its own.
+  useEffect(() => {
+    if (!bus || !obj) return;
+    return bus.on("animation:preview-stop", ({ objectId }) => {
+      if (objectId === obj.id) setPreviewing(null);
+    });
+  }, [bus, obj?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!obj) return null;
+
+  const setAuto = (clip: string | null): void => {
+    setAutoPlay(clip);
+    onAutoPlayChange?.(obj.id, clip);
+  };
+  const preview = (clip: string): void => { setPreviewing(clip); onPreviewClip?.(obj.id, clip); };
+  const stop    = (): void => { setPreviewing(null); onStopPreview?.(obj.id); };
+
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>AUTO-PLAY</div>
+        <select
+          value={autoPlay ?? ""}
+          onChange={e => setAuto(e.target.value || null)}
+          style={{
+            width: "100%", boxSizing: "border-box",
+            border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4,
+            background: "rgba(40,40,40,0.9)", color: "#c0c0c0",
+            fontSize: 10, fontFamily: "monospace", padding: "4px 6px", outline: "none",
+          }}
+        >
+          <option value="">None</option>
+          {clips.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <div style={LABEL}>CLIPS</div>
+        {clips.length === 0 && (
+          <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>No animations available</div>
+        )}
+        {clips.map(c => {
+          const isPreviewing = previewing === c;
+          const disabled = previewing !== null && !isPreviewing;
+          return (
+            <div key={c} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
+              background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "4px 8px",
+              border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div style={{ flex: 1, minWidth: 0, color: "#b0b0b0", fontSize: 11, fontFamily: "monospace",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {c}{autoPlay === c ? " · auto" : ""}
+              </div>
+              <button
+                onClick={() => (isPreviewing ? stop() : preview(c))}
+                disabled={disabled}
+                style={{ padding: "2px 8px", fontSize: 10, fontFamily: "monospace",
+                  cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.35 : 1,
+                  background: isPreviewing ? "rgba(255,120,0,0.12)" : "rgba(0,255,200,0.1)",
+                  border: `1px solid ${isPreviewing ? "rgba(255,120,0,0.3)" : "rgba(0,255,200,0.25)"}`,
+                  borderRadius: 3, color: isPreviewing ? "#dd8844" : "#44ccaa" }}
+              >{isPreviewing ? "■ Stop" : "▶ Preview"}</button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

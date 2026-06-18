@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { PreviewController } from "@/preview/PreviewController";
+import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
@@ -61,6 +62,7 @@ export default function App() {
   const worldRef         = useRef<WorldState | null>(null);
   const zonesRef         = useRef<ZoneManager | null>(null);
   const historyRef       = useRef<HistoryManager | null>(null);
+  const objectPlacerRef  = useRef<ObjectPlacer | null>(null);
   const sceneRef         = useRef<SceneManager | null>(null);
   const previewRef       = useRef<PreviewController | null>(null);
   const scriptEngineRef  = useRef<ScriptEngine | null>(null);
@@ -123,7 +125,9 @@ export default function App() {
     }).catch(err => console.error("initAssets failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
-    const zones     = new ZoneManager(scene.scene, world, bus);
+    const objectPlacer = new ObjectPlacer(bus);
+    objectPlacerRef.current = objectPlacer;
+    const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer);
     zonesRef.current = zones;
     const history   = new HistoryManager(world, bus);
     historyRef.current = history;
@@ -241,6 +245,8 @@ export default function App() {
 
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
+    // Advance object animation mixers every frame (editor + preview)
+    scene.onUpdate(dt => objectPlacer.update(dt));
 
     const unsub = [
       bus.on("preview:start", () => {
@@ -972,6 +978,13 @@ export default function App() {
         assets={assets}
         onPlayerSettingsChange={handlePlayerSettingsChange}
         onSpawnPositionChange={handleSpawnPositionChange}
+        bus={busRef.current}
+        onPreviewClip={(objectId, clipName) => objectPlacerRef.current?.previewClip(objectId, clipName)}
+        onStopPreview={(objectId) => objectPlacerRef.current?.stopPreview(objectId)}
+        onAutoPlayChange={(objectId, clipName) => {
+          objectPlacerRef.current?.setAutoPlay(objectId, clipName);
+          if (selected) worldRef.current?.updateObject(selected.zoneId, objectId, { autoPlayAnimation: clipName });
+        }}
       />
       <CoordinateDisplay coords={coords} />
 

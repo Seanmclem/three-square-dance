@@ -6,7 +6,7 @@ import { StairBuilder } from "@/builders/StairBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
-import { assetManager } from "@/core/AssetManager";
+import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject, TriggerVolume } from "@/types";
@@ -104,9 +104,10 @@ export class ZoneManager {
   private readonly _dimMaterials = new Set<THREE.Material>();
 
   constructor(
-    private readonly _scene:      THREE.Scene,
-    private readonly _worldState: WorldState,
-    private readonly _bus:        EventBus,
+    private readonly _scene:        THREE.Scene,
+    private readonly _worldState:   WorldState,
+    private readonly _bus:          EventBus,
+    private readonly _objectPlacer: ObjectPlacer,
   ) {}
 
   init(): void {
@@ -383,8 +384,8 @@ export class ZoneManager {
 
     // ── Objects ───────────────────────────────────────────────────────────
     for (const obj of zone.objects) {
-      const mesh = await this._loadObjectMesh(obj, zoneId);
-      if (mesh) { objectsGroup.add(mesh); objectMeshes.set(obj.id, mesh); }
+      const mesh = await this._objectPlacer.build(obj, zoneId);
+      objectsGroup.add(mesh); objectMeshes.set(obj.id, mesh);
     }
 
     this._scene.add(group);
@@ -427,6 +428,10 @@ export class ZoneManager {
 
     for (const se of entry.stairEntries.values()) {
       se.colliders.forEach(c => physicsWorld.removeCollider(c));
+    }
+
+    for (const id of entry.objectMeshes.keys()) {
+      this._objectPlacer.remove(id);
     }
 
     // Clear any dimming references for this zone's meshes
@@ -811,42 +816,10 @@ export class ZoneManager {
 
   // ── Object helpers ────────────────────────────────────────────────────────
 
-  private async _loadObjectMesh(obj: WorldObject, zoneId: string): Promise<THREE.Object3D | null> {
-    try {
-      const mesh = await assetManager.loadModel(obj.assetId);
-      mesh.position.set(obj.position.x, obj.position.y, obj.position.z);
-      const DEG2RAD = Math.PI / 180;
-      mesh.rotation.set(obj.rotation.x * DEG2RAD, obj.rotation.y * DEG2RAD, obj.rotation.z * DEG2RAD);
-      mesh.scale.set(obj.scale.x, obj.scale.y, obj.scale.z);
-      mesh.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor,
-        interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact" };
-      mesh.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          // _parentId tells SelectionManager._resolveRoot to walk up to the root group,
-          // so _selected is the root (world-space transform) not a local-space child mesh.
-          child.userData = { ...mesh.userData, _parentId: obj.id };
-          child.castShadow    = true;
-          child.receiveShadow = true;
-        }
-      });
-      return mesh;
-    } catch (err) {
-      console.warn(`ZoneManager: failed to load model for asset "${obj.assetId}"`, err);
-      const geo  = new THREE.BoxGeometry(1, 1, 1);
-      const mat  = new THREE.MeshStandardMaterial({ color: 0xff6600, wireframe: true });
-      const box  = new THREE.Mesh(geo, mat);
-      box.position.set(obj.position.x, obj.position.y, obj.position.z);
-      box.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor,
-        _ownsMaterial: true, interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact" };
-      return box;
-    }
-  }
-
   private async _addObject(zoneId: string, obj: WorldObject): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
-    const mesh = await this._loadObjectMesh(obj, zoneId);
-    if (!mesh) return;
+    const mesh = await this._objectPlacer.build(obj, zoneId);
     entry.objectsGroup.add(mesh);
     entry.objectMeshes.set(obj.id, mesh);
   }
@@ -856,6 +829,7 @@ export class ZoneManager {
     if (!entry) return;
     const mesh = entry.objectMeshes.get(objectId);
     if (!mesh) return;
+    this._objectPlacer.remove(objectId);
     entry.objectsGroup.remove(mesh);
     mesh.traverse(child => {
       if (child instanceof THREE.Mesh) {
