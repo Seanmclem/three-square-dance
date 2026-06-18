@@ -319,17 +319,6 @@
       "dateAdded": "2026-06-02"
     },
     {
-      "id": "rockplatforms_large",
-      "label": "RockPlatforms Large",
-      "category": "Nature",
-      "path": "/assets/models/rockplatforms_large.gltf",
-      "thumbnail": "/assets/models/rockplatforms_large_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
       "id": "tree",
       "label": "Tree",
       "category": "Nature",
@@ -363,17 +352,6 @@
       "dateAdded": "2026-06-02"
     },
     {
-      "id": "rockplatform_tall",
-      "label": "RockPlatform Tall",
-      "category": "Nature",
-      "path": "/assets/models/rockplatform_tall.gltf",
-      "thumbnail": "/assets/models/rockplatform_tall_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
       "id": "grass_2",
       "label": "Grass 2",
       "category": "Nature",
@@ -396,55 +374,11 @@
       "dateAdded": "2026-06-02"
     },
     {
-      "id": "rockplatforms_1",
-      "label": "RockPlatforms 1",
-      "category": "Nature",
-      "path": "/assets/models/rockplatforms_1.gltf",
-      "thumbnail": "/assets/models/rockplatforms_1_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
       "id": "grass_3",
       "label": "Grass 3",
       "category": "Nature",
       "path": "/assets/models/grass_3.gltf",
       "thumbnail": "/assets/models/grass_3_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
-      "id": "rockplatforms_3",
-      "label": "RockPlatforms 3",
-      "category": "Nature",
-      "path": "/assets/models/rockplatforms_3.gltf",
-      "thumbnail": "/assets/models/rockplatforms_3_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
-      "id": "rockplatforms_medium",
-      "label": "RockPlatforms Medium",
-      "category": "Nature",
-      "path": "/assets/models/rockplatforms_medium.gltf",
-      "thumbnail": "/assets/models/rockplatforms_medium_thumb.png",
-      "collidable": true,
-      "colliderType": "box",
-      "tags": [],
-      "dateAdded": "2026-06-02"
-    },
-    {
-      "id": "grass_1",
-      "label": "Grass 1",
-      "category": "Nature",
-      "path": "/assets/models/grass_1.gltf",
-      "thumbnail": "/assets/models/grass_1_thumb.png",
       "collidable": true,
       "colliderType": "box",
       "tags": [],
