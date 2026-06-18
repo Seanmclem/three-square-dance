@@ -33,6 +33,7 @@ import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
+import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef } from "@/types";
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes, pruneOrphanNodes } from "@/world/WorldLoader";
@@ -82,6 +83,9 @@ export default function App() {
   const [assets,          setAssets]           = useState<AssetDef[]>([]);
   const [selectedAssetId, setSelectedAssetId]  = useState<string | null>(null);
   const [showImporter,    setShowImporter]     = useState(false);
+  const [pendingAssetDelete, setPendingAssetDelete] = useState<
+    { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
+  >(null);
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
@@ -759,6 +763,68 @@ export default function App() {
     if (id) busRef.current.emit("asset:selected", { assetId: id });
   };
 
+  // Open the delete-confirm dialog, computing how many placed objects use the assets.
+  const handleRequestAssetDelete = (ids: string[]): void => {
+    if (!ids.length) return;
+    const idSet  = new Set(ids);
+    const labels = ids.map(id => assets.find(a => a.id === id)?.label ?? id);
+    let count = 0;
+    const zones = new Set<string>();
+    const world = worldRef.current;
+    if (world) {
+      for (const zone of world.zones.values()) {
+        for (const obj of zone.objects) {
+          if (idSet.has(obj.assetId)) { count++; zones.add(zone.name); }
+        }
+      }
+    }
+    setPendingAssetDelete({ ids, labels, usage: { count, zones: [...zones] } });
+  };
+
+  const handleConfirmAssetDelete = async (deleteFiles: boolean): Promise<void> => {
+    const pending = pendingAssetDelete;
+    setPendingAssetDelete(null);
+    if (!pending) return;
+    const ids = pending.ids;
+
+    // Manifest write + file removal need a read/write directory handle.
+    let dir = modelsDir;
+    if (!dir) {
+      try {
+        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
+          .showDirectoryPicker({ mode: "readwrite" });
+        setModelsDir(dir);
+      } catch { return; } // cancelled — abort without changing anything
+    }
+
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
+      const removed = data.assets.filter(a => ids.includes(a.id));
+      data.assets   = data.assets.filter(a => !ids.includes(a.id));
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+
+      if (deleteFiles) {
+        const base = (p?: string) => p?.split("/").pop();
+        for (const a of removed) {
+          for (const f of [base(a.path), base(a.thumbnail), base(a.mtlPath)]) {
+            if (f) { try { await dir.removeEntry(f); } catch { /* missing — ignore */ } }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("asset delete failed:", err);
+      return;
+    }
+
+    assetManager.removeAssets(ids);
+    setAssets(prev => prev.filter(a => !ids.includes(a.id)));
+    busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
+    if (selectedAssetId && ids.includes(selectedAssetId)) handleAssetSelect(null);
+  };
+
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     const history = historyRef.current;
@@ -930,6 +996,7 @@ export default function App() {
         selectedAssetId={selectedAssetId}
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
+        onDeleteAssets={handleRequestAssetDelete}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         onGroupAdd={handleAddGroup}
@@ -1068,6 +1135,16 @@ SquareDance
             if (imported.length === 1) handleAssetSelect(imported[0]!.id);
           }}
           onClose={() => setShowImporter(false)}
+        />
+      )}
+
+      {pendingAssetDelete && (
+        <DeleteAssetDialog
+          labels={pendingAssetDelete.labels}
+          usage={pendingAssetDelete.usage}
+          needsFolderGrant={!modelsDir}
+          onCancel={() => setPendingAssetDelete(null)}
+          onConfirm={deleteFiles => void handleConfirmAssetDelete(deleteFiles)}
         />
       )}
 

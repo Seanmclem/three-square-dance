@@ -19,12 +19,29 @@ interface AssetBrowserProps {
   selectedAssetId: string | null;
   onSelect:        (id: string | null) => void;
   onImport:        () => void;
+  onDeleteAssets:  (ids: string[]) => void;
 }
 
-export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: AssetBrowserProps) {
+export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDeleteAssets }: AssetBrowserProps) {
   const [search,   setSearch]   = useState("");
   const [category, setCategory] = useState<AssetCategory | "All">("All");
   const [popoutOpen, setPopoutOpen] = useState(false);
+  // Manage mode: tiles become multi-select checkboxes for batch delete
+  const [manage, setManage]     = useState(false);
+  const [checked, setChecked]   = useState<Set<string>>(new Set());
+
+  const exitManage = () => { setManage(false); setChecked(new Set()); };
+  const toggleCheck = (id: string) =>
+    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // Drop checks for assets that no longer exist (e.g. just deleted).
+  useEffect(() => {
+    setChecked(prev => {
+      const ids = new Set(assets.map(a => a.id));
+      const next = new Set([...prev].filter(id => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [assets]);
   // Most recently selected named categories, newest last
   const [recent, setRecent] = useState<AssetCategory[]>([]);
 
@@ -185,29 +202,67 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
         )}
       </div>
 
-      {/* Import button */}
-      <div style={{ padding: "8px 8px 6px", flexShrink: 0 }}>
-        <button
-          onClick={onImport}
-          style={{
-            width: "100%", padding: "5px 0",
-            background: "rgba(80,140,255,0.12)",
-            border: "1px solid rgba(80,140,255,0.25)",
-            borderRadius: 4, cursor: "pointer",
-            color: "#80aaff", fontSize: 10, letterSpacing: 0.5,
-            transition: "background 0.1s, border-color 0.1s",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = "rgba(80,140,255,0.22)";
-            e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = "rgba(80,140,255,0.12)";
-            e.currentTarget.style.borderColor = "rgba(80,140,255,0.25)";
-          }}
-        >
-          + Import Model
-        </button>
+      {/* Import / Manage toolbar */}
+      <div style={{ padding: "8px 8px 6px", flexShrink: 0, display: "flex", gap: 4 }}>
+        {!manage ? (
+          <>
+            <button
+              onClick={onImport}
+              style={{
+                flex: 1, padding: "5px 0",
+                background: "rgba(80,140,255,0.12)",
+                border: "1px solid rgba(80,140,255,0.25)",
+                borderRadius: 4, cursor: "pointer",
+                color: "#80aaff", fontSize: 10, letterSpacing: 0.5,
+              }}
+            >
+              + Import Model
+            </button>
+            {assets.length > 0 && (
+              <button
+                onClick={() => setManage(true)}
+                title="Select models to delete"
+                style={{
+                  flexShrink: 0, padding: "5px 10px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 4, cursor: "pointer",
+                  color: "#808080", fontSize: 10, letterSpacing: 0.5,
+                }}
+              >
+                Manage
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => { if (checked.size) onDeleteAssets([...checked]); }}
+              disabled={checked.size === 0}
+              style={{
+                flex: 1, padding: "5px 0",
+                background: checked.size ? "rgba(200,60,60,0.15)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size ? "rgba(200,60,60,0.35)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size ? "pointer" : "default",
+                color: checked.size ? "#cc6666" : "#555", fontSize: 10, letterSpacing: 0.5,
+              }}
+            >
+              Delete{checked.size ? ` (${checked.size})` : ""}
+            </button>
+            <button
+              onClick={exitManage}
+              style={{
+                flexShrink: 0, padding: "5px 10px",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 4, cursor: "pointer",
+                color: "#808080", fontSize: 10, letterSpacing: 0.5,
+              }}
+            >
+              Done
+            </button>
+          </>
+        )}
       </div>
 
       {/* Grid */}
@@ -225,20 +280,32 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
           </div>
         ) : (
           filtered.map(asset => {
-            const sel = asset.id === selectedAssetId;
+            const sel = manage ? checked.has(asset.id) : asset.id === selectedAssetId;
+            const accent = manage ? "200,60,60" : "80,140,255";
             return (
               <button
                 key={asset.id}
                 title={asset.label}
-                onClick={() => onSelect(sel ? null : asset.id)}
+                onClick={() => manage ? toggleCheck(asset.id) : onSelect(sel ? null : asset.id)}
                 style={{
-                  background: sel ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
-                  border: sel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.05)",
+                  position: "relative",
+                  background: sel ? `rgba(${accent},0.2)` : "rgba(255,255,255,0.04)",
+                  border: sel ? `1px solid rgba(${accent},0.5)` : "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 4, cursor: "pointer", padding: 2,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                   overflow: "hidden", minHeight: 80,
                 }}
               >
+                {manage && (
+                  <div style={{
+                    position: "absolute", top: 3, left: 3, zIndex: 1,
+                    width: 14, height: 14, borderRadius: 3,
+                    background: sel ? "rgba(200,60,60,0.9)" : "rgba(20,20,20,0.8)",
+                    border: `1px solid ${sel ? "rgba(255,140,140,0.8)" : "rgba(255,255,255,0.3)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontSize: 10, lineHeight: 1,
+                  }}>{sel ? "✓" : ""}</div>
+                )}
                 {asset.thumbnail ? (
                   <img
                     src={asset.thumbnail}
@@ -254,7 +321,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport }: As
                   }}>◻</div>
                 )}
                 <span style={{
-                  fontSize: 8, color: sel ? "#80aaff" : "#808080",
+                  fontSize: 8, color: sel ? (manage ? "#cc8888" : "#80aaff") : "#808080",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   width: "100%", textAlign: "center",
                 }}>

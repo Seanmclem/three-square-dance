@@ -9,6 +9,7 @@ interface LeftPanelProps {
   selectedAssetId: string | null;
   onAssetSelect:   (id: string | null) => void;
   onImport:        () => void;
+  onDeleteAssets:  (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   onGroupAdd:      () => void;
@@ -26,7 +27,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  panelId, assets, selectedAssetId, onAssetSelect, onImport, onClose,
+  panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onClose,
   groups, onGroupAdd, onGroupRemove, onGroupRename,
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
@@ -79,6 +80,7 @@ export function LeftPanel({
                 selectedAssetId={selectedAssetId}
                 onSelect={onAssetSelect}
                 onImport={onImport}
+                onDeleteAssets={onDeleteAssets}
               />
             )}
             {panelId === "groups" && (

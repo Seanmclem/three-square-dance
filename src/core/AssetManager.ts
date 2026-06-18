@@ -84,6 +84,15 @@ export class AssetManager {
     return Object.values(this._assetRegistry);
   }
 
+  /** Drop assets from the registry (and any cached GLTF) after a manifest delete. */
+  removeAssets(ids: string[]): void {
+    for (const id of ids) {
+      delete this._assetRegistry[id];
+      this._gltfCache.delete(id);
+      this._gltfCache.delete(`obj:${id}`);
+    }
+  }
+
   async loadTexture(url: string, colorSpace: THREE.ColorSpace = THREE.SRGBColorSpace): Promise<THREE.Texture> {
     const key = `${url}:${colorSpace}`;
     const cached = this._textureCache.get(key);
