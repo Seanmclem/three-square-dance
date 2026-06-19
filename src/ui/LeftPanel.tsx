@@ -1,5 +1,6 @@
-import type { LeftPanelId, AssetDef, GroupDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
 import { AssetBrowser } from "@/ui/AssetBrowser";
+import { MaterialBrowser } from "@/ui/MaterialBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
 
@@ -10,6 +11,9 @@ interface LeftPanelProps {
   onAssetSelect:   (id: string | null) => void;
   onImport:        () => void;
   onDeleteAssets:  (ids: string[]) => void;
+  materials:        MaterialDef[];
+  onMaterialImport: () => void;
+  onDeleteMaterials:(ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   onGroupAdd:      () => void;
@@ -28,6 +32,7 @@ interface LeftPanelProps {
 
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onClose,
+  materials, onMaterialImport, onDeleteMaterials,
   groups, onGroupAdd, onGroupRemove, onGroupRename,
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
@@ -81,6 +86,13 @@ export function LeftPanel({
                 onSelect={onAssetSelect}
                 onImport={onImport}
                 onDeleteAssets={onDeleteAssets}
+              />
+            )}
+            {panelId === "materials" && (
+              <MaterialBrowser
+                materials={materials}
+                onImport={onMaterialImport}
+                onDeleteMaterials={onDeleteMaterials}
               />
             )}
             {panelId === "groups" && (

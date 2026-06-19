@@ -5,7 +5,10 @@ import type {
   PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
-import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
+import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
+
+// Preview swatch size in the material picker rows — tweak to taste.
+const PICKER_SWATCH = 26;
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -258,7 +261,7 @@ interface PropertiesPanelProps {
   quality:                  QualityScale;
   onObjectUpdate:           (changes: Partial<WorldObject>) => void;
   onSegmentUpdate:          (wallId: string, changes: Partial<WallDef>) => void;
-  onMaterialsReload:        () => void;
+  onImportMaterial:         () => void;
   onQualityChange:          (q: QualityScale) => void;
   onCopyRunToFloor?:        (targetLevel: number) => void;
   onFillRunWithFloor?:      () => void;
@@ -280,7 +283,7 @@ interface PropertiesPanelProps {
 
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
-  onMaterialsReload, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
+  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
@@ -288,10 +291,6 @@ export function PropertiesPanel({
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
   const bodyRef = useRef<HTMLDivElement>(null);
-
-  const [texturesDir,  setTexturesDir]  = useState<FileSystemDirectoryHandle | null>(null);
-  const [importerOpen, setImporterOpen] = useState(false);
-  const [dirError,     setDirError]     = useState<string | null>(null);
 
   useEffect(() => { setStack([]); setActionsOpen(true); }, [selected?.id]);
 
@@ -313,11 +312,6 @@ export function PropertiesPanel({
   const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? selected.id            : SCREEN_LABELS[currentScreen!];
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
-  const openImporter = () => {
-    setDirError(null);
-    if (!("showDirectoryPicker" in window)) { setDirError("Material importer requires Chrome or Edge."); return; }
-    setImporterOpen(true);
-  };
 
   return (
     <div style={PANEL_STYLE}>
@@ -380,14 +374,14 @@ export function PropertiesPanel({
             selected={selected}
             materialList={materialList}
             onObjectUpdate={onObjectUpdate}
-            onAddMaterial={openImporter}
+            onAddMaterial={onImportMaterial}
             quality={quality}
             onQualityChange={onQualityChange}
           />
         ) : currentScreen === "open" ? (
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
-          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={openImporter} onSegmentUpdate={onSegmentUpdate} />
+          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} />
         ) : currentScreen === "animations" ? (
           <AnimationsScreen
             selected={selected}
@@ -402,17 +396,6 @@ export function PropertiesPanel({
         ) : null}
       </div>
 
-      {dirError && (
-        <div style={{ padding: "4px 16px 8px", color: "#ff6b6b", fontSize: 10 }}>{dirError}</div>
-      )}
-      {importerOpen && (
-        <MaterialImporterModal
-          texturesDir={texturesDir}
-          onTextureDirSet={setTexturesDir}
-          onComplete={m => { setImporterOpen(false); onMaterialsReload(); void m; }}
-          onClose={() => setImporterOpen(false)}
-        />
-      )}
     </div>
   );
 }
@@ -1459,64 +1442,6 @@ function VertScreen({ selected, onObjectUpdate }: {
 
 // ── MaterialSection ───────────────────────────────────────────────────────────
 
-const MAT_CAT_ORDER = ["Stone", "Wood", "Metal", "Fabric", "Ground", "Concrete", "Brick", "Plaster", "Other"];
-const MAT_PILL_VISIBLE = 4; // category pills shown inline beside "All" before overflow
-
-function MaterialCategoryPills({ categories, active, onSelect }: {
-  categories: string[];   // ordered, includes "All" first
-  active:     string;
-  onSelect:   (c: string) => void;
-}) {
-  const [popout, setPopout] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!popout) return;
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setPopout(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [popout]);
-
-  const rest = categories.slice(1);
-  let inline = rest.slice(0, MAT_PILL_VISIBLE);
-  let overflow = rest.slice(MAT_PILL_VISIBLE);
-  if (active !== "All" && overflow.includes(active)) {  // keep the active category visible inline
-    inline = [...inline, active];
-    overflow = overflow.filter(c => c !== active);
-  }
-
-  const pillStyle = (c: string): React.CSSProperties => ({
-    flexShrink: 0, fontSize: 10, padding: "3px 7px", borderRadius: 4, border: "none", cursor: "pointer",
-    background: active === c ? "rgba(80,140,255,0.25)" : "rgba(255,255,255,0.04)",
-    color: active === c ? "#80aaff" : "#808080", whiteSpace: "nowrap",
-  });
-
-  return (
-    <div ref={ref} style={{ position: "relative", display: "flex", gap: 3, flexWrap: "wrap" }}>
-      <button onClick={() => onSelect("All")} style={pillStyle("All")}>All</button>
-      {inline.map(c => <button key={c} onClick={() => onSelect(c)} style={pillStyle(c)}>{c}</button>)}
-      {overflow.length > 0 && (
-        <button onClick={() => setPopout(v => !v)} style={pillStyle("__more__")}>More ▾</button>
-      )}
-      {popout && overflow.length > 0 && (
-        <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 20,
-          background: "rgba(28,28,28,0.98)", border: "1px solid rgba(255,255,255,0.09)",
-          borderRadius: 4, padding: "4px 0", minWidth: 110, maxHeight: 180, overflowY: "auto",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
-        }}>
-          {overflow.map(c => (
-            <button key={c} onClick={() => { onSelect(c); setPopout(false); }} style={{
-              display: "block", width: "100%", textAlign: "left", border: "none", cursor: "pointer",
-              background: active === c ? "rgba(80,140,255,0.2)" : "transparent",
-              color: active === c ? "#80aaff" : "#808080", fontSize: 10, padding: "5px 12px",
-            }}>{c}</button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function MaterialSection({
   label = "MATERIAL", defaultExpanded = true,
   materialList, currentMaterialId, overrides, onMaterialChange, onOverridesChange, onAddMaterial,
@@ -1537,10 +1462,7 @@ function MaterialSection({
 
   const catOf = (m: MaterialDef) => m.category ?? "Other";
   const present = [...new Set(materialList.map(catOf))];
-  const orderedCats = ["All",
-    ...MAT_CAT_ORDER.filter(c => present.includes(c)),
-    ...present.filter(c => !MAT_CAT_ORDER.includes(c)).sort(),
-  ];
+  const orderedCats = orderedMaterialCategories(present);
   const inCategory = materialList.filter(m => matCat === "All" || catOf(m) === matCat);
   // When the applied material isn't in the active category, pin it above the list (set apart).
   const pinnedCurrent = baseDef && !inCategory.some(m => m.id === baseDef.id) ? baseDef : null;
@@ -1549,13 +1471,19 @@ function MaterialSection({
     const active = mat.id === currentMaterialId;
     return (
       <div key={mat.id} onClick={() => onMaterialChange(mat.id)} style={{
-        padding: "5px 10px",
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "4px 8px",
         background: active ? "rgba(80,140,255,0.15)" : "rgba(46,46,46,0.9)",
         border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
         borderRadius: 4, color: active ? "#80aaff" : "#7a7a7a",
         fontSize: 11, fontFamily: "monospace", cursor: "pointer",
       }}>
-        {mat.label}
+        <div style={{
+          width: PICKER_SWATCH, height: PICKER_SWATCH, flexShrink: 0, borderRadius: 3,
+          border: "1px solid rgba(255,255,255,0.1)",
+          background: `#3a3a3a url("${materialSwatchUrl(mat)}") center/cover`,
+        }} />
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mat.label}</span>
       </div>
     );
   };

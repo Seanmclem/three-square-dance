@@ -32,6 +32,7 @@ import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
+import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef } from "@/types";
@@ -87,6 +88,11 @@ export default function App() {
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
   >(null);
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
+  const [texturesDir,     setTexturesDir]      = useState<FileSystemDirectoryHandle | null>(null);
+  const [materialImporterOpen, setMaterialImporterOpen] = useState(false);
+  const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
+    { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
+  >(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [groups,          setGroups]           = useState<GroupDef[]>([]);
@@ -825,6 +831,74 @@ export default function App() {
     if (selectedAssetId && ids.includes(selectedAssetId)) handleAssetSelect(null);
   };
 
+  const openMaterialImporter = (): void => {
+    if (!("showDirectoryPicker" in window)) {
+      console.warn("Material importer requires Chrome or Edge.");
+      return;
+    }
+    setMaterialImporterOpen(true);
+  };
+
+  // Open the delete-confirm dialog, counting how many surfaces use the materials.
+  const handleRequestMaterialDelete = (ids: string[]): void => {
+    if (!ids.length) return;
+    const idSet  = new Set(ids);
+    const labels = ids.map(id => materialList.find(m => m.id === id)?.label ?? id);
+    let count = 0;
+    const zones = new Set<string>();
+    const world = worldRef.current;
+    if (world) {
+      for (const zone of world.zones.values()) {
+        const hits = [
+          ...zone.walls.map(w => w.material),
+          ...zone.floors.map(f => f.floorMesh.material),
+          ...zone.platforms.flatMap(p => [p.material, p.sideMaterial]),
+          ...zone.stairs.flatMap(s => [s.material, s.riserMaterial]),
+        ].filter(m => m && idSet.has(m));
+        if (hits.length) { count += hits.length; zones.add(zone.name); }
+      }
+    }
+    setPendingMaterialDelete({ ids, labels, usage: { count, zones: [...zones] } });
+  };
+
+  const handleConfirmMaterialDelete = async (deleteFiles: boolean): Promise<void> => {
+    const pending = pendingMaterialDelete;
+    setPendingMaterialDelete(null);
+    if (!pending) return;
+    const ids = pending.ids;
+
+    let dir = texturesDir;
+    if (!dir) {
+      try {
+        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
+          .showDirectoryPicker({ mode: "readwrite" });
+        setTexturesDir(dir);
+      } catch { return; } // cancelled — abort without changing anything
+    }
+
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; materials: MaterialDef[] };
+      data.materials = data.materials.filter(m => !ids.includes(m.id));
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+
+      if (deleteFiles) {
+        for (const id of ids) {
+          try { await (dir as unknown as { removeEntry: (n: string, o?: unknown) => Promise<void> }).removeEntry(id, { recursive: true }); }
+          catch { /* folder missing — ignore */ }
+        }
+      }
+    } catch (err) {
+      console.error("material delete failed:", err);
+      return;
+    }
+
+    assetManager.removeMaterials(ids);
+    setMaterialList(prev => prev.filter(m => !ids.includes(m.id)));
+  };
+
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     const history = historyRef.current;
@@ -997,6 +1071,9 @@ export default function App() {
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
         onDeleteAssets={handleRequestAssetDelete}
+        materials={materialList}
+        onMaterialImport={openMaterialImporter}
+        onDeleteMaterials={handleRequestMaterialDelete}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         onGroupAdd={handleAddGroup}
@@ -1033,7 +1110,7 @@ export default function App() {
         quality={quality}
         onObjectUpdate={handleObjectUpdate}
         onSegmentUpdate={handleSegmentUpdate}
-        onMaterialsReload={handleMaterialsReload}
+        onImportMaterial={openMaterialImporter}
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
@@ -1145,6 +1222,29 @@ SquareDance
           needsFolderGrant={!modelsDir}
           onCancel={() => setPendingAssetDelete(null)}
           onConfirm={deleteFiles => void handleConfirmAssetDelete(deleteFiles)}
+        />
+      )}
+
+      {materialImporterOpen && (
+        <MaterialImporterModal
+          texturesDir={texturesDir}
+          onTextureDirSet={setTexturesDir}
+          onComplete={() => { setMaterialImporterOpen(false); handleMaterialsReload(); }}
+          onClose={() => setMaterialImporterOpen(false)}
+        />
+      )}
+
+      {pendingMaterialDelete && (
+        <DeleteAssetDialog
+          labels={pendingMaterialDelete.labels}
+          usage={pendingMaterialDelete.usage}
+          needsFolderGrant={!texturesDir}
+          noun="material"
+          usageNoun="surface"
+          usageEffect="Those surfaces will fall back to the default look until reassigned."
+          folderHint="public/assets/textures"
+          onCancel={() => setPendingMaterialDelete(null)}
+          onConfirm={deleteFiles => void handleConfirmMaterialDelete(deleteFiles)}
         />
       )}
 

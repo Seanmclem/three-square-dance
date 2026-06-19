@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay, IconTriggerVolume } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icons";
 
 interface ToolDef { id: ToolId; label: string; shortcut: string }
 
@@ -71,6 +71,33 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
       })}
 
       <div style={{ flex: 1 }} />
+
+      {/* Materials panel button */}
+      {(() => {
+        const matActive = openPanel === "materials";
+        return (
+          <button
+            title="Materials panel"
+            onClick={() => onPanelToggle(matActive ? null : "materials")}
+            style={{
+              width: 48, height: 36, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: matActive ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: matActive ? "1px solid rgba(80,140,255,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!matActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!matActive) e.currentTarget.style.background = "transparent"; }}
+          >
+            <IconMaterial color={matActive ? "#80aaff" : "#7a7a7a"} />
+            <span style={{ fontSize: 6, letterSpacing: 0.5, color: matActive ? "#80aaff" : "#7a7a7a",
+                           opacity: 0.85, fontFamily: "monospace" }}>
+              MATS
+            </span>
+          </button>
+        );
+      })()}
 
       {/* Scripts panel button */}
       {(() => {

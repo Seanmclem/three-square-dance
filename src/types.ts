@@ -47,7 +47,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'groups' | 'scripts' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | null;
 
 export interface GroupDef {
   id:   string;

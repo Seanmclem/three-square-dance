@@ -86,6 +86,15 @@ export const IconPolyPlatform = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconMaterial = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+    <rect x="4" y="4" width="9" height="9" rx="1.5" stroke={color} strokeWidth="1.5"/>
+    <rect x="15" y="4" width="9" height="9" rx="1.5" stroke={color} strokeWidth="1.5"/>
+    <rect x="4" y="15" width="9" height="9" rx="1.5" stroke={color} strokeWidth="1.5"/>
+    <rect x="15" y="15" width="9" height="9" rx="1.5" fill={color} fillOpacity="0.5" stroke={color} strokeWidth="1.5"/>
+  </svg>
+);
+
 export const IconPlay = ({ color }: IconProps) => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
     <polygon points="5,3 17,10 5,17" fill={color} stroke={color} strokeWidth="1" strokeLinejoin="round"/>

@@ -57,6 +57,14 @@ export class AssetManager {
     return Object.values(this._materialRegistry);
   }
 
+  /** Drop materials from the registry (and their cached Three.js materials) after a manifest delete. */
+  removeMaterials(ids: string[]): void {
+    for (const id of ids) {
+      delete this._materialRegistry[id];
+      this.evictMaterial(id);
+    }
+  }
+
   /** Fetch models/manifest.json, populate the asset registry, return the list. */
   async initAssets(): Promise<AssetDef[]> {
     try {
