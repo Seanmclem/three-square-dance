@@ -240,8 +240,8 @@
       }
     },
     {
-      "id": "tiny_paving_stones",
-      "label": "Tiny Paving Stones",
+      "id": "paving_stones_tiny",
+      "label": "Paving Stones - Tiny",
       "category": "Ground",
       "tileScale": 1,
       "roughnessVal": 0.85,
@@ -250,27 +250,27 @@
       "maps": {
         "albedo": {
           "enabled": true,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/albedo.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/albedo.jpg"
         },
         "normal": {
           "enabled": true,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/normal.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/normal.jpg"
         },
         "roughness": {
           "enabled": true,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/roughness.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/roughness.jpg"
         },
         "metalness": {
           "enabled": false,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/metalness.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/metalness.jpg"
         },
         "ao": {
           "enabled": true,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/ao.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/ao.jpg"
         },
         "displacement": {
           "enabled": false,
-          "path": "/assets/textures/tiny_paving_stones/{quality}/displacement.jpg"
+          "path": "/assets/textures/paving_stones_tiny/{quality}/displacement.jpg"
         }
       }
     }
