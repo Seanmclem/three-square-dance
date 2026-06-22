@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { LoadingManager } from "three";
 import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
 import { renderModelThumbnail } from "@/editor/thumbnailRenderer";
 import { AttributionFields } from "@/ui/AttributionFields";
@@ -73,7 +74,6 @@ async function generateThumbnail(
 
       if (mtlHandle) {
         const { MTLLoader } = await import("three/addons/loaders/MTLLoader.js");
-        const { LoadingManager } = await import("three");
         const manager = new LoadingManager();
         manager.onError = () => {}; // silently ignore missing texture images
         const mtlFile = await mtlHandle.getFile();

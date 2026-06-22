@@ -38,6 +38,8 @@ export interface MaterialOverrides {
   tileScale?:         number;
   tileScaleX?:        number;
   tileScaleY?:        number;
+  offsetX?:           number;   // UV offset, repeat units (Phase 10.8)
+  offsetY?:           number;
   roughnessVal?:      number;
   displacementScale?: number;
 }
@@ -249,6 +251,7 @@ export interface SceneMetadata {
   author:       string;
   created:      string;
   lastModified: string;
+  uvVersion?:   number;   // 1 = world-space ÷ UV convention (Phase 10.8); absent = legacy
 }
 
 export interface SpawnDef {

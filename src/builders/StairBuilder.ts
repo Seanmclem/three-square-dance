@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
+import { applyUVOffset } from "@/builders/UVUtils";
 import type { StairDef, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -136,8 +137,8 @@ export class StairBuilder {
       const [pBBL_x, pBBL_y, pBBL_z] = toWorld( hw, -hh, -hd, cx, cy, cz); // bot back left
       const [pBBR_x, pBBR_y, pBBR_z] = toWorld( hw, -hh,  hd, cx, cy, cz); // bot back right
 
-      const wd = stepDepth * ts, wh = stepRise * ts, ww = stair.width * ts;
-      const rWw = stair.width * riserTs, rWh = stepRise * riserTs;
+      const wd = stepDepth / ts, wh = stepRise / ts, ww = stair.width / ts;
+      const rWw = stair.width / riserTs, rWh = stepRise / riserTs;
 
       // ── Body faces ──────────────────────────────────────────────────────────
       // +Y top
@@ -169,7 +170,12 @@ export class StairBuilder {
 
     const meshes: THREE.Mesh[] = [];
 
-    const bodyMesh = new THREE.Mesh(accumToGeo(body), mat);
+    // UV offset (Phase 10.8); riser falls back to body overrides when no separate riser material
+    const rOffX = riserOvr?.offsetX ?? ovr?.offsetX ?? 0;
+    const rOffY = riserOvr?.offsetY ?? ovr?.offsetY ?? 0;
+    const bodyGeo = accumToGeo(body);
+    applyUVOffset(bodyGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
+    const bodyMesh = new THREE.Mesh(bodyGeo, mat);
     bodyMesh.castShadow    = true;
     bodyMesh.receiveShadow = true;
     bodyMesh.userData = {
@@ -178,7 +184,9 @@ export class StairBuilder {
     } satisfies MeshUserData;
     meshes.push(bodyMesh);
 
-    const riserMesh = new THREE.Mesh(accumToGeo(riser), riserMat);
+    const riserGeo = accumToGeo(riser);
+    applyUVOffset(riserGeo, rOffX, rOffY);
+    const riserMesh = new THREE.Mesh(riserGeo, riserMat);
     riserMesh.castShadow    = true;
     riserMesh.receiveShadow = true;
     riserMesh.userData = {

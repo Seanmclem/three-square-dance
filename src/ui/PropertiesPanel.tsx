@@ -1494,6 +1494,8 @@ function MaterialSection({
   const [splitTile, setSplitTile] = useState(hasSplitInit);
   const [roughStr,  setRoughStr]  = useState(String(overrides?.roughnessVal      ?? baseDef?.roughnessVal      ?? 0.85));
   const [dispStr,   setDispStr]   = useState(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
+  const [offXStr,   setOffXStr]   = useState(String(overrides?.offsetX ?? 0));
+  const [offYStr,   setOffYStr]   = useState(String(overrides?.offsetY ?? 0));
 
   useEffect(() => {
     const base = overrides?.tileScale ?? baseDef?.tileScale ?? 1.0;
@@ -1503,6 +1505,8 @@ function MaterialSection({
     setSplitTile(!!(overrides?.tileScaleX !== undefined || overrides?.tileScaleY !== undefined));
     setRoughStr(String(overrides?.roughnessVal     ?? baseDef?.roughnessVal      ?? 0.85));
     setDispStr(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
+    setOffXStr(String(overrides?.offsetX ?? 0));
+    setOffYStr(String(overrides?.offsetY ?? 0));
   }, [currentMaterialId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveEnabled = (key: MapKey): boolean => {
@@ -1525,6 +1529,8 @@ function MaterialSection({
   const commitTileY = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScaleY: n }); };
   const commitRough = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, roughnessVal: Math.max(0, Math.min(1, n)) }); };
   const commitDisp  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n < 0) return; onOverridesChange({ ...overrides, displacementScale: n }); };
+  const commitOffX  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetX: n }); };
+  const commitOffY  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetY: n }); };
 
   const toggleSplitTile = () => {
     const next = !splitTile;
@@ -1629,6 +1635,20 @@ function MaterialSection({
         <label htmlFor="split-tile" style={{ color: "#646464", fontSize: 10, cursor: "pointer", userSelect: "none" }}>
           split X / Y
         </label>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>OFFSET</div>
+        <input type="number" step={0.1} value={offXStr}
+          onChange={e => { setOffXStr(e.target.value); schedule(() => commitOffX(e.target.value)); }}
+          onBlur={e => flush(() => commitOffX(e.target.value))}
+          style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+        />
+        <input type="number" step={0.1} value={offYStr}
+          onChange={e => { setOffYStr(e.target.value); schedule(() => commitOffY(e.target.value)); }}
+          onBlur={e => flush(() => commitOffY(e.target.value))}
+          style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
+        />
       </div>
 
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>

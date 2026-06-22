@@ -47,7 +47,7 @@ type PendingEdit = {
   initial: { label: string; category: string; attribution: Attribution };
 };
 import { HistoryManager } from "@/editor/HistoryManager";
-import { migrateWallNodes, pruneOrphanNodes } from "@/world/WorldLoader";
+import { migrateWallNodes, pruneOrphanNodes, migrateUVs } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
@@ -443,6 +443,7 @@ export default function App() {
     try {
       const file = json as SceneFile;
       migrateWallNodes(file.zones);
+      migrateUVs(file);  // Phase 10.8: reset legacy tileScale to 1.0 (pre-world-space-UV scenes)
       for (const zone of file.zones) pruneOrphanNodes(zone);  // reap orphaned polygon nodes from old saves
       await physicsWorld.init();
       for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);

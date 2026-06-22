@@ -3,6 +3,7 @@ import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { csgSubtract } from "@/utils/csg";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
+import { applyUVOffset } from "@/builders/UVUtils";
 import type { WallDef, ZoneDef, WallNode, MeshUserData, Opening } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -10,32 +11,6 @@ export interface WallBuildOutput {
   mesh:       THREE.Mesh;
   colliders:  RAPIER.Collider[];
   trimMeshes: THREE.Mesh[];
-}
-
-function applyBoxUVTiling(
-  geo: THREE.BoxGeometry,
-  W: number, H: number, D: number,
-  tileX: number, tileY: number,
-): void {
-  const uv  = geo.attributes.uv as THREE.BufferAttribute;
-  const idx = geo.index!;
-  const dims: [number, number][] = [
-    [D, H], [D, H], // +x, -x
-    [W, D], [W, D], // +y, -y
-    [W, H], [W, H], // +z, -z
-  ];
-  for (let fi = 0; fi < geo.groups.length; fi++) {
-    const { start, count } = geo.groups[fi];
-    const [uS, vS] = dims[fi];
-    const seen = new Set<number>();
-    for (let i = start; i < start + count; i++) {
-      const vi = idx.getX(i);
-      if (seen.has(vi)) continue;
-      seen.add(vi);
-      uv.setXY(vi, uv.getX(vi) * uS * tileX, uv.getY(vi) * vS * tileY);
-    }
-  }
-  uv.needsUpdate = true;
 }
 
 const TRIM_W = 0.08;
@@ -84,11 +59,11 @@ function buildPassageLiner(
 
   // Jamb UV: U = depth (Z from -ht→+ht), V = height (Y from -hh→+hh)
   const jUV = (x: number, y: number, z: number): [number, number] =>
-    [(z + ht) * tileV, (y + hh) * tileV];
+    [(z + ht) / tileV, (y + hh) / tileV];
 
   // Sill/lintel UV: U = width (X from -hw→+hw), V = depth (Z from -ht→+ht)
   const hUV = (x: number, y: number, z: number): [number, number] =>
-    [(x + hw) * tileH, (z + ht) * tileH];
+    [(x + hw) / tileH, (z + ht) / tileH];
 
   // Right jamb (x = +hw, normal = -X toward center)
   tri([[+hw,-hh,-ht],[+hw,-hh,+ht],[+hw,+hh,+ht]], -1, 0, 0, jUV);
@@ -304,6 +279,7 @@ export class WallBuilder {
     baseGeo.setAttribute('uv2', new THREE.Float32BufferAttribute([...uvArr], 2));
     baseGeo.setIndex(idxArr);
     baseGeo.computeVertexNormals();
+    applyUVOffset(baseGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);  // offset before CSG so cut UVs inherit it
 
     // CSG: subtract openings. Cutters positioned in world space (matching buildRun).
     let finalGeo: THREE.BufferGeometry = baseGeo;
@@ -579,6 +555,7 @@ export class WallBuilder {
     geo.setAttribute('uv2',      new THREE.Float32BufferAttribute(uvArr.slice(), 2));
     geo.setIndex(idxArr);
     geo.computeVertexNormals();
+    applyUVOffset(geo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);  // offset before CSG so cut UVs inherit it
 
     // --- Opening processing: CSG cuts + trim/trigger meshes for any wall in the run ---
     // Uses global arc-length so openings slide around corners when offset > wall length.

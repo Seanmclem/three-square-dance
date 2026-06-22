@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { csgSubtract } from "@/utils/csg";
+import { applyUVOffset } from "@/builders/UVUtils";
 import type { FloorDef, MeshUserData } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -51,8 +52,9 @@ export class FloorBuilder {
       const szD  = Math.max(...pts.map(p => p.z)) - minZ;
       const uvAttr = shapeGeo.attributes["uv"] as THREE.BufferAttribute;
       for (let i = 0; i < uvAttr.count; i++) {
-        uvAttr.setXY(i, uvAttr.getX(i) * szW * tileX, uvAttr.getY(i) * szD * tileY);
+        uvAttr.setXY(i, uvAttr.getX(i) * szW / tileX, uvAttr.getY(i) * szD / tileY);
       }
+      applyUVOffset(shapeGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
       shapeGeo.setAttribute('uv2', shapeGeo.attributes.uv.clone());
       geo = shapeGeo;
 
@@ -78,8 +80,9 @@ export class FloorBuilder {
 
       const uvAttr = rectGeo.attributes["uv"] as THREE.BufferAttribute;
       for (let i = 0; i < uvAttr.count; i++) {
-        uvAttr.setXY(i, uvAttr.getX(i) * w * tileX, uvAttr.getY(i) * d * tileY);
+        uvAttr.setXY(i, uvAttr.getX(i) * w / tileX, uvAttr.getY(i) * d / tileY);
       }
+      applyUVOffset(rectGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
       rectGeo.setAttribute('uv2', rectGeo.attributes.uv);
       geo = rectGeo;
       colliderBounds = { x: minX, z: minZ, width: w, depth: d };

@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 3.9.6** — last updated 2026-06-18
+**Version 4.0.0** — last updated 2026-06-22
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -40,6 +40,7 @@
 - v3.9.5 — **Orphaned-node cleanup (pre-existing bug, surfaced during 10.6b testing).** `removePlatform`/`removeFloor` never deleted a node-backed polygon primitive's corner nodes, so deleted polygons left orphan nodes in `zone.nodes` that `NodeDragger` kept drawing as scattered dots + edge lines (and they persisted after delete). Added `pruneOrphanNodes(zone)` to `WorldLoader` (reaps nodes not referenced by any wall/floor/platform; shared nodes kept); called from `removePlatform`/`removeFloor` and from the load path (`handleLoadFromJSON`, covering both file-open and autosave-restore, so old saves self-clean). `NodeDragger` now also `_refresh()`es on `platform:removed`/`floor:removed` so stale dots clear immediately. Not part of 10.6b's geometry work; tracked here for history.
 - v3.9.4 — **Phase 10.6b implemented + scope corrected to match the code.** Investigation found the original "local-space storage for platforms + polygon floors" premise false: polygon floors/platforms are node-backed (`points[]` is a cache regenerated from world-space `zone.nodes` each build), so they never snap back and a `points[]`→local migration would be a no-op (and `FloorDef.position` actively harmful — double offset). The real user-visible bug was a **gimbal flip in `GizmoManager`**: rotate commits read `pivot.rotation.y` (Euler), which wraps past ±90° (135°→45°, 180°→0°), so rotating a platform/room past 90° snapped to a wrong angle on release — affecting rect platforms *and* node-backed polygons (and distorting polygon shape via the AABB `size` recompute). Fixed with a `_pivotYaw()` quaternion-based yaw helper routing all four pivot-yaw reads. Also shipped (separate, smaller): rect Y rotation via `mesh.rotation` instead of baked geometry (`PlatformBuilder`) + collider quaternion mirroring it, CSG-guarded (`ColliderBuilder.registerPlatform`) — fixes the previously un-rotated collider. Reverted the speculative doc additions: removed `FloorDef.position` from the type block and the `_migrateToLocalSpace` migration-ordering note (no geometry migration added). Skip-rebuild optimization deferred (perf-only). Section retitled "Rect Platform Rotation as a Mesh Transform."
 - v3.9.6 — **Phase 10.7 — Object Animation Editor implemented (Option B: full extraction), spec corrected to match the code.** Created `src/preview/ObjectPlacer.ts` owning the full placed-object domain — mesh build (transform + userData + `SkeletonUtils.clone` for skinned/animated GLTFs + fallback box) and the animation subsystem (`AnimationMixer`/clip map per object, `update(dt)`, `previewClip`/`stopPreview`, auto-play, lazy back-fill of `assetDef.animations`). `ZoneManager` no longer builds object meshes: `_loadObjectMesh` removed, `loadZone`/`_addObject`/`_removeObject`/`unloadZone` now delegate to `ObjectPlacer` and keep only `objectsGroup`/`objectMeshes` registration for selection; the now-unused `assetManager` import was dropped. `App.tsx` instantiates `ObjectPlacer`, passes it to `ZoneManager`, and registers `scene.onUpdate(dt => objectPlacer.update(dt))` (runs in editor + preview). Three stale spec assumptions corrected: (1) **no `src/ui/screens/` folder** — screens are inline `PropertiesPanel.tsx` components, so `AnimationsScreen` is inline and `"animations"` is appended to an object's `ScreenId[]` only when its asset has clips; (2) **no `WorldLoader._migrate()`** — `autoPlayAnimation?` is optional so old files need no migration, and pre-existing assets' clip names are lazily back-filled by `ObjectPlacer` (plus stored in `manifest.json` at import via `ModelImporterModal`); (3) `worldState.getObject`/`assetManager.getAsset` don't exist (used `assetManager.getAssetDef` + an internal auto-play map). Added `AssetDef.animations?`, `WorldObject.autoPlayAnimation?`, and `animation:preview-start`/`preview-stop`/`auto-play-changed` bus events to `types.ts`. Verified: `npm run typecheck`/`build` clean; data-layer add/remove and sync ZoneManager delegation verified in-browser; async asset-load path could not be exercised in the automation tab (background tabs freeze `fetch`/timers) and needs a foreground tab + an animated GLB for the full preview/auto-play visual check.
+- v4.0.0 — **Phase 10.8 — World-Space UV Generation implemented, spec corrected to match the code.** Investigation found the spec's premise false: builders never used Three.js default `0→1` UVs or `texture.repeat` — every builder already baked world-space UVs proportional to physical size (`wrapS/wrapT` set once in `AssetManager`). The *real* bug was an **inverted `tileScale` convention**: `WallBuilder` divided (`len / tileScale` = meters-per-repeat) while `FloorBuilder`/`PlatformBuilder`/`StairBuilder` multiplied (`dim · tileScale` = repeats-per-meter), so the same value behaved oppositely on a wall vs a floor (agreeing only at `1.0`). Fix: created `src/builders/UVUtils.ts` (`applyUVOffset`, `applyProjectedUVs`, `worldUV`) and **unified all builders onto the ÷ convention** (flipped floors/platforms/stairs `×→÷`, incl. the wall's passage-liner reveals which also multiplied). The spec's literal `applyWorldSpaceUVs(geo, w, h)` 4-vertex BL/BR/TL/TR helper was **not adopted** — builders hand-build multi-face indexed `BufferGeometry` (8-vert wall strip; `pushFace`/`pushQuad` per face), so the convention lives at the inline UV call-sites + `worldUV`. Added `offsetX/offsetY` to `MaterialOverrides` (applied via `applyUVOffset` per built geometry, after scale) + an OFFSET row in the PropertiesPanel Material screen (Tile/Tile X/Y/split already existed from before). Migration: added `uvVersion?: number` to `SceneMetadata`, `migrateUVs(file)` in `WorldLoader` (resets legacy `tileScale*`→`1.0`; **not** a nonexistent `WorldLoader._migrate()`), called from `App.tsx`'s load path beside `migrateWallNodes` (**not** in `loadFromJSON` — `HistoryManager` reuses that for already-migrated undo snapshots); `WorldState.toJSON()` stamps `uvVersion: 1` on every save. Verified: `npm run typecheck`/`build` clean.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 
 ---
@@ -5710,17 +5711,58 @@ ScriptEngine, ActionDispatcher, or EntityRegistry.
 
 ### Phase 10.8 — World-Space UV Generation
 
-Fixes texture density inconsistency across all builders. After this phase, the same `tileScale` value produces visually identical results on a 1m wall and a 10m wall — one texture repeat per meter at default scale, everywhere, on everything.
+Makes the same `tileScale` value produce visually identical results on a 1m wall and a 10m wall — and on a wall vs a floor — by unifying every builder onto one world-space UV convention.
+
+> **Status: implemented (v4.0.0), spec corrected to match the code.** The original spec premise below (Three.js `0→1` default UVs + `texture.repeat`) was **false** for this codebase — builders already baked world-space UVs. The real fix was unifying an inverted per-builder `tileScale` convention. The corrected sections follow; the struck-through original is kept for history.
 
 ---
 
-#### The Problem
+#### The Problem (corrected)
 
-Three.js geometry primitives (`PlaneGeometry`, `BoxGeometry`, `ExtrudeGeometry`) generate UVs from 0→1 across the entire face regardless of physical size. A 1m floor and a 10m floor both get UVs 0→1. When the same `tileScale` is applied to both via `texture.repeat`, the texture scales differently on each — larger surfaces look stretched or over-tiled compared to smaller ones. Every time you place a surface of a different size you have to manually tweak `tileScale` to compensate. This is the bug.
+~~Three.js geometry primitives generate UVs from 0→1 regardless of physical size, so `texture.repeat` scales them inconsistently.~~ **Not what was happening.** Every builder already generated world-space UVs proportional to physical dimensions, and none used `texture.repeat` (only `wrapS/wrapT = RepeatWrapping`, set once in `AssetManager`). So texture density was *already* size-consistent within each builder.
+
+The real bug was an **inverted `tileScale` convention between builders**:
+
+| Builder | UV math | `tileScale` meaning |
+|---|---|---|
+| `WallBuilder` | `len / tileScale` | meters per repeat (÷) |
+| `FloorBuilder` | `uv·dim · tileScale` | repeats per meter (×) |
+| `PlatformBuilder` | `pos · tileScale` (cap), `arcLen · tileScale` (sides) | repeats per meter (×) |
+| `StairBuilder` | `dim · tileScale` | repeats per meter (×) |
+
+So `tileScale: 2` made a wall's texture *bigger* but a floor's texture *smaller* — they only agreed at `1.0`. The wall's own passage-liner reveals also multiplied, contradicting the wall body's divide.
 
 ---
 
-#### The Fix — World-Space UV Generation
+#### The Fix — one division convention (`UVUtils.ts`)
+
+The unified rule is **`UV = meters / tileScale`** ("meters per repeat") everywhere. Walls already complied; floors/platforms/stairs (and the wall passage liners) were flipped `×→÷`. `texture.repeat` stays `(1,1)` — all tiling is baked into UVs at build time.
+
+`src/builders/UVUtils.ts` exports:
+
+```ts
+// Meters → UV repeats under the division convention.
+export function worldUV(meters: number, tileScale: number): number;
+
+// Project positions onto a plane and divide by tileScale (polygon floors/caps).
+export function applyProjectedUVs(
+  geometry: THREE.BufferGeometry,
+  axis: 'xz' | 'xy' | 'zy',
+  tileScaleX?: number, tileScaleY?: number,
+): void;
+
+// Shift all UVs by (offsetX, offsetY) in repeat units; wraps; no-op at 0,0.
+export function applyUVOffset(
+  geometry: THREE.BufferGeometry,
+  offsetX: number, offsetY: number,
+): void;
+```
+
+> **Why not the spec's `applyWorldSpaceUVs(geo, w, h, …)`?** That helper assumes one 4-vertex BL/BR/TL/TR quad. The real builders hand-build multi-face indexed `BufferGeometry` (8-vertex wall strip; `pushFace`/`pushQuad` per face), so a single-quad helper doesn't slot in. The ÷ convention instead lives at the existing inline UV call-sites (now dividing) plus `worldUV`; only `applyUVOffset` and `applyProjectedUVs` are geometry-level helpers.
+
+The original (unadopted) spec text is retained below for reference.
+
+#### Original spec (unadopted) — World-Space UV Generation
 
 Every builder generates UVs manually, proportional to the physical size of each face. The rule is simple:
 
@@ -5822,26 +5864,19 @@ export function applyProjectedUVs(
 
 ---
 
-#### Builder Changes
+#### Builder Changes (as implemented)
 
-**WallBuilder:**
-- Rect wall faces: `applyWorldSpaceUVs(faceGeo, wallLength, wallHeight, tileScaleX, tileScaleY)`
-- Wall run merged mesh: `applyProjectedUVs(runGeo, 'zy', tileScaleX, tileScaleY)` — projects along the wall plane so UV continuity is maintained around corners
-- Trim meshes (door/window reveals): `applyWorldSpaceUVs` with reveal width × reveal height
+Each builder reads the existing `tileScale`/`tileScaleX`/`tileScaleY` overrides, applies the ÷ convention at its inline UV math, then calls `applyUVOffset(geo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0)` once per built geometry (before any CSG, so cut UVs inherit the offset).
 
-**FloorBuilder:**
-- Rect floor: `applyWorldSpaceUVs(geo, boundsWidth, boundsDepth, tileScaleX, tileScaleY)`
-- Polygon floor: `applyProjectedUVs(geo, 'xz', tileScaleX, tileScaleY)` — projects down onto XZ plane
+**WallBuilder** — already divided (`len / tileX`, `H / tileY`); no math change. Added `applyUVOffset` on the base geometry in both `build` and `buildRun` (before opening CSG). The passage-liner reveals (`jUV`/`hUV`) were flipped `×→÷` to match the wall body. (The decorative trim frame is a solid-color `BoxGeometry` with no tileScale UVs — untouched.)
 
-**PlatformBuilder:**
-- Cap (top/bottom faces): `applyProjectedUVs(capGeo, 'xz', tileScaleX, tileScaleY)`
-- Side faces: `applyWorldSpaceUVs(sideFaceGeo, edgeLength, platformHeight, tileScaleX, tileScaleY)` per edge
-- Polygon platform sides: `applyProjectedUVs` along each edge's local plane
+**FloorBuilder** — rect + polygon: `uv·dim · tileX` → `uv·dim / tileX` (and `tileY`), then `applyUVOffset`.
 
-**StairBuilder:**
-- Tread faces (horizontal): `applyWorldSpaceUVs(treadGeo, stairWidth, treadDepth, tileScaleX, tileScaleY)`
-- Riser faces (vertical): `applyWorldSpaceUVs(riserGeo, stairWidth, riserHeight, tileScaleX, tileScaleY)`
-- Railing faces: `applyWorldSpaceUVs` with physical railing dimensions
+**PlatformBuilder** — `buildSlabCapGeo`/`buildSlabSideGeo` face UVs and `buildInnerFaceGeo`: `dim·ts` → `dim/ts`; polygon cap `pos · tileScale` → `pos / tileScale`; polygon side `arcLen · tileScale` → `arcLen / tileScale`. `applyUVOffset` on cap (cap overrides), sides + inner faces (side overrides, falling back to cap overrides). Separate `sideTileScale`/`sideMaterialOverrides` preserved.
+
+**StairBuilder** — `dim · ts` → `dim / ts` for both body and riser; `applyUVOffset` on body (body overrides) and riser (riser overrides, falling back to body). Railings are solid-color boxes — untouched.
+
+Polygon floors/caps could alternatively route through `applyProjectedUVs('xz')`; they were left on the existing object-anchored inline math (default-UV × dimension, now ÷) to keep the change to the convention flip only and avoid shifting the UV origin from the object corner to the world origin.
 
 ---
 
@@ -5892,11 +5927,16 @@ The value is now physically meaningful and consistent. The same `tileScale: 1.0`
 
 ---
 
-#### Migration
+#### Migration (as implemented)
 
-Existing scenes built before this phase have `tileScale` values tuned to compensate for the old inconsistent behaviour, so after this fix those values produce different results. **Option 1 (reset tileScale)** is correct: accept that existing scenes need re-tweaking. Add `uvVersion: 1` to `SceneFile` metadata; `WorldLoader._migrate()` resets `tileScale` to 1.0 on any file without `uvVersion`, and all new scenes get `uvVersion: 1` written automatically.
+Pre-10.8 scenes tuned `tileScale` under the inverted convention, so at non-`1.0` values they now read differently. **Reset to `1.0`** is the chosen behavior (at `1.0` the old × and new ÷ math agree, so untouched scenes look identical).
 
-`WorldLoader._migrate()` resets `tileScale` to 1.0 on scenes missing `uvVersion: 1`. (Phase 10.6b added no geometry migration — see its section for why polygon primitives are node-backed and need none — so there is no local-space migration to order against. The Phase 10.7 `autoPlayAnimation` defaulting migration is independent of geometry.)
+- `SceneMetadata` gains `uvVersion?: number` (1 = world-space ÷ convention).
+- `migrateUVs(file)` in `src/world/WorldLoader.ts` (there is **no** `WorldLoader._migrate()`): if `metadata.uvVersion !== 1`, walk every zone's walls/floors/platforms/stairs — including the secondary `sideMaterialOverrides`/`riserMaterialOverrides` — and reset `tileScale`/`tileScaleX`/`tileScaleY` (any that are present) to `1.0`, then stamp `uvVersion = 1`.
+- Called from `App.tsx`'s load path (beside `migrateWallNodes`, before `world.loadFromJSON`) — **not** inside `loadFromJSON`, because `HistoryManager` reuses that to restore already-migrated undo snapshots.
+- `WorldState.toJSON()` writes `uvVersion: 1` into `metadata` on every save, so a loaded-and-saved scene won't re-migrate.
+
+(Phase 10.6b added no geometry migration to order against; the 10.7 `autoPlayAnimation` defaulting is independent.)
 
 ---
 
@@ -5905,18 +5945,21 @@ Existing scenes built before this phase have `tileScale` values tuned to compens
 ```
 src/
   builders/
-    UVUtils.ts    ← applyWorldSpaceUVs(), applyProjectedUVs() — imported by all builders
+    UVUtils.ts    ← worldUV(), applyProjectedUVs(), applyUVOffset() — imported by all builders
 ```
 
 #### Files Modified
 
 ```
-src/builders/WallBuilder.ts
-src/builders/FloorBuilder.ts
-src/builders/PlatformBuilder.ts
-src/builders/StairBuilder.ts
-src/world/WorldLoader.ts    ← uvVersion migration
-types.ts                    ← add uvVersion to SceneMetadata
+src/builders/WallBuilder.ts      ← passage-liner ÷ flip + applyUVOffset (build + buildRun)
+src/builders/FloorBuilder.ts     ← ×→÷ flip + applyUVOffset
+src/builders/PlatformBuilder.ts  ← ×→÷ flip (cap/side/inner) + applyUVOffset
+src/builders/StairBuilder.ts     ← ×→÷ flip (body/riser) + applyUVOffset
+src/world/WorldLoader.ts         ← migrateUVs()
+src/world/WorldState.ts          ← toJSON stamps uvVersion: 1
+src/App.tsx                      ← call migrateUVs() in load path
+src/ui/PropertiesPanel.tsx       ← OFFSET X/Y row in Material screen
+src/types.ts                     ← MaterialOverrides.offsetX/offsetY, SceneMetadata.uvVersion
 ```
 
 ### Phase 10.9 — Group Functionality + Scripting Cleanup

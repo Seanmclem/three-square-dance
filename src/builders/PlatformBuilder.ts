@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { csgSubtract } from "@/utils/csg";
+import { applyUVOffset } from "@/builders/UVUtils";
 import type { PlatformDef, MeshUserData, Vec2 } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -59,9 +60,9 @@ function buildSlabCapGeo(w: number, h: number, d: number, ts: number): THREE.Buf
   let vi = 0;
   const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
   // +Y top
-  f(pos,nrm,uv,idx,vi,  -hw, hh,-hd,  hw, hh,-hd,  hw, hh, hd,  -hw, hh, hd,  0,1,0, w*ts,d*ts);
+  f(pos,nrm,uv,idx,vi,  -hw, hh,-hd,  hw, hh,-hd,  hw, hh, hd,  -hw, hh, hd,  0,1,0, w/ts,d/ts);
   // -Y bottom
-  f(pos,nrm,uv,idx,vi,  -hw,-hh, hd,  hw,-hh, hd,  hw,-hh,-hd,  -hw,-hh,-hd,  0,-1,0, w*ts,d*ts);
+  f(pos,nrm,uv,idx,vi,  -hw,-hh, hd,  hw,-hh, hd,  hw,-hh,-hd,  -hw,-hh,-hd,  0,-1,0, w/ts,d/ts);
   return makeGeo(pos, nrm, uv, idx);
 }
 
@@ -71,13 +72,13 @@ function buildSlabSideGeo(w: number, h: number, d: number, ts: number): THREE.Bu
   let vi = 0;
   const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
   // +Z front
-  f(pos,nrm,uv,idx,vi,  -hw, hh, hd,  hw, hh, hd,  hw,-hh, hd,  -hw,-hh, hd,  0,0,1, w*ts,h*ts);
+  f(pos,nrm,uv,idx,vi,  -hw, hh, hd,  hw, hh, hd,  hw,-hh, hd,  -hw,-hh, hd,  0,0,1, w/ts,h/ts);
   // -Z back
-  f(pos,nrm,uv,idx,vi,   hw, hh,-hd, -hw, hh,-hd, -hw,-hh,-hd,   hw,-hh,-hd,  0,0,-1, w*ts,h*ts);
+  f(pos,nrm,uv,idx,vi,   hw, hh,-hd, -hw, hh,-hd, -hw,-hh,-hd,   hw,-hh,-hd,  0,0,-1, w/ts,h/ts);
   // +X right
-  f(pos,nrm,uv,idx,vi,   hw, hh, hd,  hw, hh,-hd,  hw,-hh,-hd,   hw,-hh, hd,  1,0,0, d*ts,h*ts);
+  f(pos,nrm,uv,idx,vi,   hw, hh, hd,  hw, hh,-hd,  hw,-hh,-hd,   hw,-hh, hd,  1,0,0, d/ts,h/ts);
   // -X left
-  f(pos,nrm,uv,idx,vi,  -hw, hh,-hd, -hw, hh, hd, -hw,-hh, hd,  -hw,-hh,-hd, -1,0,0, d*ts,h*ts);
+  f(pos,nrm,uv,idx,vi,  -hw, hh,-hd, -hw, hh, hd, -hw,-hh, hd,  -hw,-hh,-hd, -1,0,0, d/ts,h/ts);
   return makeGeo(pos, nrm, uv, idx);
 }
 
@@ -128,7 +129,7 @@ function buildPolygonCapGeo(points: Vec2[], cx: number, cz: number, thickness: n
   for (const geo of [topGeo, botGeo]) {
     const p = geo.attributes["position"] as THREE.BufferAttribute;
     const u = geo.attributes["uv"]       as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) u.setXY(i, p.getX(i) * tileScale, p.getZ(i) * tileScale);
+    for (let i = 0; i < p.count; i++) u.setXY(i, p.getX(i) / tileScale, p.getZ(i) / tileScale);
     u.needsUpdate = true;
   }
 
@@ -185,8 +186,8 @@ function buildPolygonSideGeo(points: Vec2[], cx: number, cz: number, thickness: 
     pos.push(lx1, yB, lz1,  lx2, yB, lz2,  lx2, yT, lz2,  lx1, yT, lz1);
     nrm.push(nx, 0, nz,  nx, 0, nz,  nx, 0, nz,  nx, 0, nz);
 
-    const u0 = arcLen * tileScale, u1 = (arcLen + edgeLen) * tileScale;
-    const v1 = thickness * tileScale;
+    const u0 = arcLen / tileScale, u1 = (arcLen + edgeLen) / tileScale;
+    const v1 = thickness / tileScale;
     uv.push(u0, 0,  u1, 0,  u1, v1,  u0, v1);
 
     // Winding: for outward -Z normal on a CW-from-above edge (e.g. TL→TR, dx=2,dz=0),
@@ -212,10 +213,10 @@ function buildInnerFaceGeo(
   let vi = 0;
   const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
   // Inward normals: faces visible from inside the hole
-  f(pos,nrm,uv,idx,vi,   hw,hh,hd,  -hw,hh,hd,  -hw,-hh,hd,   hw,-hh,hd,  0,0,-1,  width*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,  -hw,hh,-hd,  hw,hh,-hd,   hw,-hh,-hd, -hw,-hh,-hd, 0,0, 1,  width*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,   hw,hh,-hd,  hw,hh,hd,   hw,-hh,hd,   hw,-hh,-hd, -1,0, 0,  depth*tileH,height*tileV);
-  f(pos,nrm,uv,idx,vi,  -hw,hh,hd,  -hw,hh,-hd, -hw,-hh,-hd, -hw,-hh,hd,  1,0, 0,  depth*tileH,height*tileV);
+  f(pos,nrm,uv,idx,vi,   hw,hh,hd,  -hw,hh,hd,  -hw,-hh,hd,   hw,-hh,hd,  0,0,-1,  width/tileH,height/tileV);
+  f(pos,nrm,uv,idx,vi,  -hw,hh,-hd,  hw,hh,-hd,   hw,-hh,-hd, -hw,-hh,-hd, 0,0, 1,  width/tileH,height/tileV);
+  f(pos,nrm,uv,idx,vi,   hw,hh,-hd,  hw,hh,hd,   hw,-hh,hd,   hw,-hh,-hd, -1,0, 0,  depth/tileH,height/tileV);
+  f(pos,nrm,uv,idx,vi,  -hw,hh,hd,  -hw,hh,-hd, -hw,-hh,-hd, -hw,-hh,hd,  1,0, 0,  depth/tileH,height/tileV);
   return makeGeo(pos, nrm, uv, idx);
 }
 
@@ -258,6 +259,12 @@ export class PlatformBuilder {
     const sideGeo = isPolygon
       ? buildPolygonSideGeo(platform.points!, p.x, p.z, thickness, sideTileScale)
       : buildSlabSideGeo(size.width, thickness, size.depth, sideTileScale);
+
+    // UV offset (Phase 10.8); sides fall back to cap overrides when no separate side material
+    const sOffX = sideOvr?.offsetX ?? ovr?.offsetX ?? 0;
+    const sOffY = sideOvr?.offsetY ?? ovr?.offsetY ?? 0;
+    applyUVOffset(capGeo,  ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
+    applyUVOffset(sideGeo, sOffX, sOffY);
 
     const slabY = p.y + thickness / 2;
 
@@ -318,6 +325,7 @@ export class PlatformBuilder {
         const innerCY  = (p.y + thickness) - innerH / 2;  // top of shaft = platform top
         // expand by the same padding _createCutterMesh adds so inner faces flush with hole edges
         const innerGeo = buildInnerFaceGeo(cut.width + 0.05, cut.depth + 0.05, innerH, cut.innerTileH, cut.innerTileV);
+        applyUVOffset(innerGeo, sOffX, sOffY);
         const innerMat = (sideMat as THREE.Material).clone();
         const innerMesh = new THREE.Mesh(innerGeo, innerMat);
         innerMesh.position.set(cut.worldX, innerCY, cut.worldZ);
