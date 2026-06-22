@@ -11,7 +11,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "sofa3",
@@ -23,7 +30,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "door1",
@@ -35,7 +49,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "beddouble",
@@ -47,7 +68,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "bedtwin",
@@ -59,7 +87,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "shortcloset",
@@ -71,7 +106,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "sofa",
@@ -83,7 +125,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "chair",
@@ -95,7 +144,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "desk",
@@ -107,7 +163,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "bookcase_books",
@@ -119,7 +182,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "bookcase",
@@ -131,7 +201,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "sofa_individual",
@@ -143,7 +220,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "table",
@@ -155,7 +239,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "door2",
@@ -167,7 +258,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "table2",
@@ -179,7 +277,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "officechair",
@@ -191,7 +296,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "sofa2",
@@ -203,7 +315,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "door3",
@@ -215,7 +334,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "stool",
@@ -227,7 +353,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "nightstand",
@@ -239,7 +372,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "rock_2",
@@ -250,7 +390,14 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [],
-      "dateAdded": "2026-06-02"
+      "dateAdded": "2026-06-02",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Furniture Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimatefurniture.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "fruit",

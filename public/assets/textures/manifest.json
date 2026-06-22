@@ -272,6 +272,13 @@
           "enabled": false,
           "path": "/assets/textures/paving_stones_tiny/{quality}/displacement.jpg"
         }
+      },
+      "attribution": {
+        "patreonUrl": "https://patreon.com/ambientcg",
+        "author": "ambientCG",
+        "sourceUrl": "https://ambientcg.com/view?id=PavingStones141",
+        "sourceName": "Paving Stones 141",
+        "license": "CC0"
       }
     }
   ]
