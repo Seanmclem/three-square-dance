@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { materialImporter } from "@/editor/MaterialImporter";
 import type { DetectedMaps, ImportResult } from "@/editor/MaterialImporter";
-import type { MaterialDef, MaterialCategory } from "@/types";
+import type { MaterialDef, MaterialCategory, Attribution } from "@/types";
+import { AttributionFields } from "@/ui/AttributionFields";
+
+const ACG_ATTRIBUTION: Attribution = {
+  author: "ambientCG", patreonUrl: "https://patreon.com/ambientcg", license: "CC0",
+};
 
 const MATERIAL_CATEGORIES: MaterialCategory[] = [
   "Stone", "Wood", "Metal", "Fabric", "Ground", "Concrete", "Brick", "Plaster", "Other",
@@ -70,6 +75,15 @@ export function MaterialImporterModal({
   const [materialId,   setMaterialId]   = useState("");
   const [label,        setLabel]        = useState("");
   const [category,     setCategory]     = useState<MaterialCategory>("Other");
+  const [attribution,  setAttribution]  = useState<Attribution>({ ...ACG_ATTRIBUTION });
+  const [acgAuto,      setAcgAuto]       = useState(true);
+
+  const toggleAcg = (on: boolean) => {
+    setAcgAuto(on);
+    setAttribution(prev => on
+      ? { ...prev, ...ACG_ATTRIBUTION }
+      : { ...prev, author: undefined, patreonUrl: undefined, license: undefined, licenseOther: undefined });
+  };
   const [sourceDir,    setSourceDir]    = useState<FileSystemDirectoryHandle | null>(null);
   const [detectedMaps, setDetectedMaps] = useState<DetectedMaps | null>(null);
   const [phase,        setPhase]        = useState<Phase>("input");
@@ -114,7 +128,7 @@ export function MaterialImporterModal({
     setPhase("importing");
     setError(null);
     try {
-      const res = await materialImporter.importMaterial(id, effectiveLabel, category, texturesDir, detectedMaps);
+      const res = await materialImporter.importMaterial(id, effectiveLabel, category, attribution, texturesDir, detectedMaps);
       setResult(res);
       setPhase("done");
     } catch (e) {
@@ -128,6 +142,7 @@ export function MaterialImporterModal({
     const base = `/assets/textures/${id}`;
     const def: MaterialDef = {
       id, label: effectiveLabel, category,
+      ...(Object.keys(attribution).length ? { attribution } : {}),
       tileScale: 1.0, roughnessVal: 0.85, metalnessVal: 0.0, displacementScale: 0.03,
       maps: {
         albedo:       { enabled: true,                             path: `${base}/albedo.jpg` },
@@ -142,7 +157,7 @@ export function MaterialImporterModal({
   };
 
   const handleImportAnother = () => {
-    setMaterialId(""); setLabel(""); setCategory("Other"); setSourceDir(null);
+    setMaterialId(""); setLabel(""); setCategory("Other"); setAcgAuto(true); setAttribution({ ...ACG_ATTRIBUTION }); setSourceDir(null);
     setDetectedMaps(null); setPhase("input"); setResult(null); setError(null);
   };
 
@@ -208,6 +223,16 @@ export function MaterialImporterModal({
             >
               {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+
+          {/* Attribution (optional) */}
+          <div>
+            <div style={STEP_LABEL}>ATTRIBUTION (optional)</div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, marginBottom: 8 }}>
+              <input type="checkbox" checked={acgAuto} onChange={e => toggleAcg(e.currentTarget.checked)} />
+              Auto-fill ambientCG (author, Patreon, CC0)
+            </label>
+            <AttributionFields value={attribution} onChange={setAttribution} />
           </div>
 
           {/* Step 2 — source folder */}

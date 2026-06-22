@@ -6,11 +6,12 @@ interface MaterialBrowserProps {
   materials:         MaterialDef[];
   onImport:          () => void;
   onDeleteMaterials: (ids: string[]) => void;
+  onEdit:            (ids: string[]) => void;
 }
 
 const catOf = (m: MaterialDef) => m.category ?? "Other";
 
-export function MaterialBrowser({ materials, onImport, onDeleteMaterials }: MaterialBrowserProps) {
+export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit }: MaterialBrowserProps) {
   const [search,  setSearch]  = useState("");
   const [matCat,  setMatCat]  = useState<string>("All");
   const [manage,  setManage]  = useState(false);
@@ -76,6 +77,17 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials }: Mate
           </>
         ) : (
           <>
+            <button
+              onClick={() => { if (checked.size) onEdit([...checked]); }}
+              disabled={checked.size === 0}
+              style={{
+                flex: 1, padding: "5px 0",
+                background: checked.size ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size ? "pointer" : "default",
+                color: checked.size ? "#80aaff" : "#555", fontSize: 10, letterSpacing: 0.5,
+              }}
+            >Edit{checked.size ? ` (${checked.size})` : ""}</button>
             <button
               onClick={() => { if (checked.size) onDeleteMaterials([...checked]); }}
               disabled={checked.size === 0}

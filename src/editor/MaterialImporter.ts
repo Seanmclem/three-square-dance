@@ -1,4 +1,4 @@
-import type { MaterialDef, MaterialManifest, MaterialCategory } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialCategory, Attribution } from "@/types";
 
 export interface DetectedMap {
   handle:  FileSystemFileHandle;
@@ -57,6 +57,7 @@ export class MaterialImporter {
     materialId:   string,
     label:        string,
     category:     MaterialCategory,
+    attribution:  Attribution,
     texturesDir:  FileSystemDirectoryHandle,
     detectedMaps: DetectedMaps,
   ): Promise<ImportResult> {
@@ -102,7 +103,7 @@ export class MaterialImporter {
       manifest = JSON.parse(await mfFile.text()) as MaterialManifest;
     } catch { /* no manifest yet */ }
 
-    const entry = this._buildEntry(materialId, label, category, detectedMaps);
+    const entry = this._buildEntry(materialId, label, category, attribution, detectedMaps);
     const idx   = manifest.materials.findIndex(m => m.id === materialId);
     if (idx >= 0) manifest.materials[idx] = entry;
     else manifest.materials.push(entry);
@@ -119,6 +120,7 @@ export class MaterialImporter {
     id:           string,
     label:        string,
     category:     MaterialCategory,
+    attribution:  Attribution,
     detectedMaps: DetectedMaps,
   ): MaterialDef {
     const base = `/assets/textures/${id}/{quality}`;
@@ -126,6 +128,7 @@ export class MaterialImporter {
       id,
       label,
       category,
+      ...(Object.keys(attribution).length ? { attribution } : {}),
       tileScale:         1.0,
       roughnessVal:      0.85,
       metalnessVal:      0.0,

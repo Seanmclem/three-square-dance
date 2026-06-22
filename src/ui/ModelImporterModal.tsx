@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
-import type { AssetDef, AssetCategory, AssetManifest } from "@/types";
+import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
 import { renderModelThumbnail } from "@/editor/thumbnailRenderer";
+import { AttributionFields } from "@/ui/AttributionFields";
 
 interface Props {
   modelsDir:      FileSystemDirectoryHandle | null;
@@ -139,6 +140,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
   const [collidable,    setCollidable]    = useState(true);
   const [bulkNewCat,    setBulkNewCat]    = useState<string | null>(null);
+  const [attribution,   setAttribution]   = useState<Attribution>({});
   const [progress,   setProgress]   = useState("");
   const [error,      setError]      = useState<string | null>(null);
   const [results,    setResults]    = useState<AssetDef[]>([]);
@@ -266,6 +268,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
           tags:         [],
           dateAdded:    new Date().toISOString().slice(0, 10),
           ...(animations.length ? { animations } : {}),
+          ...(Object.keys(attribution).length ? { attribution } : {}),
         };
 
         manifest.assets = manifest.assets.filter(a => a.id !== asset.id);
@@ -376,6 +379,12 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
                     }}
                   />
                 )}
+              </div>
+
+              {/* Attribution (optional) — applies to all imported models */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Attribution (optional — applies to all)</span>
+                <AttributionFields value={attribution} onChange={setAttribution} />
               </div>
 
               {/* Entry list */}

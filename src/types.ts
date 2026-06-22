@@ -13,6 +13,7 @@ export interface MaterialDef {
   id:                string;
   label:             string;
   category?:         MaterialCategory;
+  attribution?:      Attribution;
   tileScale:         number;
   roughnessVal:      number;
   metalnessVal:      number;
@@ -54,6 +55,17 @@ export interface GroupDef {
   name: string;
 }
 
+export type LicenseId = 'CC0' | 'CC BY' | 'CC BY-SA' | 'CC BY-ND' | 'CC BY-NC' | 'CC BY-NC-SA' | 'Other';
+
+export interface Attribution {
+  author?:       string;
+  sourceName?:   string;   // content pack / kit name
+  patreonUrl?:   string;
+  sourceUrl?:    string;   // source page / kit URL
+  license?:      LicenseId;
+  licenseOther?: string;   // free text when license === 'Other'
+}
+
 export interface AssetDef {
   id:           string;
   label:        string;
@@ -66,6 +78,7 @@ export interface AssetDef {
   tags:         string[];
   dateAdded:    string;
   animations?:  string[];   // GLTF clip names, populated at import (Phase 10.7)
+  attribution?: Attribution;
 }
 
 export interface AssetManifest {

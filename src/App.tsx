@@ -35,7 +35,17 @@ import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef } from "@/types";
+import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
+import { MAT_CAT_ORDER } from "@/ui/materialCategories";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution } from "@/types";
+
+const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
+
+type PendingEdit = {
+  ids:     string[];
+  items:   { id: string; label: string }[];
+  initial: { label: string; category: string; attribution: Attribution };
+};
 import { HistoryManager } from "@/editor/HistoryManager";
 import { migrateWallNodes, pruneOrphanNodes } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -93,6 +103,8 @@ export default function App() {
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
   >(null);
+  const [pendingAssetEdit,    setPendingAssetEdit]    = useState<PendingEdit | null>(null);
+  const [pendingMaterialEdit, setPendingMaterialEdit] = useState<PendingEdit | null>(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [groups,          setGroups]           = useState<GroupDef[]>([]);
@@ -899,6 +911,95 @@ export default function App() {
     setMaterialList(prev => prev.filter(m => !ids.includes(m.id)));
   };
 
+  // ── Metadata editing (label / category / attribution) ─────────────────────
+  const commonOr = (vals: string[]): string => (vals.every(v => v === vals[0]) ? vals[0] ?? "" : "");
+
+  const handleRequestAssetEdit = (ids: string[]): void => {
+    const defs = ids.map(id => assets.find(a => a.id === id)).filter(Boolean) as AssetDef[];
+    if (!defs.length) return;
+    const single = defs.length === 1;
+    setPendingAssetEdit({
+      ids, items: defs.map(d => ({ id: d.id, label: d.label })),
+      initial: {
+        label:       single ? defs[0]!.label : "",
+        category:    single ? defs[0]!.category : commonOr(defs.map(d => d.category)),
+        attribution: single ? (defs[0]!.attribution ?? {}) : {},
+      },
+    });
+  };
+
+  const handleRequestMaterialEdit = (ids: string[]): void => {
+    const defs = ids.map(id => materialList.find(m => m.id === id)).filter(Boolean) as MaterialDef[];
+    if (!defs.length) return;
+    const single = defs.length === 1;
+    setPendingMaterialEdit({
+      ids, items: defs.map(d => ({ id: d.id, label: d.label })),
+      initial: {
+        label:       single ? defs[0]!.label : "",
+        category:    single ? (defs[0]!.category ?? "Other") : commonOr(defs.map(d => d.category ?? "Other")),
+        attribution: single ? (defs[0]!.attribution ?? {}) : {},
+      },
+    });
+  };
+
+  // Apply an edit patch to a manifest entry (label/category set if present; attribution merged).
+  const patchEntry = <T extends { label: string; attribution?: Attribution }>(entry: T, patch: EditPatch): T => ({
+    ...entry,
+    ...(patch.label !== undefined    ? { label: patch.label } : {}),
+    ...(patch.category !== undefined ? { category: patch.category } : {}),
+    ...(patch.attribution            ? { attribution: { ...entry.attribution, ...patch.attribution } } : {}),
+  });
+
+  const ensureDir = async (
+    cur: FileSystemDirectoryHandle | null,
+    setCur: (d: FileSystemDirectoryHandle) => void,
+  ): Promise<FileSystemDirectoryHandle | null> => {
+    if (cur) return cur;
+    try {
+      const d = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
+        .showDirectoryPicker({ mode: "readwrite" });
+      setCur(d);
+      return d;
+    } catch { return null; }
+  };
+
+  const handleConfirmAssetEdit = async (patch: EditPatch): Promise<void> => {
+    const pending = pendingAssetEdit;
+    setPendingAssetEdit(null);
+    if (!pending) return;
+    const dir = await ensureDir(modelsDir, setModelsDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
+      data.assets = data.assets.map(a => pending.ids.includes(a.id) ? patchEntry(a, patch) : a);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("asset edit failed:", err); return; }
+    pending.ids.forEach(id => assetManager.updateAsset(id, patch as Partial<AssetDef>));
+    setAssets(assetManager.getAssetList());
+    busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
+  };
+
+  const handleConfirmMaterialEdit = async (patch: EditPatch): Promise<void> => {
+    const pending = pendingMaterialEdit;
+    setPendingMaterialEdit(null);
+    if (!pending) return;
+    const dir = await ensureDir(texturesDir, setTexturesDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; materials: MaterialDef[] };
+      data.materials = data.materials.map(m => pending.ids.includes(m.id) ? patchEntry(m, patch) : m);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("material edit failed:", err); return; }
+    pending.ids.forEach(id => assetManager.updateMaterial(id, patch as Partial<MaterialDef>));
+    setMaterialList(assetManager.getMaterialList());
+  };
+
   const handleObjectUpdate = (changes: Partial<WorldObject>): void => {
     if (!selected) return;
     const history = historyRef.current;
@@ -1071,9 +1172,11 @@ export default function App() {
         onAssetSelect={handleAssetSelect}
         onImport={() => setShowImporter(true)}
         onDeleteAssets={handleRequestAssetDelete}
+        onEditAssets={handleRequestAssetEdit}
         materials={materialList}
         onMaterialImport={openMaterialImporter}
         onDeleteMaterials={handleRequestMaterialDelete}
+        onEditMaterials={handleRequestMaterialEdit}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         onGroupAdd={handleAddGroup}
@@ -1245,6 +1348,32 @@ SquareDance
           folderHint="public/assets/textures"
           onCancel={() => setPendingMaterialDelete(null)}
           onConfirm={deleteFiles => void handleConfirmMaterialDelete(deleteFiles)}
+        />
+      )}
+
+      {pendingAssetEdit && (
+        <EditMetadataDialog
+          items={pendingAssetEdit.items}
+          noun="model"
+          categoryOptions={ASSET_CATEGORIES}
+          initial={pendingAssetEdit.initial}
+          needsFolderGrant={!modelsDir}
+          folderHint="public/assets/models"
+          onCancel={() => setPendingAssetEdit(null)}
+          onSave={patch => void handleConfirmAssetEdit(patch)}
+        />
+      )}
+
+      {pendingMaterialEdit && (
+        <EditMetadataDialog
+          items={pendingMaterialEdit.items}
+          noun="material"
+          categoryOptions={MAT_CAT_ORDER}
+          initial={pendingMaterialEdit.initial}
+          needsFolderGrant={!texturesDir}
+          folderHint="public/assets/textures"
+          onCancel={() => setPendingMaterialEdit(null)}
+          onSave={patch => void handleConfirmMaterialEdit(patch)}
         />
       )}
 

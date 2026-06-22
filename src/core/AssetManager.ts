@@ -57,6 +57,13 @@ export class AssetManager {
     return Object.values(this._materialRegistry);
   }
 
+  /** Merge a metadata patch into a registry material entry (attribution merged one level deep). */
+  updateMaterial(id: string, patch: Partial<MaterialDef>): void {
+    const def = this._materialRegistry[id];
+    if (!def) return;
+    this._materialRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
+  }
+
   /** Drop materials from the registry (and their cached Three.js materials) after a manifest delete. */
   removeMaterials(ids: string[]): void {
     for (const id of ids) {
@@ -90,6 +97,13 @@ export class AssetManager {
 
   getAssetList(): AssetDef[] {
     return Object.values(this._assetRegistry);
+  }
+
+  /** Merge a metadata patch into a registry asset entry (attribution merged one level deep). */
+  updateAsset(id: string, patch: Partial<AssetDef>): void {
+    const def = this._assetRegistry[id];
+    if (!def) return;
+    this._assetRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
   }
 
   /** Drop assets from the registry (and any cached GLTF) after a manifest delete. */
