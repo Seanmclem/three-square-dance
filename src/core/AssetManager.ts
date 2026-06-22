@@ -12,6 +12,9 @@ export class AssetManager {
   private _renderer: THREE.WebGLRenderer | null = null;
   private _materialRegistry: Record<string, MaterialDef> = {};
   private _assetRegistry:   Record<string, AssetDef>    = {};
+  private _missingAssetIds    = new Set<string>();
+  private _missingMaterialIds = new Set<string>();
+  private _fallbackMat: THREE.MeshStandardMaterial | null = null;
   private _quality: QualityScale = 'high';
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
@@ -40,8 +43,16 @@ export class AssetManager {
         return [];
       }
       const manifest: MaterialManifest = await res.json();
-      this._materialRegistry = Object.fromEntries(manifest.materials.map(m => [m.id, m]));
-      return manifest.materials;
+      // Filter out entries whose texture files are missing on disk (e.g. gitignored,
+      // closed-source). They silently vanish from the UI; the manifest is left untouched.
+      const checks = await Promise.all(manifest.materials.map(m =>
+        this._fileExists(this._resolveQualityPath(m.maps.albedo.path))));
+      const present = manifest.materials.filter((_, i) => checks[i]);
+      this._missingMaterialIds = new Set(manifest.materials.filter((_, i) => !checks[i]).map(m => m.id));
+      if (this._missingMaterialIds.size)
+        console.info(`AssetManager: ${this._missingMaterialIds.size} material(s) missing files, hidden:`, [...this._missingMaterialIds]);
+      this._materialRegistry = Object.fromEntries(present.map(m => [m.id, m]));
+      return present;
     } catch (err) {
       console.warn('AssetManager: failed to load manifest', err);
       this._materialRegistry = {};
@@ -82,14 +93,33 @@ export class AssetManager {
         return [];
       }
       const manifest: AssetManifest = await res.json();
-      this._assetRegistry = Object.fromEntries(manifest.assets.map(a => [a.id, a]));
-      return manifest.assets;
+      // Filter out entries whose model file is missing on disk (gitignored / closed-source).
+      const checks = await Promise.all(manifest.assets.map(a => this._fileExists(a.path)));
+      const present = manifest.assets.filter((_, i) => checks[i]);
+      this._missingAssetIds = new Set(manifest.assets.filter((_, i) => !checks[i]).map(a => a.id));
+      if (this._missingAssetIds.size)
+        console.info(`AssetManager: ${this._missingAssetIds.size} model(s) missing files, hidden:`, [...this._missingAssetIds]);
+      this._assetRegistry = Object.fromEntries(present.map(a => [a.id, a]));
+      return present;
     } catch (err) {
       console.warn('AssetManager: failed to load model manifest', err);
       this._assetRegistry = {};
       return [];
     }
   }
+
+  /** HEAD-check a static file's existence (used to hide manifest entries with missing files). */
+  private async _fileExists(url: string): Promise<boolean> {
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  isAssetMissing(id: string):    boolean { return this._missingAssetIds.has(id); }
+  isMaterialMissing(id: string): boolean { return this._missingMaterialIds.has(id); }
 
   getAssetDef(id: string): AssetDef | undefined {
     return this._assetRegistry[id];
@@ -143,14 +173,16 @@ export class AssetManager {
     if (cached) return cached;
 
     const def = this._materialRegistry[materialId];
-    if (!def) {
-      console.warn(`Unknown material: ${materialId}`);
-      return new THREE.MeshStandardMaterial({ color: 0x888888 });
-    }
+    if (!def) return this._fallbackMaterial();   // missing-file or unknown id
 
-    const mat = await this._buildMaterial(def, undefined);
-    this._materialCache.set(cacheKey, mat);
-    return mat;
+    try {
+      const mat = await this._buildMaterial(def, undefined);
+      this._materialCache.set(cacheKey, mat);
+      return mat;
+    } catch (err) {
+      console.warn(`AssetManager: failed to build material "${materialId}"`, err);
+      return this._fallbackMaterial();
+    }
   }
 
   /** Build an uncached material applying per-instance overrides. */
@@ -159,8 +191,29 @@ export class AssetManager {
     overrides:  MaterialOverrides,
   ): Promise<THREE.MeshStandardMaterial> {
     const def = this._materialRegistry[materialId];
-    if (!def) return new THREE.MeshStandardMaterial({ color: 0x888888 });
-    return this._buildMaterial(def, overrides);
+    if (!def) return this._fallbackMaterial();
+    try {
+      return await this._buildMaterial(def, overrides);
+    } catch (err) {
+      console.warn(`AssetManager: failed to build material "${materialId}"`, err);
+      return this._fallbackMaterial();
+    }
+  }
+
+  /** Cached magenta/black checkerboard — the "missing texture" fallback for surfaces. */
+  private _fallbackMaterial(): THREE.MeshStandardMaterial {
+    if (this._fallbackMat) return this._fallbackMat;
+    const size = 64, half = size / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#e000e0'; ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, half, half); ctx.fillRect(half, half, half, half);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    this._fallbackMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, metalness: 0 });
+    return this._fallbackMat;
   }
 
   /** Replace {quality} placeholder with the current quality level. */

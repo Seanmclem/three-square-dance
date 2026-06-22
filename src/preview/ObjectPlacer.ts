@@ -24,6 +24,8 @@ export class ObjectPlacer {
 
   /** Build an object's mesh and wire up its animation mixer. Returns the scene-ready root. */
   async build(obj: WorldObject, zoneId: string): Promise<THREE.Object3D> {
+    // Missing-file model (e.g. gitignored / closed-source): skip the wasted 404 fetch.
+    if (assetManager.isAssetMissing(obj.assetId)) return this._fallbackBox(obj, zoneId);
     const def  = assetManager.getAssetDef(obj.assetId);
     const path = def?.path ?? `/assets/models/${obj.assetId}.glb`;
     const isGltf = !/\.obj$/i.test(path);
