@@ -25,6 +25,14 @@ The app is a browser canvas app, so testing means clicking inside a browser.
    `mcp__claude-in-chrome__*` tools. If none appear, it is **not** connected —
    do not fall back to `computer-use` clicks, they will be blocked.
 
+**This project's setup (as of 2026-06-23):** the extension is installed on
+**Chrome only**. It was removed from Edge because Edge was flaky. So
+`list_connected_browsers` should show a **single** device — no browser picker,
+no naming. Just use it. (If a second browser ever reappears, ask which to use.
+Note: naming a browser via the `switch_browser` Connect-prompt does **not**
+persist — it only labels the live connection; persistent device names must be set
+in the extension popup, which Claude can't drive.)
+
 ---
 
 ## 2. Verifying WebGL canvas content
@@ -106,6 +114,14 @@ sputter — every failure mode below was hit and diagnosed in practice.
 2. **Reuse the existing World Editor tab; navigate once.** Get tabs with
    `tabs_context_mcp`, find the `localhost:<port>` tab, work in it. Wait for load
    with a **Bash `sleep`**, never an in-page await.
+   - **Tag the tab so the user can find it.** First action: set
+     `document.title = "🤖 CLAUDE TESTING — <Mon DD H:MMam>"` (timestamp from the
+     system clock) via `javascript_tool`. If the app overwrites `document.title`
+     on re-render, reapply it. A tabId is useless to the user — a labelled title
+     is what they spot in the tab strip.
+   - **Close the tab when done.** A new conversation always opens its own fresh
+     tab, so leftover tabs pile up in the extension's tab group. Close yours at
+     the end of the run (`tabs_close_mcp`).
 3. **Drive via the real UI, not internals.** Select / click / type the way a user
    does. Do **not** emit bus events or call handlers on `window.__*` to *drive*
    state: `busRef = useRef(new EventBus())` + React **StrictMode** double-mount
