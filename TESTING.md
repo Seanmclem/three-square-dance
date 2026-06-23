@@ -64,12 +64,19 @@ console.log(px); // e.g. [143, 105, 88, 255] = brick color
 
 **For visual screenshots** (when you actually need a picture):
 
-Use the **Chrome MCP** `mcp__claude-in-chrome__gif_creator` or a
-`browser_batch` containing a `screenshot` action — these capture the page via
-the extension's DOM-aware pipeline and correctly show WebGL canvas output.
+⚠️ **Chrome-MCP screenshots hang on this app.** `mcp__claude-in-chrome__computer`
+`screenshot` (and any extension action that waits for `document_idle`) blocks for
+~45s and then times out with *"Page still loading (executeScript waited 45000ms
+for document_idle)"*. This app **never reaches `document_idle`** — the RAF render
+loop plus the Vite HMR websocket keep the page perpetually "busy". So do **not**
+rely on screenshots here. When the extension's DOM-aware pipeline does return,
+`gif_creator` / `browser_batch` screenshots show WebGL output correctly, but
+expect the long wait and treat any picture as best-effort.
 
-`computer-use` screenshots are fine for reading **UI chrome** (toolbar buttons,
-PropertiesPanel text, coordinate readout) but useless for verifying 3D content.
+Prefer reading state programmatically (Section 2 snippets + DOM text via
+`javascript_tool`) over taking pictures. `computer-use` screenshots are fine for
+reading **UI chrome** but useless for 3D content (and also can't capture WebGL on
+this Mac, per the note above).
 
 ### Dev globals (DEV mode only)
 
@@ -85,27 +92,57 @@ PropertiesPanel text, coordinate readout) but useless for verifying 3D content.
 
 ---
 
-## 3. Strategies for visual-interactive testing (Chrome MCP)
+## 3. Chrome-MCP golden path (read this first)
 
-Lessons for driving a 3D canvas app reliably:
+The reliable, repeatable recipe. Skipping these steps is what makes a session
+sputter — every failure mode below was hit and diagnosed in practice.
 
-- **Dev server:** `npm run dev -- --port 7373` → app at `http://localhost:7373`.
-- **Go slow.** One action → screenshot → verify → next action. Never batch
+1. **Reuse the running dev server — do NOT start a second one.**
+   Check first: `lsof -ti:7373` (and nearby ports, since Vite auto-bumps). If the
+   app is already up, use it. Running `npm run dev` when 7373 is taken silently
+   starts a **second** instance on 7374, giving you two app states to confuse
+   yourself with. Only start a server if none exists, and read the chosen port
+   from its output.
+2. **Reuse the existing World Editor tab; navigate once.** Get tabs with
+   `tabs_context_mcp`, find the `localhost:<port>` tab, work in it. Wait for load
+   with a **Bash `sleep`**, never an in-page await.
+3. **Drive via the real UI, not internals.** Select / click / type the way a user
+   does. Do **not** emit bus events or call handlers on `window.__*` to *drive*
+   state: `busRef = useRef(new EventBus())` + React **StrictMode** double-mount
+   means `window.__world._bus` and the *rendered* App's listeners can be
+   different instances — synthetic emits silently no-op against the live UI.
+   `window.__*` globals are for **reading**, not driving.
+4. **To select a 3D object, project its world position and click.** There are no
+   DOM nodes for 3D objects, and screenshots hang (Section 2), so compute the
+   pixel from the camera and `computer left_click` it (clicks work even when
+   screenshots don't):
+   ```js
+   // javascript_tool — synchronous, returns instantly
+   const cam = window.__camera, canvas = window.__renderer.domElement;
+   const r = canvas.getBoundingClientRect();
+   const p = new cam.position.constructor(wx, wy, wz); // THREE.Vector3 at world pos
+   p.project(cam);                                     // → NDC
+   const x = r.left + (p.x * 0.5 + 0.5) * r.width;
+   const y = r.top  + (-p.y * 0.5 + 0.5) * r.height;
+   JSON.stringify({ x: Math.round(x), y: Math.round(y) });
+   ```
+   Then `computer left_click` at `{x, y}`. (Reload before a coordinate-based
+   click sequence — the editor camera is at a deterministic default on load, but
+   any RMB-orbit / MMB-pan / scroll / WASD moves objects' screen positions.)
+5. **Read results two ways, both via `javascript_tool` (synchronous only):**
+   the PropertiesPanel DOM text (`document.body.innerText`) **and**
+   `window.__world.toJSON()`. Either alone can mislead.
+6. **Never block inside the page.** `javascript_tool` containing an in-page
+   `await`/`setTimeout` times out (CDP `Runtime.evaluate`, ~45s). Keep page eval
+   synchronous; put every wait *between* calls as a Bash `sleep`.
+
+### Other lessons
+
+- **Go slow.** One action → read state → verify → next action. Never batch
   clicks across unverified UI state — a wrong assumption compounds.
-- **Verify in two places.** After every interaction check *both* the 3D
-  viewport (emissive glow on the mesh) *and* the PropertiesPanel DOM text.
-  Either alone can mislead.
-- **Use `zoom`** to read small text — PropertiesPanel values, the coordinate
-  readout, the floor selector. The full-screen screenshot downscales them.
-- **Canvas picks are pixel-based.** There are no DOM nodes for 3D objects.
-  Read a target's screen pixel from a screenshot, click that pixel, screenshot
-  again to confirm.
-- **Camera state matters.** On load the editor camera is at a deterministic
-  default, so object screen positions are predictable. If you orbit/pan/zoom
-  (RMB / MMB / scroll / WASD), positions change — reload before any
-  coordinate-based click sequence, or re-screenshot first.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and
-  the browser console surface TS / runtime errors. A clean run shows neither.
+  the browser console (`read_console_messages`) surface TS / runtime errors. A
+  clean run shows neither.
 
 ---
 

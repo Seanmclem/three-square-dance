@@ -1083,14 +1083,11 @@ export default function App() {
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
     } else {
-      if (changes.properties !== undefined) {
-        historyRef.current?.record("update object properties", () => {
-          worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
-        });
-        syncHistory();
-      } else {
-        busRef.current.emit("object:updated", { id: selected.id, zoneId: selected.zoneId, changes });
-      }
+      const label = changes.properties !== undefined ? "update object properties" : "update object transform";
+      historyRef.current?.record(label, () => {
+        worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
+      });
+      syncHistory();
     }
   };
 
