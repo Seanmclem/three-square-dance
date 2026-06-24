@@ -356,30 +356,29 @@ export function PropertiesPanel({
                   placeholder={selected.id}
                   onChange={e => setLabelDraft(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") commitLabel(); else if (e.key === "Escape") cancelEdit(); }}
-                  style={{ flex: 1, minWidth: 0, boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", padding: "2px 6px", outline: "none" }}
+                  style={{ flex: 1, minWidth: 0, boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 13, fontFamily: "monospace", padding: "3px 6px", outline: "none" }}
                 />
               ) : (
-                <div style={{ flex: 1, minWidth: 0, color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ flex: "0 1 auto", minWidth: 0, color: "#c0c0c0", fontSize: 13, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {headerTitle}
                 </div>
               )}
               {canRename && (
                 <button
                   onClick={editingLabel ? commitLabel : startEdit}
-                  style={{ flexShrink: 0, background: "none", border: "none", color: "#4a9eff", fontSize: 11, cursor: "pointer", padding: "2px 0", fontFamily: "monospace" }}
+                  title={editingLabel ? "Save name" : "Rename"}
+                  style={{ flexShrink: 0, background: "none", border: "none", color: "#4a9eff", fontSize: 13, lineHeight: 1, cursor: "pointer", padding: "2px 4px" }}
                 >
-                  {editingLabel ? "Done" : "Edit"}
+                  {editingLabel ? "✓" : "✎"}
                 </button>
               )}
             </div>
-            <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
-              {headerSubtitle}
+            <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 3, fontSize: 10, overflow: "hidden" }}>
+              <span style={{ color: "#646464", letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }}>{headerSubtitle}</span>
+              {canRename && (currentLabel || editingLabel) && (
+                <span style={{ color: "#555", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>· {selected.id}</span>
+              )}
             </div>
-            {canRename && currentLabel && !editingLabel && (
-              <div style={{ color: "#5a5a5a", fontSize: 10, fontFamily: "monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {selected.id}
-              </div>
-            )}
           </div>
         )}
       </div>
