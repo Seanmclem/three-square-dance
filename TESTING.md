@@ -3,6 +3,10 @@
 How to test the World Editor — written so a future Claude session (or a human)
 can pick it up cold and run an interactive pass.
 
+> **Testing by hand through the UI?** See **`HUMAN_TESTING.md`** for click-by-click
+> feature walkthroughs. This guide skews toward automation (Chrome MCP, dev globals,
+> the `window.__test` harness). Per-phase acceptance checklists are in `test-plans/`.
+
 ---
 
 ## 1. Tooling reality — how to drive the browser
