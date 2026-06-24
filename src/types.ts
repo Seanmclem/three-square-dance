@@ -305,6 +305,7 @@ export interface FloorMeshDef {
 
 export interface FloorDef {
   id:                string;
+  label?:            string;   // optional human-friendly name; falls back to id
   level:             number;
   elevation:         number;
   ceilingHeight:     number | null;
@@ -329,6 +330,7 @@ export interface Opening {
 
 export interface WallDef {
   id:                 string;
+  label?:             string;   // optional human-friendly name; falls back to id
   startNodeId:        string;
   endNodeId:          string;
   floor:              number;
@@ -344,6 +346,7 @@ export interface WallDef {
 
 export interface PlatformDef {
   id:             string;
+  label?:         string;     // optional human-friendly name; falls back to id
   position:       Vec3;
   size:           { width: number; depth: number };
   thickness:      number;
@@ -372,6 +375,7 @@ export interface StairCutterDef {
 
 export interface StairDef {
   id:          string;
+  label?:      string;   // optional human-friendly name; falls back to id
   start:       Vec3;
   end:         Vec3;
   width:       number;
@@ -396,6 +400,7 @@ export interface ObjectProperties {
 
 export interface WorldObject {
   id:         string;
+  label?:     string;   // optional human-friendly name; falls back to id
   assetId:    string;
   position:   Vec3;
   rotation:   Euler3;

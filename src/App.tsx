@@ -1082,9 +1082,15 @@ export default function App() {
       });
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
+    } else if (selected.type === "trigger-volume") {
+      const volChanges = changes as unknown as Partial<TriggerVolume>;
+      history?.record("update trigger volume", () => {
+        worldRef.current?.updateTriggerVolume(selected.zoneId, selected.id, volChanges);
+      });
+      syncHistory();
     } else {
-      const label = changes.properties !== undefined ? "update object properties" : "update object transform";
-      historyRef.current?.record(label, () => {
+      const action = changes.properties !== undefined ? "update object properties" : "update object transform";
+      historyRef.current?.record(action, () => {
         worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
       });
       syncHistory();

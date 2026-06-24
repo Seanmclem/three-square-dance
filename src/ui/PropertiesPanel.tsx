@@ -290,9 +290,15 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
+  const [labelDraft, setLabelDraft]   = useState("");
+  const [editingLabel, setEditingLabel] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setStack([]); setActionsOpen(true); }, [selected?.id]);
+  useEffect(() => {
+    setStack([]); setActionsOpen(true);
+    setEditingLabel(false);
+    setLabelDraft((selected?.data as { label?: string } | null)?.label ?? "");
+  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
@@ -309,8 +315,23 @@ export function PropertiesPanel({
     ? [...(OBJECT_SCREENS[selected.type] ?? []), ...(hasClips ? ["animations" as ScreenId] : [])]
     : [];
 
-  const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? selected.id            : SCREEN_LABELS[currentScreen!];
+  // Committed label (if any). The root header shows it in place of the id;
+  // the id then appears underneath so it's never lost.
+  const currentLabel   = ((selected?.data as { label?: string } | null)?.label ?? "").trim();
+  const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? (currentLabel || selected.id) : SCREEN_LABELS[currentScreen!];
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
+
+  const canRename = !!selected && isRoot && selected.id !== "__spawn__"
+    && ["object", "wall", "floor", "platform", "stair", "trigger-volume"].includes(selected.type as string);
+  const startEdit  = (): void => { setLabelDraft(currentLabel); setEditingLabel(true); };
+  const cancelEdit = (): void => { setLabelDraft(currentLabel); setEditingLabel(false); };
+  const commitLabel = (): void => {
+    setEditingLabel(false);
+    if (!selected) return;
+    const trimmed = labelDraft.trim();
+    if (trimmed === currentLabel) return;
+    onObjectUpdate({ label: trimmed || undefined } as Partial<WorldObject>);
+  };
 
 
   return (
@@ -327,12 +348,38 @@ export function PropertiesPanel({
         </div>
         {selected && (
           <div style={{ padding: "0 16px 10px" }}>
-            <div style={{ color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {headerTitle}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {canRename && editingLabel ? (
+                <input
+                  autoFocus
+                  value={labelDraft}
+                  placeholder={selected.id}
+                  onChange={e => setLabelDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") commitLabel(); else if (e.key === "Escape") cancelEdit(); }}
+                  style={{ flex: 1, minWidth: 0, boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", padding: "2px 6px", outline: "none" }}
+                />
+              ) : (
+                <div style={{ flex: 1, minWidth: 0, color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {headerTitle}
+                </div>
+              )}
+              {canRename && (
+                <button
+                  onClick={editingLabel ? commitLabel : startEdit}
+                  style={{ flexShrink: 0, background: "none", border: "none", color: "#4a9eff", fontSize: 11, cursor: "pointer", padding: "2px 0", fontFamily: "monospace" }}
+                >
+                  {editingLabel ? "Done" : "Edit"}
+                </button>
+              )}
             </div>
             <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginTop: 2 }}>
               {headerSubtitle}
             </div>
+            {canRename && currentLabel && !editingLabel && (
+              <div style={{ color: "#5a5a5a", fontSize: 10, fontFamily: "monospace", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {selected.id}
+              </div>
+            )}
           </div>
         )}
       </div>
