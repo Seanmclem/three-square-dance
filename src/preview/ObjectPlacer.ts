@@ -18,14 +18,21 @@ export class ObjectPlacer {
   private readonly _clips    = new Map<string, Map<string, THREE.AnimationClip>>();
   private readonly _autoPlay = new Map<string, string | null>();
   private readonly _finish   = new Map<string, () => void>();
+  private readonly _meshes   = new Map<string, THREE.Object3D>();
   private _previewingId: string | null = null;
 
-  constructor(private readonly _bus: EventBus) {}
+  constructor(private readonly _bus: EventBus) {
+    // Script-driven actions (Phase 10.9). Object id is already group-resolved by ScriptEngine.
+    this._bus.on("object:play-animation", ({ id, clipName }) => this.previewClip(id, clipName));
+    this._bus.on("object:updated", ({ id, changes }) => {
+      if (changes.material) void this._applyMaterial(id, changes.material);
+    });
+  }
 
   /** Build an object's mesh and wire up its animation mixer. Returns the scene-ready root. */
   async build(obj: WorldObject, zoneId: string): Promise<THREE.Object3D> {
     // Missing-file model (e.g. gitignored / closed-source): skip the wasted 404 fetch.
-    if (assetManager.isAssetMissing(obj.assetId)) return this._fallbackBox(obj, zoneId);
+    if (assetManager.isAssetMissing(obj.assetId)) return this._register(obj.id, this._fallbackBox(obj, zoneId));
     const def  = assetManager.getAssetDef(obj.assetId);
     const path = def?.path ?? `/assets/models/${obj.assetId}.glb`;
     const isGltf = !/\.obj$/i.test(path);
@@ -48,10 +55,11 @@ export class ObjectPlacer {
       }
       this._applyTransform(mesh, obj, zoneId);
       if (clips.length) this._setupMixer(obj, mesh, clips);
-      return mesh;
+      if (obj.material) void this._applyMaterial(obj.id, obj.material, mesh);
+      return this._register(obj.id, mesh);
     } catch (err) {
       console.warn(`ObjectPlacer: failed to load model for asset "${obj.assetId}"`, err);
-      return this._fallbackBox(obj, zoneId);
+      return this._register(obj.id, this._fallbackBox(obj, zoneId));
     }
   }
 
@@ -68,6 +76,7 @@ export class ObjectPlacer {
     this._clips.delete(objectId);
     this._autoPlay.delete(objectId);
     this._finish.delete(objectId);
+    this._meshes.delete(objectId);
   }
 
   /** Advance every active mixer. Registered on the SceneManager RAF loop. */
@@ -127,6 +136,25 @@ export class ObjectPlacer {
   }
 
   // ── internals ───────────────────────────────────────────────────────────────
+
+  private _register(objectId: string, mesh: THREE.Object3D): THREE.Object3D {
+    this._meshes.set(objectId, mesh);
+    return mesh;
+  }
+
+  /** Swap every mesh material on a placed object to a registry material (change_material). */
+  private async _applyMaterial(objectId: string, materialId: string, target?: THREE.Object3D): Promise<void> {
+    const mesh = target ?? this._meshes.get(objectId);
+    if (!mesh) return;
+    const mat = await assetManager.getMaterial(materialId);
+    mesh.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        child.material = mat;
+        // This mesh's material is now shared/registry-owned, not built per-instance.
+        (child.userData as { _ownsMaterial?: boolean })._ownsMaterial = false;
+      }
+    });
+  }
 
   private _applyTransform(mesh: THREE.Object3D, obj: WorldObject, zoneId: string): void {
     mesh.position.set(obj.position.x, obj.position.y, obj.position.z);

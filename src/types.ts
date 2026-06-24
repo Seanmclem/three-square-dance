@@ -202,6 +202,8 @@ export interface BusEvents {
   "group:added":           { group: GroupDef };
   "group:removed":         { id: string };
   "group:updated":         { id: string; name: string };
+  "group:visibility":      { groupId: string; visible: boolean };
+  "object:play-animation": { id: string; clipName: string };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -411,6 +413,7 @@ export interface WorldObject {
   scripts?:   ScriptDef[];
   groupIds?:  string[];
   autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
+  material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
 }
 
 export interface ZoneDef {

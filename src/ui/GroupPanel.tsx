@@ -2,13 +2,15 @@ import { useState } from "react";
 import type { GroupDef } from "@/types";
 
 interface GroupPanelProps {
-  groups:   GroupDef[];
-  onAdd:    () => void;
-  onRemove: (id: string) => void;
-  onRename: (id: string, name: string) => void;
+  groups:           GroupDef[];
+  hiddenGroupIds:   Set<string>;
+  onAdd:            () => void;
+  onRemove:         (id: string) => void;
+  onRename:         (id: string, name: string) => void;
+  onToggleVisibility: (id: string) => void;
 }
 
-export function GroupPanel({ groups, onAdd, onRemove, onRename }: GroupPanelProps) {
+export function GroupPanel({ groups, hiddenGroupIds, onAdd, onRemove, onRename, onToggleVisibility }: GroupPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft,     setDraft]     = useState("");
 
@@ -84,6 +86,14 @@ export function GroupPanel({ groups, onAdd, onRemove, onRename }: GroupPanelProp
                 {g.name}
               </span>
             )}
+
+            <button
+              onClick={() => onToggleVisibility(g.id)}
+              title={hiddenGroupIds.has(g.id) ? "Group hidden — click to show" : "Group visible — click to hide"}
+              style={{ background: "none", border: "none", fontSize: 12,
+                       color: hiddenGroupIds.has(g.id) ? "#555560" : "#8a9ab0",
+                       cursor: "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
+            >{hiddenGroupIds.has(g.id) ? "🚫" : "👁"}</button>
 
             <button
               onClick={() => onRemove(g.id)}

@@ -18,9 +18,11 @@ interface LeftPanelProps {
   onEditMaterials:  (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
+  hiddenGroupIds:  Set<string>;
   onGroupAdd:      () => void;
   onGroupRemove:   (id: string) => void;
   onGroupRename:   (id: string, name: string) => void;
+  onGroupToggleVisibility: (id: string) => void;
   activeZoneId:    string | null;
   // scripts panel
   zoneScripts:          ScriptDef[];
@@ -35,7 +37,7 @@ interface LeftPanelProps {
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
-  groups, onGroupAdd, onGroupRemove, onGroupRename,
+  groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
   onZoneScriptsChange, onObjectScriptsChange,
@@ -102,9 +104,11 @@ export function LeftPanel({
             {panelId === "groups" && (
               <GroupPanel
                 groups={groups}
+                hiddenGroupIds={hiddenGroupIds}
                 onAdd={onGroupAdd}
                 onRemove={onGroupRemove}
                 onRename={onGroupRename}
+                onToggleVisibility={onGroupToggleVisibility}
               />
             )}
             {panelId === "scripts" && (

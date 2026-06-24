@@ -578,15 +578,41 @@ function ActionFields({ action, onChange }: {
 
     case "despawn_object":
     case "move_object":
-    case "play_animation":
-    case "change_material":
     case "open_door":
     case "close_door":
       return (
-        <input style={S.field} placeholder="Target object ID"
+        <input style={S.field} placeholder="Target object or group ID"
           value={action.targetId ?? ""}
           onChange={e => set({ targetId: e.target.value })}
         />
+      );
+
+    case "play_animation":
+      return (
+        <div style={{ display: "flex", gap: 4 }}>
+          <input style={{ ...S.field, flex: 1 }} placeholder="Target object or group ID"
+            value={action.targetId ?? ""}
+            onChange={e => set({ targetId: e.target.value })}
+          />
+          <input style={{ ...S.field, flex: 1 }} placeholder="Clip name"
+            value={action.animation ?? ""}
+            onChange={e => set({ animation: e.target.value })}
+          />
+        </div>
+      );
+
+    case "change_material":
+      return (
+        <div style={{ display: "flex", gap: 4 }}>
+          <input style={{ ...S.field, flex: 1 }} placeholder="Target object or group ID"
+            value={action.targetId ?? ""}
+            onChange={e => set({ targetId: e.target.value })}
+          />
+          <input style={{ ...S.field, flex: 1 }} placeholder="Material ID"
+            value={action.material ?? ""}
+            onChange={e => set({ material: e.target.value })}
+          />
+        </div>
       );
 
     case "teleport_player":

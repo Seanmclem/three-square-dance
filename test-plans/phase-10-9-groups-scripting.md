@@ -4,11 +4,20 @@
 - Phase 10.5/10.6b complete: scripting engine, trigger volumes, GroupPanel name-list
 - `npm run build` / `npx tsc --noEmit` passes with zero TypeScript errors
 
-> **Status:** as of this commit, only **`on_timer`** is implemented in code. The remaining
-> sections (Groups assignment/visibility/bulk/scripting-targets, `change_material`,
-> `play_animation`, `fade_screen` visual) are **specced in `WORLD_EDITOR_ARCHITECTURE.md`
-> Phase 10.9** but not yet built. Their checklists below are the acceptance criteria for
-> when that work lands.
+> **Verified 2026-06-24 (Chrome, localhost:5173):** §2 accordion renders on a selected platform's
+> root screen above Actions; checkbox assignment persisted to `groupIds` and the "Groups (N)" count
+> updated. §3 emitting `group:visibility` (the eye-icon's payload) hid the member mesh and left a
+> non-member visible; re-show restored it. §6 `overlay:fade-in` tinted the full viewport;
+> `object:updated{material}` swapped a placed object's mesh material (uuid changed). No console
+> errors. Not live-fired through preview: `_resolveTargets` group expansion (trivial pure fn,
+> typecheck-passed; the events it emits are verified downstream) and `play_animation` visual
+> (needs an animated GLB) — and the GroupPanel eye-button→App wiring (left panel didn't open via the
+> `z` hotkey in the automation tab; the emitted event path is verified).
+>
+> **Status:** Groups assignment UI, group visibility toggle, group-targeted script actions,
+> `change_material`, `play_animation`, and the `fade_screen` visual are now **implemented**
+> (`on_timer` shipped earlier). **Bulk operations (§4) are deferred** to a follow-up phase —
+> they need real multi-select in `SelectionManager`, which doesn't exist yet.
 
 ---
 
@@ -30,45 +39,58 @@ and an action that is observable (e.g. `set_flag` plus a chained `on_flag_set` s
 
 ---
 
-## 2. Groups — assignment UI (spec — not yet built)
+## 2. Groups — assignment UI (accordion)
 
-- [ ] Select an object — PropertiesPanel shows a **GROUPS** section listing existing groups
-- [ ] Toggle a group on — object's `groupIds` gains the id (verify in saved JSON)
+Create ≥1 group first in the Groups panel (Z).
+
+- [ ] Select an object — PropertiesPanel root shows a **Groups** accordion (collapsed by default), above the **Actions** accordion
+- [ ] Expand it — lists all existing groups, each with a checkbox; header shows a count when ≥1 assigned
+- [ ] Toggle a group on — object's `groupIds` gains the id; re-select shows it checked; verify it persists in saved JSON
 - [ ] Toggle off — id removed
-- [ ] Works for floors, walls, platforms, stairs, trigger volumes (not just objects)
-- [ ] No groups defined — section shows an empty/“create a group first” state
+- [ ] Works for floors, walls, platforms, stairs **and trigger volumes** (trigger volumes show the accordion at the bottom of their dedicated view)
+- [ ] No groups defined — accordion body shows "No groups yet — create one in the Groups panel"
+- [ ] Assignment goes through undo/redo (Cmd+Z restores prior groupIds)
 
 ---
 
-## 3. Groups — visibility toggle (spec — not yet built)
+## 3. Groups — visibility toggle (editor-only)
 
-- [ ] Eye icon per group in GroupPanel
-- [ ] Hiding a group hides every mesh whose entity is in that group
+- [ ] Eye icon (👁) per group in GroupPanel; click toggles to 🚫 when hidden
+- [ ] Hiding a group hides every mesh whose entity is in that group (objects + floors/walls/platforms/stairs)
+- [ ] A merged wall run hides only when *all* its walls are in the hidden group
 - [ ] Showing re-displays them
-- [ ] Visibility is editor-only — saved JSON unchanged; preview shows everything
+- [ ] Visibility is editor-only — saved JSON unchanged; entering preview shows everything
+- [ ] Deleting a hidden group makes its members reappear (no stuck-hidden meshes)
 
 ---
 
-## 4. Groups — bulk operations (spec — not yet built)
+## 4. Groups — bulk operations (DEFERRED — not in this phase)
 
-- [ ] "Select all" selects every member of the group (multi-select gizmo)
-- [ ] "Delete" removes all members (single undo step)
-- [ ] "Duplicate" / "Move" act on all members
-- [ ] Undo/redo restores bulk operations correctly
+Needs `SelectionManager` multi-select, which doesn't exist yet. Tracked as a follow-up phase.
+
+- [ ] (later) "Select all" / "Delete" / "Duplicate" / "Move" act on all members with correct undo/redo
 
 ---
 
-## 5. Groups — scripting targets (spec — not yet built)
+## 5. Groups — scripting targets
 
-- [ ] A script action with `targetId` = a group id resolves to all members
+- [ ] A script action with `targetId` = a group id resolves to all members in the active zone
 - [ ] `despawn_object` on a group removes every member in preview
-- [ ] `move_object` / `change_material` / `show_ui` apply per-member
+- [ ] `move_object` / `change_material` / `play_animation` apply per-member
 - [ ] `targetId` = a single entity id still works (non-group fallback)
+- [ ] (note) `show_ui` targets a UI element id, not entities — it is *not* group-resolved
 
 ---
 
-## 6. Re-homed actions (spec — not yet built)
+## 6. Re-homed actions
 
-- [ ] `change_material` — swaps the GLTF object's material at runtime (via `materialOverride`)
-- [ ] `play_animation` — plays the named clip on the object's mixer
-- [ ] `fade_screen` — `<FadeOverlay>` fades the screen to `fadeColor` over `fadeDuration`
+Author these in the Scripts panel. `play_animation` and `change_material` now expose a second
+input (clip name / material id) beside the target field.
+
+- [ ] `play_animation` — plays the named clip on the object's mixer (one-shot via ObjectPlacer); group target plays on all members
+- [ ] `change_material` — swaps the GLTF object's material to the registry material id (via `WorldObject.material`); group target swaps all members
+- [ ] `fade_screen` — `<FadeOverlay>` (`src/preview/FadeOverlay.tsx`) fades the screen to `fadeColor` over `fadeDuration`, then clears
+- [ ] An object saved with `material` set loads with that material applied (ObjectPlacer applies on build)
+
+> **Test-tab note:** animated-GLB / async asset paths must run in a **foreground** Chrome tab —
+> background tabs freeze `fetch`/timers (carried over from Phase 10.7).

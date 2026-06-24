@@ -202,17 +202,30 @@ export class ScriptEngine {
         break;
 
       case "despawn_object":
-        if (action.targetId) this._bus.emit("object:despawn", { id: action.targetId });
+        for (const id of this._resolveTargets(action.targetId))
+          this._bus.emit("object:despawn", { id });
         break;
 
       case "move_object": {
-        if (action.targetId && action.position) {
+        if (action.position) {
           const zoneId = this._state.activeZoneId ?? "";
-          this._bus.emit("object:updated", {
-            id:      action.targetId,
-            zoneId,
-            changes: { position: action.position as Vec3 },
-          });
+          for (const id of this._resolveTargets(action.targetId))
+            this._bus.emit("object:updated", { id, zoneId, changes: { position: action.position as Vec3 } });
+        }
+        break;
+      }
+
+      case "play_animation":
+        if (action.animation)
+          for (const id of this._resolveTargets(action.targetId))
+            this._bus.emit("object:play-animation", { id, clipName: action.animation });
+        break;
+
+      case "change_material": {
+        if (action.material) {
+          const zoneId = this._state.activeZoneId ?? "";
+          for (const id of this._resolveTargets(action.targetId))
+            this._bus.emit("object:updated", { id, zoneId, changes: { material: action.material } });
         }
         break;
       }
@@ -243,15 +256,36 @@ export class ScriptEngine {
         }
         break;
 
-      case "play_animation":
       case "spawn_npc":
-      case "change_material":
       case "open_door":
       case "close_door":
         // stubs — Phase 13 / future phases
         console.warn(`[ScriptEngine] action '${action.type}' not yet implemented`);
         break;
     }
+  }
+
+  /**
+   * Expand an action target into concrete entity ids. A targetId matching a
+   * GroupDef resolves to every active-zone entity tagged with that group;
+   * anything else is treated as a single entity id.
+   */
+  private _resolveTargets(targetId?: string): string[] {
+    if (!targetId) return [];
+    if (!this._state.groups.some(g => g.id === targetId)) return [targetId];
+    const zone = this._state.activeZoneId ? this._state.zones.get(this._state.activeZoneId) : undefined;
+    if (!zone) return [];
+    const ids: string[] = [];
+    const collect = (arr: { id: string; groupIds?: string[] }[]) => {
+      for (const e of arr) if (e.groupIds?.includes(targetId)) ids.push(e.id);
+    };
+    collect(zone.objects);
+    collect(zone.walls);
+    collect(zone.floors);
+    collect(zone.platforms);
+    collect(zone.stairs);
+    collect(zone.triggerVolumes ?? []);
+    return ids;
   }
 
   // ─── Flag system ──────────────────────────────────────────────────────────

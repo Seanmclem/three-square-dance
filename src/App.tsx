@@ -24,6 +24,7 @@ import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
+import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -108,10 +109,12 @@ export default function App() {
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [groups,          setGroups]           = useState<GroupDef[]>([]);
+  const [hiddenGroups,    setHiddenGroups]      = useState<Set<string>>(new Set());
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
+  const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
@@ -286,6 +289,7 @@ export default function App() {
         scriptEngine.deactivate();
       }),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
+      bus.on("overlay:fade-in", payload => setFadeState(payload)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected", payload => {
         setSelected(payload);
@@ -417,11 +421,26 @@ export default function App() {
   };
 
   const handleRemoveGroup = (id: string): void => {
+    setHiddenGroups(prev => {
+      if (!prev.has(id)) return prev;
+      busRef.current?.emit("group:visibility", { groupId: id, visible: true });
+      const next = new Set(prev); next.delete(id); return next;
+    });
     worldRef.current?.removeGroup(id);
   };
 
   const handleRenameGroup = (id: string, name: string): void => {
     worldRef.current?.updateGroup(id, name);
+  };
+
+  const handleToggleGroupVisibility = (id: string): void => {
+    setHiddenGroups(prev => {
+      const next = new Set(prev);
+      const visible = next.has(id);   // currently hidden → make visible
+      if (visible) next.delete(id); else next.add(id);
+      busRef.current?.emit("group:visibility", { groupId: id, visible });
+      return next;
+    });
   };
 
   const handleFloorChange = (level: number): void => {
@@ -1183,9 +1202,11 @@ export default function App() {
         onEditMaterials={handleRequestMaterialEdit}
         onClose={() => setLeftPanel(null)}
         groups={groups}
+        hiddenGroupIds={hiddenGroups}
         onGroupAdd={handleAddGroup}
         onGroupRemove={handleRemoveGroup}
         onGroupRename={handleRenameGroup}
+        onGroupToggleVisibility={handleToggleGroupVisibility}
         activeZoneId={activeZoneId}
         zoneScripts={zoneScripts}
         objectScripts={objectScripts}
@@ -1224,6 +1245,7 @@ export default function App() {
         onDelete={selected ? handleDelete : undefined}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         zones={zones}
+        groups={groups}
         activeZoneId={activeZoneId}
         playerSettings={worldRef.current?.world?.playerSettings}
         assets={assets}
@@ -1393,6 +1415,10 @@ SquareDance
       <DialogueOverlay
         dialogue={dialogueState}
         onClose={() => setDialogueState(null)}
+      />
+      <FadeOverlay
+        fade={fadeState}
+        onComplete={() => setFadeState(null)}
       />
     </div>
   );

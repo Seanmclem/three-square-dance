@@ -98,6 +98,9 @@ export class ZoneManager {
   // Cancellation tokens — increment on each new build; stale async results are discarded
   private readonly _platformBuildTokens = new Map<string, number>();
 
+  // Editor-only group visibility — group ids the user has hidden via the Groups panel
+  private readonly _hiddenGroups = new Set<string>();
+
   // Floor dimming state
   private _activeLevel = 0;
   private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
@@ -237,6 +240,11 @@ export class ZoneManager {
       this._bus.on("triggervolume:select", ({ zoneId, id }) => {
         this._selectedVolumeId.set(zoneId, id);
         this._refreshVolumeHighlights(zoneId);
+      }),
+      this._bus.on("group:visibility", ({ groupId, visible }) => {
+        if (visible) this._hiddenGroups.delete(groupId);
+        else this._hiddenGroups.add(groupId);
+        this._applyGroupVisibility();
       }),
       this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
       this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
@@ -404,6 +412,7 @@ export class ZoneManager {
 
     // Apply current dimming level after loading
     this._applyDimming();
+    if (this._hiddenGroups.size > 0) this._applyGroupVisibility();
   }
 
   unloadZone(zoneId: string): void {
@@ -957,6 +966,53 @@ export class ZoneManager {
       if (cMaxY < pMinY || cMinY > pMaxY) continue;
       if (cMaxZ < pMinZ || cMinZ > pMaxZ) continue;
       await this._rebuildPlatform(zoneId, platform.id);
+    }
+  }
+
+  // ── Group visibility (editor-only) ─────────────────────────────────────────
+
+  private _isHidden(groupIds: string[] | undefined): boolean {
+    return groupIds?.some(g => this._hiddenGroups.has(g)) ?? false;
+  }
+
+  /** Recompute mesh visibility for all loaded entities from the hidden-group set. */
+  private _applyGroupVisibility(): void {
+    for (const [zoneId, entry] of this._loadedZones) {
+      const zone = this._worldState.zones.get(zoneId);
+      if (!zone) continue;
+
+      for (const obj of zone.objects) {
+        const mesh = entry.objectMeshes.get(obj.id);
+        if (mesh) mesh.visible = !this._isHidden(obj.groupIds);
+      }
+
+      for (const floor of zone.floors) {
+        const hidden = this._isHidden(floor.groupIds);
+        entry.floorsGroup.traverse(child => {
+          if (child instanceof THREE.Mesh && child.userData["editorId"] === floor.id)
+            child.visible = !hidden;
+        });
+      }
+
+      for (const platform of zone.platforms) {
+        const pe = entry.platformEntries.get(platform.id);
+        if (pe) { const v = !this._isHidden(platform.groupIds); for (const m of pe.meshes) m.visible = v; }
+      }
+
+      for (const stair of zone.stairs) {
+        const se = entry.stairEntries.get(stair.id);
+        if (se) se.group.visible = !this._isHidden(stair.groupIds);
+      }
+
+      // A merged wall run spans multiple walls — hide it only when every wall in the run is hidden.
+      const seenRuns = new Set<RunEntry>();
+      for (const re of entry.wallData.values()) {
+        if (seenRuns.has(re)) continue;
+        seenRuns.add(re);
+        const hidden = re.wallIds.every(id => this._isHidden(zone.walls.find(w => w.id === id)?.groupIds));
+        re.mesh.visible = !hidden;
+        for (const tm of re.trimMeshes) tm.visible = !hidden;
+      }
     }
   }
 

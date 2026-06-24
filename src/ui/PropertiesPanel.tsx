@@ -3,6 +3,7 @@ import type {
   ToolId, SelectedObjectPayload, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
+  GroupDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -268,6 +269,7 @@ interface PropertiesPanelProps {
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
   zones?:                   ZoneDef[];
+  groups?:                  GroupDef[];
   activeZoneId?:            string | null;
   playerSettings?:          PlayerSettings;
   assets?:                  AssetDef[];
@@ -285,17 +287,18 @@ export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
-  zones = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
+  zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
+  const [groupsOpen, setGroupsOpen]   = useState(false);
   const [labelDraft, setLabelDraft]   = useState("");
   const [editingLabel, setEditingLabel] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setStack([]); setActionsOpen(true);
+    setStack([]); setActionsOpen(true); setGroupsOpen(false);
     setEditingLabel(false);
     setLabelDraft((selected?.data as { label?: string } | null)?.label ?? "");
   }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -393,7 +396,15 @@ export function PropertiesPanel({
         ) : !selected ? (
           <ToolView activeTool={activeTool} />
         ) : selected.type === "trigger-volume" ? (
-          <TriggerVolumeView selected={selected} onDelete={onDelete} onScriptsChange={onVolumeScriptsChange} />
+          <TriggerVolumeView
+            selected={selected}
+            onDelete={onDelete}
+            onScriptsChange={onVolumeScriptsChange}
+            groups={groups}
+            groupsOpen={groupsOpen}
+            onToggleGroups={() => setGroupsOpen(v => !v)}
+            onObjectUpdate={onObjectUpdate}
+          />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -404,6 +415,13 @@ export function PropertiesPanel({
                 onPress={() => push(s)}
               />
             ))}
+            <GroupsAccordion
+              open={groupsOpen}
+              onToggle={() => setGroupsOpen(v => !v)}
+              selected={selected}
+              groups={groups}
+              onObjectUpdate={onObjectUpdate}
+            />
             <ActionsAccordion
               open={actionsOpen}
               onToggle={() => setActionsOpen(v => !v)}
@@ -540,6 +558,74 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
               }}
             >Delete</button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── GroupsAccordion ───────────────────────────────────────────────────────────
+
+function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
+  open:           boolean;
+  onToggle:       () => void;
+  selected:       SelectedObjectPayload;
+  groups:         GroupDef[];
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const memberIds = (selected.data as { groupIds?: string[] } | null)?.groupIds ?? [];
+
+  const toggleGroup = (id: string): void => {
+    const next = memberIds.includes(id)
+      ? memberIds.filter(g => g !== id)
+      : [...memberIds, id];
+    onObjectUpdate({ groupIds: next });
+  };
+
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.05)" }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>
+          Groups{memberIds.length > 0 ? ` (${memberIds.length})` : ""}
+        </span>
+        <span style={{ color: "#505060", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          {groups.length === 0 ? (
+            <div style={{ color: "#505060", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5 }}>
+              No groups yet — create one in the Groups panel.
+            </div>
+          ) : groups.map(g => {
+            const checked = memberIds.includes(g.id);
+            return (
+              <button
+                key={g.id}
+                onClick={() => toggleGroup(g.id)}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
+                         background: "none", border: "none", cursor: "pointer", padding: "3px 0" }}
+              >
+                <span style={{ width: 14, height: 14, flexShrink: 0, borderRadius: 3,
+                               border: checked ? "1px solid rgba(80,140,255,0.6)" : "1px solid rgba(255,255,255,0.15)",
+                               background: checked ? "rgba(80,140,255,0.7)" : "transparent",
+                               color: "#fff", fontSize: 10, lineHeight: "13px", textAlign: "center" }}>
+                  {checked ? "✓" : ""}
+                </span>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4d6fa8", flexShrink: 0 }} />
+                <span style={{ flex: 1, color: "#b0b0c0", fontSize: 11, fontFamily: "monospace",
+                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {g.name}
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
@@ -2052,10 +2138,14 @@ function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter
   };
 }
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
+  groups:           GroupDef[];
+  groupsOpen:       boolean;
+  onToggleGroups:   () => void;
+  onObjectUpdate:   (changes: Partial<WorldObject>) => void;
 }) {
   const vol = selected.data as TriggerVolume | null;
   if (!vol) return null;
@@ -2078,6 +2168,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
   }
 
   return (
+    <>
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
@@ -2189,6 +2280,14 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange }: {
         >Delete Volume</button>
       )}
     </div>
+    <GroupsAccordion
+      open={groupsOpen}
+      onToggle={onToggleGroups}
+      selected={selected}
+      groups={groups}
+      onObjectUpdate={onObjectUpdate}
+    />
+    </>
   );
 }
 
