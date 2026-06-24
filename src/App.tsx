@@ -25,6 +25,7 @@ import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
+import { installTestHelpers } from "@/dev/testHelpers";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
@@ -189,6 +190,8 @@ export default function App() {
       g.__scene = scene.scene; g.__camera = scene.camera;
       g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
       g.__editorCamera = scene.editorCamera;
+      g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
+      installTestHelpers({ bus, world, scriptEngine, preview });
     }
 
 
@@ -290,6 +293,7 @@ export default function App() {
       }),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
       bus.on("overlay:fade-in", payload => setFadeState(payload)),
+      bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected", payload => {
         setSelected(payload);

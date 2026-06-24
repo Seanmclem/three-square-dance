@@ -37,6 +37,15 @@ in the extension popup, which Claude can't drive.)
 
 ## 2. Verifying WebGL canvas content
 
+> **Update (2026-06-24):** the two big warnings below did **not** reproduce this
+> session. `mcp__claude-in-chrome__computer` `screenshot` returned in ~1–2s and showed
+> WebGL content correctly (magenta platforms, a red `fade_screen` overlay), and emitting
+> on `window.__world._bus` *did* drive the live UI (group hide/show, fade, material swap
+> all fired). So treat the "screenshots hang" / "synthetic emits no-op" notes as
+> **intermittent / setup-dependent, not universal** — try the direct path first, fall
+> back to the workarounds if it misbehaves. (`window.__bus` is now exposed if you want the
+> exact rendered-App bus instance, removing any StrictMode ambiguity.)
+
 **`mcp__computer-use__screenshot` cannot reliably capture the WebGL canvas on
 this Mac.** On a Retina / Display P3 setup, the OS compositor screenshot shows
 the canvas as uniformly dark even when the GL drawing buffer has bright content.
@@ -97,6 +106,10 @@ this Mac, per the note above).
 | `window.__renderer` | `THREE.WebGLRenderer` | The renderer |
 | `window.__world` | `WorldState` | Zone/wall/floor data |
 | `window.__zones` | `ZoneManager` | Loaded zone entries & meshes |
+| `window.__bus` | `EventBus` | The **rendered** App's bus (use this to emit, not `__world._bus`) |
+| `window.__scriptEngine` | `ScriptEngine` | Script index + dispatch |
+| `window.__preview` | `PreviewController` | `enter("preview"\|"game")` / `exit()` |
+| `window.__test` | object | Test harness — see Section 8 |
 
 ---
 
@@ -230,3 +243,59 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
 - No browser-console errors on load or interaction.
 - StrictMode double-mount: editor still renders once, no duplicated canvases
   or leaked listeners after a hot reload.
+
+---
+
+## 8. Driving preview mode & firing scripts (`window.__test`)
+
+Scripts only run when the **ScriptEngine is active**, which happens on `preview:start`
+(`App.tsx` → `scriptEngine.activate()`). Two ways in, both via `PreviewController.enter`:
+
+| Mode | Call | Spawn | Notes |
+|---|---|---|---|
+| Preview | `__test.enterPreview()` | none needed — falls back to a floor point (`PreviewController.ts:39-47`) | walk-around test |
+| Game | `__test.enterGame()` | uses `world.world.defaultSpawn` | also fires `on_game_start` |
+
+To set a spawn for game mode without the SpawnPoint tool:
+`__world.setDefaultSpawn({ position:{x:0,y:0,z:0}, facing:0 })`.
+
+### The `__test` harness (DEV only — `src/dev/testHelpers.ts`)
+
+Installed on `window.__test`. These are the shortcuts for things that are painful to
+click from an automation tab (firing scripts, opening focus-gated panels, spawning
+entities). All synchronous — safe to call from `javascript_tool`.
+
+```js
+// Spawn throwaway entities (ids are test_*/grp_* so cleanup() finds them)
+__world.addGroup({ id: "grp_a", name: "A" });
+__test.spawnObject({ id: "test_obj", x: 0, z: -3, groupIds: ["grp_a"] });
+__test.spawnPlatform({ id: "test_plat", x: 3 });
+
+// Fire script actions through the REAL dispatch (incl. _resolveTargets group expansion),
+// no preview needed:
+__test.runAction({ type: "despawn_object",  targetId: "grp_a" });               // hides all members
+__test.runAction({ type: "move_object",     targetId: "test_obj", position:{x:5,y:0,z:0} });
+__test.runAction({ type: "change_material", targetId: "test_obj", material: "brick" });
+
+// Fire a trigger through the index (after entering preview + authoring a script):
+__test.enterGame();
+__test.fire("on_game_start");
+__test.fire("on_interact", "test_obj");
+
+__test.openPanel("groups");   // reliable replacement for the focus-gated `z` hotkey
+__test.exitPreview();
+__test.cleanup();             // remove all test_*/grp_* entities + groups
+```
+
+### Persisted vs runtime (important when validating script actions)
+
+Script actions emit raw bus events and **never** touch `WorldState`, so they affect only
+the live Three.js scene — `__world.toJSON()` is unchanged and a zone reload reverts them.
+This is by design. To verify a script effect, **read the mesh**, not the JSON:
+
+```js
+// e.g. confirm despawn hid the member but not a non-member
+let vis = {}; __scene.traverse(o => { if (o.userData?.editorId) vis[o.userData.editorId] ??= o.visible; });
+```
+
+Editor edits, by contrast, go through `WorldState.updateObject` → persisted + undoable.

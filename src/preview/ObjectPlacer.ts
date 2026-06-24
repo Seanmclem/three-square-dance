@@ -26,6 +26,15 @@ export class ObjectPlacer {
     this._bus.on("object:play-animation", ({ id, clipName }) => this.previewClip(id, clipName));
     this._bus.on("object:updated", ({ id, changes }) => {
       if (changes.material) void this._applyMaterial(id, changes.material);
+      // move_object (and editor transform edits): apply to the live mesh for any object,
+      // not just the selected one. Script edits are runtime-only (data untouched).
+      if (changes.position || changes.rotation || changes.scale) this._applyTransformChanges(id, changes);
+    });
+    // despawn_object: runtime-only hide. A zone reload restores it (data is untouched).
+    this._bus.on("object:despawn", ({ id }) => {
+      const mesh = this._meshes.get(id);
+      if (mesh) mesh.visible = false;
+      this._mixers.get(id)?.stopAllAction();
     });
   }
 
@@ -154,6 +163,16 @@ export class ObjectPlacer {
         (child.userData as { _ownsMaterial?: boolean })._ownsMaterial = false;
       }
     });
+  }
+
+  /** Apply a partial transform change (degrees for rotation) to a placed object's mesh. */
+  private _applyTransformChanges(objectId: string, changes: Partial<WorldObject>): void {
+    const mesh = this._meshes.get(objectId);
+    if (!mesh) return;
+    const DEG2RAD = Math.PI / 180;
+    if (changes.position) mesh.position.set(changes.position.x, changes.position.y, changes.position.z);
+    if (changes.rotation) mesh.rotation.set(changes.rotation.x * DEG2RAD, changes.rotation.y * DEG2RAD, changes.rotation.z * DEG2RAD);
+    if (changes.scale)    mesh.scale.set(changes.scale.x, changes.scale.y, changes.scale.z);
   }
 
   private _applyTransform(mesh: THREE.Object3D, obj: WorldObject, zoneId: string): void {
