@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type {
   ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
   TriggerType, ActionType, ConditionType,
-  TriggerVolume, WorldObject, GroupDef,
+  TriggerVolume, WorldObject, GroupDef, AssetDef,
 } from "@/types";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -83,6 +83,7 @@ export interface ScriptPanelProps {
   triggerVolumes:  TriggerVolume[];
   zoneObjects:     WorldObject[];
   groups:          GroupDef[];
+  assets:          AssetDef[];
   onZoneScriptsChange:    (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:  (objectId: string, scripts: ScriptDef[]) => void;
 }
@@ -93,7 +94,7 @@ type TabId = "level" | "object";
 
 export function ScriptPanel({
   zoneScripts, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects, groups,
+  activeZoneId, triggerVolumes, zoneObjects, groups, assets,
   onZoneScriptsChange, onObjectScriptsChange,
 }: ScriptPanelProps) {
   const [tab,       setTab]       = useState<TabId>("level");
@@ -167,6 +168,7 @@ export function ScriptPanel({
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
           groups={groups}
+          assets={assets}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -237,11 +239,12 @@ function ScriptList({ scripts, onSelect, onToggle, onAdd }: {
 
 // ── ScriptEditor ──────────────────────────────────────────────────────────────
 
-function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
+function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
   script:           ScriptDef;
   triggerVolumes:   TriggerVolume[];
   zoneObjects:      WorldObject[];
   groups:           GroupDef[];
+  assets:           AssetDef[];
   ownerIsEntity:    boolean;
   selectedObjectId: string | null;
   onBack:   () => void;
@@ -395,6 +398,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, ownerIsEnti
               action={a}
               zoneObjects={zoneObjects}
               groups={groups}
+              assets={assets}
               onChange={na => set("actions", script.actions.map((x, j) => j === i ? na : x))}
               onRemove={() => set("actions", script.actions.filter((_, j) => j !== i))}
             />
@@ -530,10 +534,11 @@ function ConditionRow({ condition, onChange, onRemove }: {
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
 
-function ActionRow({ action, zoneObjects, groups, onChange, onRemove }: {
+function ActionRow({ action, zoneObjects, groups, assets, onChange, onRemove }: {
   action:      ScriptAction;
   zoneObjects: WorldObject[];
   groups:      GroupDef[];
+  assets:      AssetDef[];
   onChange:    (a: ScriptAction) => void;
   onRemove:    () => void;
 }) {
@@ -550,15 +555,16 @@ function ActionRow({ action, zoneObjects, groups, onChange, onRemove }: {
         </select>
         <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
       </div>
-      <ActionFields action={action} zoneObjects={zoneObjects} groups={groups} onChange={onChange} />
+      <ActionFields action={action} zoneObjects={zoneObjects} groups={groups} assets={assets} onChange={onChange} />
     </div>
   );
 }
 
-function ActionFields({ action, zoneObjects, groups, onChange }: {
+function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
   action:      ScriptAction;
   zoneObjects: WorldObject[];
   groups:      GroupDef[];
+  assets:      AssetDef[];
   onChange:    (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void { onChange({ ...action, ...changes }); }
@@ -566,6 +572,9 @@ function ActionFields({ action, zoneObjects, groups, onChange }: {
     <ActionTargetPicker targetId={action.targetId ?? ""} zoneObjects={zoneObjects} groups={groups}
       onChange={id => set({ targetId: id })} />
   );
+  // Clips available on the action's target object (empty for groups / unknown / no-anim assets).
+  const targetObj  = zoneObjects.find(o => o.id === action.targetId);
+  const targetClips = assets.find(a => a.id === targetObj?.assetId)?.animations ?? [];
 
   switch (action.type) {
     case "show_dialogue":
@@ -638,16 +647,26 @@ function ActionFields({ action, zoneObjects, groups, onChange }: {
         </div>
       );
 
-    case "play_animation":
+    case "play_animation": {
+      const clipKnown = targetClips.includes(action.animation ?? "");
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {targetPicker}
-          <input style={S.field} placeholder="Clip name"
-            value={action.animation ?? ""}
-            onChange={e => set({ animation: e.target.value })}
-          />
+          {targetClips.length > 0 ? (
+            <select style={S.select} value={action.animation ?? ""} onChange={e => set({ animation: e.target.value })}>
+              <option value="">— pick clip —</option>
+              {targetClips.map(c => <option key={c} value={c}>{c}</option>)}
+              {action.animation && !clipKnown && <option value={action.animation}>{action.animation} (custom)</option>}
+            </select>
+          ) : (
+            <input style={S.field} placeholder={targetObj ? "Clip name (no clips found on asset)" : "Clip name (pick an object target for a list)"}
+              value={action.animation ?? ""}
+              onChange={e => set({ animation: e.target.value })}
+            />
+          )}
         </div>
       );
+    }
 
     case "change_material":
       return (
