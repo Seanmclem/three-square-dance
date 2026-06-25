@@ -449,7 +449,10 @@ export class GizmoManager implements IEditorModule {
   }
 
   private _onDragEnd(): void {
-    if (!this._selId || !this._selZoneId || !this._selType) return;
+    // Spawn is world-level (zoneId is ""), so don't require _selZoneId for it —
+    // otherwise the falsy empty-string zoneId skips the commit and the move is lost.
+    if (!this._selId || !this._selType) return;
+    if (this._selType !== "spawn" && !this._selZoneId) return;
     const mode = this._controls?.getMode() ?? "translate";
 
     if (mode === "translate") {
@@ -528,14 +531,13 @@ export class GizmoManager implements IEditorModule {
         if (delta.lengthSq() < 1e-6) break;
         const spawn = this._worldState.world?.defaultSpawn;
         if (!spawn) break;
-        this._worldState.setDefaultSpawn({
-          ...spawn,
-          position: {
-            x: spawn.position.x + delta.x,
-            y: spawn.position.y + delta.y,
-            z: spawn.position.z + delta.z,
-          },
-        });
+        const position = {
+          x: spawn.position.x + delta.x,
+          y: spawn.position.y + delta.y,
+          z: spawn.position.z + delta.z,
+        };
+        this._worldState.setDefaultSpawn({ ...spawn, position });
+        this._bus.emit("spawn:updated", { position });
         break;
       }
       case "floor": {
