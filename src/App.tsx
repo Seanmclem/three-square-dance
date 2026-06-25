@@ -191,6 +191,7 @@ export default function App() {
       g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
       g.__editorCamera = scene.editorCamera;
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
+      g.__objectPlacer = objectPlacer;
       installTestHelpers({ bus, world, scriptEngine, preview });
     }
 

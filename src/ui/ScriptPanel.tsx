@@ -117,10 +117,10 @@ export function ScriptPanel({
   }
 
   function addScript(): void {
+    // Leave trigger.targetId unset — ScriptEngine.loadZone derives it per trigger type
+    // (on_interact → this object; target-less triggers stay wildcard). Stamping the object id
+    // onto the default on_game_start trigger here mis-keys it so it never fires.
     const s = blankScript(currentZoneId);
-    if (tab === "object" && selectedObjectId) {
-      s.trigger.targetId = selectedObjectId;
-    }
     const next = [...currentScripts, s];
     save(next);
     setEditingId(s.id);

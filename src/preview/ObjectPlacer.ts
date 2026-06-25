@@ -98,7 +98,14 @@ export class ObjectPlacer {
     if (this._previewingId) this.stopPreview(this._previewingId);
     const mixer = this._mixers.get(objectId);
     const clip  = this._clips.get(objectId)?.get(clipName);
-    if (!mixer || !clip) return;
+    if (!mixer || !clip) {
+      console.warn(
+        `ObjectPlacer.previewClip: nothing to play for object "${objectId}", clip "${clipName}" — ` +
+        `${!mixer ? "no mixer (object has no animation clips)" : "clip name not found"}. ` +
+        `Available: [${[...(this._clips.get(objectId)?.keys() ?? [])].join(", ")}]`,
+      );
+      return;
+    }
 
     this._previewingId = objectId;
     mixer.stopAllAction();

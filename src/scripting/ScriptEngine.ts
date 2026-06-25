@@ -64,7 +64,20 @@ export class ScriptEngine {
   loadZone(zone: ZoneDef): void {
     for (const s of zone.scripts ?? []) this._indexScript(s);
     for (const obj of zone.objects) {
-      for (const s of obj.scripts ?? []) this._indexScript(s);
+      for (const s of obj.scripts ?? []) {
+        // Normalise the per-object trigger target so the index key matches what fire() looks up:
+        //  - on_interact's target is always the owning object → key on_interact:<objId>
+        //  - target-less triggers (on_game_start/on_timer/on_level_load/…) fire with null and
+        //    must key to the wildcard; an old ScriptPanel set targetId = objId on these, which
+        //    mis-keys them so they never fire — strip that stale id.
+        let trig = s.trigger;
+        if (trig.type === "on_interact") {
+          trig = { ...trig, targetId: obj.id };
+        } else if (trig.targetId === obj.id) {
+          trig = { ...trig, targetId: undefined };
+        }
+        this._indexScript(trig === s.trigger ? s : { ...s, trigger: trig });
+      }
     }
     for (const vol of zone.triggerVolumes ?? []) {
       for (const s of vol.scripts ?? []) {
