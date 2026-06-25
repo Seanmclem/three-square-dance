@@ -104,6 +104,11 @@ export class GizmoManager implements IEditorModule {
       this._bus.on("triggervolume:updated", ({ zoneId, id }) => {
         if (id === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
       }),
+      // Spawn has no rebuild event; re-seed the pivot after each commit so repeated
+      // rotations don't accumulate stale pivot/tracked-mesh state. (zoneId is "" for spawn.)
+      this._bus.on("spawn:updated", () => {
+        if (this._selType === "spawn" && this._selId === "__spawn__") this._reattachMeshes();
+      }),
 
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._controls || this._selId === null) return;
@@ -377,6 +382,13 @@ export class GizmoManager implements IEditorModule {
       if (vol) {
         this._pivot.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
         this._pivot.rotation.set(0, vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0, 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
+    } else if (type === "spawn") {
+      const s = this._worldState.world?.defaultSpawn;
+      if (s) {
+        this._pivot.position.set(s.position.x, s.position.y + 0.3, s.position.z);
+        this._pivot.rotation.set(0, THREE.MathUtils.degToRad(s.facingDeg ?? 0), 0);
         this._pivotStart.copy(this._pivot.position);
       }
     }
