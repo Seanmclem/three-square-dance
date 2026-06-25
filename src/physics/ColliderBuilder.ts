@@ -103,6 +103,8 @@ export class ColliderBuilder {
   static registerVolumeSensor(vol: TriggerVolume): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2)
       .setTranslation(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
+    if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
     return physicsWorld.createSensorCollider(desc);
   }
 

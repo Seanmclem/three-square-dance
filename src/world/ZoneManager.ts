@@ -1091,6 +1091,7 @@ export class ZoneManager {
     const mat = new THREE.LineBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.8 });
     const wire = new THREE.LineSegments(geo, mat);
     wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false };
     group.add(wire);
     const arr = this._volumeMeshes.get(zoneId) ?? [];

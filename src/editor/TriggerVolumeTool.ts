@@ -101,7 +101,7 @@ export class TriggerVolumeTool {
             type:     "trigger-volume",
             zoneId:   this._activeZoneId,
             position: vol.position,
-            rotation: ZERO_ROT,
+            rotation: vol.rotation ?? ZERO_ROT,
             scale:    UNIT_SCL,
             data:     vol,
           });
@@ -163,7 +163,19 @@ export class TriggerVolumeTool {
         new THREE.Vector3(vol.position.x - vol.size.x / 2, vol.position.y,                vol.position.z - vol.size.z / 2),
         new THREE.Vector3(vol.position.x + vol.size.x / 2, vol.position.y + vol.size.y,  vol.position.z + vol.size.z / 2),
       );
-      if (this._raycaster.ray.intersectBox(box, target)) return vol;
+      const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
+      let ray = this._raycaster.ray;
+      if (angle) {
+        // Inverse-rotate the ray about the volume's vertical axis so the test runs in the
+        // box's local (unrotated) frame — an OBB hit-test without building OBB math.
+        const m = new THREE.Matrix4()
+          .makeTranslation(vol.position.x, 0, vol.position.z)
+          .multiply(new THREE.Matrix4().makeRotationY(angle))
+          .multiply(new THREE.Matrix4().makeTranslation(-vol.position.x, 0, -vol.position.z))
+          .invert();
+        ray = this._raycaster.ray.clone().applyMatrix4(m);
+      }
+      if (ray.intersectBox(box, target)) return vol;
     }
     return undefined;
   }

@@ -577,6 +577,7 @@ export interface TriggerVolume {
   label:    string;
   position: Vec3;
   size:     Vec3;
+  rotation?: Vec3;   // degrees, Y = yaw — applied to wireframe + sensor (axis-aligned when absent)
   zoneId:    string;
   scripts?:  ScriptDef[];
   groupIds?: string[];

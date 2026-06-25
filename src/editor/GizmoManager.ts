@@ -220,6 +220,7 @@ export class GizmoManager implements IEditorModule {
         px = vol.position.x;
         py = vol.position.y + vol.size.y / 2;
         pz = vol.position.z;
+        rotY = vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0;
       }
     }
 
@@ -373,7 +374,7 @@ export class GizmoManager implements IEditorModule {
       const vol  = zone?.triggerVolumes?.find(v => v.id === this._selId);
       if (vol) {
         this._pivot.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
-        this._pivot.rotation.set(0, 0, 0);
+        this._pivot.rotation.set(0, vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0, 0);
         this._pivotStart.copy(this._pivot.position);
       }
     }
@@ -697,6 +698,15 @@ export class GizmoManager implements IEditorModule {
             y: DEG(mesh.rotation.y),
             z: DEG(mesh.rotation.z),
           },
+        });
+        break;
+      }
+      case "trigger-volume": {
+        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        // Store absolute yaw (degrees) — applied by ZoneManager's wireframe + the Rapier sensor.
+        const rotY = THREE.MathUtils.radToDeg(this._pivotYaw());
+        this._worldState.updateTriggerVolume(this._selZoneId!, this._selId!, {
+          rotation: { x: 0, y: rotY, z: 0 },
         });
         break;
       }
