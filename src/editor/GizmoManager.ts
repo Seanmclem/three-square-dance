@@ -108,7 +108,7 @@ export class GizmoManager implements IEditorModule {
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._controls || this._selId === null) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }

@@ -2202,6 +2202,17 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
           ))}
         </div>
       </div>
+      <div>
+        <div style={LABEL}>ROTATION (Y°)</div>
+        <input
+          type="number"
+          key={vol.id + "-roty"}
+          defaultValue={vol.rotation?.y ?? 0}
+          style={NUM_INPUT}
+          onBlur={e => onObjectUpdate({ rotation: { x: 0, y: parseFloat(e.target.value) || 0, z: 0 } } as Partial<WorldObject>)}
+          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        />
+      </div>
 
       {/* Scripts section */}
       <div>
