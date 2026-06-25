@@ -49,7 +49,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         return (
           <button
             key={tool.id}
-            title={`${tool.label} (${tool.shortcut})`}
+            title={tool.label}
             onClick={() => onToolSelect(tool.id)}
             style={{
               width: 48, height: 48, border: "none", cursor: "pointer",
@@ -63,8 +63,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
           >
             <Icon color={color} />
-            <span style={{ fontSize: 8, letterSpacing: 0.8, color, opacity: 0.7, fontFamily: "monospace" }}>
-              {tool.shortcut}
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+                           textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
+              {tool.label}
             </span>
           </button>
         );
