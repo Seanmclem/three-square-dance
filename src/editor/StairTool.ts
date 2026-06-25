@@ -152,7 +152,7 @@ export class StairTool implements IEditorModule {
       hasRailing: this._hasRailing,
     };
 
-    this._history.record("add stair", () => {
+    this._world.transaction("add stair", () => {
       this._world.addStair(this._activeZoneId, stair);
       this._bus.emit("tool:placed", { type: "stair", id: stair.id, zoneId: this._activeZoneId });
     });

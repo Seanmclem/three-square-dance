@@ -317,21 +317,21 @@ export class OpeningDragHandler implements IEditorModule {
 
     if (newWallId !== drag.origWallId) {
       // Opening migrated to a different wall segment
-      this._history.beginBatch("move opening");
+      this._world.beginTransaction("move opening");
       this._world.removeOpening(drag.zoneId, drag.origWallId, drag.openingId);
       this._world.addOpening(drag.zoneId, newWallId, {
         ...drag.opening,
         offsetAlongWall: newOffset,
         elevation:       newElev,
       });
-      this._history.commitBatch();
+      this._world.commitTransaction();
       // SelectionManager will handle re-selection via the wall:rebuilt chain.
       // Deselect here so there's no stale selection on the old wall while rebuilding.
       this._bus.emit("object:deselected", {});
     } else {
       // Same wall — updateOpening triggers wall:updated → ZoneManager rebuild →
       // wall:rebuilt → SelectionManager re-emits object:selected automatically.
-      this._history.record("move opening", () => {
+      this._world.transaction("move opening", () => {
         this._world.updateOpening(drag.zoneId, drag.origWallId, drag.openingId, {
           offsetAlongWall: newOffset,
           elevation:       newElev,

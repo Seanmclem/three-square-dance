@@ -143,7 +143,7 @@ export class PolygonFloorTool {
     const elevation = this._activeLevel * 3.0;
     const pts = [...this._points];
 
-    this._history.record("add floor", () => {
+    this._world.transaction("add floor", () => {
       const nodes: WallNode[] = pts.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
       for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 

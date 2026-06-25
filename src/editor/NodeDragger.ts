@@ -298,6 +298,7 @@ export class NodeDragger {
       this._dragNodeId  = this._hoveredNodeId;
       this._dragOrigPos = { x: node.x, z: node.z };
       this._state       = "DRAG";
+      this._world.beginTransaction("move node");
       this._bus.emit("gizmo:dragging", { isDragging: true });
       const dot = this._nodeDots.get(this._dragNodeId);
       if (dot) {
@@ -320,6 +321,7 @@ export class NodeDragger {
       const { x: esx, z: esz } = this._projectRayToY(this._lastRawPos.x, this._lastRawPos.z, edge.y);
       this._dragEdgeStart = { x: esx, z: esz };
       this._state         = "DRAG";
+      this._world.beginTransaction("move edge");
       this._bus.emit("gizmo:dragging", { isDragging: true });
       document.body.style.cursor = "grabbing";
     }
@@ -327,6 +329,7 @@ export class NodeDragger {
 
   private _onMouseUp(): void {
     if (this._state !== "DRAG") return;
+    this._world.commitTransaction();  // the live updateNode calls collapse into one undo step
     this._endDrag();
   }
 
@@ -355,6 +358,7 @@ export class NodeDragger {
       }
     }
 
+    this._world.abortTransaction();  // reverted above — discard the journal, no undo entry
     this._endDrag();
   }
 

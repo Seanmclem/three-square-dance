@@ -155,8 +155,9 @@ export default function App() {
     objectPlacerRef.current = objectPlacer;
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer);
     zonesRef.current = zones;
-    const history   = new HistoryManager(world, bus);
+    const history   = new HistoryManager(world);
     historyRef.current = history;
+    world.setHistory(history);
     bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
     bus.on("scene:loaded",  () => { history.clear(); syncHistory(); });
 
@@ -191,7 +192,7 @@ export default function App() {
       g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
       g.__editorCamera = scene.editorCamera;
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
-      g.__objectPlacer = objectPlacer;
+      g.__objectPlacer = objectPlacer; g.__history = history;
       installTestHelpers({ bus, world, scriptEngine, preview });
     }
 
@@ -422,7 +423,7 @@ export default function App() {
   const handleAddGroup = (): void => {
     const world = worldRef.current;
     if (!world) return;
-    world.addGroup({ id: crypto.randomUUID(), name: "New Group" });
+    world.transaction("add group", () => world.addGroup({ id: crypto.randomUUID(), name: "New Group" }));
   };
 
   const handleRemoveGroup = (id: string): void => {
@@ -431,11 +432,11 @@ export default function App() {
       busRef.current?.emit("group:visibility", { groupId: id, visible: true });
       const next = new Set(prev); next.delete(id); return next;
     });
-    worldRef.current?.removeGroup(id);
+    worldRef.current?.transaction("delete group", () => worldRef.current?.removeGroup(id));
   };
 
   const handleRenameGroup = (id: string, name: string): void => {
-    worldRef.current?.updateGroup(id, name);
+    worldRef.current?.transaction("rename group", () => worldRef.current?.updateGroup(id, name));
   };
 
   const handleToggleGroupVisibility = (id: string): void => {
@@ -573,7 +574,7 @@ export default function App() {
   const handlePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
     const world = worldRef.current;
     if (!world?.world) return;
-    historyRef.current?.record("update player settings", () => {
+    worldRef.current?.transaction("update player settings", () => {
       Object.assign(world.world!.playerSettings, changes);
     });
     syncHistory();
@@ -583,7 +584,7 @@ export default function App() {
     const world = worldRef.current;
     if (!world?.world?.defaultSpawn) return;
     const spawn = world.world.defaultSpawn;
-    historyRef.current?.record("move spawn point", () => {
+    worldRef.current?.transaction("move spawn point", () => {
       world.setDefaultSpawn({ ...spawn, position: pos });
     });
     busRef.current.emit("spawn:updated", { position: pos });
@@ -637,7 +638,7 @@ export default function App() {
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
-    historyRef.current?.record("update wall segment", () => {
+    worldRef.current?.transaction("update wall segment", () => {
       worldRef.current?.updateWallSegment(selected.zoneId, wallId, changes);
     });
     syncHistory();
@@ -665,7 +666,7 @@ export default function App() {
     const wallHeight = (selected.data as WallDef)?.height ?? 3.0;
     const targetElevation =
       zone.floors.find(f => f.level === targetLevel)?.elevation ?? targetLevel * wallHeight;
-    historyRef.current?.beginBatch("copy walls to floor");
+    worldRef.current?.beginTransaction("copy walls to floor");
     const nodeMap = new Map<string, string>();
     for (const w of walls) {
       for (const oldId of [w.startNodeId, w.endNodeId]) {
@@ -688,7 +689,7 @@ export default function App() {
         openings:    [],
       });
     }
-    historyRef.current?.commitBatch();
+    worldRef.current?.commitTransaction();
     syncHistory();
   };
 
@@ -710,7 +711,7 @@ export default function App() {
       const n = zone.nodes.find(nn => nn.id === id);
       return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
     });
-    historyRef.current?.record("fill run with floor", () => {
+    worldRef.current?.transaction("fill run with floor", () => {
       world.addFloor(selected.zoneId, {
         id:            crypto.randomUUID(),
         level,
@@ -736,7 +737,7 @@ export default function App() {
     if (!selected || !world) return;
     const { type, id, zoneId } = selected;
 
-    history?.beginBatch(`delete ${type}`);
+    worldRef.current?.beginTransaction(`delete ${type}`);
     if (type === "wall") {
       const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
       const nodeIds = new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]));
@@ -752,7 +753,7 @@ export default function App() {
       const obj = world.zones.get(zoneId)?.objects.find(o => o.id === id);
       if (obj?.scripts?.length) {
         setDeletePrompt({ type: "object", id, zoneId, scripts: obj.scripts });
-        history?.cancelBatch();
+        worldRef.current?.abortTransaction();
         return;
       }
       world.removeObject(zoneId, id);
@@ -760,7 +761,7 @@ export default function App() {
       const vol = world.zones.get(zoneId)?.triggerVolumes?.find(v => v.id === id);
       if (vol?.scripts?.length) {
         setDeletePrompt({ type: "volume", id, zoneId, scripts: vol.scripts });
-        history?.cancelBatch();
+        worldRef.current?.abortTransaction();
         return;
       }
       world.removeTriggerVolume(zoneId, id);
@@ -768,10 +769,10 @@ export default function App() {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
       const wall = zone?.walls.find(w => w.id === wallId);
-      if (!wall) { history?.cancelBatch(); return; }
+      if (!wall) { worldRef.current?.abortTransaction(); return; }
       world.updateWall(zoneId, wallId, { openings: wall.openings.filter(o => o.id !== id) });
     }
-    history?.commitBatch();
+    worldRef.current?.commitTransaction();
     syncHistory();
     setSelected(null);
     busRef.current.emit("object:deselected", {});
@@ -1041,7 +1042,7 @@ export default function App() {
         }
       }
       const fullChanges = { ...openingChanges, ...extra };
-      history?.record("update opening", () => {
+      worldRef.current?.transaction("update opening", () => {
         worldRef.current?.updateOpening(selected.zoneId, wallId, selected.id, fullChanges);
       });
       syncHistory();
@@ -1051,13 +1052,13 @@ export default function App() {
       if (wallChanges.floor !== undefined) {
         // Floor level applies to every wall in the run.
         const runWalls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
-        history?.beginBatch("update wall floor");
+        worldRef.current?.beginTransaction("update wall floor");
         runWalls.forEach(w => {
           worldRef.current?.updateWall(selected.zoneId, w.id, { floor: wallChanges.floor });
         });
-        history?.commitBatch();
+        worldRef.current?.commitTransaction();
       } else {
-        history?.record("update wall", () => {
+        worldRef.current?.transaction("update wall", () => {
           worldRef.current?.updateWall(selected.zoneId, selected.id, wallChanges);
         });
       }
@@ -1074,7 +1075,7 @@ export default function App() {
     } else if (selected.type === "floor") {
       const floorDef = selected.data as FloorDef;
       const floorChanges = changes as unknown as Partial<FloorDef>;
-      history?.record("update floor", () => {
+      worldRef.current?.transaction("update floor", () => {
         worldRef.current?.updateFloor(selected.zoneId, floorDef.id, floorChanges);
       });
       syncHistory();
@@ -1094,27 +1095,27 @@ export default function App() {
       });
     } else if (selected.type === "platform") {
       const platChanges = changes as unknown as Partial<PlatformDef>;
-      history?.record("update platform", () => {
+      worldRef.current?.transaction("update platform", () => {
         worldRef.current?.updatePlatform(selected.zoneId, selected.id, platChanges);
       });
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as PlatformDef), ...platChanges } } : null);
     } else if (selected.type === "stair") {
       const stairChanges = changes as unknown as Partial<StairDef>;
-      history?.record("update stair", () => {
+      worldRef.current?.transaction("update stair", () => {
         worldRef.current?.updateStair(selected.zoneId, selected.id, stairChanges);
       });
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
     } else if (selected.type === "trigger-volume") {
       const volChanges = changes as unknown as Partial<TriggerVolume>;
-      history?.record("update trigger volume", () => {
+      worldRef.current?.transaction("update trigger volume", () => {
         worldRef.current?.updateTriggerVolume(selected.zoneId, selected.id, volChanges);
       });
       syncHistory();
     } else {
       const action = changes.properties !== undefined ? "update object properties" : "update object transform";
-      historyRef.current?.record(action, () => {
+      worldRef.current?.transaction(action, () => {
         worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
       });
       syncHistory();
@@ -1134,11 +1135,11 @@ export default function App() {
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
-      historyRef.current?.record("update volume scripts", () => {
+      worldRef.current?.transaction("update volume scripts", () => {
         worldRef.current?.updateTriggerVolume(selected.zoneId, objectId, { scripts });
       });
     } else {
-      historyRef.current?.record("update object scripts", () => {
+      worldRef.current?.transaction("update object scripts", () => {
         worldRef.current?.updateObject(selected.zoneId, objectId, { scripts });
       });
     }
@@ -1152,7 +1153,7 @@ export default function App() {
     const { type, id, zoneId, scripts } = prompt;
     const world = worldRef.current;
     if (!world) return;
-    historyRef.current?.record(`delete ${type}`, () => {
+    worldRef.current?.transaction(`delete ${type}`, () => {
       if (keepScripts) {
         const zone = world.zones.get(zoneId)!;
         zone.scripts = [...(zone.scripts ?? []), ...scripts];
@@ -1293,7 +1294,7 @@ export default function App() {
               const { zoneId, level, points, nodeIds } = autoFloorPrompt;
               const zone = worldRef.current?.zones.get(zoneId);
               const elevation = zone?.floors.find(f => f.level === level)?.elevation ?? level * 3.0;
-              historyRef.current?.record("auto-fill floor", () => {
+              worldRef.current?.transaction("auto-fill floor", () => {
                 worldRef.current?.addFloor(zoneId, {
                   id:            crypto.randomUUID(),
                   level,

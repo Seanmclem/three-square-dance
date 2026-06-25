@@ -142,7 +142,7 @@ export class TriggerVolumeTool {
           const zoneId = this._activeZoneId;
           this._clearSelect();
           this._bus.emit("object:deselected", {});
-          this._history.record("delete trigger volume", () => {
+          this._world.transaction("delete trigger volume", () => {
             this._world.removeTriggerVolume(zoneId, id);
           });
         }
@@ -240,7 +240,7 @@ export class TriggerVolumeTool {
       size:     { x: w, y: this._height, z: d },
       zoneId:   this._activeZoneId,
     };
-    this._history.record("place trigger volume", () => {
+    this._world.transaction("place trigger volume", () => {
       this._world.addTriggerVolume(this._activeZoneId, vol);
     });
     this._reset();

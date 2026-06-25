@@ -475,13 +475,16 @@ export class GizmoManager implements IEditorModule {
     if (this._selType !== "spawn" && !this._selZoneId) return;
     const mode = this._controls?.getMode() ?? "translate";
 
-    if (mode === "translate") {
-      this._commitTranslate();
-    } else if (mode === "rotate") {
-      this._commitRotate();
-    } else if (mode === "scale") {
-      this._commitScale();
-    }
+    // One undo step per gesture — covers multi-entity commits (wall-run nodes, copy-to-floor).
+    this._worldState.transaction(`${mode} ${this._selType}`, () => {
+      if (mode === "translate") {
+        this._commitTranslate();
+      } else if (mode === "rotate") {
+        this._commitRotate();
+      } else if (mode === "scale") {
+        this._commitScale();
+      }
+    });
   }
 
   private _commitTranslate(): void {

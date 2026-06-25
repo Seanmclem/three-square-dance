@@ -240,7 +240,7 @@ export class WallTool {
     let endNodeId!: string;
     let isLoopClose = false;
 
-    this._history.beginBatch("add wall");
+    this._world.beginTransaction("add wall");
     const { nodeId } = this._getOrCreateNode(epSnapped.x, epSnapped.z);
     endNodeId   = nodeId;
     isLoopClose = endNodeId === this._chainStartNodeId;
@@ -259,7 +259,7 @@ export class WallTool {
     };
 
     this._world.addWall(this._activeZoneId, wall);
-    this._history.commitBatch();
+    this._world.commitTransaction();
 
     this._lastWallId = wall.id;
     this._chainNodeIds.push(endNodeId);

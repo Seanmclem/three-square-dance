@@ -148,7 +148,7 @@ export class ObjectTool implements IEditorModule {
       },
     };
 
-    this._history.record("add object", () => {
+    this._world.transaction("add object", () => {
       this._world.addObject(this._activeZoneId, obj);
       this._bus.emit("tool:placed", { type: "object", id: obj.id, zoneId: this._activeZoneId });
     });

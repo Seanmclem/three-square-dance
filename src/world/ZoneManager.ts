@@ -158,8 +158,9 @@ export class ZoneManager {
               if (changes.materialOverrides !== undefined) sync.materialOverrides = changes.materialOverrides;
               for (const id of re.wallIds) {
                 if (id === wallId) continue;
-                const wall = zone.walls.find(w => w.id === id);
-                if (wall) Object.assign(wall, sync);
+                // Route through updateWallSegment (segmentOnly) so the run-mate edit is
+                // captured by the open undo transaction; segmentOnly skips re-syncing here.
+                if (zone.walls.some(w => w.id === id)) this._worldState.updateWallSegment(zoneId, id, sync);
               }
             }
           }

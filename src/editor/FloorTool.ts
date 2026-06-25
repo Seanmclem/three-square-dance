@@ -120,7 +120,7 @@ export class FloorTool {
       { x: minX,     z: minZ + d },
     ];
 
-    this._history.record("add floor", () => {
+    this._world.transaction("add floor", () => {
       const nodes: WallNode[] = corners.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
       for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 

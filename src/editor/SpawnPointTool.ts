@@ -95,7 +95,9 @@ export class SpawnPointTool {
     this._marker = group;
 
     if (persist) {
-      this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg });
+      this._world.transaction("place spawn point", () => {
+        this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg });
+      });
     }
   }
 

@@ -158,7 +158,7 @@ export class PolygonPlatformTool {
 
     const pts = [...this._points];
 
-    this._history.beginBatch("add platform");
+    this._world.beginTransaction("add platform");
     const nodes: WallNode[] = pts.map(p => ({ id: crypto.randomUUID(), x: p.x, z: p.z }));
     for (const node of nodes) this._world.addNode(this._activeZoneId, node);
 
@@ -177,7 +177,7 @@ export class PolygonPlatformTool {
 
     this._world.addPlatform(this._activeZoneId, platform);
     this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
-    this._history.commitBatch();
+    this._world.commitTransaction();
     this._reset();
   }
 

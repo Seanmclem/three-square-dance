@@ -139,7 +139,7 @@ export class PlatformTool implements IEditorModule {
       floorLevel:    this._activeLevel,
     };
 
-    this._history.record("add platform", () => {
+    this._world.transaction("add platform", () => {
       this._world.addPlatform(this._activeZoneId, platform);
       this._bus.emit("tool:placed", { type: "platform", id: platform.id, zoneId: this._activeZoneId });
     });
