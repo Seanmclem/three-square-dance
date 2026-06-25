@@ -76,13 +76,51 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 6. **Leave preview** to reset — runtime script effects revert (the saved level is
    untouched).
 
-### Quick smoke test (despawn via a group)
+### Do I need a trigger volume?
 
-1. Place two objects; create a group in the Groups panel; assign **both** to it
-   (Properties → **Groups** accordion → check the group).
-2. LEVEL tab → new script, trigger `on_game_start`, action `despawn_object`,
-   Target = the group (under the **Groups** heading in the dropdown).
-3. **Start Game** → both objects vanish. Leave preview → they're back.
+**Only for scenario C** below (`on_player_enter` / `on_player_exit`). `on_game_start`,
+`on_interact`, and `on_timer` do **not** use one.
+
+---
+
+### Scenario A — `on_game_start`, no trigger volume (despawn a group)
+
+1. Place two objects (drag from the Assets list). Open the **Groups** panel, **+ New** a
+   group. Select each object → Properties → **Groups** accordion → check the group, so
+   **both** are members.
+2. Open **SCRIPTS** → **LEVEL** tab → **+ New**. Trigger = `on_game_start`.
+   **+ Add** action → `despawn_object` → Target = your group (under the **Groups**
+   heading in the dropdown).
+3. Click the **▶ dropdown caret → Start Game** (`on_game_start` only fires in game mode).
+4. **Expect:** both objects vanish immediately. **Leave preview** → they reappear (script
+   effects are runtime-only).
+
+### Scenario B — `on_interact`, no trigger volume (recolor an object with E)
+
+1. Place one object. Select it → Properties → **Geometry** screen → check **Interactable**
+   (optionally set a prompt label). Note a material id you want to swap to (any id from
+   the Materials panel).
+2. With the object still selected, open **SCRIPTS** → **SELECTED** tab → **+ New**.
+   Trigger = `on_interact` (target is this object, implicit). **+ Add** → `change_material`
+   → Target = the object, and type the material id.
+3. Click **▶ Preview** (hotkey **G**). Walk up to the object (**WASD**, mouse to look);
+   an **"Interact"** prompt appears within range. Press **E**.
+4. **Expect:** the object's material swaps. Leave preview → reverts.
+
+### Scenario C — `on_player_enter`, **with** a trigger volume (fade the screen)
+
+1. Pick the **Trigger** tool (toolbar, hotkey **U**). **Click-drag on the floor** to draw
+   the volume (scroll to adjust its height). It auto-selects and the **SCRIPTS** panel
+   opens to **SELECTED**.
+2. **+ New** script. Trigger = `on_player_enter` (fires when the player crosses this
+   volume). **+ Add** → `fade_screen` → set a color (e.g. `#000000`) and duration (e.g.
+   `1`).
+3. Click **▶ Preview** (**G**). Walk into the volume's footprint.
+4. **Expect:** the screen fades to your color as you cross the boundary. Leave preview to
+   reset.
+
+> Trigger volumes are invisible at runtime — in the editor they show as a wireframe box so
+> you can see where to walk.
 
 ---
 
