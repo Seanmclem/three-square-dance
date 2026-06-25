@@ -106,8 +106,14 @@ export class GizmoManager implements IEditorModule {
       }),
       // Spawn has no rebuild event; re-seed the pivot after each commit so repeated
       // rotations don't accumulate stale pivot/tracked-mesh state. (zoneId is "" for spawn.)
+      // Deferred a microtask so it runs AFTER SpawnPointTool rebuilds the marker (both listen
+      // to spawn:updated) and after TransformControls' drag-end fully unwinds — then
+      // _updateMeshOffsets re-tracks the fresh marker rather than the just-removed one.
       this._bus.on("spawn:updated", () => {
-        if (this._selType === "spawn" && this._selId === "__spawn__") this._reattachMeshes();
+        if (this._selType !== "spawn" || this._selId !== "__spawn__") return;
+        queueMicrotask(() => {
+          if (this._selType === "spawn" && this._selId === "__spawn__") this._reattachMeshes();
+        });
       }),
 
       this._bus.on("input:keydown", ({ code }) => {

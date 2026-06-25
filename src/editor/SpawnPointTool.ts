@@ -31,12 +31,12 @@ export class SpawnPointTool {
       this._bus.on("world:loaded",   () => this._restoreFromWorld()),
       this._bus.on("scene:loaded",   () => this._restoreFromWorld()),
       this._bus.on("spawn:updated",  () => {
-        // Re-sync from world state (authoritative) so both position AND facing follow.
+        // Rebuild the marker fresh from world state (authoritative) for both position AND
+        // facing. Rebuilding (vs mutating in place) mirrors how ZoneManager rebuilds the
+        // trigger-volume wireframe on commit, so the gizmo re-tracks a clean mesh each time
+        // instead of a persistent marker that accumulates stale transform state across rotations.
         const s = this._world.world?.defaultSpawn;
-        if (this._marker && s) {
-          this._marker.position.set(s.position.x, s.position.y, s.position.z);
-          this._marker.rotation.y = (s.facingDeg ?? 0) * Math.PI / 180;
-        }
+        if (s) this._placeMarker(s.position.x, s.position.y, s.position.z, false, s.facingDeg ?? 0);
       }),
     );
   }
