@@ -123,11 +123,10 @@ The reliable, repeatable recipe. Skipping these steps is what makes a session
 sputter — every failure mode below was hit and diagnosed in practice.
 
 1. **Reuse the running dev server — do NOT start a second one.**
-   Check first: `lsof -ti:7373` (and nearby ports, since Vite auto-bumps). If the
-   app is already up, use it. Running `npm run dev` when 7373 is taken silently
-   starts a **second** instance on 7374, giving you two app states to confuse
-   yourself with. Only start a server if none exists, and read the chosen port
-   from its output.
+   The port is pinned to **7373** in `vite.config.ts` (`server.port`, `strictPort`).
+   Check first: `lsof -ti:7373`. If the app is already up, use it. With `strictPort`,
+   a second `npm run dev` while 7373 is taken **fails loudly** (rather than silently
+   bumping to 7374) — so just reuse the running one.
 2. **Reuse the existing World Editor tab; navigate once.** Get tabs with
    `tabs_context_mcp`, find the `localhost:<port>` tab, work in it. Wait for load
    with a **Bash `sleep`**, never an in-page await.
