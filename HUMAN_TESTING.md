@@ -47,12 +47,13 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
    - `on_player_enter` / `on_player_exit` — pick a **trigger volume** (place one first
      with the trigger-volume tool).
    - `on_timer` — set an interval (and repeat).
-4. **Add the action** (action-type dropdown → **+ Add**) and fill its fields:
-   - `despawn_object` — **Target** = an object id **or a group id** (a group despawns
-     every member).
-   - `move_object` — Target + destination position.
-   - `change_material` — Target + a material id.
-   - `play_animation` — Target + a clip name (the object's asset must have that clip).
+4. **Add the action** (action-type dropdown → **+ Add**) and fill its fields. The
+   **Target** field is a dropdown of the zone's **Groups** and **Objects** (a group target
+   fans out to every member):
+   - `despawn_object` — pick a target.
+   - `move_object` — pick a target + set the destination X/Y/Z.
+   - `change_material` — pick a target + type a material id.
+   - `play_animation` — pick a target + type a clip name (the object's asset must have it).
    - `fade_screen` — color + duration.
 5. **Play** (▶ Preview / Start Game) and **trigger it**: press **E** on an interactable,
    walk into the trigger volume, wait for the timer, or let `on_game_start` fire.
@@ -64,15 +65,8 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 1. Place two objects; create a group in the Groups panel; assign **both** to it
    (Properties → **Groups** accordion → check the group).
 2. LEVEL tab → new script, trigger `on_game_start`, action `despawn_object`,
-   Target = the group's id.
+   Target = the group (under the **Groups** heading in the dropdown).
 3. **Start Game** → both objects vanish. Leave preview → they're back.
-
-### Known rough edge
-
-The **trigger** target is a dropdown (it lists your objects / volumes), but the
-**action** target is currently a **plain text box** — you type the object/group id by
-hand (read it off the Properties header). A picker dropdown for action targets is a
-planned improvement.
 
 ---
 

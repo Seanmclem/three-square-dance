@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type {
   ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
   TriggerType, ActionType, ConditionType,
-  TriggerVolume, WorldObject,
+  TriggerVolume, WorldObject, GroupDef,
 } from "@/types";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -82,6 +82,7 @@ export interface ScriptPanelProps {
   activeZoneId:    string | null;
   triggerVolumes:  TriggerVolume[];
   zoneObjects:     WorldObject[];
+  groups:          GroupDef[];
   onZoneScriptsChange:    (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:  (objectId: string, scripts: ScriptDef[]) => void;
 }
@@ -92,7 +93,7 @@ type TabId = "level" | "object";
 
 export function ScriptPanel({
   zoneScripts, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects,
+  activeZoneId, triggerVolumes, zoneObjects, groups,
   onZoneScriptsChange, onObjectScriptsChange,
 }: ScriptPanelProps) {
   const [tab,       setTab]       = useState<TabId>("level");
@@ -165,6 +166,7 @@ export function ScriptPanel({
           script={editing}
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
+          groups={groups}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -235,10 +237,11 @@ function ScriptList({ scripts, onSelect, onToggle, onAdd }: {
 
 // ── ScriptEditor ──────────────────────────────────────────────────────────────
 
-function ScriptEditor({ script, triggerVolumes, zoneObjects, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
+function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
   script:           ScriptDef;
   triggerVolumes:   TriggerVolume[];
   zoneObjects:      WorldObject[];
+  groups:           GroupDef[];
   ownerIsEntity:    boolean;
   selectedObjectId: string | null;
   onBack:   () => void;
@@ -390,6 +393,8 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, ownerIsEntity, sele
             <ActionRow
               key={i}
               action={a}
+              zoneObjects={zoneObjects}
+              groups={groups}
               onChange={na => set("actions", script.actions.map((x, j) => j === i ? na : x))}
               onRemove={() => set("actions", script.actions.filter((_, j) => j !== i))}
             />
@@ -457,6 +462,35 @@ function TargetPicker({ triggerType, targetId, triggerVolumes, zoneObjects, onCh
   );
 }
 
+// ── ActionTargetPicker ──────────────────────────────────────────────────────────
+// Dropdown of the zone's groups + objects for action targets (despawn/move/etc).
+// A group target fans out to all members at dispatch (ScriptEngine._resolveTargets).
+function ActionTargetPicker({ targetId, zoneObjects, groups, onChange }: {
+  targetId:    string;
+  zoneObjects: WorldObject[];
+  groups:      GroupDef[];
+  onChange:    (id: string) => void;
+}) {
+  const known = groups.some(g => g.id === targetId) || zoneObjects.some(o => o.id === targetId);
+  return (
+    <select style={S.select} value={targetId} onChange={e => onChange(e.target.value)}>
+      <option value="">— pick target —</option>
+      {groups.length > 0 && (
+        <optgroup label="Groups">
+          {groups.map(g => <option key={g.id} value={g.id}>▦ {g.name}</option>)}
+        </optgroup>
+      )}
+      {zoneObjects.length > 0 && (
+        <optgroup label="Objects">
+          {zoneObjects.map(o => <option key={o.id} value={o.id}>{o.label || o.assetId} ({o.id.slice(0,8)})</option>)}
+        </optgroup>
+      )}
+      {/* Preserve a hand-entered / cross-zone id that isn't in either list */}
+      {targetId && !known && <option value={targetId}>{targetId} (custom)</option>}
+    </select>
+  );
+}
+
 // ── ConditionRow ──────────────────────────────────────────────────────────────
 
 function ConditionRow({ condition, onChange, onRemove }: {
@@ -496,10 +530,12 @@ function ConditionRow({ condition, onChange, onRemove }: {
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
 
-function ActionRow({ action, onChange, onRemove }: {
-  action:   ScriptAction;
-  onChange: (a: ScriptAction) => void;
-  onRemove: () => void;
+function ActionRow({ action, zoneObjects, groups, onChange, onRemove }: {
+  action:      ScriptAction;
+  zoneObjects: WorldObject[];
+  groups:      GroupDef[];
+  onChange:    (a: ScriptAction) => void;
+  onRemove:    () => void;
 }) {
   return (
     <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
@@ -514,16 +550,22 @@ function ActionRow({ action, onChange, onRemove }: {
         </select>
         <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
       </div>
-      <ActionFields action={action} onChange={onChange} />
+      <ActionFields action={action} zoneObjects={zoneObjects} groups={groups} onChange={onChange} />
     </div>
   );
 }
 
-function ActionFields({ action, onChange }: {
-  action:   ScriptAction;
-  onChange: (a: ScriptAction) => void;
+function ActionFields({ action, zoneObjects, groups, onChange }: {
+  action:      ScriptAction;
+  zoneObjects: WorldObject[];
+  groups:      GroupDef[];
+  onChange:    (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void { onChange({ ...action, ...changes }); }
+  const targetPicker = (
+    <ActionTargetPicker targetId={action.targetId ?? ""} zoneObjects={zoneObjects} groups={groups}
+      onChange={id => set({ targetId: id })} />
+  );
 
   switch (action.type) {
     case "show_dialogue":
@@ -577,24 +619,30 @@ function ActionFields({ action, onChange }: {
       );
 
     case "despawn_object":
-    case "move_object":
     case "open_door":
     case "close_door":
+      return targetPicker;
+
+    case "move_object":
       return (
-        <input style={S.field} placeholder="Target object or group ID"
-          value={action.targetId ?? ""}
-          onChange={e => set({ targetId: e.target.value })}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {targetPicker}
+          <div style={{ display: "flex", gap: 4 }}>
+            {(["x","y","z"] as const).map(ax => (
+              <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+                value={action.position?.[ax] ?? ""}
+                onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+              />
+            ))}
+          </div>
+        </div>
       );
 
     case "play_animation":
       return (
-        <div style={{ display: "flex", gap: 4 }}>
-          <input style={{ ...S.field, flex: 1 }} placeholder="Target object or group ID"
-            value={action.targetId ?? ""}
-            onChange={e => set({ targetId: e.target.value })}
-          />
-          <input style={{ ...S.field, flex: 1 }} placeholder="Clip name"
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {targetPicker}
+          <input style={S.field} placeholder="Clip name"
             value={action.animation ?? ""}
             onChange={e => set({ animation: e.target.value })}
           />
@@ -603,12 +651,9 @@ function ActionFields({ action, onChange }: {
 
     case "change_material":
       return (
-        <div style={{ display: "flex", gap: 4 }}>
-          <input style={{ ...S.field, flex: 1 }} placeholder="Target object or group ID"
-            value={action.targetId ?? ""}
-            onChange={e => set({ targetId: e.target.value })}
-          />
-          <input style={{ ...S.field, flex: 1 }} placeholder="Material ID"
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {targetPicker}
+          <input style={S.field} placeholder="Material ID"
             value={action.material ?? ""}
             onChange={e => set({ material: e.target.value })}
           />

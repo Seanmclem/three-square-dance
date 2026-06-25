@@ -119,6 +119,7 @@ export function LeftPanel({
                 activeZoneId={activeZoneId}
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
+                groups={groups}
                 onZoneScriptsChange={onZoneScriptsChange}
                 onObjectScriptsChange={onObjectScriptsChange}
               />
