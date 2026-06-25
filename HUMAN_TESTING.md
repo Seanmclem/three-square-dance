@@ -33,19 +33,35 @@ npm run dev          # then open the printed http://localhost:5173/
 Use this to test `despawn_object`, `move_object`, `change_material`, `play_animation`,
 `fade_screen`, etc.
 
+> **How a script is put together — three independent parts:**
+> 1. **Where it lives** — the tab (LEVEL vs SELECTED). Just storage; doesn't affect *when*
+>    it runs.
+> 2. **What fires it** — the **trigger** dropdown (`on_game_start`, `on_interact`, …).
+> 3. **What it does** — the **actions** (despawn, move, …).
+>
+> **"trigger" ≠ "trigger volume".** A *trigger* is the firing event you pick in the
+> dropdown. A *trigger volume* is an invisible region you place in the world; it's just
+> *one source* of a trigger (it produces `on_player_enter` / `on_player_exit`). You do
+> **not** need a trigger volume for most scripts — `on_game_start`, `on_interact`, and
+> `on_timer` don't involve one.
+
 1. **Note the target's id.** Select the object you want the script to affect; read its
    `id` from the Properties header (rename it for clarity if you like). For a **group**
    target, create the group in the Groups panel first and use the group's name/id.
-2. **Open SCRIPTS** (bottom-left). Pick a tab:
-   - **LEVEL** — level-wide scripts. Best for `on_game_start` (one-time setup) and
-     `on_timer`.
-   - **SELECTED** — scripts on the currently-selected object or trigger volume.
-3. **Add a script** (+ New) and choose its **trigger** from the dropdown:
+2. **Open SCRIPTS** (bottom-left) and pick **where the script lives** (this is *not* the
+   trigger — that's the next step):
+   - **LEVEL** — the script belongs to the level. Use for `on_game_start`, `on_timer`,
+     or anything not tied to one entity.
+   - **SELECTED** — the script is attached to whatever object or trigger volume you have
+     selected. Use for `on_interact` on that object, or `on_player_enter`/`exit` on that
+     trigger volume.
+3. **Add a script** (+ New) and choose **what fires it** — the **trigger** dropdown:
    - `on_game_start` — fires automatically on Start Game.
    - `on_interact` — pick the object from the target dropdown. **The object must be
      marked Interactable** (Properties) so you can press **E** on it in game.
-   - `on_player_enter` / `on_player_exit` — pick a **trigger volume** (place one first
-     with the trigger-volume tool).
+   - `on_player_enter` / `on_player_exit` — fires when the player crosses a **trigger
+     volume** (place one first with the trigger-volume tool, then select it and author
+     under the SELECTED tab).
    - `on_timer` — set an interval (and repeat).
 4. **Add the action** (action-type dropdown → **+ Add**) and fill its fields. The
    **Target** field is a dropdown of the zone's **Groups** and **Objects** (a group target
