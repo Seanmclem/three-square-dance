@@ -108,7 +108,7 @@ export class GizmoManager implements IEditorModule {
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._controls || this._selId === null) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -222,6 +222,8 @@ export class GizmoManager implements IEditorModule {
         pz = vol.position.z;
         rotY = vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0;
       }
+    } else if (type === "spawn") {
+      rotY = THREE.MathUtils.degToRad(this._worldState.world?.defaultSpawn?.facingDeg ?? 0);
     }
 
     this._pivot.position.set(px, py, pz);
@@ -710,6 +712,16 @@ export class GizmoManager implements IEditorModule {
         this._worldState.updateTriggerVolume(this._selZoneId!, this._selId!, {
           rotation: { x: 0, y: rotY, z: 0 },
         });
+        break;
+      }
+      case "spawn": {
+        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        const spawn = this._worldState.world?.defaultSpawn;
+        if (!spawn) break;
+        // Pivot yaw maps directly to facingDeg (0° = -Z, matching CharacterController).
+        const facingDeg = THREE.MathUtils.radToDeg(this._pivotYaw());
+        this._worldState.setDefaultSpawn({ ...spawn, facingDeg });
+        this._bus.emit("spawn:updated", { position: spawn.position });
         break;
       }
     }

@@ -30,48 +30,72 @@ export class SpawnPointTool {
       }),
       this._bus.on("world:loaded",   () => this._restoreFromWorld()),
       this._bus.on("scene:loaded",   () => this._restoreFromWorld()),
-      this._bus.on("spawn:updated",  ({ position }) => {
-        if (this._marker) this._marker.position.set(position.x, position.y, position.z);
+      this._bus.on("spawn:updated",  () => {
+        // Re-sync from world state (authoritative) so both position AND facing follow.
+        const s = this._world.world?.defaultSpawn;
+        if (this._marker && s) {
+          this._marker.position.set(s.position.x, s.position.y, s.position.z);
+          this._marker.rotation.y = (s.facingDeg ?? 0) * Math.PI / 180;
+        }
       }),
     );
   }
 
   private _restoreFromWorld(): void {
     const spawn = this._world.world?.defaultSpawn;
-    if (spawn) this._placeMarker(spawn.position.x, spawn.position.y, spawn.position.z, false);
+    if (spawn) this._placeMarker(spawn.position.x, spawn.position.y, spawn.position.z, false, spawn.facingDeg ?? 0);
     else this._removeMarker();
   }
 
-  private _placeMarker(x: number, y: number, z: number, persist = true): void {
+  private _placeMarker(x: number, y: number, z: number, persist = true, facingDeg = 0): void {
     this._removeMarker();
 
-    const origin = new THREE.Vector3(x, y, z);
-    const dir    = new THREE.Vector3(0, 1, 0);
-    const arrow  = new THREE.ArrowHelper(dir, origin, 1.8, 0xffcc44, 0.55, 0.28);
-    arrow.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
-    arrow.traverse(child => {
-      if (child === arrow) return;
-      child.userData.editorOnly = true;
-      child.userData.editorId   = "__spawn__";
-      child.userData.editorType = "spawn";
-      child.userData.selectable = true;
-      child.userData.zoneId     = "";
-      child.userData._parentId  = "__spawn__";
-    });
+    // Parent group at the spawn foot; rotation.y is the facing yaw (0° = looking toward -Z,
+    // matching CharacterController). Children live in local space so they rotate together.
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+    group.rotation.y = facingDeg * Math.PI / 180;
 
+    // Vertical post (selection handle / "you spawn here" stick).
+    const arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1.8, 0xffcc44, 0.55, 0.28);
+    group.add(arrow);
+
+    // Ground ring.
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.22, 0.38, 32),
       new THREE.MeshBasicMaterial({ color: 0xffcc44, side: THREE.DoubleSide, opacity: 0.6, transparent: true }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "", _parentId: "__spawn__" };
-    arrow.add(ring);
+    group.add(ring);
 
-    this._scene.add(arrow);
-    this._marker = arrow;
+    // Facing cone — midway up, pointing in the start-facing direction (local -Z).
+    // Cone's default axis is +Y; rotX(-90°) aims it down -Z.
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.18, 0.5, 16),
+      new THREE.MeshBasicMaterial({ color: 0xff8844 }),
+    );
+    cone.rotation.x = -Math.PI / 2;
+    cone.position.set(0, 0.9, -0.45);
+    group.add(cone);
+
+    // Tag the whole marker for selection; children carry _parentId so SelectionManager
+    // resolves clicks to the group root (and the gizmo tracks the group, not each child).
+    group.userData = { editorOnly: true, editorId: "__spawn__", editorType: "spawn", selectable: true, zoneId: "" };
+    group.traverse(child => {
+      if (child === group) return;
+      child.userData.editorOnly  = true;
+      child.userData.editorId    = "__spawn__";
+      child.userData.editorType  = "spawn";
+      child.userData.selectable  = true;
+      child.userData.zoneId      = "";
+      child.userData._parentId   = "__spawn__";
+    });
+
+    this._scene.add(group);
+    this._marker = group;
 
     if (persist) {
-      this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg: 0 });
+      this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg });
     }
   }
 
