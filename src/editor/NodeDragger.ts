@@ -145,6 +145,14 @@ export class NodeDragger {
       this._bus.on("wall:rebuilt", () => {
         if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
       }),
+      // Deleting a wall run removes the walls then their nodes (separate removeNode calls
+      // emit no event). Defer a microtask so the refresh runs after the whole delete, then
+      // _refresh rebuilds dots from the remaining geometry — clearing the orphaned dots.
+      this._bus.on("wall:removed", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG") {
+          queueMicrotask(() => { if (this._activeTool === "select" && this._state !== "DRAG") this._refresh(); });
+        }
+      }),
     );
   }
 
