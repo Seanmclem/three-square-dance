@@ -327,6 +327,56 @@ export class GizmoManager implements IEditorModule {
     return out;
   }
 
+  /** An entity's visual center, derived from world data (used to place the group pivot). */
+  private _refDisplayPos(ref: SelectedRef): THREE.Vector3 | null {
+    const zone = this._worldState.zones.get(ref.zoneId);
+    if (!zone) return null;
+    switch (ref.type) {
+      case "object": {
+        const o = zone.objects.find(x => x.id === ref.id);
+        return o ? new THREE.Vector3(o.position.x, o.position.y, o.position.z) : null;
+      }
+      case "platform": {
+        const p = zone.platforms.find(x => x.id === ref.id);
+        return p ? new THREE.Vector3(p.position.x, p.position.y, p.position.z) : null;
+      }
+      case "stair": {
+        const s = zone.stairs.find(x => x.id === ref.id);
+        return s ? new THREE.Vector3((s.start.x + s.end.x) / 2, (s.start.y + s.end.y) / 2, (s.start.z + s.end.z) / 2) : null;
+      }
+      case "trigger-volume": {
+        const v = zone.triggerVolumes?.find(x => x.id === ref.id);
+        return v ? new THREE.Vector3(v.position.x, v.position.y, v.position.z) : null;
+      }
+      case "floor": {
+        const f = zone.floors.find(x => x.id === ref.id);
+        if (!f) return null;
+        const pts = f.floorMesh.points;
+        if (pts && pts.length > 0) {
+          const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+          const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+          return new THREE.Vector3(cx, f.elevation, cz);
+        }
+        return new THREE.Vector3(zone.bounds.x + zone.bounds.width / 2, f.elevation, zone.bounds.z + zone.bounds.depth / 2);
+      }
+      case "wall": {
+        const ids = ref.memberIds?.length ? ref.memberIds : [ref.id];
+        const nodeIds = new Set<string>();
+        for (const wid of ids) {
+          const w = zone.walls.find(x => x.id === wid);
+          if (w) { nodeIds.add(w.startNodeId); nodeIds.add(w.endNodeId); }
+        }
+        const nodes = [...nodeIds].map(id => zone.nodes.find(n => n.id === id)).filter((n): n is WallNode => !!n);
+        if (nodes.length === 0) return null;
+        const cx = nodes.reduce((s, n) => s + n.x, 0) / nodes.length;
+        const cz = nodes.reduce((s, n) => s + n.z, 0) / nodes.length;
+        return new THREE.Vector3(cx, 0, cz);
+      }
+      default:
+        return null;
+    }
+  }
+
   private _buildGroup(refs: SelectedRef[]): void {
     this._groupMode = true;
     this._groupRefs = refs;
@@ -338,9 +388,19 @@ export class GizmoManager implements IEditorModule {
     const cands = this._collectGroupMeshes(this._groupIdSet());
     if (cands.length === 0) { this._detach(); return; }
 
+    // Pivot at the centroid of each entity's DATA position (one vote per entity), not the
+    // mesh transforms — wall/floor meshes bake geometry in world space with the transform at
+    // the origin, which would otherwise drag the centroid toward (0,0,0). Falls back to the
+    // mesh-world centroid if no ref resolves a data position.
     const centroid = new THREE.Vector3();
-    for (const c of cands) centroid.add(c.worldPos);
-    centroid.multiplyScalar(1 / cands.length);
+    const dataPositions = refs.map(r => this._refDisplayPos(r)).filter((p): p is THREE.Vector3 => p !== null);
+    if (dataPositions.length > 0) {
+      for (const p of dataPositions) centroid.add(p);
+      centroid.multiplyScalar(1 / dataPositions.length);
+    } else {
+      for (const c of cands) centroid.add(c.worldPos);
+      centroid.multiplyScalar(1 / cands.length);
+    }
 
     this._pivot.position.copy(centroid);
     this._pivot.rotation.set(0, 0, 0);
