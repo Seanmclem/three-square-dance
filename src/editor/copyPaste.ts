@@ -1,21 +1,28 @@
 import type { WorldState } from "@/world/WorldState";
 import type {
-  SelectedObjectPayload, EditorObjectType,
+  SelectedObjectPayload, SelectedRef, EditorObjectType,
   WallDef, FloorDef, PlatformDef, StairDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
 } from "@/types";
 
 /** Selection types that can be copied. (Openings/spawn/terrain are excluded.) */
 const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "object", "trigger-volume"]);
 
+/** One copied entity, tagged with its type so paste can route per-entity. */
+export interface ClipEntity {
+  type: EditorObjectType;
+  def:  unknown;
+}
+
 /**
  * A self-contained snapshot of a copied selection — deep-cloned so paste still works
- * after the source is moved or deleted. `entities` is the run (walls) or a single entity;
- * `nodes` are the referenced corner/endpoint nodes (deduped) for node-backed types.
+ * after the source is moved or deleted. `entities` is a mixed-type list (single copy is
+ * a 1-entry list, a wall run is one entry per segment); `nodes` are the referenced
+ * corner/endpoint nodes for all node-backed entities, deduped and shared so corners
+ * shared between two selected entities clone as one node.
  */
 export interface Clipboard {
-  type:     EditorObjectType;
   zoneId:   string;
-  entities: unknown[];
+  entities: ClipEntity[];
   nodes:    WallNode[];
 }
 
@@ -34,6 +41,14 @@ function newId(type: EditorObjectType): string {
   }
 }
 
+/** Node ids referenced by a node-backed entity (empty for position-only types). */
+function entityNodeIds(type: EditorObjectType, def: unknown): string[] {
+  if (type === "wall")     { const w = def as WallDef;     return [w.startNodeId, w.endNodeId]; }
+  if (type === "floor")    { const f = def as FloorDef;    return f.floorMesh.nodeIds ?? []; }
+  if (type === "platform") { const p = def as PlatformDef; return p.nodeIds ?? []; }
+  return [];
+}
+
 function cloneNodes(world: WorldState, zoneId: string, ids: string[]): WallNode[] {
   const zone = world.zones.get(zoneId);
   if (!zone) return [];
@@ -47,47 +62,71 @@ function cloneNodes(world: WorldState, zoneId: string, ids: string[]): WallNode[
   return out;
 }
 
+/** Look up an entity def from a selection ref. Wall runs expand to all member walls. */
+function defsForRef(world: WorldState, ref: SelectedRef): ClipEntity[] {
+  const zone = world.zones.get(ref.zoneId);
+  if (!zone) return [];
+  switch (ref.type) {
+    case "wall": {
+      const ids = ref.memberIds && ref.memberIds.length ? ref.memberIds : [ref.id];
+      return ids
+        .map(id => zone.walls.find(w => w.id === id))
+        .filter((w): w is WallDef => !!w)
+        .map(w => ({ type: "wall" as const, def: structuredClone(w) }));
+    }
+    case "floor":          { const f = zone.floors.find(x => x.id === ref.id);    return f ? [{ type: ref.type, def: structuredClone(f) }] : []; }
+    case "platform":       { const p = zone.platforms.find(x => x.id === ref.id); return p ? [{ type: ref.type, def: structuredClone(p) }] : []; }
+    case "stair":          { const s = zone.stairs.find(x => x.id === ref.id);    return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
+    case "object":         { const o = zone.objects.find(x => x.id === ref.id);   return o ? [{ type: ref.type, def: structuredClone(o) }] : []; }
+    case "trigger-volume": { const v = zone.triggerVolumes?.find(x => x.id === ref.id); return v ? [{ type: ref.type, def: structuredClone(v) }] : []; }
+    default:               return [];
+  }
+}
+
 const off2 = (p: Vec2, dx: number, dz: number): Vec2 => ({ x: p.x + dx, z: p.z + dz });
 const off3 = (p: Vec3, dx: number, dz: number): Vec3 => ({ x: p.x + dx, y: p.y, z: p.z + dz });
 
-/** Deep-clone the current selection (entity/run + referenced nodes) into a clipboard. */
+function buildClipboard(world: WorldState, zoneId: string, entities: ClipEntity[]): Clipboard | null {
+  if (entities.length === 0) return null;
+  const nodeIds = entities.flatMap(e => entityNodeIds(e.type, e.def));
+  return { zoneId, entities, nodes: cloneNodes(world, zoneId, nodeIds) };
+}
+
+/** Deep-clone the current single selection (entity/run + referenced nodes) into a clipboard. */
 export function copySelection(world: WorldState, selected: SelectedObjectPayload | null): Clipboard | null {
   if (!selected || !selected.data || !COPYABLE.has(selected.type)) return null;
-  const zoneId = selected.zoneId;
+  const entities: ClipEntity[] =
+    selected.type === "wall"
+      ? (selected.runWalls ?? [selected.data as WallDef]).map(w => ({ type: "wall" as const, def: structuredClone(w) }))
+      : [{ type: selected.type, def: structuredClone(selected.data) }];
+  return buildClipboard(world, selected.zoneId, entities);
+}
 
-  if (selected.type === "wall") {
-    const walls = (selected.runWalls ?? [selected.data as WallDef]).map(w => structuredClone(w));
-    const nodeIds = walls.flatMap(w => [w.startNodeId, w.endNodeId]);
-    return { type: "wall", zoneId, entities: walls, nodes: cloneNodes(world, zoneId, nodeIds) };
-  }
-  if (selected.type === "floor") {
-    const floor = structuredClone(selected.data as FloorDef);
-    const nodes = floor.floorMesh.nodeIds ? cloneNodes(world, zoneId, floor.floorMesh.nodeIds) : [];
-    return { type: "floor", zoneId, entities: [floor], nodes };
-  }
-  if (selected.type === "platform") {
-    const plat = structuredClone(selected.data as PlatformDef);
-    const nodes = plat.nodeIds ? cloneNodes(world, zoneId, plat.nodeIds) : [];
-    return { type: "platform", zoneId, entities: [plat], nodes };
-  }
-  // stair / object / trigger-volume — position-only, no nodes
-  return { type: selected.type, zoneId, entities: [structuredClone(selected.data)], nodes: [] };
+/** Deep-clone a multi-selection (mixed types) into one clipboard with shared, deduped nodes. */
+export function copySelectionMulti(world: WorldState, refs: SelectedRef[]): Clipboard | null {
+  const copyable = refs.filter(r => COPYABLE.has(r.type));
+  if (copyable.length === 0) return null;
+  const zoneId = copyable[0].zoneId;
+  const entities = copyable.flatMap(r => defsForRef(world, r));
+  return buildClipboard(world, zoneId, entities);
 }
 
 /**
  * Paste a clipboard into a zone, offset by (dx,dz). Regenerates all ids, clones referenced
- * nodes with fresh ids and remaps references, regenerates opening ids — all in one undoable
- * transaction. Returns the primary new entity's {type,id} for post-paste selection.
+ * nodes once with fresh ids and remaps references (so shared corners stay shared), regenerates
+ * opening ids — all in one undoable transaction. Returns the refs of every pasted entity
+ * (first = primary) for post-paste selection.
  */
 export function pasteClipboard(
   world: WorldState, clip: Clipboard, zoneId: string, offset: { x: number; z: number },
-): { type: EditorObjectType; id: string } | null {
-  if (!clip || clip.entities.length === 0) return null;
+): { type: EditorObjectType; id: string }[] {
+  if (!clip || clip.entities.length === 0) return [];
   const dx = offset.x, dz = offset.z;
-  let primaryId: string | null = null;
+  const pasted: { type: EditorObjectType; id: string }[] = [];
 
-  world.transaction(`paste ${clip.type}`, () => {
-    // 1) Clone referenced nodes with new ids (deduped), offset.
+  const label = clip.entities.length > 1 ? `paste ${clip.entities.length} items` : `paste ${clip.entities[0].type}`;
+  world.transaction(label, () => {
+    // 1) Clone referenced nodes with new ids (deduped, shared), offset.
     const nodeMap = new Map<string, string>();
     for (const n of clip.nodes) {
       const id = uuid();
@@ -98,12 +137,12 @@ export function pasteClipboard(
 
     // 2) Clone each entity with a new id + remapped/offset geometry.
     for (const ent of clip.entities) {
-      const id = newId(clip.type);
-      if (primaryId === null) primaryId = id;
+      const id = newId(ent.type);
+      pasted.push({ type: ent.type, id });
 
-      switch (clip.type) {
+      switch (ent.type) {
         case "wall": {
-          const w = ent as WallDef;
+          const w = ent.def as WallDef;
           world.addWall(zoneId, {
             ...w, id,
             startNodeId: mapNode(w.startNodeId),
@@ -113,7 +152,7 @@ export function pasteClipboard(
           break;
         }
         case "floor": {
-          const f  = ent as FloorDef;
+          const f  = ent.def as FloorDef;
           const fm = f.floorMesh;
           world.addFloor(zoneId, {
             ...f, id,
@@ -126,7 +165,7 @@ export function pasteClipboard(
           break;
         }
         case "platform": {
-          const p = ent as PlatformDef;
+          const p = ent.def as PlatformDef;
           world.addPlatform(zoneId, {
             ...p, id,
             position: off3(p.position, dx, dz),
@@ -136,17 +175,17 @@ export function pasteClipboard(
           break;
         }
         case "stair": {
-          const s = ent as StairDef;
+          const s = ent.def as StairDef;
           world.addStair(zoneId, { ...s, id, start: off3(s.start, dx, dz), end: off3(s.end, dx, dz) });
           break;
         }
         case "object": {
-          const o = ent as WorldObject;
+          const o = ent.def as WorldObject;
           world.addObject(zoneId, { ...o, id, position: off3(o.position, dx, dz) });
           break;
         }
         case "trigger-volume": {
-          const v = ent as TriggerVolume;
+          const v = ent.def as TriggerVolume;
           world.addTriggerVolume(zoneId, { ...v, id, position: off3(v.position, dx, dz) });
           break;
         }
@@ -154,5 +193,5 @@ export function pasteClipboard(
     }
   });
 
-  return primaryId ? { type: clip.type, id: primaryId } : null;
+  return pasted;
 }

@@ -39,7 +39,7 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -49,7 +49,7 @@ type PendingEdit = {
   initial: { label: string; category: string; attribution: Attribution };
 };
 import { HistoryManager } from "@/editor/HistoryManager";
-import { copySelection, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
+import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
@@ -86,6 +86,7 @@ export default function App() {
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
   const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
   const [selected,         setSelected]         = useState<SelectedObjectPayload | null>(null);
+  const [multiSelected,    setMultiSelected]    = useState<SelectedRef[]>([]);
   const [materialList,     setMaterialList]     = useState<MaterialDef[]>([]);
   const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
@@ -306,6 +307,7 @@ export default function App() {
         if (payload.type === "trigger-volume") setLeftPanel("scripts");
       }),
       bus.on("object:deselected", ()            => setSelected(null)),
+      bus.on("selection:changed", ({ refs }) => setMultiSelected(refs)),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
       bus.on("tool:placed", ({ type }) => {
         if (type !== "object") {
@@ -609,33 +611,37 @@ export default function App() {
     syncHistory();
   }, [syncHistory]);
 
-  const handleCopy = useCallback((): void => {
+  const captureClipboard = useCallback((): Clipboard | null => {
     const world = worldRef.current;
-    if (!world || !selected) return;
-    const clip = copySelection(world, selected);
+    if (!world) return null;
+    return multiSelected.length > 1
+      ? copySelectionMulti(world, multiSelected)
+      : copySelection(world, selected);
+  }, [selected, multiSelected]);
+
+  const handleCopy = useCallback((): void => {
+    const clip = captureClipboard();
     if (clip) { clipboardRef.current = clip; pasteCountRef.current = 0; }
-  }, [selected]);
+  }, [captureClipboard]);
 
   // Paste the clipboard (or, for Duplicate, a fresh clone of the current selection) into the
-  // active zone with a cascading offset, then select the new entity.
+  // active zone with a cascading offset, then select the (primary) new entity.
   const pasteClip = useCallback((clip: Clipboard | null): void => {
     const world = worldRef.current;
     const zoneId = activeZoneId ?? clip?.zoneId;
     if (!world || !clip || !zoneId) return;
     const n = (pasteCountRef.current += 1);
     const result = pasteClipboard(world, clip, zoneId, { x: n, z: n });
-    if (result) busRef.current.emit("tool:placed", { type: result.type, id: result.id, zoneId });
+    if (result.length > 0) busRef.current.emit("tool:placed", { type: result[0].type, id: result[0].id, zoneId });
     syncHistory();
   }, [activeZoneId, syncHistory]);
 
   const handlePaste = useCallback((): void => { pasteClip(clipboardRef.current); }, [pasteClip]);
 
   const handleDuplicate = useCallback((): void => {
-    const world = worldRef.current;
-    if (!world || !selected) return;
-    const clip = copySelection(world, selected);
+    const clip = captureClipboard();
     if (clip) { clipboardRef.current = clip; pasteCountRef.current = 0; pasteClip(clip); }
-  }, [selected, pasteClip]);
+  }, [captureClipboard, pasteClip]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -774,6 +780,39 @@ export default function App() {
   const handleDelete = useCallback((): void => {
     const world   = worldRef.current;
     const history = historyRef.current;
+
+    // Multi-select: delete the whole set in one transaction (no per-entity script prompt).
+    if (multiSelected.length > 1 && world) {
+      const zoneId = multiSelected[0].zoneId;
+      const nodesToRemove = new Set<string>();
+      world.transaction(`delete ${multiSelected.length} items`, () => {
+        for (const ref of multiSelected) {
+          const zone = world.zones.get(ref.zoneId);
+          switch (ref.type) {
+            case "wall": {
+              const ids = ref.memberIds?.length ? ref.memberIds : [ref.id];
+              for (const wid of ids) {
+                const w = zone?.walls.find(ww => ww.id === wid);
+                if (w) { nodesToRemove.add(w.startNodeId); nodesToRemove.add(w.endNodeId); }
+                world.removeWall(ref.zoneId, wid);
+              }
+              break;
+            }
+            case "floor":          world.removeFloor(ref.zoneId, ref.id); break;
+            case "platform":       world.removePlatform(ref.zoneId, ref.id); break;
+            case "stair":          world.removeStair(ref.zoneId, ref.id); break;
+            case "object":         world.removeObject(ref.zoneId, ref.id); break;
+            case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
+          }
+        }
+        for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
+      });
+      syncHistory();
+      setSelected(null);
+      busRef.current.emit("object:deselected", {});
+      return;
+    }
+
     if (!selected || !world) return;
     const { type, id, zoneId } = selected;
 
@@ -816,7 +855,7 @@ export default function App() {
     syncHistory();
     setSelected(null);
     busRef.current.emit("object:deselected", {});
-  }, [selected, syncHistory]);
+  }, [selected, multiSelected, syncHistory]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -1288,7 +1327,10 @@ export default function App() {
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
-        onDelete={selected ? handleDelete : undefined}
+        onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
+        multiSelected={multiSelected}
+        onCopy={handleCopy}
+        onDuplicate={handleDuplicate}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         zones={zones}
         groups={groups}

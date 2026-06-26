@@ -172,7 +172,8 @@ export interface BusEvents {
   "materials:loaded":      { materials: MaterialDef[] };
   "quality:changed":       { quality: QualityScale };
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
-  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
+  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number; shift: boolean; ctrl: boolean; meta: boolean };
+  "selection:changed":     { refs: SelectedRef[] };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
@@ -210,6 +211,14 @@ export type BusEventName = keyof BusEvents;
 export type BusCallback<K extends BusEventName> = (payload: BusEvents[K]) => void;
 
 // ─── Selection ────────────────────────────────────────────────────────────────
+
+/** Lightweight reference to a selected entity (multi-select set). */
+export interface SelectedRef {
+  id:        string;
+  type:      EditorObjectType;
+  zoneId:    string;
+  memberIds?: string[]; // all wall ids when the ref is a multi-wall run (type === "wall")
+}
 
 export interface SelectedObjectPayload {
   id: string;

@@ -3,7 +3,7 @@ import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
-  IEditorModule, SelectedObjectPayload,
+  IEditorModule, SelectedObjectPayload, SelectedRef,
   PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume,
 } from "@/types";
 
@@ -22,6 +22,12 @@ export class GizmoManager implements IEditorModule {
   private _selId:     string | null   = null;
   private _selZoneId: string | null   = null;
   private _selType:   GizmoType | null = null;
+
+  // Group (multi-select) translate-only mode. When active, _selId/_selType are null and
+  // the pivot sits at the centroid of all selected meshes.
+  private _groupMode      = false;
+  private _groupRefs:     SelectedRef[] = [];
+  private _regroupScheduled = false;
 
   // Meshes that follow the pivot during live preview
   private _trackedMeshes: Array<{
@@ -89,20 +95,28 @@ export class GizmoManager implements IEditorModule {
     this._unsubs.push(
       this._bus.on("object:selected",  payload => this._onSelect(payload)),
       this._bus.on("object:deselected", ()     => this._detach()),
+      this._bus.on("selection:changed", ({ refs }) => this._onSelectionChanged(refs)),
 
       // Re-attach after async rebuild (SelectionManager also re-emits object:selected,
       // but _reattachMeshes runs first to avoid a one-frame pop of the old pivot)
       this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => {
         if (platformId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(platformId)) this._scheduleRegroup();
       }),
       this._bus.on("stair:rebuilt", ({ zoneId, stairId }) => {
         if (stairId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(stairId)) this._scheduleRegroup();
       }),
       this._bus.on("floor:rebuilt", ({ zoneId, floorId }) => {
         if (floorId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(floorId)) this._scheduleRegroup();
+      }),
+      this._bus.on("wall:rebuilt", ({ wallId }) => {
+        if (this._groupMode && this._groupHas(wallId)) this._scheduleRegroup();
       }),
       this._bus.on("triggervolume:updated", ({ zoneId, id }) => {
         if (id === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(id)) this._scheduleRegroup();
       }),
       // Spawn has no rebuild event; re-seed the pivot after each commit so repeated
       // rotations don't accumulate stale pivot/tracked-mesh state. (zoneId is "" for spawn.)
@@ -117,8 +131,9 @@ export class GizmoManager implements IEditorModule {
       }),
 
       this._bus.on("input:keydown", ({ code, ctrl, meta }) => {
-        if (!this._controls || this._selId === null) return;
+        if (!this._controls || (this._selId === null && !this._groupMode)) return;
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
+        if (this._groupMode) return;  // group is translate-only — ignore T/R/S mode switches
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
         if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn")) {
           this._controls.setMode("rotate");
@@ -149,6 +164,10 @@ export class GizmoManager implements IEditorModule {
   // ─── Selection ────────────────────────────────────────────────────────────
 
   private _onSelect(payload: SelectedObjectPayload): void {
+    // A single-entity selection always supersedes any group mode.
+    this._groupMode = false;
+    this._groupRefs = [];
+
     const type = payload.type as string;
     if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume"].includes(type)) {
       this._detach(); return;
@@ -253,12 +272,196 @@ export class GizmoManager implements IEditorModule {
     this._selId      = null;
     this._selZoneId  = null;
     this._selType    = null;
+    this._groupMode  = false;
+    this._groupRefs  = [];
     this._trackedMeshes = [];
     this._wallNodeIds   = [];
     this._wallRunIds    = [];
     this._stairDragSnapshot    = null;
     this._wallDragSnapshot     = null;
     this._polyPlatDragSnapshot = null;
+  }
+
+  // ─── Group (multi-select) translate ─────────────────────────────────────────
+
+  private _onSelectionChanged(refs: SelectedRef[]): void {
+    if (refs.length <= 1) {
+      // Single (or empty) selection is driven by object:selected / object:deselected.
+      if (this._groupMode) { this._groupMode = false; this._groupRefs = []; }
+      return;
+    }
+    this._buildGroup(refs);
+  }
+
+  private _groupHas(id: string): boolean {
+    return this._groupRefs.some(r => r.id === id || (r.memberIds?.includes(id) ?? false));
+  }
+
+  private _groupIdSet(): Set<string> {
+    const ids = new Set<string>();
+    for (const ref of this._groupRefs) {
+      ids.add(ref.id);
+      ref.memberIds?.forEach(id => ids.add(id));
+    }
+    return ids;
+  }
+
+  /** Meshes (deduped to roots) whose editorId is in the group's id set, with world positions. */
+  private _collectGroupMeshes(idSet: Set<string>): Array<{ obj: THREE.Object3D; worldPos: THREE.Vector3 }> {
+    const out: Array<{ obj: THREE.Object3D; worldPos: THREE.Vector3 }> = [];
+    const wp = new THREE.Vector3();
+    this._scene.traverse(obj => {
+      const eid = obj.userData["editorId"] as string | undefined;
+      if (!eid || !idSet.has(eid)) return;
+      if ((obj.userData as { _hasCsgCuts?: boolean })._hasCsgCuts) return;
+      // Skip if any ancestor is also a selected root — it moves as part of that ancestor.
+      let anc = obj.parent;
+      while (anc) {
+        const aid = anc.userData["editorId"] as string | undefined;
+        if (aid && idSet.has(aid)) return;
+        anc = anc.parent;
+      }
+      obj.getWorldPosition(wp);
+      out.push({ obj, worldPos: wp.clone() });
+    });
+    return out;
+  }
+
+  private _buildGroup(refs: SelectedRef[]): void {
+    this._groupMode = true;
+    this._groupRefs = refs;
+    this._selId     = null;
+    this._selType   = null;
+    this._selZoneId = refs[0].zoneId;
+    this._controls?.setMode("translate");
+
+    const cands = this._collectGroupMeshes(this._groupIdSet());
+    if (cands.length === 0) { this._detach(); return; }
+
+    const centroid = new THREE.Vector3();
+    for (const c of cands) centroid.add(c.worldPos);
+    centroid.multiplyScalar(1 / cands.length);
+
+    this._pivot.position.copy(centroid);
+    this._pivot.rotation.set(0, 0, 0);
+    this._pivotStart.copy(this._pivot.position);
+
+    this._trackedMeshes = cands.map(c => ({
+      obj:          c.obj,
+      offset:       c.worldPos.clone().sub(centroid),
+      origLocalPos: c.obj.position.clone(),
+      origLocalRot: c.obj.rotation.clone(),
+      origParent:   c.obj.parent,
+    }));
+
+    this._syncAxisVisibility();
+    this._controls?.attach(this._pivot);
+  }
+
+  /** After a group commit rebuilds meshes, re-track them against the (unchanged) pivot. */
+  private _scheduleRegroup(): void {
+    if (this._regroupScheduled) return;
+    this._regroupScheduled = true;
+    queueMicrotask(() => {
+      this._regroupScheduled = false;
+      if (!this._groupMode) return;
+      const pivotPos = this._pivot.position;
+      const cands = this._collectGroupMeshes(this._groupIdSet());
+      if (cands.length === 0) return;
+      this._trackedMeshes = cands.map(c => ({
+        obj:          c.obj,
+        offset:       c.worldPos.clone().sub(pivotPos),
+        origLocalPos: c.obj.position.clone(),
+        origLocalRot: c.obj.rotation.clone(),
+        origParent:   c.obj.parent,
+      }));
+    });
+  }
+
+  private _commitGroupTranslate(): void {
+    const delta = this._pivot.position.clone().sub(this._pivotStart);
+    if (delta.lengthSq() < 1e-6) { this._pivotStart.copy(this._pivot.position); return; }
+    const movedNodes = new Set<string>();
+    for (const ref of this._groupRefs) this._translateRef(ref, delta, movedNodes);
+    this._pivotStart.copy(this._pivot.position);
+  }
+
+  /** Offset one entity by delta; shared nodes (dedupe via movedNodes) move exactly once. */
+  private _translateRef(ref: SelectedRef, delta: THREE.Vector3, movedNodes: Set<string>): void {
+    const zoneId = ref.zoneId;
+    const zone   = this._worldState.zones.get(zoneId);
+    if (!zone) return;
+
+    const moveNode = (nodeId: string): void => {
+      if (movedNodes.has(nodeId)) return;
+      movedNodes.add(nodeId);
+      const node = zone.nodes.find(n => n.id === nodeId);
+      if (node) this._worldState.updateNode(zoneId, nodeId, { x: node.x + delta.x, z: node.z + delta.z });
+    };
+
+    switch (ref.type) {
+      case "wall": {
+        const ids = ref.memberIds?.length ? ref.memberIds : [ref.id];
+        for (const wid of ids) {
+          const wall = zone.walls.find(w => w.id === wid);
+          if (!wall) continue;
+          moveNode(wall.startNodeId);
+          moveNode(wall.endNodeId);
+        }
+        break;
+      }
+      case "platform": {
+        const plat = zone.platforms.find(p => p.id === ref.id);
+        if (!plat) break;
+        if (plat.nodeIds?.length) for (const id of plat.nodeIds) moveNode(id);
+        const changes: Partial<PlatformDef> = {
+          position: { x: plat.position.x + delta.x, y: plat.position.y + delta.y, z: plat.position.z + delta.z },
+        };
+        if (plat.points && plat.points.length >= 3) {
+          changes.points = plat.points.map(pt => ({ x: pt.x + delta.x, z: pt.z + delta.z }));
+        }
+        this._worldState.updatePlatform(zoneId, ref.id, changes);
+        break;
+      }
+      case "floor": {
+        const floor = zone.floors.find(f => f.id === ref.id);
+        if (!floor) break;
+        const fm = floor.floorMesh;
+        if (fm.nodeIds?.length) {
+          for (const id of fm.nodeIds) moveNode(id);
+        } else if (fm.points?.length) {
+          this._worldState.updateFloor(zoneId, ref.id, {
+            floorMesh: { ...fm, points: fm.points.map(p => ({ x: p.x + delta.x, z: p.z + delta.z })) },
+          });
+        }
+        break;
+      }
+      case "stair": {
+        const s = zone.stairs.find(x => x.id === ref.id);
+        if (!s) break;
+        this._worldState.updateStair(zoneId, ref.id, {
+          start: { x: s.start.x + delta.x, y: s.start.y + delta.y, z: s.start.z + delta.z },
+          end:   { x: s.end.x   + delta.x, y: s.end.y   + delta.y, z: s.end.z   + delta.z },
+        });
+        break;
+      }
+      case "object": {
+        const o = zone.objects.find(x => x.id === ref.id);
+        if (!o) break;
+        this._worldState.updateObject(zoneId, ref.id, {
+          position: { x: o.position.x + delta.x, y: o.position.y + delta.y, z: o.position.z + delta.z },
+        });
+        break;
+      }
+      case "trigger-volume": {
+        const v = zone.triggerVolumes?.find(x => x.id === ref.id);
+        if (!v) break;
+        this._worldState.updateTriggerVolume(zoneId, ref.id, {
+          position: { x: v.position.x + delta.x, y: v.position.y + delta.y, z: v.position.z + delta.z },
+        });
+        break;
+      }
+    }
   }
 
   // ─── Mesh tracking ────────────────────────────────────────────────────────
@@ -470,6 +673,10 @@ export class GizmoManager implements IEditorModule {
   }
 
   private _onDragEnd(): void {
+    if (this._groupMode) {
+      this._worldState.transaction(`move ${this._groupRefs.length} items`, () => this._commitGroupTranslate());
+      return;
+    }
     // Spawn is world-level (zoneId is ""), so don't require _selZoneId for it —
     // otherwise the falsy empty-string zoneId skips the commit and the move is lost.
     if (!this._selId || !this._selType) return;

@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, ToolId, EditorObjectType, ScreenPos,
-  SelectedObjectPayload, WorldObject, WallDef,
+  SelectedObjectPayload, SelectedRef, WorldObject, WallDef,
 } from "@/types";
 
 const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor", "spawn"];
@@ -29,6 +29,9 @@ export class SelectionManager implements IEditorModule {
   private readonly _mouse     = new THREE.Vector2();
 
   private _selected:          THREE.Object3D | null = null;
+  // Additional selected entities beyond the primary (stored as refs so they survive mesh
+  // rebuilds; re-tinted via _retintExtras on the rebuilt events).
+  private _extraRefs:         SelectedRef[] = [];
   private _hovered:           THREE.Object3D | null = null;
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
@@ -51,7 +54,7 @@ export class SelectionManager implements IEditorModule {
 
   init(): void {
     this._unsub.push(
-      this._bus.on("input:click",     ({ screenPos }) => this._onClick(screenPos)),
+      this._bus.on("input:click",     ({ screenPos, shift, meta, ctrl }) => this._onClick(screenPos, shift || meta || ctrl)),
       this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
       this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
       this._bus.on("floor:select",    ({ level })     => { this._activeFloorLevel = level; }),
@@ -64,12 +67,16 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("gizmo:dragging",  ({ isDragging }) => {
         if (!isDragging) this._suppressNextClick = true;
       }),
-      this._bus.on("wall:removed",     ({ wallId })  => { if (this._selected?.userData.editorId === wallId)  this._deselect(); }),
-      this._bus.on("floor:removed",    ({ floorId }) => { if (this._selected?.userData.editorId === floorId) this._deselect(); }),
-      this._bus.on("platform:removed", ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
-      this._bus.on("stair:removed",    ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
-      this._bus.on("object:removed",   ({ id })      => { if (this._selected?.userData.editorId === id)      this._deselect(); }),
-      this._bus.on("object:deselected", ()           => { if (this._selected) this._restore(this._selected); this._selected = null; }),
+      this._bus.on("wall:removed",     ({ wallId })  => this._removeFromSelection(wallId)),
+      this._bus.on("floor:removed",    ({ floorId }) => this._removeFromSelection(floorId)),
+      this._bus.on("platform:removed", ({ id })      => this._removeFromSelection(id)),
+      this._bus.on("stair:removed",    ({ id })      => this._removeFromSelection(id)),
+      this._bus.on("object:removed",   ({ id })      => this._removeFromSelection(id)),
+      this._bus.on("object:deselected", ()           => {
+        if (this._selected) { this._restore(this._selected); this._selected = null; }
+        this._clearExtras();
+        this._emitSelectionChanged();
+      }),
     );
   }
 
@@ -80,18 +87,75 @@ export class SelectionManager implements IEditorModule {
     this._unsub = [];
     if (this._hovered  && this._hovered !== this._selected) this._restore(this._hovered);
     if (this._selected) this._restore(this._selected);
+    this._clearExtras();
     this._selected = null;
     this._hovered  = null;
   }
 
   // ─── Picking ────────────────────────────────────────────────────────────────
 
-  private _onClick(screenPos: ScreenPos): void {
+  private _onClick(screenPos: ScreenPos, additive = false): void {
     if (this._suppressNextClick) { this._suppressNextClick = false; return; }
     if (this._activeTool !== "select") return;
     const selectable = this._cast(screenPos);
-    if (selectable.length === 0) { this._deselect(); return; }
-    this._select(this._resolveRoot(this._pickByPriority(selectable).object));
+    if (selectable.length === 0) { if (!additive) this._deselect(); return; }
+    const root = this._resolveRoot(this._pickByPriority(selectable).object);
+    if (additive) this._toggleInSelection(root);
+    else          this._select(root);
+  }
+
+  /** Shift/Cmd-click: add an unselected entity to the set, or remove an already-selected one. */
+  private _toggleInSelection(root: THREE.Object3D): void {
+    const id = root.userData.editorId as string;
+    if (!id) return;
+    if (this._selected && this._selected.userData.editorId === id) {
+      // Toggling the primary: only meaningful as "clear" when it's the sole selection.
+      if (this._extraRefs.length === 0) this._deselect();
+      return;
+    }
+    const extraIdx = this._extraRefs.findIndex(r => r.id === id);
+    if (extraIdx >= 0) {                       // remove an extra
+      this._restore(root);
+      this._extraRefs.splice(extraIdx, 1);
+      this._emitSelectionChanged();
+      return;
+    }
+    if (!this._selected) { this._select(root); return; }   // nothing yet → make it primary
+    this._extraRefs.push(this._refOf(root));   // add as extra
+    this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelectionChanged();
+  }
+
+  private _refOf(root: THREE.Object3D): SelectedRef {
+    const ud = root.userData;
+    const memberIds = ud.editorType === "wall" ? (ud.wallIds as string[] | undefined) : undefined;
+    return { id: ud.editorId, type: ud.editorType, zoneId: ud.zoneId, memberIds };
+  }
+
+  private _clearExtras(): void {
+    for (const ref of this._extraRefs) {
+      const mesh = this._findMesh(ref.id, ref.zoneId);
+      if (mesh) this._restore(mesh);
+    }
+    this._extraRefs = [];
+  }
+
+  /** Re-apply the selection tint to all extra refs (after a mesh rebuild). */
+  private _retintExtras(): void {
+    for (const ref of this._extraRefs) {
+      const mesh = this._findMesh(ref.id, ref.zoneId);
+      if (mesh) this._applyTint(mesh, SELECT_EMISSIVE, SELECT_INTENSITY);
+    }
+  }
+
+  private _selectionRefs(): SelectedRef[] {
+    const refs = [...this._extraRefs];
+    if (this._selected) refs.unshift(this._refOf(this._selected));
+    return refs;
+  }
+
+  private _emitSelectionChanged(): void {
+    this._bus.emit("selection:changed", { refs: this._selectionRefs() });
   }
 
   private _onMove(screenPos: ScreenPos): void {
@@ -147,12 +211,14 @@ export class SelectionManager implements IEditorModule {
   // ─── Selection state ────────────────────────────────────────────────────────
 
   private _select(root: THREE.Object3D): void {
-    if (this._selected === root) return;
-    if (this._selected) this._restore(this._selected);
+    if (this._selected === root && this._extraRefs.length === 0) return;
+    this._clearExtras();
+    if (this._selected && this._selected !== root) this._restore(this._selected);
     this._selected = root;
     if (this._hovered === root) this._hovered = null;
     this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
     this._emitSelected(root);
+    this._emitSelectionChanged();
   }
 
   private _emitSelected(root: THREE.Object3D): void {
@@ -186,14 +252,25 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _deselect(): void {
-    if (!this._selected) return;
-    this._restore(this._selected);
-    this._selected = null;
+    if (!this._selected && this._extraRefs.length === 0) return;
+    // The object:deselected listener does the actual clearing (primary + extras) + event.
     this._bus.emit("object:deselected", {});
+  }
+
+  /** Remove one entity from the selection (e.g. it was deleted). */
+  private _removeFromSelection(id: string): void {
+    if (this._selected?.userData.editorId === id) { this._deselect(); return; }
+    const i = this._extraRefs.findIndex(r => r.id === id);
+    if (i < 0) return;
+    const mesh = this._findMesh(this._extraRefs[i].id, this._extraRefs[i].zoneId);
+    if (mesh) this._restore(mesh);
+    this._extraRefs.splice(i, 1);
+    this._emitSelectionChanged();
   }
 
   /** Wall was rebuilt — re-apply selection tint to the new mesh and refresh panel. */
   private _onWallRebuilt(zoneId: string, wallId: string): void {
+    if (this._extraRefs.length) this._retintExtras();
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     const ud = this._selected.userData;
 
@@ -230,6 +307,7 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _onPlatformRebuilt(zoneId: string, platformId: string): void {
+    if (this._extraRefs.length) this._retintExtras();
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     if (this._selected.userData.editorId !== platformId) return;
     const newMesh = this._findMesh(platformId, zoneId);
@@ -240,6 +318,7 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _onStairRebuilt(zoneId: string, stairId: string): void {
+    if (this._extraRefs.length) this._retintExtras();
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     if (this._selected.userData.editorId !== stairId) return;
     const newMesh = this._findMesh(stairId, zoneId);
@@ -250,6 +329,7 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _onFloorRebuilt(zoneId: string, floorId: string): void {
+    if (this._extraRefs.length) this._retintExtras();
     if (!this._selected || this._selected.userData.zoneId !== zoneId) return;
     if (this._selected.userData.editorId !== floorId) return;
     const newMesh = this._findMesh(floorId, zoneId);

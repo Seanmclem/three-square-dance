@@ -125,6 +125,9 @@ export class InputManager implements IEditorModule {
       screenPos: { x: e.clientX, y: e.clientY },
       worldPos:  this._worldPos(e),
       button:    e.button,
+      shift:     e.shiftKey,
+      ctrl:      e.ctrlKey,
+      meta:      e.metaKey,
     });
   }
 

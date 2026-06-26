@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type {
-  ToolId, SelectedObjectPayload, WorldObject, Vec3,
+  ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
   GroupDef,
@@ -279,6 +279,9 @@ interface PropertiesPanelProps {
   onPreviewClip?:           (objectId: string, clipName: string) => void;
   onStopPreview?:           (objectId: string) => void;
   onAutoPlayChange?:        (objectId: string, clipName: string | null) => void;
+  multiSelected?:           SelectedRef[];
+  onCopy?:                  () => void;
+  onDuplicate?:             () => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -289,6 +292,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
+  multiSelected = [], onCopy, onDuplicate,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -336,6 +340,50 @@ export function PropertiesPanel({
     onObjectUpdate({ label: trimmed || undefined } as Partial<WorldObject>);
   };
 
+  // Multi-select: a compact "N selected" view with bulk actions (move is via the group gizmo).
+  if (multiSelected.length > 1) {
+    const counts = multiSelected.reduce<Record<string, number>>((acc, r) => {
+      acc[r.type] = (acc[r.type] ?? 0) + 1; return acc;
+    }, {});
+    const summary = Object.entries(counts)
+      .map(([t, n]) => `${n} ${t}${n > 1 ? "s" : ""}`)
+      .join(" · ");
+    const ACTION_BTN: React.CSSProperties = {
+      width: "100%", padding: "9px 0", marginBottom: 8, borderRadius: 5,
+      border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
+      color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", cursor: "pointer",
+    };
+    return (
+      <div style={PANEL_STYLE}>
+        <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          <div style={{ padding: "11px 16px 6px" }}>
+            <span style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</span>
+          </div>
+          <div style={{ padding: "0 16px 10px" }}>
+            <div style={{ color: "#c0c0c0", fontSize: 14, fontFamily: "monospace" }}>
+              {multiSelected.length} selected
+            </div>
+            <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{summary}</div>
+          </div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginBottom: 12, lineHeight: 1.5 }}>
+            Drag the gizmo to move all together (translate only). Rotate/scale need a single selection.
+          </div>
+          {onDuplicate && <button style={ACTION_BTN} onClick={onDuplicate}>Duplicate</button>}
+          {onCopy      && <button style={ACTION_BTN} onClick={onCopy}>Copy</button>}
+          {onDelete    && (
+            <button
+              style={{ ...ACTION_BTN, color: "#ff6b6b", borderColor: "rgba(255,107,107,0.3)", marginBottom: 0 }}
+              onClick={onDelete}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={PANEL_STYLE}>
