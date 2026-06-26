@@ -664,6 +664,25 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
               onChange={e => set({ animation: e.target.value })}
             />
           )}
+          <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
+            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                type="checkbox"
+                checked={action.animationLoop ?? false}
+                onChange={e => set({ animationLoop: e.target.checked })}
+              />
+              Loop
+            </label>
+            <label style={{ color: action.animationLoop ? "#555" : "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                type="checkbox"
+                disabled={action.animationLoop ?? false}
+                checked={action.animationHold ?? false}
+                onChange={e => set({ animationHold: e.target.checked })}
+              />
+              Hold at end
+            </label>
+          </div>
         </div>
       );
     }

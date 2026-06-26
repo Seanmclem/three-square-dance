@@ -23,7 +23,7 @@ export class ObjectPlacer {
 
   constructor(private readonly _bus: EventBus) {
     // Script-driven actions (Phase 10.9). Object id is already group-resolved by ScriptEngine.
-    this._bus.on("object:play-animation", ({ id, clipName }) => this.previewClip(id, clipName));
+    this._bus.on("object:play-animation", ({ id, clipName, loop, hold }) => this.previewClip(id, clipName, { loop, hold }));
     this._bus.on("object:updated", ({ id, changes }) => {
       if (changes.material) void this._applyMaterial(id, changes.material);
       // move_object (and editor transform edits): apply to the live mesh for any object,
@@ -93,8 +93,12 @@ export class ObjectPlacer {
     for (const mixer of this._mixers.values()) mixer.update(dt);
   }
 
-  /** Play a clip once on the object's mesh in the editor — no preview mode needed. */
-  previewClip(objectId: string, clipName: string): void {
+  /**
+   * Play a clip on the object's mesh — no preview mode needed.
+   * Default: play once, then revert to the auto-play clip / bind pose.
+   * `opts.loop`: repeat forever. `opts.hold`: play once and freeze on the final frame.
+   */
+  previewClip(objectId: string, clipName: string, opts?: { loop?: boolean; hold?: boolean }): void {
     if (this._previewingId) this.stopPreview(this._previewingId);
     const mixer = this._mixers.get(objectId);
     const clip  = this._clips.get(objectId)?.get(clipName);
@@ -107,14 +111,21 @@ export class ObjectPlacer {
       return;
     }
 
+    const loop = opts?.loop ?? false;
     this._previewingId = objectId;
     mixer.stopAllAction();
-    const action = mixer.clipAction(clip).setLoop(THREE.LoopOnce, 1).reset().play();
-    action.clampWhenFinished = true;
+    const action = mixer.clipAction(clip)
+      .setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1)
+      .reset().play();
+    action.clampWhenFinished = !loop;
 
-    const onFinished = () => this.stopPreview(objectId);
-    this._finish.set(objectId, onFinished);
-    mixer.addEventListener("finished", onFinished);
+    // Only revert to rest pose for the default case. Loop never finishes; hold freezes
+    // on the clamped final frame (e.g. a death animation stays lying down).
+    if (!loop && !opts?.hold) {
+      const onFinished = () => this.stopPreview(objectId);
+      this._finish.set(objectId, onFinished);
+      mixer.addEventListener("finished", onFinished);
+    }
 
     this._bus.emit("animation:preview-start", { objectId, clipName });
   }

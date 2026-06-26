@@ -204,7 +204,7 @@ export interface BusEvents {
   "group:removed":         { id: string };
   "group:updated":         { id: string; name: string };
   "group:visibility":      { groupId: string; visible: boolean };
-  "object:play-animation": { id: string; clipName: string };
+  "object:play-animation": { id: string; clipName: string; loop?: boolean; hold?: boolean };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -557,6 +557,8 @@ export interface ScriptAction {
   type:          ActionType;
   targetId?:     string;
   animation?:    string;
+  animationLoop?: boolean;   // play_animation: loop the clip forever
+  animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   sound?:        string;
   dialogue?:     DialogueDef;
   material?:     string;
