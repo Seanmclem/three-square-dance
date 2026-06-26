@@ -231,7 +231,7 @@ export class ScriptEngine {
       case "play_animation":
         if (action.animation)
           for (const id of this._resolveTargets(action.targetId))
-            this._bus.emit("object:play-animation", { id, clipName: action.animation, loop: action.animationLoop, hold: action.animationHold });
+            this._bus.emit("object:play-animation", { id, clipName: action.animation, loop: action.animationLoop, hold: action.animationHold, blend: action.animationBlend });
         break;
 
       case "change_material": {

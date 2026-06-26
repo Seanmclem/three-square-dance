@@ -4,6 +4,9 @@ import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldObject } from "@/types";
 
+/** Default crossfade duration (seconds) when switching animation clips. */
+const BLEND_SEC = 0.3;
+
 /**
  * Owns the placed-object domain: builds object meshes (mesh + transform + userData,
  * skeleton-safe clone for skinned/animated GLTFs, fallback box on load failure) and
@@ -18,12 +21,13 @@ export class ObjectPlacer {
   private readonly _clips    = new Map<string, Map<string, THREE.AnimationClip>>();
   private readonly _autoPlay = new Map<string, string | null>();
   private readonly _finish   = new Map<string, () => void>();
+  private readonly _active   = new Map<string, THREE.AnimationAction>();
   private readonly _meshes   = new Map<string, THREE.Object3D>();
   private _previewingId: string | null = null;
 
   constructor(private readonly _bus: EventBus) {
     // Script-driven actions (Phase 10.9). Object id is already group-resolved by ScriptEngine.
-    this._bus.on("object:play-animation", ({ id, clipName, loop, hold }) => this.previewClip(id, clipName, { loop, hold }));
+    this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) => this.previewClip(id, clipName, { loop, hold, blend }));
     this._bus.on("object:updated", ({ id, changes }) => {
       if (changes.material) void this._applyMaterial(id, changes.material);
       // move_object (and editor transform edits): apply to the live mesh for any object,
@@ -35,6 +39,7 @@ export class ObjectPlacer {
       const mesh = this._meshes.get(id);
       if (mesh) mesh.visible = false;
       this._mixers.get(id)?.stopAllAction();
+      this._active.delete(id);
     });
   }
 
@@ -90,7 +95,35 @@ export class ObjectPlacer {
     this._clips.delete(objectId);
     this._autoPlay.delete(objectId);
     this._finish.delete(objectId);
+    this._active.delete(objectId);
     this._meshes.delete(objectId);
+  }
+
+  /**
+   * Crossfade the object's active action to `clip`. Tracks the new action in `_active` so the
+   * next switch can fade from it. With no prior action (or duration 0) it just starts the clip.
+   */
+  private _fadeTo(
+    objectId: string,
+    mixer: THREE.AnimationMixer,
+    clip: THREE.AnimationClip,
+    opts: { loop: boolean; duration: number },
+  ): THREE.AnimationAction {
+    const next = mixer.clipAction(clip);
+    next.reset();
+    next.setLoop(opts.loop ? THREE.LoopRepeat : THREE.LoopOnce, opts.loop ? Infinity : 1);
+    next.clampWhenFinished = !opts.loop;
+    next.enabled = true;
+    next.setEffectiveWeight(1);
+    next.play();
+
+    const prev = this._active.get(objectId);
+    if (prev && prev !== next) {
+      if (opts.duration > 0) prev.crossFadeTo(next, opts.duration, false);
+      else prev.stop();
+    }
+    this._active.set(objectId, next);
+    return next;
   }
 
   /** Advance every active mixer. Registered on the SceneManager RAF loop. */
@@ -103,7 +136,7 @@ export class ObjectPlacer {
    * Default: play once, then revert to the auto-play clip / bind pose.
    * `opts.loop`: repeat forever. `opts.hold`: play once and freeze on the final frame.
    */
-  previewClip(objectId: string, clipName: string, opts?: { loop?: boolean; hold?: boolean }): void {
+  previewClip(objectId: string, clipName: string, opts?: { loop?: boolean; hold?: boolean; blend?: number }): void {
     if (this._previewingId) this.stopPreview(this._previewingId);
     const mixer = this._mixers.get(objectId);
     const clip  = this._clips.get(objectId)?.get(clipName);
@@ -117,16 +150,13 @@ export class ObjectPlacer {
     }
 
     const loop = opts?.loop ?? false;
-    this._previewingId = objectId;
-    mixer.stopAllAction();
-    const action = mixer.clipAction(clip)
-      .setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1)
-      .reset().play();
-    action.clampWhenFinished = !loop;
+    this._fadeTo(objectId, mixer, clip, { loop, duration: opts?.blend ?? BLEND_SEC });
 
-    // Only revert to rest pose for the default case. Loop never finishes; hold freezes
-    // on the clamped final frame (e.g. a death animation stays lying down).
+    // Only the default case plays once then reverts, and counts as the evictable preview.
+    // Loop never finishes; hold freezes on the clamped final frame (e.g. a death pose stays
+    // down) — neither should be reverted by a later play, so don't mark them as _previewingId.
     if (!loop && !opts?.hold) {
+      this._previewingId = objectId;
       const onFinished = () => this.stopPreview(objectId);
       this._finish.set(objectId, onFinished);
       mixer.addEventListener("finished", onFinished);
@@ -141,12 +171,15 @@ export class ObjectPlacer {
     if (!mixer) return;
     const fin = this._finish.get(objectId);
     if (fin) { mixer.removeEventListener("finished", fin); this._finish.delete(objectId); }
-    mixer.stopAllAction();
 
+    // Crossfade back to the resting clip (or fade out to bind pose if there's none).
     const auto = this._autoPlay.get(objectId);
-    if (auto) {
-      const clip = this._clips.get(objectId)?.get(auto);
-      if (clip) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+    const clip = auto ? this._clips.get(objectId)?.get(auto) : undefined;
+    if (clip) {
+      this._fadeTo(objectId, mixer, clip, { loop: true, duration: BLEND_SEC });
+    } else {
+      this._active.get(objectId)?.fadeOut(BLEND_SEC);
+      this._active.delete(objectId);
     }
     if (this._previewingId === objectId) this._previewingId = null;
     this._bus.emit("animation:preview-stop", { objectId });
@@ -160,10 +193,12 @@ export class ObjectPlacer {
     if (this._previewingId === objectId) return;
     const mixer = this._mixers.get(objectId);
     if (!mixer) return;
-    mixer.stopAllAction();
     if (clipName) {
       const clip = this._clips.get(objectId)?.get(clipName);
-      if (clip) mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+      if (clip) this._fadeTo(objectId, mixer, clip, { loop: true, duration: BLEND_SEC });
+    } else {
+      this._active.get(objectId)?.fadeOut(BLEND_SEC);
+      this._active.delete(objectId);
     }
   }
 
@@ -225,7 +260,10 @@ export class ObjectPlacer {
     this._autoPlay.set(obj.id, obj.autoPlayAnimation ?? null);
 
     if (obj.autoPlayAnimation && clipMap.has(obj.autoPlayAnimation)) {
-      mixer.clipAction(clipMap.get(obj.autoPlayAnimation)!).setLoop(THREE.LoopRepeat, Infinity).play();
+      // Hard start (nothing to blend from); record as active so the first switch can crossfade.
+      const action = mixer.clipAction(clipMap.get(obj.autoPlayAnimation)!).setLoop(THREE.LoopRepeat, Infinity);
+      action.play();
+      this._active.set(obj.id, action);
     }
   }
 

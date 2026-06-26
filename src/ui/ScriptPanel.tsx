@@ -682,6 +682,17 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
               />
               Hold at end
             </label>
+            <div style={{ flex: 1 }} />
+            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+              Blend (s)
+              <input
+                type="number"
+                style={{ ...S.field, width: 52 }}
+                placeholder="0.3"
+                value={action.animationBlend ?? ""}
+                onChange={e => set({ animationBlend: parseFloat(e.target.value) || undefined })}
+              />
+            </label>
           </div>
         </div>
       );

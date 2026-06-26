@@ -1884,6 +1884,18 @@ For each step i:
 > never finishes; hold must not revert). The Properties-panel preview button calls
 > `previewClip` with no opts, so it keeps the play-once-then-revert behaviour.
 >
+> **Crossfade / blending:** clip switches are blended, not hard-cut. A `_active: Map<id,
+> AnimationAction>` tracks the currently-playing action; `_fadeTo(objectId, mixer, clip,
+> {loop, duration})` resets+plays the next action and `prev.crossFadeTo(next, duration)` from
+> the tracked active one (duration 0 → hard cut). Used at `previewClip` (blend in, duration =
+> `action.animationBlend ?? BLEND_SEC`), `stopPreview` (blend back to the resting clip), and
+> `setAutoPlay` (blend resting-clip swaps). `_setupMixer`'s first auto-play is a hard start
+> (nothing to blend from) but records `_active` so the first switch can fade. Per-action
+> override: `ScriptAction.animationBlend` (seconds) flows through `object:play-animation`'s
+> `blend`. Default `BLEND_SEC = 0.3`. Teardown paths (`remove`, `object:despawn`) clear
+> `_active`. Cost: a blend evaluates two clips for that one model during the overlap window —
+> see Performance Concerns.
+>
 > **Skinned-mesh frustum culling:** `build` disables `frustumCulled` on skinned meshes only
 > (`isSkinnedMesh`) so animation-displaced submeshes like eyes/face don't get culled against
 > a stale bind-pose bounding sphere. See **Performance Concerns → Skinned-mesh frustum
@@ -1904,7 +1916,7 @@ class ObjectPlacer {
 
   remove(objectId: string): void {}              // tear down mixer/clips/preview (geometry: ZoneManager)
   update(dt: number): void {}                     // advance all mixers — registered on SceneManager RAF
-  previewClip(objectId, clipName, opts?): void {} // play clip; opts {loop, hold}; one preview at a time
+  previewClip(objectId, clipName, opts?): void {} // play clip; opts {loop, hold, blend}; one preview at a time
   stopPreview(objectId): void {}                  // restore auto-play clip or bind pose
   setAutoPlay(objectId, clipName | null): void {} // change resting-state loop; takes effect immediately
 }
@@ -6945,6 +6957,16 @@ mesh's bounding sphere from the deformed pose (`computeBoundingSphere()` after t
 updates each frame). That gives accurate culling with no guessing, at the cost of a bit of
 per-frame work — worth it only above the crowd threshold. Below it, the box is just more
 complexity for no measurable gain.
+
+### Animation crossfade cost
+
+`ObjectPlacer` crossfades between clips (`_fadeTo` + `AnimationAction.crossFadeTo`). During a
+blend window (default `BLEND_SEC = 0.3`s) the mixer evaluates **two clips at once** for that
+one model, so a transient ~2× skinning cost per blending character — negligible at a handful
+of characters, and zero outside the blend window. The existing `mixer.update(dt)` drives the
+fades; no new render loop. Faded-out actions are left at weight 0 (standard three.js pattern)
+rather than explicitly stopped; harmless for one-active-at-a-time character models. At crowd
+scale this combines with the culling concern above.
 
 ---
 
