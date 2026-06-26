@@ -105,6 +105,9 @@ export class EditorCamera {
 
   private _handleKeyDown(e: KeyboardEvent): void {
     if (!this._enabled || this._isTypingTarget(e)) return;
+    // Don't treat WASD/arrows as camera movement when a modifier is held — those are app
+    // shortcuts (Cmd+D duplicate, Cmd+S save, etc.) and shouldn't also pan the camera.
+    if (e.metaKey || e.ctrlKey) return;
     this._keys[e.code] = true;
   }
   private _handleKeyUp(e: KeyboardEvent): void {

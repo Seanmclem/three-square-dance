@@ -147,7 +147,7 @@ export class InputManager implements IEditorModule {
     this._keys[e.code] = true;
     if (this._suppress) return;
     this._bus.emit("input:keydown", {
-      code: e.code, key: e.key, shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey,
+      code: e.code, key: e.key, shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey,
     });
   }
 

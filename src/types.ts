@@ -178,7 +178,7 @@ export interface BusEvents {
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
   "input:wheel":           { delta: number };
-  "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean };
+  "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean; meta: boolean };
   "input:keyup":           { code: string };
   "history:restore":       Record<string, never>;
   "assets:loaded":         { assets: AssetDef[] };
