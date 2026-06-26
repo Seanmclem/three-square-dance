@@ -49,6 +49,7 @@ type PendingEdit = {
   initial: { label: string; category: string; attribution: Attribution };
 };
 import { HistoryManager } from "@/editor/HistoryManager";
+import { copySelection, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
@@ -121,6 +122,8 @@ export default function App() {
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
+  const clipboardRef   = useRef<Clipboard | null>(null);
+  const pasteCountRef  = useRef(0);
 
   const syncHistory = useCallback((): void => {
     const hu = historyRef.current?.canUndo ?? false;
@@ -193,6 +196,7 @@ export default function App() {
       g.__editorCamera = scene.editorCamera;
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
       g.__objectPlacer = objectPlacer; g.__history = history;
+      g.__copyPaste = { copySelection, pasteClipboard };
       installTestHelpers({ bus, world, scriptEngine, preview });
     }
 
@@ -605,6 +609,34 @@ export default function App() {
     syncHistory();
   }, [syncHistory]);
 
+  const handleCopy = useCallback((): void => {
+    const world = worldRef.current;
+    if (!world || !selected) return;
+    const clip = copySelection(world, selected);
+    if (clip) { clipboardRef.current = clip; pasteCountRef.current = 0; }
+  }, [selected]);
+
+  // Paste the clipboard (or, for Duplicate, a fresh clone of the current selection) into the
+  // active zone with a cascading offset, then select the new entity.
+  const pasteClip = useCallback((clip: Clipboard | null): void => {
+    const world = worldRef.current;
+    const zoneId = activeZoneId ?? clip?.zoneId;
+    if (!world || !clip || !zoneId) return;
+    const n = (pasteCountRef.current += 1);
+    const result = pasteClipboard(world, clip, zoneId, { x: n, z: n });
+    if (result) busRef.current.emit("tool:placed", { type: result.type, id: result.id, zoneId });
+    syncHistory();
+  }, [activeZoneId, syncHistory]);
+
+  const handlePaste = useCallback((): void => { pasteClip(clipboardRef.current); }, [pasteClip]);
+
+  const handleDuplicate = useCallback((): void => {
+    const world = worldRef.current;
+    if (!world || !selected) return;
+    const clip = copySelection(world, selected);
+    if (clip) { clipboardRef.current = clip; pasteCountRef.current = 0; pasteClip(clip); }
+  }, [selected, pasteClip]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape') {
@@ -631,10 +663,18 @@ export default function App() {
         e.preventDefault();
         handleRedo();
       }
+      // Copy / paste / duplicate — but never hijack normal text copy/paste in fields.
+      const tag = (e.target as HTMLElement).tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      if ((e.metaKey || e.ctrlKey) && !typing) {
+        if (e.code === 'KeyC')      { e.preventDefault(); handleCopy(); }
+        else if (e.code === 'KeyV') { e.preventDefault(); handlePaste(); }
+        else if (e.code === 'KeyD') { e.preventDefault(); handleDuplicate(); }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave, handleUndo, handleRedo]);
+  }, [handleSave, handleUndo, handleRedo, handleCopy, handlePaste, handleDuplicate]);
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
