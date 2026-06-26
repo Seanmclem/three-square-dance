@@ -34,7 +34,10 @@ export class HistoryManager {
   private _undo: HistoryEntry[] = [];
   private _redo: HistoryEntry[] = [];
 
-  constructor(private readonly _world: WorldState) {}
+  // Notified on every stack change so the UI (undo/redo buttons) can refresh — needed
+  // because transactions are committed inside WorldState (gizmo/tools/node-drag), far from
+  // the React layer, so callers can't reliably call syncHistory themselves.
+  constructor(private readonly _world: WorldState, private readonly _onChange?: () => void) {}
 
   /** Called by WorldState.commitTransaction. */
   push(entry: HistoryEntry): void {
@@ -42,6 +45,7 @@ export class HistoryManager {
     if (this._undo.length >= MAX) this._undo.shift();
     this._undo.push(entry);
     this._redo = [];
+    this._onChange?.();
   }
 
   undo(): void {
@@ -49,6 +53,7 @@ export class HistoryManager {
     if (!e) return;
     this._redo.push(e);
     this._world._applyChanges(e.changes, "before");
+    this._onChange?.();
   }
 
   redo(): void {
@@ -56,10 +61,11 @@ export class HistoryManager {
     if (!e) return;
     this._undo.push(e);
     this._world._applyChanges(e.changes, "after");
+    this._onChange?.();
   }
 
   get canUndo(): boolean { return this._undo.length > 0; }
   get canRedo(): boolean { return this._redo.length > 0; }
 
-  clear(): void { this._undo = []; this._redo = []; }
+  clear(): void { this._undo = []; this._redo = []; this._onChange?.(); }
 }

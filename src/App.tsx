@@ -155,7 +155,7 @@ export default function App() {
     objectPlacerRef.current = objectPlacer;
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer);
     zonesRef.current = zones;
-    const history   = new HistoryManager(world);
+    const history   = new HistoryManager(world, syncHistory);
     historyRef.current = history;
     world.setHistory(history);
     bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
