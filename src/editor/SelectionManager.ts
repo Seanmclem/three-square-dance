@@ -295,7 +295,9 @@ export class SelectionManager implements IEditorModule {
       this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
       // Re-emit whenever any wall in this run is rebuilt so openings on non-primary
       // segments (e.g. after a cross-wall drag) appear in the panel immediately.
-      if (inMyRun) this._emitSelected(newMesh);
+      // But NOT during a multi-selection — object:selected would drop the group gizmo
+      // back to single-select on the primary (the extras stay tinted but untracked).
+      if (inMyRun && this._extraRefs.length === 0) this._emitSelected(newMesh);
     } else if (ud.editorType === "opening" && ud.wallId === wallId) {
       const newMesh = this._findMesh(ud.editorId as string, zoneId);
       if (!newMesh) { this._deselect(); return; }
@@ -322,7 +324,7 @@ export class SelectionManager implements IEditorModule {
     if (!newMesh) { this._deselect(); return; }
     this._selected = newMesh;
     this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
-    this._emitSelected(newMesh);
+    if (this._extraRefs.length === 0) this._emitSelected(newMesh);
   }
 
   private _onStairRebuilt(zoneId: string, stairId: string): void {
@@ -333,7 +335,7 @@ export class SelectionManager implements IEditorModule {
     if (!newMesh) { this._deselect(); return; }
     this._selected = newMesh;
     this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
-    this._emitSelected(newMesh);
+    if (this._extraRefs.length === 0) this._emitSelected(newMesh);
   }
 
   private _onFloorRebuilt(zoneId: string, floorId: string): void {
@@ -344,7 +346,7 @@ export class SelectionManager implements IEditorModule {
     if (!newMesh) { this._deselect(); return; }
     this._selected = newMesh;
     this._applyTint(newMesh, SELECT_EMISSIVE, SELECT_INTENSITY);
-    this._emitSelected(newMesh);
+    if (this._extraRefs.length === 0) this._emitSelected(newMesh);
   }
 
   private _selectAfterPlace(id: string, zoneId: string, attempt = 0): void {
