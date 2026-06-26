@@ -1874,6 +1874,20 @@ For each step i:
 > and traverses the object's meshes, flipping `_ownsMaterial=false`). `build` also applies
 > `obj.material` when present. ScriptEngine has already group-resolved the target id, so these
 > handlers act on a single concrete object id.
+>
+> **Animation playback options:** `previewClip(objectId, clipName, opts?)` takes
+> `{ loop?, hold? }`. The `play_animation` script action forwards `action.animationLoop` /
+> `action.animationHold` through the `object:play-animation` event. `loop` → `LoopRepeat`;
+> `hold` → play once and clamp on the final frame (e.g. a death pose stays lying down);
+> default → play once then revert to auto-play/bind pose. The revert is driven by a
+> `finished`→`stopPreview` listener that is **only** registered in the default case (loop
+> never finishes; hold must not revert). The Properties-panel preview button calls
+> `previewClip` with no opts, so it keeps the play-once-then-revert behaviour.
+>
+> **Skinned-mesh frustum culling:** `build` disables `frustumCulled` on skinned meshes only
+> (`isSkinnedMesh`) so animation-displaced submeshes like eyes/face don't get culled against
+> a stale bind-pose bounding sphere. See **Performance Concerns → Skinned-mesh frustum
+> culling** for the full rationale and the crowd-scale upgrade path.
 
 ```ts
 class ObjectPlacer {
@@ -1890,7 +1904,7 @@ class ObjectPlacer {
 
   remove(objectId: string): void {}              // tear down mixer/clips/preview (geometry: ZoneManager)
   update(dt: number): void {}                     // advance all mixers — registered on SceneManager RAF
-  previewClip(objectId, clipName): void {}        // play once in the editor; only one preview at a time
+  previewClip(objectId, clipName, opts?): void {} // play clip; opts {loop, hold}; one preview at a time
   stopPreview(objectId): void {}                  // restore auto-play clip or bind pose
   setAutoPlay(objectId, clipName | null): void {} // change resting-state loop; takes effect immediately
 }
@@ -6878,6 +6892,59 @@ Zone button label changed from "Zone" to "Groups". Active state triggered by `op
 - Old saves load fine; `groups` defaults to `[]`.
 - Old saves with multiple zones still render (all zone geometry loads, only the first zone is actively editable).
 - `groupIds` is optional on all entity types — existing entities behave as if in no groups.
+
+---
+
+## Performance Concerns (circle back to)
+
+Running list of deliberate performance trade-offs — decisions that are correct at the
+current scale but have a documented upgrade path if scale grows. Revisit when the
+relevant scale assumption changes.
+
+### Skinned-mesh frustum culling (animated characters)
+
+**Symptom that prompted this:** at the end of a death animation (character lying flat),
+walking close/around the body made the eyes and face pop out of existence.
+
+**Cause:** Three.js frustum-culls each mesh against a **bounding sphere computed once from
+the bind pose** (the default standing pose baked into the geometry). A skinning animation
+that moves vertices far from that sphere — e.g. lying flat — leaves the sphere stale. Eyes
+and face are usually **separate small submeshes** with their own small spheres; once the
+animation displaces them and the camera moves so the stale sphere falls outside the
+frustum, Three.js culls the whole submesh and it disappears. The body has a larger sphere
+so it survives; small parts vanish first.
+
+**Current fix (`ObjectPlacer.build`):** disable frustum culling on skinned meshes only:
+
+```ts
+mesh.traverse(c => { if ((c as THREE.SkinnedMesh).isSkinnedMesh) c.frustumCulled = false; });
+```
+
+This walk runs **once per model at spawn** (not per frame), so it has no per-frame cost.
+Static GLB props keep normal culling — only actually-animated character meshes are flagged.
+
+**Cost of the fix:** a flagged mesh is always submitted for drawing.
+- **On-screen:** zero difference — it was going to be drawn anyway.
+- **Off-screen:** one extra draw call (plus its skinning) per flagged character per frame,
+  instead of being skipped. Negligible for a handful of characters.
+
+**Why not just enlarge the bounding box instead?** Considered and rejected at this scale.
+Keeping culling on with a bigger sphere *would* still cull genuinely off-screen characters,
+but: (1) it needs **per-model, per-animation tuning** — a death pose pushes geometry well
+outside the standing silhouette, so the margin must be generous, which erodes the culling
+benefit (it stops being skipped until far off-screen); (2) guess too small and the exact
+eyes/face bug returns **intermittently and pose-dependent** — the worst kind to debug;
+(3) the eyes/face are separate submeshes, so it's several spheres to tune per asset. It's
+"smarter" but fragile and high-maintenance. Disabling culling is correct for **any**
+imported model and animation with zero tuning, and can never wrongly hide a visible part.
+
+**Upgrade path (only when scale demands it):** the trade-off flips with a **crowd** — dozens
+to hundreds of skinned characters, many off-screen at once — where the un-culled draw calls
+add up. The right upgrade is **not** the hand-tuned box; it's recomputing each skinned
+mesh's bounding sphere from the deformed pose (`computeBoundingSphere()` after the mixer
+updates each frame). That gives accurate culling with no guessing, at the cost of a bit of
+per-frame work — worth it only above the crowd threshold. Below it, the box is just more
+complexity for no measurable gain.
 
 ---
 
