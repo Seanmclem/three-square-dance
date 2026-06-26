@@ -307,6 +307,16 @@ export default function App() {
         if (payload.type === "trigger-volume") setLeftPanel("scripts");
       }),
       bus.on("object:deselected", ()            => setSelected(null)),
+      bus.on("object:updated", ({ id, zoneId }) => {
+        // Refresh selected.data with a fresh reference so the panel (e.g. ScriptEditor)
+        // re-renders from current data. Without this, object script edits read a stale
+        // snapshot and a later edit can revert an earlier one (mirrors triggervolume:updated).
+        setSelected(prev => {
+          if (prev?.type !== "object" || prev.id !== id) return prev;
+          const obj = world.zones.get(zoneId)?.objects.find(o => o.id === id);
+          return obj ? { ...prev, data: obj } : prev;
+        });
+      }),
       bus.on("selection:changed", ({ refs }) => setMultiSelected(refs)),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
       bus.on("tool:placed", ({ type }) => {
