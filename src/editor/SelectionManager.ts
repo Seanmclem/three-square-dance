@@ -165,9 +165,17 @@ export class SelectionManager implements IEditorModule {
       ? this._resolveRoot(this._pickByPriority(selectable).object)
       : null;
     if (hovered === this._hovered) return;
-    if (this._hovered && this._hovered !== this._selected) this._restore(this._hovered);
+    // Don't strip the selection tint off the primary OR any extra when hover leaves it.
+    if (this._hovered && !this._isSelected(this._hovered)) this._restore(this._hovered);
     this._hovered = hovered;
-    if (hovered && hovered !== this._selected) this._applyTint(hovered, HOVER_EMISSIVE, HOVER_INTENSITY);
+    if (hovered && !this._isSelected(hovered)) this._applyTint(hovered, HOVER_EMISSIVE, HOVER_INTENSITY);
+  }
+
+  /** Is this root the primary selection or one of the extras? */
+  private _isSelected(root: THREE.Object3D): boolean {
+    const id = root.userData.editorId as string;
+    if (this._selected && this._selected.userData.editorId === id) return true;
+    return this._extraRefs.some(r => r.id === id);
   }
 
   private _cast(screenPos: ScreenPos): THREE.Intersection[] {
