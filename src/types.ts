@@ -174,6 +174,7 @@ export interface BusEvents {
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
   "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number; shift: boolean; ctrl: boolean; meta: boolean };
   "selection:changed":     { refs: SelectedRef[] };
+  "selection:set":         { refs: SelectedRef[] };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };

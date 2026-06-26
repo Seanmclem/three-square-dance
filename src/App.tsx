@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
@@ -50,6 +50,7 @@ type PendingEdit = {
 };
 import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
+import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
@@ -113,6 +114,7 @@ export default function App() {
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
   const [groups,          setGroups]           = useState<GroupDef[]>([]);
   const [hiddenGroups,    setHiddenGroups]      = useState<Set<string>>(new Set());
+  const [membershipRev,   setMembershipRev]     = useState(0); // bumps when any entity's groupIds change
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
@@ -283,6 +285,8 @@ export default function App() {
     // Advance object animation mixers every frame (editor + preview)
     scene.onUpdate(dt => objectPlacer.update(dt));
 
+    const bumpMembership = () => setMembershipRev(v => v + 1);
+
     const unsub = [
       bus.on("preview:start", () => {
         setIsPreview(true);
@@ -383,8 +387,29 @@ export default function App() {
         setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
       bus.on("group:added",   () => setGroups([...world.groups])),
-      bus.on("group:removed", () => setGroups([...world.groups])),
+      bus.on("group:removed", () => { setGroups([...world.groups]); bumpMembership(); }),
       bus.on("group:updated", () => setGroups([...world.groups])),
+
+      // Keep the per-group member lists live: bump on any groupIds edit or member deletion.
+      bus.on("floor:updated",        ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("wall:updated",         ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("platform:updated",     ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("stair:updated",        ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("object:updated",       ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("triggervolume:updated",({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("floor:removed",        bumpMembership),
+      bus.on("wall:removed",         bumpMembership),
+      bus.on("platform:removed",     bumpMembership),
+      bus.on("stair:removed",        bumpMembership),
+      bus.on("object:removed",       bumpMembership),
+      bus.on("triggervolume:removed",bumpMembership),
+      // Pasted/duplicated entities arrive via *:added carrying their cloned groupIds.
+      bus.on("floor:added",          ({ floor })    => { if (floor.groupIds?.length)    bumpMembership(); }),
+      bus.on("wall:added",           ({ wall })     => { if (wall.groupIds?.length)     bumpMembership(); }),
+      bus.on("platform:added",       ({ platform }) => { if (platform.groupIds?.length) bumpMembership(); }),
+      bus.on("stair:added",          ({ stair })    => { if (stair.groupIds?.length)    bumpMembership(); }),
+      bus.on("object:added",         ({ object })   => { if (object.groupIds?.length)   bumpMembership(); }),
+      bus.on("triggervolume:added",  ({ volume })   => { if (volume.groupIds?.length)   bumpMembership(); }),
     ];
 
     return () => {
@@ -653,6 +678,97 @@ export default function App() {
     if (clip) { clipboardRef.current = clip; pasteCountRef.current = 0; pasteClip(clip); }
   }, [captureClipboard, pasteClip]);
 
+  // Duplicate an arbitrary ref set (group "Duplicate all members"). Reuses the multi clipboard
+  // + paste path; non-copyable refs are dropped by copySelectionMulti.
+  const duplicateRefs = useCallback((refs: SelectedRef[]): void => {
+    const world = worldRef.current;
+    if (!world || refs.length === 0) return;
+    const clip = copySelectionMulti(world, refs);
+    if (!clip) return;
+    clipboardRef.current = clip; pasteCountRef.current = 0;
+    pasteClip(clip);
+  }, [pasteClip]);
+
+  // Delete an arbitrary ref set in one transaction (no per-entity script prompt).
+  // Shared by multi-select delete and group "Delete all members".
+  const deleteRefs = useCallback((refs: SelectedRef[]): void => {
+    const world = worldRef.current;
+    if (!world || refs.length === 0) return;
+    const zoneId = refs[0].zoneId;
+    const nodesToRemove = new Set<string>();
+    world.transaction(`delete ${refs.length} item${refs.length > 1 ? "s" : ""}`, () => {
+      for (const ref of refs) {
+        const zone = world.zones.get(ref.zoneId);
+        switch (ref.type) {
+          case "wall": {
+            const ids = ref.memberIds?.length ? ref.memberIds : [ref.id];
+            for (const wid of ids) {
+              const w = zone?.walls.find(ww => ww.id === wid);
+              if (w) { nodesToRemove.add(w.startNodeId); nodesToRemove.add(w.endNodeId); }
+              world.removeWall(ref.zoneId, wid);
+            }
+            break;
+          }
+          case "floor":          world.removeFloor(ref.zoneId, ref.id); break;
+          case "platform":       world.removePlatform(ref.zoneId, ref.id); break;
+          case "stair":          world.removeStair(ref.zoneId, ref.id); break;
+          case "object":         world.removeObject(ref.zoneId, ref.id); break;
+          case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
+        }
+      }
+      for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
+    });
+    syncHistory();
+    setSelected(null);
+    busRef.current.emit("object:deselected", {});
+  }, [syncHistory]);
+
+  // ── Group bulk operations ───────────────────────────────────────────────────
+  // groupId → members, rebuilt only when membership or the group list changes.
+  const groupMembers = useMemo<Map<string, GroupMember[]>>(
+    () => (worldRef.current ? membersByGroup(worldRef.current) : new Map()),
+    [membershipRev, groups], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const handleAddSelectedToGroup = useCallback((groupId: string): void => {
+    const world = worldRef.current;
+    if (!world || multiSelected.length === 0) return;
+    world.transaction(`add ${multiSelected.length} to group`, () => {
+      for (const ref of multiSelected) {
+        const current = entityGroupIds(world, ref);
+        if (current.includes(groupId)) continue;
+        writeGroupIds(world, ref, [...current, groupId]);
+      }
+    });
+    syncHistory();
+  }, [multiSelected, syncHistory]);
+
+  const handleRemoveGroupMember = useCallback((groupId: string, ref: SelectedRef): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    const current = entityGroupIds(world, ref);
+    if (!current.includes(groupId)) return;
+    world.transaction("remove from group", () => {
+      writeGroupIds(world, ref, current.filter(g => g !== groupId));
+    });
+    syncHistory();
+  }, [syncHistory]);
+
+  const handleSelectGroupMembers = useCallback((groupId: string): void => {
+    const refs = (groupMembers.get(groupId) ?? []).map(m => m.ref);
+    busRef.current.emit("selection:set", { refs });
+  }, [groupMembers]);
+
+  const handleDeleteGroupMembers = useCallback((groupId: string): void => {
+    const refs = (groupMembers.get(groupId) ?? []).map(m => m.ref);
+    if (refs.length > 0) deleteRefs(refs);
+  }, [groupMembers, deleteRefs]);
+
+  const handleDuplicateGroupMembers = useCallback((groupId: string): void => {
+    const refs = (groupMembers.get(groupId) ?? []).map(m => m.ref);
+    if (refs.length > 0) duplicateRefs(refs);
+  }, [groupMembers, duplicateRefs]);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape') {
@@ -788,40 +904,10 @@ export default function App() {
   };
 
   const handleDelete = useCallback((): void => {
-    const world   = worldRef.current;
-    const history = historyRef.current;
+    const world = worldRef.current;
 
     // Multi-select: delete the whole set in one transaction (no per-entity script prompt).
-    if (multiSelected.length > 1 && world) {
-      const zoneId = multiSelected[0].zoneId;
-      const nodesToRemove = new Set<string>();
-      world.transaction(`delete ${multiSelected.length} items`, () => {
-        for (const ref of multiSelected) {
-          const zone = world.zones.get(ref.zoneId);
-          switch (ref.type) {
-            case "wall": {
-              const ids = ref.memberIds?.length ? ref.memberIds : [ref.id];
-              for (const wid of ids) {
-                const w = zone?.walls.find(ww => ww.id === wid);
-                if (w) { nodesToRemove.add(w.startNodeId); nodesToRemove.add(w.endNodeId); }
-                world.removeWall(ref.zoneId, wid);
-              }
-              break;
-            }
-            case "floor":          world.removeFloor(ref.zoneId, ref.id); break;
-            case "platform":       world.removePlatform(ref.zoneId, ref.id); break;
-            case "stair":          world.removeStair(ref.zoneId, ref.id); break;
-            case "object":         world.removeObject(ref.zoneId, ref.id); break;
-            case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
-          }
-        }
-        for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
-      });
-      syncHistory();
-      setSelected(null);
-      busRef.current.emit("object:deselected", {});
-      return;
-    }
+    if (multiSelected.length > 1 && world) { deleteRefs(multiSelected); return; }
 
     if (!selected || !world) return;
     const { type, id, zoneId } = selected;
@@ -865,7 +951,7 @@ export default function App() {
     syncHistory();
     setSelected(null);
     busRef.current.emit("object:deselected", {});
-  }, [selected, multiSelected, syncHistory]);
+  }, [selected, multiSelected, syncHistory, deleteRefs]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -1302,6 +1388,13 @@ export default function App() {
         onGroupRemove={handleRemoveGroup}
         onGroupRename={handleRenameGroup}
         onGroupToggleVisibility={handleToggleGroupVisibility}
+        groupMembers={groupMembers}
+        multiSelectedCount={multiSelected.length}
+        onAddSelectedToGroup={handleAddSelectedToGroup}
+        onRemoveGroupMember={handleRemoveGroupMember}
+        onSelectGroupMembers={handleSelectGroupMembers}
+        onDeleteGroupMembers={handleDeleteGroupMembers}
+        onDuplicateGroupMembers={handleDuplicateGroupMembers}
         activeZoneId={activeZoneId}
         zoneScripts={zoneScripts}
         objectScripts={objectScripts}

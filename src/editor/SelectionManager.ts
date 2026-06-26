@@ -77,6 +77,7 @@ export class SelectionManager implements IEditorModule {
         this._clearExtras();
         this._emitSelectionChanged();
       }),
+      this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
     );
   }
 
@@ -123,6 +124,42 @@ export class SelectionManager implements IEditorModule {
     if (!this._selected) { this._select(root); return; }   // nothing yet → make it primary
     this._extraRefs.push(this._refOf(root));   // add as extra
     this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
+    this._emitSelectionChanged();
+  }
+
+  /**
+   * Replace the whole selection from a ref list (e.g. "select all in group").
+   * First resolvable ref becomes primary, the rest become extras. Refs whose mesh
+   * isn't in the live scene are skipped; duplicate roots (walls sharing a run mesh)
+   * are deduped. Empty result clears the selection.
+   */
+  private _setSelection(refs: SelectedRef[]): void {
+    const resolved: THREE.Object3D[] = [];
+    const seen = new Set<string>();
+    for (const ref of refs) {
+      const mesh = this._findMesh(ref.id, ref.zoneId);
+      if (!mesh) continue;
+      const root = this._resolveRoot(mesh);
+      if (seen.has(root.uuid)) continue;
+      seen.add(root.uuid);
+      resolved.push(root);
+    }
+
+    // Drop the current selection/hover tints before applying the new set.
+    if (this._selected) { this._restore(this._selected); this._selected = null; }
+    this._clearExtras();
+    if (this._hovered) { this._restore(this._hovered); this._hovered = null; }
+
+    if (resolved.length === 0) { this._bus.emit("object:deselected", {}); return; }
+
+    const [primary, ...rest] = resolved;
+    this._selected = primary;
+    this._applyTint(primary, SELECT_EMISSIVE, SELECT_INTENSITY);
+    for (const root of rest) {
+      this._extraRefs.push(this._refOf(root));
+      this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
+    }
+    this._emitSelected(primary);
     this._emitSelectionChanged();
   }
 

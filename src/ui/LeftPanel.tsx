@@ -1,4 +1,5 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, SelectedRef } from "@/types";
+import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
@@ -23,6 +24,13 @@ interface LeftPanelProps {
   onGroupRemove:   (id: string) => void;
   onGroupRename:   (id: string, name: string) => void;
   onGroupToggleVisibility: (id: string) => void;
+  groupMembers:    Map<string, GroupMember[]>;
+  multiSelectedCount: number;
+  onAddSelectedToGroup:    (groupId: string) => void;
+  onRemoveGroupMember:     (groupId: string, ref: SelectedRef) => void;
+  onSelectGroupMembers:    (groupId: string) => void;
+  onDeleteGroupMembers:    (groupId: string) => void;
+  onDuplicateGroupMembers: (groupId: string) => void;
   activeZoneId:    string | null;
   // scripts panel
   zoneScripts:          ScriptDef[];
@@ -38,6 +46,8 @@ export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
+  groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
+  onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
   onZoneScriptsChange, onObjectScriptsChange,
@@ -105,10 +115,17 @@ export function LeftPanel({
               <GroupPanel
                 groups={groups}
                 hiddenGroupIds={hiddenGroupIds}
+                groupMembers={groupMembers}
+                multiSelectedCount={multiSelectedCount}
                 onAdd={onGroupAdd}
                 onRemove={onGroupRemove}
                 onRename={onGroupRename}
                 onToggleVisibility={onGroupToggleVisibility}
+                onAddSelected={onAddSelectedToGroup}
+                onRemoveMember={onRemoveGroupMember}
+                onSelectMembers={onSelectGroupMembers}
+                onDeleteMembers={onDeleteGroupMembers}
+                onDuplicateMembers={onDuplicateGroupMembers}
               />
             )}
             {panelId === "scripts" && (

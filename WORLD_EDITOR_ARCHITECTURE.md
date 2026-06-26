@@ -1480,6 +1480,8 @@ class EventBus {
 | `floor:select` | React → Three.js | `{ level: number }` |
 | `object:selected` | Three.js → React | `{ id, type, zoneId, position, rotation, scale, data }` |
 | `object:deselected` | Three.js → React | `{}` |
+| `selection:changed` | Three.js → React | `{ refs: SelectedRef[] }` (multi-select set changed) |
+| `selection:set` | React → Three.js | `{ refs: SelectedRef[] }` (programmatic select, e.g. "select all in group") |
 | `object:updated` | React → Three.js | `{ id, zoneId, changes }` |
 | `asset:selected` | React → Three.js | `{ assetId }` |
 | `asset:dropped` | React → Three.js | `{ assetId, screenPos }` |
@@ -6020,10 +6022,13 @@ src/types.ts                     ← MaterialOverrides.offsetX/offsetY, SceneMet
 > into `ObjectPlacer` as originally drafted — ZoneManager already owns both world data and all
 > mesh references. `_resolveTargets` + `play_animation`/`change_material` route through
 > `ObjectPlacer` (new `_meshes` registry); `show_ui` is **not** group-resolved (UI element id, not
-> an entity). `FadeOverlay.tsx` renders `overlay:fade-in`. **Bulk operations need
-> `SelectionManager` multi-select (not built) and are deferred to a follow-up phase.**
+> an entity). `FadeOverlay.tsx` renders `overlay:fade-in`. ~~**Bulk operations need
+> `SelectionManager` multi-select (not built) and are deferred to a follow-up phase.**~~
 > (v4.1.1: `despawn_object`/`move_object` gained their missing runtime consumers in
 > `ObjectPlacer` — hide-mesh and apply-transform, runtime-only.)
+>
+> **Correction:** multi-select *was* built (test-plan `phase-11-multi-select`), and group bulk
+> operations shipped on top of it — see **Phase 10.9b — Group Bulk Operations** below.
 
 Two threads land together here:
 
@@ -6084,6 +6089,51 @@ src/types.ts                    ← WorldObject.material; bus events group:visib
 ```
 
 > **Object-mesh actions route through `ObjectPlacer`** (the Phase 10.7 owner of object meshes + mixers), not `ZoneManager`. Group *visibility* spans all entity types, so it stays split: `ObjectPlacer` toggles object meshes, `ZoneManager` toggles built geometry.
+
+### Phase 10.9b — Group Bulk Operations
+
+> **Status: implemented.** Closes Phase 10.9's deferred bulk operations. The prerequisite
+> multi-select (`SelectionManager` primary + `_extraRefs`, `selection:changed`) already shipped
+> (test-plan `phase-11-multi-select`); this phase builds the group-level UI and one new engine
+> event on top of it. Test-plan: `test-plans/phase-12-group-bulk-ops.md`.
+
+The Groups left panel (`GroupPanel.tsx`) becomes an **accordion**: each group expands to a member
+list plus an action bar.
+
+- **Member derivation** (`src/editor/groupMembers.ts`, new) — `membersByGroup(world)` does one
+  O(entities) sweep over every zone's grouped collections (`floors`/`walls`/`platforms`/`stairs`/
+  `objects`/`triggerVolumes`), returning `Map<groupId, GroupMember[]>` where a member is
+  `{ ref: SelectedRef, label }` (label = `entity.label ?? entity.id`). Also exports
+  `entityGroupIds(world, ref)` and `writeGroupIds(world, ref, ids)` — a type→mutator dispatch
+  (`updateFloor`/`updateWall`/…) so an arbitrary ref's `groupIds` can be read/written generically.
+- **Live refresh** — `App` holds a `membershipRev` counter bumped by bus listeners on
+  `*:updated` (only when `changes.groupIds !== undefined`), all `*:removed`, and `*:added` (only
+  when the added entity carries `groupIds` — covers paste/duplicate clones). `groupMembers` is a
+  `useMemo` keyed on `[membershipRev, groups]`, so the panel stays in sync without polling.
+- **`selection:set` (new engine event)** — `SelectionManager._setSelection(refs)` replaces the
+  whole selection programmatically: resolves refs to live meshes (skips missing, dedups walls
+  sharing a run mesh), makes the first primary and the rest extras, tints all, and emits
+  `object:selected` + `selection:changed`. Empty list clears via `object:deselected`. This is the
+  only new engine surface; it powers "Select all members".
+- **Handlers** (`App`) — `handleAddSelectedToGroup` merges a group id into every `multiSelected`
+  ref's `groupIds` in one transaction; `handleRemoveGroupMember` strips it; `handleSelectGroupMembers`
+  emits `selection:set`. **Delete/Duplicate reuse the multi-select paths**: `handleDelete`'s
+  multi-branch was extracted into `deleteRefs(refs)`, and `duplicateRefs(refs)` wraps
+  `copySelectionMulti` + the existing paste path — group Delete/Duplicate just call these with the
+  member refs (no new delete/clone logic). Duplicated members keep their `groupIds`, so clones
+  re-join the group.
+
+#### Files
+
+```
+src/editor/groupMembers.ts    ← new — membersByGroup / entityGroupIds / writeGroupIds
+src/editor/SelectionManager.ts← _setSelection + selection:set listener
+src/ui/GroupPanel.tsx         ← accordion: member list, action bar, per-member remove
+src/ui/LeftPanel.tsx          ← threads the new group-bulk props through
+src/App.tsx                   ← membershipRev + listeners, groupMembers memo, deleteRefs/duplicateRefs,
+                                group-bulk handlers, LeftPanel wiring
+src/types.ts                  ← bus event selection:set
+```
 
 ### Phase 11 — Terrain
 - TerrainBuilder: heightmap → PlaneGeometry with `computeBoundsTree()` (BVH for editor raycasting)
