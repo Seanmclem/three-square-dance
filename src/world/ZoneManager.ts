@@ -247,8 +247,14 @@ export class ZoneManager {
         else this._hiddenGroups.add(groupId);
         this._applyGroupVisibility();
       }),
-      this._bus.on("preview:start", () => { this._setEditorOnlyVisible(false); }),
-      this._bus.on("preview:stop",  () => { this._setEditorOnlyVisible(true);  }),
+      this._bus.on("preview:start", ({ mode }) => {
+        this._setEditorOnlyVisible(false);
+        if (mode === "game") this._setHideInGameVisible(false);
+      }),
+      this._bus.on("preview:stop",  () => {
+        this._setEditorOnlyVisible(true);
+        this._setHideInGameVisible(true);
+      }),
       this._bus.on("history:restore", () => {
         const zoneId = this._worldState.activeZoneId;
         if (!zoneId) return;
@@ -1028,6 +1034,14 @@ export class ZoneManager {
     }
   }
 
+  // Game mode only: hide editor helpers that stay visible in Preview (grid, trigger
+  // wireframes, node dots, edge lines — anything tagged userData.hideInGame).
+  private _setHideInGameVisible(visible: boolean): void {
+    this._scene.traverse(o => {
+      if ((o.userData as { hideInGame?: boolean }).hideInGame) o.visible = visible;
+    });
+  }
+
   // ── Floor dimming ─────────────────────────────────────────────────────────
 
   private _applyDimming(): void {
@@ -1093,7 +1107,7 @@ export class ZoneManager {
     const wire = new THREE.LineSegments(geo, mat);
     wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
-    wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false };
+    wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false, hideInGame: true };
     group.add(wire);
     const arr = this._volumeMeshes.get(zoneId) ?? [];
     arr.push(wire);

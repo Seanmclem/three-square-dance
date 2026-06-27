@@ -50,6 +50,7 @@ function makeNodeDot(): THREE.Mesh {
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 3;
+  mesh.userData.hideInGame = true;
   return mesh;
 }
 
@@ -64,6 +65,7 @@ function makeEdgeLine(x1: number, z1: number, x2: number, z2: number, y = 0.04):
   });
   const line = new THREE.Line(geo, mat);
   line.renderOrder = 2;
+  line.userData.hideInGame = true;
   return line;
 }
 

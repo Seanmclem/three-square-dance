@@ -67,7 +67,7 @@ export class PreviewController {
 
     this._scene.renderer.domElement.requestPointerLock();
 
-    this._bus.emit("preview:start", {});
+    this._bus.emit("preview:start", { mode });
   }
 
   exit(): void {

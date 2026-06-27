@@ -152,7 +152,7 @@ export interface BusEvents {
   "zone:enter":            { zoneId: string };
   "transition:added":      { transition: TransitionDef };
   "spawn:updated":         { position: Vec3 };
-  "preview:start":         Record<string, never>;
+  "preview:start":         { mode: "preview" | "game" };
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };
   "gizmo:dragging":        { isDragging: boolean };

@@ -119,10 +119,12 @@ export class SceneManager {
   private _setupGrid(): void {
     const minor = new THREE.GridHelper(100, 100, 0x334466, 0x222d44);
     minor.position.y = 0.001;
+    minor.userData.hideInGame = true;
     this.scene.add(minor);
 
     const major = new THREE.GridHelper(100, 10, 0x445577, 0x2d3d55);
     major.position.y = 0.002;
+    major.userData.hideInGame = true;
     this.scene.add(major);
 
     const ground = new THREE.Mesh(

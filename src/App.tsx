@@ -118,6 +118,7 @@ export default function App() {
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
+  const [isGame,          setIsGame]           = useState(false);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
@@ -288,8 +289,9 @@ export default function App() {
     const bumpMembership = () => setMembershipRev(v => v + 1);
 
     const unsub = [
-      bus.on("preview:start", () => {
+      bus.on("preview:start", ({ mode }) => {
         setIsPreview(true);
+        setIsGame(mode === "game");
         // Re-index from current world state — zone:activated fires at startup before
         // any volumes/scripts exist in the editor, so the index is always stale by preview time.
         const activeZone = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
@@ -300,6 +302,7 @@ export default function App() {
       }),
       bus.on("preview:stop",  () => {
         setIsPreview(false);
+        setIsGame(false);
         scriptEngine.deactivate();
       }),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
@@ -1360,6 +1363,7 @@ export default function App() {
                  cursor: activeTool === "trigger-volume" ? "crosshair" : "default" }}
       />
 
+      {!isGame && <>
       <Toolbar
         activeTool={activeTool}
         openPanel={leftPanel}
@@ -1451,6 +1455,7 @@ export default function App() {
         }}
       />
       <CoordinateDisplay coords={coords} />
+      </>}
 
       {activeTool === "trigger-volume" && !isPreview && (
         <div style={{
@@ -1515,12 +1520,14 @@ export default function App() {
         />
       )}
 
-      <div style={{
-        position: "absolute", bottom: 16, right: 296,
-        color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
-      }}>
+      {!isGame && (
+        <div style={{
+          position: "absolute", bottom: 16, right: 296,
+          color: "rgba(80,120,180,0.25)", fontSize: 10, fontFamily: "monospace", letterSpacing: 2,
+        }}>
 SquareDance
-      </div>
+        </div>
+      )}
 
       {showImporter && (
         <ModelImporterModal

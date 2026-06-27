@@ -130,6 +130,21 @@ export class GizmoManager implements IEditorModule {
         });
       }),
 
+      // Game mode: hide the gizmo (Preview keeps it). Restore on exit — visible only if
+      // something is still attached, so an existing selection's gizmo reappears.
+      this._bus.on("preview:start", ({ mode }) => {
+        if (mode === "game" && this._controls) {
+          this._controls.visible = false;
+          this._controls.enabled = false;
+        }
+      }),
+      this._bus.on("preview:stop", () => {
+        if (this._controls) {
+          this._controls.enabled = true;
+          this._controls.visible = this._controls.object != null;
+        }
+      }),
+
       this._bus.on("input:keydown", ({ code, ctrl, meta }) => {
         if (!this._controls || (this._selId === null && !this._groupMode)) return;
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.

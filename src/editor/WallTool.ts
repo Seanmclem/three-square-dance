@@ -40,6 +40,7 @@ function makeNodeDot(): THREE.Mesh {
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 2;
+  mesh.userData.hideInGame = true;
   return mesh;
 }
 
