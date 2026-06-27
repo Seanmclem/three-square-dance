@@ -396,6 +396,12 @@ export interface StairRailingDef {
   overhang:      number;    // how far the top rail extends past the end posts, each end (m)
 }
 
+export type StairUndersideMode = "open" | "diagonal" | "closed";
+export interface StairUndersideDef {
+  mode:      StairUndersideMode;  // open = stepped (current); diagonal = slanted soffit; closed = to floor
+  thickness: number;              // diagonal only: vertical drop below the nosing line (m)
+}
+
 export interface StairDef {
   id:          string;
   label?:      string;   // optional human-friendly name; falls back to id
@@ -407,6 +413,7 @@ export interface StairDef {
   material:    string;
   hasRailing:  boolean;
   railing?:    StairRailingDef;   // railing config; absent → builder defaults
+  underside?:  StairUndersideDef; // underside style; absent → "open" (current behavior)
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;

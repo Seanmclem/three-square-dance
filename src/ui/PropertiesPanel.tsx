@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
+  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
   GroupDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
@@ -883,6 +883,8 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [railPostT,     setRailPostT]     = useState(String(stair?.railing?.postThickness ?? 0.06));
   const [railSideInset, setRailSideInset] = useState(String(stair?.railing?.sideInset     ?? 0.1));
   const [railOverhang,  setRailOverhang]  = useState(String(stair?.railing?.overhang      ?? 0.15));
+  const [undersideMode, setUndersideMode] = useState<StairUndersideMode>(stair?.underside?.mode ?? "open");
+  const [undersideThk,  setUndersideThk]  = useState(String(stair?.underside?.thickness ?? 0.3));
   const [linked,      setLinked]      = useState(false);
   const [hasCutter,   setHasCutter]   = useState(!!(stair?.csgCutter));
   const [cutW,  setCutW]  = useState(String(stair?.csgCutter?.width  ?? stair?.width ?? 2.5));
@@ -908,6 +910,8 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setRailPostT(String(stair.railing?.postThickness ?? 0.06));
     setRailSideInset(String(stair.railing?.sideInset ?? 0.1));
     setRailOverhang(String(stair.railing?.overhang ?? 0.15));
+    setUndersideMode(stair.underside?.mode ?? "open");
+    setUndersideThk(String(stair.underside?.thickness ?? 0.3));
     setLinked(false);
     setHasCutter(!!(stair.csgCutter));
     setCutW(String(stair.csgCutter?.width  ?? stair.width));
@@ -978,6 +982,13 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const commitRailPostT = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateRailing({ postThickness: n }); };
   const commitRailSideInset = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ sideInset: n }); };
   const commitRailOverhang = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ overhang: n }); };
+
+  const UNDERSIDE_DEFAULTS = { mode: "open" as StairUndersideMode, thickness: 0.3 };
+  const updateUnderside = (patch: Partial<typeof UNDERSIDE_DEFAULTS>) => {
+    const cur = { ...UNDERSIDE_DEFAULTS, ...(stair.underside ?? {}) };
+    onObjectUpdate({ underside: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
+  };
+  const commitUndersideThk = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateUnderside({ thickness: n }); };
 
   const commitCutter = (field: "width" | "depth" | "height", val: string) => {
     const n = parseFloat(val);
@@ -1154,6 +1165,39 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Underside / stringer */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>UNDERSIDE</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["open","Open"],["diagonal","Diagonal"],["closed","To floor"]] as const).map(([m, lbl]) => {
+            const isCurrent = m === undersideMode;
+            return (
+              <button key={m} disabled={isCurrent}
+                onClick={() => { setUndersideMode(m); updateUnderside({ mode: m }); }}
+                style={{
+                  flex: 1, padding: "5px 0", borderRadius: 4,
+                  cursor: isCurrent ? "default" : "pointer",
+                  fontFamily: "monospace", fontSize: 10, border: "none",
+                  background: isCurrent ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.6)",
+                  color: isCurrent ? "#80aaff" : "#9a9a9a",
+                  outline: isCurrent ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                }}
+              >{lbl}</button>
+            );
+          })}
+        </div>
+        {undersideMode === "diagonal" && (
+          <div>
+            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>STRINGER THICKNESS</div>
+            <input type="number" step={0.05} min={0.05} value={undersideThk} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+              onChange={e => { setUndersideThk(e.target.value); schedule(() => commitUndersideThk(e.target.value)); }}
+              onBlur={e => flush(() => commitUndersideThk(e.target.value))}
+              onKeyDown={e => { if (e.key === "Enter") flush(() => commitUndersideThk((e.target as HTMLInputElement).value)); }}
+            />
           </div>
         )}
       </div>

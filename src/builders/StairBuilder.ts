@@ -89,6 +89,12 @@ export class StairBuilder {
     const hh = stepRise  / 2;
     const hd = stair.width / 2;
 
+    // Underside style. "open" = current free-floating stepped boxes; "diagonal" = solid
+    // wedge with a slanted soffit; "closed" = solid down to the floor. effThk must clear
+    // the inner step corners (> stepRise), else the side panels invert.
+    const undersideMode = stair.underside?.mode ?? "open";
+    const effThk        = Math.max(stair.underside?.thickness ?? 0.3, stepRise * 1.001);
+
     // Rotation matrix for rotation.y = -angle  (local → world direction)
     const cosA =  Math.cos(angle);
     const sinA =  Math.sin(angle);
@@ -145,22 +151,73 @@ export class StairBuilder {
       pushQuad(body,
         pTFL_x,pTFL_y,pTFL_z, pTBL_x,pTBL_y,pTBL_z, pTBR_x,pTBR_y,pTBR_z, pTFR_x,pTFR_y,pTFR_z,
         ...nTop, wd, ww);
-      // -Y bottom
-      pushQuad(body,
-        pBFL_x,pBFL_y,pBFL_z, pBFR_x,pBFR_y,pBFR_z, pBBR_x,pBBR_y,pBBR_z, pBBL_x,pBBL_y,pBBL_z,
-        ...nBot, wd, ww);
-      // +X back
-      pushQuad(body,
-        pTBR_x,pTBR_y,pTBR_z, pTBL_x,pTBL_y,pTBL_z, pBBL_x,pBBL_y,pBBL_z, pBBR_x,pBBR_y,pBBR_z,
-        ...nBack, ww, wh);
-      // +Z right side
-      pushQuad(body,
-        pTFR_x,pTFR_y,pTFR_z, pTBR_x,pTBR_y,pTBR_z, pBBR_x,pBBR_y,pBBR_z, pBFR_x,pBFR_y,pBFR_z,
-        ...nSideP, wd, wh);
-      // -Z left side
-      pushQuad(body,
-        pTBL_x,pTBL_y,pTBL_z, pTFL_x,pTFL_y,pTFL_z, pBFL_x,pBFL_y,pBFL_z, pBBL_x,pBBL_y,pBBL_z,
-        ...nSideN, wd, wh);
+      // ── Underside / sides / caps (mode-gated) ─────────────────────────────────
+      if (undersideMode === "open") {
+        // -Y bottom
+        pushQuad(body,
+          pBFL_x,pBFL_y,pBFL_z, pBFR_x,pBFR_y,pBFR_z, pBBR_x,pBBR_y,pBBR_z, pBBL_x,pBBL_y,pBBL_z,
+          ...nBot, wd, ww);
+        // +X back
+        pushQuad(body,
+          pTBR_x,pTBR_y,pTBR_z, pTBL_x,pTBL_y,pTBL_z, pBBL_x,pBBL_y,pBBL_z, pBBR_x,pBBR_y,pBBR_z,
+          ...nBack, ww, wh);
+        // +Z right side
+        pushQuad(body,
+          pTFR_x,pTFR_y,pTFR_z, pTBR_x,pTBR_y,pTBR_z, pBBR_x,pBBR_y,pBBR_z, pBFR_x,pBFR_y,pBFR_z,
+          ...nSideP, wd, wh);
+        // -Z left side
+        pushQuad(body,
+          pTBL_x,pTBL_y,pTBL_z, pTFL_x,pTFL_y,pTFL_z, pBFL_x,pBFL_y,pBFL_z, pBBL_x,pBBL_y,pBBL_z,
+          ...nSideN, wd, wh);
+      } else {
+        // Solid wedge ("diagonal") or solid to floor ("closed"). Side bottom corners are
+        // constant in local coords across steps, so the soffit tiles into one watertight plane.
+        const lyFB = undersideMode === "closed" ? stair.start.y - cy : hh - effThk;       // front-bottom
+        const lyBB = undersideMode === "closed" ? stair.start.y - cy : 3 * hh - effThk;   // back-bottom
+        const [sFBL_x, sFBL_y, sFBL_z] = toWorld(-hw, lyFB, -hd, cx, cy, cz);
+        const [sFBR_x, sFBR_y, sFBR_z] = toWorld(-hw, lyFB,  hd, cx, cy, cz);
+        const [sBBL_x, sBBL_y, sBBL_z] = toWorld( hw, lyBB, -hd, cx, cy, cz);
+        const [sBBR_x, sBBR_y, sBBR_z] = toWorld( hw, lyBB,  hd, cx, cy, cz);
+
+        const vSide = (hh - (lyFB + lyBB) / 2) / ts;
+
+        // +Z right side trapezoid (top edge = step profile, bottom edge = stringer line)
+        pushQuad(body,
+          pTFR_x,pTFR_y,pTFR_z, pTBR_x,pTBR_y,pTBR_z, sBBR_x,sBBR_y,sBBR_z, sFBR_x,sFBR_y,sFBR_z,
+          ...nSideP, wd, vSide);
+        // -Z left side trapezoid
+        pushQuad(body,
+          pTBL_x,pTBL_y,pTBL_z, pTFL_x,pTFL_y,pTFL_z, sFBL_x,sFBL_y,sFBL_z, sBBL_x,sBBL_y,sBBL_z,
+          ...nSideN, wd, vSide);
+
+        // Underside — slanted (diagonal) or flat at floor (closed)
+        let nUnder: [number, number, number];
+        if (undersideMode === "diagonal") {
+          const L = Math.hypot(stepRise, stepDepth);
+          nUnder = toWorldN(stepRise / L, -stepDepth / L, 0);   // perpendicular to the soffit, pointing down
+        } else {
+          nUnder = nBot;
+        }
+        const uUnder = (undersideMode === "diagonal" ? Math.hypot(stepDepth, stepRise) : stepDepth) / ts;
+        pushQuad(body,
+          sFBL_x,sFBL_y,sFBL_z, sFBR_x,sFBR_y,sFBR_z, sBBR_x,sBBR_y,sBBR_z, sBBL_x,sBBL_y,sBBL_z,
+          ...nUnder, uUnder, ww);
+
+        // Back cap (+X) closes the top of the run (both modes)
+        if (i === numSteps - 1) {
+          pushQuad(body,
+            pTBR_x,pTBR_y,pTBR_z, pTBL_x,pTBL_y,pTBL_z, sBBL_x,sBBL_y,sBBL_z, sBBR_x,sBBR_y,sBBR_z,
+            ...nBack, ww, (hh - lyBB) / ts);
+        }
+        // Front cap (-X) — diagonal only: fills the sub-floor nose below the step-0 riser
+        if (undersideMode === "diagonal" && i === 0) {
+          const [fcTL_x, fcTL_y, fcTL_z] = toWorld(-hw, stair.start.y - cy, -hd, cx, cy, cz);
+          const [fcTR_x, fcTR_y, fcTR_z] = toWorld(-hw, stair.start.y - cy,  hd, cx, cy, cz);
+          pushQuad(body,
+            fcTL_x,fcTL_y,fcTL_z, fcTR_x,fcTR_y,fcTR_z, sFBR_x,sFBR_y,sFBR_z, sFBL_x,sFBL_y,sFBL_z,
+            ...nRiser, ww, (effThk - stepRise) / ts);
+        }
+      }
 
       // ── Riser face (-X) ─────────────────────────────────────────────────────
       pushQuad(riser,
