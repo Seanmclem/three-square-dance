@@ -49,6 +49,11 @@ in the extension popup, which Claude can't drive.)
 > **intermittent / setup-dependent, not universal** — try the direct path first, fall
 > back to the workarounds if it misbehaves. (`window.__bus` is now exposed if you want the
 > exact rendered-App bus instance, removing any StrictMode ambiguity.)
+>
+> **Update (2026-06-27):** `mcp__claude-in-chrome__computer` `screenshot` worked on
+> *every* call across a long stair-editing session (~1–2s each, correct WebGL output,
+> never hung) — another datapoint that the "screenshots hang" warning is intermittent,
+> not the norm. Try it first.
 
 **`mcp__computer-use__screenshot` cannot reliably capture the WebGL canvas on
 this Mac.** On a Retina / Display P3 setup, the OS compositor screenshot shows
@@ -81,6 +86,20 @@ renderer.render(scene, camera);
 const px = new Uint8Array(4);
 gl.readPixels(canvas.width/2, canvas.height/2, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
 console.log(px); // e.g. [143, 105, 88, 255] = brick color
+
+// World-space bounds + face classification — verify the SHAPE of built geometry
+// (e.g. a stair's underside: is it stepped, slanted, or flat at the floor?).
+// GOTCHA: `THREE` is NOT a page global. Grab the Vector3 ctor off an existing object:
+const V = window.__camera.position.constructor;            // THREE.Vector3
+mesh.updateWorldMatrix(true, true);
+const pos = mesh.geometry.attributes.position, nrm = mesh.geometry.attributes.normal, v = new V();
+let minY = Infinity;
+for (let i = 0; i < pos.count; i++) { v.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld); minY = Math.min(minY, v.y); }
+const tris = mesh.geometry.index.count / 3;                // this mesh's triangle count
+let downVerts = 0; for (let i = 0; i < nrm.count; i++) if (nrm.getY(i) < -0.3) downVerts++; // e.g. count under-facing faces
+console.log({ minY, tris, downVerts });
+// Filter a multi-mesh entity by userData when traversing: o.userData?.editorId === id,
+// o.userData?.editorType === "stair", o.userData?.selectable (body vs riser), etc.
 ```
 
 **For visual screenshots** (when you actually need a picture):
@@ -184,6 +203,12 @@ sputter — every failure mode below was hit and diagnosed in practice.
    the WebGL content correctly, matching the §2 2026-06-24 note that the hang is
    intermittent). The field names come from `EditorCamera` (`focus`/`targetFocus`
    are `Vector3`, `spherical`/`targetSpherical` are `THREE.Spherical`).
+   - **Picking `phi`/`theta`:** `phi ≈ 1.5` is roughly eye-level (lower = look down
+     from above). `theta` orbits the azimuth — you usually want to look **perpendicular
+     to the geometry's long axis** for a clean side profile. Concretely, the demo's
+     railed stair runs along `-Z`, so `theta ≈ 1.571` (π/2, camera offset along ±X)
+     gives the side/silhouette view, while `theta ≈ 0` looks straight up the run
+     (head-on). If your first guess frames the wrong face, rotate `theta` by π/2.
 6. **Read results two ways, both via `javascript_tool` (synchronous only):**
    the PropertiesPanel DOM text (`document.body.innerText`) **and**
    `window.__world.toJSON()`. Either alone can mislead.
@@ -198,6 +223,18 @@ sputter — every failure mode below was hit and diagnosed in practice.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and
   the browser console (`read_console_messages`) surface TS / runtime errors. A
   clean run shows neither.
+- **For fast geometry/builder iteration, drive `WorldState` mutator methods —
+  they reliably rebuild AND persist.** This is the exception to step 3's "globals are
+  for reading, not driving." That warning is about raw `__world._bus.emit(...)`, which
+  can no-op against the live UI. The editing-path *methods* on the exposed
+  `window.__world` are different: `__world.updateStair("demo", id, changes)` (and
+  `updateObject` / `updatePlatform` / `updateWall` / …) emit on the rendered
+  WorldState's own bus that the live `ZoneManager` subscribes to, so the mesh rebuilds
+  within a frame and the change lands in `__world.toJSON()`. This session drove every
+  stair railing/underside change that way and each persisted. Wait for the rebuild with
+  a Bash `sleep` (~1s), then re-probe (Section 2). **Caveat:** this skips the React
+  layer, so to confirm the *panel* actually writes the field, also exercise the real
+  click→input path at least once (select the entity, edit in the PropertiesPanel).
 
 ---
 
