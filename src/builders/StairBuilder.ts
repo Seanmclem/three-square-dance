@@ -39,6 +39,27 @@ function pushQuad(
   acc.vi += 4;
 }
 
+// Like pushQuad but with explicit per-corner UVs — used for the stringer side/underside
+// faces, where UVs accumulate in world space across steps so the texture flows continuously
+// instead of restarting per step.
+function pushQuadUV(
+  acc: StepAccum,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
+  cx: number, cy: number, cz: number,
+  dx: number, dy: number, dz: number,
+  nx: number, ny: number, nz: number,
+  ua: number, va: number, ub: number, vb: number,
+  uc: number, vc: number, ud: number, vd: number,
+): void {
+  const { pos, nrm, uv, idx } = acc;
+  pos.push(ax,ay,az, bx,by,bz, cx,cy,cz, dx,dy,dz);
+  nrm.push(nx,ny,nz, nx,ny,nz, nx,ny,nz, nx,ny,nz);
+  uv.push(ua,va, ub,vb, uc,vc, ud,vd);
+  idx.push(acc.vi, acc.vi+2, acc.vi+1,  acc.vi, acc.vi+3, acc.vi+2);
+  acc.vi += 4;
+}
+
 function accumToGeo(acc: StepAccum): THREE.BufferGeometry {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(acc.pos, 3));
@@ -179,16 +200,21 @@ export class StairBuilder {
         const [sBBL_x, sBBL_y, sBBL_z] = toWorld( hw, lyBB, -hd, cx, cy, cz);
         const [sBBR_x, sBBR_y, sBBR_z] = toWorld( hw, lyBB,  hd, cx, cy, cz);
 
-        const vSide = (hh - (lyFB + lyBB) / 2) / ts;
+        // Continuous world-space UVs so the texture flows up the whole stringer instead of
+        // restarting each step. Sides: u = run distance, v = world height. Soffit: u = run, v = width.
+        const uF   = (i * stepDepth) / ts, uB = ((i + 1) * stepDepth) / ts;
+        const vTop = (pTFR_y - stair.start.y) / ts;
+        const vFB  = (sFBR_y - stair.start.y) / ts;
+        const vBB  = (sBBR_y - stair.start.y) / ts;
 
         // +Z right side trapezoid (top edge = step profile, bottom edge = stringer line)
-        pushQuad(body,
+        pushQuadUV(body,
           pTFR_x,pTFR_y,pTFR_z, pTBR_x,pTBR_y,pTBR_z, sBBR_x,sBBR_y,sBBR_z, sFBR_x,sFBR_y,sFBR_z,
-          ...nSideP, wd, vSide);
+          ...nSideP, uF,vTop, uB,vTop, uB,vBB, uF,vFB);
         // -Z left side trapezoid
-        pushQuad(body,
+        pushQuadUV(body,
           pTBL_x,pTBL_y,pTBL_z, pTFL_x,pTFL_y,pTFL_z, sFBL_x,sFBL_y,sFBL_z, sBBL_x,sBBL_y,sBBL_z,
-          ...nSideN, wd, vSide);
+          ...nSideN, uB,vTop, uF,vTop, uF,vFB, uB,vBB);
 
         // Underside — slanted (diagonal) or flat at floor (closed)
         let nUnder: [number, number, number];
@@ -198,10 +224,11 @@ export class StairBuilder {
         } else {
           nUnder = nBot;
         }
-        const uUnder = (undersideMode === "diagonal" ? Math.hypot(stepDepth, stepRise) : stepDepth) / ts;
-        pushQuad(body,
+        const stepRun = undersideMode === "diagonal" ? Math.hypot(stepDepth, stepRise) : stepDepth;
+        const uuF = (i * stepRun) / ts, uuB = ((i + 1) * stepRun) / ts, wUV = stair.width / ts;
+        pushQuadUV(body,
           sFBL_x,sFBL_y,sFBL_z, sFBR_x,sFBR_y,sFBR_z, sBBR_x,sBBR_y,sBBR_z, sBBL_x,sBBL_y,sBBL_z,
-          ...nUnder, uUnder, ww);
+          ...nUnder, uuF,0, uuF,wUV, uuB,wUV, uuB,0);
 
         // Back cap (+X) closes the top of the run (both modes)
         if (i === numSteps - 1) {
