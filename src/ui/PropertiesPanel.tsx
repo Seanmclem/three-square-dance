@@ -875,6 +875,14 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [widthStr,    setWidthStr]    = useState(String(stair?.width ?? 2.5));
   const [stepsStr,    setStepsStr]    = useState(String(stair ? effectiveSteps(stair) : 1));
   const [hasRailing,  setHasRailing]  = useState(stair?.hasRailing ?? false);
+  const [railTopRail,   setRailTopRail]   = useState(stair?.railing?.topRail   ?? true);
+  const [railBalusters, setRailBalusters] = useState(stair?.railing?.balusters ?? true);
+  const [railHeight,    setRailHeight]    = useState(String(stair?.railing?.height        ?? 0.9));
+  const [railInterval,  setRailInterval]  = useState(String(stair?.railing?.stepInterval  ?? 1));
+  const [railBarT,      setRailBarT]      = useState(String(stair?.railing?.barThickness  ?? 0.1));
+  const [railPostT,     setRailPostT]     = useState(String(stair?.railing?.postThickness ?? 0.06));
+  const [railSideInset, setRailSideInset] = useState(String(stair?.railing?.sideInset     ?? 0.1));
+  const [railOverhang,  setRailOverhang]  = useState(String(stair?.railing?.overhang      ?? 0.15));
   const [linked,      setLinked]      = useState(false);
   const [hasCutter,   setHasCutter]   = useState(!!(stair?.csgCutter));
   const [cutW,  setCutW]  = useState(String(stair?.csgCutter?.width  ?? stair?.width ?? 2.5));
@@ -892,6 +900,14 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setWidthStr(String(stair.width));
     setStepsStr(String(effectiveSteps(stair)));
     setHasRailing(stair.hasRailing);
+    setRailTopRail(stair.railing?.topRail   ?? true);
+    setRailBalusters(stair.railing?.balusters ?? true);
+    setRailHeight(String(stair.railing?.height        ?? 0.9));
+    setRailInterval(String(stair.railing?.stepInterval  ?? 1));
+    setRailBarT(String(stair.railing?.barThickness  ?? 0.1));
+    setRailPostT(String(stair.railing?.postThickness ?? 0.06));
+    setRailSideInset(String(stair.railing?.sideInset ?? 0.1));
+    setRailOverhang(String(stair.railing?.overhang ?? 0.15));
     setLinked(false);
     setHasCutter(!!(stair.csgCutter));
     setCutW(String(stair.csgCutter?.width  ?? stair.width));
@@ -950,6 +966,18 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
 
   const commitWidth  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ width: n } as unknown as Partial<WorldObject>); };
   const toggleRailing = (checked: boolean) => { setHasRailing(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
+
+  const RAIL_DEFAULTS = { topRail: true, balusters: true, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15 };
+  const updateRailing = (patch: Partial<typeof RAIL_DEFAULTS>) => {
+    const cur = { ...RAIL_DEFAULTS, ...(stair.railing ?? {}) };
+    onObjectUpdate({ railing: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
+  };
+  const commitRailHeight = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateRailing({ height: n }); };
+  const commitRailInterval = (val: string) => { const n = Math.round(parseFloat(val)); if (Number.isFinite(n) && n >= 1) updateRailing({ stepInterval: n }); };
+  const commitRailBarT = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateRailing({ barThickness: n }); };
+  const commitRailPostT = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateRailing({ postThickness: n }); };
+  const commitRailSideInset = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ sideInset: n }); };
+  const commitRailOverhang = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ overhang: n }); };
 
   const commitCutter = (field: "width" | "depth" | "height", val: string) => {
     const n = parseFloat(val);
@@ -1061,10 +1089,74 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
         Rise: {rise.toFixed(2)} m · Step H: {stepH.toFixed(3)} m
       </div>
 
-      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-        <input type="checkbox" checked={hasRailing} onChange={e => toggleRailing(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-        <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
-      </label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={hasRailing} onChange={e => toggleRailing(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: hasRailing ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+        </label>
+        {hasRailing && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={railTopRail} onChange={e => { setRailTopRail(e.target.checked); updateRailing({ topRail: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#9a9a9a", fontSize: 10 }}>Top rail</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={railBalusters} onChange={e => { setRailBalusters(e.target.checked); updateRailing({ balusters: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#9a9a9a", fontSize: 10 }}>Balusters</span>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>HEIGHT</div>
+                <input type="number" step={0.1} min={0.1} value={railHeight} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailHeight(e.target.value); schedule(() => commitRailHeight(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailHeight(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailHeight((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>POST EVERY N STEPS</div>
+                <input type="number" step={1} min={1} value={railInterval} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailInterval(e.target.value); schedule(() => commitRailInterval(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailInterval(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailInterval((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAIL THICKNESS</div>
+                <input type="number" step={0.02} min={0.02} value={railBarT} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailBarT(e.target.value); schedule(() => commitRailBarT(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailBarT(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailBarT((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>POST THICKNESS</div>
+                <input type="number" step={0.02} min={0.02} value={railPostT} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailPostT(e.target.value); schedule(() => commitRailPostT(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailPostT(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailPostT((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>SIDE INSET</div>
+                <input type="number" step={0.02} min={0} value={railSideInset} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailSideInset(e.target.value); schedule(() => commitRailSideInset(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailSideInset(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailSideInset((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAIL OVERHANG</div>
+                <input type="number" step={0.05} min={0} value={railOverhang} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setRailOverhang(e.target.value); schedule(() => commitRailOverhang(e.target.value)); }}
+                  onBlur={e => flush(() => commitRailOverhang(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailOverhang((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Cut box */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>

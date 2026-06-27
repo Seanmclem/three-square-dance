@@ -196,35 +196,83 @@ export class StairBuilder {
     meshes.push(riserMesh);
 
     // ── Railings ─────────────────────────────────────────────────────────────
+    // An open railing per side: a thin top rail following the slope, carried by
+    // vertical balusters spaced up the run.
     if (stair.hasRailing) {
+      const r           = stair.railing;
+      const showTopRail = r?.topRail   ?? true;
+      const showPosts   = r?.balusters ?? true;
+      const handrailH   = r?.height        ?? 0.9;    // top rail height above the step nosings
+      const railBarT    = r?.barThickness  ?? 0.1;    // top-rail cross-section
+      const postT       = r?.postThickness ?? 0.06;   // baluster cross-section
+      const stepEvery   = Math.max(1, Math.round(r?.stepInterval ?? 1));
+      const sideInset   = r?.sideInset ?? 0.1;         // inward offset from the step's side edge
+      const overhang    = r?.overhang  ?? 0.15;        // top-rail extension past the end posts, each end
+
       const railMat = new THREE.MeshStandardMaterial({
         color: 0x9aabb8, roughness: 0.4, metalness: 0.4,
       });
-      const railH = 0.9;
-      const railT = 0.05;
 
-      for (let side = -1; side <= 1; side += 2) {
-        const sideOff = side * (stair.width / 2 + railT / 2);
-        const geo  = new THREE.BoxGeometry(railT, railH, horizDist);
+      // Orthonormal basis aligned to the slope:
+      //   xAxis → up the slope, zAxis → horizontal side, yAxis → perpendicular up.
+      const xAxis = new THREE.Vector3(dx, heightDiff, dz).normalize();
+      const zAxis = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+      const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+      const slopeQuat = new THREE.Quaternion().setFromRotationMatrix(
+        new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
+      );
+
+      let ownsMat = true;
+      const addRail = (
+        geo: THREE.BufferGeometry,
+        x: number, y: number, z: number,
+        quat?: THREE.Quaternion,
+      ): void => {
         const mesh = new THREE.Mesh(geo, railMat);
-
-        const midX = (stair.start.x + stair.end.x) / 2;
-        const midY = (stair.start.y + stair.end.y) / 2 + railH / 2;
-        const midZ = (stair.start.z + stair.end.z) / 2;
-
-        const perpX = -Math.sin(angle) * sideOff;
-        const perpZ =  Math.cos(angle) * sideOff;
-
-        mesh.position.set(midX + perpX, midY, midZ + perpZ);
-        mesh.rotation.y = -angle;
+        mesh.position.set(x, y, z);
+        if (quat) mesh.quaternion.copy(quat);
         mesh.castShadow = true;
-
         mesh.userData = {
           editorId: stair.id, editorType: "stair", zoneId,
-          selectable: false, floorLevel: 0,
-          _ownsMaterial: side === -1,
+          selectable: false, floorLevel: 0, _ownsMaterial: ownsMat,
         } satisfies MeshUserData;
+        ownsMat = false;
         meshes.push(mesh);
+      };
+
+      for (let side = -1; side <= 1; side += 2) {
+        const localZ = side * Math.max(postT / 2, hd - sideInset);   // inset from the step edge
+
+        // Anchor on the centre of step i's tread (local x = 0), at the outer edge.
+        const treadAnchor = (i: number): [number, number, number] => {
+          const t  = (i + 0.5) / numSteps;
+          const cx = stair.start.x + dx * t;
+          const cy = stair.start.y + (i + 0.5) * stepRise;
+          const cz = stair.start.z + dz * t;
+          return toWorld(0, hh, localZ, cx, cy, cz);
+        };
+
+        // Balusters: every Nth step, always including the top step for support.
+        if (showPosts) {
+          const placePost = (i: number): void => {
+            const [nx, ny, nz] = treadAnchor(i);
+            addRail(new THREE.BoxGeometry(postT, handrailH, postT), nx, ny + handrailH / 2, nz);
+          };
+          for (let i = 0; i < numSteps; i += stepEvery) placePost(i);
+          if ((numSteps - 1) % stepEvery !== 0) placePost(numSteps - 1);
+        }
+
+        // Top rail — spans first→last tread anchor + a symmetric overhang each end,
+        // raised by handrailH. Grows about the fixed midpoint, so the end posts don't move.
+        if (showTopRail && numSteps >= 2) {
+          const [ax, ay, az] = treadAnchor(0);
+          const [bx, by, bz] = treadAnchor(numSteps - 1);
+          const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
+          addRail(
+            new THREE.BoxGeometry(len, railBarT, railBarT),
+            (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
+          );
+        }
       }
     }
 

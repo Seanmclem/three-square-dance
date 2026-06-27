@@ -385,6 +385,17 @@ export interface StairCutterDef {
   innerTileV?: number;  // UV tiling along thickness of inner faces
 }
 
+export interface StairRailingDef {
+  topRail:       boolean;   // top cap rail along the slope
+  balusters:     boolean;   // vertical posts
+  height:        number;    // rail height above the step nosings (m)
+  stepInterval:  number;    // a baluster every N steps (>= 1)
+  barThickness:  number;    // top-rail cross-section (m)
+  postThickness: number;    // baluster cross-section (m)
+  sideInset:     number;    // inward offset of the rail from the step's side edge (m)
+  overhang:      number;    // how far the top rail extends past the end posts, each end (m)
+}
+
 export interface StairDef {
   id:          string;
   label?:      string;   // optional human-friendly name; falls back to id
@@ -395,6 +406,7 @@ export interface StairDef {
   style:       StairStyle;
   material:    string;
   hasRailing:  boolean;
+  railing?:    StairRailingDef;   // railing config; absent → builder defaults
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;

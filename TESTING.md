@@ -106,7 +106,8 @@ this Mac, per the note above).
 | Global | Type | What it is |
 |---|---|---|
 | `window.__scene` | `THREE.Scene` | The active scene |
-| `window.__camera` | `THREE.Camera` | The editor camera |
+| `window.__camera` | `THREE.Camera` | The editor camera (transform is **driven** by `__editorCamera` — don't set it directly, see §3) |
+| `window.__editorCamera` | `EditorCamera` | The orbit controller — set this to frame a viewpoint for a screenshot (§3) |
 | `window.__renderer` | `THREE.WebGLRenderer` | The renderer |
 | `window.__world` | `WorldState` | Zone/wall/floor data |
 | `window.__zones` | `ZoneManager` | Loaded zone entries & meshes |
@@ -161,10 +162,32 @@ sputter — every failure mode below was hit and diagnosed in practice.
    Then `computer left_click` at `{x, y}`. (Reload before a coordinate-based
    click sequence — the editor camera is at a deterministic default on load, but
    any RMB-orbit / MMB-pan / scroll / WASD moves objects' screen positions.)
-5. **Read results two ways, both via `javascript_tool` (synchronous only):**
+5. **To frame a specific viewpoint (e.g. a side view for a screenshot), drive
+   `window.__editorCamera`, NOT `__camera`.** Setting `__camera.position` /
+   `__camera.lookAt()` does **not** stick — the `EditorCamera.update()` loop
+   re-derives the camera transform from its orbit state every RAF and overwrites
+   you. Set the controller's orbit state instead. It holds a current pose
+   (`focus`, `spherical`) and a target it lerps toward (`targetFocus`,
+   `targetSpherical`); set **both** so the view snaps instead of animating:
+   ```js
+   // javascript_tool — synchronous
+   const ec = window.__editorCamera;
+   ec.focus.set(16, 1.0, -8.75); ec.targetFocus.set(16, 1.0, -8.75); // look-at point
+   ec.spherical.radius = 7;   ec.targetSpherical.radius = 7;         // distance
+   ec.spherical.phi    = 1.25; ec.targetSpherical.phi   = 1.25;      // polar: 0=top-down, ~1.3=low/eye-level
+   ec.spherical.theta  = 0.7;  ec.targetSpherical.theta = 0.7;       // azimuth (orbit around)
+   ec.update(0.016);                                                 // apply now; next RAF renders it
+   "framed";
+   ```
+   Then take the screenshot. This was used to get a clean side view of a stair
+   railing (verified working — `computer screenshot` returned in ~1–2s and showed
+   the WebGL content correctly, matching the §2 2026-06-24 note that the hang is
+   intermittent). The field names come from `EditorCamera` (`focus`/`targetFocus`
+   are `Vector3`, `spherical`/`targetSpherical` are `THREE.Spherical`).
+6. **Read results two ways, both via `javascript_tool` (synchronous only):**
    the PropertiesPanel DOM text (`document.body.innerText`) **and**
    `window.__world.toJSON()`. Either alone can mislead.
-6. **Never block inside the page.** `javascript_tool` containing an in-page
+7. **Never block inside the page.** `javascript_tool` containing an in-page
    `await`/`setTimeout` times out (CDP `Runtime.evaluate`, ~45s). Keep page eval
    synchronous; put every wait *between* calls as a Bash `sleep`.
 

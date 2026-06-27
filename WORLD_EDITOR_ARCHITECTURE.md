@@ -54,6 +54,7 @@
 - v4.2.0 — **Undo/redo redesigned: transaction + per-entity diff (replaces whole-world snapshots).** The old `HistoryManager` deep-cloned the entire world (`JSON.parse(JSON.stringify(toJSON()))`) per entry and restored via full `loadFromJSON` — `O(world)` time/memory, the Scripts-panel lag, and (worse) **incomplete coverage**: gizmo commits, node drags, spawn placement, and group ops bypassed it, so undo "did nothing / undid too much." New model: `WorldState` owns a **change journal** — every mutator calls `_touch(kind,zone,id)` (deep-clones only that entity, first-touch-wins); `transaction(label, fn)` / `beginTransaction`/`commitTransaction`/`abortTransaction` group a gesture into one `HistoryEntry { label, changes[] }` (drops no-op/unchanged keys, `O(touched entities)`). `_applyChanges(changes, dir)` replays per-entity diffs (mutate-all-then-emit the existing `*:added/updated/removed`/`node:updated` events) so `ZoneManager` rebuilds only affected meshes — no full reload. `HistoryManager` is now a thin command stack. Coverage is automatic: `GizmoManager._onDragEnd` wraps the commit in `world.transaction`; `NodeDragger` brackets drags with begin/commit/abort; tools/App handlers/`OpeningDragHandler` use `world.transaction` instead of `history.record`. Cascades captured: `pruneOrphanNodes` journals removed nodes (delete polygon floor → undo restores floor + nodes); ZoneManager's run-mate wall sync routed through `updateWallSegment` (segmentOnly, no re-sync loop) so undo restores all run-mates. Verified at the data layer: add/update/remove undo+redo, **interleaved edits undo one logical change at a time** (not "everything"), gizmo gesture = exactly one entry. `window.__history` exposed in DEV.
 - v4.2.2 — **Copy / paste / duplicate (Cmd+C / Cmd+V / Cmd+D), all types incl. node-backed.** New `src/editor/copyPaste.ts`: `copySelection` deep-clones the selection (entity, or the whole `runWalls` run, plus the referenced corner/endpoint **nodes**, deduped) into a self-contained `Clipboard`; `pasteClipboard` regenerates ids per type (`obj_`/`plat_`/`stair_`/`wall_`/`vol_`+uuid8, floors/nodes full uuid), clones referenced nodes with fresh ids and **remaps** `startNodeId`/`endNodeId` / `floorMesh.nodeIds` / `platform.nodeIds`, offsets positions/points, regenerates `openings[].id`, and adds everything inside `world.transaction("paste")` — so paste is **undoable in one step** (incl. its cloned nodes) and pasted polygons get fresh nodes (editing a copy never moves the original). Mirrors the existing `handleCopyRunToFloor` node-remap pattern. `App` holds `clipboardRef` + a cascading paste offset, wires `handleCopy/handlePaste/handleDuplicate` to Cmd+C/V/D (skipped while typing in inputs / in preview), and emits `tool:placed` so the pasted entity auto-selects. Scripts copy as-is (`on_interact` re-targets to the new object via ScriptEngine.loadZone; other action `targetId`s keep originals). Single-selection for now (multi-select copy needs the deferred SelectionManager multi-select). Verified at the data layer for object/wall/polygon-platform incl. **disjoint cloned nodes** + one-step undo/redo of the wall+nodes; `window.__copyPaste` exposed in DEV.
 - v4.2.3 — **Modifier-key guard for editor movement / gizmo-mode keys.** Cmd+D (duplicate) also panned the editor camera because `D` is a WASD key — `EditorCamera._handleKeyDown` recorded held keys without checking modifiers. Same class of bug let Cmd+S/Cmd+R flip the gizmo's T/R/S mode. Fix: `EditorCamera` ignores movement keys when `metaKey||ctrlKey` is held; `GizmoManager`'s `input:keydown` (T/R/S) bails on `ctrl||meta`; added `meta` to the `input:keydown` bus payload (`InputManager`) so consumers can see Cmd. Verified: Cmd+D no longer registers `KeyD` for the camera while plain `D` still pans.
+- v4.2.4 — **Stair railings reworked into real, configurable railings.** The old railing was a single `BoxGeometry(railT, railH, horizDist)` per side, only yaw-rotated — so it rendered as a flat horizontal slab cutting through the stairs (length was the *horizontal* run; it was never pitched up the slope). `StairBuilder` now builds an **open railing** per side from a slope-aligned orthonormal basis (`makeBasis`: x→up-slope, z→side, y→perp-up): a top rail spanning first→last step **nosing** (no overhang) plus **vertical balusters anchored at the centre of each step's tread** (local x = 0), so posts sit on the tread rather than overhanging the nosing and never float (verified: post bottoms land exactly on every step top 0.2…3.0; post centres match each tread centre). Made fully configurable via new optional `StairDef.railing` (`StairRailingDef`: `topRail`/`balusters` toggles, `height`, `stepInterval` = a post every N steps with the top step always included, `barThickness`, `postThickness`, `sideInset` = inward offset from the step's side edge so balusters sit on the tread instead of overhanging the side — `localZ = side·max(postT/2, hd − sideInset)`; `overhang` = how far the top rail extends past the end posts each end, added as `2·overhang` to the rail length about its fixed midpoint so the end posts don't move); absent → defaults (0.9 / every step / 0.1 / 0.06 / 0.1 / 0.15) so existing stairs are unchanged. `StairGeoView` gained a `RAILING` sub-section (the two toggles + four numeric inputs) writing through the existing `onObjectUpdate`→`updateStair` path (undo/redo + autosave for free). Verified in-browser: toggles/interval/height drive the rebuild and persist in `toJSON()`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 
 ---
@@ -373,6 +374,7 @@ export interface StairDef {
   style:       StairStyle;
   material:    string;
   hasRailing:  boolean;
+  railing?:                StairRailingDef; // railing config; absent → builder defaults
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
@@ -380,6 +382,17 @@ export interface StairDef {
   topOpening?:             StairOpening;    // optional zone link at top of stair
   bottomOpening?:          StairOpening;    // optional zone link at bottom of stair
   groupIds?:               string[];        // Phase 10.6a
+}
+
+export interface StairRailingDef {
+  topRail:       boolean;   // top cap rail along the slope
+  balusters:     boolean;   // vertical posts
+  height:        number;    // rail height above the step nosings (m)
+  stepInterval:  number;    // a baluster every N steps (>= 1)
+  barThickness:  number;    // top-rail cross-section (m)
+  postThickness: number;    // baluster cross-section (m)
+  sideInset:     number;    // inward offset of the rail from the step's side edge (m)
+  overhang:      number;    // how far the top rail extends past the end posts, each end (m)
 }
 
 export interface ObjectProperties {
@@ -1833,7 +1846,7 @@ export interface StairBuildOutput {
 **Mesh breakdown:**
 - **bodyMesh**: single merged custom geometry for all step tops/sides/backs (one mesh per material — body material)
 - **riserMesh**: single merged geometry for all step front faces (`riserMaterial` if set, else falls back to body material)
-- **railing meshes** (2): `BoxGeometry` bars along each side if `hasRailing: true`
+- **railing meshes**: per side, an open railing built from `BoxGeometry` parts when `hasRailing: true` — a sloped top rail plus vertical balusters anchored at the **centre of each step's tread** (local x = 0, outer edge), so posts sit on the tread rather than overhanging the nosing, and the rail (derived from the same anchors) spans first→last tread centre plus a symmetric `overhang` each end. Config comes from `stair.railing` (`StairRailingDef`): `topRail`/`balusters` toggles, `height`, `stepInterval` (a post every N steps, top step always included), `barThickness`, `postThickness`. Absent → defaults (0.9 / every step / 0.1 / 0.06). Built via a slope-aligned orthonormal basis (`makeBasis`): rail follows the diagonal, posts are world-vertical.
 - **CSG cutter wireframe**: `LineSegments` (EdgesGeometry of cutter box) if `stair.csgCutter` is set. Tagged `editorOnly: true` — hidden in preview mode.
 
 **Algorithm (straight style):**
@@ -2441,7 +2454,7 @@ Subscribes to `object:selected` and `object:deselected`. Renders a view based on
 
 **PlatformView** — position XYZ, size (width/depth), thickness, railing toggle + height, two material sections: cap (top/bottom) and side, each with full overrides.
 
-**StairView** — start/end vectors, step count, width, railing toggle, body material + overrides, riser material + overrides. **CUT BOX section**: enable/disable toggle; when enabled shows offset XYZ, rotation XYZ (deg), width/depth/height, inner tiling (T+B, L+R). Changes emit `stair:updated`.
+**StairView** — start/end vectors, step count, width, railing toggle (when on, a `RAILING` sub-section exposes Top rail / Balusters checkboxes + Height / Post every N steps / Rail thickness / Post thickness / Side inset / Rail overhang inputs, writing `stair.railing`), body material + overrides, riser material + overrides. **CUT BOX section**: enable/disable toggle; when enabled shows offset XYZ, rotation XYZ (deg), width/depth/height, inner tiling (T+B, L+R). Changes emit `stair:updated`.
 
 **TransformView** — position XYZ, rotation XYZ, scale XYZ (for selected WorldObjects).
 
