@@ -399,7 +399,7 @@ export interface StairRailingDef {
 export type StairUndersideMode = "open" | "diagonal" | "closed";
 export interface StairUndersideDef {
   mode:      StairUndersideMode;  // open = stepped (current); diagonal = slanted soffit; closed = to floor
-  thickness: number;              // diagonal only: vertical drop below the nosing line (m)
+  thickness: number;              // diagonal only: clearance below the steps (stringer depth, m)
 }
 
 export interface StairDef {

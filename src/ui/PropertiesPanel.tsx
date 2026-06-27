@@ -884,7 +884,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [railSideInset, setRailSideInset] = useState(String(stair?.railing?.sideInset     ?? 0.1));
   const [railOverhang,  setRailOverhang]  = useState(String(stair?.railing?.overhang      ?? 0.15));
   const [undersideMode, setUndersideMode] = useState<StairUndersideMode>(stair?.underside?.mode ?? "open");
-  const [undersideThk,  setUndersideThk]  = useState(String(stair?.underside?.thickness ?? 0.3));
+  const [undersideThk,  setUndersideThk]  = useState(String(stair?.underside?.thickness ?? 0.25));
   const [linked,      setLinked]      = useState(false);
   const [hasCutter,   setHasCutter]   = useState(!!(stair?.csgCutter));
   const [cutW,  setCutW]  = useState(String(stair?.csgCutter?.width  ?? stair?.width ?? 2.5));
@@ -911,7 +911,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setRailSideInset(String(stair.railing?.sideInset ?? 0.1));
     setRailOverhang(String(stair.railing?.overhang ?? 0.15));
     setUndersideMode(stair.underside?.mode ?? "open");
-    setUndersideThk(String(stair.underside?.thickness ?? 0.3));
+    setUndersideThk(String(stair.underside?.thickness ?? 0.25));
     setLinked(false);
     setHasCutter(!!(stair.csgCutter));
     setCutW(String(stair.csgCutter?.width  ?? stair.width));
@@ -983,7 +983,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const commitRailSideInset = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ sideInset: n }); };
   const commitRailOverhang = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ overhang: n }); };
 
-  const UNDERSIDE_DEFAULTS = { mode: "open" as StairUndersideMode, thickness: 0.3 };
+  const UNDERSIDE_DEFAULTS = { mode: "open" as StairUndersideMode, thickness: 0.25 };
   const updateUnderside = (patch: Partial<typeof UNDERSIDE_DEFAULTS>) => {
     const cur = { ...UNDERSIDE_DEFAULTS, ...(stair.underside ?? {}) };
     onObjectUpdate({ underside: { ...cur, ...patch } } as unknown as Partial<WorldObject>);

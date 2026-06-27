@@ -111,10 +111,13 @@ export class StairBuilder {
     const hd = stair.width / 2;
 
     // Underside style. "open" = current free-floating stepped boxes; "diagonal" = solid
-    // wedge with a slanted soffit; "closed" = solid down to the floor. effThk must clear
-    // the inner step corners (> stepRise), else the side panels invert.
+    // wedge with a slanted soffit; "closed" = solid down to the floor.
+    // `thickness` = clearance below the step undersides (the visible stringer depth). The
+    // soffit drops that far below the inner step corners, so the internal drop below the
+    // nosing line is clearance + stepRise (always > stepRise → side panels never invert).
     const undersideMode = stair.underside?.mode ?? "open";
-    const effThk        = Math.max(stair.underside?.thickness ?? 0.3, stepRise * 1.001);
+    const stringerGap   = Math.max(stair.underside?.thickness ?? 0.25, 0.02);
+    const effThk        = stringerGap + stepRise;
 
     // Rotation matrix for rotation.y = -angle  (local → world direction)
     const cosA =  Math.cos(angle);
