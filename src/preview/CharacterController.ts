@@ -1,8 +1,21 @@
 import * as THREE from "three";
+import RAPIER from "@dimforge/rapier3d-compat";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import type { PlayerSettings } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { CharacterBody } from "./CharacterBody";
+import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
+
+const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
+const CAM_SKIN = 0.2;   // gap kept in front of an occluding wall
+const ZOOM_MIN = 1.5;   // scroll-zoom distance clamp
+const ZOOM_MAX = 12;
+const INTERACT_RANGE = 2.5;
+// Avatar GLBs vary in authored forward axis; this model faces +Z, our math assumes -Z.
+const MODEL_FORWARD_OFFSET = Math.PI;
+// The avatar is never an interact target — skip its (expensive, skinned) per-frame raycast.
+const NO_RAYCAST: THREE.Object3D["raycast"] = () => {};
 
 export class CharacterController {
   private readonly _body = new CharacterBody();
@@ -18,12 +31,15 @@ export class CharacterController {
   private _mixer:     THREE.AnimationMixer | null = null;
   private _modelAnimations: THREE.AnimationClip[] = [];
   private _currentClip = "";
+  private _modelYaw   = 0;                       // smoothed avatar facing (third-person)
+  private _desiredDist: number;                  // scroll-zoom target distance
 
   readonly camera: THREE.PerspectiveCamera;
 
   private readonly _onMouseMove: (e: MouseEvent) => void;
   private readonly _onKeyDown:   (e: KeyboardEvent) => void;
   private readonly _onKeyUp:     (e: KeyboardEvent) => void;
+  private readonly _onWheel:     (e: WheelEvent) => void;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -34,10 +50,16 @@ export class CharacterController {
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
     );
 
+    this._desiredDist = _settings.thirdPersonDistance;
+    this._raycaster.far = INTERACT_RANGE;
+
     this._onMouseMove = (e: MouseEvent) => {
       this._yaw   -= e.movementX * 0.002;
       this._pitch -= e.movementY * 0.002;
       this._pitch  = Math.max(-Math.PI * 80 / 180, Math.min(Math.PI * 80 / 180, this._pitch));
+    };
+    this._onWheel = (e: WheelEvent) => {
+      this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + e.deltaY * 0.005));
     };
     this._onKeyDown = (e: KeyboardEvent) => {
       this._keys.add(e.code);
@@ -54,6 +76,7 @@ export class CharacterController {
     document.addEventListener("mousemove", this._onMouseMove);
     document.addEventListener("keydown",   this._onKeyDown);
     document.addEventListener("keyup",     this._onKeyUp);
+    document.addEventListener("wheel",     this._onWheel, { passive: true });
     void this._loadModel();
   }
 
@@ -81,23 +104,37 @@ export class CharacterController {
     this._body.move(dir);
     const pos = this._body.position;
 
-    // Camera — FPS or third-person
+    // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision
     if (this._settings.cameraMode === "thirdperson") {
-      const camX = pos.x - Math.sin(this._yaw) * this._settings.thirdPersonDistance;
-      const camZ = pos.z - Math.cos(this._yaw) * this._settings.thirdPersonDistance;
-      this.camera.position.set(camX, pos.y + this._settings.thirdPersonHeight, camZ);
-      this.camera.lookAt(pos.x, pos.y + this._body.capsuleHalfHeight, pos.z);
+      const pivot   = new THREE.Vector3(pos.x, pos.y + this._settings.thirdPersonHeight, pos.z);
+      const forward = new THREE.Vector3(0, 0, -1)
+        .applyEuler(new THREE.Euler(this._pitch, this._yaw, 0, "YXZ")); // camera look dir
+      const back    = forward.clone().negate();                         // pivot → camera
+      let dist = this._desiredDist;
+      const hit = physicsWorld.world.castRay(
+        new RAPIER.Ray(pivot, back), dist, true,
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._body.collider,
+      );
+      if (hit) dist = Math.max(MIN_DIST, hit.timeOfImpact - CAM_SKIN); // pull in on walls
+      this.camera.position.copy(pivot).addScaledVector(back, dist);
+      this.camera.lookAt(pivot);
     } else {
       const eyeY = pos.y + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
       this.camera.position.set(pos.x, eyeY, pos.z);
       this.camera.rotation.set(this._pitch, this._yaw, 0, "YXZ");
     }
 
-    // Character model
+    // Character model — face the movement direction (smoothed), hold facing when idle
     if (this._modelRoot) {
       const feetY = pos.y - (this._body.capsuleHalfHeight + this._body.capsuleRadius);
       this._modelRoot.position.set(pos.x, feetY, pos.z);
-      this._modelRoot.rotation.y = this._yaw;
+      if (isMoving) {
+        const targetYaw = Math.atan2(-dir.x, -dir.z);
+        let delta = targetYaw - this._modelYaw;
+        delta = Math.atan2(Math.sin(delta), Math.cos(delta));   // wrap to [-π, π]
+        this._modelYaw += delta * Math.min(1, dt * 10);
+      }
+      this._modelRoot.rotation.y = this._modelYaw + MODEL_FORWARD_OFFSET;
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
       this._playClip(isMoving ? "walk" : "idle");
@@ -108,7 +145,7 @@ export class CharacterController {
     this._raycaster.set(this.camera.position, lookDir);
     const hits = this._raycaster
       .intersectObjects(this._scene.children, true)
-      .filter(h => h.distance < 2.5 && h.object.userData["interactable"]);
+      .filter(h => h.object.userData["interactable"]);
     const hit = hits[0] ?? null;
     const newId = (hit?.object.userData["editorId"] as string | undefined) ?? null;
     if (newId !== this._interactTargetId) {
@@ -125,35 +162,69 @@ export class CharacterController {
   get body(): CharacterBody { return this._body; }
 
   private async _loadModel(): Promise<void> {
-    if (!this._settings.modelAssetId) return;
+    // No avatar asset chosen → show a plain capsule (the dropdown's "capsule only" option),
+    // so third-person always has a visible body.
+    if (!this._settings.modelAssetId) { this._buildCapsule(); return; }
     try {
-      const root = await assetManager.loadModel(this._settings.modelAssetId);
-      this._modelAnimations = ((root as unknown as { animations?: THREE.AnimationClip[] }).animations) ?? [];
+      const gltf = await assetManager.loadGLTF(this._settings.modelAssetId) as {
+        scene: THREE.Object3D; animations: THREE.AnimationClip[];
+      };
+      // SkeletonUtils.clone rebinds skinned meshes to the cloned skeleton (plain .clone() breaks it)
+      const root = cloneSkinned(gltf.scene);
+      root.traverse(c => {
+        if ((c as THREE.SkinnedMesh).isSkinnedMesh) c.frustumCulled = false;
+        c.raycast = NO_RAYCAST;
+      });
+      this._modelAnimations = gltf.animations ?? [];
       this._modelRoot = root;
       this._mixer = new THREE.AnimationMixer(root);
       this._scene.add(root);
+      this._modelYaw = this._yaw;
       this._playClip("idle");
     } catch (err) {
       console.warn("CharacterController: failed to load model", err);
     }
   }
 
-  private _playClip(name: string): void {
-    if (name === this._currentClip || !this._mixer) return;
-    const clip = THREE.AnimationClip.findByName(this._modelAnimations, name);
+  private _buildCapsule(): void {
+    const r = this._body.capsuleRadius, h = this._body.capsuleHalfHeight;
+    const mesh = new THREE.Mesh(
+      new THREE.CapsuleGeometry(r, h * 2, 6, 12),
+      new THREE.MeshStandardMaterial({ color: 0x6b8cc4, roughness: 0.7 }),
+    );
+    mesh.position.y = h + r;                 // lift so the capsule's foot sits at the group origin
+    mesh.raycast = NO_RAYCAST;
+    const group = new THREE.Group();
+    group.add(mesh);
+    this._modelRoot = group;
+    this._scene.add(group);
+    this._modelYaw = this._yaw;
+  }
+
+  // Resolve an intent ("idle"/"walk") to an actual clip, case-insensitively, so any
+  // model's capitalization ("Idle", "Walk", …) works.
+  private _clipFor(intent: string): THREE.AnimationClip | null {
+    const lc = intent.toLowerCase();
+    return this._modelAnimations.find(c => c.name.toLowerCase() === lc)
+        ?? this._modelAnimations.find(c => c.name.toLowerCase().includes(lc))
+        ?? null;
+  }
+
+  private _playClip(intent: string): void {
+    if (intent === this._currentClip || !this._mixer) return;
+    const clip = this._clipFor(intent);
     if (!clip) return;
-    if (this._currentClip) {
-      const prev = THREE.AnimationClip.findByName(this._modelAnimations, this._currentClip);
-      if (prev) this._mixer.clipAction(prev).fadeOut(0.15);
-    }
+    const prev = this._currentClip ? this._clipFor(this._currentClip) : null;
+    if (prev) this._mixer.clipAction(prev).fadeOut(0.15);
     this._mixer.clipAction(clip).reset().fadeIn(0.15).play();
-    this._currentClip = name;
+    this._currentClip = intent;
   }
 
   dispose(): void {
     document.removeEventListener("mousemove", this._onMouseMove);
     document.removeEventListener("keydown",   this._onKeyDown);
     document.removeEventListener("keyup",     this._onKeyUp);
+    document.removeEventListener("wheel",     this._onWheel);
     if (this._modelRoot) this._scene.remove(this._modelRoot);
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);

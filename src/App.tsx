@@ -119,6 +119,7 @@ export default function App() {
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const [isGame,          setIsGame]           = useState(false);
+  const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
@@ -619,9 +620,13 @@ export default function App() {
     const world = worldRef.current;
     if (!world?.world) return;
     worldRef.current?.transaction("update player settings", () => {
-      Object.assign(world.world!.playerSettings, changes);
+      // Assign a fresh object (new reference) so the panel reflects the change.
+      world.world!.playerSettings = { ...world.world!.playerSettings, ...changes };
     });
     syncHistory();
+    // syncHistory() no-ops once undo/dirty are already set, so force a re-render
+    // for the spawn settings panel.
+    setPlayerSettingsRev(v => v + 1);
   }, [syncHistory]);
 
   const handleSpawnPositionChange = useCallback((pos: Vec3): void => {
