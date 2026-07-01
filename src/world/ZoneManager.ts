@@ -65,6 +65,30 @@ function resolveFloorMesh(floorMesh: FloorMeshDef, zone: ZoneDef): FloorMeshDef 
   return { ...floorMesh, points };
 }
 
+// A node-backed platform's nodes are authoritative; its points/size/position are a
+// derived cache that can go stale (e.g. after a node drag). Re-derive them from the
+// current node positions so cold load matches the rebuild path.
+function resolvePlatformNodes(platform: PlatformDef, zone: ZoneDef): PlatformDef {
+  if (!platform.nodeIds?.length) return platform;
+  const pts = platform.nodeIds
+    .map(id => zone.nodes.find(n => n.id === id))
+    .filter((n): n is NonNullable<typeof n> => n != null)
+    .map(n => ({ x: n.x, z: n.z }));
+  if (pts.length < 3) return platform;
+  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+  const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
+  return {
+    ...platform,
+    points:   pts,
+    position: { ...platform.position, x: cx, z: cz },
+    size: {
+      width: Math.max(Math.max(...xs) - Math.min(...xs), 0.5),
+      depth: Math.max(Math.max(...zs) - Math.min(...zs), 0.5),
+    },
+  };
+}
+
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
   private readonly _unsubs: Array<() => void> = [];
@@ -383,7 +407,8 @@ export class ZoneManager {
 
     // ── Platforms ─────────────────────────────────────────────────────────
     for (const platform of zone.platforms) {
-      const { meshes, collider } = await PlatformBuilder.build(platform, zoneId);
+      const resolved = resolvePlatformNodes(platform, zone);
+      const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId);
       for (const m of meshes) platformsGroup.add(m);
       platformEntries.set(platform.id, { meshes, collider });
     }
@@ -715,27 +740,7 @@ export class ZoneManager {
     if (!platform) return;
 
     // Resolve polygon vertices from current node positions (synchronous, before the await)
-    let resolved = platform;
-    if (platform.nodeIds?.length) {
-      const pts = platform.nodeIds
-        .map(id => zone.nodes.find(n => n.id === id))
-        .filter((n): n is NonNullable<typeof n> => n != null)
-        .map(n => ({ x: n.x, z: n.z }));
-      if (pts.length >= 3) {
-        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-        const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
-        const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
-        resolved = {
-          ...platform,
-          points:   pts,
-          position: { ...platform.position, x: cx, z: cz },
-          size: {
-            width: Math.max(Math.max(...xs) - Math.min(...xs), 0.5),
-            depth: Math.max(Math.max(...zs) - Math.min(...zs), 0.5),
-          },
-        };
-      }
-    }
+    const resolved = resolvePlatformNodes(platform, zone);
 
     // Compute cutter meshes before the async gap so we read current stair state
     const cutters = this._getStairCuttersForPlatform(zoneId, resolved);
