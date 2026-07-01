@@ -137,7 +137,9 @@ export class CharacterController {
       this._modelRoot.rotation.y = this._modelYaw + MODEL_FORWARD_OFFSET;
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
-      this._playClip(isMoving ? "walk" : "idle");
+      // Airborne overrides walk/idle; falls back to walk/idle if the model has no jump clip.
+      const airborne = !this._body.isGrounded;
+      this._playClip(airborne ? "jump" : isMoving ? "walk" : "idle");
     }
 
     // Interact ray — cast from camera in look direction, max 2.5m
