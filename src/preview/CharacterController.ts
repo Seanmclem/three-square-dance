@@ -11,11 +11,18 @@ const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const CAM_SKIN = 0.2;   // gap kept in front of an occluding wall
 const ZOOM_MIN = 1.5;   // scroll-zoom distance clamp
 const ZOOM_MAX = 12;
-const INTERACT_RANGE = 2.5;
+const INTERACT_RANGE = 3;        // how far (m) an interactable is reachable
+const INTERACT_MIN_DOT = 0.5;    // must be within ~120° front cone of where the player faces
 // Avatar GLBs vary in authored forward axis; this model faces +Z, our math assumes -Z.
 const MODEL_FORWARD_OFFSET = Math.PI;
-// The avatar is never an interact target — skip its (expensive, skinned) per-frame raycast.
+// The avatar is never an interact target — skip it from any raycast.
 const NO_RAYCAST: THREE.Object3D["raycast"] = () => {};
+
+// Reused scratch objects for the per-frame interact scan (no allocations in the hot path).
+const _tmpForward = new THREE.Vector3();
+const _tmpEuler   = new THREE.Euler();
+const _tmpEye     = new THREE.Vector3();
+const _tmpWp      = new THREE.Vector3();
 
 export class CharacterController {
   private readonly _body: CharacterBody;   // built in the constructor (needs _settings scale)
@@ -24,7 +31,7 @@ export class CharacterController {
   private _velY    = 0;
   private readonly _keys = new Set<string>();
 
-  private readonly _raycaster = new THREE.Raycaster();
+  private readonly _interactSeen = new Set<string>();   // dedupe interactables per frame by editorId
   private _interactTargetId: string | null = null;
 
   private _modelRoot: THREE.Object3D | null = null;
@@ -55,7 +62,6 @@ export class CharacterController {
 
     this._body = new CharacterBody(_settings.characterScale ?? 1);
     this._desiredDist = _settings.thirdPersonDistance;
-    this._raycaster.far = INTERACT_RANGE;
 
     this._onMouseMove = (e: MouseEvent) => {
       this._yaw   -= e.movementX * 0.002;
@@ -144,24 +150,32 @@ export class CharacterController {
       this._updateAnim(!this._body.isGrounded, isMoving);
     }
 
-    // Interact ray — cast from the PLAYER's eye (not the camera) in the camera look
-    // direction, max 2.5m. In third-person the camera sits well behind the player, so
-    // originating at the camera would put nearby objects out of range.
-    const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(this.camera.rotation);
+    // Interact — pick the nearest interactable within range that's roughly in front of the
+    // player. A proximity/facing test (not a per-frame scene raycast) avoids the costly skinned
+    // raycast of animated NPCs and isn't limited to a pixel-precise hit.
+    const forward = _tmpForward.set(0, 0, -1).applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
     const eyeY = pos.y + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
-    this._raycaster.set(new THREE.Vector3(pos.x, eyeY, pos.z), lookDir);
-    const hits = this._raycaster
-      .intersectObjects(this._scene.children, true)
-      .filter(h => h.object.userData["interactable"]);
-    const hit = hits[0] ?? null;
-    const newId = (hit?.object.userData["editorId"] as string | undefined) ?? null;
-    if (newId !== this._interactTargetId) {
-      this._interactTargetId = newId;
+    const eye  = _tmpEye.set(pos.x, eyeY, pos.z);
+    let bestId: string | null = null, bestLabel = "Interact", bestDist = Infinity;
+    const seen = this._interactSeen; seen.clear();
+    this._scene.traverse(o => {
+      const id = o.userData["editorId"] as string | undefined;
+      if (!o.userData["interactable"] || !id || seen.has(id)) return;
+      seen.add(id);                                  // root is visited first → its world pos ≈ the object
+      const to = o.getWorldPosition(_tmpWp).sub(eye); to.y = 0;
+      const d = to.length();
+      if (d < 1e-3 || d > INTERACT_RANGE) return;
+      if (forward.dot(to.divideScalar(d)) < INTERACT_MIN_DOT) return;   // must be in front
+      if (d < bestDist) {
+        bestDist = d; bestId = id;
+        bestLabel = (o.userData["interactLabel"] as string | undefined) ?? "Interact";
+      }
+    });
+    if (bestId !== this._interactTargetId) {
+      this._interactTargetId = bestId;
       this._bus.emit(
         "character:interact-range",
-        newId
-          ? { objectId: newId, label: (hit!.object.userData["interactLabel"] as string | undefined) ?? "Interact" }
-          : null,
+        bestId ? { objectId: bestId, label: bestLabel } : null,
       );
     }
   }
