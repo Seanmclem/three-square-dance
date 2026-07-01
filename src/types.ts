@@ -278,6 +278,7 @@ export interface PlayerSettings {
   fov:                 number;
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
+  jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
   modelAssetId?:       string | null;
 }
 

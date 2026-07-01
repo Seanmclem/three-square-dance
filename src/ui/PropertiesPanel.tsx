@@ -2221,13 +2221,13 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
 function SpawnSettingsView({
   settings, assets, onChange, position, onPositionChange,
 }: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void; position?: Vec3; onPositionChange?: (pos: Vec3) => void }) {
-  const numField = (label: string, key: keyof PlayerSettings, step = 0.1) => (
+  const numField = (label: string, key: keyof PlayerSettings, step = 0.1, fallback?: number) => (
     <div key={key}>
       <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
       <input
         type="number" step={step}
-        defaultValue={settings[key] as number}
-        key={String(settings[key])}
+        defaultValue={(settings[key] as number) ?? fallback}
+        key={String(settings[key] ?? fallback)}
         onBlur={e => { const n = parseFloat(e.target.value); if (Number.isFinite(n)) onChange({ [key]: n }); }}
         style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, background: "rgba(40,40,40,0.9)", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "3px 6px", outline: "none" }}
       />
@@ -2289,6 +2289,7 @@ function SpawnSettingsView({
       {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
       {settings.cameraMode === "thirdperson" && numField("3RD PERSON DISTANCE", "thirdPersonDistance", 0.5)}
       {settings.cameraMode === "thirdperson" && numField("3RD PERSON HEIGHT", "thirdPersonHeight", 0.5)}
+      {settings.cameraMode === "thirdperson" && numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1)}
 
       <div>
         <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER MODEL</div>

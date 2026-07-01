@@ -216,7 +216,8 @@ export class CharacterController {
   private _has(intent: string): boolean { return this._clipFor(intent) != null; }
 
   // Crossfade to a clip. `loop` false = one-shot that clamps on its last frame.
-  private _play(intent: string, loop: boolean): void {
+  // `speed` scales playback rate (used for the configurable jump-anim speed).
+  private _play(intent: string, loop: boolean, speed = 1): void {
     if (intent === this._currentClip || !this._mixer) return;
     const clip = this._clipFor(intent);
     if (!clip) return;
@@ -224,6 +225,7 @@ export class CharacterController {
     next.reset();
     next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
     next.clampWhenFinished = !loop;
+    next.timeScale = speed;
     next.fadeIn(0.15).play();
     this._currentAction?.fadeOut(0.15);
     this._currentAction  = next;
@@ -249,7 +251,7 @@ export class CharacterController {
       case "jump":                                        // takeoff one-shot
         if (!airborne) this._enterLand();
         else if (this._animDone() && this._has("jump_idle")) {
-          this._play("jump_idle", true);                  // still airborne past takeoff → loop air pose
+          this._play("jump_idle", true, this._jumpSpeed()); // still airborne past takeoff → loop air pose
           this._animPhase = "airidle";
         }
         break;
@@ -266,14 +268,17 @@ export class CharacterController {
     }
   }
 
+  private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
+
   private _enterJump(): void {
-    if      (this._has("jump"))      { this._play("jump", false);     this._animPhase = "jump"; }
-    else if (this._has("jump_idle")) { this._play("jump_idle", true); this._animPhase = "airidle"; }
+    const s = this._jumpSpeed();
+    if      (this._has("jump"))      { this._play("jump", false, s);     this._animPhase = "jump"; }
+    else if (this._has("jump_idle")) { this._play("jump_idle", true, s); this._animPhase = "airidle"; }
     else                             { this._animPhase = "airidle"; }   // no jump clips: keep current
   }
 
   private _enterLand(): void {
-    if (this._has("jump_land")) { this._play("jump_land", false); this._animPhase = "land"; }
+    if (this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed()); this._animPhase = "land"; }
     else                        { this._animPhase = "ground"; }         // resolves to walk/idle next frame
   }
 

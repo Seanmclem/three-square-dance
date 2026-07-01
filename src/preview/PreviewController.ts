@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
   fov:                 75,
   thirdPersonDistance: 4,
   thirdPersonHeight:   2,
+  jumpAnimSpeed:       1,
 };
 
 export class PreviewController {
