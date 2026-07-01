@@ -32,7 +32,8 @@ export class SceneManager {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // PCF (not PCFSoft) — cheaper per-pixel shadow sampling. See TESTING.md §7 (perf).
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.5;
     this.renderer.autoClear = false; // ViewHelper needs manual clear control
@@ -67,7 +68,7 @@ export class SceneManager {
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
     sun.position.set(30, 50, 20);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(1024, 1024);   // 1024² halves shadow-map fill vs 2048² (perf)
     const sc = sun.shadow.camera as THREE.OrthographicCamera;
     sc.near = 0.5; sc.far = 200;
     sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40;
