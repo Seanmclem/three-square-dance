@@ -348,11 +348,14 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
 - No browser-console errors on load or interaction.
 - StrictMode double-mount: editor still renders once, no duplicated canvases
   or leaked listeners after a hot reload.
-- **Framerate — watch the FPS counter** (small readout, top-left of the canvas,
-  `src/ui/FpsCounter.tsx`; green ≥55 / amber ≥40 / red below). It should sit at the
-  display refresh (≈60) in the editor and in preview/game. **Be wary of anything that
-  adds per-frame work**, especially in the RAF/update path — this is where regressions
-  hide. Concrete traps hit before:
+- **Framerate — watch the perf counter** (small readout, top-left of the canvas,
+  `src/ui/FpsCounter.tsx`). It shows **avg FPS** *and* the **worst single-frame time (ms)**
+  in each 0.5s window. **Watch the ms, not just the FPS:** averaged FPS masks brief hitches
+  (a couple of long frames barely move a 500ms average, and rAF is capped at the display
+  refresh — 120Hz here), so a stutter you *feel* can sit at a steady "120 FPS". The worst-ms
+  surfaces it — ideal is ~8.3ms @120Hz; a spike to 17ms+ is a dropped frame. **Be wary of
+  anything that adds per-frame work**, especially in the RAF/update path — this is where
+  regressions hide. Concrete traps hit before:
   - **Per-frame scene raycasts** (`intersectObjects(scene.children, true)` each frame),
     *especially* against **skinned/animated meshes** — a skinned raycast CPU-skins every
     vertex. The interact system used to do this and tanked FPS near an animated NPC; it's
