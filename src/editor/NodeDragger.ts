@@ -91,6 +91,7 @@ export class NodeDragger {
   private _rectFloorNodes   = new Map<string, string[]>(); // floorId → [id0,id1,id2,id3]
 
   private _altDown = false;
+  private _gameMode = false;   // in Play (game) mode, helpers stay hidden — don't rebuild them
   private _lastRawPos: Vec2 = { x: 0, z: 0 };
   private readonly _unsubs: Array<() => void> = [];
 
@@ -130,6 +131,15 @@ export class NodeDragger {
       this._bus.on("input:keyup", ({ code }) => {
         if (code === "AltLeft" || code === "AltRight") this._altDown = false;
       }),
+      // Cold load builds zone geometry with no per-entity rebuild event, so refresh
+      // here to create the node dots / edge lines that _refresh would otherwise miss.
+      // Skip in game mode: helpers are hidden there, and a mid-game zone transition
+      // must not resurrect them as fresh (visible) meshes.
+      this._bus.on("zone:loaded", () => {
+        if (this._activeTool === "select" && this._state !== "DRAG" && !this._gameMode) this._refresh();
+      }),
+      this._bus.on("preview:start", ({ mode }) => { if (mode === "game") this._gameMode = true; }),
+      this._bus.on("preview:stop",  () => { this._gameMode = false; }),
       this._bus.on("platform:updated", () => {
         if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
       }),

@@ -149,6 +149,7 @@ export interface BusEvents {
   "animation:auto-play-changed": { objectId: string; clipName: string | null };
   "zone:added":            { zone: ZoneDef };
   "zone:activated":        { zoneId: string };
+  "zone:loaded":           { zoneId: string };
   "zone:enter":            { zoneId: string };
   "transition:added":      { transition: TransitionDef };
   "spawn:updated":         { position: Vec3 };

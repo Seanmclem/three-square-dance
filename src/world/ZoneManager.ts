@@ -445,6 +445,11 @@ export class ZoneManager {
     // Apply current dimming level after loading
     this._applyDimming();
     if (this._hiddenGroups.size > 0) this._applyGroupVisibility();
+
+    // Zone geometry is now in the scene — let editor helpers (node dots / edge lines)
+    // build themselves. _buildZone emits no per-entity rebuild event, so without this
+    // NodeDragger never refreshes on a cold load.
+    this._bus.emit("zone:loaded", { zoneId });
   }
 
   unloadZone(zoneId: string): void {
