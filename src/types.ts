@@ -283,6 +283,7 @@ export interface PlayerSettings {
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
+  characterScale?:     number;            // uniform scale of the 3rd-person avatar + collision (default 1)
   // Per-character clip overrides. Key absent/undefined = Auto (name match); null = None
   // (play nothing); string = use that exact clip name.
   animClips?:          Partial<Record<LocomotionState, string | null>>;

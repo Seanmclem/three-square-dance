@@ -3,14 +3,20 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 
 export class CharacterBody {
-  readonly capsuleRadius     = 0.3;
-  readonly capsuleHalfHeight = 0.6;
+  readonly capsuleRadius:     number;
+  readonly capsuleHalfHeight: number;
 
   private _body!:     RAPIER.RigidBody;
   private _collider!: RAPIER.Collider;
   private _kcc!:      RAPIER.KinematicCharacterController;
 
+  constructor(private readonly _scale = 1) {
+    this.capsuleRadius     = 0.3 * _scale;
+    this.capsuleHalfHeight = 0.6 * _scale;
+  }
+
   init(spawnPos: THREE.Vector3): void {
+    const s = this._scale;
     const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
       .setTranslation(spawnPos.x, spawnPos.y, spawnPos.z);
     this._body     = physicsWorld.world.createRigidBody(bodyDesc);
@@ -19,8 +25,8 @@ export class CharacterBody {
       this._body,
     );
     this._kcc = physicsWorld.world.createCharacterController(0.01);
-    this._kcc.enableAutostep(0.5, 0.2, true);
-    this._kcc.enableSnapToGround(0.3);
+    this._kcc.enableAutostep(0.5 * s, 0.2 * s, true);
+    this._kcc.enableSnapToGround(0.3 * s);
     this._kcc.setSlideEnabled(true);
     this._kcc.setMaxSlopeClimbAngle(45 * Math.PI / 180);
   }

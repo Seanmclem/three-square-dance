@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   thirdPersonDistance: 4,
   thirdPersonHeight:   2,
   jumpAnimSpeed:       1,
+  characterScale:      1,
 };
 
 export class PreviewController {
@@ -39,8 +40,8 @@ export class PreviewController {
     let facingDeg = 0;
     if (mode === "game" && this._world.world?.defaultSpawn) {
       const s = this._world.world.defaultSpawn;
-      // s.position is at foot/floor level; body origin is at capsule center
-      const capsuleBottom = 0.6 + 0.3; // halfHeight + radius
+      // s.position is at foot/floor level; body origin is at capsule center (scaled)
+      const capsuleBottom = (0.6 + 0.3) * (settings.characterScale ?? 1); // (halfHeight + radius) * scale
       spawnPos = new THREE.Vector3(s.position.x, s.position.y + capsuleBottom, s.position.z);
       facingDeg = s.facingDeg;
     } else {

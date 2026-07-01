@@ -18,7 +18,7 @@ const MODEL_FORWARD_OFFSET = Math.PI;
 const NO_RAYCAST: THREE.Object3D["raycast"] = () => {};
 
 export class CharacterController {
-  private readonly _body = new CharacterBody();
+  private readonly _body: CharacterBody;   // built in the constructor (needs _settings scale)
   private _yaw     = 0;
   private _pitch   = 0;
   private _velY    = 0;
@@ -53,6 +53,7 @@ export class CharacterController {
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
     );
 
+    this._body = new CharacterBody(_settings.characterScale ?? 1);
     this._desiredDist = _settings.thirdPersonDistance;
     this._raycaster.far = INTERACT_RANGE;
 
@@ -143,9 +144,12 @@ export class CharacterController {
       this._updateAnim(!this._body.isGrounded, isMoving);
     }
 
-    // Interact ray — cast from camera in look direction, max 2.5m
+    // Interact ray — cast from the PLAYER's eye (not the camera) in the camera look
+    // direction, max 2.5m. In third-person the camera sits well behind the player, so
+    // originating at the camera would put nearby objects out of range.
     const lookDir = new THREE.Vector3(0, 0, -1).applyEuler(this.camera.rotation);
-    this._raycaster.set(this.camera.position, lookDir);
+    const eyeY = pos.y + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
+    this._raycaster.set(new THREE.Vector3(pos.x, eyeY, pos.z), lookDir);
     const hits = this._raycaster
       .intersectObjects(this._scene.children, true)
       .filter(h => h.object.userData["interactable"]);
@@ -181,6 +185,7 @@ export class CharacterController {
       this._modelAnimations = gltf.animations ?? [];
       this._modelRoot = root;
       this._mixer = new THREE.AnimationMixer(root);
+      root.scale.setScalar(this._settings.characterScale ?? 1);
       this._scene.add(root);
       this._modelYaw = this._yaw;
       this._play("idle", true);
@@ -198,7 +203,7 @@ export class CharacterController {
     mesh.position.y = h + r;                 // lift so the capsule's foot sits at the group origin
     mesh.raycast = NO_RAYCAST;
     const group = new THREE.Group();
-    group.add(mesh);
+    group.add(mesh);   // mesh already sized from the (scaled) body dims — no extra group scale
     this._modelRoot = group;
     this._scene.add(group);
     this._modelYaw = this._yaw;
