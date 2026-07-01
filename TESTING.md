@@ -366,6 +366,8 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
   - After a change touching the render loop or `update()`, enter preview and eyeball the
     counter while moving/near dynamic content — a dip that only appears "around" a specific
     object is the tell.
+  - **Diagnosing/fixing perf: see `PROFILING.md`** — the counter, a DevTools Performance
+    walkthrough, this app's per-frame hot paths, and the culprit/fix catalog.
 
 ---
 
