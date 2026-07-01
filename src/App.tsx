@@ -32,6 +32,7 @@ import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
+import { FpsCounter } from "@/ui/FpsCounter";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
@@ -1367,6 +1368,8 @@ export default function App() {
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
                  cursor: activeTool === "trigger-volume" ? "crosshair" : "default" }}
       />
+
+      <FpsCounter />
 
       {!isGame && <>
       <Toolbar

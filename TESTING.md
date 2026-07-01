@@ -348,6 +348,21 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
 - No browser-console errors on load or interaction.
 - StrictMode double-mount: editor still renders once, no duplicated canvases
   or leaked listeners after a hot reload.
+- **Framerate — watch the FPS counter** (small readout, top-left of the canvas,
+  `src/ui/FpsCounter.tsx`; green ≥55 / amber ≥40 / red below). It should sit at the
+  display refresh (≈60) in the editor and in preview/game. **Be wary of anything that
+  adds per-frame work**, especially in the RAF/update path — this is where regressions
+  hide. Concrete traps hit before:
+  - **Per-frame scene raycasts** (`intersectObjects(scene.children, true)` each frame),
+    *especially* against **skinned/animated meshes** — a skinned raycast CPU-skins every
+    vertex. The interact system used to do this and tanked FPS near an animated NPC; it's
+    now a cheap proximity+facing scan (`CharacterController`). Don't reintroduce per-frame
+    raycasts over the whole scene / skinned meshes.
+  - **Allocations in `update()`** (`new THREE.Vector3()`/`Euler`/`Ray` every frame) → GC
+    hitches. Reuse module/instance scratch objects (see `_tmp*` in `CharacterController`).
+  - After a change touching the render loop or `update()`, enter preview and eyeball the
+    counter while moving/near dynamic content — a dip that only appears "around" a specific
+    object is the tell.
 
 ---
 
