@@ -91,6 +91,7 @@ export class NodeDragger {
   private _rectFloorNodes   = new Map<string, string[]>(); // floorId → [id0,id1,id2,id3]
 
   private _altDown = false;
+  private _gizmoActive = false; // a TransformControls gizmo drag is in progress — mute node picking
   private _gameMode = false;   // in Play (game) mode, helpers stay hidden — don't rebuild them
   private _lastRawPos: Vec2 = { x: 0, z: 0 };
   private readonly _unsubs: Array<() => void> = [];
@@ -114,12 +115,20 @@ export class NodeDragger {
         }
       }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._activeTool !== "select") return;
+        if (this._activeTool !== "select" || this._gizmoActive) return;
         this._onMouseMove(worldPos.x, worldPos.z);
       }),
       this._bus.on("input:mousedown", ({ button }) => {
-        if (this._activeTool !== "select" || button !== 0) return;
+        if (this._activeTool !== "select" || button !== 0 || this._gizmoActive) return;
         this._onMouseDown();
+      }),
+      // A gizmo drag (TransformControls) shares the canvas; without this, pressing on a
+      // gizmo ring over a node dot behind it would also grab the node. Mute picking while
+      // the gizmo is dragging. Fires on pointerdown, before input:mousedown's mousedown.
+      // NodeDragger re-emits this for its OWN drags (state==="DRAG" by then) — ignore those
+      // so a node drag doesn't mute itself.
+      this._bus.on("gizmo:dragging", ({ isDragging }) => {
+        this._gizmoActive = isDragging && this._state !== "DRAG";
       }),
       this._bus.on("input:mouseup", ({ button }) => {
         if (button === 0) this._onMouseUp();
