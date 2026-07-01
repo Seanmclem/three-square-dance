@@ -31,6 +31,9 @@ export class CharacterController {
   private _mixer:     THREE.AnimationMixer | null = null;
   private _modelAnimations: THREE.AnimationClip[] = [];
   private _currentClip = "";
+  private _currentAction:  THREE.AnimationAction | null = null;
+  private _currentClipObj: THREE.AnimationClip  | null = null;
+  private _animPhase: "ground" | "jump" | "airidle" | "land" = "ground";
   private _modelYaw   = 0;                       // smoothed avatar facing (third-person)
   private _desiredDist: number;                  // scroll-zoom target distance
 
@@ -137,9 +140,7 @@ export class CharacterController {
       this._modelRoot.rotation.y = this._modelYaw + MODEL_FORWARD_OFFSET;
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
-      // Airborne overrides walk/idle; falls back to walk/idle if the model has no jump clip.
-      const airborne = !this._body.isGrounded;
-      this._playClip(airborne ? "jump" : isMoving ? "walk" : "idle");
+      this._updateAnim(!this._body.isGrounded, isMoving);
     }
 
     // Interact ray — cast from camera in look direction, max 2.5m
@@ -182,7 +183,7 @@ export class CharacterController {
       this._mixer = new THREE.AnimationMixer(root);
       this._scene.add(root);
       this._modelYaw = this._yaw;
-      this._playClip("idle");
+      this._play("idle", true);
     } catch (err) {
       console.warn("CharacterController: failed to load model", err);
     }
@@ -212,14 +213,68 @@ export class CharacterController {
         ?? null;
   }
 
-  private _playClip(intent: string): void {
+  private _has(intent: string): boolean { return this._clipFor(intent) != null; }
+
+  // Crossfade to a clip. `loop` false = one-shot that clamps on its last frame.
+  private _play(intent: string, loop: boolean): void {
     if (intent === this._currentClip || !this._mixer) return;
     const clip = this._clipFor(intent);
     if (!clip) return;
-    const prev = this._currentClip ? this._clipFor(this._currentClip) : null;
-    if (prev) this._mixer.clipAction(prev).fadeOut(0.15);
-    this._mixer.clipAction(clip).reset().fadeIn(0.15).play();
-    this._currentClip = intent;
+    const next = this._mixer.clipAction(clip);
+    next.reset();
+    next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+    next.clampWhenFinished = !loop;
+    next.fadeIn(0.15).play();
+    this._currentAction?.fadeOut(0.15);
+    this._currentAction  = next;
+    this._currentClipObj = clip;
+    this._currentClip    = intent;
+  }
+
+  // Has the current one-shot reached its end? (Only meaningful for a clamped LoopOnce.)
+  private _animDone(): boolean {
+    const a = this._currentAction, c = this._currentClipObj;
+    return !!a && !!c && a.time >= c.duration - 0.02;
+  }
+
+  // Locomotion state machine: ground (idle/walk) → jump takeoff → air-idle loop → land → ground.
+  // Each stage falls back gracefully if the model lacks that clip.
+  private _updateAnim(airborne: boolean, isMoving: boolean): void {
+    if (!this._mixer) return;
+    switch (this._animPhase) {
+      case "ground":
+        if (airborne) this._enterJump();
+        else this._play(isMoving ? "walk" : "idle", true);
+        break;
+      case "jump":                                        // takeoff one-shot
+        if (!airborne) this._enterLand();
+        else if (this._animDone() && this._has("jump_idle")) {
+          this._play("jump_idle", true);                  // still airborne past takeoff → loop air pose
+          this._animPhase = "airidle";
+        }
+        break;
+      case "airidle":
+        if (!airborne) this._enterLand();
+        break;
+      case "land":                                        // landing one-shot
+        if (airborne) this._enterJump();                  // jumped again mid-landing
+        else if (this._animDone()) {
+          this._play(isMoving ? "walk" : "idle", true);
+          this._animPhase = "ground";
+        }
+        break;
+    }
+  }
+
+  private _enterJump(): void {
+    if      (this._has("jump"))      { this._play("jump", false);     this._animPhase = "jump"; }
+    else if (this._has("jump_idle")) { this._play("jump_idle", true); this._animPhase = "airidle"; }
+    else                             { this._animPhase = "airidle"; }   // no jump clips: keep current
+  }
+
+  private _enterLand(): void {
+    if (this._has("jump_land")) { this._play("jump_land", false); this._animPhase = "land"; }
+    else                        { this._animPhase = "ground"; }         // resolves to walk/idle next frame
   }
 
   dispose(): void {

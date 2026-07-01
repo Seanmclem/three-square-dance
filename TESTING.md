@@ -236,6 +236,48 @@ sputter — every failure mode below was hit and diagnosed in practice.
   layer, so to confirm the *panel* actually writes the field, also exercise the real
   click→input path at least once (select the entity, edit in the PropertiesPanel).
 
+### Driving the live *runtime* (preview / game): the StrictMode split-brain
+
+> Learned the hard way in the 2026-07-01 third-person session. This is the §3-step-3
+> warning taken to its worst case, and it specifically bites **runtime** verification
+> (player movement, camera, animation) — not editor/geometry reads.
+
+StrictMode double-mounts the App, so **two** live instances exist and the `window.__*`
+globals can be split across them **inconsistently**: e.g. `__editorCamera` / `__world`
+resolved to the *rendered* instance while `__preview` / `__test` pointed at a **frozen
+orphan** whose RAF `update()` never runs. Symptoms of reading/driving the orphan:
+
+- `__preview._controller.body.position` and `._currentClip` are **frozen** across
+  `sleep`-separated samples; `.camera.position` sits at the origin.
+- `__test.enterGame()` / `__test.enterPreview()` spawn an avatar you can see in
+  `__scene` **at (0,0,0)** (a duplicate), but the *visible* canvas shows a different
+  player. Dev-only artifact, not production.
+
+**Detecting which instance you hold:** set `__editorCamera.focus` — if the view moves,
+that global is live. Sample `__preview._controller.body.position.y` twice with a Bash
+`sleep` between — if it never changes, that controller is the orphan.
+
+**Ground truth for the live runtime = the DOM canvas + real input events**, because:
+- The **screenshot** captures whatever renders to the page canvas = the live instance.
+- The live controller's listeners are on **`document`**, so a real event reaches it:
+  `document.dispatchEvent(new KeyboardEvent('keydown', { code:'Space', bubbles:true }))`
+  (also `'Escape'` to exit preview, `'KeyW'`, etc.). Dispatch `keydown` without a
+  matching `keyup` to *hold* a key.
+- Enter preview/game via the **real Play button** (green ▶ bottom-left, or Start Game
+  via its caret) — that runs the mounted instance's handler. Prefer this over `__test.*`
+  when you need the *rendered* runtime.
+
+**Framing an airborne / falling avatar:** preview spawns at `__editorCamera.focus + 1.5y`.
+Set `focus` to a **high, open point** (e.g. `focus.set(3, 45, 3)`) so the player free-falls
+for ~2s in open air — a long, unobstructed third-person shot. This also dodges the
+third-person **spring-arm jamming**: near a wall (e.g. the demo courtyard, spawn ~1.4m
+from brick) the camera pulls to its MIN_DIST and ends up *inside* the avatar, so frame
+avatar shots in open space.
+
+**Dev server may be DOWN.** The golden path says "reuse the running server," but it can
+stop between/among sessions. Check `lsof -ti:7373`; if down, start `npm run dev` in the
+background (Bash `run_in_background`) before navigating.
+
 ---
 
 ## 4. Phase 4.7 — Merged Wall Runs test
