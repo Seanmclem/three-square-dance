@@ -19,6 +19,7 @@ export class SceneManager {
   private readonly _clock:           THREE.Clock;
   private readonly _updateCallbacks: UpdateCallback[] = [];
   private _raf:             number = 0;
+  private readonly _loopBound = () => this._loop();   // bind once; avoids a per-frame closure alloc
   private _disposed         = false;
   private _previewCamera:   THREE.PerspectiveCamera | null = null;
   private readonly _onResize: () => void;
@@ -57,7 +58,7 @@ export class SceneManager {
     this._handleResize();
 
     this._clock = new THREE.Clock();
-    this._raf = requestAnimationFrame(this._loop.bind(this));
+    this._raf = requestAnimationFrame(this._loopBound);
   }
 
   private _setupLighting(): THREE.DirectionalLight {
@@ -170,7 +171,7 @@ export class SceneManager {
     this.renderer.clear();
     this.renderer.render(this.scene, this._previewCamera ?? this.camera);
     if (!this._previewCamera) this._viewHelper.render(this.renderer);
-    this._raf = requestAnimationFrame(this._loop.bind(this));
+    this._raf = requestAnimationFrame(this._loopBound);
   }
 
   private _handleResize(): void {

@@ -18,11 +18,16 @@ const MODEL_FORWARD_OFFSET = Math.PI;
 // The avatar is never an interact target — skip it from any raycast.
 const NO_RAYCAST: THREE.Object3D["raycast"] = () => {};
 
-// Reused scratch objects for the per-frame interact scan (no allocations in the hot path).
+// Reused scratch objects — the update() loop runs every frame, so it must not allocate
+// (per-frame garbage triggers GC pauses = micro-stutters). All temps below are set fresh
+// each use and never held across the yield back to the RAF loop.
 const _tmpForward = new THREE.Vector3();
 const _tmpEuler   = new THREE.Euler();
 const _tmpEye     = new THREE.Vector3();
 const _tmpWp      = new THREE.Vector3();
+const _tmpDir     = new THREE.Vector3();
+const _tmpPivot   = new THREE.Vector3();
+const _tmpBack    = new THREE.Vector3();
 
 export class CharacterController {
   private readonly _body: CharacterBody;   // built in the constructor (needs _settings scale)
@@ -32,6 +37,7 @@ export class CharacterController {
   private readonly _keys = new Set<string>();
 
   private readonly _interactSeen = new Set<string>();   // dedupe interactables per frame by editorId
+  private readonly _ray = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3()); // reused spring-arm ray
   private _interactTargetId: string | null = null;
 
   private _modelRoot: THREE.Object3D | null = null;
@@ -92,7 +98,7 @@ export class CharacterController {
 
   update(dt: number): void {
     const speed = this._settings.moveSpeed;
-    const dir   = new THREE.Vector3();
+    const dir   = _tmpDir.set(0, 0, 0);
 
     if (this._keys.has("KeyW") || this._keys.has("ArrowUp"))    dir.z -= 1;
     if (this._keys.has("KeyS") || this._keys.has("ArrowDown"))  dir.z += 1;
@@ -100,7 +106,7 @@ export class CharacterController {
     if (this._keys.has("KeyD") || this._keys.has("ArrowRight")) dir.x += 1;
     const isMoving = dir.lengthSq() > 0;
     if (isMoving) dir.normalize().multiplyScalar(speed * dt);
-    dir.applyEuler(new THREE.Euler(0, this._yaw, 0, "YXZ"));
+    dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
 
     if (this._body.isGrounded) {
       this._velY = this._keys.has("Space")
@@ -116,13 +122,15 @@ export class CharacterController {
 
     // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision
     if (this._settings.cameraMode === "thirdperson") {
-      const pivot   = new THREE.Vector3(pos.x, pos.y + this._settings.thirdPersonHeight, pos.z);
-      const forward = new THREE.Vector3(0, 0, -1)
-        .applyEuler(new THREE.Euler(this._pitch, this._yaw, 0, "YXZ")); // camera look dir
-      const back    = forward.clone().negate();                         // pivot → camera
+      const pivot   = _tmpPivot.set(pos.x, pos.y + this._settings.thirdPersonHeight, pos.z);
+      const forward = _tmpForward.set(0, 0, -1)
+        .applyEuler(_tmpEuler.set(this._pitch, this._yaw, 0, "YXZ")); // camera look dir
+      const back    = _tmpBack.copy(forward).negate();                 // pivot → camera
       let dist = this._desiredDist;
+      this._ray.origin = pivot;
+      this._ray.dir    = back;
       const hit = physicsWorld.world.castRay(
-        new RAPIER.Ray(pivot, back), dist, true,
+        this._ray, dist, true,
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._body.collider,
       );
       if (hit) dist = Math.max(MIN_DIST, hit.timeOfImpact - CAM_SKIN); // pull in on walls
