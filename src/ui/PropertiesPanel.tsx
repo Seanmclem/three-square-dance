@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, AssetDef, TriggerVolume, ScriptDef,
+  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, ScriptDef,
   GroupDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
@@ -2236,6 +2236,44 @@ function SpawnSettingsView({
 
   const modelAssets = assets.filter(a => a.category === "Characters" || a.category === "Props" || a.category === "Other");
 
+  // Per-character locomotion clip overrides (third-person). Clip list comes from the selected
+  // model's imported animation names; the auto match mirrors CharacterController._clipFor.
+  const modelClips = assets.find(a => a.id === settings.modelAssetId)?.animations ?? [];
+  const animSlots: { slot: LocomotionState; label: string }[] = [
+    { slot: "idle",      label: "IDLE" },
+    { slot: "walk",      label: "WALK" },
+    { slot: "jump",      label: "JUMP (takeoff)" },
+    { slot: "jump_idle", label: "JUMP IDLE (in air)" },
+    { slot: "jump_land", label: "JUMP LAND" },
+  ];
+  const autoClip = (intent: string): string | undefined => {
+    const lc = intent.toLowerCase();
+    return modelClips.find(c => c.toLowerCase() === lc) ?? modelClips.find(c => c.toLowerCase().includes(lc));
+  };
+  const animField = (slot: LocomotionState, label: string) => {
+    const cur = settings.animClips?.[slot];                       // undefined | null | string
+    const value = cur === undefined ? "__auto__" : cur === null ? "__none__" : cur;
+    const auto = autoClip(slot);
+    return (
+      <div key={slot}>
+        <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
+        <select
+          value={value}
+          onChange={e => {
+            const v = e.target.value;
+            const next = v === "__auto__" ? undefined : v === "__none__" ? null : v;
+            onChange({ animClips: { ...settings.animClips, [slot]: next } });
+          }}
+          style={{ width: "100%", background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "4px 6px" }}
+        >
+          <option value="__auto__">{auto ? `Auto (${auto})` : "Auto (none found)"}</option>
+          <option value="__none__">None</option>
+          {modelClips.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+    );
+  };
+
   const posField = (axis: "x" | "y" | "z") => (
     <div key={axis} style={{ flex: 1 }}>
       <div style={{ ...LABEL, marginBottom: 2 }}>{axis.toUpperCase()}</div>
@@ -2304,6 +2342,13 @@ function SpawnSettingsView({
           ))}
         </select>
       </div>
+
+      {settings.cameraMode === "thirdperson" && modelClips.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
+          {animSlots.map(({ slot, label }) => animField(slot, label))}
+        </div>
+      )}
     </div>
   );
 }

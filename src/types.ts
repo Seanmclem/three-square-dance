@@ -272,6 +272,9 @@ export interface SpawnDef {
   facingDeg: number;
 }
 
+// Locomotion states the third-person animation state machine drives (intent strings).
+export type LocomotionState = "idle" | "walk" | "jump" | "jump_idle" | "jump_land";
+
 export interface PlayerSettings {
   cameraMode:          CameraMode;
   moveSpeed:           number;
@@ -280,6 +283,9 @@ export interface PlayerSettings {
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
+  // Per-character clip overrides. Key absent/undefined = Auto (name match); null = None
+  // (play nothing); string = use that exact clip name.
+  animClips?:          Partial<Record<LocomotionState, string | null>>;
   modelAssetId?:       string | null;
 }
 

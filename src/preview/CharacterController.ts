@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import type { PlayerSettings } from "@/types";
+import type { PlayerSettings, LocomotionState } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { CharacterBody } from "./CharacterBody";
 import { physicsWorld } from "@/physics/PhysicsWorld";
@@ -204,9 +204,17 @@ export class CharacterController {
     this._modelYaw = this._yaw;
   }
 
-  // Resolve an intent ("idle"/"walk") to an actual clip, case-insensitively, so any
-  // model's capitalization ("Idle", "Walk", …) works.
+  private _byName(name: string): THREE.AnimationClip | null {
+    return this._modelAnimations.find(c => c.name === name) ?? null;
+  }
+
+  // Resolve an intent ("idle"/"walk"/…) to an actual clip. A per-character override wins:
+  // null = None (play nothing), a string = that exact clip. Undefined falls back to
+  // case-insensitive name matching, so any model's capitalization ("Idle", "Walk", …) works.
   private _clipFor(intent: string): THREE.AnimationClip | null {
+    const override = this._settings.animClips?.[intent as LocomotionState];
+    if (override === null) return null;
+    if (override) return this._byName(override);
     const lc = intent.toLowerCase();
     return this._modelAnimations.find(c => c.name.toLowerCase() === lc)
         ?? this._modelAnimations.find(c => c.name.toLowerCase().includes(lc))
