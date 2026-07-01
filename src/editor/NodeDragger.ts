@@ -46,7 +46,7 @@ function makeNodeDot(): THREE.Mesh {
     depthTest:   false,
     depthWrite:  false,
     transparent: true,
-    opacity:     0.6,
+    opacity:     0.48,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 3;
@@ -61,7 +61,7 @@ function makeEdgeLine(x1: number, z1: number, x2: number, z2: number, y = 0.04):
     color:       0x3366aa,
     depthTest:   false,
     transparent: true,
-    opacity:     0.35,
+    opacity:     0.42,
   });
   const line = new THREE.Line(geo, mat);
   line.renderOrder = 2;
@@ -278,7 +278,7 @@ export class NodeDragger {
         const dot = this._nodeDots.get(this._hoveredNodeId);
         if (dot) {
           (dot.material as THREE.MeshBasicMaterial).color.setHex(0x6699bb);
-          (dot.material as THREE.MeshBasicMaterial).opacity = 0.6;
+          (dot.material as THREE.MeshBasicMaterial).opacity = 0.48;
           dot.scale.setScalar(1);
         }
       }
@@ -388,7 +388,7 @@ export class NodeDragger {
       const dot = this._nodeDots.get(this._dragNodeId);
       if (dot) {
         (dot.material as THREE.MeshBasicMaterial).color.setHex(isHovered ? 0x4d8cff : 0x6699bb);
-        (dot.material as THREE.MeshBasicMaterial).opacity = isHovered ? 1.0 : 0.6;
+        (dot.material as THREE.MeshBasicMaterial).opacity = isHovered ? 1.0 : 0.48;
         dot.scale.setScalar(isHovered ? 1.4 : 1);
       }
     }
@@ -567,7 +567,7 @@ export class NodeDragger {
   private _setEdgeStyle(line: THREE.Line, hovered: boolean): void {
     const mat = line.material as THREE.LineBasicMaterial;
     mat.color.setHex(hovered ? 0x5599ff : 0x3366aa);
-    mat.opacity = hovered ? 0.85 : 0.35;
+    mat.opacity = hovered ? 0.85 : 0.42;
   }
 
   private _updateEdgeLine(edge: EdgeEntry, x1: number, z1: number, x2: number, z2: number): void {

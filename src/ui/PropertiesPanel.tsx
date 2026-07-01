@@ -95,6 +95,17 @@ function effectiveSteps(stair: StairDef): number {
   return stair.numSteps ?? Math.max(1, Math.round((stair.end.y - stair.start.y) / STAIR_STEP_H));
 }
 
+// Height / horizontal length / bearing (deg) derived from the start→end vector.
+// These drive the alternate dimension inputs; `end` remains the stored source of truth.
+function stairDims(start: Vec3, end: Vec3): { height: number; length: number; rotation: number } {
+  const dx = end.x - start.x, dz = end.z - start.z;
+  return {
+    height:   +(end.y - start.y).toFixed(3),
+    length:   +Math.hypot(dx, dz).toFixed(3),
+    rotation: +(Math.atan2(dz, dx) * 180 / Math.PI).toFixed(2),
+  };
+}
+
 // ── Shared debounce hook ──────────────────────────────────────────────────────
 
 function useFieldDebounce(delayMs = 300) {
@@ -874,6 +885,10 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [endStr,   setEndStr]   = useState({ x: String(stair?.end.x ?? 0),   y: String(stair?.end.y ?? 0),   z: String(stair?.end.z ?? 0)   });
   const [widthStr,    setWidthStr]    = useState(String(stair?.width ?? 2.5));
   const [stepsStr,    setStepsStr]    = useState(String(stair ? effectiveSteps(stair) : 1));
+  const initDims = stair ? stairDims(stair.start, stair.end) : { height: 0, length: 0, rotation: 0 };
+  const [heightStr, setHeightStr] = useState(String(initDims.height));
+  const [lengthStr, setLengthStr] = useState(String(initDims.length));
+  const [rotStr,    setRotStr]    = useState(String(initDims.rotation));
   const [hasRailing,  setHasRailing]  = useState(stair?.hasRailing ?? false);
   const [railTopRail,   setRailTopRail]   = useState(stair?.railing?.topRail   ?? true);
   const [railBalusters, setRailBalusters] = useState(stair?.railing?.balusters ?? true);
@@ -901,6 +916,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setEndStr({   x: String(stair.end.x),   y: String(stair.end.y),   z: String(stair.end.z)   });
     setWidthStr(String(stair.width));
     setStepsStr(String(effectiveSteps(stair)));
+    { const d = stairDims(stair.start, stair.end); setHeightStr(String(d.height)); setLengthStr(String(d.length)); setRotStr(String(d.rotation)); }
     setHasRailing(stair.hasRailing);
     setRailTopRail(stair.railing?.topRail   ?? true);
     setRailBalusters(stair.railing?.balusters ?? true);
@@ -925,9 +941,12 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
 
   useEffect(() => {
     if (!stair) return;
+    setStartStr({ x: String(stair.start.x), y: String(stair.start.y), z: String(stair.start.z) });
     setEndStr({ x: String(stair.end.x), y: String(stair.end.y), z: String(stair.end.z) });
     setStepsStr(String(effectiveSteps(stair)));
-  }, [stair?.end.x, stair?.end.y, stair?.end.z, stair?.numSteps]); // eslint-disable-line react-hooks/exhaustive-deps
+    const d = stairDims(stair.start, stair.end);
+    setHeightStr(String(d.height)); setLengthStr(String(d.length)); setRotStr(String(d.rotation));
+  }, [stair?.start.x, stair?.start.y, stair?.start.z, stair?.end.x, stair?.end.y, stair?.end.z, stair?.numSteps]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!stair) return null;
 
@@ -966,6 +985,41 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     } else {
       onObjectUpdate({ numSteps: n } as unknown as Partial<WorldObject>);
     }
+  };
+
+  // Alternate dimension inputs — rewrite `end` from start + height/length/bearing.
+  const DEG2RAD = Math.PI / 180;
+  const commitHeight = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const newEndY = stair.start.y + n;
+    setEndStr(p => ({ ...p, y: String(newEndY) }));
+    if (linked) {
+      const newSteps = Math.max(1, Math.round(n / STAIR_STEP_H));
+      setStepsStr(String(newSteps));
+      onObjectUpdate({ end: { ...stair.end, y: newEndY }, numSteps: newSteps } as unknown as Partial<WorldObject>);
+    } else {
+      onObjectUpdate({ end: { ...stair.end, y: newEndY }, numSteps: effectiveSteps(stair) } as unknown as Partial<WorldObject>);
+    }
+  };
+  const commitLength = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0) return;
+    const rot = stairDims(stair.start, stair.end).rotation * DEG2RAD;
+    const ex = stair.start.x + n * Math.cos(rot);
+    const ez = stair.start.z + n * Math.sin(rot);
+    setEndStr(p => ({ ...p, x: String(+ex.toFixed(4)), z: String(+ez.toFixed(4)) }));
+    onObjectUpdate({ end: { ...stair.end, x: ex, z: ez } } as unknown as Partial<WorldObject>);
+  };
+  const commitRotation = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const rot = n * DEG2RAD;
+    const len = stairDims(stair.start, stair.end).length;
+    const ex = stair.start.x + len * Math.cos(rot);
+    const ez = stair.start.z + len * Math.sin(rot);
+    setEndStr(p => ({ ...p, x: String(+ex.toFixed(4)), z: String(+ez.toFixed(4)) }));
+    onObjectUpdate({ end: { ...stair.end, x: ex, z: ez } } as unknown as Partial<WorldObject>);
   };
 
   const commitWidth  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ width: n } as unknown as Partial<WorldObject>); };
@@ -1069,6 +1123,28 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
       {vecRow("START", "start", startStr, setStartStr)}
       {vecRow("END",   "end",   endStr,   setEndStr)}
+
+      {/* Alternate dimension inputs — drive END from start + height/length/bearing */}
+      <div>
+        <div style={LABEL}>HEIGHT · LENGTH · ROTATION°</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+          {([
+            ["H", heightStr, setHeightStr, commitHeight, 0.1] as const,
+            ["L", lengthStr, setLengthStr, commitLength, 0.5] as const,
+            ["R", rotStr,    setRotStr,    commitRotation, 5] as const,
+          ]).map(([lbl, val, setter, commit, step]) => (
+            <div key={lbl} style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color: "#8a8a8a", fontSize: 9 }}>{lbl}</span>
+              <input type="number" step={step} value={val}
+                onChange={e => { setter(e.target.value); schedule(() => commit(e.target.value)); }}
+                onBlur={e => flush(() => commit(e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commit((e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <div>
