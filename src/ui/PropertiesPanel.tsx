@@ -7,6 +7,7 @@ import type {
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
+import { HelpTooltip } from "@/ui/HelpTooltip";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -2297,9 +2298,12 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
 function SpawnSettingsView({
   settings, assets, onChange, position, onPositionChange,
 }: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void; position?: Vec3; onPositionChange?: (pos: Vec3) => void }) {
-  const numField = (label: string, key: keyof PlayerSettings, step = 0.1, fallback?: number) => (
+  const numField = (label: string, key: keyof PlayerSettings, step = 0.1, fallback?: number, help?: string) => (
     <div key={key}>
-      <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
+      <div style={{ ...LABEL, marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+        <span>{label}</span>
+        {help && <HelpTooltip text={help} />}
+      </div>
       <input
         type="number" step={step}
         defaultValue={(settings[key] as number) ?? fallback}
@@ -2401,9 +2405,12 @@ function SpawnSettingsView({
       {numField("MOVE SPEED", "moveSpeed", 0.5)}
       {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
       {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
-      {settings.cameraMode === "thirdperson" && numField("3RD PERSON DISTANCE", "thirdPersonDistance", 0.5)}
-      {settings.cameraMode === "thirdperson" && numField("3RD PERSON HEIGHT", "thirdPersonHeight", 0.5)}
-      {settings.cameraMode === "thirdperson" && numField("CHARACTER SCALE", "characterScale", 0.1, 1)}
+      {settings.cameraMode === "thirdperson" && numField("CAMERA DISTANCE", "thirdPersonDistance", 0.5, undefined,
+        "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
+      {settings.cameraMode === "thirdperson" && numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
+        "Height of the camera's aim point above the player (metres). This is CAMERA framing, not the character's size. Higher = the camera sits higher and frames the head/above (character appears lower, seen more from above); lower = aims toward the feet. To resize the character itself, use Character Scale.")}
+      {settings.cameraMode === "thirdperson" && numField("CHARACTER SCALE", "characterScale", 0.1, 1,
+        "Uniform size of the character itself — the visible avatar AND its collision. 2 = twice as tall; 0.5 = half. (Does not move the camera — after scaling up you may want to raise Camera Height/Distance.)")}
       {settings.cameraMode === "thirdperson" && numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1)}
 
       <div>
