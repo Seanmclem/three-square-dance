@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
+import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldObject } from "@/types";
@@ -61,11 +62,9 @@ export class ObjectPlacer {
         // SkeletonUtils.clone rebinds skinned meshes to the cloned skeleton; plain
         // .clone() leaves the AnimationMixer driving the shared source skeleton.
         mesh  = cloneSkinned(gltf.scene);
-        // Skinned meshes frustum-cull against their bind-pose bounding sphere, so an
-        // animation that moves vertices far from it (e.g. a death pose lying flat) makes
-        // small submeshes like eyes/face pop out when the camera moves. Disable culling
-        // only on the skinned meshes (static props keep normal culling). One-time walk.
-        mesh.traverse(c => { if ((c as THREE.SkinnedMesh).isSkinnedMesh) c.frustumCulled = false; });
+        // Keep skinned meshes cullable (skip them off-screen in render + shadow passes) but with
+        // padded bounds so animations don't pop them out. See skinnedCulling.ts.
+        enablePaddedSkinnedCulling(mesh);
         clips = gltf.animations ?? [];
         // Lazy back-fill for assets imported before clip discovery existed.
         if (def && def.animations === undefined) def.animations = clips.map(c => c.name);

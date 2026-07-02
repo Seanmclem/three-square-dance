@@ -10,6 +10,7 @@ export class TriggerSystem {
   // trigger volume tracking
   private _volumeSensors = new Map<number, string>(); // colliderHandle → volumeId
   private _insideVolumes = new Set<number>();
+  private _scratchInside = new Set<number>();          // reused each frame (swapped, not re-allocated)
 
   constructor(
     private readonly _doorSensors: ReadonlyMap<number, string>,
@@ -28,7 +29,8 @@ export class TriggerSystem {
 
     const now = Date.now();
 
-    const nowInside = new Set<number>();
+    const nowInside = this._scratchInside;
+    nowInside.clear();
 
     physicsWorld.world.intersectionPairsWith(this._characterCollider, (other) => {
       // door / zone transition sensors
@@ -59,6 +61,8 @@ export class TriggerSystem {
       }
     }
 
+    // swap: next frame reuses the old set as scratch (no per-frame Set allocation)
+    this._scratchInside = this._insideVolumes;
     this._insideVolumes = nowInside;
   }
 }

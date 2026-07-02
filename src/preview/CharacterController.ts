@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
+import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import type { PlayerSettings, LocomotionState } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { CharacterBody } from "./CharacterBody";
@@ -13,6 +14,7 @@ const ZOOM_MIN = 1.5;   // scroll-zoom distance clamp
 const ZOOM_MAX = 12;
 const INTERACT_RANGE = 3;        // how far (m) an interactable is reachable
 const INTERACT_MIN_DOT = 0.5;    // must be within ~120° front cone of where the player faces
+const INTERACT_REBUILD_SEC = 0.25; // how often to re-scan the scene for interactables (cache TTL)
 // Avatar GLBs vary in authored forward axis; this model faces +Z, our math assumes -Z.
 const MODEL_FORWARD_OFFSET = Math.PI;
 // The avatar is never an interact target — skip it from any raycast.
@@ -36,8 +38,11 @@ export class CharacterController {
   private _velY    = 0;
   private readonly _keys = new Set<string>();
 
-  private readonly _interactSeen = new Set<string>();   // dedupe interactables per frame by editorId
+  private readonly _interactSeen = new Set<string>();   // dedupe interactables when rebuilding the cache
   private readonly _ray = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3()); // reused spring-arm ray
+  // Interactables cache — the scene is scanned only a few times/sec, not every frame.
+  private _interactCache: { id: string; label: string; obj: THREE.Object3D }[] = [];
+  private _interactAge = INTERACT_REBUILD_SEC;          // force a rebuild on the first frame
   private _interactTargetId: string | null = null;
 
   private _modelRoot: THREE.Object3D | null = null;
@@ -158,27 +163,24 @@ export class CharacterController {
       this._updateAnim(!this._body.isGrounded, isMoving);
     }
 
-    // Interact — pick the nearest interactable within range that's roughly in front of the
-    // player. A proximity/facing test (not a per-frame scene raycast) avoids the costly skinned
-    // raycast of animated NPCs and isn't limited to a pixel-precise hit.
+    // Interact — pick the nearest interactable within range that's roughly in front of the player.
+    // The interactable list is rebuilt from the scene only a few times/sec; the per-frame cost is
+    // just distance + facing over that small cached list (no per-frame scene traversal or raycast).
+    this._interactAge += dt;
+    if (this._interactAge >= INTERACT_REBUILD_SEC) { this._interactAge = 0; this._rebuildInteractCache(); }
+
     const forward = _tmpForward.set(0, 0, -1).applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
     const eyeY = pos.y + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
     const eye  = _tmpEye.set(pos.x, eyeY, pos.z);
     let bestId: string | null = null, bestLabel = "Interact", bestDist = Infinity;
-    const seen = this._interactSeen; seen.clear();
-    this._scene.traverse(o => {
-      const id = o.userData["editorId"] as string | undefined;
-      if (!o.userData["interactable"] || !id || seen.has(id)) return;
-      seen.add(id);                                  // root is visited first → its world pos ≈ the object
-      const to = o.getWorldPosition(_tmpWp).sub(eye); to.y = 0;
+    for (const e of this._interactCache) {
+      if (!e.obj.parent) continue;                   // removed from the scene since last rebuild
+      const to = e.obj.getWorldPosition(_tmpWp).sub(eye); to.y = 0;
       const d = to.length();
-      if (d < 1e-3 || d > INTERACT_RANGE) return;
-      if (forward.dot(to.divideScalar(d)) < INTERACT_MIN_DOT) return;   // must be in front
-      if (d < bestDist) {
-        bestDist = d; bestId = id;
-        bestLabel = (o.userData["interactLabel"] as string | undefined) ?? "Interact";
-      }
-    });
+      if (d < 1e-3 || d > INTERACT_RANGE) continue;
+      if (forward.dot(to.divideScalar(d)) < INTERACT_MIN_DOT) continue;   // must be in front
+      if (d < bestDist) { bestDist = d; bestId = e.id; bestLabel = e.label; }
+    }
     if (bestId !== this._interactTargetId) {
       this._interactTargetId = bestId;
       this._bus.emit(
@@ -190,6 +192,19 @@ export class CharacterController {
 
   get body(): CharacterBody { return this._body; }
 
+  // Re-scan the scene for interactable objects (deduped by editorId; the root is visited first so
+  // its world position ≈ the object). Called a few times/sec, not per frame.
+  private _rebuildInteractCache(): void {
+    this._interactCache.length = 0;
+    const seen = this._interactSeen; seen.clear();
+    this._scene.traverse(o => {
+      const id = o.userData["editorId"] as string | undefined;
+      if (!o.userData["interactable"] || !id || seen.has(id)) return;
+      seen.add(id);
+      this._interactCache.push({ id, label: (o.userData["interactLabel"] as string | undefined) ?? "Interact", obj: o });
+    });
+  }
+
   private async _loadModel(): Promise<void> {
     // No avatar asset chosen → show a plain capsule (the dropdown's "capsule only" option),
     // so third-person always has a visible body.
@@ -200,10 +215,8 @@ export class CharacterController {
       };
       // SkeletonUtils.clone rebinds skinned meshes to the cloned skeleton (plain .clone() breaks it)
       const root = cloneSkinned(gltf.scene);
-      root.traverse(c => {
-        if ((c as THREE.SkinnedMesh).isSkinnedMesh) c.frustumCulled = false;
-        c.raycast = NO_RAYCAST;
-      });
+      enablePaddedSkinnedCulling(root);              // cull off-screen, padded so it doesn't pop
+      root.traverse(c => { c.raycast = NO_RAYCAST; });
       this._modelAnimations = gltf.animations ?? [];
       this._modelRoot = root;
       this._mixer = new THREE.AnimationMixer(root);
