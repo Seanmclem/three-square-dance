@@ -112,7 +112,60 @@ mixers), `TriggerSystem.update`, `PhysicsWorld.step`, and the render/shadow pass
 
 ---
 
-## 5. Editor preview vs. a dedicated runtime
+## 5. Draw calls, batching & material sharing
+
+The GPU-side cost is roughly *draw calls × per-draw overhead*. Two common asks — "share materials"
+and "instance repeated objects" — map onto how geometry/materials are already built here.
+
+**Materials are already shared (nothing to do).** `AssetManager.getMaterial(id)`
+(`src/core/AssetManager.ts`) returns **one cached `MeshStandardMaterial`** per `id:quality`,
+reused by every wall/floor/platform/stair with that material. Textures are cached by URL
+(`loadTexture`), so even different materials sharing a texture upload it once. Tiling is baked
+into **UV coordinates** (`src/builders/UVUtils.ts`), *not* `texture.repeat`, so one shared
+material serves surfaces of any size/tiling. A distinct ("owned") material is created only for
+genuine per-instance state:
+- a `MaterialOverrides` object on that surface (`getMaterialWithOverrides` — uncached), or
+- copy-on-write clones for the selection/hover tint (`SelectionManager`) and inactive-floor
+  dimming (`ZoneManager`) — they `.clone()` so they never corrupt the shared cache.
+
+The `_ownsMaterial` userData flag marks owned vs shared, and disposal respects it (shared cache
+materials are freed by the cache, not the mesh). *(Tiny gap: `getMaterialWithOverrides` isn't
+cached, so two surfaces with identical overrides make two materials — rarely hit.)*
+
+**Draw-call structure today.** Walls are merged into **one mesh per run** (`groupWallRuns` +
+`WallBuilder.buildRun`); floors are **one mesh each**; platforms/stairs are a few meshes each;
+each **placed object is its own `Object3D`** (`ObjectPlacer.build`). Identical placed assets
+already **share `BufferGeometry`** (GLTF cache + `SkeletonUtils.clone` / `Object3D.clone`) — good
+for memory/uploads — but they are **not batched**, so N copies = N draw calls.
+
+**When `InstancedMesh` would help (future, not currently warranted).** It collapses many copies of
+the *same* geometry into **one draw call**, but only fits **many identical *static* props**:
+same asset + material, **no overrides**, **not skinned/animated**, **no CSG cut**. Excluded:
+- skinned/animated objects (per-instance bone matrices — would need instanced skinning),
+- override / CSG-cut meshes (unique geometry per instance),
+- walls/floors/stairs (already unique or merged).
+
+The real cost of adopting it isn't the batching — it's **editor integration**: instanced picking
+& selection (by `instanceId`), per-instance transforms/edits, add/remove rebuilds. So treat it as
+a **"reach for it when a scene actually has hundreds of repeated static props"** optimization,
+decided by the draw-call number below — not a speculative rewrite. (A scene of walls/floors + a
+skinned character gains nothing.)
+
+**Measure draw calls** (per `TESTING.md §2`):
+
+```js
+const r = window.__renderer;
+r.info.reset();
+r.render(window.__scene, window.__camera);
+console.log(r.info.render.calls, r.info.render.triangles); // draw calls, triangles
+// mesh counts per zone:
+const e = window.__zones._loadedZones.get('demo');
+console.log(e.wallsGroup.children.length, e.floorsGroup.children.length, e.objectsGroup.children.length);
+```
+
+---
+
+## 6. Editor preview vs. a dedicated runtime
 
 Running the game *inside the editor* does add overhead: React reconciliation, live editor
 managers, the Vite HMR websocket, and — in **development only** — React **StrictMode
@@ -135,7 +188,7 @@ editor/React margin, but it's a modest, later optimization — not where the big
 
 ---
 
-## 6. Prioritized checklist
+## 7. Prioritized checklist
 
 1. **Zero-trade-off cleanups first (always).** Reuse per-frame allocations; no whole-scene or
    skinned raycasts in the loop; no per-frame `setState`. These never regress anything.
