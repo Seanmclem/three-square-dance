@@ -65,7 +65,29 @@ sandbox ctx now exposes `get/set/has/adjust`.
 
 ---
 
+## 5. Authored state schemas (follow-up) — ✅ verified 2026-07-03
+
+Schemas moved from the App.tsx hardcode into per-level authored data
+(`WorldConfig.stateSchema`), registered on `preview:start` via
+`gameState.configureSchema()` with `DEFAULT_STATE_SCHEMA` as fallback.
+
+- [x] Hardcode removed → entering play still yields `health === 100` (now from `DEFAULT_STATE_SCHEMA`/scene, not code)
+- [x] Scene-authored key seeds: set `world.stateSchema.score = {default:5}`, re-enter → `get("score") === 5`
+- [x] New levels (`freshScene`) and every `toJSON()` carry `stateSchema` (no migration; absent → fallback)
+
+## 6. Checkpoint save + teleport-from-key (follow-up) — ✅ verified 2026-07-03
+
+- [x] `teleport_player` moves the Rapier capsule; zeroes vertical velocity
+- [x] `save_checkpoint` (emits `character:save-position` → CharacterController) stores live player `{x,y,z}` into a state key; matches `body.position`
+- [x] `teleport_player` with `positionKey` warps to the stored Vec3 (before `{-9,-9}` → after `{5,2,5}`)
+- [x] Malformed guard: `positionKey` → non-Vec3 → no move, no crash, warns `state key 'bad' is not a Vec3`
+- [ ] ScriptPanel authoring (save_checkpoint field, teleport source toggle) — data-level verified; UI not driven in automation tab
+
+---
+
 ## Notes / follow-ups
+- No editor UI for `stateSchema` yet — authored by editing scene JSON (plumbing-only pass).
+- `teleport_player` doesn't author a facing (keeps current look direction).
 - `on_state_changed` fires on every real change; scripts narrow via conditions (fire broadly, gate precisely).
   Setting a key to its current value is a no-op, which prevents the obvious feedback loop.
 - No New Game / Continue **UI** yet — exposed via `__test.newGame()` for now. A SaveLoadPanel game-mode

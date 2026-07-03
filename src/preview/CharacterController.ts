@@ -7,6 +7,7 @@ import type { EventBus } from "@/core/EventBus";
 import { CharacterBody } from "./CharacterBody";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
+import { gameState } from "@/scripting/GameState";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const CAM_SKIN = 0.2;   // gap kept in front of an occluding wall
@@ -62,6 +63,7 @@ export class CharacterController {
   private readonly _onKeyUp:     (e: KeyboardEvent) => void;
   private readonly _onWheel:     (e: WheelEvent) => void;
   private _offTeleport: (() => void) | null = null;
+  private _offSavePos:  (() => void) | null = null;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -101,6 +103,11 @@ export class CharacterController {
     this._offTeleport = this._bus.on("character:teleport", ({ position }) => {
       this._body.teleport(new THREE.Vector3(position.x, position.y, position.z));
       this._velY = 0;
+    });
+    // Script save_checkpoint → stamp the player's current position into a state key.
+    this._offSavePos = this._bus.on("character:save-position", ({ key }) => {
+      const p = this._body.position;
+      gameState.set(key, { x: p.x, y: p.y, z: p.z });
     });
     document.addEventListener("mousemove", this._onMouseMove);
     document.addEventListener("keydown",   this._onKeyDown);
@@ -344,6 +351,7 @@ export class CharacterController {
     document.removeEventListener("keyup",     this._onKeyUp);
     document.removeEventListener("wheel",     this._onWheel);
     this._offTeleport?.(); this._offTeleport = null;
+    this._offSavePos?.();  this._offSavePos  = null;
     if (this._modelRoot) this._scene.remove(this._modelRoot);
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);

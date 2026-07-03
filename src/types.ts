@@ -163,6 +163,7 @@ export interface BusEvents {
   "character:interact":       { objectId: string };
   "character:interact-range": { objectId: string; label: string } | null;
   "character:teleport":    { position: Vec3; facing: number };
+  "character:save-position": { key: string };
   "character:triggerdoor": { transitionId: string };
   "overlay:fade-in":       { color: string; duration: number };
   "overlay:fade-out":      { duration: number };
@@ -307,6 +308,7 @@ export interface WorldConfig {
   playerSettings:  PlayerSettings;
   defaultSpawn?:   SpawnDef;
   scripts?:        ScriptDef[];
+  stateSchema?:    Record<string, StateSchema>;   // authored gameplay-state keys (defaults + numeric clamp)
 }
 
 export interface TerrainLayerMaterial {
@@ -560,6 +562,7 @@ export type ActionType =
   | 'set_state'
   | 'adjust_number'
   | 'delete_state'
+  | 'save_checkpoint'
   | 'fire_event'
   | 'fade_screen'
   | 'teleport_player'
@@ -617,7 +620,8 @@ export interface ScriptAction {
   dialogue?:     DialogueDef;
   material?:     string;
   position?:     Vec3;
-  stateKey?:     string;      // set_state / adjust_number / delete_state
+  positionKey?:  string;      // teleport_player: read destination Vec3 from this state key (overrides position)
+  stateKey?:     string;      // set_state / adjust_number / delete_state / save_checkpoint
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number
   eventId?:      string;

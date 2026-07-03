@@ -54,7 +54,7 @@ const CONDITION_TYPES: ConditionType[] = [
 ];
 
 const ACTION_TYPES: ActionType[] = [
-  "show_dialogue","play_sound","set_state","adjust_number","delete_state","fire_event",
+  "show_dialogue","play_sound","set_state","adjust_number","delete_state","save_checkpoint","fire_event",
   "teleport_player","despawn_object","fade_screen","move_object",
   "show_ui","play_animation","change_material","run_script",
   "spawn_npc","open_door","close_door",
@@ -663,6 +663,14 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         />
       );
 
+    case "save_checkpoint":
+      return (
+        <input style={S.field} placeholder="State key (e.g. checkpoint) — stores player position"
+          value={action.stateKey ?? ""}
+          onChange={e => set({ stateKey: e.target.value })}
+        />
+      );
+
     case "fire_event":
       return (
         <input style={S.field} placeholder="Event ID"
@@ -753,17 +761,38 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         </div>
       );
 
-    case "teleport_player":
+    case "teleport_player": {
+      const fromKey = action.positionKey != null;
       return (
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["x","y","z"] as const).map(ax => (
-            <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
-              value={action.position?.[ax] ?? ""}
-              onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <select
+            style={S.select}
+            value={fromKey ? "key" : "literal"}
+            onChange={e => e.target.value === "key"
+              ? set({ positionKey: action.positionKey ?? "", position: undefined })
+              : set({ positionKey: undefined })}
+          >
+            <option value="literal">Destination: literal x/y/z</option>
+            <option value="key">Destination: from state key</option>
+          </select>
+          {fromKey ? (
+            <input style={S.field} placeholder="State key (e.g. checkpoint)"
+              value={action.positionKey ?? ""}
+              onChange={e => set({ positionKey: e.target.value })}
             />
-          ))}
+          ) : (
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["x","y","z"] as const).map(ax => (
+                <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+                  value={action.position?.[ax] ?? ""}
+                  onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+                />
+              ))}
+            </div>
+          )}
         </div>
       );
+    }
 
     case "fade_screen":
       return (

@@ -4,6 +4,11 @@ import type { JsonValue, StateSchema } from "@/types";
 /** localStorage key for the persisted game save (runtime state + fired one-shots). */
 export const GAMESAVE_KEY = "worldeditor_gamesave";
 
+/** Fallback registered schema for scenes that don't author their own `world.stateSchema`. */
+export const DEFAULT_STATE_SCHEMA: Record<string, StateSchema> = {
+  health: { type: "number", default: 100, min: 0, max: 100 },
+};
+
 /**
  * Generic runtime gameplay-state store — one flat key→value map that holds any
  * JSON-serializable value (health, score, lives, checkpoints, inventory counts,
@@ -30,6 +35,12 @@ export class GameState {
     if (!this._values.has(key) && schema.default !== undefined) {
       this._values.set(key, schema.default);   // seed silently — no event on defaults
     }
+  }
+
+  /** Replace the whole registered schema (per-level authored keys). Called on play start. */
+  configureSchema(schemas: Record<string, StateSchema>): void {
+    this._schema.clear();
+    for (const [key, schema] of Object.entries(schemas)) this.register(key, schema);
   }
 
   get(key: string): JsonValue | undefined { return this._values.get(key); }

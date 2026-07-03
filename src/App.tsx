@@ -23,7 +23,7 @@ import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
-import { gameState, GAMESAVE_KEY } from "@/scripting/GameState";
+import { gameState, GAMESAVE_KEY, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
 import { installTestHelpers } from "@/dev/testHelpers";
@@ -192,9 +192,9 @@ export default function App() {
     scriptEngineRef.current = scriptEngine;
 
     // Generic gameplay-state store: wire the bus (so mutations emit state:changed →
-    // on_state_changed) and register built-in defaults. Register before any reset/restore.
+    // on_state_changed). Registered schema is authored per-level (world.stateSchema) and
+    // applied on preview:start; see DEFAULT_STATE_SCHEMA for the fallback.
     gameState.attach(bus);
-    gameState.register("health", { type: "number", default: 100, min: 0, max: 100 });
 
     // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
@@ -331,6 +331,8 @@ export default function App() {
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
         if (activeZone) scriptEngine.loadZone(activeZone);
         scriptEngine.activate();
+        // Apply this level's authored state schema (defaults + clamps) before reset/restore.
+        gameState.configureSchema(world.world?.stateSchema ?? DEFAULT_STATE_SCHEMA);
         // Continue an existing game save if present, else start fresh. Must run after
         // activate() (which clears fired one-shots) so a loaded save's progress survives.
         if (!loadGame()) gameState.reset();
@@ -636,6 +638,7 @@ export default function App() {
         sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
         playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
+        stateSchema: DEFAULT_STATE_SCHEMA,
       },
       terrain: null,
       zones: [createDemoZone()],

@@ -6,6 +6,13 @@ import type {
 } from "@/types";
 import { gameState } from "./GameState";
 
+function isVec3(v: unknown): v is Vec3 {
+  return !!v && typeof v === "object"
+    && typeof (v as Vec3).x === "number"
+    && typeof (v as Vec3).y === "number"
+    && typeof (v as Vec3).z === "number";
+}
+
 function compareNum(a: number, op: CompareOp, b: number): boolean {
   switch (op) {
     case ">=": return a >= b;
@@ -226,13 +233,21 @@ export class ScriptEngine {
         });
         break;
 
-      case "teleport_player":
-        if (action.position) {
-          this._bus.emit("character:teleport", {
-            position: action.position,
-            facing:   0,
-          });
+      case "teleport_player": {
+        // Destination from a state key (e.g. a saved checkpoint Vec3) overrides the literal position.
+        let dest: Vec3 | undefined = action.position;
+        if (action.positionKey) {
+          const stored = gameState.get(action.positionKey);
+          if (isVec3(stored)) dest = stored;
+          else { console.warn(`[ScriptEngine] teleport_player: state key '${action.positionKey}' is not a Vec3`); dest = undefined; }
         }
+        if (dest) this._bus.emit("character:teleport", { position: dest, facing: 0 });
+        break;
+      }
+
+      case "save_checkpoint":
+        // Stamp the player's current position into a state key (handled by CharacterController).
+        if (action.stateKey) this._bus.emit("character:save-position", { key: action.stateKey });
         break;
 
       case "despawn_object":

@@ -5,6 +5,7 @@ import type {
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, GroupDef,
 } from "@/types";
+import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
 const SPAWN_ID = "__spawn__";
 
@@ -509,7 +510,7 @@ export class WorldState {
   toJSON(): SceneFile {
     return {
       metadata:    { ...(this.metadata ?? { name: "Untitled", version: "1", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() }), uvVersion: 1 },  // Phase 10.8: every save is world-space-UV
-      world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 1.2 }, sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 } },
+      world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 1.2 }, sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
       zones:       [...this.zones.values()],
       transitions: [...this.transitions.values()],
