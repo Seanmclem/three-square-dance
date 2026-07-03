@@ -23,6 +23,7 @@ import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
+import { gameState, GAMESAVE_KEY } from "@/scripting/GameState";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
 import { installTestHelpers } from "@/dev/testHelpers";
@@ -40,7 +41,7 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution, JsonValue } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -190,6 +191,11 @@ export default function App() {
     const scriptEngine    = new ScriptEngine(bus, world);
     scriptEngineRef.current = scriptEngine;
 
+    // Generic gameplay-state store: wire the bus (so mutations emit state:changed →
+    // on_state_changed) and register built-in defaults. Register before any reset/restore.
+    gameState.attach(bus);
+    gameState.register("health", { type: "number", default: 100, min: 0, max: 100 });
+
     // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
     world.setActiveZone(DEMO_ZONE_ID);
@@ -202,8 +208,9 @@ export default function App() {
       g.__editorCamera = scene.editorCamera;
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
       g.__objectPlacer = objectPlacer; g.__history = history;
+      g.__gameState = gameState;
       g.__copyPaste = { copySelection, pasteClipboard };
-      installTestHelpers({ bus, world, scriptEngine, preview });
+      installTestHelpers({ bus, world, scriptEngine, preview, gameState });
     }
 
 
@@ -236,6 +243,29 @@ export default function App() {
     // Autosave to localStorage every 60 seconds and on page unload
     const autosaveTimer = setInterval(writeAutosave, 60_000);
     window.addEventListener('beforeunload', writeAutosave);
+
+    // ── Gameplay game-save (runtime state, separate from the scene autosave) ──
+    // Persists gameState + fired one-shots so play progress survives a reload.
+    const saveGame = () => {
+      const blob = {
+        version:       1,
+        ts:            Date.now(),
+        state:         gameState.snapshot(),
+        firedOneShots: scriptEngine.getFiredOneShots(),
+      };
+      localStorage.setItem(GAMESAVE_KEY, JSON.stringify(blob));
+    };
+    const loadGame = (): boolean => {
+      const raw = localStorage.getItem(GAMESAVE_KEY);
+      if (!raw) return false;
+      try {
+        const blob = JSON.parse(raw) as { state?: Record<string, JsonValue>; firedOneShots?: string[] };
+        gameState.restore(blob.state ?? {});
+        scriptEngine.restoreFiredOneShots(blob.firedOneShots ?? []);
+        return true;
+      } catch { return false; }
+    };
+    let gameAutosaveTimer: ReturnType<typeof setInterval> | null = null;
 
     // active flag: set to false in cleanup so StrictMode's first-mount IIFE exits after
     // its first await rather than racing the second-mount IIFE on shared singletons.
@@ -301,10 +331,16 @@ export default function App() {
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
         if (activeZone) scriptEngine.loadZone(activeZone);
         scriptEngine.activate();
+        // Continue an existing game save if present, else start fresh. Must run after
+        // activate() (which clears fired one-shots) so a loaded save's progress survives.
+        if (!loadGame()) gameState.reset();
+        gameAutosaveTimer = setInterval(saveGame, 30_000);
       }),
       bus.on("preview:stop",  () => {
         setIsPreview(false);
         setIsGame(false);
+        if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
+        saveGame();
         scriptEngine.deactivate();
       }),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
@@ -420,6 +456,7 @@ export default function App() {
     return () => {
       active = false; // tell in-flight IIFE this mount is stale
       clearInterval(autosaveTimer);
+      if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
       window.removeEventListener('beforeunload', writeAutosave);
       previewRef.current?.exit();
       previewRef.current  = null;

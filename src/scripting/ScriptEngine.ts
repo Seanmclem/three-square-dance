@@ -2,16 +2,26 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   ZoneDef, WorldConfig, ScriptDef, ScriptAction, ScriptCondition,
-  TriggerType, Vec3,
+  TriggerType, Vec3, CompareOp,
 } from "@/types";
-import { gameStateManager } from "./GameStateManager";
+import { gameState } from "./GameState";
+
+function compareNum(a: number, op: CompareOp, b: number): boolean {
+  switch (op) {
+    case ">=": return a >= b;
+    case "<=": return a <= b;
+    case ">":  return a >  b;
+    case "<":  return a <  b;
+    case "==": return a === b;
+    case "!=": return a !== b;
+  }
+}
 
 export class ScriptEngine {
   private _active       = false;
   // index: `${triggerType}:${targetId}` → scripts[]
   private _index        = new Map<string, ScriptDef[]>();
   private _firedOneShots = new Set<string>();
-  private _flags        = new Map<string, boolean>();
   private _timers: ReturnType<typeof setTimeout>[] = [];
   private _intervals: ReturnType<typeof setInterval>[] = [];
 
@@ -29,7 +39,6 @@ export class ScriptEngine {
     if (this._active) return;
     this._active = true;
     this._firedOneShots.clear();
-    this._flags.clear();
 
     const sub = <K extends keyof import("@/types").BusEvents>(
       event: K,
@@ -43,6 +52,7 @@ export class ScriptEngine {
     sub("trigger:volume-exit",   ({ volumeId })  => this.fire("on_player_exit",  volumeId));
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
+    sub("state:changed",         ({ key })       => this.fire("on_state_changed", key));
 
     this._startTimers();
   }
@@ -151,10 +161,17 @@ export class ScriptEngine {
   private _checkConditions(conditions: ScriptCondition[]): boolean {
     for (const c of conditions) {
       switch (c.type) {
-        case "flag_set":       if (!this.hasFlag(c.flag ?? "")) return false; break;
-        case "flag_not_set":   if (this.hasFlag(c.flag ?? ""))  return false; break;
-        case "player_has_item":
-          if (!gameStateManager.hasItem(c.itemId ?? "")) return false; break;
+        case "has_state": {
+          const v = gameState.get(c.stateKey ?? "");
+          if (v === undefined || v === null || v === false) return false;
+          break;
+        }
+        case "compare_number": {
+          const v      = Number(gameState.get(c.stateKey ?? "") ?? 0);
+          const target = Number(c.stateValue ?? 0);
+          if (!compareNum(v, c.compareOp ?? "==", target)) return false;
+          break;
+        }
         case "npc_alive":
         case "npc_dead":
           // stub — NPC system Phase 13
@@ -186,16 +203,20 @@ export class ScriptEngine {
         }
         break;
 
-      case "set_flag":
-        if (action.flag) this.setFlag(action.flag);
+      case "set_state":
+        if (action.stateKey) gameState.set(action.stateKey, action.stateValue ?? null);
         break;
 
-      case "clear_flag":
-        if (action.flag) this.clearFlag(action.flag);
+      case "adjust_number":
+        if (action.stateKey) gameState.adjust(action.stateKey, action.numberDelta ?? 0);
+        break;
+
+      case "delete_state":
+        if (action.stateKey) gameState.delete(action.stateKey);
         break;
 
       case "fire_event":
-        if (action.eventId) this.fire("on_flag_set", action.eventId);
+        if (action.eventId) this.fire("on_state_changed", action.eventId);
         break;
 
       case "fade_screen":
@@ -247,19 +268,15 @@ export class ScriptEngine {
         if (action.uiElementId) this._bus.emit("ui:show", { elementId: action.uiElementId });
         break;
 
-      case "give_item":
-        if (action.itemId) gameStateManager.addItem(action.itemId);
-        break;
-
       case "run_script":
         if (action.script) {
           try {
             // sandboxed via limited context object — not truly isolated
             const ctx = {
-              flags:        Object.fromEntries(this._flags),
-              setFlag:      (f: string) => this.setFlag(f),
-              clearFlag:    (f: string) => this.clearFlag(f),
-              hasFlag:      (f: string) => this.hasFlag(f),
+              get:    (k: string) => gameState.get(k),
+              set:    (k: string, v: import("@/types").JsonValue) => gameState.set(k, v),
+              has:    (k: string) => gameState.has(k),
+              adjust: (k: string, d: number) => gameState.adjust(k, d),
             };
             // eslint-disable-next-line no-new-func
             new Function("ctx", action.script)(ctx);
@@ -301,19 +318,11 @@ export class ScriptEngine {
     return ids;
   }
 
-  // ─── Flag system ──────────────────────────────────────────────────────────
+  // ─── Game-save hooks ──────────────────────────────────────────────────────
+  // Fired one-shots are session progress — persisted alongside gameState so a
+  // saved game doesn't re-run scripts that already fired.
 
-  setFlag(flag: string): void {
-    this._flags.set(flag, true);
-    this.fire("on_flag_set", flag);
-  }
+  getFiredOneShots(): string[] { return [...this._firedOneShots]; }
 
-  clearFlag(flag: string): void {
-    this._flags.delete(flag);
-    this.fire("on_flag_cleared", flag);
-  }
-
-  hasFlag(flag: string): boolean {
-    return this._flags.get(flag) === true;
-  }
+  restoreFiredOneShots(ids: string[]): void { this._firedOneShots = new Set(ids); }
 }

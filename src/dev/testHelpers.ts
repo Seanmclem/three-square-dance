@@ -1,6 +1,7 @@
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { ScriptEngine } from "@/scripting/ScriptEngine";
+import { GAMESAVE_KEY, type GameState } from "@/scripting/GameState";
 import type { PreviewController } from "@/preview/PreviewController";
 import type { LeftPanelId, ScriptAction, TriggerType, PlatformDef, WorldObject } from "@/types";
 
@@ -18,9 +19,10 @@ export interface TestHelperDeps {
   world:        WorldState;
   scriptEngine: ScriptEngine;
   preview:      PreviewController;
+  gameState:    GameState;
 }
 
-export function installTestHelpers({ bus, world, scriptEngine, preview }: TestHelperDeps): void {
+export function installTestHelpers({ bus, world, scriptEngine, preview, gameState }: TestHelperDeps): void {
   const zoneId = () => world.activeZoneId ?? "demo";
 
   const api = {
@@ -34,6 +36,16 @@ export function installTestHelpers({ bus, world, scriptEngine, preview }: TestHe
     fire:         (trigger: TriggerType, targetId: string | null = null) => scriptEngine.fire(trigger, targetId),
     /** Run one action through the full dispatch (incl. _resolveTargets) without preview. */
     runAction:    (action: ScriptAction) => (scriptEngine as unknown as { _dispatch(a: ScriptAction): void })._dispatch(action),
+
+    // ── Gameplay state ─────────────────────────────────────────────────────────
+    /** Direct access to the generic gameplay-state store. */
+    gameState,
+    /** Wipe the game save + reset runtime state + fired one-shots (New Game). */
+    newGame: (): void => {
+      localStorage.removeItem(GAMESAVE_KEY);
+      gameState.reset();
+      scriptEngine.restoreFiredOneShots([]);
+    },
 
     // ── UI ───────────────────────────────────────────────────────────────────
     /** Open a left panel programmatically (reliable replacement for the z hotkey). */

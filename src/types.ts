@@ -208,6 +208,7 @@ export interface BusEvents {
   "group:updated":         { id: string; name: string };
   "group:visibility":      { groupId: string; visible: boolean };
   "object:play-animation": { id: string; clipName: string; loop?: boolean; hold?: boolean; blend?: number };
+  "state:changed":         { key: string; value: JsonValue };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -536,15 +537,13 @@ export type TriggerType =
   | 'on_interact'
   | 'on_timer'
   | 'on_health_zero'
-  | 'on_flag_set'
-  | 'on_flag_cleared'
+  | 'on_state_changed'
   | 'on_level_load'
   | 'on_game_start';
 
 export type ConditionType =
-  | 'flag_set'
-  | 'flag_not_set'
-  | 'player_has_item'
+  | 'has_state'
+  | 'compare_number'
   | 'npc_alive'
   | 'npc_dead';
 
@@ -558,14 +557,32 @@ export type ActionType =
   | 'change_material'
   | 'open_door'
   | 'close_door'
-  | 'set_flag'
-  | 'clear_flag'
+  | 'set_state'
+  | 'adjust_number'
+  | 'delete_state'
   | 'fire_event'
   | 'fade_screen'
   | 'teleport_player'
   | 'show_ui'
-  | 'give_item'
   | 'run_script';
+
+// ─── Generic gameplay state ───────────────────────────────────────────────────
+
+/** Any JSON-serializable value the GameState store can hold. */
+export type JsonValue =
+  | number | boolean | string | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+/** Optional schema for a registered state key — drives defaults + numeric clamping. */
+export interface StateSchema {
+  type:     'number' | 'boolean' | 'string' | 'object';
+  default?: JsonValue;
+  min?:     number;
+  max?:     number;
+}
+
+export type CompareOp = '>=' | '<=' | '>' | '<' | '==' | '!=';
 
 export interface ScriptTrigger {
   type:       TriggerType;
@@ -576,10 +593,11 @@ export interface ScriptTrigger {
 }
 
 export interface ScriptCondition {
-  type:    ConditionType;
-  flag?:   string;
-  itemId?: string;
-  npcId?:  string;
+  type:       ConditionType;
+  npcId?:     string;
+  stateKey?:  string;      // has_state / compare_number
+  compareOp?: CompareOp;   // compare_number
+  stateValue?: JsonValue;  // compare_number (compared as number)
 }
 
 export interface DialogueDef {
@@ -599,9 +617,10 @@ export interface ScriptAction {
   dialogue?:     DialogueDef;
   material?:     string;
   position?:     Vec3;
-  flag?:         string;
+  stateKey?:     string;      // set_state / adjust_number / delete_state
+  stateValue?:   JsonValue;   // set_state
+  numberDelta?:  number;      // adjust_number
   eventId?:      string;
-  itemId?:       string;
   fadeColor?:    string;
   fadeDuration?: number;
   uiElementId?:  string;

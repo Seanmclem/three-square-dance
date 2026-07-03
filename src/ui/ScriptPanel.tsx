@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type {
   ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
-  TriggerType, ActionType, ConditionType,
+  TriggerType, ActionType, ConditionType, CompareOp, JsonValue,
   TriggerVolume, WorldObject, GroupDef, AssetDef,
 } from "@/types";
 
@@ -46,19 +46,29 @@ const S = {
 
 const TRIGGER_TYPES: TriggerType[] = [
   "on_player_enter","on_player_exit","on_interact","on_timer",
-  "on_flag_set","on_flag_cleared","on_level_load","on_game_start","on_health_zero",
+  "on_state_changed","on_level_load","on_game_start","on_health_zero",
 ];
 
 const CONDITION_TYPES: ConditionType[] = [
-  "flag_set","flag_not_set","player_has_item","npc_alive","npc_dead",
+  "has_state","compare_number","npc_alive","npc_dead",
 ];
 
 const ACTION_TYPES: ActionType[] = [
-  "show_dialogue","play_sound","set_flag","clear_flag","fire_event",
+  "show_dialogue","play_sound","set_state","adjust_number","delete_state","fire_event",
   "teleport_player","despawn_object","fade_screen","move_object",
-  "show_ui","give_item","play_animation","change_material","run_script",
+  "show_ui","play_animation","change_material","run_script",
   "spawn_npc","open_door","close_door",
 ];
+
+const COMPARE_OPS: CompareOp[] = [">=","<=",">","<","==","!="];
+
+/** Coerce a free-text state value into boolean / number / string for set_state. */
+function coerceStateValue(raw: string): JsonValue {
+  if (raw === "true")  return true;
+  if (raw === "false") return false;
+  if (raw.trim() !== "" && !Number.isNaN(Number(raw))) return Number(raw);
+  return raw;
+}
 
 function blankScript(zoneId: string): ScriptDef {
   return {
@@ -263,8 +273,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
     script.trigger.type === "on_player_enter" ||
     script.trigger.type === "on_player_exit"  ||
     script.trigger.type === "on_interact"      ||
-    script.trigger.type === "on_flag_set"      ||
-    script.trigger.type === "on_flag_cleared"
+    script.trigger.type === "on_state_changed"
   );
 
   return (
@@ -358,7 +367,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
             <button
               style={{ ...S.btn(), fontSize: 10 }}
               onClick={() => set("conditions", [...script.conditions,
-                { type: "flag_set" } as ScriptCondition,
+                { type: "has_state" } as ScriptCondition,
               ])}
             >
               + Add
@@ -386,7 +395,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
             <button
               style={{ ...S.btn(), fontSize: 10 }}
               onClick={() => set("actions", [...script.actions,
-                { type: "set_flag" } as ScriptAction,
+                { type: "set_state" } as ScriptAction,
               ])}
             >
               + Add
@@ -455,11 +464,11 @@ function TargetPicker({ triggerType, targetId, triggerVolumes, zoneObjects, onCh
       </select>
     );
   }
-  // flag-based or zone-based: free text
+  // on_state_changed: the target is the state key to watch
   return (
     <input
       style={S.field}
-      placeholder="Target ID"
+      placeholder={triggerType === "on_state_changed" ? "State key (e.g. health)" : "Target ID"}
       value={targetId}
       onChange={e => onChange(e.target.value)}
     />
@@ -511,21 +520,37 @@ function ConditionRow({ condition, onChange, onRemove }: {
       >
         {CONDITION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
       </select>
-      {(condition.type === "flag_set" || condition.type === "flag_not_set") && (
+      {condition.type === "has_state" && (
         <input
           style={{ ...S.field, flex: 1 }}
-          placeholder="flag name"
-          value={condition.flag ?? ""}
-          onChange={e => onChange({ ...condition, flag: e.target.value })}
+          placeholder="state key"
+          value={condition.stateKey ?? ""}
+          onChange={e => onChange({ ...condition, stateKey: e.target.value })}
         />
       )}
-      {condition.type === "player_has_item" && (
-        <input
-          style={{ ...S.field, flex: 1 }}
-          placeholder="item id"
-          value={condition.itemId ?? ""}
-          onChange={e => onChange({ ...condition, itemId: e.target.value })}
-        />
+      {condition.type === "compare_number" && (
+        <>
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="state key"
+            value={condition.stateKey ?? ""}
+            onChange={e => onChange({ ...condition, stateKey: e.target.value })}
+          />
+          <select
+            style={{ ...S.select, flex: "0 0 56px" }}
+            value={condition.compareOp ?? ">="}
+            onChange={e => onChange({ ...condition, compareOp: e.target.value as CompareOp })}
+          >
+            {COMPARE_OPS.map(op => <option key={op} value={op}>{op}</option>)}
+          </select>
+          <input
+            type="number"
+            style={{ ...S.field, flex: "0 0 64px" }}
+            placeholder="value"
+            value={typeof condition.stateValue === "number" ? condition.stateValue : ""}
+            onChange={e => onChange({ ...condition, stateValue: parseFloat(e.target.value) || 0 })}
+          />
+        </>
       )}
       <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
     </div>
@@ -602,12 +627,39 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         />
       );
 
-    case "set_flag":
-    case "clear_flag":
+    case "set_state":
       return (
-        <input style={S.field} placeholder="Flag name"
-          value={action.flag ?? ""}
-          onChange={e => set({ flag: e.target.value })}
+        <div style={{ display: "flex", gap: 4 }}>
+          <input style={{ ...S.field, flex: 1 }} placeholder="State key"
+            value={action.stateKey ?? ""}
+            onChange={e => set({ stateKey: e.target.value })}
+          />
+          <input style={{ ...S.field, flex: 1 }} placeholder="value (true / 100 / text)"
+            value={action.stateValue == null ? "" : String(action.stateValue)}
+            onChange={e => set({ stateValue: coerceStateValue(e.target.value) })}
+          />
+        </div>
+      );
+
+    case "adjust_number":
+      return (
+        <div style={{ display: "flex", gap: 4 }}>
+          <input style={{ ...S.field, flex: 1 }} placeholder="State key (e.g. health)"
+            value={action.stateKey ?? ""}
+            onChange={e => set({ stateKey: e.target.value })}
+          />
+          <input type="number" style={{ ...S.field, flex: "0 0 72px" }} placeholder="±delta"
+            value={action.numberDelta ?? ""}
+            onChange={e => set({ numberDelta: parseFloat(e.target.value) || 0 })}
+          />
+        </div>
+      );
+
+    case "delete_state":
+      return (
+        <input style={S.field} placeholder="State key"
+          value={action.stateKey ?? ""}
+          onChange={e => set({ stateKey: e.target.value })}
         />
       );
 
@@ -616,14 +668,6 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         <input style={S.field} placeholder="Event ID"
           value={action.eventId ?? ""}
           onChange={e => set({ eventId: e.target.value })}
-        />
-      );
-
-    case "give_item":
-      return (
-        <input style={S.field} placeholder="Item ID"
-          value={action.itemId ?? ""}
-          onChange={e => set({ itemId: e.target.value })}
         />
       );
 
@@ -747,7 +791,7 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
       return (
         <textarea
           style={{ ...S.field, height: 80, resize: "vertical", fontFamily: "monospace", fontSize: 10 }}
-          placeholder="// JS — ctx.setFlag('f'), ctx.hasFlag('f'), ctx.clearFlag('f')"
+          placeholder="// JS — ctx.get('k'), ctx.set('k',v), ctx.has('k'), ctx.adjust('k',n)"
           value={action.script ?? ""}
           onChange={e => set({ script: e.target.value })}
         />
