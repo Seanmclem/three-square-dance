@@ -70,9 +70,13 @@ so objects round-trip correctly.
 
 Consequence: the numeric script condition can't reach inside an object.
 `compare_number` reads `Number(get(key))`, and `Number({x:1})` is `NaN`, so you
-**cannot** author "checkpoint.x >= 5". Objects are for storage/restore (save a
-checkpoint, teleport back to it from `run_script` or code). To gate a script on a
-coordinate, store it as its own scalar key (`set("checkpoint_x", 1)`).
+**cannot** author "checkpoint.x >= 5". To *gate* a script on a coordinate, store
+it as its own scalar key (`set("checkpoint_x", 1)`).
+
+But a Vec3-shaped record **is** first-class for the checkpoint flow: `save_checkpoint`
+writes the live player position into a key, and `teleport_player`'s "from state key"
+mode reads it back (§5). So `{x,y,z}` records are usable for save/warp without
+`run_script` — just not for numeric comparisons.
 
 ---
 
@@ -88,6 +92,12 @@ export interface StateSchema {
 
 gameState.register("health", { type: "number", default: 100, min: 0, max: 100 });
 ```
+
+Schemas are **authored per level** in the scene file (`WorldConfig.stateSchema`)
+and applied on `preview:start` via `gameState.configureSchema()`, falling back to
+`DEFAULT_STATE_SCHEMA` (`{ health: … }`) for scenes that don't define any. New
+levels seed `DEFAULT_STATE_SCHEMA`. There is no schema-editing UI yet — author it
+by editing the scene JSON.
 
 Registration is **optional** and buys exactly two things:
 
@@ -171,9 +181,19 @@ The old `set_flag`/`clear_flag`/`give_item` + `flag_set`/`flag_not_set`/
 - `set_state` — `set(stateKey, stateValue)`
 - `adjust_number` — `adjust(stateKey, numberDelta)`
 - `delete_state` — `delete(stateKey)`
+- `save_checkpoint` — stamps the live player position `{x,y,z}` into `stateKey` (emits `character:save-position` → `CharacterController` writes it)
+- `teleport_player` — moves the player; destination is literal `position` **or** a stored Vec3 via `positionKey` (malformed/missing key → warn + no-op)
 
 `fire_event` fires `on_state_changed` (a manual signal). `run_script`'s sandbox
 ctx exposes `{ get, set, has, adjust }` over the store.
+
+**Checkpoint loop (records used first-class):**
+```ts
+{ trigger:{ type:"on_player_enter", targetId:"checkpoint_volume" },
+  actions:[{ type:"save_checkpoint", stateKey:"checkpoint" }] }        // stamp live pos
+{ trigger:{ type:"on_state_changed", targetId:"dead" },
+  actions:[{ type:"teleport_player", positionKey:"checkpoint" }] }     // warp back to it
+```
 
 **Example — a death check (verified):**
 ```ts
@@ -239,5 +259,7 @@ Test plan: `test-plans/phase-13-gameplay-state.md`.
 
 ## Known gaps / follow-ups
 - `type` is unenforced — no validation/coercion on `set` (§3).
-- Object values aren't reachable by `compare_number` (§2).
+- Object values aren't reachable by `compare_number` (§2) — store scalars for comparisons; records work for save/warp.
+- No schema-editing UI — `WorldConfig.stateSchema` is authored via scene JSON (§3).
 - No New Game / Continue UI; game save omits player position/zone (§6).
+- `teleport_player` doesn't author a facing (keeps current look direction).
