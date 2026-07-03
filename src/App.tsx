@@ -1232,7 +1232,53 @@ export default function App() {
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as Opening), ...fullChanges } } : null);
     } else if (selected.type === "wall") {
-      const wallChanges = changes as Partial<WallDef>;
+      const wallChanges = changes as Partial<WallDef> & { position?: Vec3; rotation?: { x: number; y: number; z: number } };
+      if (wallChanges.position || wallChanges.rotation) {
+        // Walls are node-backed — "position"/"rotation" aren't real WallDef fields, so
+        // translate this into the same node-move / node-rotate-around-centroid the gizmo
+        // does: XZ delta moves shared nodes, Y delta adjusts elevation on every run member.
+        const runWalls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+        const nodeIds  = [...new Set(runWalls.flatMap(w => [w.startNodeId, w.endNodeId]))];
+        const zone     = worldRef.current?.zones.get(selected.zoneId);
+        worldRef.current?.transaction("move wall", () => {
+          if (wallChanges.position) {
+            const cx = selected.wallRunCenter?.x ?? 0;
+            const cz = selected.wallRunCenter?.z ?? 0;
+            const dx = wallChanges.position.x - cx;
+            const dz = wallChanges.position.z - cz;
+            const dy = wallChanges.position.y - selected.position.y;
+            if (dx || dz) {
+              for (const nodeId of nodeIds) {
+                const node = zone?.nodes.find(n => n.id === nodeId);
+                if (node) worldRef.current?.updateNode(selected.zoneId, nodeId, { x: node.x + dx, z: node.z + dz });
+              }
+            }
+            if (dy) {
+              for (const w of runWalls) worldRef.current?.updateWall(selected.zoneId, w.id, { elevation: (w.elevation ?? 0) + dy });
+            }
+          }
+          if (wallChanges.rotation) {
+            const deltaDeg = wallChanges.rotation.y - (selected.wallRunAngleDeg ?? 0);
+            if (Math.abs(deltaDeg) > 1e-6) {
+              const rad = deltaDeg * Math.PI / 180;
+              const cos = Math.cos(rad), sin = Math.sin(rad);
+              const cx = selected.wallRunCenter?.x ?? 0;
+              const cz = selected.wallRunCenter?.z ?? 0;
+              for (const nodeId of nodeIds) {
+                const node = zone?.nodes.find(n => n.id === nodeId);
+                if (!node) continue;
+                const ox = node.x - cx, oz = node.z - cz;
+                worldRef.current?.updateNode(selected.zoneId, nodeId, {
+                  x: cx + ox * cos - oz * sin,
+                  z: cz + ox * sin + oz * cos,
+                });
+              }
+            }
+          }
+        });
+        syncHistory();
+        return;
+      }
       if (wallChanges.floor !== undefined) {
         // Floor level applies to every wall in the run.
         const runWalls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);

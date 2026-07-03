@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, ToolId, EditorObjectType, ScreenPos,
-  SelectedObjectPayload, SelectedRef, WorldObject, WallDef,
+  SelectedObjectPayload, SelectedRef, WorldObject, WallDef, WallNode,
 } from "@/types";
 
 const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor", "spawn"];
@@ -268,6 +268,7 @@ export class SelectionManager implements IEditorModule {
 
   private _emitSelected(root: THREE.Object3D): void {
     const ud = root.userData;
+    const wallTransform = ud.editorType === "wall" ? this._wallRunTransform(root) : undefined;
     this._bus.emit("object:selected", {
       id:       ud.editorId,
       type:     ud.editorType,
@@ -282,6 +283,8 @@ export class SelectionManager implements IEditorModule {
       scale:    { x: root.scale.x, y: root.scale.y, z: root.scale.z },
       data:     this._getDataRecord(root),
       runWalls: this._getRunWalls(root),
+      wallRunCenter:   wallTransform?.center,
+      wallRunAngleDeg: wallTransform?.angleDeg,
     });
   }
 
@@ -294,6 +297,31 @@ export class SelectionManager implements IEditorModule {
     return wallIds
       .map(id => zone.walls.find(w => w.id === id))
       .filter((w): w is WallDef => w !== undefined);
+  }
+
+  /**
+   * WallDef has no stored position/rotation (it's node-backed) — derive the run's XZ
+   * centroid (from every shared node) and orientation (anchor wall's start→end vector)
+   * from live node positions so the panel can show/edit them like any other type.
+   */
+  private _wallRunTransform(root: THREE.Object3D): { center: { x: number; z: number }; angleDeg: number } | undefined {
+    const zone = this._worldState.zones.get(root.userData.zoneId as string);
+    if (!zone) return undefined;
+    const wallIds = (root.userData.wallIds as string[] | undefined) ?? [root.userData.editorId as string];
+    const walls = wallIds.map(id => zone.walls.find(w => w.id === id)).filter((w): w is WallDef => !!w);
+    if (!walls.length) return undefined;
+    const nodeIds = [...new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]))];
+    const nodes = nodeIds.map(id => zone.nodes.find(n => n.id === id)).filter((n): n is WallNode => !!n);
+    if (!nodes.length) return undefined;
+    const center = {
+      x: nodes.reduce((s, n) => s + n.x, 0) / nodes.length,
+      z: nodes.reduce((s, n) => s + n.z, 0) / nodes.length,
+    };
+    const anchor = walls[0]!;
+    const start  = zone.nodes.find(n => n.id === anchor.startNodeId);
+    const end    = zone.nodes.find(n => n.id === anchor.endNodeId);
+    const angleDeg = (start && end) ? THREE.MathUtils.radToDeg(Math.atan2(end.z - start.z, end.x - start.x)) : 0;
+    return { center, angleDeg };
   }
 
   private _deselect(): void {

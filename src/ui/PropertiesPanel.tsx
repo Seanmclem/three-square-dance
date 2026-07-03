@@ -714,6 +714,12 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
   const [height,    setHeight]    = useState(String(wallData?.height    ?? 3));
   const [thickness, setThickness] = useState(String(wallData?.thickness ?? 0.2));
   const [floorLvl,  setFloorLvl]  = useState(wallData?.floor ?? 0);
+  const [posStr,    setPosStr]    = useState({
+    x: String(selected.wallRunCenter?.x ?? 0),
+    y: String(selected.position.y ?? 0),
+    z: String(selected.wallRunCenter?.z ?? 0),
+  });
+  const [rotYStr,   setRotYStr]   = useState(String(selected.wallRunAngleDeg ?? 0));
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
@@ -722,14 +728,71 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
     setFloorLvl(wallData?.floor ?? 0);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Position/rotation are derived from live node positions (walls have no stored
+  // transform), so re-sync whenever the run's centroid/angle changes — not just on
+  // reselect — to reflect gizmo drags, node drags, or another panel edit.
+  useEffect(() => {
+    setPosStr({
+      x: String(selected.wallRunCenter?.x ?? 0),
+      y: String(selected.position.y ?? 0),
+      z: String(selected.wallRunCenter?.z ?? 0),
+    });
+    setRotYStr(String(selected.wallRunAngleDeg ?? 0));
+  }, [selected.id, selected.wallRunCenter?.x, selected.wallRunCenter?.z, selected.position.y, selected.wallRunAngleDeg]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const commit = (field: "height" | "thickness", val: string) => {
     const n = parseFloat(val);
     if (!Number.isFinite(n) || n <= 0) return;
     onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>);
   };
 
+  const commitPos = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const cur = {
+      x: selected.wallRunCenter?.x ?? 0,
+      y: selected.position.y ?? 0,
+      z: selected.wallRunCenter?.z ?? 0,
+    };
+    onObjectUpdate({ position: { ...cur, [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+
+  const commitRotY = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ rotation: { x: 0, y: n, z: 0 } } as unknown as Partial<WorldObject>);
+  };
+
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={LABEL}>ROTATION Y (deg)</div>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px", width: "fit-content" }}>
+          <span style={{ color: "#6bff8a", fontSize: 9 }}>Y</span>
+          <input type="number" step={15} value={rotYStr}
+            onChange={e => { setRotYStr(e.target.value); schedule(() => commitRotY(e.target.value)); }}
+            onBlur={e => flush(() => commitRotY(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitRotY((e.target as HTMLInputElement).value)); }}
+            style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+          />
+        </div>
+      </div>
       <div>
         <div style={LABEL}>HEIGHT</div>
         <input type="number" value={height} step={0.5} min={0.5} style={NUM_INPUT}

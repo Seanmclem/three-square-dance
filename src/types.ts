@@ -232,6 +232,11 @@ export interface SelectedObjectPayload {
   scale: Scale3;
   data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
+  // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
+  // needs the run's current XZ centroid + orientation computed from live node positions.
+  // Populated only for type === "wall"; position.y (elevation) is already meaningful.
+  wallRunCenter?:   Vec2;
+  wallRunAngleDeg?: number;
 }
 
 // ─── userData on Three.js meshes ─────────────────────────────────────────────
