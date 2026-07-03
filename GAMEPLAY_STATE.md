@@ -96,8 +96,9 @@ gameState.register("health", { type: "number", default: 100, min: 0, max: 100 })
 Schemas are **authored per level** in the scene file (`WorldConfig.stateSchema`)
 and applied on `preview:start` via `gameState.configureSchema()`, falling back to
 `DEFAULT_STATE_SCHEMA` (`{ health: … }`) for scenes that don't define any. New
-levels seed `DEFAULT_STATE_SCHEMA`. There is no schema-editing UI yet — author it
-by editing the scene JSON.
+levels seed `DEFAULT_STATE_SCHEMA`. Edit them visually in the **Scripts & Triggers
+panel → STATE tab** (add/rename keys, set type + default + min/max); changes save
+with the scene and apply on the next play.
 
 Registration is **optional** and buys exactly two things:
 
@@ -181,19 +182,11 @@ The old `set_flag`/`clear_flag`/`give_item` + `flag_set`/`flag_not_set`/
 - `set_state` — `set(stateKey, stateValue)`
 - `adjust_number` — `adjust(stateKey, numberDelta)`
 - `delete_state` — `delete(stateKey)`
-- `save_checkpoint` — stamps the live player position `{x,y,z}` into `stateKey` (emits `character:save-position` → `CharacterController` writes it)
-- `teleport_player` — moves the player; destination is literal `position` **or** a stored Vec3 via `positionKey` (malformed/missing key → warn + no-op)
+- `store_position` — stores a `{x,y,z,facing}` pose into `stateKey` (see §5a)
+- `teleport_player` — moves the player to a position, optionally sets facing (see §5a)
 
 `fire_event` fires `on_state_changed` (a manual signal). `run_script`'s sandbox
 ctx exposes `{ get, set, has, adjust }` over the store.
-
-**Checkpoint loop (records used first-class):**
-```ts
-{ trigger:{ type:"on_player_enter", targetId:"checkpoint_volume" },
-  actions:[{ type:"save_checkpoint", stateKey:"checkpoint" }] }        // stamp live pos
-{ trigger:{ type:"on_state_changed", targetId:"dead" },
-  actions:[{ type:"teleport_player", positionKey:"checkpoint" }] }     // warp back to it
-```
 
 **Example — a death check (verified):**
 ```ts
@@ -203,6 +196,43 @@ ctx exposes `{ get, set, has, adjust }` over the store.
   actions:    [{ type: "set_state", stateKey: "dead", stateValue: true }],
 }
 ```
+
+## 5a. Positions, checkpoints & teleport
+
+A "position" value is a **pose** record — `{ x, y, z, facing? }`, `facing` in
+degrees (optional). It's just a generic state value; a "checkpoint" is one use.
+
+**`store_position`** writes a pose into a state key (`stateKey`). Source (`posSource`):
+- `player` — the player's live position + look direction (yaw). Emits
+  `character:save-position`; `CharacterController` writes the pose.
+- `object` — a scene object's position + `rotation.y` (resolved from the active zone).
+- `coords` — authored `position` `{x,y,z}` + optional literal `facing`.
+
+**`teleport_player`** moves the player. Two independent inputs:
+- **Position:** literal `position` `{x,y,z}`, **or** from a state key (`positionKey`)
+  that holds a Vec3/pose. Malformed/missing → warn + no-op.
+- **Facing** (`facingSource`): `keep` (leave current look direction — the default),
+  `literal` (`facing` degrees), or `key` (`facingKey` → a number, **or** the
+  `.facing` of a stored pose, so one key restores both position and facing).
+
+The trigger is independent of the action — **any** trigger can drive a teleport
+(volume enter, interact, timer, `on_state_changed`, game start…).
+
+**Checkpoint loop (poses used first-class, incl. facing):**
+```ts
+// stamp the player's pose (position + facing) when they cross a volume
+{ trigger:{ type:"on_player_enter", targetId:"checkpoint_volume" },
+  actions:[{ type:"store_position", posSource:"player", stateKey:"checkpoint" }] }
+
+// on death, warp back to the pose — position AND facing from the same key
+{ trigger:{ type:"on_state_changed", targetId:"dead" },
+  actions:[{ type:"teleport_player",
+             positionKey:"checkpoint", facingSource:"key", facingKey:"checkpoint" }] }
+```
+
+To store a **fixed** marker instead of the live player, use `posSource:"coords"`
+(or an `object` source). Facing can also be a plain number key (a generic
+variable) rather than a pose.
 
 ---
 
@@ -260,6 +290,4 @@ Test plan: `test-plans/phase-13-gameplay-state.md`.
 ## Known gaps / follow-ups
 - `type` is unenforced — no validation/coercion on `set` (§3).
 - Object values aren't reachable by `compare_number` (§2) — store scalars for comparisons; records work for save/warp.
-- No schema-editing UI — `WorldConfig.stateSchema` is authored via scene JSON (§3).
 - No New Game / Continue UI; game save omits player position/zone (§6).
-- `teleport_player` doesn't author a facing (keeps current look direction).

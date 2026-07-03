@@ -41,7 +41,7 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution, JsonValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution, JsonValue, StateSchema } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -125,6 +125,7 @@ export default function App() {
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
+  const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
@@ -388,6 +389,7 @@ export default function App() {
         setZones([...world.zones.values()]);
         setActiveZoneId(world.activeZoneId);
         setGroups([...world.groups]);
+        setStateSchema(world.world?.stateSchema ?? {});
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
@@ -1402,6 +1404,15 @@ export default function App() {
     setIsDirty(true);
   };
 
+  const handleStateSchemaChange = (schema: Record<string, StateSchema>): void => {
+    const world = worldRef.current;
+    if (!world?.world) return;
+    world.transaction("edit state schema", () => { world.world!.stateSchema = schema; });
+    setStateSchema(schema);
+    syncHistory();
+    setIsDirty(true);
+  };
+
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
@@ -1501,6 +1512,8 @@ export default function App() {
         zoneObjects={zoneObjects}
         onZoneScriptsChange={handleZoneScriptsChange}
         onObjectScriptsChange={handleObjectScriptsChange}
+        stateSchema={stateSchema}
+        onStateSchemaChange={handleStateSchemaChange}
       />
       <TopBar
         activeFloor={activeFloor}

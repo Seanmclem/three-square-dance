@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type {
   ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
-  TriggerType, ActionType, ConditionType, CompareOp, JsonValue,
+  TriggerType, ActionType, ConditionType, CompareOp, JsonValue, StateSchema,
   TriggerVolume, WorldObject, GroupDef, AssetDef,
 } from "@/types";
 
@@ -54,7 +54,7 @@ const CONDITION_TYPES: ConditionType[] = [
 ];
 
 const ACTION_TYPES: ActionType[] = [
-  "show_dialogue","play_sound","set_state","adjust_number","delete_state","save_checkpoint","fire_event",
+  "show_dialogue","play_sound","set_state","adjust_number","delete_state","store_position","fire_event",
   "teleport_player","despawn_object","fade_screen","move_object",
   "show_ui","play_animation","change_material","run_script",
   "spawn_npc","open_door","close_door",
@@ -96,9 +96,11 @@ export interface ScriptPanelProps {
   assets:          AssetDef[];
   onZoneScriptsChange:    (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:  (objectId: string, scripts: ScriptDef[]) => void;
+  stateSchema:            Record<string, StateSchema>;
+  onStateSchemaChange:    (schema: Record<string, StateSchema>) => void;
 }
 
-type TabId = "level" | "object";
+type TabId = "level" | "object" | "state";
 
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
@@ -106,6 +108,7 @@ export function ScriptPanel({
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects, groups, assets,
   onZoneScriptsChange, onObjectScriptsChange,
+  stateSchema, onStateSchemaChange,
 }: ScriptPanelProps) {
   const [tab,       setTab]       = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -155,13 +158,13 @@ export function ScriptPanel({
     <div style={S.root}>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["level","object"] as TabId[]).map(t => (
+        {(["level","object","state"] as TabId[]).map(t => (
           <button
             key={t}
             style={S.tab(tab === t)}
             onClick={() => { setTab(t); setEditingId(null); }}
           >
-            {t === "level" ? "LEVEL" : "SELECTED"}
+            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : "STATE"}
           </button>
         ))}
       </div>
@@ -170,9 +173,12 @@ export function ScriptPanel({
       <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "5px 10px 0", lineHeight: 1.4 }}>
         {tab === "level"  && "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
         {tab === "object" && "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
+        {tab === "state"  && "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
       </div>
 
-      {editing ? (
+      {tab === "state" ? (
+        <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+      ) : editing ? (
         <ScriptEditor
           script={editing}
           triggerVolumes={triggerVolumes}
@@ -197,6 +203,135 @@ export function ScriptPanel({
           onAdd={addScript}
         />
       )}
+    </div>
+  );
+}
+
+// ── SchemaEditor (STATE tab) ────────────────────────────────────────────────────
+// Edits the level's authored gameplay-state schema (WorldConfig.stateSchema): each
+// key's default + (numbers) min/max clamp. Applied on play start via configureSchema.
+
+function SchemaEditor({ schema, onChange }: {
+  schema:   Record<string, StateSchema>;
+  onChange: (s: Record<string, StateSchema>) => void;
+}) {
+  const entries = Object.entries(schema);
+
+  function replace(key: string, next: StateSchema): void {
+    onChange({ ...schema, [key]: next });
+  }
+  function rename(oldKey: string, raw: string): void {
+    const newKey = raw.trim();
+    if (!newKey || newKey === oldKey || schema[newKey]) return;   // ignore empty / unchanged / duplicate
+    const next: Record<string, StateSchema> = {};
+    for (const [k, v] of Object.entries(schema)) next[k === oldKey ? newKey : k] = v;
+    onChange(next);
+  }
+  function remove(key: string): void {
+    const next = { ...schema }; delete next[key]; onChange(next);
+  }
+  function add(): void {
+    let name = "new_key", i = 2;
+    while (schema[name]) name = `new_key_${i++}`;
+    onChange({ ...schema, [name]: { type: "number", default: 0 } });
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", padding: "6px 10px", flexShrink: 0 }}>
+        <button style={S.btn(true)} onClick={add}>+ Add key</button>
+      </div>
+      <div style={S.scroll}>
+        {entries.length === 0 && (
+          <div style={{ color: "#555", fontSize: 11, padding: "16px 12px", textAlign: "center" }}>
+            No state keys yet
+          </div>
+        )}
+        {entries.map(([key, sch]) => (
+          <SchemaKeyRow
+            key={key}
+            name={key}
+            schema={sch}
+            onRename={n => rename(key, n)}
+            onReplace={next => replace(key, next)}
+            onRemove={() => remove(key)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SchemaKeyRow({ name, schema, onRename, onReplace, onRemove }: {
+  name:      string;
+  schema:    StateSchema;
+  onRename:  (n: string) => void;
+  onReplace: (next: StateSchema) => void;
+  onRemove:  () => void;
+}) {
+  const [nameStr, setNameStr] = useState(name);
+  useEffect(() => setNameStr(name), [name]);
+  const isNum = schema.type === "number";
+
+  function commitDefault(raw: string): void {
+    let val: JsonValue;
+    if (schema.type === "number")       val = parseFloat(raw) || 0;
+    else if (schema.type === "boolean") val = raw === "true";
+    else if (schema.type === "object")  { try { val = JSON.parse(raw); } catch { return; } }
+    else                                val = raw;
+    onReplace({ ...schema, default: val });
+  }
+  function withBound(field: "min" | "max", raw: string): void {
+    const next: StateSchema = { ...schema };
+    if (raw === "") delete next[field];
+    else next[field] = parseFloat(raw) || 0;
+    onReplace(next);
+  }
+
+  return (
+    <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
+                  margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+        <input style={{ ...S.field, flex: 1 }} placeholder="key name"
+          value={nameStr}
+          onChange={e => setNameStr(e.target.value)}
+          onBlur={() => onRename(nameStr)}
+        />
+        <select style={{ ...S.select, flex: "0 0 84px" }} value={schema.type}
+          onChange={e => onReplace({ ...schema, type: e.target.value as StateSchema["type"] })}
+        >
+          {(["number","boolean","string","object"] as const).map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {schema.type === "boolean" ? (
+          <select style={{ ...S.select, flex: 1 }} value={String(schema.default ?? false)}
+            onChange={e => onReplace({ ...schema, default: e.target.value === "true" })}
+          >
+            <option value="false">default: false</option>
+            <option value="true">default: true</option>
+          </select>
+        ) : (
+          <input style={{ ...S.field, flex: 1 }} placeholder="default"
+            type={isNum ? "number" : "text"}
+            value={schema.default == null ? "" : String(schema.default)}
+            onChange={e => commitDefault(e.target.value)}
+          />
+        )}
+        {isNum && (
+          <>
+            <input type="number" style={{ ...S.field, flex: "0 0 56px" }} placeholder="min"
+              value={schema.min ?? ""}
+              onChange={e => withBound("min", e.target.value)}
+            />
+            <input type="number" style={{ ...S.field, flex: "0 0 56px" }} placeholder="max"
+              value={schema.max ?? ""}
+              onChange={e => withBound("max", e.target.value)}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -663,13 +798,39 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         />
       );
 
-    case "save_checkpoint":
+    case "store_position": {
+      const src = action.posSource ?? "player";
       return (
-        <input style={S.field} placeholder="State key (e.g. checkpoint) — stores player position"
-          value={action.stateKey ?? ""}
-          onChange={e => set({ stateKey: e.target.value })}
-        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <input style={S.field} placeholder="Store into state key (e.g. checkpoint)"
+            value={action.stateKey ?? ""}
+            onChange={e => set({ stateKey: e.target.value })}
+          />
+          <select style={S.select} value={src}
+            onChange={e => set({ posSource: e.target.value as "player" | "object" | "coords" })}
+          >
+            <option value="player">Source: player position</option>
+            <option value="object">Source: object position</option>
+            <option value="coords">Source: specific coordinates</option>
+          </select>
+          {src === "object" && targetPicker}
+          {src === "coords" && (
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["x","y","z"] as const).map(ax => (
+                <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+                  value={action.position?.[ax] ?? ""}
+                  onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+                />
+              ))}
+              <input type="number" style={{ ...S.field, flex: "0 0 64px" }} placeholder="facing°"
+                value={action.facing ?? ""}
+                onChange={e => set({ facing: e.target.value === "" ? undefined : (parseFloat(e.target.value)||0) })}
+              />
+            </div>
+          )}
+        </div>
       );
+    }
 
     case "fire_event":
       return (
@@ -789,6 +950,25 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
                 />
               ))}
             </div>
+          )}
+          <select style={S.select} value={action.facingSource ?? "keep"}
+            onChange={e => set({ facingSource: e.target.value as "keep" | "literal" | "key" })}
+          >
+            <option value="keep">Facing: keep current</option>
+            <option value="literal">Facing: set to (deg)</option>
+            <option value="key">Facing: from state key</option>
+          </select>
+          {action.facingSource === "literal" && (
+            <input type="number" style={S.field} placeholder="facing degrees"
+              value={action.facing ?? ""}
+              onChange={e => set({ facing: parseFloat(e.target.value) || 0 })}
+            />
+          )}
+          {action.facingSource === "key" && (
+            <input style={S.field} placeholder="facing state key (number, or a stored pose)"
+              value={action.facingKey ?? ""}
+              onChange={e => set({ facingKey: e.target.value })}
+            />
           )}
         </div>
       );

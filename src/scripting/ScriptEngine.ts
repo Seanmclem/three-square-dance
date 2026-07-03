@@ -234,21 +234,53 @@ export class ScriptEngine {
         break;
 
       case "teleport_player": {
-        // Destination from a state key (e.g. a saved checkpoint Vec3) overrides the literal position.
+        // Destination: literal position, or a stored Vec3/pose via positionKey (overrides).
         let dest: Vec3 | undefined = action.position;
         if (action.positionKey) {
           const stored = gameState.get(action.positionKey);
           if (isVec3(stored)) dest = stored;
           else { console.warn(`[ScriptEngine] teleport_player: state key '${action.positionKey}' is not a Vec3`); dest = undefined; }
         }
-        if (dest) this._bus.emit("character:teleport", { position: dest, facing: 0 });
+        if (!dest) break;
+        // Facing (degrees): keep current (undefined), a literal, or from a state key
+        // (a number, or the .facing of a stored pose — so one key restores position + facing).
+        let facing: number | undefined;
+        if (action.facingSource === "literal") facing = action.facing;
+        else if (action.facingSource === "key") {
+          const v = gameState.get(action.facingKey ?? "");
+          const poseFacing = (v as { facing?: unknown } | undefined)?.facing;
+          if (typeof v === "number") facing = v;                    // a plain number key
+          else if (typeof poseFacing === "number") facing = poseFacing;  // a stored pose's .facing
+          else console.warn(`[ScriptEngine] teleport_player: facing key '${action.facingKey}' has no numeric facing`);
+        }
+        this._bus.emit("character:teleport", { position: dest, facing });
         break;
       }
 
-      case "save_checkpoint":
-        // Stamp the player's current position into a state key (handled by CharacterController).
-        if (action.stateKey) this._bus.emit("character:save-position", { key: action.stateKey });
+      case "store_position": {
+        // Store a position (as a { x,y,z,facing? } pose) into a state key.
+        const key = action.stateKey;
+        if (!key) break;
+        switch (action.posSource ?? "player") {
+          case "player":
+            this._bus.emit("character:save-position", { key });   // CharacterController writes live pose
+            break;
+          case "object": {
+            const pose = this._resolveObjectPose(action.targetId);
+            if (pose) gameState.set(key, pose);
+            else console.warn(`[ScriptEngine] store_position: object '${action.targetId}' not found in active zone`);
+            break;
+          }
+          case "coords":
+            if (action.position) {
+              const pose: Record<string, number> = { x: action.position.x, y: action.position.y, z: action.position.z };
+              if (action.facing != null) pose.facing = action.facing;
+              gameState.set(key, pose);
+            }
+            break;
+        }
         break;
+      }
 
       case "despawn_object":
         for (const id of this._resolveTargets(action.targetId))
@@ -315,6 +347,15 @@ export class ScriptEngine {
    * GroupDef resolves to every active-zone entity tagged with that group;
    * anything else is treated as a single entity id.
    */
+  /** Resolve an object id in the active zone to a { x,y,z,facing } pose (rotation.y is already degrees). */
+  private _resolveObjectPose(targetId?: string): { x: number; y: number; z: number; facing: number } | null {
+    if (!targetId) return null;
+    const zone = this._state.activeZoneId ? this._state.zones.get(this._state.activeZoneId) : undefined;
+    const obj = zone?.objects.find(o => o.id === targetId);
+    if (!obj) return null;
+    return { x: obj.position.x, y: obj.position.y, z: obj.position.z, facing: obj.rotation.y };
+  }
+
   private _resolveTargets(targetId?: string): string[] {
     if (!targetId) return [];
     if (!this._state.groups.some(g => g.id === targetId)) return [targetId];

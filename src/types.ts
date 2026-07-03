@@ -162,7 +162,7 @@ export interface BusEvents {
   "camera:topdown":        Record<string, never>;
   "character:interact":       { objectId: string };
   "character:interact-range": { objectId: string; label: string } | null;
-  "character:teleport":    { position: Vec3; facing: number };
+  "character:teleport":    { position: Vec3; facing?: number };
   "character:save-position": { key: string };
   "character:triggerdoor": { transitionId: string };
   "overlay:fade-in":       { color: string; duration: number };
@@ -562,7 +562,7 @@ export type ActionType =
   | 'set_state'
   | 'adjust_number'
   | 'delete_state'
-  | 'save_checkpoint'
+  | 'store_position'
   | 'fire_event'
   | 'fade_screen'
   | 'teleport_player'
@@ -621,7 +621,11 @@ export interface ScriptAction {
   material?:     string;
   position?:     Vec3;
   positionKey?:  string;      // teleport_player: read destination Vec3 from this state key (overrides position)
-  stateKey?:     string;      // set_state / adjust_number / delete_state / save_checkpoint
+  posSource?:    'player' | 'object' | 'coords';  // store_position: where the stored position comes from
+  facing?:       number;      // degrees — store_position coords facing / teleport_player literal facing
+  facingSource?: 'keep' | 'literal' | 'key';      // teleport_player: how to set look direction
+  facingKey?:    string;      // teleport_player: read facing (number, or a pose's .facing) from this key
+  stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number
   eventId?:      string;

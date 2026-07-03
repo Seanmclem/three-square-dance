@@ -100,14 +100,18 @@ export class CharacterController {
     // Script teleport_player → character:teleport. Snap position + kill vertical velocity so
     // the player doesn't inherit fall speed through the warp. Facing is left as-is for now
     // (teleport_player doesn't author a facing yet — always sends 0).
-    this._offTeleport = this._bus.on("character:teleport", ({ position }) => {
+    this._offTeleport = this._bus.on("character:teleport", ({ position, facing }) => {
       this._body.teleport(new THREE.Vector3(position.x, position.y, position.z));
       this._velY = 0;
+      if (facing != null) {                          // set look direction (degrees); undefined = keep current
+        this._yaw = THREE.MathUtils.degToRad(facing);
+        this._modelYaw = this._yaw;                  // snap the third-person avatar too
+      }
     });
-    // Script save_checkpoint → stamp the player's current position into a state key.
+    // Script store_position (player source) → stamp the player's current pose into a state key.
     this._offSavePos = this._bus.on("character:save-position", ({ key }) => {
       const p = this._body.position;
-      gameState.set(key, { x: p.x, y: p.y, z: p.z });
+      gameState.set(key, { x: p.x, y: p.y, z: p.z, facing: THREE.MathUtils.radToDeg(this._yaw) });
     });
     document.addEventListener("mousemove", this._onMouseMove);
     document.addEventListener("keydown",   this._onKeyDown);

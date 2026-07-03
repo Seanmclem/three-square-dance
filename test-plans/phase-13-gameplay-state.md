@@ -75,19 +75,31 @@ Schemas moved from the App.tsx hardcode into per-level authored data
 - [x] Scene-authored key seeds: set `world.stateSchema.score = {default:5}`, re-enter → `get("score") === 5`
 - [x] New levels (`freshScene`) and every `toJSON()` carry `stateSchema` (no migration; absent → fallback)
 
-## 6. Checkpoint save + teleport-from-key (follow-up) — ✅ verified 2026-07-03
+## 6. store_position + teleport (position & facing) — ✅ verified 2026-07-03
 
-- [x] `teleport_player` moves the Rapier capsule; zeroes vertical velocity
-- [x] `save_checkpoint` (emits `character:save-position` → CharacterController) stores live player `{x,y,z}` into a state key; matches `body.position`
-- [x] `teleport_player` with `positionKey` warps to the stored Vec3 (before `{-9,-9}` → after `{5,2,5}`)
-- [x] Malformed guard: `positionKey` → non-Vec3 → no move, no crash, warns `state key 'bad' is not a Vec3`
-- [ ] ScriptPanel authoring (save_checkpoint field, teleport source toggle) — data-level verified; UI not driven in automation tab
+`save_checkpoint` was generalized/renamed to **`store_position`** (source: player /
+object / coords), and `teleport_player` gained facing control. Poses are
+`{x,y,z,facing}` records.
+
+- [x] `store_position` **player** → stores `{x,y,z,facing}`; facing captured from yaw (set yaw 45 → pose.facing ≈ 45)
+- [x] `store_position` **coords** → `{x:1,y:2,z:3,facing:90}`
+- [x] `store_position` **object** → object position + `rotation.y` (`{7,0.5,-2,facing:120}`)
+- [x] `teleport_player` `positionKey` warps to the stored Vec3; malformed key → warn + no-op
+- [x] teleport facing `key` (reads pose `.facing`) → yaw set to the stored facing (45°)
+- [x] teleport facing `literal` 180 → yaw 180°; `keep` → yaw unchanged
+- [x] `character:teleport.facing` is optional (undefined = keep current)
+
+## 7. STATE tab schema editor — ✅ verified 2026-07-03 (real UI path)
+
+- [x] Scripts panel shows a STATE tab; "+ Add key" adds `new_key` to `world.stateSchema`
+- [x] Rename key (on blur / `focusout`) → key renamed in `world.stateSchema`
+- [x] Edit default (e.g. `lives` default 3) persists; entering play seeds `get("lives") === 3`
+- [x] Edits go through `handleStateSchemaChange` (transaction → undo; `setIsDirty`)
+- [x] Cold reload has no `setStateSchema` error (an earlier one was transient HMR staleness)
 
 ---
 
 ## Notes / follow-ups
-- No editor UI for `stateSchema` yet — authored by editing scene JSON (plumbing-only pass).
-- `teleport_player` doesn't author a facing (keeps current look direction).
 - `on_state_changed` fires on every real change; scripts narrow via conditions (fire broadly, gate precisely).
   Setting a key to its current value is a no-op, which prevents the obvious feedback loop.
 - No New Game / Continue **UI** yet — exposed via `__test.newGame()` for now. A SaveLoadPanel game-mode

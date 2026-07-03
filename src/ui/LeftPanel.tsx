@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, SelectedRef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, SelectedRef, StateSchema } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -40,6 +40,8 @@ interface LeftPanelProps {
   zoneObjects:          WorldObject[];
   onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
+  stateSchema:          Record<string, StateSchema>;
+  onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
 }
 
 export function LeftPanel({
@@ -51,6 +53,7 @@ export function LeftPanel({
   zoneScripts, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects,
   onZoneScriptsChange, onObjectScriptsChange,
+  stateSchema, onStateSchemaChange,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -140,6 +143,8 @@ export function LeftPanel({
                 assets={assets}
                 onZoneScriptsChange={onZoneScriptsChange}
                 onObjectScriptsChange={onObjectScriptsChange}
+                stateSchema={stateSchema}
+                onStateSchemaChange={onStateSchemaChange}
               />
             )}
           </div>
