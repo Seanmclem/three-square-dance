@@ -216,6 +216,49 @@ sputter — every failure mode below was hit and diagnosed in practice.
    `await`/`setTimeout` times out (CDP `Runtime.evaluate`, ~45s). Keep page eval
    synchronous; put every wait *between* calls as a Bash `sleep`.
 
+### Protecting the user's autosave (localStorage snapshot-restore)
+
+**The problem:** the app writes `worldeditor_autosave` + `worldeditor_autosave_ts` to
+`localStorage` on every `beforeunload` (tab close/navigate). Because all tabs at
+`localhost:7373` share the same `localStorage`, closing a test tab overwrites the user's
+level with the test tab's stale in-memory copy.
+
+**Run these two snippets via `javascript_tool` on every test session.**
+
+**At the start** (immediately after navigating to `localhost:7373`, before any mutations):
+
+```js
+window.__lsSnapshot = {
+  value: localStorage.getItem('worldeditor_autosave'),
+  ts:    localStorage.getItem('worldeditor_autosave_ts'),
+};
+// Return snapshot so it lives in conversation context too
+JSON.stringify({ hasSnapshot: !!window.__lsSnapshot.value });
+```
+
+**At the end, before closing the test tab:**
+
+```js
+const s = window.__lsSnapshot;
+if (s) {
+  if (s.value) {
+    localStorage.setItem('worldeditor_autosave', s.value);
+    localStorage.setItem('worldeditor_autosave_ts', s.ts);
+  } else {
+    localStorage.removeItem('worldeditor_autosave');
+    localStorage.removeItem('worldeditor_autosave_ts');
+  }
+}
+// Prevent beforeunload from clobbering the restored state when the tab closes
+localStorage.setItem = () => {};
+"restored";
+```
+
+Then call `tabs_close_mcp`. The tab's `beforeunload` fires but `setItem` is now a no-op,
+so the user's level remains exactly as it was before the test session.
+
+---
+
 ### Other lessons
 
 - **Go slow.** One action → read state → verify → next action. Never batch
