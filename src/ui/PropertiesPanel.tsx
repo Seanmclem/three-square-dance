@@ -1912,6 +1912,7 @@ function MaterialSection({
   onAddMaterial:     () => void;
 }) {
   const baseDef = materialList.find(m => m.id === currentMaterialId);
+  const isColorMode = !!overrides?.color;
   const [open,    setOpen]    = useState(defaultExpanded);
   const [matCat,  setMatCat]  = useState<string>("All");
   const [hovered, setHovered] = useState(false);
@@ -1952,6 +1953,7 @@ function MaterialSection({
   const [dispStr,   setDispStr]   = useState(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
   const [offXStr,   setOffXStr]   = useState(String(overrides?.offsetX ?? 0));
   const [offYStr,   setOffYStr]   = useState(String(overrides?.offsetY ?? 0));
+  const [colorStr,  setColorStr]  = useState(overrides?.color ?? "#888888");
 
   useEffect(() => {
     const base = overrides?.tileScale ?? baseDef?.tileScale ?? 1.0;
@@ -1963,6 +1965,7 @@ function MaterialSection({
     setDispStr(String(overrides?.displacementScale ?? baseDef?.displacementScale ?? 0.03));
     setOffXStr(String(overrides?.offsetX ?? 0));
     setOffYStr(String(overrides?.offsetY ?? 0));
+    setColorStr(overrides?.color ?? "#888888");
   }, [currentMaterialId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveEnabled = (key: MapKey): boolean => {
@@ -1987,6 +1990,7 @@ function MaterialSection({
   const commitDisp  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n < 0) return; onOverridesChange({ ...overrides, displacementScale: n }); };
   const commitOffX  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetX: n }); };
   const commitOffY  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetY: n }); };
+  const commitColor = (val: string) => { if (!/^#[0-9a-fA-F]{6}$/.test(val)) return; onOverridesChange({ ...overrides, color: val }); };
 
   const toggleSplitTile = () => {
     const next = !splitTile;
@@ -2004,7 +2008,7 @@ function MaterialSection({
   const roughEnabled = effectiveEnabled("roughness");
   const dispEnabled  = effectiveEnabled("displacement");
 
-  const currentLabel = baseDef?.label ?? currentMaterialId;
+  const currentLabel = isColorMode ? `Color ${overrides?.color}` : (baseDef?.label ?? currentMaterialId);
 
   return (
     <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -2030,6 +2034,26 @@ function MaterialSection({
 
       {open && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 16px 14px" }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["texture", "color"] as const).map(m => {
+              const active = (m === "color") === isColorMode;
+              return (
+                <button key={m} onClick={() => {
+                  if (m === "color") { setColorStr(overrides?.color ?? "#888888"); onOverridesChange({ ...overrides, color: overrides?.color ?? "#888888" }); }
+                  else                { onOverridesChange({ ...overrides, color: undefined }); }
+                }} style={{
+                  flex: 1, padding: "4px 0", borderRadius: 4, cursor: "pointer",
+                  fontFamily: "monospace", fontSize: 10, border: "none",
+                  background: active ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+                  color: active ? "#80aaff" : "#646464",
+                  outline: active ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                }}>{m.toUpperCase()}</button>
+              );
+            })}
+          </div>
+
+          {!isColorMode && (
+            <>
           <button
             onClick={onAddMaterial}
             style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#646464", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
@@ -2140,6 +2164,34 @@ function MaterialSection({
           })}
         </div>
       </div>
+            </>
+          )}
+
+          {isColorMode && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>COLOR</div>
+                <input type="color" value={colorStr}
+                  onChange={e => { setColorStr(e.target.value); schedule(() => commitColor(e.target.value)); }}
+                  onBlur={e => flush(() => commitColor(e.target.value))}
+                  style={{ width: 36, height: 26, padding: 0, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, background: "none", cursor: "pointer" }}
+                />
+                <input type="text" value={colorStr} placeholder="#888888"
+                  onChange={e => { setColorStr(e.target.value); schedule(() => commitColor(e.target.value)); }}
+                  onBlur={e => flush(() => commitColor(colorStr))}
+                  style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10, width: 80 }}
+                />
+              </div>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div style={{ ...LABEL, marginBottom: 0, width: 60, flexShrink: 0 }}>ROUGHNESS</div>
+                <input type="number" step={0.05} min={0} max={1} value={roughStr}
+                  onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
+                  onBlur={e => flush(() => commitRough(e.target.value))}
+                  style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10, width: 60 }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

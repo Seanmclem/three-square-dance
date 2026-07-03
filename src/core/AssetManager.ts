@@ -190,6 +190,15 @@ export class AssetManager {
     materialId: string,
     overrides:  MaterialOverrides,
   ): Promise<THREE.MeshStandardMaterial> {
+    // Flat-color mode: skip the texture registry entirely, independent of whether
+    // materialId resolves to anything.
+    if (overrides.color) {
+      return new THREE.MeshStandardMaterial({
+        color:     overrides.color,
+        roughness: overrides.roughnessVal ?? 0.85,
+        metalness: 0,
+      });
+    }
     const def = this._materialRegistry[materialId];
     if (!def) return this._fallbackMaterial();
     try {

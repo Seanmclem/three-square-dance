@@ -42,6 +42,7 @@ export interface MaterialOverrides {
   offsetY?:           number;
   roughnessVal?:      number;
   displacementScale?: number;
+  color?:             string;   // hex "#rrggbb" — flat-color mode, skips all texture maps
 }
 
 export type QualityScale = 'low' | 'medium' | 'high';
