@@ -61,6 +61,7 @@
 - v4.2.8 — **Stair HEIGHT / LENGTH / ROTATION inputs (alternate dimension entry).** Stairs were only editable via the raw START/END points, so setting a specific rise/run or bearing meant hand-computing the end coordinate. Added three inputs to `StairGeoView` (a `H · L · R°` row under START/END) that are **two-way bindings on the existing `end` point** — no schema change, no `StairBuilder`/collider/copy-paste change, no migration: `height = end.y − start.y` (rewrites `end.y`, honoring the existing "Link end-Y to steps" toggle), `length = hypot(dx,dz)` (rewrites `end.x/z` along the current bearing), `rotation = atan2(dz,dx)°` (rewrites `end.x/z` at the current length, pivoting about START). Backed by a `stairDims(start,end)` helper; the panel's sync effect now watches `start` **and** `end` (previously end-only) so the H/L/R **and** the START row stay live when the gizmo moves/rotates the stair. All writes go through the existing `onObjectUpdate`→`updateStair` path (undo/redo + autosave for free). `start`/`end` remain the stored source of truth.
 - v4.2.9 — **NodeDragger mutes picking during a gizmo drag (fixes nodes snagged by rotate/move).** `TransformControls` and `InputManager` both listen on the canvas, so pressing a gizmo ring that sits over a node dot from another floor/platform behind it fired `input:mousedown` into `NodeDragger`, which grabbed that node — then the gizmo rotate/move drag dragged it around the whole gesture. `NodeDragger` now subscribes to the existing `gizmo:dragging` event (already consumed by `EditorCamera`/`SelectionManager`) and sets a `_gizmoActive` flag that early-returns out of `input:mousedown` **and** `input:mousemove`. `gizmo:dragging` fires on `TransformControls` **pointerdown**, before the compat `mousedown` that drives `input:mousedown`, so the flag is set in time. Guard: `NodeDragger` re-emits `gizmo:dragging` for its *own* node/edge drags (state is already `"DRAG"` by then), so the listener sets `_gizmoActive = isDragging && _state !== "DRAG"` to avoid a node drag muting itself.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
+- v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
 ---
 
@@ -703,6 +704,11 @@ export interface TriggerVolume {
 // Scene file: already implemented as SceneFile above.
 // Game state and editor prefs: planned Phase 9.
 
+// ⚠️ SUPERSEDED — runtime game state now lives in the generic GameState store,
+// not this flags/inventory-shaped GameSave. See GAMEPLAY_STATE.md. The shipped
+// save (worldeditor_gamesave) is { version, ts, state: snapshot, firedOneShots }
+// and omits playerPosition/zone/facing. The struct below is retained only as the
+// original design intent.
 export interface GameSave {
   version:        string;
   timestamp:      string;
@@ -819,8 +825,8 @@ world-editor/
 │   │   ├── ColliderBuilder.ts      ← mesh → Rapier collider (called by every builder)
 │   │   └── CharacterBody.ts        ← Rapier KinematicCharacterController wrapper
 │   ├── scripting/
-│   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch, flag system
-│   │   └── GameStateManager.ts     ← Item inventory singleton (give_item / player_has_item)
+│   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch
+│   │   └── GameState.ts            ← Generic runtime state store (see GAMEPLAY_STATE.md; replaced GameStateManager)
 │   ├── preview/
 │   │   ├── PreviewController.ts
 │   │   ├── CharacterController.ts  ← input + camera; delegates physics to CharacterBody
@@ -5153,8 +5159,8 @@ Key behaviours:
 ```
 src/
   scripting/
-    ScriptEngine.ts         ← runtime execution, flag system
-    GameStateManager.ts     ← game save, auto-save
+    ScriptEngine.ts         ← runtime execution
+    GameState.ts            ← generic runtime state store + game save (see GAMEPLAY_STATE.md)
   ui/
     ScriptPanel.tsx         ← script list + editor, in left panel slot
     DialogueOverlay.tsx     ← in-game dialogue display
