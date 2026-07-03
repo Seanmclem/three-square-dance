@@ -42,6 +42,11 @@ export class CharacterBody {
     });
   }
 
+  /** Hard-snap the capsule to a world position (script teleport / respawn). */
+  teleport(pos: THREE.Vector3): void {
+    this._body.setTranslation({ x: pos.x, y: pos.y, z: pos.z }, true);
+  }
+
   get position(): THREE.Vector3 {
     const t = this._body.translation();
     return new THREE.Vector3(t.x, t.y, t.z);

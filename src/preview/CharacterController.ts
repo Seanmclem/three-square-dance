@@ -61,6 +61,7 @@ export class CharacterController {
   private readonly _onKeyDown:   (e: KeyboardEvent) => void;
   private readonly _onKeyUp:     (e: KeyboardEvent) => void;
   private readonly _onWheel:     (e: WheelEvent) => void;
+  private _offTeleport: (() => void) | null = null;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -94,6 +95,13 @@ export class CharacterController {
   init(spawnPos: THREE.Vector3, facingDeg: number): void {
     this._yaw = THREE.MathUtils.degToRad(facingDeg);
     this._body.init(spawnPos);
+    // Script teleport_player → character:teleport. Snap position + kill vertical velocity so
+    // the player doesn't inherit fall speed through the warp. Facing is left as-is for now
+    // (teleport_player doesn't author a facing yet — always sends 0).
+    this._offTeleport = this._bus.on("character:teleport", ({ position }) => {
+      this._body.teleport(new THREE.Vector3(position.x, position.y, position.z));
+      this._velY = 0;
+    });
     document.addEventListener("mousemove", this._onMouseMove);
     document.addEventListener("keydown",   this._onKeyDown);
     document.addEventListener("keyup",     this._onKeyUp);
@@ -335,6 +343,7 @@ export class CharacterController {
     document.removeEventListener("keydown",   this._onKeyDown);
     document.removeEventListener("keyup",     this._onKeyUp);
     document.removeEventListener("wheel",     this._onWheel);
+    this._offTeleport?.(); this._offTeleport = null;
     if (this._modelRoot) this._scene.remove(this._modelRoot);
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);
