@@ -248,7 +248,15 @@ export class GizmoManager implements IEditorModule {
       const floorDef = payload.data as FloorDef | null;
       if (floorDef) {
         py = floorDef.elevation + 0.3;
-        const pts = floorDef.floorMesh.points;
+        // floorMesh.points is a build-time-only cache for node-backed floors — it isn't
+        // written back to WorldState when nodes move, so read live node positions instead.
+        const nodeIds = floorDef.floorMesh.nodeIds;
+        const zoneForNodes = this._worldState.zones.get(payload.zoneId);
+        const pts = (nodeIds?.length && zoneForNodes)
+          ? nodeIds
+              .map(id => zoneForNodes.nodes.find(n => n.id === id))
+              .filter((n): n is WallNode => !!n)
+          : floorDef.floorMesh.points;
         if (pts && pts.length > 0) {
           px = pts.reduce((s, p) => s + p.x, 0) / pts.length;
           pz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
@@ -847,13 +855,33 @@ export class GizmoManager implements IEditorModule {
         break;
       }
       case "floor": {
-        // Only Y is live — X/Z arrows are hidden
-        if (Math.abs(delta.y) < 1e-4) break;
+        if (delta.lengthSq() < 1e-6) break;
         const floor = this._getFloor();
         if (!floor) break;
-        this._worldState.updateFloor(this._selZoneId!, this._selId!, {
-          elevation: floor.elevation + delta.y,
-        });
+        if (Math.abs(delta.x) >= 1e-4 || Math.abs(delta.z) >= 1e-4) {
+          const fm = floor.floorMesh;
+          if (fm.nodeIds?.length) {
+            const zone = this._worldState.zones.get(this._selZoneId!);
+            for (const nodeId of fm.nodeIds) {
+              const node = zone?.nodes.find(n => n.id === nodeId);
+              if (node) {
+                this._worldState.updateNode(this._selZoneId!, nodeId, {
+                  x: node.x + delta.x,
+                  z: node.z + delta.z,
+                });
+              }
+            }
+          } else if (fm.points?.length) {
+            this._worldState.updateFloor(this._selZoneId!, this._selId!, {
+              floorMesh: { ...fm, points: fm.points.map(p => ({ x: p.x + delta.x, z: p.z + delta.z })) },
+            });
+          }
+        }
+        if (Math.abs(delta.y) >= 1e-4) {
+          this._worldState.updateFloor(this._selZoneId!, this._selId!, {
+            elevation: floor.elevation + delta.y,
+          });
+        }
         break;
       }
       case "wall": {
@@ -1080,17 +1108,11 @@ export class GizmoManager implements IEditorModule {
 
   private _syncAxisVisibility(): void {
     if (!this._controls) return;
-    if (this._controls.getMode() === "rotate") {
-      // Keep all three rings — hiding any one breaks the ring geometry
-      this._controls.showX = true;
-      this._controls.showY = true;
-      this._controls.showZ = true;
-    } else {
-      // Floors: elevation only (Y arrow); everything else: all
-      this._controls.showX = this._selType !== "floor";
-      this._controls.showY = true;
-      this._controls.showZ = this._selType !== "floor";
-    }
+    // All axes are always live — hiding any one breaks the rotate ring geometry,
+    // and translate now supports full X/Y/Z movement for every gizmo type.
+    this._controls.showX = true;
+    this._controls.showY = true;
+    this._controls.showZ = true;
   }
 
   // ─── Wall-run helpers ─────────────────────────────────────────────────────
