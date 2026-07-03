@@ -18,9 +18,12 @@ export class SpawnPointTool {
       this._bus.on("tool:select", ({ tool }) => {
         this._active = (tool === "spawnpoint");
       }),
-      this._bus.on("input:click", ({ worldPos, button }) => {
+      this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
         if (!this._active || button !== 0) return;
-        this._placeMarker(worldPos.x, worldPos.y, worldPos.z);
+        // Prefer the real surface hit so the marker lands on top of a floor/platform
+        // instead of falling through to the y=0 ground plane underneath it.
+        const p = surfacePos ?? worldPos;
+        this._placeMarker(p.x, p.y, p.z);
       }),
       this._bus.on("preview:start", () => {
         if (this._marker) this._marker.visible = false;

@@ -32,7 +32,8 @@ export class ObjectTool implements IEditorModule {
   private _ghostBox: THREE.Mesh | null = null;
   private _activeZoneId = "demo";
   private _activeLevel  = 0;
-  private _lastWorldPos: Vec3 | null = null;
+  private _lastWorldPos:   Vec3 | null = null;
+  private _lastSurfacePos: Vec3 | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -56,14 +57,15 @@ export class ObjectTool implements IEditorModule {
         this._assetId = assetId;
         void this._beginPlacing(assetId);
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        this._lastWorldPos = worldPos;
-        if (this._active && this._state === "PLACING") this._onMouseMove(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        this._lastWorldPos   = worldPos;
+        this._lastSurfacePos = surfacePos;
+        if (this._active && this._state === "PLACING") this._onMouseMove(worldPos, surfacePos);
       }),
-      this._bus.on("input:click", ({ worldPos, button }) => {
+      this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
         if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
-        if (this._state === "PLACING") this._commit(worldPos);
+        if (this._state === "PLACING") this._commit(worldPos, surfacePos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (this._active && code === "Escape") this._reset();
@@ -104,13 +106,16 @@ export class ObjectTool implements IEditorModule {
     }
     this._state = "PLACING";
     document.body.style.cursor = "crosshair";
-    if (this._lastWorldPos) this._onMouseMove(this._lastWorldPos);
+    if (this._lastWorldPos) this._onMouseMove(this._lastWorldPos, this._lastSurfacePos);
   }
 
-  private _onMouseMove(worldPos: Vec3): void {
-    const x = snap(worldPos.x);
-    const z = snap(worldPos.z);
-    const y = this._getElevation();
+  private _onMouseMove(worldPos: Vec3, surfacePos: Vec3 | null): void {
+    // Land on the real surface under the cursor (floor/platform/etc.) when there is one,
+    // so the ghost doesn't sink through to the y=0 ground plane below it.
+    const p = surfacePos ?? worldPos;
+    const x = snap(p.x);
+    const z = snap(p.z);
+    const y = surfacePos ? surfacePos.y : this._getElevation();
     const target = this._ghost ?? this._ghostBox;
     if (target) {
       target.position.set(x, y, z);
@@ -125,12 +130,13 @@ export class ObjectTool implements IEditorModule {
     return this._activeLevel * 3.0;
   }
 
-  private _commit(worldPos: Vec3): void {
+  private _commit(worldPos: Vec3, surfacePos: Vec3 | null): void {
     if (!this._assetId) { this._reset(); return; }
 
-    const x = snap(worldPos.x);
-    const z = snap(worldPos.z);
-    const y = this._getElevation();
+    const p = surfacePos ?? worldPos;
+    const x = snap(p.x);
+    const z = snap(p.z);
+    const y = surfacePos ? surfacePos.y : this._getElevation();
 
     const obj: WorldObject = {
       id:       `obj_${crypto.randomUUID().slice(0, 8)}`,

@@ -6,10 +6,16 @@ import type { IEditorModule, Vec3 } from "@/types";
  * Centralizes all DOM input and re-emits it as typed bus events so tools never
  * attach their own listeners. `_suppress` mutes emission during transitions.
  */
+// Landing surfaces for the surfacePos hit-test — real buildable geometry a
+// spawn/object placement should rest on top of, rather than falling through to
+// the y=0 ground plane.
+const SURFACE_TYPES = new Set(["floor", "platform", "wall", "stair", "object"]);
+
 export class InputManager implements IEditorModule {
   private readonly _dom:    HTMLCanvasElement;
   private readonly _camera: THREE.PerspectiveCamera;
   private readonly _bus:    EventBus;
+  private readonly _scene:  THREE.Scene;
 
   private readonly _keys:        Record<string, boolean> = {};
   private readonly _mouse        = new THREE.Vector2();
@@ -31,10 +37,11 @@ export class InputManager implements IEditorModule {
   private readonly _onKeyDown:     (e: KeyboardEvent) => void;
   private readonly _onKeyUp:       (e: KeyboardEvent) => void;
 
-  constructor(domElement: HTMLCanvasElement, camera: THREE.PerspectiveCamera, bus: EventBus) {
+  constructor(domElement: HTMLCanvasElement, camera: THREE.PerspectiveCamera, bus: EventBus, scene: THREE.Scene) {
     this._dom    = domElement;
     this._camera = camera;
     this._bus    = bus;
+    this._scene  = scene;
 
     this._onMouseDown   = e => this._handleMouseDown(e);
     this._onMouseMove   = e => this._handleMouseMove(e);
@@ -85,13 +92,27 @@ export class InputManager implements IEditorModule {
   get isCtrlDown():  boolean { return !!(this._keys["ControlLeft"] || this._keys["ControlRight"]); }
   isKeyDown(code: string): boolean { return !!this._keys[code]; }
 
-  private _worldPos(e: MouseEvent): Vec3 {
+  /**
+   * `worldPos` is the y=0 ground-plane hit (existing behavior — Floor/Wall/Platform/etc.
+   * tools use this for XZ and derive elevation themselves via the level selector).
+   * `surfacePos` is a real raycast against buildable geometry, so surface-placed tools
+   * (spawn point, object) can land on top of a floor/platform instead of falling through
+   * to the ground plane underneath it. Null when nothing is under the cursor.
+   */
+  private _computePositions(e: MouseEvent): { worldPos: Vec3; surfacePos: Vec3 | null } {
     const rect = this._dom.getBoundingClientRect();
     this._mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
     this._mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._mouse, this._camera);
     this._raycaster.ray.intersectPlane(this._groundPlane, this._hit);
-    return { x: this._hit.x, y: this._hit.y, z: this._hit.z };
+    const worldPos = { x: this._hit.x, y: this._hit.y, z: this._hit.z };
+
+    const hit = this._raycaster
+      .intersectObjects(this._scene.children, true)
+      .find(h => h.object.userData.selectable && SURFACE_TYPES.has(h.object.userData.editorType));
+    const surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;
+
+    return { worldPos, surfacePos };
   }
 
   private _handleMouseDown(e: MouseEvent): void {
@@ -102,9 +123,10 @@ export class InputManager implements IEditorModule {
 
   private _handleMouseMove(e: MouseEvent): void {
     if (this._suppress) return;
+    const { worldPos, surfacePos } = this._computePositions(e);
     this._bus.emit("input:mousemove", {
       screenPos: { x: e.clientX, y: e.clientY },
-      worldPos:  this._worldPos(e),
+      worldPos, surfacePos,
       delta:     { x: e.movementX, y: e.movementY },
     });
   }
@@ -121,9 +143,10 @@ export class InputManager implements IEditorModule {
       const dy = e.clientY - this._mouseDownScreenPos.y;
       if (Math.sqrt(dx * dx + dy * dy) > this._DRAG_THRESHOLD) return;
     }
+    const { worldPos, surfacePos } = this._computePositions(e);
     this._bus.emit("input:click", {
       screenPos: { x: e.clientX, y: e.clientY },
-      worldPos:  this._worldPos(e),
+      worldPos, surfacePos,
       button:    e.button,
       shift:     e.shiftKey,
       ctrl:      e.ctrlKey,
@@ -133,9 +156,10 @@ export class InputManager implements IEditorModule {
 
   private _handleDblClick(e: MouseEvent): void {
     if (this._suppress) return;
+    const { worldPos, surfacePos } = this._computePositions(e);
     this._bus.emit("input:dblclick", {
       screenPos: { x: e.clientX, y: e.clientY },
-      worldPos:  this._worldPos(e),
+      worldPos, surfacePos,
     });
   }
 

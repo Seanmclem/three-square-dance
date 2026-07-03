@@ -173,11 +173,11 @@ export interface BusEvents {
   "materials:loaded":      { materials: MaterialDef[] };
   "quality:changed":       { quality: QualityScale };
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
-  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number; shift: boolean; ctrl: boolean; meta: boolean };
+  "input:click":           { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; button: number; shift: boolean; ctrl: boolean; meta: boolean };
   "selection:changed":     { refs: SelectedRef[] };
   "selection:set":         { refs: SelectedRef[] };
-  "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
-  "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
+  "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
+  "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
   "input:wheel":           { delta: number };

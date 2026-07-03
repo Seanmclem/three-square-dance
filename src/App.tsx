@@ -172,7 +172,7 @@ export default function App() {
 
     const preview = new PreviewController(bus, world, scene, zones);
     previewRef.current = preview;
-    const input     = new InputManager(canvas, scene.camera, bus);
+    const input     = new InputManager(canvas, scene.camera, bus, scene.scene);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const floorTool    = new FloorTool(scene.scene, world, bus, history);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus, history);
