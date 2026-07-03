@@ -280,6 +280,48 @@
         "sourceName": "Paving Stones 141",
         "license": "CC0"
       }
+    },
+    {
+      "id": "white_smooth_concrete",
+      "label": "White Smooth Concrete",
+      "category": "Concrete",
+      "attribution": {
+        "author": "ambientCG",
+        "patreonUrl": "https://patreon.com/ambientcg",
+        "license": "CC0",
+        "sourceUrl": "https://ambientcg.com/view?id=Concrete034",
+        "sourceName": "Concrete 034"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/albedo.jpg"
+        },
+        "normal": {
+          "enabled": true,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": true,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/white_smooth_concrete/{quality}/displacement.jpg"
+        }
+      }
     }
   ]
 }
