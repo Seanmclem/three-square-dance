@@ -24,12 +24,17 @@ interface ToolbarProps {
   onToolSelect:  (tool: ToolId) => void;
   onPanelToggle: (panelId: LeftPanelId) => void;
   onPreview?:    () => void;
-  onStartGame?:  () => void;
+  onNewGame?:    () => void;
+  onContinue?:   () => void;
+  hasGameSave?:  () => boolean;
   isPreview?:    boolean;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onStartGame, isPreview }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, hasGameSave, isPreview }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
+  // Re-evaluated whenever the menu opens (opening flips showGameMenu → re-render),
+  // so it reflects a save written since the last play session.
+  const canContinue = showGameMenu && (hasGameSave?.() ?? false);
   return (
     <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
@@ -129,11 +134,11 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
 
       <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 
-      {/* Play row: Preview button + dropdown caret */}
+      {/* Play row: New Game button + dropdown caret (Preview/Continue in the menu) */}
       <div style={{ position: "relative", display: "flex", gap: 2, marginBottom: 8 }}>
         <button
-          title="Preview (G)"
-          onClick={onPreview}
+          title="New Game (G)"
+          onClick={onNewGame}
           style={{
             width: 36, height: 36,
             border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
@@ -173,14 +178,26 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
             >▶ Preview</button>
             <button
-              onClick={() => { setShowGameMenu(false); onStartGame?.(); }}
+              onClick={() => { setShowGameMenu(false); onNewGame?.(); }}
               style={{
                 width: "100%", padding: "6px 12px", background: "none", border: "none",
                 color: "#ccc", cursor: "pointer", textAlign: "left", fontSize: 12,
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
-            >▶ Start Game</button>
+            >▶ New Game</button>
+            <button
+              disabled={!canContinue}
+              title={canContinue ? "Resume the saved game" : "No saved game yet"}
+              onClick={() => { setShowGameMenu(false); onContinue?.(); }}
+              style={{
+                width: "100%", padding: "6px 12px", background: "none", border: "none",
+                color: canContinue ? "#ccc" : "#555", cursor: canContinue ? "pointer" : "default",
+                textAlign: "left", fontSize: 12,
+              }}
+              onMouseEnter={e => { if (canContinue) (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+            >▶ Continue</button>
           </div>
         )}
       </div>

@@ -158,6 +158,7 @@ export class TriggerVolumeTool {
     const ndcY  = -((screenPos.y - rect.top)  / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this._camera);
     const target = new THREE.Vector3();
+    let best: { vol: TriggerVolume; distance: number } | undefined;
     for (const vol of zone.triggerVolumes) {
       const box = new THREE.Box3(
         new THREE.Vector3(vol.position.x - vol.size.x / 2, vol.position.y,                vol.position.z - vol.size.z / 2),
@@ -175,9 +176,31 @@ export class TriggerVolumeTool {
           .invert();
         ray = this._raycaster.ray.clone().applyMatrix4(m);
       }
-      if (ray.intersectBox(box, target)) return vol;
+      if (ray.intersectBox(box, target)) {
+        // Rotation is distance-preserving, so this distance matches world space even
+        // though `target`/`ray` may be in the volume's local (unrotated) frame.
+        const distance = ray.origin.distanceTo(target);
+        if (!best || distance < best.distance) best = { vol, distance };
+      }
     }
-    return undefined;
+    if (!best) return undefined;
+
+    // Trigger volumes are meant to be see-through where floors/walls coincide with them
+    // (that's the whole point of clicking "into" a volume), but real solid geometry
+    // genuinely in front of the volume — an object, platform, stair, etc. — should still
+    // block the pick instead of the click passing through to the volume behind it.
+    const occluder = this._raycaster
+      .intersectObjects(this._scene.children, true)
+      .find(h => {
+        if (!(h.object instanceof THREE.Mesh) || !h.object.visible) return false;
+        // Only real authored entities occlude — editor helpers (gizmo planes, grid, sky
+        // dome, etc.) carry no editorType and must not block picking through them.
+        const et = h.object.userData.editorType;
+        return !!et && et !== "floor" && et !== "wall";
+      });
+    if (occluder && occluder.distance < best.distance) return undefined;
+
+    return best.vol;
   }
 
   private _clearHover(): void {

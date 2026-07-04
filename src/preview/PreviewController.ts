@@ -31,7 +31,7 @@ export class PreviewController {
 
   get isActive(): boolean { return this._controller !== null; }
 
-  enter(mode: "preview" | "game"): void {
+  enter(mode: "preview" | "game", opts?: { resume?: boolean }): void {
     if (this._controller) return;
 
     const settings = this._world.world?.playerSettings ?? DEFAULT_SETTINGS;
@@ -69,7 +69,7 @@ export class PreviewController {
 
     this._scene.renderer.domElement.requestPointerLock();
 
-    this._bus.emit("preview:start", { mode });
+    this._bus.emit("preview:start", { mode, resume: opts?.resume ?? false });
   }
 
   exit(): void {

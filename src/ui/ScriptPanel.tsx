@@ -1,70 +1,154 @@
 import { useState, useEffect } from "react";
 import type {
-  ScriptDef, ScriptTrigger, ScriptAction, ScriptCondition,
-  TriggerType, ActionType, ConditionType, CompareOp, JsonValue, StateSchema,
-  TriggerVolume, WorldObject, GroupDef, AssetDef,
+  ScriptDef,
+  ScriptTrigger,
+  ScriptAction,
+  ScriptCondition,
+  TriggerType,
+  ActionType,
+  ConditionType,
+  CompareOp,
+  JsonValue,
+  StateSchema,
+  TriggerVolume,
+  WorldObject,
+  GroupDef,
+  AssetDef,
 } from "@/types";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const S = {
-  root: { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" } as const,
-  tabs: { display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 } as const,
-  tab:  (active: boolean): React.CSSProperties => ({
-    flex: 1, padding: "7px 4px", background: "none", border: "none", cursor: "pointer",
-    color: active ? "#c0c0e0" : "#606070", fontSize: 11, fontFamily: "monospace",
+  root: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    overflow: "hidden",
+  } as const,
+  tabs: {
+    display: "flex",
+    borderBottom: "1px solid rgba(255,255,255,0.07)",
+    flexShrink: 0,
+  } as const,
+  tab: (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: "7px 4px",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: active ? "#c0c0e0" : "#606070",
+    fontSize: 11,
+    fontFamily: "monospace",
     borderBottom: active ? "2px solid #80aaff" : "2px solid transparent",
   }),
   scroll: { flex: 1, overflowY: "auto", padding: "8px 0" } as const,
-  row: { display: "flex", alignItems: "center", justifyContent: "space-between",
-         padding: "8px 12px", borderBottom: "1px solid rgba(255,255,255,0.05)",
-         cursor: "pointer" } as const,
-  label:  { color: "#c0c0c0", fontSize: 12 } as const,
-  sub:    { color: "#606070", fontSize: 10, marginTop: 2 } as const,
-  badge:  (enabled: boolean): React.CSSProperties => ({
-    width: 8, height: 8, borderRadius: "50%",
+  row: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "8px 12px",
+    borderBottom: "1px solid rgba(255,255,255,0.05)",
+    cursor: "pointer",
+  } as const,
+  label: { color: "#c0c0c0", fontSize: 12 } as const,
+  sub: { color: "#606070", fontSize: 10, marginTop: 2 } as const,
+  badge: (enabled: boolean): React.CSSProperties => ({
+    width: 8,
+    height: 8,
+    borderRadius: "50%",
     background: enabled ? "#44cc88" : "#555",
-    flexShrink: 0, marginLeft: 8,
+    flexShrink: 0,
+    marginLeft: 8,
   }),
   btn: (primary?: boolean): React.CSSProperties => ({
     padding: primary ? "6px 12px" : "4px 8px",
     background: primary ? "rgba(80,140,255,0.25)" : "rgba(255,255,255,0.07)",
-    border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4,
-    color: "#c0c0c0", fontSize: 11, cursor: "pointer",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 4,
+    color: "#c0c0c0",
+    fontSize: 11,
+    cursor: "pointer",
   }),
-  field: { width: "100%", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.08)",
-           borderRadius: 4, color: "#c0c0c0", fontSize: 11, padding: "4px 8px",
-           fontFamily: "monospace", outline: "none" } as const,
-  select: { width: "100%", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.08)",
-             borderRadius: 4, color: "#c0c0c0", fontSize: 11, padding: "4px 6px", outline: "none" } as const,
-  sectionLabel: { color: "#606070", fontSize: 10, letterSpacing: 1, padding: "8px 12px 4px",
-                   textTransform: "uppercase" } as const,
-  divider: { borderTop: "1px solid rgba(255,255,255,0.05)", margin: "8px 0" } as const,
+  field: {
+    width: "100%",
+    background: "rgba(46,46,46,0.9)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 4,
+    color: "#c0c0c0",
+    fontSize: 11,
+    padding: "4px 8px",
+    fontFamily: "monospace",
+    outline: "none",
+  } as const,
+  select: {
+    width: "100%",
+    background: "rgba(46,46,46,0.9)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 4,
+    color: "#c0c0c0",
+    fontSize: 11,
+    padding: "4px 6px",
+    outline: "none",
+  } as const,
+  sectionLabel: {
+    color: "#606070",
+    fontSize: 10,
+    letterSpacing: 1,
+    padding: "8px 12px 4px",
+    textTransform: "uppercase",
+  } as const,
+  divider: {
+    borderTop: "1px solid rgba(255,255,255,0.05)",
+    margin: "8px 0",
+  } as const,
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TRIGGER_TYPES: TriggerType[] = [
-  "on_player_enter","on_player_exit","on_interact","on_timer",
-  "on_state_changed","on_level_load","on_game_start","on_health_zero",
+  "on_player_enter",
+  "on_player_exit",
+  "on_interact",
+  "on_timer",
+  "on_state_changed",
+  "on_level_load",
+  "on_game_start",
+  "on_health_zero",
 ];
 
 const CONDITION_TYPES: ConditionType[] = [
-  "has_state","compare_number","npc_alive","npc_dead",
+  "has_state",
+  "compare_number",
+  "npc_alive",
+  "npc_dead",
 ];
 
 const ACTION_TYPES: ActionType[] = [
-  "show_dialogue","play_sound","set_state","adjust_number","delete_state","store_position","fire_event",
-  "teleport_player","despawn_object","fade_screen","move_object",
-  "show_ui","play_animation","change_material","run_script",
-  "spawn_npc","open_door","close_door",
+  "adjust_number",
+  "change_material",
+  "close_door",
+  "delete_state",
+  "despawn_object",
+  "fade_screen",
+  "fire_event",
+  "move_object",
+  "open_door",
+  "play_animation",
+  "play_sound",
+  "run_script",
+  "set_state",
+  "show_dialogue",
+  "show_ui",
+  "spawn_npc",
+  "store_position",
+  "teleport_player",
 ];
 
-const COMPARE_OPS: CompareOp[] = [">=","<=",">","<","==","!="];
+const COMPARE_OPS: CompareOp[] = [">=", "<=", ">", "<", "==", "!="];
 
 /** Coerce a free-text state value into boolean / number / string for set_state. */
 function coerceStateValue(raw: string): JsonValue {
-  if (raw === "true")  return true;
+  if (raw === "true") return true;
   if (raw === "false") return false;
   if (raw.trim() !== "" && !Number.isNaN(Number(raw))) return Number(raw);
   return raw;
@@ -72,32 +156,32 @@ function coerceStateValue(raw: string): JsonValue {
 
 function blankScript(zoneId: string): ScriptDef {
   return {
-    id:         `scr_${crypto.randomUUID().slice(0,8)}`,
-    label:      "New Script",
+    id: `scr_${crypto.randomUUID().slice(0, 8)}`,
+    label: "New Script",
     zoneId,
-    enabled:    true,
-    trigger:    { type: "on_game_start" },
+    enabled: true,
+    trigger: { type: "on_game_start" },
     conditions: [],
-    actions:    [],
-    oneShot:    false,
+    actions: [],
+    oneShot: false,
   };
 }
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface ScriptPanelProps {
-  zoneScripts:     ScriptDef[];
-  objectScripts:   ScriptDef[] | null;
+  zoneScripts: ScriptDef[];
+  objectScripts: ScriptDef[] | null;
   selectedObjectId: string | null;
-  activeZoneId:    string | null;
-  triggerVolumes:  TriggerVolume[];
-  zoneObjects:     WorldObject[];
-  groups:          GroupDef[];
-  assets:          AssetDef[];
-  onZoneScriptsChange:    (scripts: ScriptDef[]) => void;
-  onObjectScriptsChange:  (objectId: string, scripts: ScriptDef[]) => void;
-  stateSchema:            Record<string, StateSchema>;
-  onStateSchemaChange:    (schema: Record<string, StateSchema>) => void;
+  activeZoneId: string | null;
+  triggerVolumes: TriggerVolume[];
+  zoneObjects: WorldObject[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  onZoneScriptsChange: (scripts: ScriptDef[]) => void;
+  onObjectScriptsChange: (objectId: string, scripts: ScriptDef[]) => void;
+  stateSchema: Record<string, StateSchema>;
+  onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
 }
 
 type TabId = "level" | "object" | "state";
@@ -105,17 +189,28 @@ type TabId = "level" | "object" | "state";
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
 export function ScriptPanel({
-  zoneScripts, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects, groups, assets,
-  onZoneScriptsChange, onObjectScriptsChange,
-  stateSchema, onStateSchemaChange,
+  zoneScripts,
+  objectScripts,
+  selectedObjectId,
+  activeZoneId,
+  triggerVolumes,
+  zoneObjects,
+  groups,
+  assets,
+  onZoneScriptsChange,
+  onObjectScriptsChange,
+  stateSchema,
+  onStateSchemaChange,
 }: ScriptPanelProps) {
-  const [tab,       setTab]       = useState<TabId>("level");
+  const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Auto-switch to SELECTED tab when a trigger volume or object is selected
   useEffect(() => {
-    if (selectedObjectId) { setTab("object"); setEditingId(null); }
+    if (selectedObjectId) {
+      setTab("object");
+      setEditingId(null);
+    }
   }, [selectedObjectId]);
 
   const currentScripts: ScriptDef[] =
@@ -124,7 +219,7 @@ export function ScriptPanel({
   const currentZoneId = activeZoneId ?? "";
 
   function save(updated: ScriptDef[]): void {
-    if (tab === "level")  onZoneScriptsChange(updated);
+    if (tab === "level") onZoneScriptsChange(updated);
     if (tab === "object" && selectedObjectId)
       onObjectScriptsChange(selectedObjectId, updated);
   }
@@ -140,29 +235,38 @@ export function ScriptPanel({
   }
 
   function toggleEnabled(id: string): void {
-    save(currentScripts.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s));
+    save(
+      currentScripts.map((s) =>
+        s.id === id ? { ...s, enabled: !s.enabled } : s,
+      ),
+    );
   }
 
   function deleteScript(id: string): void {
-    save(currentScripts.filter(s => s.id !== id));
+    save(currentScripts.filter((s) => s.id !== id));
     if (editingId === id) setEditingId(null);
   }
 
   function updateScript(updated: ScriptDef): void {
-    save(currentScripts.map(s => s.id === updated.id ? updated : s));
+    save(currentScripts.map((s) => (s.id === updated.id ? updated : s)));
   }
 
-  const editing = editingId ? currentScripts.find(s => s.id === editingId) ?? null : null;
+  const editing = editingId
+    ? (currentScripts.find((s) => s.id === editingId) ?? null)
+    : null;
 
   return (
     <div style={S.root}>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["level","object","state"] as TabId[]).map(t => (
+        {(["level", "object", "state"] as TabId[]).map((t) => (
           <button
             key={t}
             style={S.tab(tab === t)}
-            onClick={() => { setTab(t); setEditingId(null); }}
+            onClick={() => {
+              setTab(t);
+              setEditingId(null);
+            }}
           >
             {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : "STATE"}
           </button>
@@ -170,10 +274,21 @@ export function ScriptPanel({
       </div>
 
       {/* Per-tab description */}
-      <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "5px 10px 0", lineHeight: 1.4 }}>
-        {tab === "level"  && "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
-        {tab === "object" && "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
-        {tab === "state"  && "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
+      <div
+        style={{
+          color: "#555",
+          fontSize: 10,
+          fontStyle: "italic",
+          padding: "5px 10px 0",
+          lineHeight: 1.4,
+        }}
+      >
+        {tab === "level" &&
+          "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
+        {tab === "object" &&
+          "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
+        {tab === "state" &&
+          "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
       </div>
 
       {tab === "state" ? (
@@ -192,14 +307,25 @@ export function ScriptPanel({
           onDelete={() => deleteScript(editing.id)}
         />
       ) : tab === "object" && !selectedObjectId ? (
-        <div style={{ color: "#555", fontSize: 11, fontStyle: "italic", textAlign: "center", marginTop: 40, lineHeight: 1.6 }}>
-          Select a trigger volume or object<br/>to see its scripts here.
+        <div
+          style={{
+            color: "#555",
+            fontSize: 11,
+            fontStyle: "italic",
+            textAlign: "center",
+            marginTop: 40,
+            lineHeight: 1.6,
+          }}
+        >
+          Select a trigger volume or object
+          <br />
+          to see its scripts here.
         </div>
       ) : (
         <ScriptList
           scripts={currentScripts}
-          onSelect={id => setEditingId(id)}
-          onToggle={id => toggleEnabled(id)}
+          onSelect={(id) => setEditingId(id)}
+          onToggle={(id) => toggleEnabled(id)}
           onAdd={addScript}
         />
       )}
@@ -211,8 +337,11 @@ export function ScriptPanel({
 // Edits the level's authored gameplay-state schema (WorldConfig.stateSchema): each
 // key's default + (numbers) min/max clamp. Applied on play start via configureSchema.
 
-function SchemaEditor({ schema, onChange }: {
-  schema:   Record<string, StateSchema>;
+function SchemaEditor({
+  schema,
+  onChange,
+}: {
+  schema: Record<string, StateSchema>;
   onChange: (s: Record<string, StateSchema>) => void;
 }) {
   const entries = Object.entries(schema);
@@ -222,28 +351,48 @@ function SchemaEditor({ schema, onChange }: {
   }
   function rename(oldKey: string, raw: string): void {
     const newKey = raw.trim();
-    if (!newKey || newKey === oldKey || schema[newKey]) return;   // ignore empty / unchanged / duplicate
+    if (!newKey || newKey === oldKey || schema[newKey]) return; // ignore empty / unchanged / duplicate
     const next: Record<string, StateSchema> = {};
-    for (const [k, v] of Object.entries(schema)) next[k === oldKey ? newKey : k] = v;
+    for (const [k, v] of Object.entries(schema))
+      next[k === oldKey ? newKey : k] = v;
     onChange(next);
   }
   function remove(key: string): void {
-    const next = { ...schema }; delete next[key]; onChange(next);
+    const next = { ...schema };
+    delete next[key];
+    onChange(next);
   }
   function add(): void {
-    let name = "new_key", i = 2;
+    let name = "new_key",
+      i = 2;
     while (schema[name]) name = `new_key_${i++}`;
     onChange({ ...schema, [name]: { type: "number", default: 0 } });
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "6px 10px", flexShrink: 0 }}>
-        <button style={S.btn(true)} onClick={add}>+ Add key</button>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "6px 10px",
+          flexShrink: 0,
+        }}
+      >
+        <button style={S.btn(true)} onClick={add}>
+          + Add key
+        </button>
       </div>
       <div style={S.scroll}>
         {entries.length === 0 && (
-          <div style={{ color: "#555", fontSize: 11, padding: "16px 12px", textAlign: "center" }}>
+          <div
+            style={{
+              color: "#555",
+              fontSize: 11,
+              padding: "16px 12px",
+              textAlign: "center",
+            }}
+          >
             No state keys yet
           </div>
         )}
@@ -252,8 +401,8 @@ function SchemaEditor({ schema, onChange }: {
             key={key}
             name={key}
             schema={sch}
-            onRename={n => rename(key, n)}
-            onReplace={next => replace(key, next)}
+            onRename={(n) => rename(key, n)}
+            onReplace={(next) => replace(key, next)}
             onRemove={() => remove(key)}
           />
         ))}
@@ -262,12 +411,18 @@ function SchemaEditor({ schema, onChange }: {
   );
 }
 
-function SchemaKeyRow({ name, schema, onRename, onReplace, onRemove }: {
-  name:      string;
-  schema:    StateSchema;
-  onRename:  (n: string) => void;
+function SchemaKeyRow({
+  name,
+  schema,
+  onRename,
+  onReplace,
+  onRemove,
+}: {
+  name: string;
+  schema: StateSchema;
+  onRename: (n: string) => void;
   onReplace: (next: StateSchema) => void;
-  onRemove:  () => void;
+  onRemove: () => void;
 }) {
   const [nameStr, setNameStr] = useState(name);
   useEffect(() => setNameStr(name), [name]);
@@ -275,10 +430,15 @@ function SchemaKeyRow({ name, schema, onRename, onReplace, onRemove }: {
 
   function commitDefault(raw: string): void {
     let val: JsonValue;
-    if (schema.type === "number")       val = parseFloat(raw) || 0;
+    if (schema.type === "number") val = parseFloat(raw) || 0;
     else if (schema.type === "boolean") val = raw === "true";
-    else if (schema.type === "object")  { try { val = JSON.parse(raw); } catch { return; } }
-    else                                val = raw;
+    else if (schema.type === "object") {
+      try {
+        val = JSON.parse(raw);
+      } catch {
+        return;
+      }
+    } else val = raw;
     onReplace({ ...schema, default: val });
   }
   function withBound(field: "min" | "max", raw: string): void {
@@ -289,45 +449,89 @@ function SchemaKeyRow({ name, schema, onRename, onReplace, onRemove }: {
   }
 
   return (
-    <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
-                  margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
-        <input style={{ ...S.field, flex: 1 }} placeholder="key name"
+    <div
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        borderRadius: 4,
+        padding: "6px 8px",
+        margin: "0 10px 6px",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="key name"
           value={nameStr}
-          onChange={e => setNameStr(e.target.value)}
+          onChange={(e) => setNameStr(e.target.value)}
           onBlur={() => onRename(nameStr)}
         />
-        <select style={{ ...S.select, flex: "0 0 84px" }} value={schema.type}
-          onChange={e => onReplace({ ...schema, type: e.target.value as StateSchema["type"] })}
+        <select
+          style={{ ...S.select, flex: "0 0 84px" }}
+          value={schema.type}
+          onChange={(e) =>
+            onReplace({
+              ...schema,
+              type: e.target.value as StateSchema["type"],
+            })
+          }
         >
-          {(["number","boolean","string","object"] as const).map(t => <option key={t} value={t}>{t}</option>)}
+          {(["number", "boolean", "string", "object"] as const).map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
-        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+        <button
+          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          onClick={onRemove}
+        >
+          ×
+        </button>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
         {schema.type === "boolean" ? (
-          <select style={{ ...S.select, flex: 1 }} value={String(schema.default ?? false)}
-            onChange={e => onReplace({ ...schema, default: e.target.value === "true" })}
+          <select
+            style={{ ...S.select, flex: 1 }}
+            value={String(schema.default ?? false)}
+            onChange={(e) =>
+              onReplace({ ...schema, default: e.target.value === "true" })
+            }
           >
             <option value="false">default: false</option>
             <option value="true">default: true</option>
           </select>
         ) : (
-          <input style={{ ...S.field, flex: 1 }} placeholder="default"
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="default"
             type={isNum ? "number" : "text"}
             value={schema.default == null ? "" : String(schema.default)}
-            onChange={e => commitDefault(e.target.value)}
+            onChange={(e) => commitDefault(e.target.value)}
           />
         )}
         {isNum && (
           <>
-            <input type="number" style={{ ...S.field, flex: "0 0 56px" }} placeholder="min"
+            <input
+              type="number"
+              style={{ ...S.field, flex: "0 0 56px" }}
+              placeholder="min"
               value={schema.min ?? ""}
-              onChange={e => withBound("min", e.target.value)}
+              onChange={(e) => withBound("min", e.target.value)}
             />
-            <input type="number" style={{ ...S.field, flex: "0 0 56px" }} placeholder="max"
+            <input
+              type="number"
+              style={{ ...S.field, flex: "0 0 56px" }}
+              placeholder="max"
               value={schema.max ?? ""}
-              onChange={e => withBound("max", e.target.value)}
+              onChange={(e) => withBound("max", e.target.value)}
             />
           </>
         )}
@@ -338,43 +542,67 @@ function SchemaKeyRow({ name, schema, onRename, onReplace, onRemove }: {
 
 // ── ScriptList ────────────────────────────────────────────────────────────────
 
-function ScriptList({ scripts, onSelect, onToggle, onAdd }: {
+function ScriptList({
+  scripts,
+  onSelect,
+  onToggle,
+  onAdd,
+}: {
   scripts: ScriptDef[];
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
-  onAdd:    () => void;
+  onAdd: () => void;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", padding: "6px 10px", flexShrink: 0 }}>
-        <button style={S.btn(true)} onClick={onAdd}>+ New</button>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "6px 10px",
+          flexShrink: 0,
+        }}
+      >
+        <button style={S.btn(true)} onClick={onAdd}>
+          + New
+        </button>
       </div>
       <div style={S.scroll}>
         {scripts.length === 0 && (
-          <div style={{ color: "#555", fontSize: 11, padding: "16px 12px", textAlign: "center" }}>
+          <div
+            style={{
+              color: "#555",
+              fontSize: 11,
+              padding: "16px 12px",
+              textAlign: "center",
+            }}
+          >
             No scripts yet
           </div>
         )}
-        {scripts.map(s => (
-          <div
-            key={s.id}
-            style={{ ...S.row }}
-            onClick={() => onSelect(s.id)}
-          >
+        {scripts.map((s) => (
+          <div key={s.id} style={{ ...S.row }} onClick={() => onSelect(s.id)}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={S.label}>{s.label}</div>
               <div style={S.sub}>
                 {s.trigger.type}
-                {s.conditions.length > 0 ? ` · ${s.conditions.length} cond` : ""}
+                {s.conditions.length > 0
+                  ? ` · ${s.conditions.length} cond`
+                  : ""}
                 {` · ${s.actions.length} action${s.actions.length !== 1 ? "s" : ""}`}
               </div>
             </div>
             <div
               style={S.badge(s.enabled)}
               title={s.enabled ? "Enabled" : "Disabled"}
-              onClick={e => { e.stopPropagation(); onToggle(s.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle(s.id);
+              }}
             />
-            <span style={{ color: "#444", marginLeft: 8, fontSize: 13 }}>›</span>
+            <span style={{ color: "#444", marginLeft: 8, fontSize: 13 }}>
+              ›
+            </span>
           </div>
         ))}
       </div>
@@ -384,15 +612,26 @@ function ScriptList({ scripts, onSelect, onToggle, onAdd }: {
 
 // ── ScriptEditor ──────────────────────────────────────────────────────────────
 
-function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, ownerIsEntity, selectedObjectId, onBack, onChange, onDelete }: {
-  script:           ScriptDef;
-  triggerVolumes:   TriggerVolume[];
-  zoneObjects:      WorldObject[];
-  groups:           GroupDef[];
-  assets:           AssetDef[];
-  ownerIsEntity:    boolean;
+function ScriptEditor({
+  script,
+  triggerVolumes,
+  zoneObjects,
+  groups,
+  assets,
+  ownerIsEntity,
+  selectedObjectId,
+  onBack,
+  onChange,
+  onDelete,
+}: {
+  script: ScriptDef;
+  triggerVolumes: TriggerVolume[];
+  zoneObjects: WorldObject[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  ownerIsEntity: boolean;
   selectedObjectId: string | null;
-  onBack:   () => void;
+  onBack: () => void;
   onChange: (s: ScriptDef) => void;
   onDelete: () => void;
 }) {
@@ -404,21 +643,38 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
     onChange({ ...script, trigger: { ...script.trigger, ...changes } });
   }
 
-  const needsTarget = (
+  const needsTarget =
     script.trigger.type === "on_player_enter" ||
-    script.trigger.type === "on_player_exit"  ||
-    script.trigger.type === "on_interact"      ||
-    script.trigger.type === "on_state_changed"
-  );
+    script.trigger.type === "on_player_exit" ||
+    script.trigger.type === "on_interact" ||
+    script.trigger.type === "on_state_changed";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px",
-                    borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
-        <button style={{ ...S.btn(), padding: "3px 8px" }} onClick={onBack}>←</button>
-        <span style={{ color: "#c0c0c0", fontSize: 12, flex: 1, overflow: "hidden",
-                       textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 10px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          flexShrink: 0,
+        }}
+      >
+        <button style={{ ...S.btn(), padding: "3px 8px" }} onClick={onBack}>
+          ←
+        </button>
+        <span
+          style={{
+            color: "#c0c0c0",
+            fontSize: 12,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           {script.label || "Script"}
         </span>
       </div>
@@ -430,7 +686,7 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
           <input
             style={S.field}
             value={script.label}
-            onChange={e => set("label", e.target.value)}
+            onChange={(e) => set("label", e.target.value)}
           />
         </div>
 
@@ -440,9 +696,18 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
           <select
             style={{ ...S.select, marginBottom: 4 }}
             value={script.trigger.type}
-            onChange={e => setTrigger({ type: e.target.value as TriggerType, targetId: undefined })}
+            onChange={(e) =>
+              setTrigger({
+                type: e.target.value as TriggerType,
+                targetId: undefined,
+              })
+            }
           >
-            {TRIGGER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            {TRIGGER_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
           </select>
 
           {needsTarget && !ownerIsEntity && (
@@ -451,12 +716,21 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
               targetId={script.trigger.targetId ?? ""}
               triggerVolumes={triggerVolumes}
               zoneObjects={zoneObjects}
-              onChange={id => setTrigger({ targetId: id })}
+              onChange={(id) => setTrigger({ targetId: id })}
             />
           )}
           {needsTarget && ownerIsEntity && (
-            <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0" }}>
-              Target: this {selectedObjectId?.startsWith("vol_") ? "volume" : "object"} (implicit)
+            <div
+              style={{
+                color: "#555",
+                fontSize: 10,
+                fontStyle: "italic",
+                padding: "4px 0",
+              }}
+            >
+              Target: this{" "}
+              {selectedObjectId?.startsWith("vol_") ? "volume" : "object"}{" "}
+              (implicit)
             </div>
           )}
 
@@ -466,28 +740,48 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
               style={{ ...S.field, marginTop: 4 }}
               placeholder="Interval (seconds)"
               value={script.trigger.interval ?? ""}
-              onChange={e => setTrigger({ interval: parseFloat(e.target.value) || 1 })}
+              onChange={(e) =>
+                setTrigger({ interval: parseFloat(e.target.value) || 1 })
+              }
             />
           )}
 
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                color: "#888",
+                fontSize: 11,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={script.oneShot}
-                onChange={e => set("oneShot", e.target.checked)}
+                onChange={(e) => set("oneShot", e.target.checked)}
               />
               One-shot
             </label>
             <div style={{ flex: 1 }} />
-            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                color: "#888",
+                fontSize: 11,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               Delay (s)
               <input
                 type="number"
                 style={{ ...S.field, width: 52 }}
                 value={script.trigger.delay ?? ""}
                 placeholder="0"
-                onChange={e => setTrigger({ delay: parseFloat(e.target.value) || undefined })}
+                onChange={(e) =>
+                  setTrigger({ delay: parseFloat(e.target.value) || undefined })
+                }
               />
             </label>
           </div>
@@ -497,13 +791,24 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
 
         {/* Conditions */}
         <div style={{ padding: "0 12px 8px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={S.sectionLabel as React.CSSProperties}>Conditions</span>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={S.sectionLabel as React.CSSProperties}>
+              Conditions
+            </span>
             <button
               style={{ ...S.btn(), fontSize: 10 }}
-              onClick={() => set("conditions", [...script.conditions,
-                { type: "has_state" } as ScriptCondition,
-              ])}
+              onClick={() =>
+                set("conditions", [
+                  ...script.conditions,
+                  { type: "has_state" } as ScriptCondition,
+                ])
+              }
             >
               + Add
             </button>
@@ -512,12 +817,24 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
             <ConditionRow
               key={i}
               condition={c}
-              onChange={nc => set("conditions", script.conditions.map((x, j) => j === i ? nc : x))}
-              onRemove={() => set("conditions", script.conditions.filter((_, j) => j !== i))}
+              onChange={(nc) =>
+                set(
+                  "conditions",
+                  script.conditions.map((x, j) => (j === i ? nc : x)),
+                )
+              }
+              onRemove={() =>
+                set(
+                  "conditions",
+                  script.conditions.filter((_, j) => j !== i),
+                )
+              }
             />
           ))}
           {script.conditions.length === 0 && (
-            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>(none)</div>
+            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+              (none)
+            </div>
           )}
         </div>
 
@@ -525,13 +842,22 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
 
         {/* Actions */}
         <div style={{ padding: "0 12px 8px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <span style={S.sectionLabel as React.CSSProperties}>Actions</span>
             <button
               style={{ ...S.btn(), fontSize: 10 }}
-              onClick={() => set("actions", [...script.actions,
-                { type: "set_state" } as ScriptAction,
-              ])}
+              onClick={() =>
+                set("actions", [
+                  ...script.actions,
+                  { type: "set_state" } as ScriptAction,
+                ])
+              }
             >
               + Add
             </button>
@@ -543,12 +869,24 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
               zoneObjects={zoneObjects}
               groups={groups}
               assets={assets}
-              onChange={na => set("actions", script.actions.map((x, j) => j === i ? na : x))}
-              onRemove={() => set("actions", script.actions.filter((_, j) => j !== i))}
+              onChange={(na) =>
+                set(
+                  "actions",
+                  script.actions.map((x, j) => (j === i ? na : x)),
+                )
+              }
+              onRemove={() =>
+                set(
+                  "actions",
+                  script.actions.filter((_, j) => j !== i),
+                )
+              }
             />
           ))}
           {script.actions.length === 0 && (
-            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>(none)</div>
+            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+              (none)
+            </div>
           )}
         </div>
 
@@ -564,7 +902,9 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
           </button>
           <button
             style={{ ...S.btn(), color: "#cc6666" }}
-            onClick={() => { if (confirm("Delete this script?")) onDelete(); }}
+            onClick={() => {
+              if (confirm("Delete this script?")) onDelete();
+            }}
           >
             Delete
           </button>
@@ -576,26 +916,48 @@ function ScriptEditor({ script, triggerVolumes, zoneObjects, groups, assets, own
 
 // ── TargetPicker ──────────────────────────────────────────────────────────────
 
-function TargetPicker({ triggerType, targetId, triggerVolumes, zoneObjects, onChange }: {
-  triggerType:    TriggerType;
-  targetId:       string;
+function TargetPicker({
+  triggerType,
+  targetId,
+  triggerVolumes,
+  zoneObjects,
+  onChange,
+}: {
+  triggerType: TriggerType;
+  targetId: string;
   triggerVolumes: TriggerVolume[];
-  zoneObjects:    WorldObject[];
-  onChange:       (id: string) => void;
+  zoneObjects: WorldObject[];
+  onChange: (id: string) => void;
 }) {
   if (triggerType === "on_player_enter" || triggerType === "on_player_exit") {
     return (
-      <select style={S.select} value={targetId} onChange={e => onChange(e.target.value)}>
+      <select
+        style={S.select}
+        value={targetId}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="">— pick trigger volume —</option>
-        {triggerVolumes.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+        {triggerVolumes.map((v) => (
+          <option key={v.id} value={v.id}>
+            {v.label}
+          </option>
+        ))}
       </select>
     );
   }
   if (triggerType === "on_interact") {
     return (
-      <select style={S.select} value={targetId} onChange={e => onChange(e.target.value)}>
+      <select
+        style={S.select}
+        value={targetId}
+        onChange={(e) => onChange(e.target.value)}
+      >
         <option value="">— pick object —</option>
-        {zoneObjects.map(o => <option key={o.id} value={o.id}>{o.assetId} ({o.id.slice(0,8)})</option>)}
+        {zoneObjects.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.assetId} ({o.id.slice(0, 8)})
+          </option>
+        ))}
       </select>
     );
   }
@@ -603,9 +965,13 @@ function TargetPicker({ triggerType, targetId, triggerVolumes, zoneObjects, onCh
   return (
     <input
       style={S.field}
-      placeholder={triggerType === "on_state_changed" ? "State key (e.g. health)" : "Target ID"}
+      placeholder={
+        triggerType === "on_state_changed"
+          ? "State key (e.g. health)"
+          : "Target ID"
+      }
       value={targetId}
-      onChange={e => onChange(e.target.value)}
+      onChange={(e) => onChange(e.target.value)}
     />
   );
 }
@@ -613,54 +979,87 @@ function TargetPicker({ triggerType, targetId, triggerVolumes, zoneObjects, onCh
 // ── ActionTargetPicker ──────────────────────────────────────────────────────────
 // Dropdown of the zone's groups + objects for action targets (despawn/move/etc).
 // A group target fans out to all members at dispatch (ScriptEngine._resolveTargets).
-function ActionTargetPicker({ targetId, zoneObjects, groups, onChange }: {
-  targetId:    string;
+function ActionTargetPicker({
+  targetId,
+  zoneObjects,
+  groups,
+  onChange,
+}: {
+  targetId: string;
   zoneObjects: WorldObject[];
-  groups:      GroupDef[];
-  onChange:    (id: string) => void;
+  groups: GroupDef[];
+  onChange: (id: string) => void;
 }) {
-  const known = groups.some(g => g.id === targetId) || zoneObjects.some(o => o.id === targetId);
+  const known =
+    groups.some((g) => g.id === targetId) ||
+    zoneObjects.some((o) => o.id === targetId);
   return (
-    <select style={S.select} value={targetId} onChange={e => onChange(e.target.value)}>
+    <select
+      style={S.select}
+      value={targetId}
+      onChange={(e) => onChange(e.target.value)}
+    >
       <option value="">— pick target —</option>
       {groups.length > 0 && (
         <optgroup label="Groups">
-          {groups.map(g => <option key={g.id} value={g.id}>▦ {g.name}</option>)}
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              ▦ {g.name}
+            </option>
+          ))}
         </optgroup>
       )}
       {zoneObjects.length > 0 && (
         <optgroup label="Objects">
-          {zoneObjects.map(o => <option key={o.id} value={o.id}>{o.label || o.assetId} ({o.id.slice(0,8)})</option>)}
+          {zoneObjects.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label || o.assetId} ({o.id.slice(0, 8)})
+            </option>
+          ))}
         </optgroup>
       )}
       {/* Preserve a hand-entered / cross-zone id that isn't in either list */}
-      {targetId && !known && <option value={targetId}>{targetId} (custom)</option>}
+      {targetId && !known && (
+        <option value={targetId}>{targetId} (custom)</option>
+      )}
     </select>
   );
 }
 
 // ── ConditionRow ──────────────────────────────────────────────────────────────
 
-function ConditionRow({ condition, onChange, onRemove }: {
+function ConditionRow({
+  condition,
+  onChange,
+  onRemove,
+}: {
   condition: ScriptCondition;
-  onChange:  (c: ScriptCondition) => void;
-  onRemove:  () => void;
+  onChange: (c: ScriptCondition) => void;
+  onRemove: () => void;
 }) {
   return (
-    <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
+    <div
+      style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}
+    >
       <select
         style={{ ...S.select, flex: "0 0 120px" }}
         value={condition.type}
-        onChange={e => onChange({ ...condition, type: e.target.value as ConditionType })}
+        onChange={(e) =>
+          onChange({ ...condition, type: e.target.value as ConditionType })
+        }
       >
-        {CONDITION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        {CONDITION_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
       </select>
       {condition.type === "has_state" && (
         <input
           style={{ ...S.field, flex: 1 }}
           placeholder="state key"
           value={condition.stateKey ?? ""}
-          onChange={e => onChange({ ...condition, stateKey: e.target.value })}
+          onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
         />
       )}
       {condition.type === "compare_number" && (
@@ -669,109 +1068,205 @@ function ConditionRow({ condition, onChange, onRemove }: {
             style={{ ...S.field, flex: 1 }}
             placeholder="state key"
             value={condition.stateKey ?? ""}
-            onChange={e => onChange({ ...condition, stateKey: e.target.value })}
+            onChange={(e) =>
+              onChange({ ...condition, stateKey: e.target.value })
+            }
           />
           <select
             style={{ ...S.select, flex: "0 0 56px" }}
             value={condition.compareOp ?? ">="}
-            onChange={e => onChange({ ...condition, compareOp: e.target.value as CompareOp })}
+            onChange={(e) =>
+              onChange({ ...condition, compareOp: e.target.value as CompareOp })
+            }
           >
-            {COMPARE_OPS.map(op => <option key={op} value={op}>{op}</option>)}
+            {COMPARE_OPS.map((op) => (
+              <option key={op} value={op}>
+                {op}
+              </option>
+            ))}
           </select>
           <input
             type="number"
             style={{ ...S.field, flex: "0 0 64px" }}
             placeholder="value"
-            value={typeof condition.stateValue === "number" ? condition.stateValue : ""}
-            onChange={e => onChange({ ...condition, stateValue: parseFloat(e.target.value) || 0 })}
+            value={
+              typeof condition.stateValue === "number"
+                ? condition.stateValue
+                : ""
+            }
+            onChange={(e) =>
+              onChange({
+                ...condition,
+                stateValue: parseFloat(e.target.value) || 0,
+              })
+            }
           />
         </>
       )}
-      <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+      <button
+        style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+        onClick={onRemove}
+      >
+        ×
+      </button>
     </div>
   );
 }
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
 
-function ActionRow({ action, zoneObjects, groups, assets, onChange, onRemove }: {
-  action:      ScriptAction;
+function ActionRow({
+  action,
+  zoneObjects,
+  groups,
+  assets,
+  onChange,
+  onRemove,
+}: {
+  action: ScriptAction;
   zoneObjects: WorldObject[];
-  groups:      GroupDef[];
-  assets:      AssetDef[];
-  onChange:    (a: ScriptAction) => void;
-  onRemove:    () => void;
+  groups: GroupDef[];
+  assets: AssetDef[];
+  onChange: (a: ScriptAction) => void;
+  onRemove: () => void;
 }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
-                  marginBottom: 6, border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+    <div
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        borderRadius: 4,
+        padding: "6px 8px",
+        marginBottom: 6,
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
         <select
           style={{ ...S.select, flex: 1 }}
           value={action.type}
-          onChange={e => onChange({ type: e.target.value as ActionType })}
+          onChange={(e) => onChange({ type: e.target.value as ActionType })}
         >
-          {ACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          {[...ACTION_TYPES].sort().map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
-        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+        <button
+          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          onClick={onRemove}
+        >
+          ×
+        </button>
       </div>
-      <ActionFields action={action} zoneObjects={zoneObjects} groups={groups} assets={assets} onChange={onChange} />
+      <ActionFields
+        action={action}
+        zoneObjects={zoneObjects}
+        groups={groups}
+        assets={assets}
+        onChange={onChange}
+      />
     </div>
   );
 }
 
-function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
-  action:      ScriptAction;
+function ActionFields({
+  action,
+  zoneObjects,
+  groups,
+  assets,
+  onChange,
+}: {
+  action: ScriptAction;
   zoneObjects: WorldObject[];
-  groups:      GroupDef[];
-  assets:      AssetDef[];
-  onChange:    (a: ScriptAction) => void;
+  groups: GroupDef[];
+  assets: AssetDef[];
+  onChange: (a: ScriptAction) => void;
 }) {
-  function set(changes: Partial<ScriptAction>): void { onChange({ ...action, ...changes }); }
+  function set(changes: Partial<ScriptAction>): void {
+    onChange({ ...action, ...changes });
+  }
   const targetPicker = (
-    <ActionTargetPicker targetId={action.targetId ?? ""} zoneObjects={zoneObjects} groups={groups}
-      onChange={id => set({ targetId: id })} />
+    <ActionTargetPicker
+      targetId={action.targetId ?? ""}
+      zoneObjects={zoneObjects}
+      groups={groups}
+      onChange={(id) => set({ targetId: id })}
+    />
   );
   // Clips available on the action's target object (empty for groups / unknown / no-anim assets).
-  const targetObj  = zoneObjects.find(o => o.id === action.targetId);
-  const targetClips = assets.find(a => a.id === targetObj?.assetId)?.animations ?? [];
+  const targetObj = zoneObjects.find((o) => o.id === action.targetId);
+  const targetClips =
+    assets.find((a) => a.id === targetObj?.assetId)?.animations ?? [];
 
   switch (action.type) {
     case "show_dialogue":
       return (
         <>
-          <input style={{ ...S.field, marginBottom: 4 }}
+          <input
+            style={{ ...S.field, marginBottom: 4 }}
             placeholder="Speaker name"
             value={action.dialogue?.speaker ?? ""}
-            onChange={e => set({ dialogue: { ...action.dialogue, speaker: e.target.value, lines: action.dialogue?.lines ?? [] } })}
+            onChange={(e) =>
+              set({
+                dialogue: {
+                  ...action.dialogue,
+                  speaker: e.target.value,
+                  lines: action.dialogue?.lines ?? [],
+                },
+              })
+            }
           />
           <textarea
             style={{ ...S.field, height: 60, resize: "vertical" }}
             placeholder="Lines (one per line)"
             value={action.dialogue?.lines.join("\n") ?? ""}
-            onChange={e => set({ dialogue: { ...action.dialogue, speaker: action.dialogue?.speaker ?? "", lines: e.target.value.split("\n") } })}
+            onChange={(e) =>
+              set({
+                dialogue: {
+                  ...action.dialogue,
+                  speaker: action.dialogue?.speaker ?? "",
+                  lines: e.target.value.split("\n"),
+                },
+              })
+            }
           />
         </>
       );
 
     case "play_sound":
       return (
-        <input style={S.field} placeholder="Sound asset ID"
+        <input
+          style={S.field}
+          placeholder="Sound asset ID"
           value={action.sound ?? ""}
-          onChange={e => set({ sound: e.target.value })}
+          onChange={(e) => set({ sound: e.target.value })}
         />
       );
 
     case "set_state":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input style={{ ...S.field, flex: 1 }} placeholder="State key"
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="State key"
             value={action.stateKey ?? ""}
-            onChange={e => set({ stateKey: e.target.value })}
+            onChange={(e) => set({ stateKey: e.target.value })}
           />
-          <input style={{ ...S.field, flex: 1 }} placeholder="value (true / 100 / text)"
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="value (true / 100 / text)"
             value={action.stateValue == null ? "" : String(action.stateValue)}
-            onChange={e => set({ stateValue: coerceStateValue(e.target.value) })}
+            onChange={(e) =>
+              set({ stateValue: coerceStateValue(e.target.value) })
+            }
           />
         </div>
       );
@@ -779,22 +1274,31 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
     case "adjust_number":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input style={{ ...S.field, flex: 1 }} placeholder="State key (e.g. health)"
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="State key (e.g. health)"
             value={action.stateKey ?? ""}
-            onChange={e => set({ stateKey: e.target.value })}
+            onChange={(e) => set({ stateKey: e.target.value })}
           />
-          <input type="number" style={{ ...S.field, flex: "0 0 72px" }} placeholder="±delta"
+          <input
+            type="number"
+            style={{ ...S.field, flex: "0 0 72px" }}
+            placeholder="±delta"
             value={action.numberDelta ?? ""}
-            onChange={e => set({ numberDelta: parseFloat(e.target.value) || 0 })}
+            onChange={(e) =>
+              set({ numberDelta: parseFloat(e.target.value) || 0 })
+            }
           />
         </div>
       );
 
     case "delete_state":
       return (
-        <input style={S.field} placeholder="State key"
+        <input
+          style={S.field}
+          placeholder="State key"
           value={action.stateKey ?? ""}
-          onChange={e => set({ stateKey: e.target.value })}
+          onChange={(e) => set({ stateKey: e.target.value })}
         />
       );
 
@@ -802,12 +1306,20 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
       const src = action.posSource ?? "player";
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <input style={S.field} placeholder="Store into state key (e.g. checkpoint)"
+          <input
+            style={S.field}
+            placeholder="State key (e.g. checkpoint)"
             value={action.stateKey ?? ""}
-            onChange={e => set({ stateKey: e.target.value })}
+            onChange={(e) => set({ stateKey: e.target.value })}
           />
-          <select style={S.select} value={src}
-            onChange={e => set({ posSource: e.target.value as "player" | "object" | "coords" })}
+          <select
+            style={S.select}
+            value={src}
+            onChange={(e) =>
+              set({
+                posSource: e.target.value as "player" | "object" | "coords",
+              })
+            }
           >
             <option value="player">Source: player position</option>
             <option value="object">Source: object position</option>
@@ -816,15 +1328,39 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
           {src === "object" && targetPicker}
           {src === "coords" && (
             <div style={{ display: "flex", gap: 4 }}>
-              {(["x","y","z"] as const).map(ax => (
-                <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+              {(["x", "y", "z"] as const).map((ax) => (
+                <input
+                  key={ax}
+                  type="number"
+                  style={{ ...S.field, flex: 1 }}
+                  placeholder={ax}
                   value={action.position?.[ax] ?? ""}
-                  onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+                  onChange={(e) =>
+                    set({
+                      position: {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        ...action.position,
+                        [ax]: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
                 />
               ))}
-              <input type="number" style={{ ...S.field, flex: "0 0 64px" }} placeholder="facing°"
+              <input
+                type="number"
+                style={{ ...S.field, flex: "0 0 64px" }}
+                placeholder="facing°"
                 value={action.facing ?? ""}
-                onChange={e => set({ facing: e.target.value === "" ? undefined : (parseFloat(e.target.value)||0) })}
+                onChange={(e) =>
+                  set({
+                    facing:
+                      e.target.value === ""
+                        ? undefined
+                        : parseFloat(e.target.value) || 0,
+                  })
+                }
               />
             </div>
           )}
@@ -834,9 +1370,11 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
 
     case "fire_event":
       return (
-        <input style={S.field} placeholder="Event ID"
+        <input
+          style={S.field}
+          placeholder="Event ID"
           value={action.eventId ?? ""}
-          onChange={e => set({ eventId: e.target.value })}
+          onChange={(e) => set({ eventId: e.target.value })}
         />
       );
 
@@ -850,10 +1388,24 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {targetPicker}
           <div style={{ display: "flex", gap: 4 }}>
-            {(["x","y","z"] as const).map(ax => (
-              <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+            {(["x", "y", "z"] as const).map((ax) => (
+              <input
+                key={ax}
+                type="number"
+                style={{ ...S.field, flex: 1 }}
+                placeholder={ax}
                 value={action.position?.[ax] ?? ""}
-                onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+                onChange={(e) =>
+                  set({
+                    position: {
+                      x: 0,
+                      y: 0,
+                      z: 0,
+                      ...action.position,
+                      [ax]: parseFloat(e.target.value) || 0,
+                    },
+                  })
+                }
               />
             ))}
           </div>
@@ -866,44 +1418,90 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {targetPicker}
           {targetClips.length > 0 ? (
-            <select style={S.select} value={action.animation ?? ""} onChange={e => set({ animation: e.target.value })}>
+            <select
+              style={S.select}
+              value={action.animation ?? ""}
+              onChange={(e) => set({ animation: e.target.value })}
+            >
               <option value="">— pick clip —</option>
-              {targetClips.map(c => <option key={c} value={c}>{c}</option>)}
-              {action.animation && !clipKnown && <option value={action.animation}>{action.animation} (custom)</option>}
+              {targetClips.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              {action.animation && !clipKnown && (
+                <option value={action.animation}>
+                  {action.animation} (custom)
+                </option>
+              )}
             </select>
           ) : (
-            <input style={S.field} placeholder={targetObj ? "Clip name (no clips found on asset)" : "Clip name (pick an object target for a list)"}
+            <input
+              style={S.field}
+              placeholder={
+                targetObj
+                  ? "Clip name (no clips found on asset)"
+                  : "Clip name (pick an object target for a list)"
+              }
               value={action.animation ?? ""}
-              onChange={e => set({ animation: e.target.value })}
+              onChange={(e) => set({ animation: e.target.value })}
             />
           )}
           <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
-            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                color: "#888",
+                fontSize: 11,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={action.animationLoop ?? false}
-                onChange={e => set({ animationLoop: e.target.checked })}
+                onChange={(e) => set({ animationLoop: e.target.checked })}
               />
               Loop
             </label>
-            <label style={{ color: action.animationLoop ? "#555" : "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                color: action.animationLoop ? "#555" : "#888",
+                fontSize: 11,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               <input
                 type="checkbox"
                 disabled={action.animationLoop ?? false}
                 checked={action.animationHold ?? false}
-                onChange={e => set({ animationHold: e.target.checked })}
+                onChange={(e) => set({ animationHold: e.target.checked })}
               />
               Hold at end
             </label>
             <div style={{ flex: 1 }} />
-            <label style={{ color: "#888", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+            <label
+              style={{
+                color: "#888",
+                fontSize: 11,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
               Blend (s)
               <input
                 type="number"
                 style={{ ...S.field, width: 52 }}
                 placeholder="0.3"
                 value={action.animationBlend ?? ""}
-                onChange={e => set({ animationBlend: parseFloat(e.target.value) || undefined })}
+                onChange={(e) =>
+                  set({
+                    animationBlend: parseFloat(e.target.value) || undefined,
+                  })
+                }
               />
             </label>
           </div>
@@ -915,9 +1513,11 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {targetPicker}
-          <input style={S.field} placeholder="Material ID"
+          <input
+            style={S.field}
+            placeholder="Material ID"
             value={action.material ?? ""}
-            onChange={e => set({ material: e.target.value })}
+            onChange={(e) => set({ material: e.target.value })}
           />
         </div>
       );
@@ -929,45 +1529,77 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
           <select
             style={S.select}
             value={fromKey ? "key" : "literal"}
-            onChange={e => e.target.value === "key"
-              ? set({ positionKey: action.positionKey ?? "", position: undefined })
-              : set({ positionKey: undefined })}
+            onChange={(e) =>
+              e.target.value === "key"
+                ? set({
+                    positionKey: action.positionKey ?? "",
+                    position: undefined,
+                  })
+                : set({ positionKey: undefined })
+            }
           >
             <option value="literal">Destination: literal x/y/z</option>
             <option value="key">Destination: from state key</option>
           </select>
           {fromKey ? (
-            <input style={S.field} placeholder="State key (e.g. checkpoint)"
+            <input
+              style={S.field}
+              placeholder="State key (e.g. checkpoint)"
               value={action.positionKey ?? ""}
-              onChange={e => set({ positionKey: e.target.value })}
+              onChange={(e) => set({ positionKey: e.target.value })}
             />
           ) : (
             <div style={{ display: "flex", gap: 4 }}>
-              {(["x","y","z"] as const).map(ax => (
-                <input key={ax} type="number" style={{ ...S.field, flex: 1 }} placeholder={ax}
+              {(["x", "y", "z"] as const).map((ax) => (
+                <input
+                  key={ax}
+                  type="number"
+                  style={{ ...S.field, flex: 1 }}
+                  placeholder={ax}
                   value={action.position?.[ax] ?? ""}
-                  onChange={e => set({ position: { x:0,y:0,z:0, ...action.position, [ax]: parseFloat(e.target.value)||0 } })}
+                  onChange={(e) =>
+                    set({
+                      position: {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        ...action.position,
+                        [ax]: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
                 />
               ))}
             </div>
           )}
-          <select style={S.select} value={action.facingSource ?? "keep"}
-            onChange={e => set({ facingSource: e.target.value as "keep" | "literal" | "key" })}
+          <select
+            style={S.select}
+            value={action.facingSource ?? "keep"}
+            onChange={(e) =>
+              set({
+                facingSource: e.target.value as "keep" | "literal" | "key",
+              })
+            }
           >
             <option value="keep">Facing: keep current</option>
             <option value="literal">Facing: set to (deg)</option>
             <option value="key">Facing: from state key</option>
           </select>
           {action.facingSource === "literal" && (
-            <input type="number" style={S.field} placeholder="facing degrees"
+            <input
+              type="number"
+              style={S.field}
+              placeholder="facing degrees"
               value={action.facing ?? ""}
-              onChange={e => set({ facing: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => set({ facing: parseFloat(e.target.value) || 0 })}
             />
           )}
           {action.facingSource === "key" && (
-            <input style={S.field} placeholder="facing state key (number, or a stored pose)"
+            <input
+              style={S.field}
+              placeholder="facing state key (number, or a stored pose)"
               value={action.facingKey ?? ""}
-              onChange={e => set({ facingKey: e.target.value })}
+              onChange={(e) => set({ facingKey: e.target.value })}
             />
           )}
         </div>
@@ -977,37 +1609,54 @@ function ActionFields({ action, zoneObjects, groups, assets, onChange }: {
     case "fade_screen":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input style={{ ...S.field, flex: 1 }} placeholder="Color (#000)"
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="Color (#000)"
             value={action.fadeColor ?? ""}
-            onChange={e => set({ fadeColor: e.target.value })}
+            onChange={(e) => set({ fadeColor: e.target.value })}
           />
-          <input type="number" style={{ ...S.field, width: 60 }} placeholder="sec"
+          <input
+            type="number"
+            style={{ ...S.field, width: 60 }}
+            placeholder="sec"
             value={action.fadeDuration ?? ""}
-            onChange={e => set({ fadeDuration: parseFloat(e.target.value)||0.3 })}
+            onChange={(e) =>
+              set({ fadeDuration: parseFloat(e.target.value) || 0.3 })
+            }
           />
         </div>
       );
 
     case "show_ui":
       return (
-        <input style={S.field} placeholder="UI element ID"
+        <input
+          style={S.field}
+          placeholder="UI element ID"
           value={action.uiElementId ?? ""}
-          onChange={e => set({ uiElementId: e.target.value })}
+          onChange={(e) => set({ uiElementId: e.target.value })}
         />
       );
 
     case "run_script":
       return (
         <textarea
-          style={{ ...S.field, height: 80, resize: "vertical", fontFamily: "monospace", fontSize: 10 }}
+          style={{
+            ...S.field,
+            height: 80,
+            resize: "vertical",
+            fontFamily: "monospace",
+            fontSize: 10,
+          }}
           placeholder="// JS — ctx.get('k'), ctx.set('k',v), ctx.has('k'), ctx.adjust('k',n)"
           value={action.script ?? ""}
-          onChange={e => set({ script: e.target.value })}
+          onChange={(e) => set({ script: e.target.value })}
         />
       );
 
     case "spawn_npc":
-      return <div style={{ color: "#666", fontSize: 10 }}>spawn_npc — Phase 13</div>;
+      return (
+        <div style={{ color: "#666", fontSize: 10 }}>spawn_npc — Phase 13</div>
+      );
 
     default:
       return null;

@@ -279,6 +279,48 @@ so the user's level remains exactly as it was before the test session.
   layer, so to confirm the *panel* actually writes the field, also exercise the real
   click→input path at least once (select the entity, edit in the PropertiesPanel).
 
+### Real clicks via `computer left_click`: coordinate scaling + stale camera reads
+
+> Learned in the 2026-07-03 trigger-volume-occlusion session — three separate gotchas
+> stacked and each made the other harder to diagnose.
+
+1. **`computer` tool coordinates are in *screenshot*-pixel space, not CSS-pixel space.**
+   A `screenshot` returns e.g. `1400x850`, but `canvas.getBoundingClientRect()` reports
+   the real CSS size (e.g. `1454x883` on a Retina display). The two differ by the
+   devicePixelRatio-driven capture scale. If you compute a target pixel from
+   `getBoundingClientRect()` / camera projection (CSS space) and hand it directly to
+   `left_click`, the actual click lands `rectWidth/screenshotWidth` too far out — silently,
+   with no error. **Always convert:** `compX = pageX * screenshotWidth / rect.width` (same
+   for Y) before clicking. Verify the calibration once per session with `hover` + an
+   `input:mousemove` bus listener — the reported `screenPos` must equal your intended
+   page-space target.
+2. **`document.hidden` can stay `true` even after a successful click** (OS-level window
+   visibility, separate from tab focus) — don't treat it as a signal that clicks will
+   fail. But if clicks/hovers produce **zero** DOM/bus events at all (not even
+   `input:mousemove`), call `window.focus()` on the page first, then retry. One `focus()`
+   call fixed a session where every click was silently swallowed.
+3. **`window.__camera` / `window.__scene` reads from the console can have a stale
+   `matrixWorld`.** Position/quaternion getters reflect live values (driving
+   `__editorCamera` moves them correctly), but `.matrixWorld` is only recomputed when
+   something calls `updateMatrixWorld()` — normally done every frame by
+   `renderer.render()`, but apparently not reliably reflected in time for an
+   out-of-band CDP read. Symptom: `new V(0,0,0).project(cam)` for a point you *know*
+   the camera is centered on returns wildly off-center NDC. Fix: call
+   `cam.updateMatrixWorld(true)` (and `scene.updateMatrixWorld(true)` before manually
+   raycasting against scene meshes) immediately before projecting/raycasting from a
+   `javascript_tool` snippet.
+4. **To replicate a module's internal raycast logic from the console**, `THREE` isn't a
+   page global, but you can dynamic-`import()` the exact chunk Vite serves it as, found
+   via `performance.getEntriesByType('resource')` filtered for `/three/`, e.g.
+   `await import("http://localhost:7373/node_modules/.vite/deps/three.js?v=<hash>")`.
+   This unlocks constructing a real `THREE.Raycaster`/`Box3`/etc. to debug picking math
+   step-by-step instead of guessing from black-box click outcomes.
+5. **A lingering `TransformControlsPlane` mesh has no `userData.editorType`.** Any
+   occlusion/picking logic that raycasts `scene.children` and treats "no recognized
+   editorType" as "not a blocker" will incorrectly get blocked by this invisible gizmo
+   drag-plane — it persists in the scene (visible: true) after a gizmo has ever attached,
+   long after deselecting. Filter occluders by `!!editorType`, not just an exclusion list.
+
 ### Driving the live *runtime* (preview / game): the StrictMode split-brain
 
 > Learned the hard way in the 2026-07-01 third-person session. This is the §3-step-3

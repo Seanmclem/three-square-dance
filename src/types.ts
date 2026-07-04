@@ -154,7 +154,7 @@ export interface BusEvents {
   "zone:enter":            { zoneId: string };
   "transition:added":      { transition: TransitionDef };
   "spawn:updated":         { position: Vec3 };
-  "preview:start":         { mode: "preview" | "game" };
+  "preview:start":         { mode: "preview" | "game"; resume?: boolean };
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };
   "gizmo:dragging":        { isDragging: boolean };

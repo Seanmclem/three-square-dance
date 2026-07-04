@@ -33,7 +33,6 @@ import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
-import { FpsCounter } from "@/ui/FpsCounter";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
@@ -322,7 +321,7 @@ export default function App() {
     const bumpMembership = () => setMembershipRev(v => v + 1);
 
     const unsub = [
-      bus.on("preview:start", ({ mode }) => {
+      bus.on("preview:start", ({ mode, resume }) => {
         setIsPreview(true);
         setIsGame(mode === "game");
         // Re-index from current world state — zone:activated fires at startup before
@@ -334,9 +333,10 @@ export default function App() {
         scriptEngine.activate();
         // Apply this level's authored state schema (defaults + clamps) before reset/restore.
         gameState.configureSchema(world.world?.stateSchema ?? DEFAULT_STATE_SCHEMA);
-        // Continue an existing game save if present, else start fresh. Must run after
-        // activate() (which clears fired one-shots) so a loaded save's progress survives.
-        if (!loadGame()) gameState.reset();
+        // Continue only when the launch explicitly asked to resume (Continue). New Game
+        // and Preview always start fresh — no silent auto-continue. loadGame must run after
+        // activate() (which clears fired one-shots) so a resumed save's progress survives.
+        if (resume && loadGame()) { /* resumed */ } else { gameState.reset(); }
         gameAutosaveTimer = setInterval(saveGame, 30_000);
       }),
       bus.on("preview:stop",  () => {
@@ -654,9 +654,19 @@ export default function App() {
     previewRef.current?.enter("preview");
   }, []);
 
-  const handleStartGame = useCallback((): void => {
-    previewRef.current?.enter("game");
+  const handleNewGame = useCallback((): void => {
+    previewRef.current?.enter("game", { resume: false });
     scriptEngineRef.current?.onGameStart();
+  }, []);
+
+  const handleContinue = useCallback((): void => {
+    previewRef.current?.enter("game", { resume: true });
+    scriptEngineRef.current?.onGameStart();
+  }, []);
+
+  // Fresh check each call (menu-open) — reflects saves written since last render.
+  const hasGameSave = useCallback((): boolean => {
+    try { return localStorage.getItem(GAMESAVE_KEY) !== null; } catch { return false; }
   }, []);
 
   const handlePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
@@ -1466,7 +1476,6 @@ export default function App() {
                  cursor: activeTool === "trigger-volume" ? "crosshair" : "default" }}
       />
 
-      <FpsCounter />
 
       {!isGame && <>
       <Toolbar
@@ -1475,7 +1484,9 @@ export default function App() {
         onToolSelect={handleToolSelect}
         onPanelToggle={handlePanelToggle}
         onPreview={handlePreviewEnter}
-        onStartGame={handleStartGame}
+        onNewGame={handleNewGame}
+        onContinue={handleContinue}
+        hasGameSave={hasGameSave}
         isPreview={isPreview}
       />
       <LeftPanel
