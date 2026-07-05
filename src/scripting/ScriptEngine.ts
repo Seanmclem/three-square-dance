@@ -347,13 +347,23 @@ export class ScriptEngine {
    * GroupDef resolves to every active-zone entity tagged with that group;
    * anything else is treated as a single entity id.
    */
-  /** Resolve an object id in the active zone to a { x,y,z,facing } pose (rotation.y is already degrees). */
+  /**
+   * Resolve an entity id in the active zone to a { x,y,z,facing } pose. Works for any
+   * entity type that carries a real `position` — objects, platforms, trigger volumes —
+   * not just model objects (facing is rotation.y in degrees, 0 when absent). Stairs /
+   * walls / floors are node- or segment-based with no single position, so they're skipped.
+   */
   private _resolveObjectPose(targetId?: string): { x: number; y: number; z: number; facing: number } | null {
     if (!targetId) return null;
     const zone = this._state.activeZoneId ? this._state.zones.get(this._state.activeZoneId) : undefined;
-    const obj = zone?.objects.find(o => o.id === targetId);
-    if (!obj) return null;
-    return { x: obj.position.x, y: obj.position.y, z: obj.position.z, facing: obj.rotation.y };
+    if (!zone) return null;
+    const obj = zone.objects.find(o => o.id === targetId);
+    if (obj) return { x: obj.position.x, y: obj.position.y, z: obj.position.z, facing: obj.rotation.y };
+    const plat = zone.platforms.find(p => p.id === targetId);
+    if (plat) return { x: plat.position.x, y: plat.position.y, z: plat.position.z, facing: plat.rotation?.y ?? 0 };
+    const vol = (zone.triggerVolumes ?? []).find(v => v.id === targetId);
+    if (vol) return { x: vol.position.x, y: vol.position.y, z: vol.position.z, facing: vol.rotation?.y ?? 0 };
+    return null;
   }
 
   private _resolveTargets(targetId?: string): string[] {

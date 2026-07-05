@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, SelectedRef, StateSchema } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, SelectedRef, StateSchema } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -38,6 +38,7 @@ interface LeftPanelProps {
   selectedObjectId:     string | null;
   triggerVolumes:       TriggerVolume[];
   zoneObjects:          WorldObject[];
+  zonePlatforms:        PlatformDef[];
   onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
   stateSchema:          Record<string, StateSchema>;
@@ -51,7 +52,7 @@ export function LeftPanel({
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
   zoneScripts, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects,
+  activeZoneId, triggerVolumes, zoneObjects, zonePlatforms,
   onZoneScriptsChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
 }: LeftPanelProps) {
@@ -63,7 +64,7 @@ export function LeftPanel({
       left: 64,
       top: 48,
       bottom: 0,
-      width: open ? 240 : 0,
+      width: open ? 280 : 0,
       overflow: "hidden",
       transition: "width 0.2s ease",
       background: "rgba(28,28,28,0.97)",
@@ -139,6 +140,7 @@ export function LeftPanel({
                 activeZoneId={activeZoneId}
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
+                zonePlatforms={zonePlatforms}
                 groups={groups}
                 assets={assets}
                 onZoneScriptsChange={onZoneScriptsChange}

@@ -12,6 +12,7 @@ import type {
   StateSchema,
   TriggerVolume,
   WorldObject,
+  PlatformDef,
   GroupDef,
   AssetDef,
 } from "@/types";
@@ -176,6 +177,7 @@ export interface ScriptPanelProps {
   activeZoneId: string | null;
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
   groups: GroupDef[];
   assets: AssetDef[];
   onZoneScriptsChange: (scripts: ScriptDef[]) => void;
@@ -195,6 +197,7 @@ export function ScriptPanel({
   activeZoneId,
   triggerVolumes,
   zoneObjects,
+  zonePlatforms,
   groups,
   assets,
   onZoneScriptsChange,
@@ -298,6 +301,7 @@ export function ScriptPanel({
           script={editing}
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
+          zonePlatforms={zonePlatforms}
           groups={groups}
           assets={assets}
           ownerIsEntity={tab === "object"}
@@ -616,6 +620,7 @@ function ScriptEditor({
   script,
   triggerVolumes,
   zoneObjects,
+  zonePlatforms,
   groups,
   assets,
   ownerIsEntity,
@@ -627,6 +632,7 @@ function ScriptEditor({
   script: ScriptDef;
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
   groups: GroupDef[];
   assets: AssetDef[];
   ownerIsEntity: boolean;
@@ -867,6 +873,8 @@ function ScriptEditor({
               key={i}
               action={a}
               zoneObjects={zoneObjects}
+              zonePlatforms={zonePlatforms}
+              triggerVolumes={triggerVolumes}
               groups={groups}
               assets={assets}
               onChange={(na) =>
@@ -1026,6 +1034,70 @@ function ActionTargetPicker({
   );
 }
 
+// ── PositionSourcePicker ──────────────────────────────────────────────────────────
+// For store_position's "object position" source: lists every entity that has a real
+// `position` (objects, platforms, trigger volumes) so a checkpoint/teleport target can
+// be read from any of them — not just model objects. Stairs/walls/floors are node- or
+// segment-based with no single position, so they're excluded. No groups (a pose comes
+// from one entity, not a set).
+function PositionSourcePicker({
+  targetId,
+  zoneObjects,
+  zonePlatforms,
+  triggerVolumes,
+  onChange,
+}: {
+  targetId: string;
+  zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  triggerVolumes: TriggerVolume[];
+  onChange: (id: string) => void;
+}) {
+  const known =
+    zoneObjects.some((o) => o.id === targetId) ||
+    zonePlatforms.some((p) => p.id === targetId) ||
+    triggerVolumes.some((v) => v.id === targetId);
+  return (
+    <select
+      style={S.select}
+      value={targetId}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">— pick entity —</option>
+      {zoneObjects.length > 0 && (
+        <optgroup label="Objects">
+          {zoneObjects.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.label || o.assetId} ({o.id.slice(0, 8)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zonePlatforms.length > 0 && (
+        <optgroup label="Platforms">
+          {zonePlatforms.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label || "Platform"} ({p.id.slice(0, 8)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {triggerVolumes.length > 0 && (
+        <optgroup label="Trigger Volumes">
+          {triggerVolumes.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label || "Volume"} ({v.id.slice(0, 8)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {targetId && !known && (
+        <option value={targetId}>{targetId} (custom)</option>
+      )}
+    </select>
+  );
+}
+
 // ── ConditionRow ──────────────────────────────────────────────────────────────
 
 function ConditionRow({
@@ -1118,6 +1190,8 @@ function ConditionRow({
 function ActionRow({
   action,
   zoneObjects,
+  zonePlatforms,
+  triggerVolumes,
   groups,
   assets,
   onChange,
@@ -1125,6 +1199,8 @@ function ActionRow({
 }: {
   action: ScriptAction;
   zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
   onChange: (a: ScriptAction) => void;
@@ -1169,6 +1245,8 @@ function ActionRow({
       <ActionFields
         action={action}
         zoneObjects={zoneObjects}
+        zonePlatforms={zonePlatforms}
+        triggerVolumes={triggerVolumes}
         groups={groups}
         assets={assets}
         onChange={onChange}
@@ -1180,12 +1258,16 @@ function ActionRow({
 function ActionFields({
   action,
   zoneObjects,
+  zonePlatforms,
+  triggerVolumes,
   groups,
   assets,
   onChange,
 }: {
   action: ScriptAction;
   zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
   onChange: (a: ScriptAction) => void;
@@ -1198,6 +1280,17 @@ function ActionFields({
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       groups={groups}
+      onChange={(id) => set({ targetId: id })}
+    />
+  );
+  // store_position (object source) can read a position from ANY positioned entity,
+  // not just objects — objects, platforms, and trigger volumes all have `position`.
+  const positionSourcePicker = (
+    <PositionSourcePicker
+      targetId={action.targetId ?? ""}
+      zoneObjects={zoneObjects}
+      zonePlatforms={zonePlatforms}
+      triggerVolumes={triggerVolumes}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -1325,33 +1418,35 @@ function ActionFields({
             <option value="object">Source: object position</option>
             <option value="coords">Source: specific coordinates</option>
           </select>
-          {src === "object" && targetPicker}
+          {src === "object" && positionSourcePicker}
           {src === "coords" && (
-            <div style={{ display: "flex", gap: 4 }}>
-              {(["x", "y", "z"] as const).map((ax) => (
-                <input
-                  key={ax}
-                  type="number"
-                  style={{ ...S.field, flex: 1 }}
-                  placeholder={ax}
-                  value={action.position?.[ax] ?? ""}
-                  onChange={(e) =>
-                    set({
-                      position: {
-                        x: 0,
-                        y: 0,
-                        z: 0,
-                        ...action.position,
-                        [ax]: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                />
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["x", "y", "z"] as const).map((ax) => (
+                  <input
+                    key={ax}
+                    type="number"
+                    style={{ ...S.field, flex: 1, minWidth: 0 }}
+                    placeholder={ax}
+                    value={action.position?.[ax] ?? ""}
+                    onChange={(e) =>
+                      set({
+                        position: {
+                          x: 0,
+                          y: 0,
+                          z: 0,
+                          ...action.position,
+                          [ax]: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                ))}
+              </div>
               <input
                 type="number"
-                style={{ ...S.field, flex: "0 0 64px" }}
-                placeholder="facing°"
+                style={{ ...S.field }}
+                placeholder="facing° (optional)"
                 value={action.facing ?? ""}
                 onChange={(e) =>
                   set({

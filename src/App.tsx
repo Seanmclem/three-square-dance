@@ -1467,6 +1467,7 @@ export default function App() {
   };
 
   const zoneObjects = zones.find(z => z.id === activeZoneId)?.objects ?? [];
+  const zonePlatforms = zones.find(z => z.id === activeZoneId)?.platforms ?? [];
   const objectScripts =
     selected?.type === "object"         ? ((selected.data as WorldObject)?.scripts     ?? [])
     : selected?.type === "trigger-volume" ? ((selected.data as TriggerVolume)?.scripts ?? [])
@@ -1529,6 +1530,7 @@ export default function App() {
         selectedObjectId={selectedObjectId}
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
+        zonePlatforms={zonePlatforms}
         onZoneScriptsChange={handleZoneScriptsChange}
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}
