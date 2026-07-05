@@ -6,6 +6,8 @@ import type { IEditorModule, ToolId, StairDef, StairCutterDef, Vec3, ScreenPos }
 const GRID = 0.5;
 const MIN  = 0.1;   // smallest allowed cut-box dimension (matches panel step/min)
 const HANDLE = 0.22;
+const GAP  = 0.3;   // push face handles this far OUTSIDE each face — clear of the box body
+                    // and the center move handle so they grab unambiguously.
 const DEG2RAD = Math.PI / 180;
 
 type Face = "+x" | "-x" | "+y" | "-y" | "+z" | "-z";
@@ -191,7 +193,8 @@ export class StairCutterResizer implements IEditorModule {
       if (h === "center") { m.position.copy(center); continue; }
       const [lx, ly, lz] = FACE_LOCAL[h];
       const n = new THREE.Vector3(lx, ly, lz).applyEuler(euler); // world face normal (unit)
-      const halfExtent = half[FACE_DIM[h]];
+      // A GAP outside the face (not on it) so the handle clears the box body + center handle.
+      const halfExtent = half[FACE_DIM[h]] + GAP;
       m.position.copy(center).addScaledVector(n, halfExtent);
     }
   }

@@ -6,6 +6,8 @@ import type { IEditorModule, ToolId, TriggerVolume, Vec3, ScreenPos } from "@/ty
 const GRID = 0.5;
 const MIN  = 0.5;   // smallest allowed size along any axis
 const HANDLE = 0.24;
+const GAP  = 0.35;  // push face handles this far OUTSIDE each face — clear of the
+                    // volume body and its center move gizmo so they grab unambiguously.
 
 type Face = "+x" | "-x" | "+y" | "-y" | "+z" | "-z";
 const FACES: Face[] = ["+x", "-x", "+y", "-y", "+z", "-z"];
@@ -166,20 +168,23 @@ export class TriggerVolumeResizer implements IEditorModule {
     }
   }
 
+  // Handle mesh positions — placed a GAP OUTSIDE each face (not on the surface) so they
+  // sit in clear space, away from the body and the center gizmo. The resize math reads the
+  // true box geometry, not these, so the outward offset is purely visual/pick placement.
   private _faceCenters(pos: Vec3, size: Vec3, theta: number): Record<Face, Vec3> {
     const cx = pos.x, cz = pos.z;
     const baseY = pos.y, topY = pos.y + size.y, midY = pos.y + size.y / 2;
     const cos = Math.cos(theta), sin = Math.sin(theta);
     const eX = { x: cos, z: -sin };   // local +X in world XZ
     const eZ = { x: sin, z: cos };    // local +Z in world XZ
-    const hx = size.x / 2, hz = size.z / 2;
+    const hx = size.x / 2 + GAP, hz = size.z / 2 + GAP;
     return {
       "+x": { x: cx + eX.x * hx, y: midY, z: cz + eX.z * hx },
       "-x": { x: cx - eX.x * hx, y: midY, z: cz - eX.z * hx },
       "+z": { x: cx + eZ.x * hz, y: midY, z: cz + eZ.z * hz },
       "-z": { x: cx - eZ.x * hz, y: midY, z: cz - eZ.z * hz },
-      "+y": { x: cx, y: topY,  z: cz },
-      "-y": { x: cx, y: baseY, z: cz },
+      "+y": { x: cx, y: topY + GAP,  z: cz },
+      "-y": { x: cx, y: baseY - GAP, z: cz },
     };
   }
 
