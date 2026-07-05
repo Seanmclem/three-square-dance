@@ -186,17 +186,18 @@ export class TriggerVolumeTool {
     if (!best) return undefined;
 
     // Trigger volumes are meant to be see-through where floors/walls coincide with them
-    // (that's the whole point of clicking "into" a volume), but real solid geometry
-    // genuinely in front of the volume — an object, platform, stair, etc. — should still
-    // block the pick instead of the click passing through to the volume behind it.
+    // (that's the whole point of clicking "into" a volume), but any real authored entity
+    // genuinely in front of the volume — an object, platform, stair, spawn/checkpoint
+    // marker, etc. — should block the pick instead of the click passing through to the
+    // volume behind it. Note we do NOT require a Mesh: marker helpers include Lines
+    // (e.g. the checkpoint/spawn arrow), which must occlude too. Editor helpers with no
+    // editorType (gizmo planes, grid, sky) and other volumes are ignored.
     const occluder = this._raycaster
       .intersectObjects(this._scene.children, true)
       .find(h => {
-        if (!(h.object instanceof THREE.Mesh) || !h.object.visible) return false;
-        // Only real authored entities occlude — editor helpers (gizmo planes, grid, sky
-        // dome, etc.) carry no editorType and must not block picking through them.
-        const et = h.object.userData.editorType;
-        return !!et && et !== "floor" && et !== "wall";
+        if (!h.object.visible) return false;
+        const et = h.object.userData.editorType as string | undefined;
+        return !!et && et !== "floor" && et !== "wall" && et !== "trigger-volume";
       });
     if (occluder && occluder.distance < best.distance) return undefined;
 
