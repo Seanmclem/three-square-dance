@@ -328,6 +328,8 @@ export default function App() {
     scene.onUpdate(dt => physicsWorld.step(dt));
     // Advance object animation mixers every frame (editor + preview)
     scene.onUpdate(dt => objectPlacer.update(dt));
+    // Advance animated trigger-volume fills (no-op when none are animated)
+    scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
 
     const bumpMembership = () => setMembershipRev(v => v + 1);
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, CheckpointDef, ScriptDef,
+  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
@@ -2625,6 +2625,11 @@ function CheckpointView({ selected, onDelete, onObjectUpdate }: {
 
 // ── TriggerVolumeView ─────────────────────────────────────────────────────────
 
+const DEFAULT_VOLUME_VISUAL: TriggerVolumeVisual = {
+  enabled: true, style: "gradient", color: "#5a3d8f", fadeDir: "up", opacity: 0.8, fadeHeight: 1, animate: false,
+};
+const clamp01 = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
+
 function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter" | "on_player_exit"): ScriptDef {
   return {
     id:         `scr_${crypto.randomUUID().slice(0, 8)}`,
@@ -2662,6 +2667,8 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
 
   if (!vol) return null;
   const scripts = vol.scripts ?? [];
+  const vis = vol.visual;
+  const setVisual = (v: TriggerVolumeVisual) => onObjectUpdate({ visual: v } as Partial<WorldObject>);
 
   const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ position: { ...vol.position, [axis]: n } } as Partial<WorldObject>); };
   const commitSize = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0.5) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>); };
@@ -2736,6 +2743,57 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
           onBlur={e => onObjectUpdate({ rotation: { x: 0, y: parseFloat(e.target.value) || 0, z: 0 } } as Partial<WorldObject>)}
           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         />
+      </div>
+
+      {/* Visual section — optional decorative fill (shows in preview + game) */}
+      <div>
+        <div style={LABEL}>VISUAL</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: vis?.enabled ? 8 : 0 }}>
+          <input
+            type="checkbox"
+            checked={vis?.enabled ?? false}
+            onChange={e => setVisual(e.target.checked ? { ...(vis ?? DEFAULT_VOLUME_VISUAL), enabled: true } : { ...(vis ?? DEFAULT_VOLUME_VISUAL), enabled: false })}
+          />
+          <span style={{ fontSize: 10, color: "#9090a0" }}>Show gradient fill</span>
+        </label>
+        {vis?.enabled && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Color</span>
+              <input type="color" value={vis.color}
+                onChange={e => setVisual({ ...vis, color: e.target.value })}
+                style={{ width: 44, height: 22, padding: 0, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", cursor: "pointer" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Fade</span>
+              <select value={vis.fadeDir}
+                onChange={e => setVisual({ ...vis, fadeDir: e.target.value as "up" | "down" })}
+                style={{ ...NUM_INPUT, width: 100, cursor: "pointer" }}>
+                <option value="up">Fade up</option>
+                <option value="down">Fade down</option>
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Opacity</span>
+              <input type="number" step={0.05} min={0} max={1} defaultValue={vis.opacity} key={vol.id + "-vopacity"}
+                onBlur={e => setVisual({ ...vis, opacity: clamp01(parseFloat(e.target.value)) })}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                style={{ ...NUM_INPUT, width: 100 }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Gradient height</span>
+              <input type="number" step={0.05} min={0.05} max={1} defaultValue={vis.fadeHeight} key={vol.id + "-vfade"}
+                onBlur={e => setVisual({ ...vis, fadeHeight: clamp01(parseFloat(e.target.value)) || 1 })}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                style={{ ...NUM_INPUT, width: 100 }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={vis.animate}
+                onChange={e => setVisual({ ...vis, animate: e.target.checked })} />
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Animate (pulse)</span>
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Scripts section */}

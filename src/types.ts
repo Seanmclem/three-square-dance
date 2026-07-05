@@ -676,6 +676,20 @@ export interface TriggerVolume {
   zoneId:    string;
   scripts?:  ScriptDef[];
   groupIds?: string[];
+  visual?:   TriggerVolumeVisual;   // optional in-world fill; absent/disabled = wireframe only
+}
+
+// Optional decorative fill for a trigger volume (a "warp box"). Rendered in preview AND
+// game (the debug wireframe stays editor-only). `style` is a discriminator so more fill
+// styles can be added later.
+export interface TriggerVolumeVisual {
+  enabled:    boolean;
+  style:      "gradient";        // only value for now
+  color:      string;            // hex, e.g. "#5a3d8f"
+  fadeDir:    "up" | "down";     // up = opaque at bottom, fades toward top
+  opacity:    number;            // 0..1 max alpha
+  fadeHeight: number;            // 0..1 fraction of box height the gradient spans (1 = full)
+  animate:    boolean;           // subtle pulse
 }
 
 export interface EntityCapabilities {

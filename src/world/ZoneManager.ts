@@ -6,6 +6,7 @@ import { StairBuilder } from "@/builders/StairBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
+import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -101,6 +102,8 @@ export class ZoneManager {
   private readonly _volumeSensors   = new Map<number, string>();           // handle → volumeId
   private readonly _volumeColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
   private readonly _volumeMeshes    = new Map<string, THREE.LineSegments[]>(); // zoneId → wireframes
+  private readonly _volumeFills     = new Map<string, THREE.Mesh[]>();      // zoneId → gradient fills
+  private readonly _animatedVolumeMats = new Set<THREE.ShaderMaterial>();   // fills with animate on
   private readonly _hoveredVolumeId  = new Map<string, string | null>();   // zoneId → hovered id
   private readonly _selectedVolumeId = new Map<string, string | null>();   // zoneId → selected id
 
@@ -1122,6 +1125,36 @@ export class ZoneManager {
     const arr = this._volumeMeshes.get(zoneId) ?? [];
     arr.push(wire);
     this._volumeMeshes.set(zoneId, arr);
+    if (vol.visual?.enabled && vol.visual.style === "gradient") this._buildVolumeFill(zoneId, vol, group);
+  }
+
+  // Optional decorative fill — a sibling of the wireframe (NOT a child), with no
+  // `hideInGame` tag so it renders in preview AND game while the wireframe is hidden.
+  private _buildVolumeFill(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
+    const mat  = createVolumeFillMaterial(vol.visual!, vol.size.y);
+    const fill = new THREE.Mesh(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z), mat);
+    fill.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    fill.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
+    fill.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false };
+    group.add(fill);
+    const arr = this._volumeFills.get(zoneId) ?? [];
+    arr.push(fill);
+    this._volumeFills.set(zoneId, arr);
+    if (vol.visual!.animate) this._animatedVolumeMats.add(mat);
+  }
+
+  // Per-frame: advance the pulse on animated fills. Called from App's scene.onUpdate.
+  updateVolumeVisuals(dt: number): void {
+    if (this._animatedVolumeMats.size === 0) return;
+    for (const mat of this._animatedVolumeMats) mat.uniforms["uTime"]!.value += dt;
+  }
+
+  private _disposeFill(fill: THREE.Mesh): void {
+    fill.parent?.remove(fill);
+    fill.geometry.dispose();
+    const mat = fill.material as THREE.ShaderMaterial;
+    this._animatedVolumeMats.delete(mat);
+    mat.dispose();
   }
 
   private _buildVolumeCollider(zoneId: string, vol: TriggerVolume): void {
@@ -1150,6 +1183,11 @@ export class ZoneManager {
       }
       this._volumeMeshes.delete(zoneId);
     }
+    const fills = this._volumeFills.get(zoneId);
+    if (fills) {
+      for (const f of fills) this._disposeFill(f);
+      this._volumeFills.delete(zoneId);
+    }
     this._hoveredVolumeId.delete(zoneId);
     this._selectedVolumeId.delete(zoneId);
   }
@@ -1164,6 +1202,13 @@ export class ZoneManager {
       m.geometry.dispose();
       (m.material as THREE.Material).dispose();
       meshArr.splice(idx, 1);
+    }
+    // Remove fill
+    const fillArr = this._volumeFills.get(zoneId) ?? [];
+    const fIdx = fillArr.findIndex(f => f.userData["editorId"] === volumeId);
+    if (fIdx !== -1) {
+      this._disposeFill(fillArr[fIdx]!);
+      fillArr.splice(fIdx, 1);
     }
     // Remove collider
     const colArr = this._volumeColliders.get(zoneId) ?? [];

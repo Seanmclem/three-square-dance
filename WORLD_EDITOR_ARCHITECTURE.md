@@ -60,6 +60,7 @@
 - v4.2.7 — **Diagonal stringer: `thickness` redefined as clearance, deeper default.** The diagonal soffit sat too close to the steps because `thickness` was the drop below the *nosing line*, of which `stepRise` is consumed just clearing the inner step corners — so `thickness 0.3` left only ~0.1 of visible gap. Redefined `thickness` to mean the **clearance below the step undersides** directly (internal `effThk = thickness + stepRise`), so the control maps 1:1 to the gap the user sees, and bumped the default 0.3 → 0.25. The front nose now dips `thickness` below the floor (closed by the existing front cap). Verified: diagonal `minY = −thickness` (−0.25 at default).
 - v4.2.8 — **Stair HEIGHT / LENGTH / ROTATION inputs (alternate dimension entry).** Stairs were only editable via the raw START/END points, so setting a specific rise/run or bearing meant hand-computing the end coordinate. Added three inputs to `StairGeoView` (a `H · L · R°` row under START/END) that are **two-way bindings on the existing `end` point** — no schema change, no `StairBuilder`/collider/copy-paste change, no migration: `height = end.y − start.y` (rewrites `end.y`, honoring the existing "Link end-Y to steps" toggle), `length = hypot(dx,dz)` (rewrites `end.x/z` along the current bearing), `rotation = atan2(dz,dx)°` (rewrites `end.x/z` at the current length, pivoting about START). Backed by a `stairDims(start,end)` helper; the panel's sync effect now watches `start` **and** `end` (previously end-only) so the H/L/R **and** the START row stay live when the gizmo moves/rotates the stair. All writes go through the existing `onObjectUpdate`→`updateStair` path (undo/redo + autosave for free). `start`/`end` remain the stored source of truth.
 - v4.2.9 — **NodeDragger mutes picking during a gizmo drag (fixes nodes snagged by rotate/move).** `TransformControls` and `InputManager` both listen on the canvas, so pressing a gizmo ring that sits over a node dot from another floor/platform behind it fired `input:mousedown` into `NodeDragger`, which grabbed that node — then the gizmo rotate/move drag dragged it around the whole gesture. `NodeDragger` now subscribes to the existing `gizmo:dragging` event (already consumed by `EditorCamera`/`SelectionManager`) and sets a `_gizmoActive` flag that early-returns out of `input:mousedown` **and** `input:mousemove`. `gizmo:dragging` fires on `TransformControls` **pointerdown**, before the compat `mousedown` that drives `input:mousedown`, so the flag is set in time. Guard: `NodeDragger` re-emits `gizmo:dragging` for its *own* node/edge drags (state is already `"DRAG"` by then), so the listener sets `_gizmoActive = isDragging && _state !== "DRAG"` to avoid a node drag muting itself.
+- v4.3.0 — **Trigger volumes: optional configurable "warp box" fill (visible in preview + game).** Trigger volumes rendered only as an editor-only amber wireframe (`hideInGame: true`); added an optional in-world gradient fill. `TriggerVolume` gained `visual?: TriggerVolumeVisual` (`{ enabled, style:"gradient", color, fadeDir:"up"|"down", opacity, fadeHeight (0..1 fraction of box height), animate }`) — `style` is a discriminator so more fill styles can be added later. New `src/world/volumeFillMaterial.ts` builds a `ShaderMaterial` that computes alpha from local height in the fragment shader, **driven entirely by uniforms** (uColor/uOpacity/uFadeDir/uFadeHeight/uSizeY/uTime/uAnimate) so color/fade/opacity/animation change without rebuilding geometry. `ZoneManager._buildVolumeMesh` builds the fill via new `_buildVolumeFill` as a **sibling** of the wireframe in the zone group (NOT a child — so the game-mode `_setHideInGameVisible` traversal hides the `hideInGame` wireframe while the fill, untagged, stays visible); tracked in new `_volumeFills` map + `_animatedVolumeMats` set, disposed in `_removeTriggerVolumes`/`_removeSingleVolume` via `_disposeFill`. Animation: new public `ZoneManager.updateVolumeVisuals(dt)` (bumps `uTime`, early-returns when nothing animated) registered in `App.tsx` alongside `objectPlacer.update` via `scene.onUpdate`. New **VISUAL** section in `TriggerVolumeView` (enable checkbox seeds a default; color/fade/opacity/gradient-height/animate controls) writes the full `visual` object through the existing `onObjectUpdate`→`updateTriggerVolume` shallow-`Object.assign` path (undo/redo + autosave for free). Highlight refresh (`_refreshVolumeHighlights`) is untouched — it only iterates the wireframe map. Verified in-browser: fill builds (wireframe LineBasicMaterial + fill ShaderMaterial), **in game the wireframe hides and the fill stays visible** (core check), all knobs update the shader live and persist in `toJSON`, `uTime` advances when frames run, disable disposes the fill + empties the animated set, and the real select→panel→Animate-checkbox click landed `animate:true` in the data.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -695,8 +696,24 @@ export interface TriggerVolume {
   label:    string;
   position: Vec3;
   size:     Vec3;             // width, height, depth
+  rotation?: Vec3;           // degrees, Y = yaw (v4.1.3)
   zoneId:   string;
   groupIds?: string[];        // Phase 10.6a
+  visual?:  TriggerVolumeVisual;  // optional gradient fill, shows in preview + game (v4.3.0)
+}
+
+// Optional decorative fill for a trigger volume (a "warp box"). `style` is a discriminator
+// so more fill styles can be added later. Rendered by src/world/volumeFillMaterial.ts as a
+// uniform-driven ShaderMaterial (alpha from local height); built as a sibling of the
+// wireframe so it stays visible in game while the wireframe hides.
+export interface TriggerVolumeVisual {
+  enabled:    boolean;
+  style:      "gradient";
+  color:      string;         // hex
+  fadeDir:    "up" | "down";  // up = opaque at bottom, fades toward top
+  opacity:    number;         // 0..1 max alpha
+  fadeHeight: number;         // 0..1 fraction of box height the gradient spans
+  animate:    boolean;        // subtle pulse (updateVolumeVisuals bumps uTime)
 }
 
 // ─── Persistence ───────────────────────────────────── ⏳ Phase 9 ───────────
@@ -5030,7 +5047,10 @@ Selected (Select tool):
 
 **Trigger volumes:**
 - Editor mode: amber dashed wireframe, name label floating above
-- Preview/game mode: invisible (`userData.editorOnly = true`)
+- Preview/game mode: the wireframe hides (`userData.hideInGame`), but if the volume has an
+  **enabled `visual`** (v4.3.0) its gradient "warp box" fill stays visible to the player —
+  the fill is built as a *sibling* of the wireframe with no `hideInGame` tag. Absent/disabled
+  visual = fully invisible in game, as before.
 - Selected: solid amber wireframe + resize handles
 
 **Trigger volume PropertiesPanel:**
