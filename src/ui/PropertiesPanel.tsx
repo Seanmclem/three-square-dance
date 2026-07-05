@@ -2577,9 +2577,23 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
   onObjectUpdate:   (changes: Partial<WorldObject>) => void;
 }) {
   const vol = selected.data as TriggerVolume | null;
+  const [posStr,  setPosStr]  = useState({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
+  const [sizeStr, setSizeStr] = useState({ x: String(vol?.size.x ?? 1),     y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
+    setSizeStr({ x: String(vol?.size.x ?? 1),    y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Resync when position/size change externally (gizmo move, face-handle resize).
+  useEffect(() => { setPosStr({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) }); }, [vol?.position.x, vol?.position.y, vol?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSizeStr({ x: String(vol?.size.x ?? 1), y: String(vol?.size.y ?? 1), z: String(vol?.size.z ?? 1) }); }, [vol?.size.x, vol?.size.y, vol?.size.z]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!vol) return null;
-  const fmt     = (n: number) => n.toFixed(2);
   const scripts = vol.scripts ?? [];
+
+  const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ position: { ...vol.position, [axis]: n } } as Partial<WorldObject>); };
+  const commitSize = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0.5) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>); };
 
   function addScript(type: "on_player_enter" | "on_player_exit"): void {
     if (!onScriptsChange) return;
@@ -2611,22 +2625,32 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
       </div>
       <div>
         <div style={LABEL}>POSITION</div>
-        <div style={{ display: "flex", gap: 12 }}>
-          {(["x", "y", "z"] as const).map((axis, i) => (
-            <div key={axis} style={{ flex: 1 }}>
-              <div style={{ color: ["#ff6b6b","#6bff8a","#6b8aff"][i]!, fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{axis.toUpperCase()}</div>
-              <div style={{ ...NUM_INPUT, color: "#909090" }}>{fmt(vol.position[axis])}</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
             </div>
           ))}
         </div>
       </div>
       <div>
         <div style={LABEL}>SIZE</div>
-        <div style={{ display: "flex", gap: 12 }}>
+        <div style={{ display: "flex", gap: 4 }}>
           {([["x","W"],["y","H"],["z","D"]] as const).map(([axis, lbl]) => (
             <div key={axis} style={{ flex: 1 }}>
               <div style={{ color: "#666", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
-              <div style={{ ...NUM_INPUT, color: "#909090" }}>{fmt(vol.size[axis])}</div>
+              <input type="number" step={0.5} min={0.5} value={sizeStr[axis]}
+                style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                onChange={e => { setSizeStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitSize(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitSize(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitSize(axis, (e.target as HTMLInputElement).value)); }}
+              />
             </div>
           ))}
         </div>

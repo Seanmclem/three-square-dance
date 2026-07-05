@@ -320,6 +320,26 @@ so the user's level remains exactly as it was before the test session.
    editorType" as "not a blocker" will incorrectly get blocked by this invisible gizmo
    drag-plane — it persists in the scene (visible: true) after a gizmo has ever attached,
    long after deselecting. Filter occluders by `!!editorType`, not just an exclusion list.
+6. **Clicks get silently swallowed after focus loss — a `screenshot` reliably refocuses.**
+   In the 2026-07-04 trigger-volume-resize session, `computer left_click`/`triple_click`/
+   `left_click_drag` produced **zero** bus events (not even `input:mousemove`) until a
+   `computer screenshot` was taken; every action right after a screenshot worked. So the
+   working rhythm for a click sequence is: `screenshot` → act → read state → (if the next
+   action is separated by other tool calls) `screenshot` again → act. `window.focus()`
+   alone was *not* enough here; the screenshot was. Budget for this — it's why a drag test
+   takes several turns.
+7. **Driving a React controlled `<input>` from the console: dispatch `input` + `focusout`,
+   not `blur`.** React 17+ delegates events at the root and maps `onBlur` to the native
+   **`focusout`** (which bubbles) — a dispatched `new Event('blur')` does NOT fire React's
+   `onBlur`. To commit a panel field that commits on blur:
+   `const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+   set.call(el, "6"); el.dispatchEvent(new Event('input',{bubbles:true}));
+   el.dispatchEvent(new FocusEvent('focusout',{bubbles:true}));` — the `input` event fires
+   `onChange`, the `focusout` fires `onBlur`→flush. Also note `useFieldDebounce` shares ONE
+   timer per component, so driving two fields in the same tick cancels the first field's
+   pending (debounced) commit — real users are fine (real blur=focusout flushes each field),
+   but a synthetic multi-field edit in one snippet needs a `focusout` (or a `sleep` > debounce)
+   between fields.
 
 ### Driving the live *runtime* (preview / game): the StrictMode split-brain
 

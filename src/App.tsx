@@ -22,6 +22,7 @@ import { GizmoManager } from "@/editor/GizmoManager";
 import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
+import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { gameState, GAMESAVE_KEY, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
@@ -188,6 +189,7 @@ export default function App() {
     const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
     const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
+    const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const scriptEngine    = new ScriptEngine(bus, world);
     scriptEngineRef.current = scriptEngine;
 
@@ -230,6 +232,7 @@ export default function App() {
     zoneTool.init();
     spawnPointTool.init();
     triggerVolumeTool.init();
+    triggerVolumeResizer.init();
 
     const writeAutosave = () => {
       if (!worldRef.current || restoringRef.current) return;
@@ -469,6 +472,7 @@ export default function App() {
       zonesRef.current    = null;
       unsub.forEach(u => u());
       spawnPointTool.dispose();
+      triggerVolumeResizer.dispose();
       triggerVolumeTool.dispose();
       scriptEngineRef.current = null;
       zoneTool.dispose();
