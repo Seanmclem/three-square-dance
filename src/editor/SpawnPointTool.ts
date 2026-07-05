@@ -26,6 +26,9 @@ export class SpawnPointTool {
         // instead of falling through to the y=0 ground plane underneath it.
         const p = surfacePos ?? worldPos;
         this._placeMarker(p.x, p.y, p.z);
+        // There's only ever one initial spawn (setDefaultSpawn replaces it). Break out of
+        // placing mode after setting it, so the next click doesn't re-place.
+        this._bus.emit("spawn:placed", {});
       }),
       this._bus.on("preview:start", () => {
         if (this._marker) this._marker.visible = false;

@@ -47,6 +47,9 @@ export class CheckpointTool {
           facingDeg: 0,
         };
         this._world.transaction("place checkpoint", () => this._world.addCheckpoint(this._activeZoneId, cp));
+        // One checkpoint per placement — signal App to break out of placing mode
+        // (switch to Select + auto-select) so the next click doesn't drop another.
+        this._bus.emit("checkpoint:placed", { zoneId: this._activeZoneId, id: cp.id });
       }),
 
       this._bus.on("checkpoint:added",   ({ zoneId, checkpoint }) => { if (zoneId === this._activeZoneId) this._buildMarker(checkpoint); }),

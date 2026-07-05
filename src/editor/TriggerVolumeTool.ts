@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
-import type { TriggerVolume, Vec3, Euler3, Scale3 } from "@/types";
+import type { TriggerVolume, Vec3, Euler3, Scale3, ToolId } from "@/types";
 
 type State = "IDLE" | "PLACING";
 
@@ -23,6 +23,7 @@ function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
 export class TriggerVolumeTool {
   private _state:       State  = "IDLE";
   private _active       = false;
+  private _toolId:      ToolId = "select";
   private _height       = DEFAULT_HEIGHT;
   private _start:       THREE.Vector3 | null = null;
   private _preview:     THREE.LineSegments | null = null;
@@ -47,6 +48,7 @@ export class TriggerVolumeTool {
   init(): void {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
+        this._toolId = tool;
         this._active = tool === "trigger-volume";
         if (!this._active) this._reset();
       }),
@@ -91,6 +93,9 @@ export class TriggerVolumeTool {
       // object:deselected before our object:selected clears SelectionManager's highlight.
       this._bus.on("input:click", ({ button }) => {
         if (button !== 0 || this._state === "PLACING") return;
+        // Only pick volumes under the Select or Trigger tools — never while another tool
+        // (Spawn/Floor/Wall/…) is placing, so a placement click can't also select a volume.
+        if (this._toolId !== "select" && this._toolId !== "trigger-volume") return;
         const vol = this._findVolumeAt(this._lastScreenPos);
         if (vol) {
           this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint

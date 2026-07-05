@@ -207,7 +207,9 @@ export interface BusEvents {
   "checkpoint:added":      { zoneId: string; checkpoint: CheckpointDef };
   "checkpoint:updated":    { zoneId: string; id: string; changes: Partial<CheckpointDef> };
   "checkpoint:removed":    { zoneId: string; id: string };
+  "checkpoint:placed":     { zoneId: string; id: string };
   "spawn:mode":            { mode: "initial" | "checkpoint" };
+  "spawn:placed":          Record<string, never>;
   "group:added":           { group: GroupDef };
   "group:removed":         { id: string };
   "group:updated":         { id: string; name: string };

@@ -459,6 +459,30 @@ export default function App() {
           return prev;
         });
       }),
+      bus.on("checkpoint:placed", ({ zoneId, id }) => {
+        // Place one, then break out of checkpoint mode: switch to Select and auto-select
+        // the new marker so it can be adjusted immediately (mirrors the trigger-volume flow).
+        // Deferred a microtask so the tool switch lands AFTER the placement click finishes
+        // dispatching (otherwise flipping the tool mid-click could let another tool's
+        // click handler act on the same click).
+        queueMicrotask(() => {
+          setActiveTool("select");
+          bus.emit("tool:select", { tool: "select" });
+          const cp = world.zones.get(zoneId)?.checkpoints?.find(c => c.id === id);
+          if (cp) bus.emit("object:selected", {
+            id, type: "checkpoint", zoneId,
+            position: cp.position, rotation: { x: 0, y: cp.facingDeg, z: 0 }, scale: { x: 1, y: 1, z: 1 },
+            data: cp,
+          });
+        });
+      }),
+      bus.on("spawn:placed", () => {
+        // The initial spawn is singular; break out of placing mode after setting it.
+        queueMicrotask(() => {
+          setActiveTool("select");
+          bus.emit("tool:select", { tool: "select" });
+        });
+      }),
       bus.on("group:added",   () => setGroups([...world.groups])),
       bus.on("group:removed", () => { setGroups([...world.groups]); bumpMembership(); }),
       bus.on("group:updated", () => setGroups([...world.groups])),
