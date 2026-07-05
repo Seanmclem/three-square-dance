@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, ScriptDef,
+  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, CheckpointDef, ScriptDef,
   GroupDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
@@ -341,7 +341,7 @@ export function PropertiesPanel({
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
-    && ["object", "wall", "floor", "platform", "stair", "trigger-volume"].includes(selected.type as string);
+    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint"].includes(selected.type as string);
   const startEdit  = (): void => { setLabelDraft(currentLabel); setEditingLabel(true); };
   const cancelEdit = (): void => { setLabelDraft(currentLabel); setEditingLabel(false); };
   const commitLabel = (): void => {
@@ -465,6 +465,8 @@ export function PropertiesPanel({
             onToggleGroups={() => setGroupsOpen(v => !v)}
             onObjectUpdate={onObjectUpdate}
           />
+        ) : selected.type === "checkpoint" ? (
+          <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -2547,6 +2549,75 @@ function SpawnSettingsView({
           <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
           {animSlots.map(({ slot, label }) => animField(slot, label))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── CheckpointView ────────────────────────────────────────────────────────────
+
+function CheckpointView({ selected, onDelete, onObjectUpdate }: {
+  selected:       SelectedObjectPayload;
+  onDelete?:      () => void;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const cp = selected.data as CheckpointDef | null;
+  const [posStr, setPosStr] = useState({ x: String(cp?.position.x ?? 0), y: String(cp?.position.y ?? 0), z: String(cp?.position.z ?? 0) });
+  const [facing, setFacing] = useState(String(cp?.facingDeg ?? 0));
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(cp?.position.x ?? 0), y: String(cp?.position.y ?? 0), z: String(cp?.position.z ?? 0) });
+    setFacing(String(cp?.facingDeg ?? 0));
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Resync when moved/rotated externally (gizmo drag refreshes selected.data).
+  useEffect(() => { setPosStr({ x: String(cp?.position.x ?? 0), y: String(cp?.position.y ?? 0), z: String(cp?.position.z ?? 0) }); }, [cp?.position.x, cp?.position.y, cp?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setFacing(String(cp?.facingDeg ?? 0)); }, [cp?.facingDeg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!cp) return null;
+
+  const commitPos    = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ position: { ...cp.position, [axis]: n } } as unknown as Partial<WorldObject>); };
+  const commitFacing = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ facingDeg: n } as unknown as Partial<WorldObject>); };
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
+        An inert checkpoint marker (position + facing). It does nothing on its own — use a
+        script's <b>store_position</b> (source: object → this checkpoint) to save it as a
+        respawn point, then <b>teleport_player</b> back to it.
+      </div>
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={LABEL}>FACING (Y°)</div>
+        <input type="number" step={15} value={facing} style={{ ...NUM_INPUT, width: 90 }}
+          onChange={e => { setFacing(e.target.value); schedule(() => commitFacing(e.target.value)); }}
+          onBlur={e => flush(() => commitFacing(e.target.value))}
+          onKeyDown={e => { if (e.key === "Enter") flush(() => commitFacing((e.target as HTMLInputElement).value)); }}
+        />
+      </div>
+      {onDelete && (
+        <button onClick={onDelete}
+          style={{ padding: "8px 0", background: "rgba(204,102,102,0.12)", border: "1px solid rgba(204,102,102,0.4)",
+                   borderRadius: 4, color: "#cc6666", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+          Delete Checkpoint
+        </button>
       )}
     </div>
   );

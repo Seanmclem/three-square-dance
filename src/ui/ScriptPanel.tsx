@@ -13,6 +13,7 @@ import type {
   TriggerVolume,
   WorldObject,
   PlatformDef,
+  CheckpointDef,
   GroupDef,
   AssetDef,
 } from "@/types";
@@ -178,6 +179,7 @@ export interface ScriptPanelProps {
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneCheckpoints: CheckpointDef[];
   groups: GroupDef[];
   assets: AssetDef[];
   onZoneScriptsChange: (scripts: ScriptDef[]) => void;
@@ -198,6 +200,7 @@ export function ScriptPanel({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneCheckpoints,
   groups,
   assets,
   onZoneScriptsChange,
@@ -302,6 +305,7 @@ export function ScriptPanel({
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
+          zoneCheckpoints={zoneCheckpoints}
           groups={groups}
           assets={assets}
           ownerIsEntity={tab === "object"}
@@ -621,6 +625,7 @@ function ScriptEditor({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneCheckpoints,
   groups,
   assets,
   ownerIsEntity,
@@ -633,6 +638,7 @@ function ScriptEditor({
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneCheckpoints: CheckpointDef[];
   groups: GroupDef[];
   assets: AssetDef[];
   ownerIsEntity: boolean;
@@ -874,6 +880,7 @@ function ScriptEditor({
               action={a}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
+              zoneCheckpoints={zoneCheckpoints}
               triggerVolumes={triggerVolumes}
               groups={groups}
               assets={assets}
@@ -1044,18 +1051,21 @@ function PositionSourcePicker({
   targetId,
   zoneObjects,
   zonePlatforms,
+  zoneCheckpoints,
   triggerVolumes,
   onChange,
 }: {
   targetId: string;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneCheckpoints: CheckpointDef[];
   triggerVolumes: TriggerVolume[];
   onChange: (id: string) => void;
 }) {
   const known =
     zoneObjects.some((o) => o.id === targetId) ||
     zonePlatforms.some((p) => p.id === targetId) ||
+    zoneCheckpoints.some((c) => c.id === targetId) ||
     triggerVolumes.some((v) => v.id === targetId);
   return (
     <select
@@ -1078,6 +1088,15 @@ function PositionSourcePicker({
           {zonePlatforms.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label || "Platform"} ({p.id.slice(0, 8)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zoneCheckpoints.length > 0 && (
+        <optgroup label="Checkpoints">
+          {zoneCheckpoints.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label || "Checkpoint"} ({c.id.slice(0, 8)})
             </option>
           ))}
         </optgroup>
@@ -1191,6 +1210,7 @@ function ActionRow({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneCheckpoints,
   triggerVolumes,
   groups,
   assets,
@@ -1200,6 +1220,7 @@ function ActionRow({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneCheckpoints: CheckpointDef[];
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
@@ -1246,6 +1267,7 @@ function ActionRow({
         action={action}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneCheckpoints={zoneCheckpoints}
         triggerVolumes={triggerVolumes}
         groups={groups}
         assets={assets}
@@ -1259,6 +1281,7 @@ function ActionFields({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneCheckpoints,
   triggerVolumes,
   groups,
   assets,
@@ -1267,6 +1290,7 @@ function ActionFields({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneCheckpoints: CheckpointDef[];
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
@@ -1290,6 +1314,7 @@ function ActionFields({
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       zonePlatforms={zonePlatforms}
+      zoneCheckpoints={zoneCheckpoints}
       triggerVolumes={triggerVolumes}
       onChange={(id) => set({ targetId: id })}
     />

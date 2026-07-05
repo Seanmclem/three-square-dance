@@ -7,7 +7,7 @@ import type {
   PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume,
 } from "@/types";
 
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume";
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -129,6 +129,14 @@ export class GizmoManager implements IEditorModule {
           if (this._selType === "spawn" && this._selId === "__spawn__") this._reattachMeshes();
         });
       }),
+      // Checkpoint markers are rebuilt fresh by CheckpointTool on checkpoint:updated (both
+      // listen). Defer a microtask so we re-track the new marker, mirroring spawn.
+      this._bus.on("checkpoint:updated", ({ zoneId, id }) => {
+        if (this._selType !== "checkpoint" || this._selId !== id || this._selZoneId !== zoneId) return;
+        queueMicrotask(() => {
+          if (this._selType === "checkpoint" && this._selId === id) this._reattachMeshes();
+        });
+      }),
 
       // Game mode: hide the gizmo (Preview keeps it). Restore on exit — visible only if
       // something is still attached, so an existing selection's gizmo reappears.
@@ -150,7 +158,7 @@ export class GizmoManager implements IEditorModule {
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
         if (this._groupMode) return;  // group is translate-only — ignore T/R/S mode switches
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -184,7 +192,7 @@ export class GizmoManager implements IEditorModule {
     this._groupRefs = [];
 
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint"].includes(type)) {
       this._detach(); return;
     }
 
@@ -278,6 +286,9 @@ export class GizmoManager implements IEditorModule {
       }
     } else if (type === "spawn") {
       rotY = THREE.MathUtils.degToRad(this._worldState.world?.defaultSpawn?.facingDeg ?? 0);
+    } else if (type === "checkpoint") {
+      const cp = this._worldState.zones.get(payload.zoneId)?.checkpoints?.find(c => c.id === payload.id);
+      rotY = THREE.MathUtils.degToRad(cp?.facingDeg ?? 0);
     }
 
     this._pivot.position.set(px, py, pz);
@@ -684,6 +695,13 @@ export class GizmoManager implements IEditorModule {
         this._pivot.rotation.set(0, THREE.MathUtils.degToRad(s.facingDeg ?? 0), 0);
         this._pivotStart.copy(this._pivot.position);
       }
+    } else if (type === "checkpoint") {
+      const cp = this._worldState.zones.get(this._selZoneId ?? "")?.checkpoints?.find(c => c.id === this._selId);
+      if (cp) {
+        this._pivot.position.set(cp.position.x, cp.position.y + 0.3, cp.position.z);
+        this._pivot.rotation.set(0, THREE.MathUtils.degToRad(cp.facingDeg ?? 0), 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
     }
     // For floor/wall: pivot Y is driven by the mesh; let SelectionManager re-emit handle it
 
@@ -852,6 +870,15 @@ export class GizmoManager implements IEditorModule {
         };
         this._worldState.setDefaultSpawn({ ...spawn, position });
         this._bus.emit("spawn:updated", { position });
+        break;
+      }
+      case "checkpoint": {
+        if (delta.lengthSq() < 1e-6) break;
+        const cp = this._worldState.zones.get(this._selZoneId!)?.checkpoints?.find(c => c.id === this._selId);
+        if (!cp) break;
+        this._worldState.updateCheckpoint(this._selZoneId!, this._selId!, {
+          position: { x: cp.position.x + delta.x, y: cp.position.y + delta.y, z: cp.position.z + delta.z },
+        });
         break;
       }
       case "floor": {
@@ -1054,6 +1081,12 @@ export class GizmoManager implements IEditorModule {
         const facingDeg = THREE.MathUtils.radToDeg(this._pivotYaw());
         this._worldState.setDefaultSpawn({ ...spawn, facingDeg });
         this._bus.emit("spawn:updated", { position: spawn.position });
+        break;
+      }
+      case "checkpoint": {
+        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        const facingDeg = THREE.MathUtils.radToDeg(this._pivotYaw());
+        this._worldState.updateCheckpoint(this._selZoneId!, this._selId!, { facingDeg });
         break;
       }
     }

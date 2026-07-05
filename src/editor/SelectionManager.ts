@@ -6,7 +6,7 @@ import type {
   SelectedObjectPayload, SelectedRef, WorldObject, WallDef, WallNode,
 } from "@/types";
 
-const PRIORITY: EditorObjectType[] = ["opening", "object", "platform", "wall", "floor", "spawn"];
+const PRIORITY: EditorObjectType[] = ["opening", "object", "checkpoint", "spawn", "platform", "wall", "floor"];
 
 const SELECT_EMISSIVE  = 0x3366ff;
 const SELECT_INTENSITY = 0.25;
@@ -460,6 +460,7 @@ export class SelectionManager implements IEditorModule {
       case "platform": return zone.platforms.find(p => p.id === editorId) ?? null;
       case "stair":    return zone.stairs.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
+      case "checkpoint": return zone.checkpoints?.find(c => c.id === editorId) ?? null;
       case "opening": {
         const wall = zone.walls.find(w => w.id === root.userData.wallId);
         return wall?.openings.find(o => o.id === editorId) ?? null;

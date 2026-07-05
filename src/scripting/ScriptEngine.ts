@@ -363,6 +363,8 @@ export class ScriptEngine {
     if (plat) return { x: plat.position.x, y: plat.position.y, z: plat.position.z, facing: plat.rotation?.y ?? 0 };
     const vol = (zone.triggerVolumes ?? []).find(v => v.id === targetId);
     if (vol) return { x: vol.position.x, y: vol.position.y, z: vol.position.z, facing: vol.rotation?.y ?? 0 };
+    const cp = (zone.checkpoints ?? []).find(c => c.id === targetId);
+    if (cp) return { x: cp.position.x, y: cp.position.y, z: cp.position.z, facing: cp.facingDeg };
     return null;
   }
 

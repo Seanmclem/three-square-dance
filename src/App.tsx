@@ -21,6 +21,7 @@ import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
 import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
+import { CheckpointTool } from "@/editor/CheckpointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
 import { StairCutterResizer } from "@/editor/StairCutterResizer";
@@ -42,7 +43,7 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, GroupDef, Attribution, JsonValue, StateSchema } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -87,6 +88,7 @@ export default function App() {
   const scriptEngineRef  = useRef<ScriptEngine | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
+  const [spawnMode,        setSpawnMode]        = useState<"initial" | "checkpoint">("initial");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
   const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
   const [selected,         setSelected]         = useState<SelectedObjectPayload | null>(null);
@@ -128,6 +130,7 @@ export default function App() {
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
+  const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
@@ -189,6 +192,7 @@ export default function App() {
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
     const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
+    const checkpointTool  = new CheckpointTool(scene.scene, world, bus);
     const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const stairCutterResizer = new StairCutterResizer(scene.scene, world, bus, scene.camera, canvas);
@@ -233,6 +237,7 @@ export default function App() {
     gizmoManager.init();
     zoneTool.init();
     spawnPointTool.init();
+    checkpointTool.init();
     triggerVolumeTool.init();
     triggerVolumeResizer.init();
     stairCutterResizer.init();
@@ -387,6 +392,7 @@ export default function App() {
         const z = world.zones.get(zoneId);
         setZoneScripts(z?.scripts ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
+        setCheckpoints(z?.checkpoints ?? []);
         scriptEngine.clearIndex();
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
         if (z) scriptEngine.loadZone(z);
@@ -399,6 +405,7 @@ export default function App() {
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
+        setCheckpoints(z?.checkpoints ?? []);
       }),
       bus.on("triggervolume:added",   () => {
         const z = world.zones.get(world.activeZoneId ?? "");
@@ -437,6 +444,21 @@ export default function App() {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
+      bus.on("checkpoint:added",   () => setCheckpoints([...(world.zones.get(world.activeZoneId ?? "")?.checkpoints ?? [])])),
+      bus.on("checkpoint:removed", () => {
+        setCheckpoints([...(world.zones.get(world.activeZoneId ?? "")?.checkpoints ?? [])]);
+      }),
+      bus.on("checkpoint:updated", ({ id }) => {
+        const z = world.zones.get(world.activeZoneId ?? "");
+        setCheckpoints([...(z?.checkpoints ?? [])]);
+        setSelected(prev => {
+          if (prev?.type === "checkpoint" && prev.id === id) {
+            const cp = z?.checkpoints?.find(c => c.id === id);
+            return cp ? { ...prev, data: cp } : prev;
+          }
+          return prev;
+        });
+      }),
       bus.on("group:added",   () => setGroups([...world.groups])),
       bus.on("group:removed", () => { setGroups([...world.groups]); bumpMembership(); }),
       bus.on("group:updated", () => setGroups([...world.groups])),
@@ -474,6 +496,7 @@ export default function App() {
       worldRef.current    = null;
       zonesRef.current    = null;
       unsub.forEach(u => u());
+      checkpointTool.dispose();
       spawnPointTool.dispose();
       stairCutterResizer.dispose();
       triggerVolumeResizer.dispose();
@@ -1009,6 +1032,8 @@ export default function App() {
         return;
       }
       world.removeTriggerVolume(zoneId, id);
+    } else if (type === "checkpoint") {
+      world.removeCheckpoint(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
@@ -1403,6 +1428,12 @@ export default function App() {
         worldRef.current?.updateTriggerVolume(selected.zoneId, selected.id, volChanges);
       });
       syncHistory();
+    } else if (selected.type === "checkpoint") {
+      const cpChanges = changes as unknown as Partial<CheckpointDef>;
+      worldRef.current?.transaction("update checkpoint", () => {
+        worldRef.current?.updateCheckpoint(selected.zoneId, selected.id, cpChanges);
+      });
+      syncHistory();
     } else {
       const action = changes.properties !== undefined ? "update object properties" : "update object transform";
       worldRef.current?.transaction(action, () => {
@@ -1497,6 +1528,8 @@ export default function App() {
         onContinue={handleContinue}
         hasGameSave={hasGameSave}
         isPreview={isPreview}
+        spawnMode={spawnMode}
+        onSpawnMode={m => { setSpawnMode(m); busRef.current.emit("spawn:mode", { mode: m }); }}
       />
       <LeftPanel
         panelId={leftPanel}
@@ -1531,6 +1564,7 @@ export default function App() {
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneCheckpoints={checkpoints}
         onZoneScriptsChange={handleZoneScriptsChange}
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}

@@ -96,7 +96,7 @@ export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -204,6 +204,10 @@ export interface BusEvents {
   "triggervolume:hover":   { zoneId: string; id: string | null };
   "triggervolume:select":  { zoneId: string; id: string | null };
   "triggervolume:placed":  { vol: TriggerVolume };
+  "checkpoint:added":      { zoneId: string; checkpoint: CheckpointDef };
+  "checkpoint:updated":    { zoneId: string; id: string; changes: Partial<CheckpointDef> };
+  "checkpoint:removed":    { zoneId: string; id: string };
+  "spawn:mode":            { mode: "initial" | "checkpoint" };
   "group:added":           { group: GroupDef };
   "group:removed":         { id: string };
   "group:updated":         { id: string; name: string };
@@ -233,7 +237,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
@@ -278,6 +282,20 @@ export interface SceneMetadata {
 export interface SpawnDef {
   position:  Vec3;
   facingDeg: number;
+}
+
+/**
+ * A named, inert position+facing marker (per zone). Renders a spawn-style indicator in a
+ * distinct color. Does nothing on its own — scripts reference it (e.g. store_position with
+ * posSource "object" → save its pose to a state key that teleport_player reads) to turn it
+ * into a checkpoint/respawn.
+ */
+export interface CheckpointDef {
+  id:        string;
+  label?:    string;
+  position:  Vec3;
+  facingDeg: number;
+  groupIds?: string[];
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
@@ -476,6 +494,7 @@ export interface ZoneDef {
   objects:         WorldObject[];
   scripts?:        ScriptDef[];
   triggerVolumes?: TriggerVolume[];
+  checkpoints?:    CheckpointDef[];
 }
 
 export interface TransitionDef {

@@ -3,7 +3,7 @@ import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening, SpawnDef, TriggerVolume, GroupDef,
+  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, GroupDef,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -360,6 +360,34 @@ export class WorldState {
     this._bus.emit("triggervolume:removed", { zoneId, id });
   }
 
+  // ── Checkpoint mutations ─────────────────────────────────────────────────────
+
+  addCheckpoint(zoneId: string, checkpoint: CheckpointDef): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.checkpoints) zone.checkpoints = [];
+    this._touch("checkpoint", zoneId, checkpoint.id);
+    zone.checkpoints.push(checkpoint);
+    this._bus.emit("checkpoint:added", { zoneId, checkpoint });
+  }
+
+  updateCheckpoint(zoneId: string, id: string, changes: Partial<CheckpointDef>): void {
+    const zone = this.zones.get(zoneId);
+    const cp   = zone?.checkpoints?.find(c => c.id === id);
+    if (!cp) return;
+    this._touch("checkpoint", zoneId, id);
+    Object.assign(cp, changes);
+    this._bus.emit("checkpoint:updated", { zoneId, id, changes });
+  }
+
+  removeCheckpoint(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    this._touch("checkpoint", zoneId, id);
+    zone.checkpoints = (zone.checkpoints ?? []).filter(c => c.id !== id);
+    this._bus.emit("checkpoint:removed", { zoneId, id });
+  }
+
   // ── Transition mutations ─────────────────────────────────────────────────────
 
   addTransition(transition: TransitionDef): void {
@@ -490,6 +518,7 @@ export class WorldState {
       case "stair":         return zone.stairs;
       case "object":        return zone.objects;
       case "triggerVolume": return (zone.triggerVolumes ??= []);
+      case "checkpoint":    return (zone.checkpoints ??= []);
       default:              return null;
     }
   }

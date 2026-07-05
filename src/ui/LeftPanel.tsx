@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, SelectedRef, StateSchema } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, CheckpointDef, SelectedRef, StateSchema } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -39,6 +39,7 @@ interface LeftPanelProps {
   triggerVolumes:       TriggerVolume[];
   zoneObjects:          WorldObject[];
   zonePlatforms:        PlatformDef[];
+  zoneCheckpoints:      CheckpointDef[];
   onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
   stateSchema:          Record<string, StateSchema>;
@@ -52,7 +53,7 @@ export function LeftPanel({
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
   zoneScripts, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects, zonePlatforms,
+  activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneCheckpoints,
   onZoneScriptsChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
 }: LeftPanelProps) {
@@ -141,6 +142,7 @@ export function LeftPanel({
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
                 zonePlatforms={zonePlatforms}
+                zoneCheckpoints={zoneCheckpoints}
                 groups={groups}
                 assets={assets}
                 onZoneScriptsChange={onZoneScriptsChange}

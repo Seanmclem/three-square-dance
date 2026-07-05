@@ -5,6 +5,7 @@ import type { WorldState } from "@/world/WorldState";
 export class SpawnPointTool {
   private _marker:  THREE.Object3D | null = null;
   private _active   = false;
+  private _mode: "initial" | "checkpoint" = "initial";  // Spawn-tool sub-mode (popover)
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -18,8 +19,9 @@ export class SpawnPointTool {
       this._bus.on("tool:select", ({ tool }) => {
         this._active = (tool === "spawnpoint");
       }),
+      this._bus.on("spawn:mode", ({ mode }) => { this._mode = mode; }),
       this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
-        if (!this._active || button !== 0) return;
+        if (!this._active || this._mode !== "initial" || button !== 0) return;
         // Prefer the real surface hit so the marker lands on top of a floor/platform
         // instead of falling through to the y=0 ground plane underneath it.
         const p = surfacePos ?? worldPos;

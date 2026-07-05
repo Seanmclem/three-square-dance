@@ -28,9 +28,11 @@ interface ToolbarProps {
   onContinue?:   () => void;
   hasGameSave?:  () => boolean;
   isPreview?:    boolean;
+  spawnMode?:    "initial" | "checkpoint";
+  onSpawnMode?:  (mode: "initial" | "checkpoint") => void;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, hasGameSave, isPreview }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, hasGameSave, isPreview, spawnMode = "initial", onSpawnMode }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
   // Re-evaluated whenever the menu opens (opening flips showGameMenu → re-render),
   // so it reflects a save written since the last play session.
@@ -51,9 +53,10 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
         const Icon = TOOL_ICONS[tool.id];
         const color = active ? "#80aaff" : "#7a7a7a";
+        const showSpawnMenu = tool.id === "spawnpoint" && activeTool === "spawnpoint";
         return (
+          <div key={tool.id} style={{ position: "relative", display: "flex" }}>
           <button
-            key={tool.id}
             title={tool.label}
             onClick={() => onToolSelect(tool.id)}
             style={{
@@ -73,6 +76,36 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               {tool.label}
             </span>
           </button>
+          {showSpawnMenu && (
+            <div style={{
+              position: "absolute", left: "100%", top: 0, marginLeft: 6, zIndex: 100,
+              background: "rgba(28,28,28,0.98)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 6, padding: 4, minWidth: 150,
+              display: "flex", flexDirection: "column", gap: 2,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+            }}>
+              {([["initial", "◉ Initial Spawn"], ["checkpoint", "+ Checkpoint"]] as const).map(([m, label]) => (
+                <button
+                  key={m}
+                  onClick={() => onSpawnMode?.(m)}
+                  style={{
+                    padding: "6px 10px", textAlign: "left", fontSize: 12, fontFamily: "monospace",
+                    cursor: "pointer", border: "none", borderRadius: 4, whiteSpace: "nowrap",
+                    background: spawnMode === m ? "rgba(80,140,255,0.25)" : "transparent",
+                    color: spawnMode === m ? "#cfe0ff" : "#c0c0c0",
+                  }}
+                  onMouseEnter={e => { if (spawnMode !== m) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                  onMouseLeave={e => { if (spawnMode !== m) e.currentTarget.style.background = "transparent"; }}
+                >
+                  {label}
+                </button>
+              ))}
+              <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+                {spawnMode === "initial" ? "Click in the scene to set the player start." : "Click to drop checkpoint markers."}
+              </div>
+            </div>
+          )}
+          </div>
         );
       })}
 
