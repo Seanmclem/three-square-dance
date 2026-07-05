@@ -1523,8 +1523,12 @@ export default function App() {
     busRef.current.emit("object:deselected", {});
   };
 
-  const zoneObjects = zones.find(z => z.id === activeZoneId)?.objects ?? [];
-  const zonePlatforms = zones.find(z => z.id === activeZoneId)?.platforms ?? [];
+  const activeZone = zones.find(z => z.id === activeZoneId);
+  const zoneObjects = activeZone?.objects ?? [];
+  const zonePlatforms = activeZone?.platforms ?? [];
+  const zoneStairs = activeZone?.stairs ?? [];
+  const zoneWalls = activeZone?.walls ?? [];
+  const zoneFloors = activeZone?.floors ?? [];
   const objectScripts =
     selected?.type === "object"         ? ((selected.data as WorldObject)?.scripts     ?? [])
     : selected?.type === "trigger-volume" ? ((selected.data as TriggerVolume)?.scripts ?? [])
@@ -1590,6 +1594,9 @@ export default function App() {
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneStairs={zoneStairs}
+        zoneWalls={zoneWalls}
+        zoneFloors={zoneFloors}
         zoneCheckpoints={checkpoints}
         onZoneScriptsChange={handleZoneScriptsChange}
         onObjectScriptsChange={handleObjectScriptsChange}

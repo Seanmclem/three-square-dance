@@ -13,6 +13,9 @@ import type {
   TriggerVolume,
   WorldObject,
   PlatformDef,
+  StairDef,
+  WallDef,
+  FloorDef,
   CheckpointDef,
   GroupDef,
   AssetDef,
@@ -179,6 +182,9 @@ export interface ScriptPanelProps {
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
   zoneCheckpoints: CheckpointDef[];
   groups: GroupDef[];
   assets: AssetDef[];
@@ -200,6 +206,9 @@ export function ScriptPanel({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
   zoneCheckpoints,
   groups,
   assets,
@@ -305,6 +314,9 @@ export function ScriptPanel({
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
+          zoneStairs={zoneStairs}
+          zoneWalls={zoneWalls}
+          zoneFloors={zoneFloors}
           zoneCheckpoints={zoneCheckpoints}
           groups={groups}
           assets={assets}
@@ -625,6 +637,9 @@ function ScriptEditor({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
   zoneCheckpoints,
   groups,
   assets,
@@ -638,6 +653,9 @@ function ScriptEditor({
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
   zoneCheckpoints: CheckpointDef[];
   groups: GroupDef[];
   assets: AssetDef[];
@@ -880,6 +898,9 @@ function ScriptEditor({
               action={a}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
+              zoneStairs={zoneStairs}
+              zoneWalls={zoneWalls}
+              zoneFloors={zoneFloors}
               zoneCheckpoints={zoneCheckpoints}
               triggerVolumes={triggerVolumes}
               groups={groups}
@@ -994,20 +1015,40 @@ function TargetPicker({
 // ── ActionTargetPicker ──────────────────────────────────────────────────────────
 // Dropdown of the zone's groups + objects for action targets (despawn/move/etc).
 // A group target fans out to all members at dispatch (ScriptEngine._resolveTargets).
+// The optional entity lists (platforms/stairs/walls/floors/volumes) are opt-in per
+// action: despawn_object supports every entity type at runtime (ZoneManager hides the
+// mesh + disables its collider), so it passes them; move/change_material/play_animation
+// only act on objects, so they omit them and the picker stays object-only.
 function ActionTargetPicker({
   targetId,
   zoneObjects,
   groups,
+  zonePlatforms = [],
+  zoneStairs = [],
+  zoneWalls = [],
+  zoneFloors = [],
+  triggerVolumes = [],
   onChange,
 }: {
   targetId: string;
   zoneObjects: WorldObject[];
   groups: GroupDef[];
+  zonePlatforms?: PlatformDef[];
+  zoneStairs?: StairDef[];
+  zoneWalls?: WallDef[];
+  zoneFloors?: FloorDef[];
+  triggerVolumes?: TriggerVolume[];
   onChange: (id: string) => void;
 }) {
   const known =
     groups.some((g) => g.id === targetId) ||
-    zoneObjects.some((o) => o.id === targetId);
+    zoneObjects.some((o) => o.id === targetId) ||
+    zonePlatforms.some((p) => p.id === targetId) ||
+    zoneStairs.some((s) => s.id === targetId) ||
+    zoneWalls.some((w) => w.id === targetId) ||
+    zoneFloors.some((f) => f.id === targetId) ||
+    triggerVolumes.some((v) => v.id === targetId);
+  const short = (id: string) => id.slice(0, 8);
   return (
     <select
       style={S.select}
@@ -1028,7 +1069,52 @@ function ActionTargetPicker({
         <optgroup label="Objects">
           {zoneObjects.map((o) => (
             <option key={o.id} value={o.id}>
-              {o.label || o.assetId} ({o.id.slice(0, 8)})
+              {o.label || o.assetId} ({short(o.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zonePlatforms.length > 0 && (
+        <optgroup label="Platforms">
+          {zonePlatforms.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label || "Platform"} ({short(p.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zoneStairs.length > 0 && (
+        <optgroup label="Stairs">
+          {zoneStairs.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label || "Stair"} ({short(s.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zoneWalls.length > 0 && (
+        <optgroup label="Walls">
+          {zoneWalls.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.label || "Wall"} ({short(w.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zoneFloors.length > 0 && (
+        <optgroup label="Floors">
+          {zoneFloors.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.label || `Floor · level ${f.level}`} ({short(f.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {triggerVolumes.length > 0 && (
+        <optgroup label="Trigger Volumes">
+          {triggerVolumes.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label || "Volume"} ({short(v.id)})
             </option>
           ))}
         </optgroup>
@@ -1210,6 +1296,9 @@ function ActionRow({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
   zoneCheckpoints,
   triggerVolumes,
   groups,
@@ -1220,6 +1309,9 @@ function ActionRow({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
   zoneCheckpoints: CheckpointDef[];
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
@@ -1267,6 +1359,9 @@ function ActionRow({
         action={action}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneStairs={zoneStairs}
+        zoneWalls={zoneWalls}
+        zoneFloors={zoneFloors}
         zoneCheckpoints={zoneCheckpoints}
         triggerVolumes={triggerVolumes}
         groups={groups}
@@ -1281,6 +1376,9 @@ function ActionFields({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
   zoneCheckpoints,
   triggerVolumes,
   groups,
@@ -1290,6 +1388,9 @@ function ActionFields({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
   zoneCheckpoints: CheckpointDef[];
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
@@ -1299,11 +1400,26 @@ function ActionFields({
   function set(changes: Partial<ScriptAction>): void {
     onChange({ ...action, ...changes });
   }
+  // move / change_material / play_animation only act on objects at runtime → object-only.
   const targetPicker = (
     <ActionTargetPicker
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       groups={groups}
+      onChange={(id) => set({ targetId: id })}
+    />
+  );
+  // despawn_object works on every entity type at runtime → offer them all.
+  const despawnTargetPicker = (
+    <ActionTargetPicker
+      targetId={action.targetId ?? ""}
+      zoneObjects={zoneObjects}
+      groups={groups}
+      zonePlatforms={zonePlatforms}
+      zoneStairs={zoneStairs}
+      zoneWalls={zoneWalls}
+      zoneFloors={zoneFloors}
+      triggerVolumes={triggerVolumes}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -1499,6 +1615,8 @@ function ActionFields({
       );
 
     case "despawn_object":
+      return despawnTargetPicker;
+
     case "open_door":
     case "close_door":
       return targetPicker;

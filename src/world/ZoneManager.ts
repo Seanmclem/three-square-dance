@@ -107,6 +107,9 @@ export class ZoneManager {
   private readonly _hoveredVolumeId  = new Map<string, string | null>();   // zoneId → hovered id
   private readonly _selectedVolumeId = new Map<string, string | null>();   // zoneId → selected id
 
+  // Non-object entities hidden by a script despawn_object this preview run; restored on preview:stop.
+  private readonly _despawnedIds = new Set<string>();
+
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
 
@@ -239,6 +242,12 @@ export class ZoneManager {
       this._bus.on("object:removed", ({ zoneId, id }) => {
         this._removeObject(zoneId, id);
       }),
+      // Script-driven despawn_object for NON-object entities (platforms, stairs, walls,
+      // floors, trigger volumes). Objects are handled by ObjectPlacer; a group target is
+      // already fanned out to member ids by ScriptEngine before this fires.
+      this._bus.on("object:despawn", ({ id }) => {
+        this._despawnEntity(id);
+      }),
       this._bus.on("object:updated", ({ id, zoneId, changes }) => {
         if (!changes.properties) return;
         const mesh = this._loadedZones.get(zoneId)?.objectMeshes.get(id);
@@ -279,6 +288,7 @@ export class ZoneManager {
         if (mode === "game") this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
+        this._restoreDespawned();
         this._setEditorOnlyVisible(true);
         this._setHideInGameVisible(true);
       }),
@@ -868,6 +878,67 @@ export class ZoneManager {
       }
     });
     entry.objectMeshes.delete(objectId);
+  }
+
+  /**
+   * Runtime-only despawn for a non-object entity (platform / stair / wall / floor /
+   * trigger volume). Hides the mesh(es) and disables the collider(s) so it's both
+   * invisible and non-interacting — a disabled sensor also stops firing enter/exit
+   * triggers. Objects are despawned by ObjectPlacer; this covers everything else.
+   * Script actions never touch WorldState, so the effect is purely visual/physical:
+   * the ids are tracked and restored on preview:stop (exiting preview does NOT rebuild
+   * the zone), so a despawned entity reappears in the editor rather than vanishing.
+   */
+  private _despawnEntity(id: string): void {
+    if (this._setEntityHidden(id, true)) this._despawnedIds.add(id);
+  }
+
+  /** Re-show + re-enable everything despawned during this preview run. */
+  private _restoreDespawned(): void {
+    for (const id of this._despawnedIds) this._setEntityHidden(id, false);
+    this._despawnedIds.clear();
+  }
+
+  /**
+   * Toggle a non-object entity's visibility + collider across all loaded zones (the
+   * despawn event carries no zoneId). Returns true if a matching entity was found.
+   */
+  private _setEntityHidden(id: string, hidden: boolean): boolean {
+    const visible = !hidden;
+    for (const [zoneId, entry] of this._loadedZones) {
+      const pe = entry.platformEntries.get(id);
+      if (pe) { for (const m of pe.meshes) m.visible = visible; pe.collider.setEnabled(visible); return true; }
+
+      const se = entry.stairEntries.get(id);
+      if (se) { se.group.visible = visible; for (const c of se.colliders) c.setEnabled(visible); return true; }
+
+      const fc = entry.floorColliders.get(id);
+      if (fc) {
+        fc.setEnabled(visible);
+        entry.floorsGroup.children.forEach(m => { if (m.userData["editorId"] === id) m.visible = visible; });
+        return true;
+      }
+
+      // A wall id may share a merged RunEntry with other walls — despawning one hides the run.
+      const re = entry.wallData.get(id);
+      if (re) {
+        re.mesh.visible = visible;
+        for (const t of re.trimMeshes) t.visible = visible;
+        for (const c of re.colliders) c.setEnabled(visible);
+        return true;
+      }
+
+      // Trigger volume: wireframe + optional fill + sensor (disabling the sensor stops triggers).
+      let found = false;
+      for (const m of this._volumeMeshes.get(zoneId) ?? [])
+        if (m.userData["editorId"] === id) { m.visible = visible; found = true; }
+      for (const f of this._volumeFills.get(zoneId) ?? [])
+        if (f.userData["editorId"] === id) { f.visible = visible; found = true; }
+      for (const c of this._volumeColliders.get(zoneId) ?? [])
+        if (this._volumeSensors.get(c.handle) === id) { c.setEnabled(visible); found = true; }
+      if (found) return true;
+    }
+    return false;
   }
 
   // ── CSG cutter helpers ────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ export class ObjectPlacer {
   private readonly _finish   = new Map<string, () => void>();
   private readonly _active   = new Map<string, THREE.AnimationAction>();
   private readonly _meshes   = new Map<string, THREE.Object3D>();
+  private readonly _despawned = new Set<string>();
   private _previewingId: string | null = null;
 
   constructor(private readonly _bus: EventBus) {
@@ -35,12 +36,21 @@ export class ObjectPlacer {
       // not just the selected one. Script edits are runtime-only (data untouched).
       if (changes.position || changes.rotation || changes.scale) this._applyTransformChanges(id, changes);
     });
-    // despawn_object: runtime-only hide. A zone reload restores it (data is untouched).
+    // despawn_object: runtime-only hide. Tracked so preview:stop can un-hide (exiting
+    // preview doesn't rebuild the zone), matching ZoneManager's non-object despawn.
     this._bus.on("object:despawn", ({ id }) => {
       const mesh = this._meshes.get(id);
       if (mesh) mesh.visible = false;
       this._mixers.get(id)?.stopAllAction();
       this._active.delete(id);
+      this._despawned.add(id);
+    });
+    this._bus.on("preview:stop", () => {
+      for (const id of this._despawned) {
+        const mesh = this._meshes.get(id);
+        if (mesh) mesh.visible = true;
+      }
+      this._despawned.clear();
     });
   }
 
