@@ -2,15 +2,16 @@ import { useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
 import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icons";
 
-interface ToolDef { id: ToolId; label: string; shortcut: string }
+// `variants`: a tool button that opens a popover to pick between related tools (rect vs
+// polygon). The button's primary id is variants[0]; the group is "active" when any variant
+// is the active tool.
+interface ToolDef { id: ToolId; label: string; shortcut: string; variants?: { id: ToolId; label: string }[] }
 
 const TOOLS: ToolDef[] = [
   { id: "select",          label: "Select",   shortcut: "V" },
-  { id: "floor",           label: "Floor",    shortcut: "F" },
-  { id: "poly-floor",      label: "Poly Flr", shortcut: "P" },
+  { id: "floor",           label: "Floor",    shortcut: "F", variants: [{ id: "floor", label: "▭ Rectangle" }, { id: "poly-floor", label: "⬠ Polygon" }] },
   { id: "wall",            label: "Wall",     shortcut: "W" },
-  { id: "platform",        label: "Platform", shortcut: "L" },
-  { id: "poly-platform",   label: "Poly Plat", shortcut: "K" },
+  { id: "platform",        label: "Platform", shortcut: "L", variants: [{ id: "platform", label: "▭ Rectangle" }, { id: "poly-platform", label: "⬠ Polygon" }] },
   { id: "stair",           label: "Stair",     shortcut: "T" },
   { id: "object",          label: "Object",   shortcut: "O" },
   { id: "zone",            label: "Groups",   shortcut: "Z" },
@@ -47,18 +48,23 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
     }}>
 
       {TOOLS.map(tool => {
+        // For a variant group, the active variant (if any) drives the icon and re-click target.
+        const activeVariantId = tool.variants?.find(v => v.id === activeTool)?.id;
         const active = activeTool === tool.id
+          || activeVariantId !== undefined
           || (tool.id === "zone"            && openPanel === "groups")
           || (tool.id === "object"          && openPanel === "assets")
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
-        const Icon = TOOL_ICONS[tool.id];
+        const Icon = TOOL_ICONS[activeVariantId ?? tool.id];
         const color = active ? "#80aaff" : "#7a7a7a";
-        const showSpawnMenu = tool.id === "spawnpoint" && activeTool === "spawnpoint";
+        const showSpawnMenu   = tool.id === "spawnpoint" && activeTool === "spawnpoint";
+        const showVariantMenu = !!tool.variants && active;
         return (
           <div key={tool.id} style={{ position: "relative", display: "flex" }}>
           <button
             title={tool.label}
-            onClick={() => onToolSelect(tool.id)}
+            // Re-clicking an active group keeps its current variant; otherwise select the primary.
+            onClick={() => onToolSelect(activeVariantId ?? tool.id)}
             style={{
               width: 48, height: 48, border: "none", cursor: "pointer",
               borderRadius: 8, display: "flex", flexDirection: "column",
@@ -102,6 +108,38 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               ))}
               <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
                 {spawnMode === "initial" ? "Click in the scene to set the player start." : "Click to drop checkpoint markers."}
+              </div>
+            </div>
+          )}
+          {showVariantMenu && (
+            <div style={{
+              position: "absolute", left: "100%", top: 0, marginLeft: 6, zIndex: 100,
+              background: "rgba(28,28,28,0.98)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 6, padding: 4, minWidth: 140,
+              display: "flex", flexDirection: "column", gap: 2,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+            }}>
+              {tool.variants!.map(v => {
+                const on = activeTool === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => onToolSelect(v.id)}
+                    style={{
+                      padding: "6px 10px", textAlign: "left", fontSize: 12, fontFamily: "monospace",
+                      cursor: "pointer", border: "none", borderRadius: 4, whiteSpace: "nowrap",
+                      background: on ? "rgba(80,140,255,0.25)" : "transparent",
+                      color: on ? "#cfe0ff" : "#c0c0c0",
+                    }}
+                    onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    {v.label}
+                  </button>
+                );
+              })}
+              <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+                {activeTool.startsWith("poly-") ? "Click to place vertices; Enter to close." : "Click-drag to paint a region."}
               </div>
             </div>
           )}
