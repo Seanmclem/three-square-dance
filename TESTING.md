@@ -559,3 +559,33 @@ let vis = {}; __scene.traverse(o => { if (o.userData?.editorId) vis[o.userData.e
 ```
 
 Editor edits, by contrast, go through `WorldState.updateObject` → persisted + undoable.
+
+---
+
+## 9. Testing File System Access flows without the native picker
+
+Import/save/delete flows (`ModelImporterModal`, thumbnail re-stage, asset delete)
+call `showDirectoryPicker()` / `showOpenFilePicker()`, which open **native** dialogs
+no automation tier can click. Don't click Save and abandon the test — stub the picker
+with an **OPFS-backed directory handle**, which implements the exact same
+`getFileHandle`/`createWritable`/`removeEntry` API the app code uses:
+
+```js
+const opfs = await navigator.storage.getDirectory();
+// seed whatever the flow expects to read (e.g. the manifest)
+const mtext = await fetch('/assets/models/manifest.json').then(r => r.text());
+const fh = await opfs.getFileHandle('manifest.json', { create: true });
+const w = await fh.createWritable(); await w.write(mtext); await w.close();
+window.showDirectoryPicker = async () => opfs;   // App reads it off window — plain property, overridable
+```
+
+Then click through the real UI. Afterwards, assert on OPFS contents (files written,
+manifest patched, PNG signatures) and on in-memory state (e.g. `<img>` srcs). Caveats:
+
+- The **real** `public/assets/...` folder is untouched, so `<img>` tags served by Vite
+  still show old files — verify state/bytes, not pixels, and leave the true
+  folder-grant write as a one-click human check.
+- Clean up OPFS when done: `for await (const [n] of opfs.entries()) await opfs.removeEntry(n, {recursive:true})`.
+
+First used for the v4.3.2 thumbnail re-stage save chain (see
+`test-plans/phase-15-thumbnail-stager.md`).
