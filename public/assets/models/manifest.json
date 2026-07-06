@@ -559,7 +559,8 @@
         "Walk_Gun",
         "Wave",
         "Yes"
-      ]
+      ],
+      "thumbnail": "/assets/models/character_thumb.png"
     },
     {
       "id": "donkey",
