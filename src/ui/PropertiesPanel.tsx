@@ -3,7 +3,7 @@ import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
-  GroupDef,
+  GroupDef, AttachedCollider, AttachedColliderShape,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -144,11 +144,11 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
-  animations: "Animations",
+  animations: "Animations", colliders: "Colliders",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -158,6 +158,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   seg:  "WALL SEGMENTS",
   vert: "ELEVATION",
   animations: "CLIPS · AUTO-PLAY",
+  colliders: "SHAPE · OFFSET · SENSOR",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -173,7 +174,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   floor:    ["mat", "vert"],
   platform: ["geo", "mat"],
   stair:    ["geo", "mat"],
-  object:   ["geo", "mat"],
+  object:   ["geo", "mat", "colliders"],
   opening:  ["geo"],
 };
 
@@ -230,6 +231,14 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       const assetId = (selected.data as WorldObject | null)?.assetId;
       const n = assets.find(a => a.id === assetId)?.animations?.length ?? 0;
       return `${n} clip${n !== 1 ? "s" : ""}`;
+    }
+    case "colliders": {
+      const obj = selected.data as WorldObject | null;
+      if (obj?.colliders !== undefined) {
+        const n = obj.colliders.length;
+        return n === 0 ? "none" : `${n} collider${n !== 1 ? "s" : ""}`;
+      }
+      return assets.find(a => a.id === obj?.assetId)?.collidable ? "auto box" : "none";
     }
   }
 }
@@ -294,6 +303,8 @@ interface PropertiesPanelProps {
   multiSelected?:           SelectedRef[];
   onCopy?:                  () => void;
   onDuplicate?:             () => void;
+  // Auto-fit box from the placed model's local AABB (null until the mesh is built).
+  defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -304,7 +315,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  multiSelected = [], onCopy, onDuplicate,
+  multiSelected = [], onCopy, onDuplicate, defaultColliderFor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -519,6 +530,13 @@ export function PropertiesPanel({
           />
         ) : currentScreen === "vert" ? (
           <VertScreen selected={selected} onObjectUpdate={onObjectUpdate} />
+        ) : currentScreen === "colliders" ? (
+          <CollidersScreen
+            selected={selected}
+            assets={assets}
+            onObjectUpdate={onObjectUpdate}
+            defaultColliderFor={defaultColliderFor}
+          />
         ) : null}
       </div>
 
@@ -1501,6 +1519,218 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           />
         )}
       </div>
+    </div>
+  );
+}
+
+// ── CollidersScreen ───────────────────────────────────────────────────────────
+
+const COLLIDER_SHAPES: AttachedColliderShape[] = ["box", "sphere", "capsule"];
+
+const COLLIDER_BTN = (active = false): React.CSSProperties => ({
+  flex: 1, padding: "5px 0", borderRadius: 4, cursor: active ? "default" : "pointer",
+  fontFamily: "monospace", fontSize: 10, textTransform: "capitalize",
+  border: `1px solid ${active ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.1)"}`,
+  background: active ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.9)",
+  color: active ? "#80aaff" : "#909090",
+});
+
+/** Re-derive size fields when a collider's shape changes so it stays roughly the same volume. */
+function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): AttachedCollider {
+  if (shape === c.shape) return c;
+  const s = c.size;
+  let size: Vec3;
+  if (shape === "box") {
+    size = c.shape === "sphere"
+      ? { x: s.x * 2, y: s.x * 2, z: s.x * 2 }        // sphere r → cube 2r
+      : { x: s.x * 2, y: s.y, z: s.x * 2 };            // capsule r,h → box 2r × h × 2r
+  } else if (shape === "sphere") {
+    size = { x: c.shape === "box" ? Math.max(s.x, s.y, s.z) / 2 : s.x, y: 0, z: 0 };
+  } else {
+    size = c.shape === "box"
+      ? { x: Math.max(s.x, s.z) / 2, y: s.y, z: 0 }    // box → capsule r = max(w,d)/2, h = height
+      : { x: s.x, y: s.x * 2, z: 0 };                  // sphere → capsule r, h = 2r
+  }
+  return { ...c, shape, size };
+}
+
+function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor }: {
+  selected:           SelectedObjectPayload;
+  assets:             AssetDef[];
+  onObjectUpdate:     (c: Partial<WorldObject>) => void;
+  defaultColliderFor?: (objectId: string) => AttachedCollider | null;
+}) {
+  const objData    = selected.data as WorldObject | null;
+  const colliders  = objData?.colliders;
+  const collidable = !!assets.find(a => a.id === objData?.assetId)?.collidable;
+  const defCol     = defaultColliderFor?.(selected.id) ?? null;
+
+  // Draft strings so intermediate input ("0.", "-") doesn't get clobbered; resync
+  // from data when it changes externally (handle drag) and no field here is focused.
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { schedule } = useFieldDebounce(300);
+
+  const buildDraft = (list: AttachedCollider[]): Record<string, string> => {
+    const d: Record<string, string> = {};
+    for (const c of list) {
+      d[`${c.id}.ox`] = String(c.offset.x); d[`${c.id}.oy`] = String(c.offset.y); d[`${c.id}.oz`] = String(c.offset.z);
+      d[`${c.id}.sx`] = String(c.size.x);   d[`${c.id}.sy`] = String(c.size.y);   d[`${c.id}.sz`] = String(c.size.z);
+      d[`${c.id}.ry`] = String(c.rotationY ?? 0);
+    }
+    return d;
+  };
+
+  useEffect(() => {
+    if (containerRef.current?.contains(document.activeElement)) return;
+    setDraft(buildDraft(colliders ?? []));
+  }, [selected.id, colliders]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const write = (next: AttachedCollider[]): void =>
+    onObjectUpdate({ colliders: next } as Partial<WorldObject>);
+
+  const newBox = (): AttachedCollider => ({
+    id:       `col_${crypto.randomUUID().slice(0, 8)}`,
+    shape:    "box",
+    offset:   defCol ? { ...defCol.offset } : { x: 0, y: 0.5, z: 0 },
+    size:     defCol ? { ...defCol.size }   : { x: 1, y: 1, z: 1 },
+    isSensor: false,
+  });
+
+  const updateCollider = (id: string, patch: Partial<AttachedCollider>): void =>
+    write((colliders ?? []).map(c => c.id === id ? { ...c, ...patch } : c));
+
+  // Numeric field: update draft immediately, debounce the data write.
+  const editField = (c: AttachedCollider, key: string, raw: string): void => {
+    setDraft(prev => {
+      const next = { ...prev, [`${c.id}.${key}`]: raw };
+      schedule(() => {
+        const g = (k: string, fallback: number): number => {
+          const v = next[`${c.id}.${k}`];
+          return v !== undefined ? toNum(v) : fallback;
+        };
+        updateCollider(c.id, {
+          offset:    { x: g("ox", c.offset.x), y: g("oy", c.offset.y), z: g("oz", c.offset.z) },
+          size:      { x: g("sx", c.size.x),   y: g("sy", c.size.y),   z: g("sz", c.size.z) },
+          rotationY: g("ry", c.rotationY ?? 0),
+        });
+      });
+      return next;
+    });
+  };
+
+  const numField = (c: AttachedCollider, key: string, label: string, color = "#909090"): React.ReactElement => (
+    <div key={key} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+      <span style={{ color, fontSize: 9, whiteSpace: "nowrap" }}>{label}</span>
+      <input
+        type="text" inputMode="decimal"
+        value={draft[`${c.id}.${key}`] ?? ""}
+        onChange={e => editField(c, key, e.target.value)}
+        style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+      />
+    </div>
+  );
+
+  const INFO: React.CSSProperties = { color: "#7a7a7a", fontSize: 10, lineHeight: 1.6 };
+  const ACTION_BTN: React.CSSProperties = {
+    padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
+    border: "1px solid rgba(80,140,255,0.3)", background: "rgba(80,140,255,0.12)", color: "#80aaff",
+  };
+
+  // Implicit state — no explicit array yet.
+  if (colliders === undefined) {
+    return (
+      <div ref={containerRef} style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={LABEL}>COLLISION</div>
+        <div style={INFO}>
+          {collidable
+            ? "Auto box collider fitted from the model's bounds — the player collides with it in preview and game. Customize to edit shape, size or offset."
+            : "This asset isn't marked collidable, so it has no automatic collider. Add one to make it solid."}
+        </div>
+        {collidable ? (
+          <>
+            <button style={ACTION_BTN} onClick={() => write([newBox()])}>Customize</button>
+            <button style={{ ...ACTION_BTN, borderColor: "rgba(255,107,107,0.3)", background: "rgba(200,60,60,0.1)", color: "#cc7777" }} onClick={() => write([])}>
+              Remove collision
+            </button>
+          </>
+        ) : (
+          <button style={ACTION_BTN} onClick={() => write([newBox()])}>+ Add collider</button>
+        )}
+      </div>
+    );
+  }
+
+  // Explicit list.
+  return (
+    <div ref={containerRef} style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {colliders.length === 0 && (
+        <div style={INFO}>No colliders — the player walks through this object.</div>
+      )}
+      {colliders.map(c => (
+        <div key={c.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ ...LABEL, marginBottom: 0 }}>{c.isSensor ? "SENSOR" : "SOLID"}</span>
+            <button
+              title="Remove collider"
+              onClick={() => write(colliders.filter(x => x.id !== c.id))}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#885555", fontSize: 12, lineHeight: 1, padding: "0 2px" }}
+            >✕</button>
+          </div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {COLLIDER_SHAPES.map(s => (
+              <button key={s} style={COLLIDER_BTN(c.shape === s)} disabled={c.shape === s}
+                onClick={() => write(colliders.map(x => x.id === c.id ? reshapeCollider(x, s) : x))}>
+                {s}
+              </button>
+            ))}
+          </div>
+          <div>
+            <div style={LABEL}>OFFSET</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {numField(c, "ox", "X", "#ff6b6b")}
+              {numField(c, "oy", "Y", "#6bff8a")}
+              {numField(c, "oz", "Z", "#6b8aff")}
+            </div>
+          </div>
+          <div>
+            <div style={LABEL}>{c.shape === "box" ? "SIZE" : c.shape === "sphere" ? "RADIUS" : "RADIUS · HEIGHT"}</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {c.shape === "box" && (
+                <>
+                  {numField(c, "sx", "W")}
+                  {numField(c, "sy", "H")}
+                  {numField(c, "sz", "D")}
+                </>
+              )}
+              {c.shape === "sphere" && numField(c, "sx", "R")}
+              {c.shape === "capsule" && (
+                <>
+                  {numField(c, "sx", "R")}
+                  {numField(c, "sy", "H")}
+                </>
+              )}
+            </div>
+          </div>
+          {c.shape === "box" && (
+            <div>
+              <div style={LABEL}>ROTATION (Y°)</div>
+              <div style={{ display: "flex", gap: 4 }}>{numField(c, "ry", "R°")}</div>
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={c.isSensor}
+              onChange={e => updateCollider(c.id, { isSensor: e.target.checked })}
+            />
+            <span style={{ fontSize: 10, color: "#9090a0" }}>
+              Sensor — fires on_player_enter / on_player_exit scripts instead of blocking
+            </span>
+          </label>
+        </div>
+      ))}
+      <button style={ACTION_BTN} onClick={() => write([...colliders, newBox()])}>+ Add collider</button>
     </div>
   );
 }

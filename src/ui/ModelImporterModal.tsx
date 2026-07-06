@@ -440,7 +440,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
               {/* Global collidable */}
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11 }}>
                 <input type="checkbox" checked={collidable} onChange={e => setCollidable(e.currentTarget.checked)} />
-                <span>Collidable (all)</span>
+                <span>Collidable (all) — auto box collider from model bounds</span>
               </label>
 
               {!modelsDir && (

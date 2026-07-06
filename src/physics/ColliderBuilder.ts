@@ -1,6 +1,7 @@
 import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "./PhysicsWorld";
-import type { WallDef, Vec2, PlatformDef, StairDef, Opening, TriggerVolume } from "@/types";
+import { colliderWorldTransform } from "./attachedColliderMath";
+import type { WallDef, Vec2, PlatformDef, StairDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
 
 export class ColliderBuilder {
   static registerFloor(
@@ -106,6 +107,21 @@ export class ColliderBuilder {
     const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
     return physicsWorld.createSensorCollider(desc);
+  }
+
+  /** Register a placed object's attached colliders (world transform composed from the object). */
+  static registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): RAPIER.Collider[] {
+    return colliders.map(c => {
+      const { pos, quat, halfExtents } = colliderWorldTransform(obj, c);
+      const desc =
+        c.shape === "box"    ? RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z) :
+        c.shape === "sphere" ? RAPIER.ColliderDesc.ball(halfExtents.x) :
+                               RAPIER.ColliderDesc.capsule(halfExtents.y, halfExtents.x);
+      desc.setTranslation(pos.x, pos.y, pos.z).setRotation(quat);
+      return c.isSensor
+        ? physicsWorld.createSensorCollider(desc)
+        : physicsWorld.createStaticCollider(desc);
+    });
   }
 
   static registerTerrain(

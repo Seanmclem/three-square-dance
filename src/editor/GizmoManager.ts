@@ -138,6 +138,13 @@ export class GizmoManager implements IEditorModule {
         });
       }),
 
+      // A collider face handle is hovered — suspend TransformControls so the handle wins
+      // the pick (TC's invisible picker zones blanket small objects). Editor-only: the
+      // ColliderEditor never hovers during preview, so this can't fight the game-mode disable.
+      this._bus.on("collider:handle-hover", ({ hovering }) => {
+        if (this._controls) this._controls.enabled = !hovering;
+      }),
+
       // Game mode: hide the gizmo (Preview keeps it). Restore on exit — visible only if
       // something is still attached, so an existing selection's gizmo reappears.
       this._bus.on("preview:start", ({ mode }) => {

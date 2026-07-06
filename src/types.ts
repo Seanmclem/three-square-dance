@@ -158,6 +158,9 @@ export interface BusEvents {
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };
   "gizmo:dragging":        { isDragging: boolean };
+  // A ColliderEditor face handle is under the cursor — GizmoManager suspends
+  // TransformControls so the handle wins the pick (its pickers overlap on small objects).
+  "collider:handle-hover": { hovering: boolean };
   "camera:jump":           { x: number; z: number };
   "camera:topdown":        Record<string, never>;
   "character:interact":       { objectId: string };
@@ -467,6 +470,18 @@ export interface ObjectProperties {
   triggerEventId: string | null;
 }
 
+export type AttachedColliderShape = "box" | "sphere" | "capsule";  // "hull" reserved for later
+
+/** A collider attached to a placed object in the object's local space. */
+export interface AttachedCollider {
+  id:         string;                 // col_<uuid8> — stable handle for list edits + drag handles
+  shape:      AttachedColliderShape;
+  offset:     Vec3;                   // local, pre-scale, relative to object origin
+  size:       Vec3;                   // box: full extents; sphere: x = radius; capsule: x = radius, y = full height
+  rotationY?: number;                 // deg, local yaw (box/capsule; ignored for sphere)
+  isSensor:   boolean;                // sensor fires on_player_enter/on_player_exit; solid blocks movement
+}
+
 export interface WorldObject {
   id:         string;
   label?:     string;   // optional human-friendly name; falls back to id
@@ -481,6 +496,8 @@ export interface WorldObject {
   groupIds?:  string[];
   autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
+  // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
+  colliders?: AttachedCollider[];
 }
 
 export interface ZoneDef {

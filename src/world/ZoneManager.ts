@@ -5,6 +5,8 @@ import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
+import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
+import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
@@ -47,6 +49,8 @@ interface ZoneEntry {
   platformEntries: Map<string, PlatformEntry>;
   stairEntries:    Map<string, StairEntry>;
   objectMeshes:    Map<string, THREE.Object3D>;
+  // Attached colliders per placed object (explicit colliders[] or the implicit auto-box)
+  objectColliders: Map<string, RAPIER.Collider[]>;
 }
 
 
@@ -249,6 +253,16 @@ export class ZoneManager {
         this._despawnEntity(id);
       }),
       this._bus.on("object:updated", ({ id, zoneId, changes }) => {
+        if (changes.position || changes.rotation || changes.scale || changes.colliders) {
+          const entry = this._loadedZones.get(zoneId);
+          const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
+          if (entry && obj) {
+            this._removeObjectColliders(entry, id);
+            // Merge changes over the data so script-driven moves (runtime-only,
+            // data untouched) still carry their colliders along.
+            this._buildObjectColliders(zoneId, { ...obj, ...changes }, entry);
+          }
+        }
         if (!changes.properties) return;
         const mesh = this._loadedZones.get(zoneId)?.objectMeshes.get(id);
         if (!mesh) return;
@@ -381,6 +395,7 @@ export class ZoneManager {
     const platformEntries = new Map<string, PlatformEntry>();
     const stairEntries    = new Map<string, StairEntry>();
     const objectMeshes    = new Map<string, THREE.Object3D>();
+    const objectColliders = new Map<string, RAPIER.Collider[]>();
 
     // ── Floors ────────────────────────────────────────────────────────────
     const floorsByLevel = new Map<number, typeof zone.floors>();
@@ -442,10 +457,12 @@ export class ZoneManager {
     }
 
     this._scene.add(group);
-    this._loadedZones.set(zoneId, {
+    const zoneEntry: ZoneEntry = {
       group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup,
-      floorColliders, wallData, platformEntries, stairEntries, objectMeshes,
-    });
+      floorColliders, wallData, platformEntries, stairEntries, objectMeshes, objectColliders,
+    };
+    this._loadedZones.set(zoneId, zoneEntry);
+    for (const obj of zone.objects) this._buildObjectColliders(zoneId, obj, zoneEntry);
 
     this._registerDoorSensors(zoneId);
     this._buildTriggerVolumes(zoneId, zone, group);
@@ -491,6 +508,9 @@ export class ZoneManager {
 
     for (const id of entry.objectMeshes.keys()) {
       this._objectPlacer.remove(id);
+    }
+    for (const id of [...entry.objectColliders.keys()]) {
+      this._removeObjectColliders(entry, id);
     }
 
     // Clear any dimming references for this zone's meshes
@@ -861,6 +881,38 @@ export class ZoneManager {
     const mesh = await this._objectPlacer.build(obj, zoneId);
     entry.objectsGroup.add(mesh);
     entry.objectMeshes.set(obj.id, mesh);
+    this._buildObjectColliders(zoneId, obj, entry);
+  }
+
+  /**
+   * Register an object's attached colliders: explicit colliders[] when set,
+   * else the implicit auto-fit box from the model's local AABB when the asset
+   * is collidable ([] = explicitly none). Sensor colliders join _volumeSensors
+   * so TriggerSystem fires on_player_enter/exit keyed to the object id.
+   */
+  private _buildObjectColliders(zoneId: string, obj: WorldObject, entry: ZoneEntry): void {
+    let effective = obj.colliders;
+    if (effective === undefined) {
+      const def  = assetManager.getAssetDef(obj.assetId);
+      const aabb = this._objectPlacer.getLocalAABB(obj.id);
+      effective = def?.collidable && aabb ? [defaultColliderFromAABB(aabb.center, aabb.size)] : [];
+    }
+    if (!effective.length) return;
+    const colliders = ColliderBuilder.registerAttachedColliders(obj, effective);
+    colliders.forEach((c, i) => {
+      if (effective![i]!.isSensor) this._volumeSensors.set(c.handle, obj.id);
+    });
+    entry.objectColliders.set(obj.id, colliders);
+  }
+
+  private _removeObjectColliders(entry: ZoneEntry, objectId: string): void {
+    const cols = entry.objectColliders.get(objectId);
+    if (!cols) return;
+    for (const c of cols) {
+      this._volumeSensors.delete(c.handle);
+      physicsWorld.removeCollider(c);
+    }
+    entry.objectColliders.delete(objectId);
   }
 
   private _removeObject(zoneId: string, objectId: string): void {
@@ -868,6 +920,7 @@ export class ZoneManager {
     if (!entry) return;
     const mesh = entry.objectMeshes.get(objectId);
     if (!mesh) return;
+    this._removeObjectColliders(entry, objectId);
     this._objectPlacer.remove(objectId);
     entry.objectsGroup.remove(mesh);
     mesh.traverse(child => {
@@ -918,6 +971,10 @@ export class ZoneManager {
         entry.floorsGroup.children.forEach(m => { if (m.userData["editorId"] === id) m.visible = visible; });
         return true;
       }
+
+      // Object: colliders only — ObjectPlacer owns the mesh hide/show for despawns.
+      const oc = entry.objectColliders.get(id);
+      if (oc) { for (const c of oc) c.setEnabled(visible); return true; }
 
       // A wall id may share a merged RunEntry with other walls — despawning one hides the run.
       const re = entry.wallData.get(id);

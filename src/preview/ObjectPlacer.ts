@@ -3,7 +3,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
-import type { WorldObject } from "@/types";
+import type { WorldObject, Vec3 } from "@/types";
 
 /** Default crossfade duration (seconds) when switching animation clips. */
 const BLEND_SEC = 0.3;
@@ -81,7 +81,19 @@ export class ObjectPlacer {
       } else {
         mesh = await assetManager.loadModel(obj.assetId);
       }
+      // Model-local AABB (before the object transform is applied) — feeds the
+      // auto-fit default collider and the Colliders panel. _applyTransform
+      // overwrites userData, so stash after it runs.
+      const box = new THREE.Box3().setFromObject(mesh);
       this._applyTransform(mesh, obj, zoneId);
+      if (!box.isEmpty()) {
+        const center = box.getCenter(new THREE.Vector3());
+        const size   = box.getSize(new THREE.Vector3());
+        mesh.userData["localAABB"] = {
+          center: { x: center.x, y: center.y, z: center.z },
+          size:   { x: size.x,   y: size.y,   z: size.z },
+        };
+      }
       if (clips.length) this._setupMixer(obj, mesh, clips);
       if (obj.material) void this._applyMaterial(obj.id, obj.material, mesh);
       return this._register(obj.id, mesh);
@@ -89,6 +101,12 @@ export class ObjectPlacer {
       console.warn(`ObjectPlacer: failed to load model for asset "${obj.assetId}"`, err);
       return this._register(obj.id, this._fallbackBox(obj, zoneId));
     }
+  }
+
+  /** Model-local AABB stashed at build time (null until the mesh has been built). */
+  getLocalAABB(objectId: string): { center: Vec3; size: Vec3 } | null {
+    const aabb = this._meshes.get(objectId)?.userData["localAABB"];
+    return (aabb as { center: Vec3; size: Vec3 } | undefined) ?? null;
   }
 
   /** Tear down an object's mixer/clip state. Geometry disposal is ZoneManager's job. */
@@ -282,7 +300,8 @@ export class ObjectPlacer {
     const box = new THREE.Mesh(geo, mat);
     box.position.set(obj.position.x, obj.position.y, obj.position.z);
     box.userData = { editorId: obj.id, editorType: "object", zoneId, selectable: true, floorLevel: obj.floor,
-      _ownsMaterial: true, interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact" };
+      _ownsMaterial: true, interactable: obj.properties.interactable, interactLabel: obj.properties.interactLabel ?? "Interact",
+      localAABB: { center: { x: 0, y: 0, z: 0 }, size: { x: 1, y: 1, z: 1 } } };
     return box;
   }
 }

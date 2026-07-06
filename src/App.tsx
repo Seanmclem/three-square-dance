@@ -24,6 +24,8 @@ import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { CheckpointTool } from "@/editor/CheckpointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
+import { ColliderEditor } from "@/editor/ColliderEditor";
+import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { StairCutterResizer } from "@/editor/StairCutterResizer";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { gameState, GAMESAVE_KEY, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
@@ -207,6 +209,7 @@ export default function App() {
     const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const stairCutterResizer = new StairCutterResizer(scene.scene, world, bus, scene.camera, canvas);
+    const colliderEditor  = new ColliderEditor(scene.scene, world, bus, scene.camera, canvas, objectPlacer);
     const scriptEngine    = new ScriptEngine(bus, world);
     scriptEngineRef.current = scriptEngine;
 
@@ -252,6 +255,7 @@ export default function App() {
     triggerVolumeTool.init();
     triggerVolumeResizer.init();
     stairCutterResizer.init();
+    colliderEditor.init();
 
     const writeAutosave = () => {
       if (!worldRef.current || restoringRef.current) return;
@@ -535,6 +539,7 @@ export default function App() {
       unsub.forEach(u => u());
       checkpointTool.dispose();
       spawnPointTool.dispose();
+      colliderEditor.dispose();
       stairCutterResizer.dispose();
       triggerVolumeResizer.dispose();
       triggerVolumeTool.dispose();
@@ -1505,6 +1510,8 @@ export default function App() {
         worldRef.current?.updateObject(selected.zoneId, selected.id, changes);
       });
       syncHistory();
+      // Mirror into the selection payload so panel screens (e.g. Colliders) see edits live.
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as WorldObject), ...changes } } : null);
     }
   };
 
@@ -1687,6 +1694,10 @@ export default function App() {
         onAutoPlayChange={(objectId, clipName) => {
           objectPlacerRef.current?.setAutoPlay(objectId, clipName);
           if (selected) worldRef.current?.updateObject(selected.zoneId, objectId, { autoPlayAnimation: clipName });
+        }}
+        defaultColliderFor={objectId => {
+          const aabb = objectPlacerRef.current?.getLocalAABB(objectId);
+          return aabb ? defaultColliderFromAABB(aabb.center, aabb.size) : null;
         }}
       />
       <CoordinateDisplay coords={coords} />

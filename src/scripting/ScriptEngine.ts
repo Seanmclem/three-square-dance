@@ -84,11 +84,13 @@ export class ScriptEngine {
       for (const s of obj.scripts ?? []) {
         // Normalise the per-object trigger target so the index key matches what fire() looks up:
         //  - on_interact's target is always the owning object → key on_interact:<objId>
+        //  - on_player_enter/exit on an object = its attached sensor colliders, which report
+        //    the object id through the volume-sensor path → key <trigger>:<objId>
         //  - target-less triggers (on_game_start/on_timer/on_level_load/…) fire with null and
         //    must key to the wildcard; an old ScriptPanel set targetId = objId on these, which
         //    mis-keys them so they never fire — strip that stale id.
         let trig = s.trigger;
-        if (trig.type === "on_interact") {
+        if (trig.type === "on_interact" || trig.type === "on_player_enter" || trig.type === "on_player_exit") {
           trig = { ...trig, targetId: obj.id };
         } else if (trig.targetId === obj.id) {
           trig = { ...trig, targetId: undefined };
