@@ -128,5 +128,10 @@ export class WallSplitter implements IEditorModule {
 
     // Selects the run (or refreshes the panel if already selected) + syncs history UI.
     this._bus.emit("tool:placed", { type: "wall", id: wall.id, zoneId });
+
+    // Flash the new second half so the split is visible (the run re-merges seamlessly,
+    // so without this there's no visual cue that anything happened).
+    this._bus.emit("wall:segment-hover", { zoneId, wallId: newWallId });
+    window.setTimeout(() => this._bus.emit("wall:segment-hover", { zoneId, wallId: null }), 700);
   }
 }

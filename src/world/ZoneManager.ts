@@ -121,6 +121,12 @@ export class ZoneManager {
   private readonly _pendingRebuild = new Map<string, Set<string>>();
   private _rebuildScheduled = false;
 
+  // Serializes _rebuildWallBatch/_removeWall: both mutate wallData/wallsGroup across
+  // awaits, and two in flight at once each rebuild the same surviving run → stacked
+  // duplicate meshes + an orphan (undoing a wall split emits wall:updated AND
+  // wall:removed in one tick and hit exactly that).
+  private _wallOpChain: Promise<void> = Promise.resolve();
+
   // Pending polygon-platform rebuild requests — same coalescing pattern
   private readonly _pendingPlatformRebuild = new Map<string, Set<string>>();
   private _platformRebuildScheduled = false;
@@ -202,7 +208,7 @@ export class ZoneManager {
         this._queueRebuild(zoneId, wallId);
       }),
       this._bus.on("wall:removed", ({ zoneId, wallId }) => {
-        void this._removeWall(zoneId, wallId);
+        this._enqueueWallOp(() => this._removeWall(zoneId, wallId));
       }),
       this._bus.on("node:updated", ({ zoneId, nodeId }) => {
         const zone = this._worldState.zones.get(zoneId);
@@ -338,10 +344,17 @@ export class ZoneManager {
         for (const [zid, ids] of this._pendingRebuild) {
           const snapshot = [...ids];
           this._pendingRebuild.delete(zid);
-          void this._rebuildWallBatch(zid, snapshot);
+          this._enqueueWallOp(() => this._rebuildWallBatch(zid, snapshot));
         }
       });
     }
+  }
+
+  /** Run wall mesh ops strictly one at a time (see _wallOpChain). */
+  private _enqueueWallOp(op: () => Promise<void>): void {
+    this._wallOpChain = this._wallOpChain
+      .then(() => op())
+      .catch(err => { console.error("[ZoneManager] wall op failed", err); });
   }
 
   private _queuePlatformRebuild(zoneId: string, platformId: string): void {

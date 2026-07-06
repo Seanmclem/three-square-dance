@@ -31,6 +31,21 @@ the segment in the canvas (`wall:segment-hover` → `SegmentHighlighter` overlay
       the gap (nothing solid behind) re-selects the run via the ghost
 - [x] Unhide round-trip: back to 36 tris / 4 colliders / no ghost / no badge
 
+## v4.5.1 follow-up — undo-race fix (done 2026-07-06)
+
+User-reported: split×N → undo×N left a flickering duplicate (z-fighting) wall;
+moving it appeared to fail; undoing the move left walls in both positions.
+Root cause: `wall:updated` + `wall:removed` from one undo tick ran
+`_rebuildWallBatch` and `_removeWall` concurrently — both rebuilt the same
+surviving run, adding a tracked mesh AND an untracked orphan. Fixed by
+serializing all wall mesh ops through `ZoneManager._wallOpChain`.
+
+- [x] split×2 then Cmd+Z×2 back-to-back: 0 orphan meshes (every wallsGroup
+      child tracked by a RunEntry), data reverted, run re-merged, colliders correct
+- [x] node move + undo: 0 orphans, node position restored
+- [x] WallSplitter flashes the new half (segment-highlight box, 700ms) so a
+      split is visible even though the run re-merges seamlessly
+
 ## Manual spot-checks (human)
 
 - [ ] Right-click split feel: RMB-orbit never splits (only a stationary RMB tap
