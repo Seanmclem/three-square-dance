@@ -1723,7 +1723,7 @@ export default function App() {
         />
       )}
 
-      <FpsCounter getInfo={getRenderInfo} />
+      {isPreview && <FpsCounter getInfo={getRenderInfo} />}
 
       {!isGame && (
         <div style={{

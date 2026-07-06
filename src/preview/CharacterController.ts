@@ -51,6 +51,8 @@ export class CharacterController {
   private _yaw     = 0;
   private _pitch   = 0;
   private _velY    = 0;
+  // Edge-triggered jump: must release Space before it fires again (no auto-bounce on landing).
+  private _jumpArmed = true;
   private readonly _keys = new Set<string>();
 
   private readonly _interactSeen = new Set<string>();   // dedupe interactables when rebuilding the cache
@@ -156,10 +158,15 @@ export class CharacterController {
     if (isMoving) dir.normalize().multiplyScalar(speed * dt);
     dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
 
+    const jumpHeld = this._keys.has("Space");
+    if (!jumpHeld) this._jumpArmed = true;   // re-arm on release
     if (this._body.isGrounded) {
-      this._velY = this._keys.has("Space")
-        ? Math.sqrt(2 * 9.81 * this._settings.jumpHeight)
-        : 0;
+      if (jumpHeld && this._jumpArmed) {
+        this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
+        this._jumpArmed = false;
+      } else {
+        this._velY = 0;
+      }
     } else {
       this._velY -= 20 * dt;
     }
