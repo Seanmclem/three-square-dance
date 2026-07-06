@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { assetManager } from "@/core/AssetManager";
 import { colliderWorldTransform, defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
@@ -60,6 +61,13 @@ export class ColliderEditor implements IEditorModule {
   private _state: "IDLE" | "DRAG" = "IDLE";
   private _drag: DragState | null = null;
 
+  // Editor-session UI state driven by the Colliders panel (reset on selection change).
+  private readonly _hidden = new Set<string>();     // collider ids with visuals hidden
+  private _moveId: string | null = null;            // collider with the translate gizmo
+  private _moveControls: TransformControls | null = null;
+  private readonly _moveProxy = new THREE.Group();
+  private _moveDragging = false;
+
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _unsubs: Array<() => void> = [];
 
@@ -73,6 +81,22 @@ export class ColliderEditor implements IEditorModule {
   ) {}
 
   init(): void {
+    // Per-collider translate gizmo: TransformControls on a proxy at the collider's
+    // world center; dragging writes the offset back through updateObject (undo via
+    // the surrounding transaction, same as the face handles).
+    this._moveControls = new TransformControls(this._camera, this._canvas);
+    this._moveControls.setMode("translate");
+    this._moveControls.setSize(0.5);
+    this._scene.add(this._moveProxy);
+    this._scene.add(this._moveControls);
+    this._moveControls.addEventListener("dragging-changed", e => {
+      this._moveDragging = e.value as boolean;
+      this._bus.emit("gizmo:dragging", { isDragging: this._moveDragging });
+      if (this._moveDragging) this._world.beginTransaction("move collider");
+      else { this._world.commitTransaction(); this._sync(); }
+    });
+    this._moveControls.addEventListener("objectChange", () => this._onMoveGizmoChange());
+
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
@@ -82,20 +106,34 @@ export class ColliderEditor implements IEditorModule {
       this._bus.on("object:selected", payload => {
         this._selectedId = payload.type === "object" ? payload.id : null;
         if (payload.type === "object" && payload.zoneId) this._activeZoneId = payload.zoneId;
+        this._resetPanelState();
         this._sync();
       }),
-      this._bus.on("object:deselected", () => { this._selectedId = null; this._sync(); }),
+      this._bus.on("object:deselected", () => { this._selectedId = null; this._resetPanelState(); this._sync(); }),
       this._bus.on("zone:activated", ({ zoneId }) => {
         this._activeZoneId = zoneId;
         this._selectedId = null;
+        this._resetPanelState();
         this._sync();
       }),
       this._bus.on("object:removed", ({ id }) => {
-        if (id === this._selectedId) { this._selectedId = null; this._sync(); }
+        if (id === this._selectedId) { this._selectedId = null; this._resetPanelState(); this._sync(); }
       }),
-      // External change (panel edit, gizmo commit). Skip mid-drag — we rebuild inline.
+      // External change (panel edit, gizmo commit). Skip mid-drag — we reposition inline.
       this._bus.on("object:updated", ({ id }) => {
-        if (id === this._selectedId && this._state !== "DRAG") this._sync();
+        if (id === this._selectedId && this._state !== "DRAG" && !this._moveDragging) this._sync();
+      }),
+      // Colliders panel toggles (editor-session UI state).
+      this._bus.on("collider:hidden", ({ objectId, hidden }) => {
+        if (objectId !== this._selectedId) return;
+        this._hidden.clear();
+        for (const id of hidden) this._hidden.add(id);
+        this._sync();
+      }),
+      this._bus.on("collider:move", ({ objectId, colliderId }) => {
+        if (objectId !== this._selectedId) return;
+        this._setMove(colliderId);
+        this._sync();
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
@@ -131,6 +169,72 @@ export class ColliderEditor implements IEditorModule {
     this._unsubs.forEach(u => u());
     this._unsubs.length = 0;
     this._clearVisuals();
+    if (this._moveControls) {
+      this._moveControls.detach();
+      this._scene.remove(this._moveControls);
+      this._moveControls.dispose();
+      this._moveControls = null;
+    }
+    this._scene.remove(this._moveProxy);
+  }
+
+  /** Clear panel-driven state (hidden set + move gizmo) when the selection changes. */
+  private _resetPanelState(): void {
+    this._hidden.clear();
+    this._setMove(null);
+  }
+
+  private _setMove(colliderId: string | null): void {
+    if (colliderId === this._moveId) return;
+    this._moveId = colliderId;
+    // The object gizmo sits on top of most colliders — keep it out of the way
+    // while a collider is being placed.
+    this._bus.emit("gizmo:suspend", { source: "collider-move", suspended: colliderId !== null });
+  }
+
+  /** Attach/detach + position the translate gizmo for the focused collider. */
+  private _syncMoveGizmo(): void {
+    const mc = this._moveControls;
+    if (!mc) return;
+    const obj = this._shouldShow() ? this._selectedObject() : undefined;
+    const c = obj && this._moveId ? this._effectiveColliders(obj).list.find(x => x.id === this._moveId) : undefined;
+    if (!obj || !c || this._hidden.has(c.id)) {
+      mc.detach();
+      mc.visible = false;
+      return;
+    }
+    if (!this._moveDragging) {
+      const t = colliderWorldTransform(obj, c);
+      this._moveProxy.position.set(t.pos.x, t.pos.y, t.pos.z);
+    }
+    mc.attach(this._moveProxy);
+    mc.visible = true;
+  }
+
+  /** Translate-gizmo drag: proxy world position → collider local offset (pre-scale). */
+  private _onMoveGizmoChange(): void {
+    const obj = this._selectedObject();
+    if (!obj || !this._moveId || !this._selectedId) return;
+    const { list } = this._effectiveColliders(obj);
+    const c = list.find(x => x.id === this._moveId);
+    if (!c) return;
+
+    const DEG2RAD = Math.PI / 180;
+    const invQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      obj.rotation.x * DEG2RAD, obj.rotation.y * DEG2RAD, obj.rotation.z * DEG2RAD,
+    )).invert();
+    const local = this._moveProxy.position.clone()
+      .sub(new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z))
+      .applyQuaternion(invQuat);
+    const offset: Vec3 = {
+      x: +(local.x / (obj.scale.x || 1)).toFixed(3),
+      y: +(local.y / (obj.scale.y || 1)).toFixed(3),
+      z: +(local.z / (obj.scale.z || 1)).toFixed(3),
+    };
+    // Writing the full array materializes the implicit auto-box, like the face handles.
+    const next = list.map(x => x.id === this._moveId ? { ...x, offset } : x);
+    this._world.updateObject(this._activeZoneId, this._selectedId, { colliders: next });
+    this._positionAll();
   }
 
   // ── Data access ─────────────────────────────────────────────────────────────
@@ -158,11 +262,13 @@ export class ColliderEditor implements IEditorModule {
 
   private _sync(): void {
     this._clearVisuals();
+    this._syncMoveGizmo();
     if (!this._shouldShow()) return;
     const obj = this._selectedObject();
     if (!obj) return;
     const { list } = this._effectiveColliders(obj);
     for (const c of list) {
+      if (this._hidden.has(c.id)) continue;   // panel eye-toggle: skip visuals entirely
       this._buildWireframe(obj, c);
       if (c.shape === "box") this._buildHandles(c.id);
     }

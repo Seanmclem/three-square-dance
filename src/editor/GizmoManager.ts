@@ -41,6 +41,12 @@ export class GizmoManager implements IEditorModule {
   private _rotateStartAngle = 0;
   private _rotateAttached   = false;
 
+  // Controls-enabled gating: game mode wins, then any suspend source (Colliders
+  // panel toggle / collider move gizmo), then the transient handle-hover mute.
+  private _inGame    = false;
+  private _hoverMute = false;
+  private readonly _suspends = new Set<string>();
+
   // Wall-run node IDs and wall IDs collected at selection time
   private _wallNodeIds: string[] = [];
   private _wallRunIds:  string[] = [];
@@ -142,22 +148,23 @@ export class GizmoManager implements IEditorModule {
       // the pick (TC's invisible picker zones blanket small objects). Editor-only: the
       // ColliderEditor never hovers during preview, so this can't fight the game-mode disable.
       this._bus.on("collider:handle-hover", ({ hovering }) => {
-        if (this._controls) this._controls.enabled = !hovering;
+        this._hoverMute = hovering;
+        this._applyControlsEnabled();
+      }),
+      // Longer-lived suspensions (Colliders panel toggle, collider move gizmo).
+      this._bus.on("gizmo:suspend", ({ source, suspended }) => {
+        if (suspended) this._suspends.add(source); else this._suspends.delete(source);
+        this._applyControlsEnabled();
       }),
 
       // Game mode: hide the gizmo (Preview keeps it). Restore on exit — visible only if
       // something is still attached, so an existing selection's gizmo reappears.
       this._bus.on("preview:start", ({ mode }) => {
-        if (mode === "game" && this._controls) {
-          this._controls.visible = false;
-          this._controls.enabled = false;
-        }
+        if (mode === "game") { this._inGame = true; this._applyControlsEnabled(); }
       }),
       this._bus.on("preview:stop", () => {
-        if (this._controls) {
-          this._controls.enabled = true;
-          this._controls.visible = this._controls.object != null;
-        }
+        this._inGame = false;
+        this._applyControlsEnabled();
       }),
 
       this._bus.on("input:keydown", ({ code, ctrl, meta }) => {
@@ -178,6 +185,19 @@ export class GizmoManager implements IEditorModule {
   }
 
   update(_dt: number): void {}
+
+  /** Recompute controls enabled/visible from game mode, suspend sources, and hover mute. */
+  private _applyControlsEnabled(): void {
+    if (!this._controls) return;
+    if (this._inGame) {
+      this._controls.enabled = false;
+      this._controls.visible = false;
+      return;
+    }
+    const suspended = this._suspends.size > 0;
+    this._controls.enabled = !suspended && !this._hoverMute;
+    this._controls.visible = !suspended && this._controls.object != null;
+  }
 
   dispose(): void {
     this._unsubs.forEach(u => u());

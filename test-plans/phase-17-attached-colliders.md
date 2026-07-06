@@ -53,3 +53,20 @@ Colliders screen in the PropertiesPanel, wireframes + box face handles
   matrices (no rAF). Drive the module via bus events after
   `scene.updateMatrixWorld(true)` (see this phase's verification) or test in a
   foreground tab.
+
+## v4.4.1 addendum — editing UX toggles (verified 2026-07-06)
+
+- [x] "Hide object move gizmo while editing colliders" checkbox suspends
+      TransformControls (viewport arrows disappear; restored on screen close)
+- [x] Per-collider **Move** button shows a smaller translate gizmo on that
+      collider; real mouse drag moved offset.y 0.46→1.688 with the OBJECT
+      position untouched; one Cmd+Z reverted; object gizmo auto-suspended
+      while the collider gizmo is active
+- [x] Per-collider **👁** hides only that collider's wireframe + handles
+      (card dims; physics unaffected); hiding the move-focused collider also
+      drops its gizmo
+- [x] All three reset on screen close / selection change (React cleanup +
+      ColliderEditor._resetPanelState)
+
+Manual: with two overlapping colliders, hide one, resize the other via
+handles, then swap — no cross-grabbing.

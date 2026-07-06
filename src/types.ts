@@ -161,6 +161,13 @@ export interface BusEvents {
   // A ColliderEditor face handle is under the cursor — GizmoManager suspends
   // TransformControls so the handle wins the pick (its pickers overlap on small objects).
   "collider:handle-hover": { hovering: boolean };
+  // Suspend/restore the object TransformControls. Sources are independent (panel
+  // toggle, collider move gizmo) — the gizmo stays off while any source suspends.
+  "gizmo:suspend":         { source: string; suspended: boolean };
+  // Toggle the per-collider translate gizmo (null = off). Editor-session only.
+  "collider:move":         { objectId: string; colliderId: string | null };
+  // Per-collider editor visibility (hidden wireframes/handles). Editor-session only.
+  "collider:hidden":       { objectId: string; hidden: string[] };
   "camera:jump":           { x: number; z: number };
   "camera:topdown":        Record<string, never>;
   "character:interact":       { objectId: string };

@@ -536,6 +536,7 @@ export function PropertiesPanel({
             assets={assets}
             onObjectUpdate={onObjectUpdate}
             defaultColliderFor={defaultColliderFor}
+            bus={bus}
           />
         ) : null}
       </div>
@@ -1554,16 +1555,47 @@ function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): Att
   return { ...c, shape, size };
 }
 
-function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor }: {
+function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor, bus }: {
   selected:           SelectedObjectPayload;
   assets:             AssetDef[];
   onObjectUpdate:     (c: Partial<WorldObject>) => void;
   defaultColliderFor?: (objectId: string) => AttachedCollider | null;
+  bus?:               EventBus;
 }) {
   const objData    = selected.data as WorldObject | null;
   const colliders  = objData?.colliders;
   const collidable = !!assets.find(a => a.id === objData?.assetId)?.collidable;
   const defCol     = defaultColliderFor?.(selected.id) ?? null;
+
+  // Editor-session toggles (never persisted): hide the object's own move gizmo while
+  // placing colliders, give one collider a translate gizmo, hide individual colliders'
+  // wireframes/handles so overlapping ones don't fight. All reset when the screen closes.
+  const [hideObjGizmo, setHideObjGizmo] = useState(false);
+  const [moveId,       setMoveId]       = useState<string | null>(null);
+  const [hiddenIds,    setHiddenIds]    = useState<Set<string>>(new Set());
+
+  useEffect(() => () => {
+    bus?.emit("gizmo:suspend",  { source: "colliders-panel", suspended: false });
+    bus?.emit("collider:move",  { objectId: selected.id, colliderId: null });
+    bus?.emit("collider:hidden", { objectId: selected.id, hidden: [] });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleObjGizmo = (hide: boolean): void => {
+    setHideObjGizmo(hide);
+    bus?.emit("gizmo:suspend", { source: "colliders-panel", suspended: hide });
+  };
+  const toggleMove = (id: string): void => {
+    const next = moveId === id ? null : id;
+    setMoveId(next);
+    bus?.emit("collider:move", { objectId: selected.id, colliderId: next });
+  };
+  const toggleHidden = (id: string): void => {
+    const n = new Set(hiddenIds);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    setHiddenIds(n);
+    bus?.emit("collider:hidden", { objectId: selected.id, hidden: [...n] });
+    if (n.has(id) && moveId === id) toggleMove(id);   // hiding the focused collider drops its gizmo
+  };
 
   // Draft strings so intermediate input ("0.", "-") doesn't get clobbered; resync
   // from data when it changes externally (handle drag) and no field here is focused.
@@ -1637,11 +1669,19 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor 
     border: "1px solid rgba(80,140,255,0.3)", background: "rgba(80,140,255,0.12)", color: "#80aaff",
   };
 
+  const objGizmoToggle = (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+      <input type="checkbox" checked={hideObjGizmo} onChange={e => toggleObjGizmo(e.target.checked)} />
+      <span style={{ fontSize: 10, color: "#9090a0" }}>Hide object move gizmo while editing colliders</span>
+    </label>
+  );
+
   // Implicit state — no explicit array yet.
   if (colliders === undefined) {
     return (
       <div ref={containerRef} style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={LABEL}>COLLISION</div>
+        {objGizmoToggle}
         <div style={INFO}>
           {collidable
             ? "Auto box collider fitted from the model's bounds — the player collides with it in preview and game. Customize to edit shape, size or offset."
@@ -1664,18 +1704,39 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor 
   // Explicit list.
   return (
     <div ref={containerRef} style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {objGizmoToggle}
       {colliders.length === 0 && (
         <div style={INFO}>No colliders — the player walks through this object.</div>
       )}
       {colliders.map(c => (
-        <div key={c.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div key={c.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 5, padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 8, opacity: hiddenIds.has(c.id) ? 0.55 : 1 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
             <span style={{ ...LABEL, marginBottom: 0 }}>{c.isSensor ? "SENSOR" : "SOLID"}</span>
-            <button
-              title="Remove collider"
-              onClick={() => write(colliders.filter(x => x.id !== c.id))}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#885555", fontSize: 12, lineHeight: 1, padding: "0 2px" }}
-            >✕</button>
+            <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <button
+                title={hiddenIds.has(c.id) ? "Show in editor" : "Hide in editor (wireframe + handles)"}
+                onClick={() => toggleHidden(c.id)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, lineHeight: 1, padding: "0 2px", opacity: hiddenIds.has(c.id) ? 0.35 : 1 }}
+              >👁</button>
+              <button
+                title="Toggle a move gizmo on this collider"
+                onClick={() => toggleMove(c.id)}
+                style={{
+                  padding: "2px 7px", borderRadius: 3, cursor: "pointer", fontFamily: "monospace", fontSize: 9,
+                  border: `1px solid ${moveId === c.id ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"}`,
+                  background: moveId === c.id ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
+                  color: moveId === c.id ? "#80aaff" : "#808080",
+                }}
+              >Move</button>
+              <button
+                title="Remove collider"
+                onClick={() => {
+                  if (moveId === c.id) toggleMove(c.id);
+                  write(colliders.filter(x => x.id !== c.id));
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#885555", fontSize: 12, lineHeight: 1, padding: "0 2px" }}
+              >✕</button>
+            </span>
           </div>
           <div style={{ display: "flex", gap: 4 }}>
             {COLLIDER_SHAPES.map(s => (
