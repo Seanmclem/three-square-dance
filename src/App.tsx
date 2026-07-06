@@ -43,6 +43,8 @@ import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
+import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
+import { dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema } from "@/types";
 
@@ -115,6 +117,7 @@ export default function App() {
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
   >(null);
   const [pendingAssetEdit,    setPendingAssetEdit]    = useState<PendingEdit | null>(null);
+  const [stagingAsset,        setStagingAsset]        = useState<AssetDef | null>(null);
   const [pendingMaterialEdit, setPendingMaterialEdit] = useState<PendingEdit | null>(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
@@ -1311,6 +1314,34 @@ export default function App() {
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
   };
 
+  // Write a re-staged thumbnail PNG next to the model + point the manifest at it.
+  const handleSaveThumbnail = async (asset: AssetDef, dataUrl: string): Promise<void> => {
+    setStagingAsset(null);
+    const dir = await ensureDir(modelsDir, setModelsDir);
+    if (!dir) return;
+    const fileName =
+      asset.thumbnail?.split("/").pop()?.split("?")[0] ||
+      `${(asset.path.split("/").pop() ?? asset.id).replace(/\.[^.]+$/, "")}_thumb.png`;
+    const cleanPath = `/assets/models/${fileName}`;
+    try {
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const fw = await fh.createWritable();
+      await fw.write(dataURLtoArrayBuffer(dataUrl));
+      await fw.close();
+
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
+      data.assets = data.assets.map(a => a.id === asset.id ? { ...a, thumbnail: cleanPath } : a);
+      const mw = await mh.createWritable();
+      await mw.write(JSON.stringify(data, null, 2));
+      await mw.close();
+    } catch (err) { console.error("thumbnail save failed:", err); return; }
+    // ?v= busts the <img> cache in-session; the manifest keeps the clean path.
+    assetManager.updateAsset(asset.id, { thumbnail: `${cleanPath}?v=${Date.now()}` });
+    setAssets(assetManager.getAssetList());
+    busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
+  };
+
   const handleConfirmMaterialEdit = async (patch: EditPatch): Promise<void> => {
     const pending = pendingMaterialEdit;
     setPendingMaterialEdit(null);
@@ -1577,6 +1608,7 @@ export default function App() {
         onImport={() => setShowImporter(true)}
         onDeleteAssets={handleRequestAssetDelete}
         onEditAssets={handleRequestAssetEdit}
+        onRestageAsset={id => { const a = assets.find(x => x.id === id); if (a) setStagingAsset(a); }}
         materials={materialList}
         onMaterialImport={openMaterialImporter}
         onDeleteMaterials={handleRequestMaterialDelete}
@@ -1790,6 +1822,15 @@ SquareDance
           folderHint="public/assets/models"
           onCancel={() => setPendingAssetEdit(null)}
           onSave={patch => void handleConfirmAssetEdit(patch)}
+        />
+      )}
+
+      {stagingAsset && (
+        <ThumbnailStagerModal
+          asset={stagingAsset}
+          needsFolderGrant={!modelsDir}
+          onCancel={() => setStagingAsset(null)}
+          onSave={dataUrl => void handleSaveThumbnail(stagingAsset, dataUrl)}
         />
       )}
 

@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { LoadingManager } from "three";
 import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
-import { renderModelThumbnail } from "@/editor/thumbnailRenderer";
+import { renderModelThumbnail, releaseThumbnailRenderer, dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { AttributionFields } from "@/ui/AttributionFields";
 
 interface Props {
@@ -46,14 +46,6 @@ type FSPicker = {
   showOpenFilePicker:  (opts: unknown) => Promise<FileSystemFileHandle[]>;
   showDirectoryPicker: (opts: unknown) => Promise<FileSystemDirectoryHandle>;
 };
-
-function dataURLtoArrayBuffer(dataUrl: string): ArrayBuffer {
-  const base64 = dataUrl.split(",")[1] ?? "";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)!;
-  return bytes.buffer;
-}
 
 async function generateThumbnail(
   handle: FileSystemFileHandle,
@@ -278,6 +270,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
         console.warn(`Import failed for ${entry.modelHandle.name}:`, err);
       }
     }
+    releaseThumbnailRenderer();
 
     // Write manifest once after all imports
     try {

@@ -13,6 +13,7 @@ interface LeftPanelProps {
   onImport:        () => void;
   onDeleteAssets:  (ids: string[]) => void;
   onEditAssets:    (ids: string[]) => void;
+  onRestageAsset:  (id: string) => void;
   materials:        MaterialDef[];
   onMaterialImport: () => void;
   onDeleteMaterials:(ids: string[]) => void;
@@ -50,7 +51,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onClose,
+  panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
@@ -109,6 +110,7 @@ export function LeftPanel({
                 onImport={onImport}
                 onDeleteAssets={onDeleteAssets}
                 onEdit={onEditAssets}
+                onRestage={onRestageAsset}
               />
             )}
             {panelId === "materials" && (

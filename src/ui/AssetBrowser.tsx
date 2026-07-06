@@ -21,9 +21,10 @@ interface AssetBrowserProps {
   onImport:        () => void;
   onDeleteAssets:  (ids: string[]) => void;
   onEdit:          (ids: string[]) => void;
+  onRestage:       (id: string) => void;
 }
 
-export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDeleteAssets, onEdit }: AssetBrowserProps) {
+export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDeleteAssets, onEdit, onRestage }: AssetBrowserProps) {
   const [search,   setSearch]   = useState("");
   const [category, setCategory] = useState<AssetCategory | "All">("All");
   const [popoutOpen, setPopoutOpen] = useState(false);
@@ -249,6 +250,20 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
               }}
             >
               Edit{checked.size ? ` (${checked.size})` : ""}
+            </button>
+            <button
+              onClick={() => { if (checked.size === 1) onRestage([...checked][0]!); }}
+              disabled={checked.size !== 1}
+              title="Re-stage thumbnail (select exactly one)"
+              style={{
+                flexShrink: 0, padding: "5px 8px",
+                background: checked.size === 1 ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size === 1 ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size === 1 ? "pointer" : "default",
+                color: checked.size === 1 ? "#80aaff" : "#555", fontSize: 10,
+              }}
+            >
+              📷
             </button>
             <button
               onClick={() => { if (checked.size) onDeleteAssets([...checked]); }}
