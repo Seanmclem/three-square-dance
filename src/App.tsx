@@ -50,7 +50,7 @@ import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
 import { dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -970,6 +970,19 @@ export default function App() {
     });
   };
 
+  // Batched so a rect POSITION/SIZE commit (4 nodes) is one undo step. No setSelected
+  // patch needed: node positions aren't in the payload — floor:rebuilt re-emits selection.
+  const handleFloorNodesUpdate = (updates: Array<{ nodeId: string; x: number; z: number }>, label = "move floor vertex"): void => {
+    if (!selected || updates.length === 0) return;
+    worldRef.current?.transaction(label, () => {
+      for (const u of updates) worldRef.current?.updateNode(selected.zoneId, u.nodeId, { x: u.x, z: u.z });
+    });
+    syncHistory();
+  };
+
+  const getNodeLinks = (zoneId: string, nodeId: string): NodeLinks =>
+    worldRef.current?.getNodeLinks(zoneId, nodeId) ?? { wallIds: [], floorIds: [], platformIds: [] };
+
   const handleCopyRunToFloor = (targetLevel: number): void => {
     const world = worldRef.current;
     if (!selected || selected.type !== "wall" || !world) return;
@@ -1680,6 +1693,8 @@ export default function App() {
         quality={quality}
         onObjectUpdate={handleObjectUpdate}
         onSegmentUpdate={handleSegmentUpdate}
+        onFloorNodesUpdate={handleFloorNodesUpdate}
+        getNodeLinks={getNodeLinks}
         onImportMaterial={openMaterialImporter}
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}

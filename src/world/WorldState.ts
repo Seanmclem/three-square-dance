@@ -3,7 +3,7 @@ import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, GroupDef,
+  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, GroupDef, NodeLinks,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -165,10 +165,16 @@ export class WorldState {
     return this.zones.get(zoneId)?.nodes.find(n => n.id === nodeId);
   }
 
-  getWallsAtNode(zoneId: string, nodeId: string): WallDef[] {
+  /** Every entity referencing a node — walls (start/end), floors (floorMesh.nodeIds),
+   *  platforms (nodeIds). Same reference model as _pruneOrphanNodes. */
+  getNodeLinks(zoneId: string, nodeId: string): NodeLinks {
     const zone = this.zones.get(zoneId);
-    if (!zone) return [];
-    return zone.walls.filter(w => w.startNodeId === nodeId || w.endNodeId === nodeId);
+    if (!zone) return { wallIds: [], floorIds: [], platformIds: [] };
+    return {
+      wallIds:     zone.walls.filter(w => w.startNodeId === nodeId || w.endNodeId === nodeId).map(w => w.id),
+      floorIds:    zone.floors.filter(f => f.floorMesh.nodeIds?.includes(nodeId)).map(f => f.id),
+      platformIds: zone.platforms.filter(p => p.nodeIds?.includes(nodeId)).map(p => p.id),
+    };
   }
 
   // ── Wall mutations ───────────────────────────────────────────────────────────

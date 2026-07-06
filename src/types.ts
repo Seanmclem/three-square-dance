@@ -131,6 +131,9 @@ export interface BusEvents {
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
   // Panel segment-row hover → canvas highlight (null wallId clears it).
   "wall:segment-hover":    { zoneId: string; wallId: string | null };
+  // Panel vertex-row hover → highlight everything sharing the node (null clears).
+  // sourceId: the selected entity emitting the hover — the highlighter skips it.
+  "node:link-hover":       { zoneId: string; nodeId: string | null; sourceId?: string };
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
   "floor:removed":         { zoneId: string; floorId: string };
@@ -236,6 +239,13 @@ export type BusEventName = keyof BusEvents;
 export type BusCallback<K extends BusEventName> = (payload: BusEvents[K]) => void;
 
 // ─── Selection ────────────────────────────────────────────────────────────────
+
+/** Ids of every entity referencing a wall node (see WorldState.getNodeLinks). */
+export interface NodeLinks {
+  wallIds:     string[];
+  floorIds:    string[];
+  platformIds: string[];
+}
 
 /** Lightweight reference to a selected entity (multi-select set). */
 export interface SelectedRef {

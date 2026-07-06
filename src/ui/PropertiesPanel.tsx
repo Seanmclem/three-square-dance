@@ -3,7 +3,7 @@ import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
-  GroupDef, AttachedCollider, AttachedColliderShape,
+  GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -163,6 +163,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
   wall:     "HEIGHT · THICKNESS",
+  floor:    "POSITION · SIZE · VERTICES",
   platform: "POSITION · SIZE",
   stair:    "POINTS · STEPS",
   object:   "TRANSFORM",
@@ -171,7 +172,7 @@ const GEO_SUBTITLES: Partial<Record<string, string>> = {
 
 const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   wall:     ["geo", "mat", "open", "seg"],
-  floor:    ["mat", "vert"],
+  floor:    ["geo", "mat", "vert"],
   platform: ["geo", "mat"],
   stair:    ["geo", "mat"],
   object:   ["geo", "mat", "colliders"],
@@ -201,6 +202,9 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
   switch (s) {
     case "geo":
       if (wallData)  return `h ${wallData.height} · t ${wallData.thickness}`;
+      if (floorData) return floorData.floorMesh.shape === "rect"
+        ? "rect"
+        : `${(floorData.floorMesh.nodeIds ?? floorData.floorMesh.points ?? []).length} verts`;
       if (platData)  return `${platData.size.width}×${platData.size.depth}`;
       if (stairData) return `${effectiveSteps(stairData)} steps`;
       return "geometry";
@@ -283,6 +287,8 @@ interface PropertiesPanelProps {
   quality:                  QualityScale;
   onObjectUpdate:           (changes: Partial<WorldObject>) => void;
   onSegmentUpdate:          (wallId: string, changes: Partial<WallDef>) => void;
+  onFloorNodesUpdate?:      (updates: Array<{ nodeId: string; x: number; z: number }>, label?: string) => void;
+  getNodeLinks?:            (zoneId: string, nodeId: string) => NodeLinks;
   onImportMaterial:         () => void;
   onQualityChange:          (q: QualityScale) => void;
   onCopyRunToFloor?:        (targetLevel: number) => void;
@@ -311,6 +317,7 @@ interface PropertiesPanelProps {
 
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
+  onFloorNodesUpdate, getNodeLinks,
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
@@ -505,7 +512,7 @@ export function PropertiesPanel({
             />
           </>
         ) : currentScreen === "geo" ? (
-          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} />
+          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} />
         ) : currentScreen === "mat" ? (
           <MatScreen
             selected={selected}
@@ -518,7 +525,7 @@ export function PropertiesPanel({
         ) : currentScreen === "open" ? (
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
-          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} bus={bus} />
+          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} bus={bus} getNodeLinks={getNodeLinks} />
         ) : currentScreen === "animations" ? (
           <AnimationsScreen
             selected={selected}
@@ -715,17 +722,250 @@ function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
 
 // ── GeoScreen ─────────────────────────────────────────────────────────────────
 
-function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate }: {
+function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpdate, getNodeLinks, zones, bus }: {
   selected:        SelectedObjectPayload;
   onObjectUpdate:  (changes: Partial<WorldObject>) => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
+  onFloorNodesUpdate?: (updates: Array<{ nodeId: string; x: number; z: number }>, label?: string) => void;
+  getNodeLinks?:   (zoneId: string, nodeId: string) => NodeLinks;
+  zones?:          ZoneDef[];
+  bus?:            EventBus;
 }) {
   if (selected.type === "wall")     return <WallGeoView     selected={selected} onObjectUpdate={onObjectUpdate} />;
+  if (selected.type === "floor")    return <FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />;
   if (selected.type === "platform") return <PlatformGeoView selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
   return null;
+}
+
+// ── FloorGeoView ──────────────────────────────────────────────────────────────
+
+function FloorGeoView({ selected, zones, bus, onObjectUpdate, onFloorNodesUpdate, getNodeLinks }: {
+  selected:            SelectedObjectPayload;
+  zones?:              ZoneDef[];
+  bus?:                EventBus;
+  onObjectUpdate:      (changes: Partial<WorldObject>) => void;
+  onFloorNodesUpdate?: (updates: Array<{ nodeId: string; x: number; z: number }>, label?: string) => void;
+  getNodeLinks?:       (zoneId: string, nodeId: string) => NodeLinks;
+}) {
+  const floor = selected.data as FloorDef | null;
+  const zone  = zones?.find(z => z.id === selected.zoneId);
+
+  // Node positions read live from the zones prop (WorldState mutates zones in place;
+  // floor:rebuilt re-emits selection → re-render picks up fresh positions).
+  const nodeIds  = floor?.floorMesh.nodeIds ?? [];
+  const resolved = nodeIds.map(id => zone?.nodes.find(n => n.id === id));
+  const nodesOk  = nodeIds.length >= 3 && resolved.every(n => !!n);
+  const nodes    = nodesOk ? (resolved as WallNode[]) : [];
+  const isRect   = floor?.floorMesh.shape === "rect" && nodesOk && nodes.length === 4;
+
+  const isLinked = (nodeId: string): boolean => {
+    if (!getNodeLinks || !floor) return false;
+    const l = getNodeLinks(selected.zoneId, nodeId);
+    return l.wallIds.length > 0 || l.platformIds.length > 0 || l.floorIds.some(id => id !== floor.id);
+  };
+
+  if (!floor) return null;
+
+  // Legacy floors (no nodeIds) — and node-backed floors whose nodes went missing
+  // (edit would otherwise write through resolveFloorMesh's {0,0} collapse): edit
+  // floorMesh.points directly. Commits build a NEW points array (never mutate in
+  // place — _touch snapshots the entity before updateFloor merges) and detach any
+  // broken nodeIds so points become authoritative again.
+  if (!nodesOk) {
+    const points = floor.floorMesh.points ?? [];
+    const detach = nodeIds.length > 0;
+    const commitPoint = (idx: number, x: number, z: number) => {
+      const next: Vec2[] = points.map((p, i) => i === idx ? { x, z } : { ...p });
+      onObjectUpdate({ floorMesh: { points: next, ...(detach ? { nodeIds: undefined } : {}) } } as unknown as Partial<WorldObject>);
+    };
+    return (
+      <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <div style={LABEL}>VERTICES</div>
+          {points.map((p, i) => (
+            <FloorVertexRow
+              key={i} index={i + 1} nodeId={null} x={p.x} z={p.z}
+              zoneId={selected.zoneId} sourceId={floor.id} linked={false}
+              onCommit={(x, z) => commitPoint(i, x, z)} bus={bus}
+            />
+          ))}
+        </div>
+        <div style={{ color: "#404050", fontSize: 9 }}>
+          {detach
+            ? "This floor's nodes are missing — edits detach it to plain points."
+            : "Legacy floor — vertices are not linked to wall nodes."}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      {isRect && <RectFloorFields floor={floor} nodes={nodes} onFloorNodesUpdate={onFloorNodesUpdate} />}
+      <div>
+        <div style={LABEL}>VERTICES</div>
+        {nodes.map((n, i) => (
+          <FloorVertexRow
+            key={n.id} index={i + 1} nodeId={n.id} x={n.x} z={n.z}
+            zoneId={selected.zoneId} sourceId={floor.id} linked={isLinked(n.id)}
+            readOnly={isRect}
+            onCommit={isRect ? undefined : (x, z) => onFloorNodesUpdate?.([{ nodeId: n.id, x, z }])}
+            bus={bus}
+          />
+        ))}
+        {isRect && (
+          <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
+            Rect corners stay axis-aligned — edit via POSITION/SIZE or drag in the canvas.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// POSITION (centroid) + SIZE fields for a rect floor — commits recompute all 4 node
+// positions by min/max membership (nodeIds order is never reshuffled: NodeDragger's
+// rect-corner constraints depend on it) in ONE batched update = one undo step.
+function RectFloorFields({ floor, nodes, onFloorNodesUpdate }: {
+  floor:               FloorDef;
+  nodes:               WallNode[];
+  onFloorNodesUpdate?: (updates: Array<{ nodeId: string; x: number; z: number }>, label?: string) => void;
+}) {
+  const minX = Math.min(...nodes.map(n => n.x)), maxX = Math.max(...nodes.map(n => n.x));
+  const minZ = Math.min(...nodes.map(n => n.z)), maxZ = Math.max(...nodes.map(n => n.z));
+  const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+  const w  = maxX - minX,       d  = maxZ - minZ;
+
+  const [posStr,  setPosStr]  = useState({ x: String(cx), z: String(cz) });
+  const [sizeStr, setSizeStr] = useState({ w: String(w), d: String(d) });
+  const { schedule, flush } = useFieldDebounce(300);
+
+  // Re-sync whenever the derived geometry changes (canvas node drags, undo, …).
+  useEffect(() => {
+    setPosStr({ x: String(cx), z: String(cz) });
+    setSizeStr({ w: String(w), d: String(d) });
+  }, [floor.id, cx, cz, w, d]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commit = (ncx: number, ncz: number, nw: number, nd: number) => {
+    if (!Number.isFinite(ncx) || !Number.isFinite(ncz)) return;
+    if (!Number.isFinite(nw) || !Number.isFinite(nd) || nw <= 0 || nd <= 0) return;
+    const midX = cx, midZ = cz;
+    const updates = nodes.map(n => ({
+      nodeId: n.id,
+      x: n.x < midX ? ncx - nw / 2 : ncx + nw / 2,
+      z: n.z < midZ ? ncz - nd / 2 : ncz + nd / 2,
+    }));
+    onFloorNodesUpdate?.(updates, "update floor geometry");
+  };
+
+  const commitPos  = (axis: "x" | "z", val: string) => {
+    const n = parseFloat(val);
+    commit(axis === "x" ? n : parseFloat(posStr.x), axis === "z" ? n : parseFloat(posStr.z), parseFloat(sizeStr.w), parseFloat(sizeStr.d));
+  };
+  const commitSize = (dim: "w" | "d", val: string) => {
+    const n = parseFloat(val);
+    commit(parseFloat(posStr.x), parseFloat(posStr.z), dim === "w" ? n : parseFloat(sizeStr.w), dim === "d" ? n : parseFloat(sizeStr.d));
+  };
+
+  return (
+    <>
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x", "#ff6b6b"], ["z", "#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={LABEL}>SIZE</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          {([["W", "w"], ["D", "d"]] as const).map(([lbl, dim]) => (
+            <div key={dim}>
+              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+              <input type="number" step={0.5} min={0.5} value={sizeStr[dim]}
+                style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                onChange={e => { setSizeStr(p => ({ ...p, [dim]: e.target.value })); schedule(() => commitSize(dim, e.target.value)); }}
+                onBlur={e => flush(() => commitSize(dim, e.target.value))}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── FloorVertexRow ────────────────────────────────────────────────────────────
+
+function FloorVertexRow({ index, nodeId, x, z, zoneId, sourceId, linked, readOnly, onCommit, bus }: {
+  index:     number;
+  nodeId:    string | null;   // null = legacy point (no node, no hover highlight)
+  x:         number;
+  z:         number;
+  zoneId:    string;
+  sourceId:  string;          // the selected floor — highlighter skips it
+  linked:    boolean;
+  readOnly?: boolean;
+  onCommit?: (x: number, z: number) => void;
+  bus?:      EventBus;
+}) {
+  const [xStr, setXStr] = useState(String(x));
+  const [zStr, setZStr] = useState(String(z));
+  const hoveringRef = useRef(false);
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => { setXStr(String(x)); setZStr(String(z)); }, [nodeId, x, z]);
+
+  // Clear the canvas highlight if this row unmounts while hovered.
+  useEffect(() => () => {
+    if (hoveringRef.current) bus?.emit("node:link-hover", { zoneId, nodeId: null });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commit = (xv: string, zv: string) => {
+    const nx = parseFloat(xv), nz = parseFloat(zv);
+    if (Number.isFinite(nx) && Number.isFinite(nz)) onCommit?.(nx, nz);
+  };
+
+  const field = (lbl: string, val: string, setter: (v: string) => void, other: () => string) => (
+    <div style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px", opacity: readOnly ? 0.5 : 1 }}>
+      <span style={{ color: lbl === "X" ? "#ff6b6b" : "#6b8aff", fontSize: 9 }}>{lbl}</span>
+      <input type="number" step={0.5} value={val} disabled={readOnly}
+        onChange={e => { setter(e.target.value); schedule(() => (lbl === "X" ? commit(e.target.value, other()) : commit(other(), e.target.value))); }}
+        onBlur={e => flush(() => (lbl === "X" ? commit(e.target.value, other()) : commit(other(), e.target.value)))}
+        onKeyDown={e => { if (e.key === "Enter") flush(() => { const v = (e.target as HTMLInputElement).value; if (lbl === "X") commit(v, other()); else commit(other(), v); }); }}
+        style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+      />
+    </div>
+  );
+
+  return (
+    <div
+      style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 4, padding: "6px 8px", marginBottom: 4 }}
+      onMouseEnter={nodeId ? () => { hoveringRef.current = true;  bus?.emit("node:link-hover", { zoneId, nodeId, sourceId }); } : undefined}
+      onMouseLeave={nodeId ? () => { hoveringRef.current = false; bus?.emit("node:link-hover", { zoneId, nodeId: null }); } : undefined}
+    >
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+        <span style={{ color: "#646464", fontSize: 9, letterSpacing: 1 }}>V{index}</span>
+        {linked && <span style={{ color: "#4d8cff", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>LINKED</span>}
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {field("X", xStr, setXStr, () => zStr)}
+        {field("Z", zStr, setZStr, () => xStr)}
+      </div>
+    </div>
+  );
 }
 
 // ── WallGeoView ───────────────────────────────────────────────────────────────
@@ -2115,12 +2355,13 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
 
 // ── SegmentsScreen ────────────────────────────────────────────────────────────
 
-function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate, bus }: {
+function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate, bus, getNodeLinks }: {
   selected:        SelectedObjectPayload;
   materialList:    MaterialDef[];
   onAddMaterial:   () => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
   bus?:            EventBus;
+  getNodeLinks?:   (zoneId: string, nodeId: string) => NodeLinks;
 }) {
   const wallData = selected.data as WallDef | null;
   const runWalls = selected.runWalls ?? (wallData ? [wallData] : []);
@@ -2137,6 +2378,7 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
           onAddMaterial={onAddMaterial}
           onUpdate={changes => onSegmentUpdate(wall.id, changes)}
           bus={bus}
+          getNodeLinks={getNodeLinks}
         />
       ))}
       <div style={{ color: "#404050", fontSize: 9, marginTop: 6 }}>
@@ -2659,7 +2901,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
 
 // ── WallSegmentRow ────────────────────────────────────────────────────────────
 
-function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUpdate, bus }: {
+function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUpdate, bus, getNodeLinks }: {
   index:         number;
   wall:          WallDef;
   zoneId:        string;
@@ -2667,7 +2909,14 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
   onAddMaterial: () => void;
   onUpdate:      (changes: Partial<WallDef>) => void;
   bus?:          EventBus;
+  getNodeLinks?: (zoneId: string, nodeId: string) => NodeLinks;
 }) {
+  // Linked = a floor/platform shares one of this wall's nodes. Wall–wall sharing is
+  // ignored — chained walls always share nodes and would chip every row.
+  const linked = !!getNodeLinks && [wall.startNodeId, wall.endNodeId].some(nid => {
+    const l = getNodeLinks(zoneId, nid);
+    return l.floorIds.length > 0 || l.platformIds.length > 0;
+  });
   const [tileStr, setTileStr] = useState(String(wall.materialOverrides?.tileScale ?? ""));
   const hoveringRef = useRef(false);
 
@@ -2698,6 +2947,7 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
       <div style={{ display: "flex", alignItems: "center", marginBottom: 5 }}>
         <span style={{ color: "#646464", fontSize: 9, letterSpacing: 1 }}>SEG {index}</span>
         {wall.hidden && <span style={{ color: "#8a6d3b", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>HIDDEN</span>}
+        {linked && <span style={{ color: "#4d8cff", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>LINKED</span>}
         <span style={{ flex: 1 }} />
         <button
           onClick={() => onUpdate({ hidden: !wall.hidden })}
