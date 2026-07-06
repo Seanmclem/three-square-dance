@@ -299,11 +299,13 @@ export class ZoneManager {
       }),
       this._bus.on("preview:start", ({ mode }) => {
         this._setEditorOnlyVisible(false);
+        this._setHiddenWallGhostsVisible(false);
         if (mode === "game") this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
         this._restoreDespawned();
         this._setEditorOnlyVisible(true);
+        this._setHiddenWallGhostsVisible(true);
         this._setHideInGameVisible(true);
       }),
       this._bus.on("history:restore", () => {
@@ -1175,6 +1177,16 @@ export class ZoneManager {
     }
   }
 
+  // Hidden-wall ghosts (userData.hiddenWall) are an editor-only visual — invisible in
+  // both preview and game mode.
+  private _setHiddenWallGhostsVisible(visible: boolean): void {
+    for (const [, entry] of this._loadedZones) {
+      entry.wallsGroup.traverse(o => {
+        if ((o.userData as { hiddenWall?: boolean }).hiddenWall) o.visible = visible;
+      });
+    }
+  }
+
   // Game mode only: hide editor helpers that stay visible in Preview (grid, trigger
   // wireframes, node dots, edge lines — anything tagged userData.hideInGame).
   private _setHideInGameVisible(visible: boolean): void {
@@ -1394,6 +1406,7 @@ export class ZoneManager {
     this._removeDoorSensors(zoneId);
     const colliders: RAPIER.Collider[] = [];
     for (const wall of zone.walls) {
+      if (wall.hidden) continue;  // hidden segments have no rendered openings
       const startNode = zone.nodes.find(n => n.id === wall.startNodeId);
       const endNode   = zone.nodes.find(n => n.id === wall.endNodeId);
       if (!startNode || !endNode) continue;

@@ -518,7 +518,7 @@ export function PropertiesPanel({
         ) : currentScreen === "open" ? (
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
-          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} />
+          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} bus={bus} />
         ) : currentScreen === "animations" ? (
           <AnimationsScreen
             selected={selected}
@@ -2115,11 +2115,12 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
 
 // ── SegmentsScreen ────────────────────────────────────────────────────────────
 
-function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate }: {
+function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate, bus }: {
   selected:        SelectedObjectPayload;
   materialList:    MaterialDef[];
   onAddMaterial:   () => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
+  bus?:            EventBus;
 }) {
   const wallData = selected.data as WallDef | null;
   const runWalls = selected.runWalls ?? (wallData ? [wallData] : []);
@@ -2131,11 +2132,16 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
           key={wall.id}
           index={i + 1}
           wall={wall}
+          zoneId={selected.zoneId}
           materialList={materialList}
           onAddMaterial={onAddMaterial}
           onUpdate={changes => onSegmentUpdate(wall.id, changes)}
+          bus={bus}
         />
       ))}
+      <div style={{ color: "#404050", fontSize: 9, marginTop: 6 }}>
+        Right-click a wall in the canvas to insert a vertex (splits the segment).
+      </div>
     </div>
   );
 }
@@ -2653,18 +2659,26 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
 
 // ── WallSegmentRow ────────────────────────────────────────────────────────────
 
-function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: {
+function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUpdate, bus }: {
   index:         number;
   wall:          WallDef;
+  zoneId:        string;
   materialList:  MaterialDef[];
   onAddMaterial: () => void;
   onUpdate:      (changes: Partial<WallDef>) => void;
+  bus?:          EventBus;
 }) {
   const [tileStr, setTileStr] = useState(String(wall.materialOverrides?.tileScale ?? ""));
+  const hoveringRef = useRef(false);
 
   useEffect(() => {
     setTileStr(String(wall.materialOverrides?.tileScale ?? ""));
   }, [wall.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear the canvas highlight if this row unmounts while hovered (screen close, run change).
+  useEffect(() => () => {
+    if (hoveringRef.current) bus?.emit("wall:segment-hover", { zoneId, wallId: null });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { schedule, flush } = useFieldDebounce(300);
 
@@ -2676,8 +2690,21 @@ function WallSegmentRow({ index, wall, materialList, onAddMaterial, onUpdate }: 
   };
 
   return (
-    <div style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 4, padding: "6px 8px", marginBottom: 4 }}>
-      <div style={{ color: "#646464", fontSize: 9, letterSpacing: 1, marginBottom: 5 }}>SEG {index}</div>
+    <div
+      style={{ background: "rgba(20,30,45,0.6)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 4, padding: "6px 8px", marginBottom: 4, opacity: wall.hidden ? 0.55 : 1 }}
+      onMouseEnter={() => { hoveringRef.current = true;  bus?.emit("wall:segment-hover", { zoneId, wallId: wall.id }); }}
+      onMouseLeave={() => { hoveringRef.current = false; bus?.emit("wall:segment-hover", { zoneId, wallId: null }); }}
+    >
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 5 }}>
+        <span style={{ color: "#646464", fontSize: 9, letterSpacing: 1 }}>SEG {index}</span>
+        {wall.hidden && <span style={{ color: "#8a6d3b", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>HIDDEN</span>}
+        <span style={{ flex: 1 }} />
+        <button
+          onClick={() => onUpdate({ hidden: !wall.hidden })}
+          title={wall.hidden ? "Show segment" : "Hide segment (stays in the run — no visual, no collision)"}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, lineHeight: 1, padding: "0 2px", opacity: wall.hidden ? 0.35 : 1 }}
+        >👁</button>
+      </div>
 
       <div style={{ marginBottom: 4 }}>
         <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>MATERIAL</div>

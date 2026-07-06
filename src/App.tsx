@@ -25,6 +25,8 @@ import { CheckpointTool } from "@/editor/CheckpointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
 import { ColliderEditor } from "@/editor/ColliderEditor";
+import { WallSplitter } from "@/editor/WallSplitter";
+import { SegmentHighlighter } from "@/editor/SegmentHighlighter";
 import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { StairCutterResizer } from "@/editor/StairCutterResizer";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
@@ -210,6 +212,8 @@ export default function App() {
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const stairCutterResizer = new StairCutterResizer(scene.scene, world, bus, scene.camera, canvas);
     const colliderEditor  = new ColliderEditor(scene.scene, world, bus, scene.camera, canvas, objectPlacer);
+    const wallSplitter    = new WallSplitter(scene.scene, scene.camera, canvas, world, bus);
+    const segmentHighlighter = new SegmentHighlighter(scene.scene, world, bus);
     const scriptEngine    = new ScriptEngine(bus, world);
     scriptEngineRef.current = scriptEngine;
 
@@ -256,6 +260,8 @@ export default function App() {
     triggerVolumeResizer.init();
     stairCutterResizer.init();
     colliderEditor.init();
+    wallSplitter.init();
+    segmentHighlighter.init();
 
     const writeAutosave = () => {
       if (!worldRef.current || restoringRef.current) return;
@@ -539,6 +545,8 @@ export default function App() {
       unsub.forEach(u => u());
       checkpointTool.dispose();
       spawnPointTool.dispose();
+      segmentHighlighter.dispose();
+      wallSplitter.dispose();
       colliderEditor.dispose();
       stairCutterResizer.dispose();
       triggerVolumeResizer.dispose();

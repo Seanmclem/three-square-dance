@@ -15,6 +15,13 @@ export interface WallBuildOutput {
 
 const TRIM_W = 0.08;
 
+// Editor-only ghost look for hidden wall segments (no shadows, no colliders).
+function makeGhostMaterial(): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color: 0x7aa2ff, transparent: true, opacity: 0.12, depthWrite: false,
+  });
+}
+
 function createArchCutterGeo(width: number, height: number, thickness: number): THREE.BufferGeometry {
   const radius   = width / 2;
   const rectH    = height - radius;
@@ -286,7 +293,7 @@ export class WallBuilder {
     const trimMeshes: THREE.Mesh[] = [];
     const linerSetups: LinerSetup[] = [];
 
-    if (wall.openings.length > 0) {
+    if (wall.openings.length > 0 && !wall.hidden) {
       let workMesh: THREE.Mesh = new THREE.Mesh(baseGeo, new THREE.MeshBasicMaterial());
       workMesh.updateMatrixWorld();
       let prevIsOriginal = true;
@@ -361,23 +368,26 @@ export class WallBuilder {
       }
     }
 
-    const mat = ovr
-      ? await assetManager.getMaterialWithOverrides(wall.material, ovr)
-          .catch(() => assetManager.getDefaultMaterial(0x4a5a6a))
-      : await assetManager.getMaterial(wall.material)
-          .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
+    const mat = wall.hidden
+      ? makeGhostMaterial()
+      : ovr
+        ? await assetManager.getMaterialWithOverrides(wall.material, ovr)
+            .catch(() => assetManager.getDefaultMaterial(0x4a5a6a))
+        : await assetManager.getMaterial(wall.material)
+            .catch(() => assetManager.getDefaultMaterial(0x4a5a6a));
 
     const mesh = new THREE.Mesh(finalGeo, mat);
     mesh.position.set(0, wall.elevation ?? 0, 0);
-    mesh.castShadow    = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow    = !wall.hidden;
+    mesh.receiveShadow = !wall.hidden;
     mesh.userData = {
       editorId:      wall.id,
       editorType:    "wall",
       zoneId,
       selectable:    true,
       floorLevel:    wall.floor,
-      _ownsMaterial: !!ovr,
+      _ownsMaterial: !!ovr || !!wall.hidden,
+      ...(wall.hidden ? { ghostPick: true, hiddenWall: true } : {}),
     } satisfies MeshUserData;
 
     for (const ls of linerSetups) {
@@ -395,7 +405,7 @@ export class WallBuilder {
       trimMeshes.push(linerMesh);
     }
 
-    const colliders = ColliderBuilder.registerWallSegments(
+    const colliders = wall.hidden ? [] : ColliderBuilder.registerWallSegments(
       wall, wall.elevation ?? 0,
       { x: rawStart.x, z: rawStart.z },
       { x: rawEnd.x,   z: rawEnd.z   },
@@ -524,7 +534,18 @@ export class WallBuilder {
     }
 
     // Closed loops have N segments (last wraps back to 0); open runs have N-1.
+    // Segment i corresponds to walls[i] (resolveRunNodeIds preserves order), so hidden
+    // segments route their faces into a separate ghost index buffer instead of the
+    // solid wall geometry.
     const segCount = isClosed ? N : N - 1;
+    const ghostIdx: number[] = [];
+    const isHid = (si: number) => !!walls[si]?.hidden;
+
+    // Cap patterns match the old open-run endcaps: capStart faces backward at the
+    // beginning of a solid stretch, capEnd faces forward at its end.
+    const capStart = (out: number[], b: number) => out.push(4*b, 4*b+2, 4*b+3,  4*b, 4*b+3, 4*b+1);
+    const capEnd   = (out: number[], b: number) => out.push(4*b, 4*b+1, 4*b+3,  4*b, 4*b+3, 4*b+2);
+
     for (let i = 0; i < segCount; i++) {
       // Wrap-around segment uses the extra vertex (index N) instead of vertex 0
       // so its UV continues forward rather than jumping back to 0.
@@ -532,21 +553,26 @@ export class WallBuilder {
       const LBi  = 4 * i,  LTi  = 4 * i + 1,  RBi  = 4 * i + 2,  RTi  = 4 * i + 3;
       const LBi1 = 4 * j,  LTi1 = 4 * j + 1,  RBi1 = 4 * j + 2,  RTi1 = 4 * j + 3;
 
-      // Left face — outward normal points left
-      idxArr.push(LBi, LTi, LTi1,  LBi, LTi1, LBi1);
-      // Right face — outward normal points right
-      idxArr.push(RBi, RBi1, RTi1,  RBi, RTi1, RTi);
-      // Top face — outward normal points up
-      idxArr.push(LTi, RTi, RTi1,  LTi, RTi1, LTi1);
-      // Bottom face — outward normal points down (closes mesh for watertight CSG)
-      idxArr.push(LBi, LBi1, RBi1,  LBi, RBi1, RBi);
-    }
+      const hid = isHid(i);
+      const out = hid ? ghostIdx : idxArr;
 
-    // End caps only for open runs — closed loops need no caps.
-    if (!isClosed) {
-      idxArr.push(0, 2, 3,  0, 3, 1);
-      const L = N - 1;
-      idxArr.push(4*L, 4*L+1, 4*L+3,  4*L, 4*L+3, 4*L+2);
+      // Left face — outward normal points left
+      out.push(LBi, LTi, LTi1,  LBi, LTi1, LBi1);
+      // Right face — outward normal points right
+      out.push(RBi, RBi1, RTi1,  RBi, RTi1, RTi);
+      // Top face — outward normal points up
+      out.push(LTi, RTi, RTi1,  LTi, RTi1, LTi1);
+      // Bottom face — outward normal points down (closes mesh for watertight CSG)
+      out.push(LBi, LBi1, RBi1,  LBi, RBi1, RBi);
+
+      // Caps wherever this segment borders a segment of the other kind (or the run end).
+      // For all-visible open runs this degenerates to exactly the old two endcaps.
+      const prevIdx = isClosed ? (i - 1 + segCount) % segCount : i - 1;
+      const nextIdx = isClosed ? (i + 1) % segCount : i + 1;
+      const prevBoundary = prevIdx < 0         || isHid(prevIdx) !== hid;
+      const nextBoundary = nextIdx >= segCount || isHid(nextIdx) !== hid;
+      if (prevBoundary) capStart(out, i);
+      if (nextBoundary) capEnd(out, j);
     }
 
     const geo = new THREE.BufferGeometry();
@@ -562,7 +588,7 @@ export class WallBuilder {
     let finalGeo: THREE.BufferGeometry = geo;
     const trimMeshes: THREE.Mesh[] = [];
     const linerSetups: LinerSetup[] = [];
-    const hasAnyOpenings = walls.some(w => w.openings.length > 0);
+    const hasAnyOpenings = walls.some(w => !w.hidden && w.openings.length > 0);
 
     if (hasAnyOpenings) {
       // Per-segment lengths (closed loops include the wrap-around segment).
@@ -581,7 +607,8 @@ export class WallBuilder {
 
       for (let si = 0; si < walls.length; si++) {
         const wallSeg = walls[si]!;
-        if (wallSeg.openings.length === 0) continue;
+        // Hidden segments render no openings (no CSG, no trim, no trigger meshes).
+        if (wallSeg.hidden || wallSeg.openings.length === 0) continue;
 
         const isForward = wallSeg.startNodeId === resolvedIds[si];
 
@@ -779,9 +806,33 @@ export class WallBuilder {
       trimMeshes.push(linerMesh);
     }
 
+    // Ghost mesh for hidden segments — translucent, editor-only, picked only as a
+    // fallback (ghostPick). Rides in trimMeshes so run rebuild/removal disposes it.
+    if (ghostIdx.length > 0) {
+      const gGeo = new THREE.BufferGeometry();
+      gGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+      gGeo.setIndex(ghostIdx);
+      gGeo.computeVertexNormals();
+      const gMesh = new THREE.Mesh(gGeo, makeGhostMaterial());
+      gMesh.position.set(0, runElevation, 0);
+      gMesh.userData = {
+        editorId:      wall.id,
+        editorType:    "wall",
+        zoneId,
+        selectable:    true,
+        floorLevel:    wall.floor,
+        _ownsMaterial: true,
+        ghostPick:     true,
+        hiddenWall:    true,
+      } satisfies MeshUserData;
+      gMesh.userData.wallIds = walls.map(w => w.id);
+      trimMeshes.push(gMesh);
+    }
+
     // One collider per wall segment using full (untrimmed) node positions
     const allColliders: RAPIER.Collider[] = [];
     for (const w of walls) {
+      if (w.hidden) continue;  // hidden segments are non-solid
       const sNode = nodes.get(w.startNodeId)!;
       const eNode = nodes.get(w.endNodeId)!;
       allColliders.push(

@@ -236,7 +236,12 @@ export class SelectionManager implements IEditorModule {
     for (const b of castObjectBoxes(this._raycaster.ray, this._scene)) {
       hits.push({ distance: b.distance, point: b.point, object: b.root } as THREE.Intersection);
     }
-    return hits.sort((a, b) => a.distance - b.distance);
+    hits.sort((a, b) => a.distance - b.distance);
+    // Hidden-wall ghosts never occlude real geometry: pick them only when nothing
+    // solid is under the cursor (so a dollhouse-hidden wall stays click-through,
+    // but a fully hidden run is still selectable on empty space).
+    const solid = hits.filter(h => !h.object.userData.ghostPick);
+    return solid.length > 0 ? solid : hits;
   }
 
   private _pickByPriority(hits: THREE.Intersection[]): THREE.Intersection {

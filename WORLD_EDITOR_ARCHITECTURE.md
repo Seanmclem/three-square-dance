@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.4.2** — last updated 2026-07-06
+**Version 4.5.0** — last updated 2026-07-06
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -67,6 +67,7 @@
 - v4.4.0 — **Attached colliders on placed objects (objects finally solid + per-object sensors).** `AssetDef.collidable`/`colliderType` were manifest-only dead fields — objects had zero Rapier colliders, so the game character walked through every prop. New `WorldObject.colliders?: AttachedCollider[]` (`{id, shape:"box"|"sphere"|"capsule", offset (local pre-scale), size (per-shape semantics), rotationY?, isSensor}`; `undefined` → **implicit auto-box** fitted from the model's local AABB when `asset.collidable`, `[]` → explicitly none — so every existing placed collidable object became solid with no data migration). Pieces: **`src/physics/attachedColliderMath.ts`** (`defaultColliderFromAABB`, `colliderWorldTransform` — object quat × local yaw, offsets/extents scaled componentwise in the collider's local frame; approximation documented for rotY≠0 under non-uniform scale) shared by physics + editor so they can't drift; **`ColliderBuilder.registerAttachedColliders(obj, colliders)`** (cuboid/ball/capsule; `isSensor` → `createSensorCollider`); **`ObjectPlacer.build`** stashes the pre-transform `Box3` as `mesh.userData.localAABB` + exposes `getLocalAABB(id)` (fallback box = unit AABB); **`ZoneManager`** owns the lifecycle like every other collider map (`ZoneEntry.objectColliders`, `_buildObjectColliders`/`_removeObjectColliders`, built in `loadZone`+`_addObject` after the async mesh build, rebuilt on `object:updated` transform/collider changes via a `{...obj, ...changes}` merge so runtime-only script moves carry colliders, removed in `_removeObject`/`unloadZone`, `_setEntityHidden` object case for despawn + preview:stop restore); sensor handles join **`_volumeSensors`** keyed to the object id so `TriggerSystem` → `trigger:volume-enter/exit` → ScriptEngine `on_player_enter/on_player_exit` work unchanged (`loadZone` object-script normalization now also stamps `targetId=obj.id` for those two triggers — previously it *stripped* them, which would have silently broken object sensor scripts). KCC blocking needed zero character changes (`computeColliderMovement` already collides with all non-sensor fixed colliders). UI: **"Colliders" screen** in the PropertiesPanel object drilldown (`OBJECT_SCREENS.object += "colliders"`; implicit state shows "auto box" + Customize / Remove-collision; explicit list = per-collider card with shape segmented buttons (`reshapeCollider` keeps ~volume when switching), OFFSET/SIZE/ROT-Y° draft fields debounced 300ms, Sensor checkbox, ✕ remove, + Add; App's object branch now mirrors edits into `setSelected` and passes `defaultColliderFor` from the placer AABB). **`src/editor/ColliderEditor.ts`** (modeled on TriggerVolumeResizer): cyan (solid) / amber (sensor) wireframes on the selected object incl. the implicit auto-box, 6 push/pull face handles per **box** collider with full-3D axis-constrained plane projection (opposite face pinned, snap 0.5 / MIN 0.1 / Alt = free), writes the full `colliders` array per move inside a transaction — dragging the implicit box **materializes** it; new **`collider:handle-hover`** bus event → GizmoManager suspends TransformControls while a handle is hovered (TC's invisible pickers otherwise blanket small objects and steal every grab — found live when the test desk kept translating instead of resizing). Import modal checkbox relabeled "auto box collider from model bounds". Verified in-browser (desk on a platform): auto-box registers on place (+1 collider, correct AABB), held-W character clamps at the box face (z=5.614 for face 5.39 + capsule radius), `colliders:[]` walks through, sensor doesn't block + enter/exit scripts flip `gameState` both ways, panel Colliders screen live-edits (typing W=3 updated data + wireframe scale in one debounce), handle drag through the module's real handler chain resized with exact face-pinning (1.82→3.5 snapped, offset +0.84) and one-step undo restored it, remove/unload returns the collider count to baseline. **Known limits:** thin/hollow props get a solid auto-box (customize per object); clicking through a scene-spanning trigger volume still selects the volume over an object behind it (pre-existing TriggerVolumeTool click priority, untouched).
 - v4.4.1 — **Collider editing UX: gizmo suspend toggle, per-collider move gizmo, per-collider editor visibility.** v4.4.0's collider handles sit right on top of the object's own TransformControls on typical props; three editor-session toggles fix the pile-up (no schema/persistence changes — all state resets when the Colliders screen closes or the selection changes). (1) **"Hide object move gizmo while editing colliders"** checkbox at the top of the Colliders screen → new **`gizmo:suspend { source, suspended }`** bus event; `GizmoManager` now gates controls through `_applyControlsEnabled()` (game mode wins, then a **Set of suspend sources**, then the transient `collider:handle-hover` mute — the old direct enabled writes in the hover/preview handlers are folded into this). (2) Per-collider **Move** button → **`collider:move { objectId, colliderId|null }`**; `ColliderEditor` owns a second, smaller (`setSize(0.5)`) translate-only `TransformControls` attached to a proxy `Group` at the collider's world center — `objectChange` converts proxy world pos → object-local pre-scale `offset` (inverse object quaternion, ÷ scale, 3-dp) and writes the full `colliders` array (materializes the implicit auto-box like the face handles); `dragging-changed` brackets a `"move collider"` transaction + relays `gizmo:dragging` so SelectionManager/NodeDragger/camera mute as usual; activating it also emits `gizmo:suspend(source:"collider-move")` so the object gizmo gets out of the way automatically. (3) Per-collider **👁 eye** → **`collider:hidden { objectId, hidden[] }`**; hidden ids skip wireframe+handle builds in `_sync` (physics untouched — display only), card dims to 0.55, and hiding the move-gizmo'd collider drops its gizmo. Panel state lives in `CollidersScreen` (unmount cleanup emits suspend-off/move-null/hidden-empty; `ColliderEditor._resetPanelState()` mirrors on selection/zone change); `object:updated` re-sync now also skips while `_moveDragging` (the move handler calls `_positionAll()` inline). Verified in-browser (2-collider test object): checkbox removes the object gizmo, Move shows the small gizmo on the right collider, eye hides only the sensor's amber wireframe/handles + dims its card, a **real mouse drag** on the collider gizmo's Y arrow moved `offset.y` 0.46→1.688 while the object position stayed put (suspension held), and one Cmd+Z restored it.
 - v4.4.2 — **Generous object picking (clicks no longer thread through props).** Low-poly models are full of gaps (between an animal's legs, under a desk top, through a chair back), so SelectionManager's precise triangle raycast frequently missed the prop the user was visibly clicking and selected whatever was behind it. New **`src/editor/objectPicking.ts`** — `castObjectBoxes(ray, scene)`: for every visible selectable object root, slab-tests the ray against the **cached model AABB** (`userData.localAABB`, stashed by ObjectPlacer since v4.4.0) as an oriented box in world space (ray → object-local via inverse `matrixWorld`, entry point back to world for a distance comparable with mesh hits); scratch vectors, hits sorted nearest-first. **`SelectionManager._cast`** merges these synthetic `Intersection`s ({distance, point, object: root}) into the real hits and re-sorts — entering an object's box counts as hitting the object, while anything genuinely closer (a wall in front, a nearer object) still wins on distance, and `_pickByPriority`'s coplanar tiebreak already ranks `object` above `platform`. Applies to hover tint too (same `_cast`). **`TriggerVolumeTool._findVolumeAt`** gained the matching occluder clause: a box hit closer than the volume entry blocks the volume pick, so a gap-click inside a scene-spanning volume's footprint selects the prop instead of the volume (the existing mesh-occluder rule — platforms/objects block, floors/walls stay see-through — is unchanged). Verified in-browser: clicking between the husky's legs now selects the **husky** (previously the trigger volume / platform behind), clicking the sofa's box selects the sofa, bare-platform and empty-ground clicks still select the platform / the volume. (Also learned: the Chrome-extension screenshot is downscaled vs the client — clicks aim in screenshot space, so pixel targets from projections must divide by `clientWidth/1400`-style factors; earlier "misses" in testing were this, not picking bugs.)
+- v4.5.0 — **Wall segment tools: right-click vertex insert, per-segment visibility, segment-row hover highlight.** (1) **Split:** new **`src/editor/WallSplitter.ts`** (`IEditorModule`, registered in App) — a *stationary* right-click on a wall with the Select tool inserts a vertex at the clicked point, splitting that wall into two connected segments sharing a new node. Plumbing: InputManager now emits **`input:rightclick`** from `mouseup` button 2 when the press+release stayed under the 5px `_DRAG_THRESHOLD` (DOM `click` never fires for RMB), so RMB camera orbits — which always move — never trigger it. The splitter raycasts wall meshes (solid hits preferred over ghosts), maps the hit to the nearest run segment (point-to-segment in XZ across `userData.wallIds`), projects the click onto the segment axis, refuses splits within 0.15m of a node, then in one `"split wall"` transaction: `addNode` (exact projected point, on-axis), `updateWallSegment(wallId, { endNodeId: newNode, openings: keepA })`, `addWall({...wall, id: wall_<uuid8>, startNodeId: newNode, openings: moveB })` — openings stay with the half containing their centre, second-half offsets re-measured from the new node (`offset -= splitDist`). Emits `tool:placed` for selection + history-UI sync; the two halves re-merge into the same run (same props, shared degree-2 node), so the mesh is visually unchanged until the new vertex is dragged (NodeDragger, unchanged). (2) **Per-segment visibility:** new **`WallDef.hidden?: boolean`** (persisted). A hidden segment stays in `zone.walls` and its run (room configuration, floor fills, `resolveRunNodeIds`, zone membership all unaffected) but is physically gone: `WallBuilder.buildRun` routes its 4 faces into a separate **ghost index buffer** instead of the solid geometry, registers **no colliders** for it, skips its openings (no CSG/trim/trigger meshes), and `ZoneManager._registerDoorSensors` skips it; a generalized **cap rule** replaced the old open-run endcap block (cap at every visible/hidden or run-end boundary — degenerates to exactly the old two endcaps for all-visible open runs; verified 28→32→36 tri counts). The ghost renders as a translucent editor-only mesh (`makeGhostMaterial()`: 0x7aa2ff, opacity 0.12, no depthWrite/shadows) tagged `userData.ghostPick + hiddenWall`, pushed into `trimMeshes` so run rebuild/removal disposes it; `WallBuilder.build` (single wall) swaps the whole mesh to ghost material instead. **`ZoneManager._setHiddenWallGhostsVisible`** hides ghosts on `preview:start` and restores on `preview:stop` (both preview and game). **Ghost-aware picking:** `SelectionManager._cast` and InputManager's `surfacePos` prefer non-`ghostPick` hits — ghosts never occlude real geometry (dollhouse click-through), but clicking a ghost over empty space still selects its run, so fully-hidden walls stay recoverable. UI: each `WallSegmentRow` gets a **👁 toggle** (`onUpdate({hidden})` → `updateWallSegment`, segmentOnly so run-mate sync never propagates it) + dimmed card + HIDDEN badge; `hidden` is deliberately NOT a `canMerge`/run-sync criterion. (3) **Hover highlight:** new **`src/editor/SegmentHighlighter.ts`** — `WallSegmentRow` mouseenter/leave emits **`wall:segment-hover { zoneId, wallId|null }`** (panel already holds `bus`; unmount cleanup emits null), and the module overlays a translucent box (0x4d8cff, 0.35, +0.06 inflate) on that segment computed from nodes + height/thickness/elevation — an overlay because a merged run is one mesh and can't be tinted per-segment; cleared on null/`object:deselected`/`wall:removed`. Verified in-browser end-to-end (real right-click through InputManager, real panel clicks): split at (13.2,0) on a 3-wall run → 4 walls/1 mesh/4 colliders/36 tris, `"split wall"` undo entry; eye-hide → colliders 4→3, main 32 tris + 12-tri ghost, gap visible with capped ends, ghost invisible in preview & restored on exit, gap click re-selects run via ghost fallback; unhide restores 36/4/no-ghost; hover row → box at segment midpoint, cleared on mouseout.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -141,6 +142,7 @@ export interface BusEvents {
   "wall:removed":          { zoneId: string; wallId: string };
   "wall:rebuilt":          { zoneId: string; wallId: string };
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
+  "wall:segment-hover":    { zoneId: string; wallId: string | null };  // panel row hover → SegmentHighlighter (v4.5.0)
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
   "floortool:suggest-auto-floor": { zoneId: string; level: number; points: Vec2[]; nodeIds: string[] };
@@ -178,6 +180,7 @@ export interface BusEvents {
   "terrain:sculpt":        { x: number; z: number; radius: number; delta: number };
   "input:click":           { screenPos: ScreenPos; worldPos: Vec3; button: number };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3 };
+  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };  // stationary RMB only (v4.5.0)
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
@@ -343,6 +346,7 @@ export interface WallDef {
   openings:           Opening[];
   materialOverrides?: MaterialOverrides;
   groupIds?:          string[];   // Phase 10.6a
+  hidden?:            boolean;    // v4.5.0 — editor ghost + no colliders + no openings; stays in runs/room loops
 }
 
 export interface PlatformDef {
@@ -1268,6 +1272,12 @@ When a click ray intersects multiple meshes, priority order (highest first):
 5. `terrain` — never selected directly (only for placement snapping)
 6. `trigger` — never selectable
 
+**Ghost fallback (v4.5.0):** hidden-wall ghost meshes (`userData.ghostPick`) are stripped
+from the hit list whenever any non-ghost hit exists — a ghost never occludes real geometry.
+Only when *nothing* solid is under the cursor do ghost hits count, so a fully-hidden wall
+run can still be clicked (on empty space) to select and re-show it. Applies to hover too
+(same `_cast`).
+
 ### Highlight Strategy
 
 Use **emissive tint** (not outline post-process — that requires EffectComposer, Phase 12+).
@@ -1585,6 +1595,13 @@ class EventBus {
 
 Centralizes all DOM input so tools don't each add their own listeners. Tools subscribe to bus events instead of DOM events directly. InputManager can suppress all input during transitions by simply not emitting.
 
+**Right-click (v4.5.0):** DOM `click` only fires for the primary button, so `mouseup` with
+`button === 2` synthesizes **`input:rightclick`** — but only when the cursor moved ≤ the 5px
+`_DRAG_THRESHOLD` since `mousedown`. RMB camera orbits always exceed the threshold, so they
+never fire it; a stationary RMB tap does. Consumed by `WallSplitter` (vertex insert).
+The `surfacePos` raycast also skips `userData.ghostPick` meshes so hidden-wall ghosts don't
+catch surface placements.
+
 ```js
 class InputManager {
   constructor(domElement, camera, bus) {
@@ -1750,6 +1767,28 @@ export interface WallBuildOutput {
   trimMeshes: THREE.Mesh[];       // frames, liners, door jambs/headers, passage trim
 }
 ```
+
+### Hidden segments (v4.5.0)
+
+`WallDef.hidden` walls stay in the run but are physically absent from the build output:
+
+- `buildRun` emits each segment's 4 faces into either the solid `idxArr` or a separate
+  `ghostIdx` buffer (segment *i* ↔ `walls[i]`; `resolveRunNodeIds` preserves order). A
+  generalized **cap rule** replaced the old open-run endcap block: within the face loop,
+  a `capStart`/`capEnd` pair is pushed at every boundary where the neighbor segment is the
+  other kind (visible↔hidden) or absent (run end). For all-visible open runs this degenerates
+  to exactly the old two endcaps.
+- If `ghostIdx` is non-empty, a **ghost mesh** (fresh position attribute, `makeGhostMaterial()`
+  — 0x7aa2ff, opacity 0.12, `depthWrite:false`, no shadows) is pushed into `trimMeshes` (so
+  the run entry's rebuild/removal disposes it) tagged `userData { ghostPick, hiddenWall,
+  selectable:true, editorType:"wall", wallIds }`.
+- Hidden walls contribute **no colliders**, and their openings are skipped entirely
+  (no CSG, no trim/trigger meshes; `hasAnyOpenings` ignores them).
+- `build()` (single wall): the whole mesh gets the ghost material, openings/CSG/colliders
+  skipped, same `ghostPick`/`hiddenWall` tags, `castShadow/receiveShadow` off.
+- `hidden` is deliberately **not** a `canMerge` criterion and is excluded from ZoneManager's
+  run-mate sync (panel writes it via `updateWallSegment`, segmentOnly), so toggling one
+  segment never splits or mutates the run.
 
 ### Algorithm
 
@@ -2489,7 +2528,7 @@ Subscribes to `object:selected` and `object:deselected`. Renders a view based on
 
 **OpeningView** — type (door/window/arch/passage), offset along wall, width, height, elevation, trim toggle, inner tiling (T+B, L+R). Changes emit `wall:updated`.
 
-**WallView** — height, thickness, interior material + overrides, exterior material. Openings list (add/edit/remove). **SegmentsSection** (when `runWalls.length > 1`): expandable list of run-mate wall segments with per-segment material overrides. Changes emit `wall:updated` or `wall:updated` with `segmentOnly:true`.
+**WallView** — height, thickness, interior material + overrides, exterior material. Openings list (add/edit/remove). **SegmentsSection** (when `runWalls.length > 1`): expandable list of run-mate wall segments with per-segment material overrides. Changes emit `wall:updated` or `wall:updated` with `segmentOnly:true`. (v4.5.0) Each `WallSegmentRow` also carries a **👁 visibility toggle** (writes `{ hidden }` via `updateWallSegment`; card dims + HIDDEN badge when off) and **row hover** emits `wall:segment-hover { zoneId, wallId|null }` (cleanup on unmount) → `SegmentHighlighter` overlays a translucent box on that segment in the canvas. The screen footer notes the canvas gesture: *right-click a wall to insert a vertex* (WallSplitter).
 
 **FloorView** — elevation, material, material overrides (tile scale, roughness, displacement, map toggles).
 

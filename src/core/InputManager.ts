@@ -109,7 +109,7 @@ export class InputManager implements IEditorModule {
 
     const hit = this._raycaster
       .intersectObjects(this._scene.children, true)
-      .find(h => h.object.userData.selectable && SURFACE_TYPES.has(h.object.userData.editorType));
+      .find(h => h.object.userData.selectable && !h.object.userData.ghostPick && SURFACE_TYPES.has(h.object.userData.editorType));
     const surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;
 
     return { worldPos, surfacePos };
@@ -134,6 +134,16 @@ export class InputManager implements IEditorModule {
   private _handleMouseUp(e: MouseEvent): void {
     if (this._suppress) return;
     this._bus.emit("input:mouseup", { button: e.button, screenPos: { x: e.clientX, y: e.clientY } });
+    // DOM `click` only fires for the primary button, so synthesize a right-click here.
+    // The drag threshold keeps RMB camera orbits (which always move) from firing it.
+    if (e.button === 2 && this._mouseDownScreenPos) {
+      const dx = e.clientX - this._mouseDownScreenPos.x;
+      const dy = e.clientY - this._mouseDownScreenPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= this._DRAG_THRESHOLD) {
+        const { worldPos, surfacePos } = this._computePositions(e);
+        this._bus.emit("input:rightclick", { screenPos: { x: e.clientX, y: e.clientY }, worldPos, surfacePos });
+      }
+    }
   }
 
   private _handleClick(e: MouseEvent): void {

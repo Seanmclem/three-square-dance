@@ -129,6 +129,8 @@ export interface BusEvents {
   "wall:removed":          { zoneId: string; wallId: string };
   "wall:rebuilt":          { zoneId: string; wallId: string };
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
+  // Panel segment-row hover → canvas highlight (null wallId clears it).
+  "wall:segment-hover":    { zoneId: string; wallId: string | null };
   "floor:added":           { zoneId: string; floor: FloorDef };
   "floor:updated":         { zoneId: string; floorId: string; changes: Partial<FloorDef> };
   "floor:removed":         { zoneId: string; floorId: string };
@@ -189,6 +191,8 @@ export interface BusEvents {
   "selection:changed":     { refs: SelectedRef[] };
   "selection:set":         { refs: SelectedRef[] };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
+  // Stationary right-click (RMB press+release under the drag threshold — orbit drags never fire this).
+  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
@@ -278,6 +282,9 @@ export interface MeshUserData {
   assetId?:                string;
   editorOnly?:             boolean;
   _hasCsgCuts?:            boolean;  // cap mesh with CSG-cut world-space geometry
+  // Hidden-wall ghost: picked only when nothing solid is under the cursor, hidden in preview/game.
+  ghostPick?:              boolean;
+  hiddenWall?:             boolean;
 }
 
 // ─── Scene file data model ────────────────────────────────────────────────────
@@ -402,6 +409,9 @@ export interface WallDef {
   openings:           Opening[];
   materialOverrides?: MaterialOverrides;
   groupIds?:         string[];
+  // Hidden segments render as a translucent editor-only ghost, get no colliders, and are
+  // invisible in preview/game — but stay in zone.walls/runs (room loops, floor fills).
+  hidden?:            boolean;
 }
 
 export interface PlatformDef {
