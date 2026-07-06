@@ -188,7 +188,45 @@ editor/React margin, but it's a modest, later optimization — not where the big
 
 ---
 
-## 7. Prioritized checklist
+## 7. "Stutter" that is NOT frame rate: camera-motion judder
+
+Learned in the 2026-07-05 session (subway stairs / obby platform jump): both "it stutters
+there" reports reproduced with a **perfect frame profile** (median 8.6ms @120Hz, zero dropped
+frames at the spot). The stutter was *camera motion*, not render rate:
+
+- **Stairs (FPS + third person):** the capsule climbs steps in per-frame *pulses* (2–3 flat
+  frames, then a ~0.05–0.1m snap; descending = repeated micro-falls). A camera rigidly locked
+  to the body Y turns that into visible judder. **Fix (in place):** the camera height follows a
+  smoothed body Y — `CAM_Y_RATE_GROUND/AIR` + `CAM_Y_MAX_LAG` in `CharacterController` —
+  heavy smoothing grounded, near-rigid airborne, snap on teleport.
+- **Spring-arm occlusion (third person):** applying the occlusion raycast distance instantly
+  teleports the camera meters in one frame when the ray grazes a platform edge (measured
+  4.0→0.6→4.0m across single frames during a platform jump). **Fix (in place):** asymmetric
+  smoothing — `ARM_RATE_IN` (fast, walls still can't clip through) / `ARM_RATE_OUT` (slow
+  release) in `CharacterController`.
+
+**Triage rule:** if the counter's worst-ms stays green at the "stuttery" spot, record
+`body.position.y` and `camera.position` per frame and diff them — pulsed body dy with rigid
+camera = judder, not perf. (Per-frame recorder snippets: TESTING.md §2.)
+
+Related, found the same session: **major-GC pause trains** are the only real frame drops in
+small levels — a burst of 3–7 consecutive 15–37ms frames every ~60–90s, *identical in the
+production build* (so not dev overhead; heap sawtooth ~55KB/s → periodic major GC). Small,
+unavoidable baseline; keep per-frame allocation discipline so it doesn't get worse.
+
+## 8. Baseline numbers (known-good reference levels, 2026-07-05)
+
+Measured in "New Game" mode, dev build, 120Hz Retina MacBook, DPR capped at 2:
+
+| Level | draw calls | triangles | median frame | p99 | notes |
+|---|---|---|---|---|---|
+| `subway1.json` (6 walls, 2 floors, 2 stairs+railings, 1 platform) | 14–15 | 250–850 | 8.6ms | 12ms | FPS mode, zero dropped frames incl. look-around sweeps |
+| `Obby1.json` (4 platforms, 2 trigger volumes, animated warp box, skinned avatar) | ~15 | ~1k | 8.7ms | 12ms | third person; GC bursts only (see §7) |
+
+The FpsCounter (top-left) now shows **draw calls · triangles** alongside FPS/worst-ms — compare
+any future level against these; draw calls are the number that compounds with level size (§5).
+
+## 9. Prioritized checklist
 
 1. **Zero-trade-off cleanups first (always).** Reuse per-frame allocations; no whole-scene or
    skinned raycasts in the loop; no per-frame `setState`. These never regress anything.

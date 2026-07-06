@@ -232,9 +232,17 @@ window.__lsSnapshot = {
   value: localStorage.getItem('worldeditor_autosave'),
   ts:    localStorage.getItem('worldeditor_autosave_ts'),
 };
-// Return snapshot so it lives in conversation context too
-JSON.stringify({ hasSnapshot: !!window.__lsSnapshot.value });
+// Return the FULL snapshot value, not just a boolean — `window.__lsSnapshot` dies on the
+// first reload/navigation, and if you've overwritten the autosave by then the user's level
+// is unrecoverable (this happened on 2026-07-05; recovery was only possible because the
+// last-saved file matched). Worlds are small (~10KB) — dump it into the conversation.
+JSON.stringify(window.__lsSnapshot);
 ```
+
+If the tool result would be too large to return, save it to a file instead *before* mutating
+anything (e.g. `await fetch(...)` is not available for writing — so copy it out via a second
+`javascript_tool` call reading `window.__lsSnapshot.value` in chunks). A session that reloads
+the page even once MUST have the snapshot content somewhere outside the page.
 
 **At the end, before closing the test tab:**
 
@@ -454,8 +462,9 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
 - StrictMode double-mount: editor still renders once, no duplicated canvases
   or leaked listeners after a hot reload.
 - **Framerate — watch the perf counter** (small readout, top-left of the canvas,
-  `src/ui/FpsCounter.tsx`). It shows **avg FPS** *and* the **worst single-frame time (ms)**
-  in each 0.5s window. **Watch the ms, not just the FPS:** averaged FPS masks brief hitches
+  `src/ui/FpsCounter.tsx`). It shows **avg FPS**, the **worst single-frame time (ms)**
+  in each 0.5s window, and **draw calls · triangles** (`renderer.info`) — compare against
+  the known-good baselines in PROFILING.md §8. **Watch the ms, not just the FPS:** averaged FPS masks brief hitches
   (a couple of long frames barely move a 500ms average, and rAF is capped at the display
   refresh — 120Hz here), so a stutter you *feel* can sit at a steady "120 FPS". The worst-ms
   surfaces it — ideal is ~8.3ms @120Hz; a spike to 17ms+ is a dropped frame. **Be wary of

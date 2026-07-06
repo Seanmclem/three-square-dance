@@ -11,6 +11,20 @@ import { gameState } from "@/scripting/GameState";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const CAM_SKIN = 0.2;   // gap kept in front of an occluding wall
+// Vertical camera smoothing — the capsule climbs/descends stairs in per-step pulses
+// (bursts of ~0.1m/frame between flat frames); a rigidly-locked camera turns that into
+// visible judder even at a perfect frame rate. Smooth the camera's Y toward the body:
+// heavily while grounded (step snaps are artifacts), lightly while airborne (jumps and
+// falls are real motion the camera must track), with a hard lag clamp as a safety net.
+const CAM_Y_RATE_GROUND = 14;  // 1/s exp rate on the ground (~70ms time constant)
+const CAM_Y_RATE_AIR    = 40;  // 1/s exp rate airborne (~25ms — near-rigid, still eats micro-falls)
+const CAM_Y_MAX_LAG     = 0.4; // m — camera never trails the true height by more than this
+// Spring-arm distance smoothing — applying the occlusion raycast distance instantly makes
+// the camera teleport meters in one frame when the ray grazes a platform edge (measured
+// 4.0m→0.6m→4.0m within frames on a platform jump). Pull in fast (so walls still can't
+// clip), ease back out slowly.
+const ARM_RATE_IN  = 30;  // 1/s when the target distance is closer than current
+const ARM_RATE_OUT = 6;   // 1/s when releasing back out
 const ZOOM_MIN = 1.5;   // scroll-zoom distance clamp
 const ZOOM_MAX = 12;
 const INTERACT_RANGE = 3;        // how far (m) an interactable is reachable
@@ -55,6 +69,8 @@ export class CharacterController {
   private _animPhase: "ground" | "jump" | "airidle" | "land" = "ground";
   private _modelYaw   = 0;                       // smoothed avatar facing (third-person)
   private _desiredDist: number;                  // scroll-zoom target distance
+  private _camY    = Number.NaN;                 // smoothed camera height; NaN = snap next frame
+  private _armDist = Number.NaN;                 // smoothed spring-arm distance; NaN = snap next frame
 
   readonly camera: THREE.PerspectiveCamera;
 
@@ -108,6 +124,7 @@ export class CharacterController {
     this._offTeleport = this._bus.on("character:teleport", ({ position, facing }) => {
       this._body.teleport(new THREE.Vector3(position.x, position.y + capsuleBottom, position.z));
       this._velY = 0;
+      this._camY = this._armDist = Number.NaN;   // snap camera smoothing across the warp
       if (facing != null) {                          // set look direction (degrees); undefined = keep current
         this._yaw = THREE.MathUtils.degToRad(facing);
         this._modelYaw = this._yaw;                  // snap the third-person avatar too
@@ -151,9 +168,14 @@ export class CharacterController {
     this._body.move(dir);
     const pos = this._body.position;
 
-    // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision
+    // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision.
+    // Both modes derive their height from a smoothed body Y so stair steps don't judder.
+    const camYRate = this._body.isGrounded ? CAM_Y_RATE_GROUND : CAM_Y_RATE_AIR;
+    if (Number.isNaN(this._camY)) this._camY = pos.y;
+    this._camY += (pos.y - this._camY) * Math.min(1, dt * camYRate);
+    this._camY  = Math.max(pos.y - CAM_Y_MAX_LAG, Math.min(pos.y + CAM_Y_MAX_LAG, this._camY));
     if (this._settings.cameraMode === "thirdperson") {
-      const pivot   = _tmpPivot.set(pos.x, pos.y + this._settings.thirdPersonHeight, pos.z);
+      const pivot   = _tmpPivot.set(pos.x, this._camY + this._settings.thirdPersonHeight, pos.z);
       const forward = _tmpForward.set(0, 0, -1)
         .applyEuler(_tmpEuler.set(this._pitch, this._yaw, 0, "YXZ")); // camera look dir
       const back    = _tmpBack.copy(forward).negate();                 // pivot → camera
@@ -165,10 +187,13 @@ export class CharacterController {
         RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._body.collider,
       );
       if (hit) dist = Math.max(MIN_DIST, hit.timeOfImpact - CAM_SKIN); // pull in on walls
-      this.camera.position.copy(pivot).addScaledVector(back, dist);
+      if (Number.isNaN(this._armDist)) this._armDist = dist;
+      const armRate = dist < this._armDist ? ARM_RATE_IN : ARM_RATE_OUT;
+      this._armDist += (dist - this._armDist) * Math.min(1, dt * armRate);
+      this.camera.position.copy(pivot).addScaledVector(back, this._armDist);
       this.camera.lookAt(pivot);
     } else {
-      const eyeY = pos.y + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
+      const eyeY = this._camY + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
       this.camera.position.set(pos.x, eyeY, pos.z);
       this.camera.rotation.set(this._pitch, this._yaw, 0, "YXZ");
     }

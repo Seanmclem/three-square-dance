@@ -7,10 +7,17 @@ import { useEffect, useState } from "react";
  * move the average). At 120Hz an ideal frame is ~8.3ms; a spike to 17ms+ is a dropped
  * frame you can feel. See TESTING.md §7.
  *
+ * Also shows draw calls + triangles from `renderer.info` — draw-call growth is the
+ * cost that compounds with level size (PROFILING.md §5), so it's surfaced here as a
+ * budget gauge. Baselines for known-good small levels are in PROFILING.md §8.
+ *
  * Runs its own rAF loop, `pointerEvents: none` so it never blocks the viewport.
  */
-export function FpsCounter() {
-  const [stats, setStats] = useState({ fps: 0, worstMs: 0 });
+export function FpsCounter({ getInfo }: {
+  /** Returns the renderer's per-frame render stats, or null before the scene exists. */
+  getInfo?: () => { calls: number; triangles: number } | null;
+}) {
+  const [stats, setStats] = useState({ fps: 0, worstMs: 0, calls: 0, tris: 0 });
 
   useEffect(() => {
     let raf = 0, frames = 0, worst = 0;
@@ -22,18 +29,28 @@ export function FpsCounter() {
       frames++;
       if (dt > worst) worst = dt;                 // longest frame this window
       if (now - windowStart >= 500) {
-        setStats({ fps: Math.round((frames * 1000) / (now - windowStart)), worstMs: Math.round(worst) });
+        const info = getInfo?.() ?? null;
+        setStats({
+          fps: Math.round((frames * 1000) / (now - windowStart)),
+          worstMs: Math.round(worst),
+          calls: info?.calls ?? 0,
+          tris: info?.triangles ?? 0,
+        });
         frames = 0; worst = 0; windowStart = now;
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [getInfo]);
 
   const fpsColor  = stats.fps >= 55 ? "#5fd08a" : stats.fps >= 40 ? "#d8c25f" : "#e07a7a";
   // worst-frame: ≤12ms buttery, ≤24ms a missed vsync/two, above = a visible stutter
   const worstColor = stats.worstMs <= 12 ? "#5fd08a" : stats.worstMs <= 24 ? "#d8c25f" : "#e07a7a";
+  // draw calls: <100 trivial, <500 fine, beyond that start thinking about batching (PROFILING.md §5)
+  const callColor = stats.calls < 100 ? "#5fd08a" : stats.calls < 500 ? "#d8c25f" : "#e07a7a";
+  const trisLabel = stats.tris >= 1_000_000 ? `${(stats.tris / 1e6).toFixed(1)}M` :
+                    stats.tris >= 1000      ? `${Math.round(stats.tris / 1000)}k` : `${stats.tris}`;
   return (
     <div style={{
       position: "absolute", top: 54, left: 64, zIndex: 40, pointerEvents: "none",
@@ -43,6 +60,7 @@ export function FpsCounter() {
     }}>
       <span style={{ color: fpsColor }}>{stats.fps} FPS</span>
       <span style={{ color: worstColor }} title="worst single frame in the last 0.5s">{stats.worstMs}ms&#9662;</span>
+      <span style={{ color: callColor }} title="draw calls / triangles last frame">{stats.calls}dc·{trisLabel}</span>
     </div>
   );
 }

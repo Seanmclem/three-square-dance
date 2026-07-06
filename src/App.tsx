@@ -36,6 +36,7 @@ import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
+import { FpsCounter } from "@/ui/FpsCounter";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
@@ -143,6 +144,13 @@ export default function App() {
     setCanUndo(hu);
     setCanRedo(hr);
     if (hu) setIsDirty(true);
+  }, []);
+
+  // Last frame's draw calls + triangles for the FpsCounter readout (stable ref — the
+  // counter samples it inside its own rAF loop, 2×/sec).
+  const getRenderInfo = useCallback(() => {
+    const r = sceneRef.current?.renderer;
+    return r ? { calls: r.info.render.calls, triangles: r.info.render.triangles } : null;
   }, []);
 
   useEffect(() => {
@@ -1714,6 +1722,8 @@ export default function App() {
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
         />
       )}
+
+      <FpsCounter getInfo={getRenderInfo} />
 
       {!isGame && (
         <div style={{
