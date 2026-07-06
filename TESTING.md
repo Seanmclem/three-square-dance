@@ -391,6 +391,27 @@ avatar shots in open space.
 stop between/among sessions. Check `lsof -ti:7373`; if down, start `npm run dev` in the
 background (Bash `run_in_background`) before navigating.
 
+**Hidden tab (rAF frozen)? Manually step the runtime — no visibility needed.** When the
+user is working elsewhere, `document.hidden` stays true, rAF never fires, and repeatedly
+yanking Chrome to the front is rude. Instead, drive frames synchronously from
+`javascript_tool` (works regardless of visibility, and is deterministic — fixed dt):
+
+```js
+const { physicsWorld } = await import('/src/physics/PhysicsWorld.ts'); // Vite serves the
+const c = window.__preview._controller;                                // same module instance
+document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW', bubbles: true }));
+const dt = 1/120, rows = [];
+for (let i = 0; i < 400; i++) {
+  physicsWorld.step(dt); c.update(dt);
+  rows.push([c.body.position.y, c.camera.position.y]);   // whatever you're verifying
+}
+document.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', bubbles: true }));
+```
+
+Used 2026-07-05 to verify camera-smoothing fixes on a hidden tab. Caveats: nothing renders
+(read state, not pixels), and systems registered on the RAF loop but not called here
+(TriggerSystem, animation-driven scripts) don't run unless you call them too.
+
 ---
 
 ## 4. Phase 4.7 — Merged Wall Runs test
