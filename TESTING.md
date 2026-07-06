@@ -239,6 +239,10 @@ window.__lsSnapshot = {
 JSON.stringify(window.__lsSnapshot);
 ```
 
+Note (2026-07-06): `javascript_tool` results truncate at roughly 1KB, so a one-shot dump
+gets cut off. Dump the value in ~1000-char slices (`.slice(0,1000)`, `.slice(1000,2000)`, …)
+across successive calls until the whole string is in the conversation.
+
 If the tool result would be too large to return, save it to a file instead *before* mutating
 anything (e.g. `await fetch(...)` is not available for writing — so copy it out via a second
 `javascript_tool` call reading `window.__lsSnapshot.value` in chunks). A session that reloads
