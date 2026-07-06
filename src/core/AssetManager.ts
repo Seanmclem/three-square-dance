@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest } from "@/types";
 
 export type { MaterialDef };
@@ -274,7 +275,18 @@ export class AssetManager {
       return this._loadOBJ(assetId, path, def?.mtlPath);
     }
     const gltf = await this.loadGLTF(assetId) as { scene: THREE.Object3D };
-    return gltf.scene.clone();
+    return this._cloneScene(gltf.scene);
+  }
+
+  /**
+   * Skeleton-safe clone. Plain .clone() of a SkinnedMesh keeps it bound to the
+   * cached source scene's skeleton (bones that never get matrix updates in the
+   * render scene), so the clone renders frozen at the source pose/position.
+   */
+  private _cloneScene(scene: THREE.Object3D): THREE.Object3D {
+    let skinned = false;
+    scene.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned = true; });
+    return skinned ? cloneSkinned(scene) : scene.clone();
   }
 
   private async _loadOBJ(assetId: string, path: string, mtlPath?: string): Promise<THREE.Object3D> {
