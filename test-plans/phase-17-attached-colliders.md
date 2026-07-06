@@ -70,3 +70,14 @@ Colliders screen in the PropertiesPanel, wireframes + box face handles
 
 Manual: with two overlapping colliders, hide one, resize the other via
 handles, then swap — no cross-grabbing.
+
+## v4.4.2 addendum — generous object picking (verified 2026-07-06)
+
+- [x] Clicking between the husky's legs selects the husky (was: platform /
+      trigger volume behind) — object AABB counts as a hit
+- [x] Clicking on a prop's box (sofa) selects it; nearest real hit still wins
+- [x] Bare platform + empty-ground clicks unchanged (platform / volume)
+- [x] Trigger volume no longer steals gap-clicks (box hit occludes the volume)
+
+Manual: hover feedback matches — the object tints when the cursor is anywhere
+inside its box.

@@ -86,6 +86,6 @@ select something else, and are never saved.
   a rotated box.
 - Sphere/capsule are numeric-only for now (no drag handles) — use **Move** +
   the radius/height fields.
-- If clicking an object keeps selecting a **trigger volume** instead, a large
-  volume overlaps it (volume picking wins) — select the object through the
-  Groups/Scripts lists or temporarily move the volume.
+- Clicking an object selects it even through gaps in the model (between an
+  animal's legs, under a table top) — the click counts anywhere inside the
+  object's bounding box, unless something else is genuinely in front (v4.4.2).

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
@@ -205,6 +206,11 @@ export class TriggerVolumeTool {
         return !!et && et !== "floor" && et !== "wall" && et !== "trigger-volume";
       });
     if (occluder && occluder.distance < best.distance) return undefined;
+
+    // Objects also occlude via their model AABB (matches SelectionManager's generous
+    // object picking) — a click through a gap in a prop must not fall into the volume.
+    const boxHit = castObjectBoxes(this._raycaster.ray, this._scene)[0];
+    if (boxHit && boxHit.distance < best.distance) return undefined;
 
     return best.vol;
   }

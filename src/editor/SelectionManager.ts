@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
@@ -220,7 +221,7 @@ export class SelectionManager implements IEditorModule {
     this._mouse.x =  ((screenPos.x - rect.left) / rect.width)  * 2 - 1;
     this._mouse.y = -((screenPos.y - rect.top)  / rect.height) * 2 + 1;
     this._raycaster.setFromCamera(this._mouse, this._camera);
-    return this._raycaster
+    const hits = this._raycaster
       .intersectObjects(this._scene.children, true)
       .filter(h => {
         const ud = h.object.userData;
@@ -228,6 +229,14 @@ export class SelectionManager implements IEditorModule {
         if (ud.editorType === "floor" && ud.floorLevel !== this._activeFloorLevel) return false;
         return true;
       });
+    // Generous object picking: low-poly props are full of gaps, so a click "on" an
+    // object often threads through to whatever's behind. Also test each object's
+    // cached model AABB — entering the box counts as hitting the object, and the
+    // normal nearest-distance sort still lets anything genuinely closer win.
+    for (const b of castObjectBoxes(this._raycaster.ray, this._scene)) {
+      hits.push({ distance: b.distance, point: b.point, object: b.root } as THREE.Intersection);
+    }
+    return hits.sort((a, b) => a.distance - b.distance);
   }
 
   private _pickByPriority(hits: THREE.Intersection[]): THREE.Intersection {
