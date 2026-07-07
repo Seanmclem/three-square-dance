@@ -1,5 +1,12 @@
 # Decals — Implementation Plan
 
+> **Status: IMPLEMENTED** — Stage A shipped as v4.7.0 (`780bc37`, Phase 20), Stage B as
+> v4.8.0 (`8bf901d`, Phase 21), both verified in-browser 2026-07-07. See
+> `test-plans/phase-20-decals-overlay.md` / `phase-21-decals-surface.md` and the
+> WORLD_EDITOR_ARCHITECTURE.md v4.7.0/v4.8.0 entries for as-built details (two notable
+> deviations: gizmo anchor re-snap was dropped in favor of predictable free translation,
+> and the >4-per-mesh warning is console-only rather than a panel badge).
+
 > Stains, stickers, graffiti, and weathering projected onto world surfaces.
 > Two techniques, chosen by what the decal *is*, not where it goes:
 >
