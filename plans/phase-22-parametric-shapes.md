@@ -1,6 +1,10 @@
-# Parametric Shape Primitives — Feature Plan
+# Phase 22 — Parametric Shape Primitives
 
-**Status:** planned, not started · **Written:** 2026-07-07 · **Baseline:** v4.6.0
+> Status: **PLANNED** — not yet implemented.
+> Target version: next minor after phases 20 (ControlSchemeManager) and 21
+> (runtime shell) land — renumber/re-version if ordering changes.
+> Written 2026-07-07 against baseline v4.6.0.
+
 **Scope decisions (user-approved):** parametric shapes now, data model designed for a
 later vertex-editable brush phase; v1 kinds = cylinder/cone, wedge/ramp, flexible box;
 additive only (CSG subtraction deferred).
@@ -271,9 +275,9 @@ driving (TESTING.md §3 "Other lessons"), autosave snapshot protection, typechec
 - **M6 — Docs + test plan + version bump.** WORLD_EDITOR_ARCHITECTURE.md new phase
   section AND per-file sections (PLAN_UPDATE_GUIDE.md rule), point the Phase-12 brush
   stub at ShapeDef; HUMAN_TESTING.md; TESTING.md spawnShape recipe;
-  test-plans/phase-20-parametric-shapes.md (latest is 19); COLLIDERS_GUIDE.md
-  (convexHull + 45° note). Version → v4.7.0 in doc header + commit subject. Commits
-  straight to main per project convention.
+  test-plans/phase-22-parametric-shapes.md; COLLIDERS_GUIDE.md (convexHull + 45° note).
+  Version → next minor (vX.Y.0) in doc header + commit subject. Commits straight to
+  main per project convention.
 
 ## 7. Phase 2 sketch — vertex-editable brush (future, not built now)
 
