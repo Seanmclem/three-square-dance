@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest } from "@/types";
 
 export type { MaterialDef };
 
@@ -13,6 +13,7 @@ export class AssetManager {
   private _renderer: THREE.WebGLRenderer | null = null;
   private _materialRegistry: Record<string, MaterialDef> = {};
   private _assetRegistry:   Record<string, AssetDef>    = {};
+  private _decalRegistry:   Record<string, DecalTexDef> = {};
   private _missingAssetIds    = new Set<string>();
   private _missingMaterialIds = new Set<string>();
   private _fallbackMat: THREE.MeshStandardMaterial | null = null;
@@ -107,6 +108,38 @@ export class AssetManager {
       this._assetRegistry = {};
       return [];
     }
+  }
+
+  /** Fetch decals/manifest.json, populate the decal-texture registry, return the list. */
+  async initDecals(): Promise<DecalTexDef[]> {
+    try {
+      const res = await fetch('/assets/decals/manifest.json');
+      if (!res.ok) {
+        console.warn('AssetManager: no decal manifest found — decal picker will be empty');
+        this._decalRegistry = {};
+        return [];
+      }
+      const manifest: DecalManifest = await res.json();
+      const checks  = await Promise.all(manifest.decals.map(d => this._fileExists(d.path)));
+      const present = manifest.decals.filter((_, i) => checks[i]);
+      const missing = manifest.decals.filter((_, i) => !checks[i]);
+      if (missing.length)
+        console.info(`AssetManager: ${missing.length} decal(s) missing files, hidden:`, missing.map(d => d.id));
+      this._decalRegistry = Object.fromEntries(present.map(d => [d.id, d]));
+      return present;
+    } catch (err) {
+      console.warn('AssetManager: failed to load decal manifest', err);
+      this._decalRegistry = {};
+      return [];
+    }
+  }
+
+  getDecalDef(id: string): DecalTexDef | undefined {
+    return this._decalRegistry[id];
+  }
+
+  getDecalList(): DecalTexDef[] {
+    return Object.values(this._decalRegistry);
   }
 
   /** HEAD-check a static file's existence (used to hide manifest entries with missing files). */

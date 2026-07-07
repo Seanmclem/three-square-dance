@@ -51,7 +51,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | null;
 
 export interface GroupDef {
   id:   string;
@@ -91,12 +91,12 @@ export interface AssetManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -199,7 +199,10 @@ export interface BusEvents {
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
-  "input:wheel":           { delta: number };
+  "input:wheel":           { delta: number; shift: boolean; ctrl: boolean; alt: boolean; meta: boolean };
+  // Suspend EditorCamera wheel-zoom while a tool consumes the scroll (e.g. decal resize).
+  // Sources are independent — zoom stays locked while any source holds a lock.
+  "camera:zoom-lock":      { source: string; locked: boolean };
   "input:keydown":         { code: string; key: string; shift: boolean; ctrl: boolean; alt: boolean; meta: boolean };
   "input:keyup":           { code: string };
   "history:restore":       Record<string, never>;
@@ -221,6 +224,13 @@ export interface BusEvents {
   "triggervolume:hover":   { zoneId: string; id: string | null };
   "triggervolume:select":  { zoneId: string; id: string | null };
   "triggervolume:placed":  { vol: TriggerVolume };
+  "decal:added":           { zoneId: string; decal: DecalDef };
+  "decal:updated":         { zoneId: string; id: string; changes: Partial<DecalDef> };
+  "decal:removed":         { zoneId: string; id: string };
+  "decal:rebuilt":         { zoneId: string; decalId: string };
+  "decal:placed":          { zoneId: string; id: string };
+  // Decal picker → tool: arm the DecalTool with a texture (null disarms).
+  "decaltool:texture":     { textureId: string | null; kind: DecalKind };
   "checkpoint:added":      { zoneId: string; checkpoint: CheckpointDef };
   "checkpoint:updated":    { zoneId: string; id: string; changes: Partial<CheckpointDef> };
   "checkpoint:removed":    { zoneId: string; id: string };
@@ -263,7 +273,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
@@ -541,6 +551,7 @@ export interface ZoneDef {
   scripts?:        ScriptDef[];
   triggerVolumes?: TriggerVolume[];
   checkpoints?:    CheckpointDef[];
+  decals?:         DecalDef[];
 }
 
 export interface TransitionDef {
@@ -734,6 +745,46 @@ export interface TriggerVolumeVisual {
   opacity:    number;            // 0..1 max alpha
   fadeHeight: number;            // 0..1 fraction of box height the gradient spans (1 = full)
   animate:    boolean;           // subtle pulse
+}
+
+// ─── Decals (Phase 20/21) ────────────────────────────────────────────────────
+
+export type DecalKind = "overlay" | "surface";
+
+// A decal is a free-floating world-space stamp — it stores NO target entity id.
+// Wall runs merge/split and their meshes are disposed wholesale on rebuild, so a
+// stored wallId would dangle; instead the decal re-projects at build time onto
+// whatever static geometry its projector box intersects. If geometry moves away,
+// the def is kept and the mesh is simply skipped.
+export interface DecalDef {
+  id:        string;          // dec_<uuid8>
+  label?:    string;
+  kind:      DecalKind;       // overlay = DecalGeometry mesh; surface = in-shader projection (Phase 21)
+  textureId: string;          // id in the decals manifest registry
+  position:  Vec3;            // world-space anchor ON the surface
+  normal:    Vec3;            // unit world normal captured at placement
+  rotation:  number;          // degrees, roll around normal
+  size:      { width: number; height: number };  // meters
+  depth?:    number;          // overlay projector depth; default max(w,h)*0.5, min 0.2
+  opacity:   number;          // 0..1 (surface kind: blend strength)
+  triplanar?: boolean;        // surface kind only — corner-wrapping projection
+  roughnessMod?: number;      // surface kind only — roughness where alpha>0 (wet look)
+  groupIds?: string[];
+}
+
+export interface DecalTexDef {
+  id:          string;
+  label:       string;
+  category?:   string;
+  path:        string;        // /assets/decals/<file>.png (albedo, transparent)
+  maps?:       { normal?: string; roughness?: string };  // optional PBR maps (overlay kind)
+  kinds:       DecalKind[];   // which modes this texture supports
+  attribution?: Attribution;
+}
+
+export interface DecalManifest {
+  version: string;
+  decals:  DecalTexDef[];
 }
 
 export interface EntityCapabilities {

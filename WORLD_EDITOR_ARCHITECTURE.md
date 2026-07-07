@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.6.0** — last updated 2026-07-06
+**Version 4.7.0** — last updated 2026-07-07
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -70,6 +70,7 @@
 - v4.5.0 — **Wall segment tools: right-click vertex insert, per-segment visibility, segment-row hover highlight.** (1) **Split:** new **`src/editor/WallSplitter.ts`** (`IEditorModule`, registered in App) — a *stationary* right-click on a wall with the Select tool inserts a vertex at the clicked point, splitting that wall into two connected segments sharing a new node. Plumbing: InputManager now emits **`input:rightclick`** from `mouseup` button 2 when the press+release stayed under the 5px `_DRAG_THRESHOLD` (DOM `click` never fires for RMB), so RMB camera orbits — which always move — never trigger it. The splitter raycasts wall meshes (solid hits preferred over ghosts), maps the hit to the nearest run segment (point-to-segment in XZ across `userData.wallIds`), projects the click onto the segment axis, refuses splits within 0.15m of a node, then in one `"split wall"` transaction: `addNode` (exact projected point, on-axis), `updateWallSegment(wallId, { endNodeId: newNode, openings: keepA })`, `addWall({...wall, id: wall_<uuid8>, startNodeId: newNode, openings: moveB })` — openings stay with the half containing their centre, second-half offsets re-measured from the new node (`offset -= splitDist`). Emits `tool:placed` for selection + history-UI sync; the two halves re-merge into the same run (same props, shared degree-2 node), so the mesh is visually unchanged until the new vertex is dragged (NodeDragger, unchanged). (2) **Per-segment visibility:** new **`WallDef.hidden?: boolean`** (persisted). A hidden segment stays in `zone.walls` and its run (room configuration, floor fills, `resolveRunNodeIds`, zone membership all unaffected) but is physically gone: `WallBuilder.buildRun` routes its 4 faces into a separate **ghost index buffer** instead of the solid geometry, registers **no colliders** for it, skips its openings (no CSG/trim/trigger meshes), and `ZoneManager._registerDoorSensors` skips it; a generalized **cap rule** replaced the old open-run endcap block (cap at every visible/hidden or run-end boundary — degenerates to exactly the old two endcaps for all-visible open runs; verified 28→32→36 tri counts). The ghost renders as a translucent editor-only mesh (`makeGhostMaterial()`: 0x7aa2ff, opacity 0.12, no depthWrite/shadows) tagged `userData.ghostPick + hiddenWall`, pushed into `trimMeshes` so run rebuild/removal disposes it; `WallBuilder.build` (single wall) swaps the whole mesh to ghost material instead. **`ZoneManager._setHiddenWallGhostsVisible`** hides ghosts on `preview:start` and restores on `preview:stop` (both preview and game). **Ghost-aware picking:** `SelectionManager._cast` and InputManager's `surfacePos` prefer non-`ghostPick` hits — ghosts never occlude real geometry (dollhouse click-through), but clicking a ghost over empty space still selects its run, so fully-hidden walls stay recoverable. UI: each `WallSegmentRow` gets a **👁 toggle** (`onUpdate({hidden})` → `updateWallSegment`, segmentOnly so run-mate sync never propagates it) + dimmed card + HIDDEN badge; `hidden` is deliberately NOT a `canMerge`/run-sync criterion. (3) **Hover highlight:** new **`src/editor/SegmentHighlighter.ts`** — `WallSegmentRow` mouseenter/leave emits **`wall:segment-hover { zoneId, wallId|null }`** (panel already holds `bus`; unmount cleanup emits null), and the module overlays a translucent box (0x4d8cff, 0.35, +0.06 inflate) on that segment computed from nodes + height/thickness/elevation — an overlay because a merged run is one mesh and can't be tinted per-segment; cleared on null/`object:deselected`/`wall:removed`. Verified in-browser end-to-end (real right-click through InputManager, real panel clicks): split at (13.2,0) on a 3-wall run → 4 walls/1 mesh/4 colliders/36 tris, `"split wall"` undo entry; eye-hide → colliders 4→3, main 32 tris + 12-tri ghost, gap visible with capped ends, ghost invisible in preview & restored on exit, gap click re-selects run via ghost fallback; unhide restores 36/4/no-ghost; hover row → box at segment midpoint, cleared on mouseout.
 - v4.5.1 — **Fix: duplicate/orphan wall meshes after undoing a split (+ split feedback flash).** Undoing a wall split emits `wall:updated` + `wall:removed` in one tick; the update went through the coalesced `_rebuildWallBatch` while `wall:removed` fired `_removeWall` immediately — two async ops mutating `wallData`/`wallsGroup` interleaved across `await`s, each rebuilding the same surviving run: one mesh landed tracked, one became an **untracked orphan** stacked on top (z-fighting flicker; the orphan ignores subsequent moves, looking like "the wall didn't move" and later like a duplicate wall — user-reported after split×N → undo×N → move → undo). Concurrent `_rebuildWallBatch`es (rapid splits/undos) hit the same race. Fix: **`ZoneManager._wallOpChain`** — every `_rebuildWallBatch`/`_removeWall` call is enqueued via `_enqueueWallOp` onto a single promise chain (strictly serialized, errors caught so the chain never stalls). Verified in-browser with the fix live: split×2 then Cmd+Z×2 fired back-to-back → 0 orphans (every `wallsGroup` child tracked by a `RunEntry`), data fully reverted, run re-merged with correct collider count; node move + undo also clean. Also: **WallSplitter now flashes** the new second half with the segment-highlight box for 700ms after a split ("hard to tell if it worked" feedback) — the run re-merges seamlessly, so there was previously no visual cue.
 - v4.6.0 — **Floor geometry panel + node-link visibility.** Motivated by the v4.5.1 incident's discovery that wall↔floor node sharing (by ID — WallTool endpoint snap reuses floor corner nodes; fill-run-with-floor/auto-floor reuse the wall run's nodes) was completely invisible in the UI, and floors exposed NO geometry properties at all (`OBJECT_SCREENS.floor` was `["mat","vert"]`; VertScreen = level+elevation only). (1) **Floor Geometry screen** (`OBJECT_SCREENS.floor = ["geo","mat","vert"]`, new **`FloorGeoView`** + **`FloorVertexRow`** in PropertiesPanel): rect node-backed floors get POSITION X/Z (centroid) + SIZE W/D that recompute all 4 nodes **by min/max membership** (nodeIds order never reshuffled — NodeDragger's `RECT_SAME_X/Z` rect-corner adjacency is index-based) through App's new **`handleFloorNodesUpdate`** (N× `updateNode` in ONE transaction = one undo step) with read-only corner rows; polygon node-backed floors get an editable per-node X/Z vertex list (same debounced-field pattern); legacy floors (no `nodeIds` — or **broken** ones, whose render otherwise collapses missing vertices to `{0,0}` via `resolveFloorMesh`) edit `floorMesh.points` via `updateFloor` with a fresh array, and broken-node edits detach `nodeIds` so points become authoritative again. Panel reads node positions live from the `zones` prop; refresh after edits rides `floor:rebuilt` → SelectionManager re-emit. (2) **Node-link visibility**: new **`WorldState.getNodeLinks(zoneId,nodeId) → NodeLinks {wallIds,floorIds,platformIds}`** (replaces the dead `getWallsAtNode`; same reference model as `_pruneOrphanNodes`); vertex rows show a blue **LINKED** chip when another entity shares the node, `WallSegmentRow` chips when a wall node is shared with a floor/platform (wall–wall sharing ignored); hovering a vertex row emits new **`node:link-hover {zoneId,nodeId|null,sourceId}`** → **SegmentHighlighter** (extended: `_meshes[]`, `_wallBox` helper) overlays a node marker sphere + boxes over every linked wall/floor/platform, skipping the hover's source entity; cleared on leave/unmount/deselect/removal. Verified in-browser end-to-end: fill-run floor's vertex rows all chip LINKED; editing V1.x 30→28 moved the node, the shared wall run mesh (minX 29.85→27.79), AND the floor mesh, with ONE "move floor vertex" undo reverting all three (0 orphan meshes); rect SIZE W 6→8 updated all 4 nodes (centroid preserved, still axis-aligned, one undo); hover produced exactly marker+2 wall boxes and cleared to 0; legacy points edit + undo clean; user's coincident-but-unshared east wall correctly reports unlinked. **Known follow-up (explicitly deferred):** `removeNode` still guards walls only — deleting a wall can orphan floor/platform-referenced nodes.
+- v4.7.0 — **Phase 20 — Overlay decals (DecalGeometry stamping).** First half of the decals feature (`aplans/decals-plan.md`; Phase 21 = surface-effect shader decals). New entity type **`DecalDef`** (`zone.decals?: DecalDef[]` — optional array, no migration): a **free-floating world-space anchor + unit normal + roll°/size/opacity/textureId** with **no target entity id** — wall runs merge/split and their meshes are disposed wholesale on rebuild, so decals re-project at build time onto whatever static geometry (wall/floor/platform/stair; `ghostPick` excluded) their projector box intersects; zero clipped triangles ⇒ def kept, mesh skipped. New **`src/world/decals/DecalBuilder.ts`** (pure fns: `decalOrientation` = quaternion aligning +Z to the normal × roll, `decalProjectorBox` = world AABB of the oriented projector, `buildOverlayDecalMesh` = `three/addons DecalGeometry` per intersecting target merged via `mergeGeometries` — the multi-target merge lets one stamp wrap a mitered corner between runs or bridge a wall/floor junction; output is world-space at identity). Overlay material: `MeshStandardMaterial { map (SRGB), transparent, depthWrite:false, polygonOffset -4/-4 (beats the wall-liner −1/−1), castShadow:false, renderOrder 10+i }`, `_ownsMaterial:true` — inherits fog/ACES automatically; optional manifest `maps.normal/roughness` load `NoColorSpace`. **ZoneManager owns the lifecycle** (mirrors `_volumeMeshes`): `_decalMeshes` map, `_buildDecals` in `loadZone` AFTER the stair-CSG second pass, `decal:added/updated/removed` handlers, and **rebuild survival** — `wall/floor/platform/stair:rebuilt` mark dirty any decal whose projector AABB intersects the rebuilt entity's new bounds OR whose `userData._decalTargets` (entity ids recorded at projection time) contains it (catches "target moved away" stale meshes); dirty set coalesced per microtask and regens run through the existing `_wallOpChain` so they never see a half-rebuilt run; emits new `decal:rebuilt` (consumed by SelectionManager re-tint + GizmoManager re-attach). Assets: **`public/assets/decals/manifest.json`** (`DecalTexDef { id,label,category?,path,maps?,kinds:["overlay"|"surface"] }`) + 9 procedurally-generated CC0-equivalent starter PNGs (cracks/bullet holes/paint/arrow/exit sign + stage-B weathering); `AssetManager.initDecals/getDecalDef/getDecalList` (textures through the existing `loadTexture` cache so `setQuality` disposal covers them). Tool: **`src/editor/DecalTool.ts`** (TriggerVolumeTool template) — armed by the new **`src/ui/DecalBrowser.tsx`** left panel (`LeftPanelId "decals"`, Toolbar "Decal"/K, auto-opens) via `decaltool:texture`; does its **own raycast** for hit point + world face normal; ghost = `PlaneGeometry` quad (real DecalGeometry only on commit — per-mousemove regen would clip a merged run's full index buffer); **scroll = size** (0.1–8 m), **shift+scroll = rotate**, `[`/`]` ±15°, click stamps in a `"place decal"` transaction and stays armed; Escape disarms (re-emits `decaltool:texture null` so the picker highlight clears). **Wheel gating:** new `camera:zoom-lock {source,locked}` — `EditorCamera._handleWheel` early-returns while any source holds a lock (Set, `gizmo:suspend` idiom); DecalTool locks only while its ghost is on a surface. `input:wheel` payload gained `shift/ctrl/alt/meta`. Selection: `"decal"` inserted in `PRIORITY` **above** platform/wall/floor (decals are coplanar with them — priority must break the raycast distance tie); `_getDataRecord` decal case; emissive tint works as-is. Panel: custom **`DecalView`** (texture-swap mini grid, position/size/rotation/opacity, Delete). Gizmo: **translate-only** (roll-around-normal maps badly to the world-Y ring; not in the KeyR/KeyS lists), pivot at anchor + normal·0.3, commit case + multi-select `_refDisplayPos`/`_translateRef` cases, re-attach on `decal:rebuilt`. Undo: `"decal"` `ChangeKind` + `_zoneArr`/`_emitChange` cases — place/move/edit/delete all one-step undoable; serialization automatic. Verified in-browser end-to-end (real toolbar/tile/canvas clicks): ghost orients to the brick wall, wheel resizes without zooming (radius pinned, unlocks over sky), stamp = def + 10-tri conforming mesh, undo/redo (redo = cold `loadZone` rebuild), node-drag rebuild re-projects onto the moved face (new uuid, no orphans), coplanar click selects the decal over the wall, panel width edit rebuilds (2 m at 30° roll ⇒ 2.48 m span, exact), Delete clears def+mesh; zero console errors. **Known caveat:** default projector depth (`max(w,h)·0.5`) can exceed a thin wall's 0.2 m thickness ⇒ faint mirrored bleed on the back face (classic DecalGeometry artifact) — set the per-decal `depth` field smaller when it matters.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -454,8 +455,30 @@ export interface ZoneDef {
   platforms: PlatformDef[];
   stairs:    StairDef[];
   objects:   WorldObject[];
+  decals?:   DecalDef[];   // Phase 20 — free-floating anchor+normal stamps, re-projected onto static geometry at build time
   // scripts: ScriptDef[]        — ⏳ Phase 8
   // triggerVolumes: TriggerVolume[] — ⏳ Phase 8
+}
+
+// Phase 20 — decals. NO target entity id: wall runs merge/split and their meshes are
+// disposed wholesale on rebuild, so a stored wallId would dangle. The decal re-projects
+// onto whatever static geometry its projector box intersects; if geometry moves away,
+// the def is kept and the mesh is skipped.
+export type DecalKind = "overlay" | "surface";   // surface = in-shader projection, Phase 21
+export interface DecalDef {
+  id:        string;          // dec_<uuid8>
+  label?:    string;
+  kind:      DecalKind;
+  textureId: string;          // decals-manifest id (public/assets/decals/manifest.json)
+  position:  Vec3;            // world-space anchor ON the surface
+  normal:    Vec3;            // unit world normal captured at placement
+  rotation:  number;          // degrees, roll around normal
+  size:      { width: number; height: number };  // meters
+  depth?:    number;          // overlay projector depth; default max(w,h)*0.5 (min 0.2)
+  opacity:   number;
+  triplanar?: boolean;        // surface kind only (Phase 21)
+  roughnessMod?: number;      // surface kind only (Phase 21)
+  groupIds?: string[];
 }
 
 export interface TransitionDef {
@@ -830,7 +853,9 @@ world-editor/
 │   │   ├── WorldSerializer.ts
 │   │   ├── ZoneManager.ts
 │   │   ├── TransitionManager.ts
-│   │   └── TerrainBuilder.ts
+│   │   ├── TerrainBuilder.ts
+│   │   └── decals/
+│   │       └── DecalBuilder.ts     ← overlay decals: DecalGeometry projection + merge (Phase 20)
 │   ├── builders/
 │   │   ├── WallBuilder.ts
 │   │   ├── FloorBuilder.ts
@@ -849,6 +874,7 @@ world-editor/
 │   │   ├── ZoneTool.ts
 │   │   ├── SpawnPointTool.ts
 │   │   ├── TriggerVolumeTool.ts    ← amber wireframe drag-to-size, IDLE→PLACING state machine
+│   │   ├── DecalTool.ts            ← click-to-stamp decals: quad ghost, scroll=size / shift+scroll=rotate (Phase 20)
 │   │   └── TransitionTool.ts
 │   ├── physics/
 │   │   ├── PhysicsWorld.ts         ← Rapier world singleton, step loop, debug draw
@@ -872,6 +898,7 @@ world-editor/
 │   │   ├── ZonePanel.tsx
 │   │   ├── AssetBrowser.tsx
 │   │   ├── ScriptPanel.tsx         ← World/Zone/Object tabs, script list + editor drill-down
+│   │   ├── DecalBrowser.tsx        ← decal texture picker (Overlay/Surface toggle, category pills)
 │   │   ├── DialogueOverlay.tsx     ← in-game dialogue bar (speaker + lines, E to advance)
 │   │   ├── SaveLoadPanel.tsx
 │   │   └── PreviewHUD.tsx
@@ -1268,12 +1295,14 @@ Builders tag child meshes too — GLTF models have deep mesh hierarchies that ra
 
 When a click ray intersects multiple meshes, priority order (highest first):
 
-1. `object` — props and furniture
-2. `platform` — raised floor slabs
-3. `wall` — wall segments
-4. `floor` — floor planes
-5. `terrain` — never selected directly (only for placement snapping)
-6. `trigger` — never selectable
+1. `opening` / `object` / `checkpoint` / `spawn` — props, markers, openings
+2. `decal` — projected decal meshes (v4.7.0; **above** platform/wall/floor because a decal
+   is coplanar with its surface — priority, not raycast distance, must break the tie)
+3. `platform` — raised floor slabs
+4. `wall` — wall segments
+5. `floor` — floor planes
+6. `terrain` — never selected directly (only for placement snapping)
+7. `trigger` — never selectable
 
 **Ghost fallback (v4.5.0):** hidden-wall ghost meshes (`userData.ghostPick`) are stripped
 from the hit list whenever any non-ghost hit exists — a ghost never occludes real geometry.
@@ -1587,10 +1616,17 @@ class EventBus {
 | `input:mousemove` | InputManager → all | `{ screenPos, worldPos, delta }` |
 | `input:mousedown` | InputManager → all | `{ button, screenPos }` |
 | `input:mouseup` | InputManager → all | `{ button, screenPos }` |
-| `input:wheel` | InputManager → all | `{ delta }` |
+| `input:wheel` | InputManager → all | `{ delta, shift, ctrl, alt, meta }` (modifiers added v4.7.0 for shift+scroll decal rotate) |
 | `input:keydown` | InputManager → all | `{ code, key, shift, ctrl, alt }` |
 | `input:keyup` | InputManager → all | `{ code }` |
 | `history:restore` | internal | `{}` — fired after undo/redo; ZoneManager reloads active zone |
+| `decal:added` | internal | `{ zoneId, decal }` |
+| `decal:updated` | internal | `{ zoneId, id, changes }` |
+| `decal:removed` | internal | `{ zoneId, id }` |
+| `decal:rebuilt` | internal | `{ zoneId, decalId }` — mesh re-projected; SelectionManager re-tints, GizmoManager re-attaches |
+| `decal:placed` | Three.js → React | `{ zoneId, id }` |
+| `decaltool:texture` | React ↔ Three.js | `{ textureId \| null, kind }` — picker arms the DecalTool; tool re-emits null on Escape so the picker highlight clears |
+| `camera:zoom-lock` | internal | `{ source, locked }` — EditorCamera wheel-zoom suspended while any source holds a lock |
 
 ---
 
@@ -1604,6 +1640,10 @@ Centralizes all DOM input so tools don't each add their own listeners. Tools sub
 never fire it; a stationary RMB tap does. Consumed by `WallSplitter` (vertex insert).
 The `surfacePos` raycast also skips `userData.ghostPick` meshes so hidden-wall ghosts don't
 catch surface placements.
+
+**Wheel modifiers (v4.7.0):** `input:wheel` now carries `shift/ctrl/alt/meta` from the
+WheelEvent (DecalTool uses shift+scroll = rotate). Existing consumers that destructure
+`{ delta }` are unaffected.
 
 ```js
 class InputManager {
@@ -1695,7 +1735,7 @@ class InputManager {
 | Right-click drag | Orbit around focus point |
 | Middle-click drag | Pan focus point on XZ plane |
 | WASD / Arrow keys | Pan focus point on XZ plane |
-| Scroll wheel | Zoom in/out |
+| Scroll wheel | Zoom in/out — **suspended while any `camera:zoom-lock` source is held** (v4.7.0; a tool consuming scroll, e.g. DecalTool resize, locks while active; Set-of-sources idiom like `gizmo:suspend`) |
 | Q / E | Snap rotate 45° left / right |
 | F | Frame selected object (focus on its AABB center) |
 | `[` / `]` | Previous / next floor level |
@@ -2102,6 +2142,19 @@ Each platform rebuild increments a token. Async `PlatformBuilder.build()` captur
 `preview:start` → iterate all stairEntries, set `mesh.visible = false` for any mesh with `userData.editorOnly === true` (CSG wireframes etc.)
 `preview:stop` → restore visibility
 
+**Overlay decal lifecycle (v4.7.0)**
+`_decalMeshes: Map<zoneId, Map<decalId, Mesh>>` mirrors `_volumeMeshes`. `_buildDecals`
+runs in `loadZone` **after** the stair-CSG second pass (decals project onto final cut
+geometry). Targets = meshes in the zone group with `selectable && editorType ∈
+{wall,floor,platform,stair} && !ghostPick`. Rebuild survival: `*:rebuilt` events mark
+dirty any decal whose projector AABB intersects the rebuilt entity's new bounds OR whose
+`userData._decalTargets` (ids recorded at projection time) contains the entity — the
+latter catches "target moved away" (stale mesh would float in air). Dirty set coalesces
+per microtask; regens are chained through `_wallOpChain` (never observe a half-rebuilt
+run) and emit `decal:rebuilt`. Decal materials are always `_ownsMaterial: true`
+(geometry+material disposed on remove/rebuild; textures stay in the AssetManager cache).
+`quality:changed` needs no special decal handling — the full unload/reload rebuilds them.
+
 **History restore**
 `history:restore` → `unloadZone(activeZoneId)` then `loadZone(activeZoneId)`. Called by ZoneManager after `HistoryManager` calls `world.loadFromJSON(snapshot)` to rebuild all scene geometry from the restored WorldState. Identical code path to `scene:load`, so it is proven and safe. Selection is cleared via `object:deselected` emitted immediately before `history:restore`.
 
@@ -2310,6 +2363,30 @@ Step 7: WallBuilder rebuilds the wall (trigger volume now linked)
 Step 8: Visual: dashed line drawn between source zone and destination zone
 Step 9: Clicking a linked door opening in editor → TransitionManager.editorJump()
 ```
+
+### DecalTool.ts (Phase 20)
+
+No PLACING state — the tool is either disarmed or armed with a texture and stays armed
+across stamps (repeat stamping is the workflow):
+
+```
+tool:select "decal"          → active (App auto-opens the "decals" left panel)
+decaltool:texture {id, kind} → armed: quad ghost created (PlaneGeometry, MeshBasicMaterial,
+                               polygonOffset −4, renderOrder 50, editorOnly)
+input:mousemove              → own raycast vs {wall,floor,platform,stair} (!ghostPick);
+                               hit → ghost at point + normal·0.01, quaternion from
+                               decalOrientation(normal, roll); emits camera:zoom-lock ON
+                               no hit → ghost hidden, zoom-lock OFF
+input:wheel                  → size ×= exp(−delta·0.001) clamped 0.1–8 m
+input:wheel + shift          → roll −= delta·0.1°     ([ / ] = ±15° fallback)
+input:click (L)              → world.transaction("place decal", addDecal(def)) — def captures
+                               anchor/normal/roll/size; emits decal:placed; STAYS ARMED
+Escape                       → emits decaltool:texture null (disarms + clears picker highlight)
+```
+
+The ghost is a cheap quad because a live DecalGeometry per mousemove would clip a merged
+run's entire index buffer every frame; the real projection is built once by ZoneManager
+on `decal:added`.
 
 ---
 

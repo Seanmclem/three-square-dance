@@ -1,7 +1,8 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
+import { DecalBrowser } from "@/ui/DecalBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
 
@@ -48,6 +49,10 @@ interface LeftPanelProps {
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
   stateSchema:          Record<string, StateSchema>;
   onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
+  // decals panel
+  decalTextures:   DecalTexDef[];
+  selectedDecalId: string | null;
+  onDecalSelect:   (id: string | null, kind: DecalKind) => void;
 }
 
 export function LeftPanel({
@@ -60,6 +65,7 @@ export function LeftPanel({
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
+  decalTextures, selectedDecalId, onDecalSelect,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -119,6 +125,13 @@ export function LeftPanel({
                 onImport={onMaterialImport}
                 onDeleteMaterials={onDeleteMaterials}
                 onEdit={onEditMaterials}
+              />
+            )}
+            {panelId === "decals" && (
+              <DecalBrowser
+                decals={decalTextures}
+                selectedId={selectedDecalId}
+                onSelect={onDecalSelect}
               />
             )}
             {panelId === "groups" && (

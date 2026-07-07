@@ -124,6 +124,29 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 
 ---
 
+## Workflow: stamp a decal (sticker / crack / paint)
+
+1. Click the **Decal** tool in the left toolbar (bottom of the strip). The **DECALS**
+   panel opens with a grid of decal textures (Overlay kind; Surface is a later phase).
+2. Click a texture tile — it highlights, and the tool is armed.
+3. Hover any wall, floor, platform, or stair: a translucent **ghost** of the decal sticks
+   to the surface under the cursor, facing outward.
+4. Adjust before stamping:
+   - **Scroll** = bigger/smaller (camera zoom is suspended while the ghost is on a surface).
+   - **Shift+scroll** (or `[` / `]`) = rotate around the surface normal.
+5. **Click** to stamp. The tool stays armed — keep clicking to stamp more. **Esc** when done.
+6. Edit later with the **Select** tool: click the decal (it wins the click over the wall
+   behind it) → the panel shows texture swap, position, width/height, rotation, opacity,
+   and **Delete Decal**. Drag the translate gizmo to move it — it re-projects onto the
+   surface. Everything is undoable (Cmd+Z).
+
+> Decals have no target — they re-project onto whatever is near their anchor. If you move
+> or delete the wall under one, the decal keeps its data and simply renders nothing until
+> geometry returns. Very large decals on thin walls can faintly bleed onto the back face —
+> that's the projector depth; shrink the decal (or its `depth` field) if it matters.
+
+---
+
 ## Adding more workflows
 
 Keep this doc to **reusable, feature-level UI walkthroughs** (the steps a person clicks).

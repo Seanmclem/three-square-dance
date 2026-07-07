@@ -116,6 +116,15 @@ export const IconTriggerVolume = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconDecal = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+    {/* peeling sticker: rounded square with a lifted corner */}
+    <path d="M4 5.5 A1.5 1.5 0 0 1 5.5 4 H14.5 A1.5 1.5 0 0 1 16 5.5 V11 L11 16 H5.5 A1.5 1.5 0 0 1 4 14.5 Z"
+      stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.12"/>
+    <path d="M16 11 L11 16 L11 12.5 A1.5 1.5 0 0 1 12.5 11 Z" fill={color} fillOpacity="0.55"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   floor:            IconFloor,
@@ -128,4 +137,5 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   zone:             IconZone,
   spawnpoint:       IconSpawn,
   "trigger-volume": IconTriggerVolume,
+  decal:            IconDecal,
 };

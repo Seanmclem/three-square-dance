@@ -9,10 +9,11 @@ import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
+import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject, TriggerVolume } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -111,6 +112,9 @@ export class ZoneManager {
   private readonly _hoveredVolumeId  = new Map<string, string | null>();   // zoneId → hovered id
   private readonly _selectedVolumeId = new Map<string, string | null>();   // zoneId → selected id
 
+  // Overlay decal meshes — zoneId → decalId → world-space DecalGeometry mesh
+  private readonly _decalMeshes = new Map<string, Map<string, THREE.Mesh>>();
+
   // Non-object entities hidden by a script despawn_object this preview run; restored on preview:stop.
   private readonly _despawnedIds = new Set<string>();
 
@@ -134,6 +138,10 @@ export class ZoneManager {
   // Pending floor rebuild requests — same coalescing pattern
   private readonly _pendingFloorRebuild = new Map<string, Set<string>>();
   private _floorRebuildScheduled = false;
+
+  // Pending decal re-projections (dirty on target *:rebuilt) — same coalescing pattern
+  private readonly _pendingDecalRebuild = new Map<string, Set<string>>();
+  private _decalRebuildScheduled = false;
 
   // Cancellation tokens — increment on each new build; stale async results are discarded
   private readonly _platformBuildTokens = new Map<string, number>();
@@ -298,6 +306,21 @@ export class ZoneManager {
         this._selectedVolumeId.set(zoneId, id);
         this._refreshVolumeHighlights(zoneId);
       }),
+      this._bus.on("decal:added", ({ zoneId, decal }) => {
+        this._enqueueWallOp(() => this._rebuildDecal(zoneId, decal.id));
+      }),
+      this._bus.on("decal:updated", ({ zoneId, id }) => {
+        this._enqueueWallOp(() => this._rebuildDecal(zoneId, id));
+      }),
+      this._bus.on("decal:removed", ({ zoneId, id }) => {
+        this._removeDecalMesh(zoneId, id);
+      }),
+      // Re-project decals whose footprint touches a rebuilt entity. Regens run
+      // through _wallOpChain so they never observe a half-rebuilt run.
+      this._bus.on("wall:rebuilt",     ({ zoneId, wallId })     => this._markDecalsDirty(zoneId, wallId)),
+      this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => this._markDecalsDirty(zoneId, floorId)),
+      this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._markDecalsDirty(zoneId, platformId)),
+      this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => this._markDecalsDirty(zoneId, stairId)),
       this._bus.on("group:visibility", ({ groupId, visible }) => {
         if (visible) this._hiddenGroups.delete(groupId);
         else this._hiddenGroups.add(groupId);
@@ -487,6 +510,9 @@ export class ZoneManager {
       if (stair.csgCutter) await this._rebuildOverlapping(zoneId, stair);
     }
 
+    // Decals project onto the final (CSG-cut) geometry, so build them last.
+    await this._buildDecals(zoneId, zone);
+
     // Apply current dimming level after loading
     this._applyDimming();
     if (this._hiddenGroups.size > 0) this._applyGroupVisibility();
@@ -548,6 +574,8 @@ export class ZoneManager {
           (child.material as THREE.Material).dispose();
       }
     });
+    // Decal meshes live in entry.group (disposed by the traverse above) — just drop the map.
+    this._decalMeshes.delete(zoneId);
     this._loadedZones.delete(zoneId);
 
     // Dispose any dim-cloned materials that are now orphaned
@@ -1259,6 +1287,129 @@ export class ZoneManager {
   }
 
   // ── Trigger volume helpers ────────────────────────────────────────────────
+
+  // ── Decals (overlay kind — Phase 20) ─────────────────────────────────────────
+
+  private async _buildDecals(zoneId: string, zone: ZoneDef): Promise<void> {
+    for (const decal of zone.decals ?? []) {
+      if (decal.kind !== "overlay") continue;   // surface kind lands in Phase 21
+      await this._buildDecalMesh(zoneId, decal);
+    }
+  }
+
+  /** Static geometry a decal can project onto (excludes objects, trims, ghost walls). */
+  private _collectDecalTargets(entry: ZoneEntry): THREE.Mesh[] {
+    const targets: THREE.Mesh[] = [];
+    entry.group.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const u = child.userData as { editorType?: string; selectable?: boolean; ghostPick?: boolean };
+      if (!u.selectable || u.ghostPick) return;
+      if (u.editorType === "wall" || u.editorType === "floor" || u.editorType === "platform" || u.editorType === "stair")
+        targets.push(child);
+    });
+    return targets;
+  }
+
+  private async _loadDecalTextures(textureId: string): Promise<DecalTextures | null> {
+    const texDef = assetManager.getDecalDef(textureId);
+    if (!texDef) {
+      console.info(`ZoneManager: decal texture "${textureId}" not in registry — decal hidden`);
+      return null;
+    }
+    const textures: DecalTextures = { map: await assetManager.loadTexture(texDef.path) };
+    if (texDef.maps?.normal)    textures.normalMap    = await assetManager.loadTexture(texDef.maps.normal, THREE.NoColorSpace);
+    if (texDef.maps?.roughness) textures.roughnessMap = await assetManager.loadTexture(texDef.maps.roughness, THREE.NoColorSpace);
+    return textures;
+  }
+
+  private async _buildDecalMesh(zoneId: string, decal: DecalDef): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    const zone  = this._worldState.zones.get(zoneId);
+    if (!entry || !zone) return;
+
+    const textures = await this._loadDecalTextures(decal.textureId);
+    if (!textures) return;
+
+    const renderOrder = 10 + (zone.decals?.findIndex(d => d.id === decal.id) ?? 0);
+    const mesh = buildOverlayDecalMesh(decal, this._collectDecalTargets(entry), textures, zoneId, renderOrder);
+    if (!mesh) {
+      console.info(`ZoneManager: decal "${decal.id}" projects onto nothing — def kept, mesh skipped`);
+      return;
+    }
+    entry.group.add(mesh);
+    const map = this._decalMeshes.get(zoneId) ?? new Map<string, THREE.Mesh>();
+    map.set(decal.id, mesh);
+    this._decalMeshes.set(zoneId, map);
+  }
+
+  /** Remove (if present) and re-project a decal. Also handles decal:added / removal of a stale mesh. */
+  private async _rebuildDecal(zoneId: string, decalId: string): Promise<void> {
+    this._removeDecalMesh(zoneId, decalId);
+    const decal = this._worldState.zones.get(zoneId)?.decals?.find(d => d.id === decalId);
+    if (!decal || decal.kind !== "overlay") return;
+    await this._buildDecalMesh(zoneId, decal);
+    this._bus.emit("decal:rebuilt", { zoneId, decalId });
+  }
+
+  private _removeDecalMesh(zoneId: string, decalId: string): void {
+    const mesh = this._decalMeshes.get(zoneId)?.get(decalId);
+    if (!mesh) return;
+    mesh.parent?.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as THREE.Material).dispose();   // decal materials are always owned; textures stay cached
+    this._decalMeshes.get(zoneId)!.delete(decalId);
+  }
+
+  /**
+   * A target entity's mesh was rebuilt — re-project any decal whose projector box
+   * intersects the entity's NEW bounds, or that previously projected onto it
+   * (userData._decalTargets — catches "target moved away", where the stale mesh
+   * would otherwise float in the air).
+   */
+  private _markDecalsDirty(zoneId: string, entityId: string): void {
+    const zone = this._worldState.zones.get(zoneId);
+    const entry = this._loadedZones.get(zoneId);
+    if (!zone?.decals?.length || !entry) return;
+    const entityBox = this._entityAABB(entry, entityId);
+    for (const d of zone.decals) {
+      if (d.kind !== "overlay") continue;
+      const prevTargets = this._decalMeshes.get(zoneId)?.get(d.id)?.userData["_decalTargets"] as string[] | undefined;
+      const dirty = prevTargets?.includes(entityId)
+        || (entityBox !== null && decalProjectorBox(d).intersectsBox(entityBox));
+      if (dirty) this._queueDecalRebuild(zoneId, d.id);
+    }
+  }
+
+  private _entityAABB(entry: ZoneEntry, entityId: string): THREE.Box3 | null {
+    const box = new THREE.Box3();
+    let found = false;
+    entry.group.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const u = child.userData as { editorId?: string; wallIds?: string[] };
+      if (u.editorId === entityId || (Array.isArray(u.wallIds) && u.wallIds.includes(entityId))) {
+        box.expandByObject(child);
+        found = true;
+      }
+    });
+    return found ? box : null;
+  }
+
+  private _queueDecalRebuild(zoneId: string, decalId: string): void {
+    if (!this._pendingDecalRebuild.has(zoneId))
+      this._pendingDecalRebuild.set(zoneId, new Set());
+    this._pendingDecalRebuild.get(zoneId)!.add(decalId);
+
+    if (!this._decalRebuildScheduled) {
+      this._decalRebuildScheduled = true;
+      queueMicrotask(() => {
+        this._decalRebuildScheduled = false;
+        for (const [zid, ids] of this._pendingDecalRebuild) {
+          this._pendingDecalRebuild.delete(zid);
+          for (const did of ids) this._enqueueWallOp(() => this._rebuildDecal(zid, did));
+        }
+      });
+    }
+  }
 
   private _buildTriggerVolumes(zoneId: string, zone: ZoneDef, group: THREE.Group): void {
     for (const vol of zone.triggerVolumes ?? []) {

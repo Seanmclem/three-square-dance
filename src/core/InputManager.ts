@@ -176,7 +176,7 @@ export class InputManager implements IEditorModule {
   private _handleWheel(e: WheelEvent): void {
     e.preventDefault();
     if (this._suppress) return;
-    this._bus.emit("input:wheel", { delta: e.deltaY });
+    this._bus.emit("input:wheel", { delta: e.deltaY, shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey });
   }
 
   private _handleKeyDown(e: KeyboardEvent): void {

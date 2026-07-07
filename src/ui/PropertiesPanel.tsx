@@ -4,6 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
+  DecalDef, DecalTexDef,
 } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -52,6 +53,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   zone:        { desc: "Draw a zone boundary to group rooms.",                     hint: "Click to define zone area" },
   spawnpoint:       { desc: "Click to place the player spawn point.",                   hint: "Click to set spawn location" },
   "trigger-volume": { desc: "Click and drag to place a trigger volume.",               hint: "Click to set volume start" },
+  decal:            { desc: "Pick a decal, hover a surface, scroll = size, shift+scroll = rotate, click to stamp.", hint: "Select a decal texture in the Decals panel first" },
 };
 
 const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;
@@ -306,6 +308,7 @@ interface PropertiesPanelProps {
   onPreviewClip?:           (objectId: string, clipName: string) => void;
   onStopPreview?:           (objectId: string) => void;
   onAutoPlayChange?:        (objectId: string, clipName: string | null) => void;
+  decalTextures?:           DecalTexDef[];
   multiSelected?:           SelectedRef[];
   onCopy?:                  () => void;
   onDuplicate?:             () => void;
@@ -322,7 +325,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  multiSelected = [], onCopy, onDuplicate, defaultColliderFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, defaultColliderFor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -359,7 +362,7 @@ export function PropertiesPanel({
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
-    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint"].includes(selected.type as string);
+    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal"].includes(selected.type as string);
   const startEdit  = (): void => { setLabelDraft(currentLabel); setEditingLabel(true); };
   const cancelEdit = (): void => { setLabelDraft(currentLabel); setEditingLabel(false); };
   const commitLabel = (): void => {
@@ -485,6 +488,8 @@ export function PropertiesPanel({
           />
         ) : selected.type === "checkpoint" ? (
           <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
+        ) : selected.type === "decal" ? (
+          <DecalView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} decalTextures={decalTextures} />
         ) : isRoot ? (
           <>
             {screens.map(s => (
@@ -3185,6 +3190,137 @@ function CheckpointView({ selected, onDelete, onObjectUpdate }: {
           style={{ padding: "8px 0", background: "rgba(204,102,102,0.12)", border: "1px solid rgba(204,102,102,0.4)",
                    borderRadius: 4, color: "#cc6666", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
           Delete Checkpoint
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── DecalView ─────────────────────────────────────────────────────────────────
+
+function DecalView({ selected, onDelete, onObjectUpdate, decalTextures }: {
+  selected:       SelectedObjectPayload;
+  onDelete?:      () => void;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  decalTextures:  DecalTexDef[];
+}) {
+  const dec = selected.data as DecalDef | null;
+  const [posStr,  setPosStr]  = useState({ x: String(dec?.position.x ?? 0), y: String(dec?.position.y ?? 0), z: String(dec?.position.z ?? 0) });
+  const [sizeStr, setSizeStr] = useState({ w: String(dec?.size.width ?? 1), h: String(dec?.size.height ?? 1) });
+  const [rotStr,  setRotStr]  = useState(String(dec?.rotation ?? 0));
+  const [opStr,   setOpStr]   = useState(String(dec?.opacity ?? 1));
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(dec?.position.x ?? 0), y: String(dec?.position.y ?? 0), z: String(dec?.position.z ?? 0) });
+    setSizeStr({ w: String(dec?.size.width ?? 1), h: String(dec?.size.height ?? 1) });
+    setRotStr(String(dec?.rotation ?? 0));
+    setOpStr(String(dec?.opacity ?? 1));
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Resync when moved externally (gizmo drag refreshes selected.data).
+  useEffect(() => { setPosStr({ x: String(dec?.position.x ?? 0), y: String(dec?.position.y ?? 0), z: String(dec?.position.z ?? 0) }); }, [dec?.position.x, dec?.position.y, dec?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!dec) return null;
+
+  const commit = (changes: Partial<DecalDef>) => onObjectUpdate(changes as unknown as Partial<WorldObject>);
+  const commitPos = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (Number.isFinite(n)) commit({ position: { ...dec.position, [axis]: n } });
+  };
+  const commitSize = (dim: "width" | "height", val: string) => {
+    const n = parseFloat(val);
+    if (Number.isFinite(n) && n >= 0.05) commit({ size: { ...dec.size, [dim]: n } });
+  };
+  const commitRot = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) commit({ rotation: n }); };
+  const commitOp  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) commit({ opacity: Math.max(0, Math.min(1, n)) }); };
+
+  const swapTextures = decalTextures.filter(t => t.kinds.includes(dec.kind));
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
+        A <b>{dec.kind}</b> decal projected onto nearby static geometry from its anchor
+        point. Moving it re-projects; if no surface is in range it keeps its data and
+        renders nothing.
+      </div>
+
+      <div>
+        <div style={LABEL}>TEXTURE</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4 }}>
+          {swapTextures.map(t => (
+            <button key={t.id} title={t.label} onClick={() => commit({ textureId: t.id })}
+              style={{
+                aspectRatio: "1", padding: 0, borderRadius: 4, cursor: "pointer",
+                background: `#3a3a3a url("${t.path}") center/cover`,
+                border: t.id === dec.textureId ? "2px solid rgba(80,140,255,0.8)" : "1px solid rgba(255,255,255,0.08)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.1} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>WIDTH (m)</div>
+          <input type="number" step={0.1} min={0.05} value={sizeStr.w} style={NUM_INPUT}
+            onChange={e => { setSizeStr(s => ({ ...s, w: e.target.value })); schedule(() => commitSize("width", e.target.value)); }}
+            onBlur={e => flush(() => commitSize("width", e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitSize("width", (e.target as HTMLInputElement).value)); }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>HEIGHT (m)</div>
+          <input type="number" step={0.1} min={0.05} value={sizeStr.h} style={NUM_INPUT}
+            onChange={e => { setSizeStr(s => ({ ...s, h: e.target.value })); schedule(() => commitSize("height", e.target.value)); }}
+            onBlur={e => flush(() => commitSize("height", e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitSize("height", (e.target as HTMLInputElement).value)); }}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>ROTATION (°)</div>
+          <input type="number" step={15} value={rotStr} style={NUM_INPUT}
+            onChange={e => { setRotStr(e.target.value); schedule(() => commitRot(e.target.value)); }}
+            onBlur={e => flush(() => commitRot(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitRot((e.target as HTMLInputElement).value)); }}
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={LABEL}>OPACITY</div>
+          <input type="number" step={0.1} min={0} max={1} value={opStr} style={NUM_INPUT}
+            onChange={e => { setOpStr(e.target.value); schedule(() => commitOp(e.target.value)); }}
+            onBlur={e => flush(() => commitOp(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitOp((e.target as HTMLInputElement).value)); }}
+          />
+        </div>
+      </div>
+
+      {onDelete && (
+        <button onClick={onDelete}
+          style={{ padding: "8px 0", background: "rgba(204,102,102,0.12)", border: "1px solid rgba(204,102,102,0.4)",
+                   borderRadius: 4, color: "#cc6666", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+          Delete Decal
         </button>
       )}
     </div>

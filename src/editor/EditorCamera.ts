@@ -17,6 +17,9 @@ export class EditorCamera {
   private _keys:       Record<string, boolean> = {};
   private _gizmoDragging = false;
   private _enabled       = true;
+  // Wheel-zoom suspenders (camera:zoom-lock) — a tool consuming scroll (e.g. decal
+  // resize) locks zoom while active; zoom stays locked while ANY source holds a lock.
+  private readonly _zoomLocks = new Set<string>();
 
   private readonly _onMouseDown: (e: MouseEvent) => void;
   private readonly _onMouseMove: (e: MouseEvent) => void;
@@ -52,6 +55,10 @@ export class EditorCamera {
     window.addEventListener("keyup",           this._onKeyUp);
 
     bus.on("gizmo:dragging", ({ isDragging }) => { this._gizmoDragging = isDragging; });
+    bus.on("camera:zoom-lock", ({ source, locked }) => {
+      if (locked) this._zoomLocks.add(source);
+      else this._zoomLocks.delete(source);
+    });
     bus.on("camera:topdown", () => {
       this.targetSpherical.phi    = 0.02;
       this.targetSpherical.radius = Math.min(this.targetSpherical.radius, 30);
@@ -95,6 +102,7 @@ export class EditorCamera {
 
   private _handleWheel(e: WheelEvent): void {
     e.preventDefault();
+    if (this._zoomLocks.size > 0) return;   // a tool owns the scroll right now
     this.targetSpherical.radius = Math.max(3, Math.min(80, this.targetSpherical.radius + e.deltaY * 0.05));
   }
 

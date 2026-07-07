@@ -17,6 +17,7 @@ const TOOLS: ToolDef[] = [
   { id: "zone",            label: "Groups",   shortcut: "Z" },
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
   { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
+  { id: "decal",           label: "Decal",    shortcut: "K" },
 ];
 
 interface ToolbarProps {

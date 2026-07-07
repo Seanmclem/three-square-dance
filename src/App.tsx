@@ -23,6 +23,7 @@ import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { CheckpointTool } from "@/editor/CheckpointTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
+import { DecalTool } from "@/editor/DecalTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
 import { ColliderEditor } from "@/editor/ColliderEditor";
 import { WallSplitter } from "@/editor/WallSplitter";
@@ -50,7 +51,7 @@ import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
 import { dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -110,6 +111,8 @@ export default function App() {
   const [leftPanel,       setLeftPanel]        = useState<LeftPanelId>(null);
   const [assets,          setAssets]           = useState<AssetDef[]>([]);
   const [selectedAssetId, setSelectedAssetId]  = useState<string | null>(null);
+  const [decalTextures,   setDecalTextures]    = useState<DecalTexDef[]>([]);
+  const [selectedDecalId, setSelectedDecalId]  = useState<string | null>(null);
   const [showImporter,    setShowImporter]     = useState(false);
   const [pendingAssetDelete, setPendingAssetDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
@@ -179,6 +182,8 @@ export default function App() {
       setAssets(defs);
       bus.emit("assets:loaded", { assets: defs });
     }).catch(err => console.error("initAssets failed:", err));
+    assetManager.initDecals().then(defs => setDecalTextures(defs))
+      .catch(err => console.error("initDecals failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
     const objectPlacer = new ObjectPlacer(bus);
@@ -209,6 +214,7 @@ export default function App() {
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
     const checkpointTool  = new CheckpointTool(scene.scene, world, bus);
     const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
+    const decalTool         = new DecalTool(scene.scene, world, bus, scene.camera, canvas);
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const stairCutterResizer = new StairCutterResizer(scene.scene, world, bus, scene.camera, canvas);
     const colliderEditor  = new ColliderEditor(scene.scene, world, bus, scene.camera, canvas, objectPlacer);
@@ -257,6 +263,7 @@ export default function App() {
     spawnPointTool.init();
     checkpointTool.init();
     triggerVolumeTool.init();
+    decalTool.init();
     triggerVolumeResizer.init();
     stairCutterResizer.init();
     colliderEditor.init();
@@ -467,6 +474,18 @@ export default function App() {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
       }),
+      bus.on("decal:updated", ({ id }) => {
+        // Refresh selected.data (gizmo moves emit decal:updated, panel fields resync from data).
+        setSelected(prev => {
+          if (prev?.type === "decal" && prev.id === id) {
+            const dec = world.zones.get(world.activeZoneId ?? "")?.decals?.find(d => d.id === id);
+            return dec ? { ...prev, data: dec } : prev;
+          }
+          return prev;
+        });
+      }),
+      // Keep the picker highlight in sync when the tool disarms itself (Escape).
+      bus.on("decaltool:texture", ({ textureId }) => setSelectedDecalId(textureId)),
       bus.on("checkpoint:added",   () => setCheckpoints([...(world.zones.get(world.activeZoneId ?? "")?.checkpoints ?? [])])),
       bus.on("checkpoint:removed", () => {
         setCheckpoints([...(world.zones.get(world.activeZoneId ?? "")?.checkpoints ?? [])]);
@@ -551,6 +570,7 @@ export default function App() {
       stairCutterResizer.dispose();
       triggerVolumeResizer.dispose();
       triggerVolumeTool.dispose();
+      decalTool.dispose();
       scriptEngineRef.current = null;
       zoneTool.dispose();
       gizmoManager.dispose();
@@ -580,12 +600,23 @@ export default function App() {
     setActiveTool(tool);
     busRef.current.emit("tool:select", { tool });
     if (tool === "object") setLeftPanel("assets");
+    else if (tool === "decal") setLeftPanel("decals");   // pick a decal texture first
     // trigger-volume: no left panel auto-open; draw first, then select to see scripts
     else setLeftPanel(null);
   };
 
   const handlePanelToggle = (panelId: LeftPanelId): void => {
     setLeftPanel(p => p === panelId ? null : panelId);
+  };
+
+  // Decal picker tile clicked — arm (or disarm) the DecalTool and make it the active tool.
+  const handleDecalSelect = (id: string | null, kind: DecalKind): void => {
+    setSelectedDecalId(id);
+    busRef.current.emit("decaltool:texture", { textureId: id, kind });
+    if (id && activeTool !== "decal") {
+      setActiveTool("decal");
+      busRef.current.emit("tool:select", { tool: "decal" });
+    }
   };
 
   const handleAddGroup = (): void => {
@@ -856,6 +887,7 @@ export default function App() {
           case "stair":          world.removeStair(ref.zoneId, ref.id); break;
           case "object":         world.removeObject(ref.zoneId, ref.id); break;
           case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
+          case "decal":          world.removeDecal(ref.zoneId, ref.id); break;
         }
       }
       for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
@@ -1097,6 +1129,8 @@ export default function App() {
       world.removeTriggerVolume(zoneId, id);
     } else if (type === "checkpoint") {
       world.removeCheckpoint(zoneId, id);
+    } else if (type === "decal") {
+      world.removeDecal(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
@@ -1525,6 +1559,13 @@ export default function App() {
         worldRef.current?.updateCheckpoint(selected.zoneId, selected.id, cpChanges);
       });
       syncHistory();
+    } else if (selected.type === "decal") {
+      const decChanges = changes as unknown as Partial<DecalDef>;
+      worldRef.current?.transaction("update decal", () => {
+        worldRef.current?.updateDecal(selected.zoneId, selected.id, decChanges);
+      });
+      syncHistory();
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as DecalDef), ...decChanges } } : null);
     } else {
       const action = changes.properties !== undefined ? "update object properties" : "update object transform";
       worldRef.current?.transaction(action, () => {
@@ -1670,6 +1711,9 @@ export default function App() {
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}
         onStateSchemaChange={handleStateSchemaChange}
+        decalTextures={decalTextures}
+        selectedDecalId={selectedDecalId}
+        onDecalSelect={handleDecalSelect}
       />
       <TopBar
         activeFloor={activeFloor}
@@ -1703,6 +1747,7 @@ export default function App() {
         multiSelected={multiSelected}
         onCopy={handleCopy}
         onDuplicate={handleDuplicate}
+        decalTextures={decalTextures}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         zones={zones}
         groups={groups}

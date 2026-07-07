@@ -3,7 +3,7 @@ import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, WorldObject,
-  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, GroupDef, NodeLinks,
+  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -394,6 +394,34 @@ export class WorldState {
     this._bus.emit("checkpoint:removed", { zoneId, id });
   }
 
+  // ── Decal mutations ──────────────────────────────────────────────────────────
+
+  addDecal(zoneId: string, decal: DecalDef): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.decals) zone.decals = [];
+    this._touch("decal", zoneId, decal.id);
+    zone.decals.push(decal);
+    this._bus.emit("decal:added", { zoneId, decal });
+  }
+
+  updateDecal(zoneId: string, id: string, changes: Partial<DecalDef>): void {
+    const zone  = this.zones.get(zoneId);
+    const decal = zone?.decals?.find(d => d.id === id);
+    if (!decal) return;
+    this._touch("decal", zoneId, id);
+    Object.assign(decal, changes);
+    this._bus.emit("decal:updated", { zoneId, id, changes });
+  }
+
+  removeDecal(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    this._touch("decal", zoneId, id);
+    zone.decals = (zone.decals ?? []).filter(d => d.id !== id);
+    this._bus.emit("decal:removed", { zoneId, id });
+  }
+
   // ── Transition mutations ─────────────────────────────────────────────────────
 
   addTransition(transition: TransitionDef): void {
@@ -460,6 +488,11 @@ export class WorldState {
         else if (state === "removed") this._bus.emit("triggervolume:removed", { zoneId: z, id });
         else                          this._bus.emit("triggervolume:updated", { zoneId: z, id, changes: target as Partial<TriggerVolume> });
         break;
+      case "decal":
+        if (state === "added")        this._bus.emit("decal:added", { zoneId: z, decal: target as DecalDef });
+        else if (state === "removed") this._bus.emit("decal:removed", { zoneId: z, id });
+        else                          this._bus.emit("decal:updated", { zoneId: z, id, changes: target as Partial<DecalDef> });
+        break;
       case "group":
         if (state === "added")        this._bus.emit("group:added", { group: target as GroupDef });
         else if (state === "removed") this._bus.emit("group:removed", { id });
@@ -525,6 +558,7 @@ export class WorldState {
       case "object":        return zone.objects;
       case "triggerVolume": return (zone.triggerVolumes ??= []);
       case "checkpoint":    return (zone.checkpoints ??= []);
+      case "decal":         return (zone.decals ??= []);
       default:              return null;
     }
   }

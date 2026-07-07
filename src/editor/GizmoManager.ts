@@ -4,10 +4,12 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, SelectedObjectPayload, SelectedRef,
-  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume,
+  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef,
 } from "@/types";
 
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint";
+// Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
+// rotate ring, so rotation edits stay in the panel / placement scroll.
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -124,6 +126,10 @@ export class GizmoManager implements IEditorModule {
         if (id === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
         else if (this._groupMode && this._groupHas(id)) this._scheduleRegroup();
       }),
+      this._bus.on("decal:rebuilt", ({ zoneId, decalId }) => {
+        if (decalId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(decalId)) this._scheduleRegroup();
+      }),
       // Spawn has no rebuild event; re-seed the pivot after each commit so repeated
       // rotations don't accumulate stale pivot/tracked-mesh state. (zoneId is "" for spawn.)
       // Deferred a microtask so it runs AFTER SpawnPointTool rebuilds the marker (both listen
@@ -219,7 +225,7 @@ export class GizmoManager implements IEditorModule {
     this._groupRefs = [];
 
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal"].includes(type)) {
       this._detach(); return;
     }
 
@@ -310,6 +316,14 @@ export class GizmoManager implements IEditorModule {
         py = vol.position.y + vol.size.y / 2;
         pz = vol.position.z;
         rotY = vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0;
+      }
+    } else if (type === "decal") {
+      const dec = payload.data as DecalDef | null;
+      if (dec) {
+        // Pivot floats slightly off the surface along the decal's normal.
+        px = dec.position.x + dec.normal.x * 0.3;
+        py = dec.position.y + dec.normal.y * 0.3;
+        pz = dec.position.z + dec.normal.z * 0.3;
       }
     } else if (type === "spawn") {
       rotY = THREE.MathUtils.degToRad(this._worldState.world?.defaultSpawn?.facingDeg ?? 0);
@@ -408,6 +422,10 @@ export class GizmoManager implements IEditorModule {
       case "trigger-volume": {
         const v = zone.triggerVolumes?.find(x => x.id === ref.id);
         return v ? new THREE.Vector3(v.position.x, v.position.y, v.position.z) : null;
+      }
+      case "decal": {
+        const d = zone.decals?.find(x => x.id === ref.id);
+        return d ? new THREE.Vector3(d.position.x, d.position.y, d.position.z) : null;
       }
       case "floor": {
         const f = zone.floors.find(x => x.id === ref.id);
@@ -571,6 +589,14 @@ export class GizmoManager implements IEditorModule {
         if (!o) break;
         this._worldState.updateObject(zoneId, ref.id, {
           position: { x: o.position.x + delta.x, y: o.position.y + delta.y, z: o.position.z + delta.z },
+        });
+        break;
+      }
+      case "decal": {
+        const d = zone.decals?.find(x => x.id === ref.id);
+        if (!d) break;
+        this._worldState.updateDecal(zoneId, ref.id, {
+          position: { x: d.position.x + delta.x, y: d.position.y + delta.y, z: d.position.z + delta.z },
         });
         break;
       }
@@ -986,6 +1012,19 @@ export class GizmoManager implements IEditorModule {
             x: vol.position.x + delta.x,
             y: vol.position.y + delta.y,
             z: vol.position.z + delta.z,
+          },
+        });
+        break;
+      }
+      case "decal": {
+        if (delta.lengthSq() < 1e-6) break;
+        const dec = this._worldState.zones.get(this._selZoneId!)?.decals?.find(d => d.id === this._selId);
+        if (!dec) break;
+        this._worldState.updateDecal(this._selZoneId!, this._selId!, {
+          position: {
+            x: dec.position.x + delta.x,
+            y: dec.position.y + delta.y,
+            z: dec.position.z + delta.z,
           },
         });
         break;

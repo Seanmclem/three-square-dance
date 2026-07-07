@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "decals": [
+    { "id": "crack_01",          "label": "Crack (branching)", "category": "Damage",   "path": "/assets/decals/crack_01.png",          "kinds": ["overlay"] },
+    { "id": "crack_02",          "label": "Crack (fine)",      "category": "Damage",   "path": "/assets/decals/crack_02.png",          "kinds": ["overlay"] },
+    { "id": "bullet_holes_01",   "label": "Bullet Holes",      "category": "Damage",   "path": "/assets/decals/bullet_holes_01.png",   "kinds": ["overlay"] },
+    { "id": "paint_splat_01",    "label": "Paint Splat",       "category": "Paint",    "path": "/assets/decals/paint_splat_01.png",    "kinds": ["overlay"] },
+    { "id": "graffiti_arrow_01", "label": "Graffiti Arrow",    "category": "Paint",    "path": "/assets/decals/graffiti_arrow_01.png", "kinds": ["overlay"] },
+    { "id": "sign_exit_01",      "label": "Exit Sign",         "category": "Signs",    "path": "/assets/decals/sign_exit_01.png",      "kinds": ["overlay"] },
+    { "id": "leak_stain_01",     "label": "Leak Stain",        "category": "Weather",  "path": "/assets/decals/leak_stain_01.png",     "kinds": ["surface", "overlay"] },
+    { "id": "moss_patch_01",     "label": "Moss Patch",        "category": "Weather",  "path": "/assets/decals/moss_patch_01.png",     "kinds": ["surface"] },
+    { "id": "grime_01",          "label": "Grime",             "category": "Weather",  "path": "/assets/decals/grime_01.png",          "kinds": ["surface"] }
+  ]
+}
