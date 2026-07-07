@@ -36,6 +36,63 @@
 
 ---
 
+## 0.5 Performance & regression posture
+
+**Nothing is added to the per-frame path.** Decals are entirely event-driven: built on
+place/load, regenerated on entity rebuild, uniform-updated on edit. No RAF work, no
+per-frame raycasts, no allocations in `update()` — the exact traps TESTING.md §7 warns
+about are structurally avoided.
+
+Performance decisions baked into the design:
+
+- **Placement ghost is a 2-triangle quad**, not a live DecalGeometry — the expensive
+  clip against a merged run's full index buffer happens once, on commit.
+- **Rebuild regen is scoped**: only decals whose projector AABB intersects the rebuilt
+  entity regenerate, coalesced per microtask — dragging a wall node never touches
+  decals elsewhere in the zone.
+- **Surface-effect edits never recompile shaders**: move/resize/opacity are uniform
+  writes; `customProgramCacheKey` buckets by slot count so all meshes with N decals
+  share one program. Recompiles only on 0→1 decals or a count-bucket change (one-frame
+  hitch, same cost class as the existing material-swap script action). Surface decals
+  add **zero draw calls** — the cost is a few texture samples in an already-running
+  fragment shader.
+- **Overlay decals cost one draw call each** (small transparent mesh,
+  `castShadow: false`). The FPS counter's draw-call/triangle readout is part of
+  verification; compare against PROFILING.md §8 baselines.
+- Textures flow through the existing `loadTexture` cache — no duplicate GPU uploads,
+  and `setQuality` disposal covers them with no new cache to manage.
+- (Context from design discussion: for a *flat* surface a raw offset plane is the classic
+  cheap trick — the ghost quad IS that. Committed decals still use DecalGeometry because
+  editor surfaces are user-built and irregular: CSG-cut walls, mitered corners,
+  wall/floor junctions — the case DecalGeometry exists for.)
+
+Regression posture — **the feature is almost purely additive**:
+
+- New files carry the logic (`DecalBuilder`, `surfaceDecals`, `DecalTool`, `DecalBrowser`);
+  edits to existing files are new switch cases, new bus events, and a new optional
+  `ZoneDef` field. With no decals in a zone, every new code path is a no-op.
+- **Save format**: optional array — old files load unchanged, no migration, saves from
+  this version still load in older builds (unknown key ignored).
+- **Shared material cache is never mutated** — surface effects clone per mesh and
+  restore the original when the last decal leaves; the `_ownsMaterial` disposal
+  contract is respected on both paths.
+- The two behavior-touching edits to existing systems, and their containment:
+  1. `input:wheel` payload gains modifier fields — additive; the existing consumer
+     destructures `{ delta }` and is unaffected.
+  2. `EditorCamera` zoom-lock — a guarded early-return that only fires while a lock is
+     held; DecalTool unlocks on deactivate/dispose, and the wheel-gating test verifies
+     zoom works normally over empty space. This actually *fixes* an existing conflict
+     (TriggerVolumeTool's height-scroll fights camera zoom today).
+  3. `SelectionManager.PRIORITY` insertion — changes pick order only when a decal mesh
+     is literally under the cursor.
+- Riskiest piece = Stage B's `onBeforeCompile` (first in the repo), which is why it's
+  isolated in its own file, its own stage, and its own cloned materials — a shader bug
+  can only misrender decaled meshes, never untouched geometry.
+- Every stage ends with `npm run typecheck`, console-clean check, FPS/draw-call
+  comparison, and the standard §7 regression checklist.
+
+---
+
 ## 1. Data model (`src/types.ts`)
 
 ```ts
@@ -59,7 +116,8 @@ export interface DecalDef {
 
 export interface DecalTexDef {
   id: string; label: string; category?: string;
-  path: string;               // /assets/decals/<file>.png
+  path: string;               // /assets/decals/<file>.png (albedo, transparent)
+  maps?: { normal?: string; roughness?: string };  // optional PBR maps (overlay kind)
   kinds: DecalKind[];         // which modes this texture supports
   attribution?: string;
 }
@@ -152,6 +210,12 @@ Overlay mesh recipe:
   (`WallBuilder.ts:396–398`) so decals draw over CSG passage liners too.
   MeshStandardMaterial inherits FogExp2 + ACES tone mapping automatically
   (unlike `volumeFillMaterial`, which skips fog — don't repeat that gap).
+- If the manifest entry has `maps.normal` / `maps.roughness`, assign `normalMap` /
+  `roughnessMap` (loaded `NoColorSpace`, per the AssetManager data-map convention) —
+  cracks/bullet holes read as genuinely recessed under moving light. Note the decal's
+  normals *override* the wall's in its footprint (they don't blend) — acceptable for
+  overlay kind; blending is exactly what the surface-effect kind is for. Starter pack
+  ships albedo-only; the field is there for asset upgrades.
 - `renderOrder = 10 + indexInZone` — stable ordering between overlapping decals.
 - `castShadow = false; receiveShadow = true`.
 - `userData = { editorId: def.id, editorType: "decal", zoneId, selectable: true,
