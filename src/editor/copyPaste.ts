@@ -1,11 +1,11 @@
 import type { WorldState } from "@/world/WorldState";
 import type {
   SelectedObjectPayload, SelectedRef, EditorObjectType,
-  WallDef, FloorDef, PlatformDef, StairDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
+  WallDef, FloorDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
 } from "@/types";
 
 /** Selection types that can be copied. (Openings/spawn/terrain are excluded.) */
-const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "object", "trigger-volume"]);
+const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "object", "trigger-volume", "shape"]);
 
 /** One copied entity, tagged with its type so paste can route per-entity. */
 export interface ClipEntity {
@@ -37,6 +37,7 @@ function newId(type: EditorObjectType): string {
     case "stair":          return `stair_${uuid8()}`;
     case "object":         return `obj_${uuid8()}`;
     case "trigger-volume": return `vol_${uuid8()}`;
+    case "shape":          return `shape_${uuid8()}`;
     default:               return uuid();  // floor + nodes use full uuids
   }
 }
@@ -79,6 +80,7 @@ function defsForRef(world: WorldState, ref: SelectedRef): ClipEntity[] {
     case "stair":          { const s = zone.stairs.find(x => x.id === ref.id);    return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
     case "object":         { const o = zone.objects.find(x => x.id === ref.id);   return o ? [{ type: ref.type, def: structuredClone(o) }] : []; }
     case "trigger-volume": { const v = zone.triggerVolumes?.find(x => x.id === ref.id); return v ? [{ type: ref.type, def: structuredClone(v) }] : []; }
+    case "shape":          { const s = zone.shapes?.find(x => x.id === ref.id);         return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
     default:               return [];
   }
 }
@@ -187,6 +189,11 @@ export function pasteClipboard(
         case "trigger-volume": {
           const v = ent.def as TriggerVolume;
           world.addTriggerVolume(zoneId, { ...v, id, position: off3(v.position, dx, dz) });
+          break;
+        }
+        case "shape": {
+          const s = ent.def as ShapeDef;
+          world.addShape(zoneId, { ...s, id, position: off3(s.position, dx, dz) });
           break;
         }
       }

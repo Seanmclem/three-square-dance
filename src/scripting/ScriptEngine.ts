@@ -363,6 +363,8 @@ export class ScriptEngine {
     if (obj) return { x: obj.position.x, y: obj.position.y, z: obj.position.z, facing: obj.rotation.y };
     const plat = zone.platforms.find(p => p.id === targetId);
     if (plat) return { x: plat.position.x, y: plat.position.y, z: plat.position.z, facing: plat.rotation?.y ?? 0 };
+    const shape = (zone.shapes ?? []).find(s => s.id === targetId);
+    if (shape) return { x: shape.position.x, y: shape.position.y, z: shape.position.z, facing: shape.rotation.y };
     const vol = (zone.triggerVolumes ?? []).find(v => v.id === targetId);
     if (vol) return { x: vol.position.x, y: vol.position.y, z: vol.position.z, facing: vol.rotation?.y ?? 0 };
     const cp = (zone.checkpoints ?? []).find(c => c.id === targetId);
@@ -384,6 +386,7 @@ export class ScriptEngine {
     collect(zone.floors);
     collect(zone.platforms);
     collect(zone.stairs);
+    collect(zone.shapes ?? []);
     collect(zone.triggerVolumes ?? []);
     return ids;
   }

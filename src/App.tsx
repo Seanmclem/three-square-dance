@@ -539,12 +539,14 @@ export default function App() {
       bus.on("stair:updated",        ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
       bus.on("object:updated",       ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
       bus.on("triggervolume:updated",({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
+      bus.on("shape:updated",        ({ changes }) => { if (changes.groupIds !== undefined) bumpMembership(); }),
       bus.on("floor:removed",        bumpMembership),
       bus.on("wall:removed",         bumpMembership),
       bus.on("platform:removed",     bumpMembership),
       bus.on("stair:removed",        bumpMembership),
       bus.on("object:removed",       bumpMembership),
       bus.on("triggervolume:removed",bumpMembership),
+      bus.on("shape:removed",        bumpMembership),
       // Pasted/duplicated entities arrive via *:added carrying their cloned groupIds.
       bus.on("floor:added",          ({ floor })    => { if (floor.groupIds?.length)    bumpMembership(); }),
       bus.on("wall:added",           ({ wall })     => { if (wall.groupIds?.length)     bumpMembership(); }),
@@ -552,6 +554,7 @@ export default function App() {
       bus.on("stair:added",          ({ stair })    => { if (stair.groupIds?.length)    bumpMembership(); }),
       bus.on("object:added",         ({ object })   => { if (object.groupIds?.length)   bumpMembership(); }),
       bus.on("triggervolume:added",  ({ volume })   => { if (volume.groupIds?.length)   bumpMembership(); }),
+      bus.on("shape:added",          ({ shape })    => { if (shape.groupIds?.length)    bumpMembership(); }),
     ];
 
     return () => {

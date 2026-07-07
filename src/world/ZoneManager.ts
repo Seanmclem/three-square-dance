@@ -292,6 +292,18 @@ export class ZoneManager {
         this._despawnEntity(id);
       }),
       this._bus.on("object:updated", ({ id, zoneId, changes }) => {
+        // Script move_object targeting a SHAPE (runtime-only, like object moves):
+        // local-space geometry means repositioning is a pure transform update on
+        // mesh + collider — no rebuild, and WorldState stays untouched by design.
+        if (changes.position) {
+          const she = this._loadedZones.get(zoneId)?.shapeEntries.get(id);
+          if (she) {
+            const p = changes.position;
+            she.mesh.position.set(p.x, p.y, p.z);
+            she.collider?.setTranslation({ x: p.x, y: p.y, z: p.z });
+            return;
+          }
+        }
         if (changes.position || changes.rotation || changes.scale || changes.colliders) {
           const entry = this._loadedZones.get(zoneId);
           const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);

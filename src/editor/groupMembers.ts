@@ -15,6 +15,7 @@ const COLLECTIONS: { type: EditorObjectType; key: keyof ZoneDef }[] = [
   { type: "stair",          key: "stairs" },
   { type: "object",         key: "objects" },
   { type: "trigger-volume", key: "triggerVolumes" },
+  { type: "shape",          key: "shapes" },
 ];
 
 type Grouped = { id: string; label?: string; groupIds?: string[] };
@@ -60,5 +61,6 @@ export function writeGroupIds(world: WorldState, ref: SelectedRef, groupIds: str
     case "stair":          world.updateStair(ref.zoneId, ref.id, { groupIds }); break;
     case "object":         world.updateObject(ref.zoneId, ref.id, { groupIds }); break;
     case "trigger-volume": world.updateTriggerVolume(ref.zoneId, ref.id, { groupIds }); break;
+    case "shape":          world.updateShape(ref.zoneId, ref.id, { groupIds }); break;
   }
 }
