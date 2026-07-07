@@ -3233,6 +3233,11 @@ function DecalView({ selected, onDelete, onObjectUpdate, decalTextures }: {
   };
   const commitRot = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) commit({ rotation: n }); };
   const commitOp  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) commit({ opacity: Math.max(0, Math.min(1, n)) }); };
+  const commitRoughMod = (val: string) => {
+    if (val.trim() === "") { commit({ roughnessMod: undefined }); return; }
+    const n = parseFloat(val);
+    if (Number.isFinite(n)) commit({ roughnessMod: Math.max(0, Math.min(1, n)) });
+  };
 
   const swapTextures = decalTextures.filter(t => t.kinds.includes(dec.kind));
 
@@ -3315,6 +3320,26 @@ function DecalView({ selected, onDelete, onObjectUpdate, decalTextures }: {
           />
         </div>
       </div>
+
+      {dec.kind === "surface" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 10, color: "#909090" }}>
+              <input type="checkbox" checked={!!dec.triplanar}
+                onChange={e => commit({ triplanar: e.target.checked })} />
+              TRIPLANAR (wraps corners)
+            </label>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={LABEL}>WET ROUGHNESS (blank = off)</div>
+            <input type="number" step={0.1} min={0} max={1} defaultValue={dec.roughnessMod ?? ""} style={NUM_INPUT}
+              key={`${selected.id}-rough`}
+              onBlur={e => commitRoughMod(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") commitRoughMod((e.target as HTMLInputElement).value); }}
+            />
+          </div>
+        </div>
+      )}
 
       {onDelete && (
         <button onClick={onDelete}

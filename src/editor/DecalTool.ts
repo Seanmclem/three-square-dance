@@ -28,6 +28,11 @@ export class DecalTool {
   private _ghost: THREE.Mesh | null = null;
   private _hover: { point: THREE.Vector3; normal: THREE.Vector3 } | null = null;
   private _zoomLocked = false;
+  private _lastScreenPos: ScreenPos = { x: 0, y: 0 };
+  // Surface-kind decals have no mesh to raycast — this tool picks them analytically
+  // (ray vs projector rectangle) and shows a wireframe rectangle while one is selected.
+  private _selectedSurfaceId: string | null = null;
+  private _outline: THREE.LineLoop | null = null;
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _unsubs: Array<() => void> = [];
 
@@ -56,9 +61,35 @@ export class DecalTool {
       }),
 
       this._bus.on("input:mousemove", ({ screenPos }) => {
+        this._lastScreenPos = screenPos;
         if (!this._active || !this._textureId) return;
         this._hover = this._pickSurface(screenPos);
         this._refreshGhost();
+      }),
+
+      // Surface-decal selection (Select tool, or Decal tool while disarmed). Runs after
+      // SelectionManager's click handler (registered earlier), so emitting here overrides
+      // its wall/floor pick — the TriggerVolumeTool pattern.
+      this._bus.on("input:click", ({ button }) => {
+        if (button !== 0) return;
+        if (this._toolId !== "select" && this._toolId !== "decal") return;
+        if (this._toolId === "decal" && this._textureId) return;   // armed = stamping, not selecting
+        const dec = this._findSurfaceDecalAt(this._lastScreenPos);
+        if (!dec) return;
+        this._bus.emit("object:deselected", {});
+        this._selectSurfaceDecal(dec);
+      }),
+      this._bus.on("object:deselected", () => this._clearSurfaceSelection()),
+      this._bus.on("object:selected", ({ type, id }) => {
+        if (type !== "decal" || id !== this._selectedSurfaceId) this._clearSurfaceSelection();
+      }),
+      this._bus.on("decal:removed", ({ id }) => {
+        if (id === this._selectedSurfaceId) this._clearSurfaceSelection();
+      }),
+      this._bus.on("decal:updated", ({ id }) => {
+        if (id !== this._selectedSurfaceId) return;
+        const dec = this._world.zones.get(this._activeZoneId)?.decals?.find(d => d.id === id);
+        if (dec) this._positionOutline(dec);
       }),
 
       this._bus.on("input:wheel", ({ delta, shift }) => {
@@ -92,14 +123,88 @@ export class DecalTool {
     );
   }
 
-  /** Raycast buildable static geometry under the cursor; returns hit point + world normal. */
-  private _pickSurface(screenPos: ScreenPos): { point: THREE.Vector3; normal: THREE.Vector3 } | null {
+  private _setRayFrom(screenPos: ScreenPos): void {
     const rect = this._canvas.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((screenPos.x - rect.left) / rect.width) * 2 - 1,
       -((screenPos.y - rect.top) / rect.height) * 2 + 1,
     );
     this._raycaster.setFromCamera(ndc, this._camera);
+  }
+
+  /** Analytic pick: ray vs each surface decal's projector rectangle (they have no mesh). */
+  private _findSurfaceDecalAt(screenPos: ScreenPos): DecalDef | null {
+    const decals = this._world.zones.get(this._activeZoneId)?.decals?.filter(d => d.kind === "surface");
+    if (!decals?.length) return null;
+    this._setRayFrom(screenPos);
+    const ray = this._raycaster.ray;
+    let best: { dec: DecalDef; t: number } | null = null;
+    for (const d of decals) {
+      const q = new THREE.Quaternion().setFromEuler(decalOrientation(d.normal, d.rotation));
+      const n = new THREE.Vector3(d.normal.x, d.normal.y, d.normal.z);
+      const anchor = new THREE.Vector3(d.position.x, d.position.y, d.position.z);
+      const denom = ray.direction.dot(n);
+      if (Math.abs(denom) < 1e-6) continue;
+      const t = anchor.clone().sub(ray.origin).dot(n) / denom;
+      if (t < 0) continue;
+      const p = ray.origin.clone().addScaledVector(ray.direction, t);
+      const local = p.sub(anchor).applyQuaternion(q.clone().invert());
+      if (Math.abs(local.x) > d.size.width / 2 || Math.abs(local.y) > d.size.height / 2) continue;
+      if (!best || t < best.t) best = { dec: d, t };
+    }
+    if (!best) return null;
+    // Anything genuinely in FRONT of the decal plane blocks the pick (the decal's own
+    // surface sits at ~the same distance, so allow a small epsilon).
+    const occluder = this._raycaster
+      .intersectObjects(this._scene.children, true)
+      .find(h => {
+        const u = h.object.userData as { editorType?: string; selectable?: boolean; ghostPick?: boolean };
+        return h.object.visible && !!u.selectable && !u.ghostPick && !!u.editorType;
+      });
+    if (occluder && occluder.distance < best.t - 0.05) return null;
+    return best.dec;
+  }
+
+  private _selectSurfaceDecal(dec: DecalDef): void {
+    this._selectedSurfaceId = dec.id;
+    this._positionOutline(dec);
+    this._bus.emit("object:selected", {
+      id:       dec.id,
+      type:     "decal",
+      zoneId:   this._activeZoneId,
+      position: dec.position,
+      rotation: { x: 0, y: 0, z: 0 },
+      scale:    { x: 1, y: 1, z: 1 },
+      data:     dec,
+    });
+  }
+
+  private _positionOutline(dec: DecalDef): void {
+    if (!this._outline) {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-0.5, -0.5, 0), new THREE.Vector3(0.5, -0.5, 0),
+        new THREE.Vector3(0.5, 0.5, 0),   new THREE.Vector3(-0.5, 0.5, 0),
+      ]);
+      const mat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9 });
+      this._outline = new THREE.LineLoop(geo, mat);
+      this._outline.userData = { editorOnly: true, selectable: false };
+      this._scene.add(this._outline);
+    }
+    const n = new THREE.Vector3(dec.normal.x, dec.normal.y, dec.normal.z);
+    this._outline.position.set(dec.position.x, dec.position.y, dec.position.z).addScaledVector(n, 0.02);
+    this._outline.quaternion.setFromEuler(decalOrientation(dec.normal, dec.rotation));
+    this._outline.scale.set(dec.size.width, dec.size.height, 1);
+    this._outline.visible = true;
+  }
+
+  private _clearSurfaceSelection(): void {
+    this._selectedSurfaceId = null;
+    if (this._outline) this._outline.visible = false;
+  }
+
+  /** Raycast buildable static geometry under the cursor; returns hit point + world normal. */
+  private _pickSurface(screenPos: ScreenPos): { point: THREE.Vector3; normal: THREE.Vector3 } | null {
+    this._setRayFrom(screenPos);
     const hit = this._raycaster
       .intersectObjects(this._scene.children, true)
       .find(h => {
@@ -190,6 +295,12 @@ export class DecalTool {
       this._ghost.geometry.dispose();
       (this._ghost.material as THREE.Material).dispose();
       this._ghost = null;
+    }
+    if (this._outline) {
+      this._scene.remove(this._outline);
+      this._outline.geometry.dispose();
+      (this._outline.material as THREE.Material).dispose();
+      this._outline = null;
     }
   }
 }

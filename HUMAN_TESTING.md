@@ -145,6 +145,14 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 > geometry returns. Very large decals on thin walls can faintly bleed onto the back face —
 > that's the projector depth; shrink the decal (or its `depth` field) if it matters.
 
+**Surface decals (stains / weathering):** switch the DECALS panel to **Surface** and pick
+a Weather texture (leak stain, moss, grime). Same stamp controls, but instead of a mesh
+the effect is blended into the surface's own shader — no seam at the edges, and the
+**TRIPLANAR** toggle (in the selected decal's panel) makes it wrap corners and edges.
+**WET ROUGHNESS** glosses the stained area (leave blank to disable). Selecting one shows
+a cyan rectangle outline (there's no mesh to highlight). Max 4 surface decals per
+wall-run/floor mesh.
+
 ---
 
 ## Adding more workflows

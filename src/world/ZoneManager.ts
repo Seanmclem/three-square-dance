@@ -10,6 +10,7 @@ import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
 import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
+import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MAX_SURFACE_DECALS } from "@/world/decals/surfaceDecals";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -114,6 +115,12 @@ export class ZoneManager {
 
   // Overlay decal meshes — zoneId → decalId → world-space DecalGeometry mesh
   private readonly _decalMeshes = new Map<string, Map<string, THREE.Mesh>>();
+
+  // Surface-effect decal patches (Phase 21) — meshes whose material is a cloned,
+  // shader-patched copy of the base. `original` is restored when the last decal leaves.
+  private readonly _surfacePatches = new Map<string, Map<THREE.Mesh, {
+    original: THREE.Material; ownedBefore: boolean; decalIds: string[];
+  }>>();
 
   // Non-object entities hidden by a script despawn_object this preview run; restored on preview:stop.
   private readonly _despawnedIds = new Set<string>();
@@ -313,7 +320,9 @@ export class ZoneManager {
         this._enqueueWallOp(() => this._rebuildDecal(zoneId, id));
       }),
       this._bus.on("decal:removed", ({ zoneId, id }) => {
-        this._removeDecalMesh(zoneId, id);
+        // _rebuildDecal with no surviving def = remove the overlay mesh AND reconcile
+        // surface patches (restores the shared material when the last stain leaves).
+        this._enqueueWallOp(() => this._rebuildDecal(zoneId, id));
       }),
       // Re-project decals whose footprint touches a rebuilt entity. Regens run
       // through _wallOpChain so they never observe a half-rebuilt run.
@@ -512,6 +521,7 @@ export class ZoneManager {
 
     // Decals project onto the final (CSG-cut) geometry, so build them last.
     await this._buildDecals(zoneId, zone);
+    await this._refreshSurfaceDecals(zoneId);
 
     // Apply current dimming level after loading
     this._applyDimming();
@@ -575,7 +585,9 @@ export class ZoneManager {
       }
     });
     // Decal meshes live in entry.group (disposed by the traverse above) — just drop the map.
+    // Surface-patched clones are _ownsMaterial:true, so the traverse disposed them too.
     this._decalMeshes.delete(zoneId);
+    this._surfacePatches.delete(zoneId);
     this._loadedZones.delete(zoneId);
 
     // Dispose any dim-cloned materials that are now orphaned
@@ -1346,8 +1358,9 @@ export class ZoneManager {
   private async _rebuildDecal(zoneId: string, decalId: string): Promise<void> {
     this._removeDecalMesh(zoneId, decalId);
     const decal = this._worldState.zones.get(zoneId)?.decals?.find(d => d.id === decalId);
-    if (!decal || decal.kind !== "overlay") return;
-    await this._buildDecalMesh(zoneId, decal);
+    if (decal?.kind === "overlay") await this._buildDecalMesh(zoneId, decal);
+    // Any decal change may add/remove/move a surface-effect patch (no-op for overlay-only zones).
+    await this._refreshSurfaceDecals(zoneId);
     this._bus.emit("decal:rebuilt", { zoneId, decalId });
   }
 
@@ -1358,6 +1371,77 @@ export class ZoneManager {
     mesh.geometry.dispose();
     (mesh.material as THREE.Material).dispose();   // decal materials are always owned; textures stay cached
     this._decalMeshes.get(zoneId)!.delete(decalId);
+  }
+
+  /**
+   * Surface-effect decals (Phase 21): reconcile every mesh's material against the
+   * zone's `kind: "surface"` decals. A mesh whose bounds intersect a decal's projector
+   * gets a CLONED, shader-patched material (never the shared cache instance); an
+   * already-patched mesh gets a uniform-only update (no recompile, material.uuid
+   * stable); a mesh whose last decal left gets its original material restored and the
+   * clone disposed. Called from loadZone, on every decal change, and (via the dirty
+   * queue) after target rebuilds — always through _wallOpChain.
+   */
+  private async _refreshSurfaceDecals(zoneId: string): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    const zone  = this._worldState.zones.get(zoneId);
+    if (!entry || !zone) return;
+    const surfaceDecals = (zone.decals ?? []).filter(d => d.kind === "surface");
+    const patches = this._surfacePatches.get(zoneId) ?? new Map<THREE.Mesh, { original: THREE.Material; ownedBefore: boolean; decalIds: string[] }>();
+    if (surfaceDecals.length === 0 && patches.size === 0) return;
+
+    // Desired per-mesh decal lists (projector AABB ∩ mesh AABB, capped at MAX).
+    const desired = new Map<THREE.Mesh, Array<{ decal: DecalDef; texture: THREE.Texture }>>();
+    const targets = this._collectDecalTargets(entry);
+    const targetBox = new THREE.Box3();
+    for (const d of surfaceDecals) {
+      const textures = await this._loadDecalTextures(d.textureId);
+      if (!textures) continue;
+      const projBox = decalProjectorBox(d);
+      for (const t of targets) {
+        t.updateWorldMatrix(true, false);
+        targetBox.setFromObject(t);
+        if (!projBox.intersectsBox(targetBox)) continue;
+        const arr = desired.get(t) ?? [];
+        if (arr.length >= MAX_SURFACE_DECALS) {
+          console.warn(`ZoneManager: more than ${MAX_SURFACE_DECALS} surface decals on one mesh — "${d.id}" dropped there`);
+          continue;
+        }
+        arr.push({ decal: d, texture: textures.map });
+        desired.set(t, arr);
+      }
+    }
+
+    // Unpatch meshes that no longer need decals (or whose mesh was disposed by a rebuild).
+    for (const [mesh, rec] of patches) {
+      if (desired.has(mesh) && mesh.parent) continue;
+      if (mesh.parent) {
+        (mesh.material as THREE.Material).dispose();
+        mesh.material = rec.original;
+        mesh.userData["_ownsMaterial"] = rec.ownedBefore;
+      }
+      patches.delete(mesh);
+    }
+
+    // Patch new meshes / update uniforms on already-patched ones.
+    for (const [mesh, list] of desired) {
+      const slots = list.map(({ decal, texture }) => slotFromDecal(decal, texture));
+      const rec = patches.get(mesh);
+      if (rec) {
+        updateSurfaceDecalUniforms(mesh.material as THREE.MeshStandardMaterial, slots);
+        rec.decalIds = list.map(l => l.decal.id);
+      } else {
+        const base = mesh.material as THREE.MeshStandardMaterial;
+        mesh.material = makeSurfaceDecalMaterial(base, slots);
+        patches.set(mesh, {
+          original:    base,
+          ownedBefore: !!mesh.userData["_ownsMaterial"],
+          decalIds:    list.map(l => l.decal.id),
+        });
+        mesh.userData["_ownsMaterial"] = true;
+      }
+    }
+    this._surfacePatches.set(zoneId, patches);
   }
 
   /**
@@ -1372,11 +1456,17 @@ export class ZoneManager {
     if (!zone?.decals?.length || !entry) return;
     const entityBox = this._entityAABB(entry, entityId);
     for (const d of zone.decals) {
-      if (d.kind !== "overlay") continue;
-      const prevTargets = this._decalMeshes.get(zoneId)?.get(d.id)?.userData["_decalTargets"] as string[] | undefined;
-      const dirty = prevTargets?.includes(entityId)
-        || (entityBox !== null && decalProjectorBox(d).intersectsBox(entityBox));
-      if (dirty) this._queueDecalRebuild(zoneId, d.id);
+      if (d.kind === "overlay") {
+        const prevTargets = this._decalMeshes.get(zoneId)?.get(d.id)?.userData["_decalTargets"] as string[] | undefined;
+        const dirty = prevTargets?.includes(entityId)
+          || (entityBox !== null && decalProjectorBox(d).intersectsBox(entityBox));
+        if (dirty) this._queueDecalRebuild(zoneId, d.id);
+      } else {
+        // Surface kind: the rebuilt entity's old mesh (possibly patched) is disposed;
+        // re-resolve + re-patch when the projector touches the entity's new bounds.
+        if (entityBox !== null && decalProjectorBox(d).intersectsBox(entityBox))
+          this._queueDecalRebuild(zoneId, d.id);
+      }
     }
   }
 

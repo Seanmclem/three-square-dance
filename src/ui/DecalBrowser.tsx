@@ -23,22 +23,22 @@ export function DecalBrowser({ decals, selectedId, onSelect }: DecalBrowserProps
       {/* Kind toggle */}
       <div style={{ padding: "8px 8px 4px", flexShrink: 0, display: "flex", gap: 4 }}>
         {(["overlay", "surface"] as const).map(k => {
-          const active   = kind === k;
-          const disabled = k === "surface";   // Phase 21 — surface-effect shader decals
+          const active = kind === k;
           return (
             <button
               key={k}
-              disabled={disabled}
-              title={disabled ? "Surface-effect decals land in a later phase" : k === "overlay" ? "Stickers, cracks, paint — a mesh on top of the surface" : undefined}
+              title={k === "overlay"
+                ? "Stickers, cracks, paint — a mesh on top of the surface"
+                : "Stains, weathering — blended into the surface's own shader (no seam, wraps corners)"}
               onClick={() => setKind(k)}
               style={{
                 flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, letterSpacing: 0.5,
-                cursor: disabled ? "default" : "pointer",
+                cursor: "pointer",
                 background: active ? "rgba(80,140,255,0.15)" : "rgba(255,255,255,0.04)",
                 border: `1px solid ${active ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.08)"}`,
-                color: disabled ? "#444" : active ? "#80aaff" : "#808080",
+                color: active ? "#80aaff" : "#808080",
               }}
-            >{k === "overlay" ? "Overlay" : "Surface (soon)"}</button>
+            >{k === "overlay" ? "Overlay" : "Surface"}</button>
           );
         })}
       </div>
