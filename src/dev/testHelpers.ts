@@ -3,7 +3,7 @@ import type { WorldState } from "@/world/WorldState";
 import type { ScriptEngine } from "@/scripting/ScriptEngine";
 import { GAMESAVE_KEY, type GameState } from "@/scripting/GameState";
 import type { PreviewController } from "@/preview/PreviewController";
-import type { LeftPanelId, ScriptAction, TriggerType, PlatformDef, WorldObject } from "@/types";
+import type { LeftPanelId, ScriptAction, TriggerType, PlatformDef, ShapeDef, ShapeKind, WorldObject } from "@/types";
 
 /**
  * DEV-only browser test harness. Installs `window.__test` with shortcuts for the
@@ -60,6 +60,14 @@ export function installTestHelpers({ bus, world, scriptEngine, preview, gameStat
       world.addPlatform(zoneId(), plat);
       return id;
     },
+    spawnShape: ({ id = `test_shape_${Date.now()}`, kind = "cylinder" as ShapeKind, x = 0, z = 0, groupIds = [] as string[] } = {}): string => {
+      const shape: ShapeDef = {
+        id, label: id, kind, position: { x, y: 0, z }, rotation: { x: 0, y: 0, z: 0 },
+        material: "concrete", groupIds,
+      };
+      world.addShape(zoneId(), shape);
+      return id;
+    },
     spawnObject: ({ id = `test_obj_${Date.now()}`, assetId = "nonexistent_model", x = 0, y = 0.5, z = -3, groupIds = [] as string[] } = {}): string => {
       const obj: WorldObject = {
         id, label: id, assetId, position: { x, y, z }, rotation: { x: 0, y: 0, z: 0 },
@@ -76,6 +84,7 @@ export function installTestHelpers({ bus, world, scriptEngine, preview, gameStat
       for (const [zid, zone] of world.zones) {
         for (const o of [...zone.objects])   if (o.id.startsWith("test_")) world.removeObject(zid, o.id);
         for (const p of [...zone.platforms]) if (p.id.startsWith("test_")) world.removePlatform(zid, p.id);
+        for (const s of zone.shapes ?? [])   if (s.id.startsWith("test_")) world.removeShape(zid, s.id);
       }
       for (const g of [...world.groups]) if (g.id.startsWith("grp_")) world.removeGroup(g.id);
     },

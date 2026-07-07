@@ -3,6 +3,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
+import { ShapeBuilder } from "@/builders/ShapeBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
@@ -14,7 +15,7 @@ import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MA
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -37,12 +38,18 @@ interface StairEntry {
   def:       StairDef;
 }
 
+interface ShapeEntry {
+  mesh:     THREE.Mesh;
+  collider: RAPIER.Collider | null;
+}
+
 interface ZoneEntry {
   group:          THREE.Group;
   floorsGroup:    THREE.Group;
   wallsGroup:     THREE.Group;
   platformsGroup: THREE.Group;
   stairsGroup:    THREE.Group;
+  shapesGroup:    THREE.Group;
   objectsGroup:   THREE.Group;
   // keyed by floor.id
   floorColliders: Map<string, RAPIER.Collider>;
@@ -50,6 +57,7 @@ interface ZoneEntry {
   wallData:       Map<string, RunEntry>;
   platformEntries: Map<string, PlatformEntry>;
   stairEntries:    Map<string, StairEntry>;
+  shapeEntries:    Map<string, ShapeEntry>;
   objectMeshes:    Map<string, THREE.Object3D>;
   // Attached colliders per placed object (explicit colliders[] or the implicit auto-box)
   objectColliders: Map<string, RAPIER.Collider[]>;
@@ -152,6 +160,7 @@ export class ZoneManager {
 
   // Cancellation tokens — increment on each new build; stale async results are discarded
   private readonly _platformBuildTokens = new Map<string, number>();
+  private readonly _shapeBuildTokens    = new Map<string, number>();
 
   // Editor-only group visibility — group ids the user has hidden via the Groups panel
   private readonly _hiddenGroups = new Set<string>();
@@ -249,6 +258,15 @@ export class ZoneManager {
       }),
       this._bus.on("platform:removed", ({ zoneId, id }) => {
         this._removePlatform(zoneId, id);
+      }),
+      this._bus.on("shape:added", ({ zoneId, shape }) => {
+        void this._addShape(zoneId, shape);
+      }),
+      this._bus.on("shape:updated", ({ zoneId, id }) => {
+        void this._rebuildShape(zoneId, id);
+      }),
+      this._bus.on("shape:removed", ({ zoneId, id }) => {
+        this._removeShape(zoneId, id);
       }),
       this._bus.on("stair:added", ({ zoneId, stair }) => {
         void this._addStair(zoneId, stair);
@@ -434,13 +452,15 @@ export class ZoneManager {
     const wallsGroup     = new THREE.Group();
     const platformsGroup = new THREE.Group();
     const stairsGroup    = new THREE.Group();
+    const shapesGroup    = new THREE.Group();
     const objectsGroup   = new THREE.Group();
-    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup);
+    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, shapesGroup, objectsGroup);
 
     const floorColliders  = new Map<string, RAPIER.Collider>();
     const wallData        = new Map<string, RunEntry>();
     const platformEntries = new Map<string, PlatformEntry>();
     const stairEntries    = new Map<string, StairEntry>();
+    const shapeEntries    = new Map<string, ShapeEntry>();
     const objectMeshes    = new Map<string, THREE.Object3D>();
     const objectColliders = new Map<string, RAPIER.Collider[]>();
 
@@ -497,6 +517,13 @@ export class ZoneManager {
       stairEntries.set(stair.id, { group: stairGroup, meshes, colliders, def: stair });
     }
 
+    // ── Shapes ────────────────────────────────────────────────────────────
+    for (const shape of zone.shapes ?? []) {
+      const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
+      shapesGroup.add(mesh);
+      shapeEntries.set(shape.id, { mesh, collider });
+    }
+
     // ── Objects ───────────────────────────────────────────────────────────
     for (const obj of zone.objects) {
       const mesh = await this._objectPlacer.build(obj, zoneId);
@@ -505,8 +532,8 @@ export class ZoneManager {
 
     this._scene.add(group);
     const zoneEntry: ZoneEntry = {
-      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, objectsGroup,
-      floorColliders, wallData, platformEntries, stairEntries, objectMeshes, objectColliders,
+      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, shapesGroup, objectsGroup,
+      floorColliders, wallData, platformEntries, stairEntries, shapeEntries, objectMeshes, objectColliders,
     };
     this._loadedZones.set(zoneId, zoneEntry);
     for (const obj of zone.objects) this._buildObjectColliders(zoneId, obj, zoneEntry);
@@ -555,6 +582,10 @@ export class ZoneManager {
 
     for (const se of entry.stairEntries.values()) {
       se.colliders.forEach(c => physicsWorld.removeCollider(c));
+    }
+
+    for (const she of entry.shapeEntries.values()) {
+      if (she.collider) physicsWorld.removeCollider(she.collider);
     }
 
     for (const id of entry.objectMeshes.keys()) {
@@ -882,6 +913,67 @@ export class ZoneManager {
     entry.platformEntries.delete(platformId);
   }
 
+  // ── Shape helpers ─────────────────────────────────────────────────────────
+
+  private async _addShape(zoneId: string, shape: ShapeDef): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
+    entry.shapesGroup.add(mesh);
+    entry.shapeEntries.set(shape.id, { mesh, collider });
+    this._applyDimming();
+    this._bus.emit("shape:rebuilt", { zoneId, shapeId: shape.id });
+  }
+
+  private async _rebuildShape(zoneId: string, shapeId: string): Promise<void> {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return;
+
+    // Claim a token — any older in-flight build for this shape is now stale
+    const myToken = (this._shapeBuildTokens.get(shapeId) ?? 0) + 1;
+    this._shapeBuildTokens.set(shapeId, myToken);
+
+    const shape = zone.shapes?.find(s => s.id === shapeId);
+    if (!shape) return;
+
+    const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
+
+    // If a newer rebuild started while we were awaiting, discard this stale result
+    if (this._shapeBuildTokens.get(shapeId) !== myToken) {
+      mesh.geometry.dispose();
+      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (mesh.material as THREE.Material).dispose();
+      if (collider) physicsWorld.removeCollider(collider);
+      return;
+    }
+
+    // Atomically swap: remove old mesh then add the fresh one
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    this._removeShape(zoneId, shapeId);
+    entry.shapesGroup.add(mesh);
+    entry.shapeEntries.set(shapeId, { mesh, collider });
+    this._applyDimming();
+    this._bus.emit("shape:rebuilt", { zoneId, shapeId });
+  }
+
+  private _removeShape(zoneId: string, shapeId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+
+    const she = entry.shapeEntries.get(shapeId);
+    if (!she) return;
+
+    if (she.collider) physicsWorld.removeCollider(she.collider);
+    const orig = this._dimmedMeshes.get(she.mesh);
+    if (orig) { she.mesh.material = orig; this._dimmedMeshes.delete(she.mesh); }
+    entry.shapesGroup.remove(she.mesh);
+    she.mesh.geometry.dispose();
+    if ((she.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+      (she.mesh.material as THREE.Material).dispose();
+    entry.shapeEntries.delete(shapeId);
+  }
+
   // ── Stair helpers ─────────────────────────────────────────────────────────
 
   private async _addStair(zoneId: string, stair: StairDef): Promise<void> {
@@ -1019,6 +1111,9 @@ export class ZoneManager {
 
       const se = entry.stairEntries.get(id);
       if (se) { se.group.visible = visible; for (const c of se.colliders) c.setEnabled(visible); return true; }
+
+      const she = entry.shapeEntries.get(id);
+      if (she) { she.mesh.visible = visible; she.collider?.setEnabled(visible); return true; }
 
       const fc = entry.floorColliders.get(id);
       if (fc) {
@@ -1205,6 +1300,11 @@ export class ZoneManager {
       for (const stair of zone.stairs) {
         const se = entry.stairEntries.get(stair.id);
         if (se) se.group.visible = !this._isHidden(stair.groupIds);
+      }
+
+      for (const shape of zone.shapes ?? []) {
+        const she = entry.shapeEntries.get(shape.id);
+        if (she) she.mesh.visible = !this._isHidden(shape.groupIds);
       }
 
       // A merged wall run spans multiple walls — hide it only when every wall in the run is hidden.

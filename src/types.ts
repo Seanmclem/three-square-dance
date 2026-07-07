@@ -96,7 +96,7 @@ export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -142,6 +142,10 @@ export interface BusEvents {
   "platform:updated":      { zoneId: string; id: string; changes: Partial<PlatformDef> };
   "platform:removed":      { zoneId: string; id: string };
   "platform:rebuilt":      { zoneId: string; platformId: string };
+  "shape:added":           { zoneId: string; shape: ShapeDef };
+  "shape:updated":         { zoneId: string; id: string; changes: Partial<ShapeDef> };
+  "shape:removed":         { zoneId: string; id: string };
+  "shape:rebuilt":         { zoneId: string; shapeId: string };
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
@@ -273,7 +277,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
@@ -499,6 +503,46 @@ export interface StairDef {
   groupIds?:               string[];
 }
 
+// ─── Parametric shape primitives (Phase 22) ─────────────────────────────────
+
+export type ShapeKind = "cylinder" | "wedge" | "box";
+
+/**
+ * A parametric solid (cylinder/cone, wedge/ramp, flexible box). Geometry is ALWAYS
+ * generated in LOCAL space — footprint centered on the XZ origin, base at local
+ * y = 0 (position.y = bottom, the platform convention). `position`/`rotation` are
+ * applied as mesh.position/mesh.rotation and mirrored onto the collider, never
+ * baked into vertices — the local-space contract the Phase-12 brush stub requires.
+ * Per-kind params are flat optional scalars (WorldState.updateShape shallow-merges);
+ * defaults + clamping live in ShapeBuilder.resolveShapeParams.
+ */
+export interface ShapeDef {
+  id:        string;            // shape_<uuid8>
+  label?:    string;            // optional human-friendly name; falls back to id
+  kind:      ShapeKind;
+  position:  Vec3;
+  rotation:  Euler3;            // degrees XYZ; gizmo edits Y, panel edits all three
+  material:  string;
+  materialOverrides?: MaterialOverrides;
+  floorLevel?: number;
+  groupIds?:   string[];
+  // cylinder / cone
+  radiusTop?:      number;      // default 1; 0 → cone (no top cap)
+  radiusBottom?:   number;      // default 1
+  height?:         number;      // cylinder AND box; default 2
+  radialSegments?: number;      // 3–64, default 16 (3 = tri prism, 6 = hex pillar)
+  // wedge / ramp
+  width?:      number;          // wedge AND box footprint X; default 2
+  depth?:      number;          // wedge AND box footprint Z; default 2
+  heightLow?:  number;          // default 0.1 — front edge (+Z); 0 = true ramp
+  heightHigh?: number;          // default 1.5 — back edge (−Z)
+  // flexible box extras
+  taperX?: number;              // top-face scale factor, default 1 (min 0.01)
+  taperZ?: number;
+  shearX?: number;              // top-face offset in meters, default 0
+  shearZ?: number;
+}
+
 export interface ObjectProperties {
   interactable:   boolean;
   interactLabel?: string;
@@ -552,6 +596,7 @@ export interface ZoneDef {
   triggerVolumes?: TriggerVolume[];
   checkpoints?:    CheckpointDef[];
   decals?:         DecalDef[];
+  shapes?:         ShapeDef[];
 }
 
 export interface TransitionDef {

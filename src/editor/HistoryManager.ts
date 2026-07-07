@@ -2,7 +2,7 @@ import type { WorldState } from "@/world/WorldState";
 
 /** Entity kinds tracked by the change journal. "spawn" is the world-level default spawn. */
 export type ChangeKind =
-  | "floor" | "wall" | "node" | "platform" | "stair"
+  | "floor" | "wall" | "node" | "platform" | "stair" | "shape"
   | "object" | "triggerVolume" | "checkpoint" | "decal" | "group" | "spawn" | "transition";
 
 /**

@@ -1,7 +1,8 @@
 import RAPIER from "@dimforge/rapier3d-compat";
+import * as THREE from "three";
 import { physicsWorld } from "./PhysicsWorld";
 import { colliderWorldTransform } from "./attachedColliderMath";
-import type { WallDef, Vec2, PlatformDef, StairDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
+import type { WallDef, Vec2, PlatformDef, StairDef, ShapeDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
 
 export class ColliderBuilder {
   static registerFloor(
@@ -62,6 +63,29 @@ export class ColliderBuilder {
     // Skipped for CSG platforms, whose geometry is baked unrotated (see PlatformBuilder).
     const angle = applyRotation ? ((platform.rotation?.y ?? 0) * Math.PI) / 180 : 0;
     if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
+    return physicsWorld.createStaticCollider(desc);
+  }
+
+  /**
+   * Parametric shape (Phase 22): exact convex hull of the LOCAL-space vertex
+   * cloud (all shape kinds are convex by construction), with the def's
+   * position/rotation applied on the collider — the same transform the mesh
+   * uses, so mesh and collider can never drift. Returns null only for
+   * degenerate point clouds (params are clamped upstream, so this is a
+   * shouldn't-happen guard: the mesh still renders, just without collision).
+   */
+  static registerShape(shape: ShapeDef, localPoints: Float32Array): RAPIER.Collider | null {
+    const desc = RAPIER.ColliderDesc.convexHull(localPoints);
+    if (!desc) {
+      console.warn(`ColliderBuilder: convex hull failed for shape "${shape.id}" — no collider`);
+      return null;
+    }
+    const D2R = Math.PI / 180;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
+    ));
+    desc.setTranslation(shape.position.x, shape.position.y, shape.position.z)
+        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
     return physicsWorld.createStaticCollider(desc);
   }
 
