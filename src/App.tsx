@@ -51,7 +51,7 @@ import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
 import { dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -888,6 +888,7 @@ export default function App() {
           case "object":         world.removeObject(ref.zoneId, ref.id); break;
           case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
           case "decal":          world.removeDecal(ref.zoneId, ref.id); break;
+          case "shape":          world.removeShape(ref.zoneId, ref.id); break;
         }
       }
       for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
@@ -1131,6 +1132,8 @@ export default function App() {
       world.removeCheckpoint(zoneId, id);
     } else if (type === "decal") {
       world.removeDecal(zoneId, id);
+    } else if (type === "shape") {
+      world.removeShape(zoneId, id);
     } else if (type === "opening") {
       const wallId = selected.parentId!;
       const zone = world.zones.get(zoneId);
@@ -1566,6 +1569,13 @@ export default function App() {
       });
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as DecalDef), ...decChanges } } : null);
+    } else if (selected.type === "shape") {
+      const shapeChanges = changes as unknown as Partial<ShapeDef>;
+      worldRef.current?.transaction("update shape", () => {
+        worldRef.current?.updateShape(selected.zoneId, selected.id, shapeChanges);
+      });
+      syncHistory();
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as ShapeDef), ...shapeChanges } } : null);
     } else {
       const action = changes.properties !== undefined ? "update object properties" : "update object transform";
       worldRef.current?.transaction(action, () => {

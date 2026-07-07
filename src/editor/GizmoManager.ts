@@ -2,14 +2,15 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import { resolveShapeParams } from "@/builders/ShapeBuilder";
 import type {
   IEditorModule, SelectedObjectPayload, SelectedRef,
-  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef,
+  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
 } from "@/types";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal";
+type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -130,6 +131,10 @@ export class GizmoManager implements IEditorModule {
         if (decalId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
         else if (this._groupMode && this._groupHas(decalId)) this._scheduleRegroup();
       }),
+      this._bus.on("shape:rebuilt", ({ zoneId, shapeId }) => {
+        if (shapeId === this._selId && zoneId === this._selZoneId) this._reattachMeshes();
+        else if (this._groupMode && this._groupHas(shapeId)) this._scheduleRegroup();
+      }),
       // Spawn has no rebuild event; re-seed the pivot after each commit so repeated
       // rotations don't accumulate stale pivot/tracked-mesh state. (zoneId is "" for spawn.)
       // Deferred a microtask so it runs AFTER SpawnPointTool rebuilds the marker (both listen
@@ -178,7 +183,7 @@ export class GizmoManager implements IEditorModule {
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
         if (this._groupMode) return;  // group is translate-only — ignore T/R/S mode switches
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -225,7 +230,7 @@ export class GizmoManager implements IEditorModule {
     this._groupRefs = [];
 
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal"].includes(type)) {
+    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal", "shape"].includes(type)) {
       this._detach(); return;
     }
 
@@ -324,6 +329,12 @@ export class GizmoManager implements IEditorModule {
         px = dec.position.x + dec.normal.x * 0.3;
         py = dec.position.y + dec.normal.y * 0.3;
         pz = dec.position.z + dec.normal.z * 0.3;
+      }
+    } else if (type === "shape") {
+      const shape = this._getShape();
+      if (shape) {
+        py   = this._shapeTopY(shape) + 0.3;
+        rotY = THREE.MathUtils.degToRad(shape.rotation.y);
       }
     } else if (type === "spawn") {
       rotY = THREE.MathUtils.degToRad(this._worldState.world?.defaultSpawn?.facingDeg ?? 0);
@@ -426,6 +437,10 @@ export class GizmoManager implements IEditorModule {
       case "decal": {
         const d = zone.decals?.find(x => x.id === ref.id);
         return d ? new THREE.Vector3(d.position.x, d.position.y, d.position.z) : null;
+      }
+      case "shape": {
+        const s = zone.shapes?.find(x => x.id === ref.id);
+        return s ? new THREE.Vector3(s.position.x, s.position.y, s.position.z) : null;
       }
       case "floor": {
         const f = zone.floors.find(x => x.id === ref.id);
@@ -608,6 +623,14 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "shape": {
+        const s = zone.shapes?.find(x => x.id === ref.id);
+        if (!s) break;
+        this._worldState.updateShape(zoneId, ref.id, {
+          position: { x: s.position.x + delta.x, y: s.position.y + delta.y, z: s.position.z + delta.z },
+        });
+        break;
+      }
     }
   }
 
@@ -739,6 +762,13 @@ export class GizmoManager implements IEditorModule {
       if (vol) {
         this._pivot.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
         this._pivot.rotation.set(0, vol.rotation?.y ? THREE.MathUtils.degToRad(vol.rotation.y) : 0, 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
+    } else if (type === "shape") {
+      const shape = this._getShape();
+      if (shape) {
+        this._pivot.position.set(shape.position.x, this._shapeTopY(shape) + 0.3, shape.position.z);
+        this._pivot.rotation.set(0, THREE.MathUtils.degToRad(shape.rotation.y), 0);
         this._pivotStart.copy(this._pivot.position);
       }
     } else if (type === "spawn") {
@@ -908,6 +938,19 @@ export class GizmoManager implements IEditorModule {
             x: obj.position.x + delta.x,
             y: obj.position.y + delta.y,
             z: obj.position.z + delta.z,
+          },
+        });
+        break;
+      }
+      case "shape": {
+        if (delta.lengthSq() < 1e-6) break;
+        const shape = this._getShape();
+        if (!shape) break;
+        this._worldState.updateShape(this._selZoneId!, this._selId!, {
+          position: {
+            x: shape.position.x + delta.x,
+            y: shape.position.y + delta.y,
+            z: shape.position.z + delta.z,
           },
         });
         break;
@@ -1139,6 +1182,17 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "shape": {
+        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        const shape = this._getShape();
+        if (!shape) break;
+        // Absolute yaw from the pivot; X/Z tilt is panel-only — preserve it.
+        const rotY = THREE.MathUtils.radToDeg(this._pivotYaw());
+        this._worldState.updateShape(this._selZoneId!, this._selId!, {
+          rotation: { x: shape.rotation.x, y: rotY, z: shape.rotation.z },
+        });
+        break;
+      }
       case "spawn": {
         if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
         const spawn = this._worldState.world?.defaultSpawn;
@@ -1260,5 +1314,17 @@ export class GizmoManager implements IEditorModule {
   private _getObject(): WorldObject | undefined {
     return this._worldState.zones.get(this._selZoneId ?? "")
       ?.objects.find(o => o.id === this._selId);
+  }
+
+  private _getShape(): ShapeDef | undefined {
+    return this._worldState.zones.get(this._selZoneId ?? "")
+      ?.shapes?.find(s => s.id === this._selId);
+  }
+
+  /** World Y of a shape's top face (pivot sits just above it). */
+  private _shapeTopY(shape: ShapeDef): number {
+    const p = resolveShapeParams(shape);
+    const h = shape.kind === "wedge" ? Math.max(p.heightLow, p.heightHigh) : p.height;
+    return shape.position.y + h;
   }
 }

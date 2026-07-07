@@ -9,7 +9,7 @@ import type {
 
 // "decal" sits above platform/wall/floor: decals lie coplanar with those surfaces,
 // so priority (not raycast distance) must break the tie in the decal's favor.
-const PRIORITY: EditorObjectType[] = ["opening", "object", "checkpoint", "spawn", "decal", "platform", "wall", "floor"];
+const PRIORITY: EditorObjectType[] = ["opening", "object", "checkpoint", "spawn", "decal", "shape", "platform", "wall", "floor"];
 
 const SELECT_EMISSIVE  = 0x3366ff;
 const SELECT_INTENSITY = 0.25;
@@ -67,6 +67,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => this._onStairRebuilt(zoneId, stairId)),
       this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => this._onFloorRebuilt(zoneId, floorId)),
       this._bus.on("decal:rebuilt",    ({ zoneId, decalId })    => this._onFloorRebuilt(zoneId, decalId)),
+      this._bus.on("shape:rebuilt",    ({ zoneId, shapeId })    => this._onFloorRebuilt(zoneId, shapeId)),
       this._bus.on("tool:placed",      ({ id, zoneId }) => this._selectAfterPlace(id, zoneId)),
       this._bus.on("gizmo:dragging",  ({ isDragging }) => {
         if (!isDragging) this._suppressNextClick = true;
@@ -77,6 +78,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("stair:removed",    ({ id })      => this._removeFromSelection(id)),
       this._bus.on("object:removed",   ({ id })      => this._removeFromSelection(id)),
       this._bus.on("decal:removed",    ({ id })      => this._removeFromSelection(id)),
+      this._bus.on("shape:removed",    ({ id })      => this._removeFromSelection(id)),
       this._bus.on("object:deselected", ()           => {
         if (this._selected) { this._restore(this._selected); this._selected = null; }
         this._clearExtras();
@@ -477,6 +479,7 @@ export class SelectionManager implements IEditorModule {
       case "floor":    return zone.floors.find(f => f.id === editorId) ?? null;
       case "platform": return zone.platforms.find(p => p.id === editorId) ?? null;
       case "stair":    return zone.stairs.find(s => s.id === editorId) ?? null;
+      case "shape":    return zone.shapes?.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
       case "checkpoint": return zone.checkpoints?.find(c => c.id === editorId) ?? null;
       case "decal":    return zone.decals?.find(d => d.id === editorId) ?? null;

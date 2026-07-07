@@ -4,8 +4,9 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef,
+  DecalDef, DecalTexDef, ShapeDef,
 } from "@/types";
+import { resolveShapeParams } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -170,6 +171,7 @@ const GEO_SUBTITLES: Partial<Record<string, string>> = {
   stair:    "POINTS · STEPS",
   object:   "TRANSFORM",
   opening:  "DIMENSIONS",
+  shape:    "TRANSFORM · PARAMS",
 };
 
 const OBJECT_SCREENS: Record<string, ScreenId[]> = {
@@ -179,6 +181,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   stair:    ["geo", "mat"],
   object:   ["geo", "mat", "colliders"],
   opening:  ["geo"],
+  shape:    ["geo", "mat"],
 };
 
 // ── Summary helpers ───────────────────────────────────────────────────────────
@@ -200,6 +203,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
   const floorData = type === "floor"    ? selected.data as FloorDef    : null;
   const platData  = type === "platform" ? selected.data as PlatformDef : null;
   const stairData = type === "stair"    ? selected.data as StairDef    : null;
+  const shapeData = type === "shape"    ? selected.data as ShapeDef    : null;
 
   switch (s) {
     case "geo":
@@ -209,6 +213,12 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
         : `${(floorData.floorMesh.nodeIds ?? floorData.floorMesh.points ?? []).length} verts`;
       if (platData)  return `${platData.size.width}×${platData.size.depth}`;
       if (stairData) return `${effectiveSteps(stairData)} steps`;
+      if (shapeData) {
+        const p = resolveShapeParams(shapeData);
+        if (shapeData.kind === "cylinder") return `r ${p.radiusBottom} · ${p.radialSegments} seg`;
+        if (shapeData.kind === "wedge")    return `${p.width}×${p.depth} · h ${p.heightHigh}`;
+        return `${p.width}×${p.depth}×${p.height}`;
+      }
       return "geometry";
     case "mat": {
       let matId: string | undefined;
@@ -217,6 +227,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (floorData) { matId = floorData.floorMesh.material; overrides = floorData.materialOverrides; }
       if (platData)  { matId = platData.material;            overrides = platData.materialOverrides; }
       if (stairData) { matId = stairData.material;           overrides = stairData.materialOverrides; }
+      if (shapeData) { matId = shapeData.material;           overrides = shapeData.materialOverrides; }
       if (!matId) return "";
       const baseDef = materialList.find(m => m.id === matId);
       const n = getActiveMapCount(overrides, baseDef);
@@ -272,6 +283,10 @@ function objectTypeLabel(selected: SelectedObjectPayload): string {
     return `${(d?.type ?? "").toUpperCase()} OPENING`;
   }
   if (type === "trigger-volume") return "TRIGGER VOLUME";
+  if (type === "shape") {
+    const d = selected.data as ShapeDef | null;
+    return `${(d?.kind ?? "shape").toUpperCase()} · LEVEL ${d?.floorLevel ?? 0}`;
+  }
   return type.toUpperCase();
 }
 
@@ -362,7 +377,7 @@ export function PropertiesPanel({
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
-    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal"].includes(selected.type as string);
+    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal", "shape"].includes(selected.type as string);
   const startEdit  = (): void => { setLabelDraft(currentLabel); setEditingLabel(true); };
   const cancelEdit = (): void => { setLabelDraft(currentLabel); setEditingLabel(false); };
   const commitLabel = (): void => {
@@ -742,6 +757,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
+  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   return null;
 }
 
@@ -1195,6 +1211,140 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       </div>
 
       {/* Floor level */}
+      <div>
+        <div style={LABEL}>FLOOR LEVEL</div>
+        <LevelStepper value={floorLvl} onChange={n => {
+          setFloorLvl(n);
+          onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
+        }} />
+      </div>
+    </div>
+  );
+}
+
+// ── ShapeGeoView ──────────────────────────────────────────────────────────────
+
+// Per-kind param fields for parametric shapes. Field values resolve through
+// resolveShapeParams so a sparse def shows its effective (defaulted) numbers.
+const SHAPE_PARAM_FIELDS: Record<ShapeDef["kind"], Array<{ key: keyof ShapeDef; label: string; step: number; min?: number; max?: number; int?: boolean }>> = {
+  cylinder: [
+    { key: "radiusBottom",   label: "RADIUS BOTTOM", step: 0.25, min: 0.05 },
+    { key: "radiusTop",      label: "RADIUS TOP",    step: 0.25, min: 0 },
+    { key: "height",         label: "HEIGHT",        step: 0.5,  min: 0.05 },
+    { key: "radialSegments", label: "SEGMENTS",      step: 1,    min: 3, max: 64, int: true },
+  ],
+  wedge: [
+    { key: "width",      label: "WIDTH",       step: 0.5,  min: 0.05 },
+    { key: "depth",      label: "DEPTH",       step: 0.5,  min: 0.05 },
+    { key: "heightLow",  label: "HEIGHT LOW",  step: 0.25, min: 0 },
+    { key: "heightHigh", label: "HEIGHT HIGH", step: 0.25, min: 0.05 },
+  ],
+  box: [
+    { key: "width",  label: "WIDTH",   step: 0.5,  min: 0.05 },
+    { key: "depth",  label: "DEPTH",   step: 0.5,  min: 0.05 },
+    { key: "height", label: "HEIGHT",  step: 0.5,  min: 0.05 },
+    { key: "taperX", label: "TAPER X", step: 0.1,  min: 0.01 },
+    { key: "taperZ", label: "TAPER Z", step: 0.1,  min: 0.01 },
+    { key: "shearX", label: "SHEAR X", step: 0.25 },
+    { key: "shearZ", label: "SHEAR Z", step: 0.25 },
+  ],
+};
+
+function ShapeGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void }) {
+  const shape  = selected.data as ShapeDef | null;
+  const fields = SHAPE_PARAM_FIELDS[shape?.kind ?? "box"];
+  const resolved = shape ? resolveShapeParams(shape) : null;
+
+  const paramStrs = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const f of fields) out[f.key] = String((resolved as unknown as Record<string, number>)?.[f.key] ?? 0);
+    return out;
+  };
+  const [posStr,   setPosStr]   = useState({ x: String(shape?.position.x ?? 0), y: String(shape?.position.y ?? 0), z: String(shape?.position.z ?? 0) });
+  const [rotStr,   setRotStr]   = useState({ x: String(shape?.rotation.x ?? 0), y: String(shape?.rotation.y ?? 0), z: String(shape?.rotation.z ?? 0) });
+  const [params,   setParams]   = useState<Record<string, string>>(paramStrs);
+  const [floorLvl, setFloorLvl] = useState(shape?.floorLevel ?? 0);
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(shape?.position.x ?? 0), y: String(shape?.position.y ?? 0), z: String(shape?.position.z ?? 0) });
+    setRotStr({ x: String(shape?.rotation.x ?? 0), y: String(shape?.rotation.y ?? 0), z: String(shape?.rotation.z ?? 0) });
+    setParams(paramStrs());
+    setFloorLvl(shape?.floorLevel ?? 0);
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Gizmo commits re-emit object:selected with the same id — re-sync transform fields by value.
+  useEffect(() => {
+    setPosStr({ x: String(shape?.position.x ?? 0), y: String(shape?.position.y ?? 0), z: String(shape?.position.z ?? 0) });
+  }, [shape?.position.x, shape?.position.y, shape?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setRotStr({ x: String(shape?.rotation.x ?? 0), y: String(shape?.rotation.y ?? 0), z: String(shape?.rotation.z ?? 0) });
+  }, [shape?.rotation.x, shape?.rotation.y, shape?.rotation.z]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitPos = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ position: { ...(shape?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+  const commitRot = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    onObjectUpdate({ rotation: { ...(shape?.rotation ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>);
+  };
+  const commitParam = (f: (typeof fields)[number], val: string) => {
+    let n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    if (f.int) n = Math.round(n);
+    if (f.min !== undefined) n = Math.max(f.min, n);
+    if (f.max !== undefined) n = Math.min(f.max, n);
+    onObjectUpdate({ [f.key]: n } as unknown as Partial<WorldObject>);
+  };
+
+  if (!shape) return null;
+
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      {(["position", "rotation"] as const).map(group => (
+        <div key={group}>
+          <div style={LABEL}>{group === "position" ? "POSITION" : "ROTATION (deg)"}</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["x", "#ff6b6b"], ["y", "#6bff8a"], ["z", "#6b8aff"]] as const).map(([axis, color]) => {
+              const strs   = group === "position" ? posStr : rotStr;
+              const setter = group === "position" ? setPosStr : setRotStr;
+              const commit = group === "position" ? commitPos : commitRot;
+              return (
+                <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+                  <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+                  <input type="number" step={group === "position" ? 0.5 : 15} value={strs[axis]}
+                    onChange={e => { setter(p => ({ ...p, [axis]: e.target.value })); schedule(() => commit(axis, e.target.value)); }}
+                    onBlur={e => flush(() => commit(axis, e.target.value))}
+                    onKeyDown={e => { if (e.key === "Enter") flush(() => commit(axis, (e.target as HTMLInputElement).value)); }}
+                    style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      <div>
+        <div style={LABEL}>{shape.kind.toUpperCase()} PARAMS</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          {fields.map(f => (
+            <div key={f.key}>
+              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{f.label}</div>
+              <input type="number" step={f.step} min={f.min} max={f.max} value={params[f.key] ?? ""}
+                style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                onChange={e => { const v = e.target.value; setParams(p => ({ ...p, [f.key]: v })); schedule(() => commitParam(f, v)); }}
+                onBlur={e => flush(() => commitParam(f, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitParam(f, (e.target as HTMLInputElement).value)); }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div>
         <div style={LABEL}>FLOOR LEVEL</div>
         <LevelStepper value={floorLvl} onChange={n => {
@@ -2165,6 +2315,7 @@ function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, qual
         {type === "floor"    && <FloorMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "platform" && <PlatformMatView selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "stair"    && <StairMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
+        {type === "shape"    && <ShapeMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
       </div>
       <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={LABEL}>QUALITY</div>
@@ -2271,6 +2422,21 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onAddMaterial={onAddMaterial}
       />
     </>
+  );
+}
+
+function ShapeMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
+  const shape = selected.data as ShapeDef | null;
+  return (
+    <MaterialSection
+      key={selected.id}
+      materialList={materialList}
+      currentMaterialId={shape?.material ?? "concrete_01"}
+      overrides={shape?.materialOverrides}
+      onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
+      onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+      onAddMaterial={onAddMaterial}
+    />
   );
 }
 
