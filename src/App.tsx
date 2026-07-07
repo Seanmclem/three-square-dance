@@ -15,6 +15,7 @@ import { WallTool } from "@/editor/WallTool";
 import { PlatformTool } from "@/editor/PlatformTool";
 import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
+import { ShapeTool } from "@/editor/ShapeTool";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -206,6 +207,7 @@ export default function App() {
     const platformTool       = new PlatformTool(scene.scene, world, bus, history);
     const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus, history);
     const stairTool          = new StairTool(scene.scene, world, bus, history);
+    const shapeTool          = new ShapeTool(scene.scene, world, bus, history);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
@@ -255,6 +257,7 @@ export default function App() {
     platformTool.init();
     polyPlatformTool.init();
     stairTool.init();
+    shapeTool.init();
     objectTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -577,6 +580,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      shapeTool.dispose();
       stairTool.dispose();
       polyPlatformTool.dispose();
       platformTool.dispose();

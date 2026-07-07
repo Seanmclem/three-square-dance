@@ -55,6 +55,9 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   spawnpoint:       { desc: "Click to place the player spawn point.",                   hint: "Click to set spawn location" },
   "trigger-volume": { desc: "Click and drag to place a trigger volume.",               hint: "Click to set volume start" },
   decal:            { desc: "Pick a decal, hover a surface, scroll = size, shift+scroll = rotate, click to stamp.", hint: "Select a decal texture in the Decals panel first" },
+  "shape-cylinder": { desc: "Click to set the center, move to set the radius, click to place.", hint: "Click to place cylinder center" },
+  "shape-wedge":    { desc: "Click and drag a footprint. High edge faces away; rotate after placing.", hint: "Click to place wedge corner" },
+  "shape-box":      { desc: "Click and drag a footprint. Taper/shear in the panel after placing.",     hint: "Click to place box corner" },
 };
 
 const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;

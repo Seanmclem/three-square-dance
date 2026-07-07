@@ -13,6 +13,7 @@ const TOOLS: ToolDef[] = [
   { id: "wall",            label: "Wall",     shortcut: "W" },
   { id: "platform",        label: "Platform", shortcut: "L", variants: [{ id: "platform", label: "▭ Rectangle" }, { id: "poly-platform", label: "⬠ Polygon" }] },
   { id: "stair",           label: "Stair",     shortcut: "T" },
+  { id: "shape-cylinder",  label: "Shape",    shortcut: "B", variants: [{ id: "shape-cylinder", label: "◍ Cylinder" }, { id: "shape-wedge", label: "◺ Wedge" }, { id: "shape-box", label: "▤ Box" }] },
   { id: "object",          label: "Object",   shortcut: "O" },
   { id: "zone",            label: "Groups",   shortcut: "Z" },
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },

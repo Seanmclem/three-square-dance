@@ -125,6 +125,30 @@ export const IconDecal = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconShapeCylinder = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <ellipse cx="14" cy="8" rx="8" ry="3.5" stroke={color} strokeWidth="1.5" fill={color} fillOpacity="0.15"/>
+    <path d="M6 8 V20 A8 3.5 0 0 0 22 20 V8" stroke={color} strokeWidth="1.5" fill={color} fillOpacity="0.08"/>
+  </svg>
+);
+
+export const IconShapeWedge = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <polygon points="4,21 24,21 24,7" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.15"/>
+    <line x1="4" y1="21" x2="24" y2="7" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
+export const IconShapeBox = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    {/* tapered block: narrow top face over a wide base */}
+    <polygon points="10,7 18,7 22,14 24,21 4,21 6,14" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.12"/>
+    <line x1="10" y1="7" x2="6" y2="14" stroke={color} strokeWidth="1"/>
+    <line x1="18" y1="7" x2="22" y2="14" stroke={color} strokeWidth="1"/>
+    <line x1="6" y1="14" x2="22" y2="14" stroke={color} strokeWidth="1" opacity="0.5"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   floor:            IconFloor,
@@ -138,4 +162,7 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   spawnpoint:       IconSpawn,
   "trigger-volume": IconTriggerVolume,
   decal:            IconDecal,
+  "shape-cylinder": IconShapeCylinder,
+  "shape-wedge":    IconShapeWedge,
+  "shape-box":      IconShapeBox,
 };
