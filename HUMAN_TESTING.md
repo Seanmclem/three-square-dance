@@ -155,6 +155,30 @@ wall-run/floor mesh.
 
 ---
 
+## Workflow: place a shape primitive (cylinder / wedge / box)
+
+1. Click the **Shape** tool in the left toolbar (between Stair and Object). A popover
+   opens beside it with **◍ Cylinder / ◺ Wedge / ▤ Box** — pick one (the button keeps
+   your last choice on re-click).
+2. Place it:
+   - **Cylinder**: click where the **center** should be, move the mouse to grow the
+     radius (a translucent blue ghost follows), click again to place.
+   - **Wedge / Box**: click one corner of the footprint, move to the opposite corner,
+     click to place. The wedge's high edge faces away (−Z) — rotate it after placing.
+   The base sits on whatever you clicked (ground, a platform top, etc.).
+3. The new shape auto-selects. In the **Geometry** screen you can tune everything:
+   - Cylinder: radius top/bottom (top 0 = cone), height, **segments 3–64**
+     (3 = triangular prism, 6 = hex pillar, 16+ = round; low counts render faceted).
+   - Wedge: width/depth + height low/high (low 0 = a true ramp — walkable up to 45°).
+   - Box: width/depth/height + **taper X/Z** (pyramid/trapezoid tops) and
+     **shear X/Z** (leaning blocks).
+   Plus position, full XYZ rotation, floor level; **Material** screen for the texture.
+4. Gizmos: **T** translate, **R** rotate (yaw ring; X/Z tilt via the panel). No scale
+   gizmo — resize through the params. Delete, copy/paste (Cmd+C/V), duplicate (Cmd+D),
+   groups, and script despawn/move all work like other entities. Everything undoable.
+
+---
+
 ## Adding more workflows
 
 Keep this doc to **reusable, feature-level UI walkthroughs** (the steps a person clicks).

@@ -1,8 +1,15 @@
 # Phase 22 — Parametric Shape Primitives
 
-> Status: **PLANNED** — not yet implemented.
-> Target version: next minor after phases 20 (ControlSchemeManager) and 21
-> (runtime shell) land — renumber/re-version if ordering changes.
+> Status: **IMPLEMENTED** — shipped as **v4.9.0** (2026-07-07), milestones M1–M6 all
+> verified in-browser; see `test-plans/phase-22-parametric-shapes.md` for the acceptance
+> record. §7 (vertex-editable brush) remains the future phase.
+> Notable deviations from this plan during implementation: `shapes?: ShapeDef[]` is an
+> OPTIONAL zone array (the newer decal/triggerVolume pattern — no ZoneDef-literal edits
+> needed); ToolIds landed in M4 with the tool (TOOL_INFO/TOOL_ICONS are exhaustive
+> Records, so adding them early would have broken M1's typecheck); script `move_object`
+> got a runtime fast-path in ZoneManager (mesh.position + collider.setTranslation, no
+> rebuild) instead of routing through updateShape — script actions never touch WorldState
+> by design.
 > Written 2026-07-07 against baseline v4.6.0.
 
 **Scope decisions (user-approved):** parametric shapes now, data model designed for a

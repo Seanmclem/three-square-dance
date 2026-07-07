@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.8.0** — last updated 2026-07-07
+**Version 4.9.0** — last updated 2026-07-07
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -72,6 +72,7 @@
 - v4.6.0 — **Floor geometry panel + node-link visibility.** Motivated by the v4.5.1 incident's discovery that wall↔floor node sharing (by ID — WallTool endpoint snap reuses floor corner nodes; fill-run-with-floor/auto-floor reuse the wall run's nodes) was completely invisible in the UI, and floors exposed NO geometry properties at all (`OBJECT_SCREENS.floor` was `["mat","vert"]`; VertScreen = level+elevation only). (1) **Floor Geometry screen** (`OBJECT_SCREENS.floor = ["geo","mat","vert"]`, new **`FloorGeoView`** + **`FloorVertexRow`** in PropertiesPanel): rect node-backed floors get POSITION X/Z (centroid) + SIZE W/D that recompute all 4 nodes **by min/max membership** (nodeIds order never reshuffled — NodeDragger's `RECT_SAME_X/Z` rect-corner adjacency is index-based) through App's new **`handleFloorNodesUpdate`** (N× `updateNode` in ONE transaction = one undo step) with read-only corner rows; polygon node-backed floors get an editable per-node X/Z vertex list (same debounced-field pattern); legacy floors (no `nodeIds` — or **broken** ones, whose render otherwise collapses missing vertices to `{0,0}` via `resolveFloorMesh`) edit `floorMesh.points` via `updateFloor` with a fresh array, and broken-node edits detach `nodeIds` so points become authoritative again. Panel reads node positions live from the `zones` prop; refresh after edits rides `floor:rebuilt` → SelectionManager re-emit. (2) **Node-link visibility**: new **`WorldState.getNodeLinks(zoneId,nodeId) → NodeLinks {wallIds,floorIds,platformIds}`** (replaces the dead `getWallsAtNode`; same reference model as `_pruneOrphanNodes`); vertex rows show a blue **LINKED** chip when another entity shares the node, `WallSegmentRow` chips when a wall node is shared with a floor/platform (wall–wall sharing ignored); hovering a vertex row emits new **`node:link-hover {zoneId,nodeId|null,sourceId}`** → **SegmentHighlighter** (extended: `_meshes[]`, `_wallBox` helper) overlays a node marker sphere + boxes over every linked wall/floor/platform, skipping the hover's source entity; cleared on leave/unmount/deselect/removal. Verified in-browser end-to-end: fill-run floor's vertex rows all chip LINKED; editing V1.x 30→28 moved the node, the shared wall run mesh (minX 29.85→27.79), AND the floor mesh, with ONE "move floor vertex" undo reverting all three (0 orphan meshes); rect SIZE W 6→8 updated all 4 nodes (centroid preserved, still axis-aligned, one undo); hover produced exactly marker+2 wall boxes and cleared to 0; legacy points edit + undo clean; user's coincident-but-unshared east wall correctly reports unlinked. **Known follow-up (explicitly deferred):** `removeNode` still guards walls only — deleting a wall can orphan floor/platform-referenced nodes.
 - v4.7.0 — **Phase 20 — Overlay decals (DecalGeometry stamping).** First half of the decals feature (`aplans/decals-plan.md`; Phase 21 = surface-effect shader decals). New entity type **`DecalDef`** (`zone.decals?: DecalDef[]` — optional array, no migration): a **free-floating world-space anchor + unit normal + roll°/size/opacity/textureId** with **no target entity id** — wall runs merge/split and their meshes are disposed wholesale on rebuild, so decals re-project at build time onto whatever static geometry (wall/floor/platform/stair; `ghostPick` excluded) their projector box intersects; zero clipped triangles ⇒ def kept, mesh skipped. New **`src/world/decals/DecalBuilder.ts`** (pure fns: `decalOrientation` = quaternion aligning +Z to the normal × roll, `decalProjectorBox` = world AABB of the oriented projector, `buildOverlayDecalMesh` = `three/addons DecalGeometry` per intersecting target merged via `mergeGeometries` — the multi-target merge lets one stamp wrap a mitered corner between runs or bridge a wall/floor junction; output is world-space at identity). Overlay material: `MeshStandardMaterial { map (SRGB), transparent, depthWrite:false, polygonOffset -4/-4 (beats the wall-liner −1/−1), castShadow:false, renderOrder 10+i }`, `_ownsMaterial:true` — inherits fog/ACES automatically; optional manifest `maps.normal/roughness` load `NoColorSpace`. **ZoneManager owns the lifecycle** (mirrors `_volumeMeshes`): `_decalMeshes` map, `_buildDecals` in `loadZone` AFTER the stair-CSG second pass, `decal:added/updated/removed` handlers, and **rebuild survival** — `wall/floor/platform/stair:rebuilt` mark dirty any decal whose projector AABB intersects the rebuilt entity's new bounds OR whose `userData._decalTargets` (entity ids recorded at projection time) contains it (catches "target moved away" stale meshes); dirty set coalesced per microtask and regens run through the existing `_wallOpChain` so they never see a half-rebuilt run; emits new `decal:rebuilt` (consumed by SelectionManager re-tint + GizmoManager re-attach). Assets: **`public/assets/decals/manifest.json`** (`DecalTexDef { id,label,category?,path,maps?,kinds:["overlay"|"surface"] }`) + 9 procedurally-generated CC0-equivalent starter PNGs (cracks/bullet holes/paint/arrow/exit sign + stage-B weathering); `AssetManager.initDecals/getDecalDef/getDecalList` (textures through the existing `loadTexture` cache so `setQuality` disposal covers them). Tool: **`src/editor/DecalTool.ts`** (TriggerVolumeTool template) — armed by the new **`src/ui/DecalBrowser.tsx`** left panel (`LeftPanelId "decals"`, Toolbar "Decal"/K, auto-opens) via `decaltool:texture`; does its **own raycast** for hit point + world face normal; ghost = `PlaneGeometry` quad (real DecalGeometry only on commit — per-mousemove regen would clip a merged run's full index buffer); **scroll = size** (0.1–8 m), **shift+scroll = rotate**, `[`/`]` ±15°, click stamps in a `"place decal"` transaction and stays armed; Escape disarms (re-emits `decaltool:texture null` so the picker highlight clears). **Wheel gating:** new `camera:zoom-lock {source,locked}` — `EditorCamera._handleWheel` early-returns while any source holds a lock (Set, `gizmo:suspend` idiom); DecalTool locks only while its ghost is on a surface. `input:wheel` payload gained `shift/ctrl/alt/meta`. Selection: `"decal"` inserted in `PRIORITY` **above** platform/wall/floor (decals are coplanar with them — priority must break the raycast distance tie); `_getDataRecord` decal case; emissive tint works as-is. Panel: custom **`DecalView`** (texture-swap mini grid, position/size/rotation/opacity, Delete). Gizmo: **translate-only** (roll-around-normal maps badly to the world-Y ring; not in the KeyR/KeyS lists), pivot at anchor + normal·0.3, commit case + multi-select `_refDisplayPos`/`_translateRef` cases, re-attach on `decal:rebuilt`. Undo: `"decal"` `ChangeKind` + `_zoneArr`/`_emitChange` cases — place/move/edit/delete all one-step undoable; serialization automatic. Verified in-browser end-to-end (real toolbar/tile/canvas clicks): ghost orients to the brick wall, wheel resizes without zooming (radius pinned, unlocks over sky), stamp = def + 10-tri conforming mesh, undo/redo (redo = cold `loadZone` rebuild), node-drag rebuild re-projects onto the moved face (new uuid, no orphans), coplanar click selects the decal over the wall, panel width edit rebuilds (2 m at 30° roll ⇒ 2.48 m span, exact), Delete clears def+mesh; zero console errors. **Known caveat:** default projector depth (`max(w,h)·0.5`) can exceed a thin wall's 0.2 m thickness ⇒ faint mirrored bleed on the back face (classic DecalGeometry artifact) — set the per-decal `depth` field smaller when it matters.
 - v4.8.0 — **Phase 21 — Surface-effect decals (in-shader projection / triplanar).** Second half of the decals feature: `kind: "surface"` decals (water damage, stains, moss, grime) sampled inside the target surface's **own** `MeshStandardMaterial` — the repo's first `onBeforeCompile`, isolated in new **`src/world/decals/surfaceDecals.ts`**. No extra mesh, **zero extra draw calls**; the base normal map is untouched so lighting has no seam at the decal edge. Design: `makeSurfaceDecalMaterial(base, slots)` **clones** the base (never mutates the shared AssetManager cache instance; the clone is assigned with `_ownsMaterial: true` so existing disposal owns it) and injects: vertex → `vSdWorldPos/vSdWorldNormal` after `<worldpos_vertex>` (from `transformed`/`objectNormal` — no dependence on the guarded `worldPosition`); fragment after `<map_fragment>` → **fixed unrolled samplers** `uSdTex0..3` with `MAX_SURFACE_DECALS = 4` per mesh (GLSL ES 3.0 forbids dynamically-indexed sampler arrays; excess decals on one mesh drop with a console.warn; an atlas is the documented escape hatch), planar path = `uSdProj[i]` (world→normalized projector) UV + smoothstep edge fade + **normal-dot fade** (stops painting a thick wall's far side) + z-band clamp, **triplanar path** (per-slot flag) = three world-axis projections centered on `uSdAnchor[i]` weighted `|N|⁴` with radial falloff — ignores projector direction, so a stain wraps a mitered corner / wall-top edge with no seam (verified visually); fragment after `<roughnessmap_fragment>` → `roughnessFactor = mix(roughnessFactor, uSdParams[i].z, alphaᵢ)` (wet look; `DecalDef.roughnessMod`, blank = off). Uniforms are seeded pre-compile on `mat.userData._sdUniforms` and merged in the hook, so `updateSurfaceDecalUniforms` gives **uniform-only updates** — moving/resizing/toggling a stain keeps `material.uuid` (verified); `customProgramCacheKey = "surfdecals"` shares one program per base shader config. **ZoneManager**: `_surfacePatches: Map<zoneId, Map<Mesh, {original, ownedBefore, decalIds}>>` + `_refreshSurfaceDecals(zoneId)` — a reconcile pass (desired per-mesh slot lists from projector-AABB ∩ mesh-AABB → patch new / uniform-update existing / **unpatch + restore the shared material + dispose the clone when the last stain leaves**, `ownedBefore` restored) called from `loadZone`, from `_rebuildDecal` on every decal change, and via the dirty queue after target rebuilds (patch re-lands on the NEW run mesh — verified). **Bug found & fixed in verification:** `decal:removed` went straight to `_removeDecalMesh` (overlay-only) and skipped the surface reconcile — the wall stayed patched after delete; removal now routes through `_rebuildDecal` like add/update. **Selection** (no mesh to raycast): `DecalTool` picks surface decals analytically (ray vs projector rectangle, occluder check, TriggerVolumeTool pattern — runs after SelectionManager so its emit overrides the wall pick; gated off while armed-stamping) and shows a cyan `LineLoop` rectangle while selected, synced on `decal:updated`, cleared on deselect/remove/dispose. UI: DecalBrowser **Surface** kind enabled (Weather tiles: leak stain / moss / grime); `DecalView` gains **TRIPLANAR** checkbox + **WET ROUGHNESS** input for surface kind. Verified in-browser (real toolbar/tile/canvas clicks + data-layer): stamp patches exactly the intersected run mesh (`uSdCount 1`, no decal mesh), moss renders blended into the brick, triplanar wraps the wall-top edge seamlessly, move/resize/triplanar = same `material.uuid`, delete restores the shared material (`_ownsMaterial` false, 0 patches) and undo re-patches, node-move rebuild re-patches the new mesh, zero console errors. Caveats: floor-dimming's material swap temporarily hides a patch on dimmed levels (cosmetic, editor-only); over-cap warning is console-only.
+- v4.9.0 — **Phase 22 — Parametric shape primitives (cylinder/cone, wedge/ramp, flexible box).** Unreal-style placeable solids as a new top-level entity type **`ShapeDef`** (`zone.shapes?: ShapeDef[]` — optional array, no migration; flat optional per-kind scalars because `updateShape` shallow-merges): `kind: "cylinder" | "wedge" | "box"` + cylinder `radiusTop/radiusBottom/height/radialSegments 3–64` (radiusTop 0 = cone), wedge `width/depth/heightLow/heightHigh` (heightLow 0 = true ramp), box `width/depth/height/taperX/taperZ/shearX/shearZ`. **The local-space contract (the Phase-12 brush prerequisite):** geometry is ALWAYS generated in local space (XZ-centered, base at y=0) by new **`src/builders/ShapeBuilder.ts`**; `position`/`rotation` (Euler° XYZ) are applied as `mesh.position`/`mesh.rotation` and mirrored onto the collider — never baked into vertices, so mesh and physics structurally cannot drift (the world-space platform bug class is impossible), and a future vertex-editable brush extends the same type by superseding kind params with a local vertex list. Defaults + clamping live in exported `resolveShapeParams` (every consumer resolves through it, so sparse defs never crash). **Geometry:** hand-built with explicit per-corner normals/UVs — cylinder sides use a **cylindrical metric unwrap** (u = arc-length meters ÷ tileScale per ring, so cones keep density; v = slant length) with **flat per-face normals ≤ `FLAT_SHADE_MAX_SEGMENTS` (11)** for crisp tri-prism/hex-pillar looks and analytic smooth frustum normals above; wedge/box faces go through `pushQuadMetric` (face normal from the corner cross product, in-plane metric UV projection) so slanted/tapered faces tile at the same physical density as walls (verified visually: brick courses on a tapered obelisk match the wall behind). **Physics:** `ColliderBuilder.registerShape` = `RAPIER.ColliderDesc.convexHull(localHullPoints)` + def translation/rotation — all three kinds are convex by construction so the hull is exact (verified with rays: cylinder top y=2.000, side x=3.000, 4-seg prism rotated 45° hits at exactly 2+1/√2); null-tolerant on degenerate hulls (mesh renders, no collision, warn). Walkability rides the KCC 45° max-climb: a 31° ramp climbs, a 50° wedge blocks (both verified in preview). **ZoneManager:** `shapeEntries`/`shapesGroup` + add/rebuild/remove with the platform cancellation-token pattern (`_shapeBuildTokens` — 8 rapid edits leave exactly one mesh), `shape:rebuilt` emit, `_setEntityHidden` + `_applyGroupVisibility` + floor-dimming arms, and a **runtime `move_object` fast-path**: a script move on a shape sets `mesh.position` + `collider.setTranslation` directly (no rebuild — the local-space payoff), WorldState untouched by design. **Tool:** new `src/editor/ShapeTool.ts`, one class behind three ToolIds under a single toolbar **Shape** button (variants popover, like floor/platform): cylinder = click center → move = radius → click commits; wedge/box = two-click footprint (high edge on −Z, rotate after); ghost = the real `buildLocalGeometry` in translucent blue (true silhouette), base elevation = first click's `surfacePos.y`; Escape/RMB cancels. **Selection/gizmo/panel:** `"shape"` in `PRIORITY` between decal and platform; translate + rotate gizmo (no scale — size lives in params; rotate commits absolute yaw via `_pivotYaw()` **preserving panel-set X/Z tilt**, verified committing −107.58° past the ±90° Euler gimbal trap); `ShapeGeoView` (position/rotation XYZ + kind-specific params via `SHAPE_PARAM_FIELDS`, transform fields value-resync after gizmo commits) + single-material `ShapeMatView`. **Integrations:** copy/paste/duplicate (`COPYABLE` + `shape_` id prefix + offset clone), groups (`groupMembers COLLECTIONS`, membership bumps, group hide/show), ScriptEngine `_resolveTargets` (group fan-out → despawn works via `_setEntityHidden`, restored on preview:stop) + `_resolveObjectPose` (store_position), undo (`"shape"` `ChangeKind`; journal replay generic), serialization automatic, `__test.spawnShape` dev helper. `change_material` remains object-only (unwired for shapes, like platforms). Every milestone verified in-browser through the real UI paths (toolbar clicks, canvas placement clicks, gizmo drags, panel React inputs, preview walks).
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -115,12 +116,12 @@ All shared types live in `src/types.ts` and are imported across every module. Ne
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone";
+export type ToolId = "select" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "shape-cylinder" | "shape-wedge" | "shape-box";  // (+ spawnpoint / trigger-volume / decal — see src/types.ts)
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "shape";  // (+ spawn / trigger-volume / checkpoint / decal — see src/types.ts)
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -1140,6 +1141,13 @@ The canonical save/load format. All builders read exclusively from this structur
 
 The in-memory mirror of the JSON. All tools write to WorldState; WorldState emits change events; builders/managers listen and rebuild geometry accordingly. Nothing writes directly to Three.js objects.
 
+> **v4.9.0:** `addShape` / `updateShape` / `removeShape` (`zone.shapes ??= []` — optional
+> array, old saves need no migration; `_zoneArr` normalizes like `triggerVolumes`/`decals`).
+> `updateShape` is a shallow `Object.assign` merge — ShapeDef's per-kind params are flat
+> scalars for exactly this reason. Emits `shape:added/updated/removed`; `"shape"` is a
+> `ChangeKind`, so undo/redo replay is generic. `removeShape` does NOT prune nodes
+> (shapes are not node-backed — cloned from the stair trio, not the platform trio).
+
 ```js
 class WorldState {
   constructor(bus) {
@@ -1300,11 +1308,13 @@ When a click ray intersects multiple meshes, priority order (highest first):
 1. `opening` / `object` / `checkpoint` / `spawn` — props, markers, openings
 2. `decal` — projected decal meshes (v4.7.0; **above** platform/wall/floor because a decal
    is coplanar with its surface — priority, not raycast distance, must break the tie)
-3. `platform` — raised floor slabs
-4. `wall` — wall segments
-5. `floor` — floor planes
-6. `terrain` — never selected directly (only for placement snapping)
-7. `trigger` — never selectable
+3. `shape` — parametric solids (v4.9.0; shapes typically sit ON platforms/floors, so they
+   win overlapping picks against them)
+4. `platform` — raised floor slabs
+5. `wall` — wall segments
+6. `floor` — floor planes
+7. `terrain` — never selected directly (only for placement snapping)
+8. `trigger` — never selectable
 
 **Ghost fallback (v4.5.0):** hidden-wall ghost meshes (`userData.ghostPick`) are stripped
 from the hit list whenever any non-ghost hit exists — a ghost never occludes real geometry.
@@ -1521,6 +1531,13 @@ class SelectionManager {
 ```
 
 ### Transform Gizmos (Phase 7)
+
+> **v4.9.0:** `shape` joins the gizmo types — translate + rotate (KeyR allow-list), **no
+> scale** (size lives in the shape's params; gizmo scale would fight them or bake scale,
+> which the brush contract forbids). Rotate commits absolute yaw via the gimbal-safe
+> `_pivotYaw()` while **preserving panel-set rotation.x/z**; pivot sits just above the
+> shape's top (`resolveShapeParams` height). Re-attach on `shape:rebuilt`; group
+> multi-select translate has a plain position-shift arm.
 
 Use `THREE.TransformControls` from `three/addons/controls/TransformControls.js`:
 
@@ -2064,6 +2081,45 @@ class ObjectPlacer {
 
 ---
 
+## ShapeBuilder.ts (v4.9.0)
+
+Parametric shape primitives — cylinder/cone, wedge/ramp, flexible box (`ShapeDef.kind`).
+
+```ts
+// src/builders/ShapeBuilder.ts
+export function resolveShapeParams(def: ShapeDef): ResolvedShapeParams;  // defaults + clamps
+export const FLAT_SHADE_MAX_SEGMENTS = 11;  // ≤ 11 radial segments → flat side normals
+
+export class ShapeBuilder {
+  static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry; // mesh + tool ghost
+  static localHullPoints(def: ShapeDef): Float32Array;   // convex-hull cloud for the collider
+  static async build(def: ShapeDef, zoneId: string): Promise<ShapeBuildOutput>; // { mesh, collider }
+}
+```
+
+**The local-space contract** (prerequisite for the future Phase-12 vertex-editable brush):
+geometry is ALWAYS generated in local space — footprint centered on the XZ origin, base at
+local y = 0 (`position.y` = bottom, the platform convention). `position`/`rotation`
+(Euler°, XYZ) are applied as `mesh.position`/`mesh.rotation` and mirrored onto the Rapier
+collider (`registerShape`). They are **never baked into vertices** — moving updates
+`position` only, rotating updates `rotation` only, so mesh and collider cannot drift
+(unlike world-space-baked platforms/floors/walls).
+
+- One mesh per shape, `selectable: true`, single material via the standard
+  `getMaterialWithOverrides → getMaterial → getDefaultMaterial` chain; `applyUVOffset`
+  honored.
+- **Cylinder**: rings hand-built (not `THREE.CylinderGeometry` — its side UVs are
+  parametric, not metric). Side UVs = cylindrical metric unwrap: `u = arcLenMeters /
+  tileScale` per ring (each ring uses its own circumference, so cones keep world density),
+  `v = slantLen / tileScale`. `radiusTop: 0` → cone (apex triangles, no top cap). Flat
+  per-face side normals at ≤ `FLAT_SHADE_MAX_SEGMENTS` (crisp hex pillar / tri prism);
+  analytic smooth frustum normals `normalize(h·cosθ, rB−rT, h·sinθ)` above.
+- **Wedge / flexible box**: planar faces via `pushQuadMetric` — face normal from the
+  corner cross product, in-plane metric UVs (u along the a→b edge, v along normal×u,
+  meters ÷ tileScale) so slanted tops and tapered/sheared sides tile at wall density.
+  Wedge with `heightLow: 0` degenerates the front face away (side triangles). Box
+  taper/shear keeps all four side faces planar (top/bottom edges stay axis-parallel).
+
 ## ZoneManager.ts
 
 ### Internal Entry Types
@@ -2079,6 +2135,11 @@ interface RunEntry {
 interface PlatformEntry {
   meshes:   THREE.Mesh[];
   collider: RAPIER.Collider;
+}
+
+interface ShapeEntry {           // v4.9.0 — parametric shapes
+  mesh:     THREE.Mesh;          // one mesh per shape, local-space geometry + transform
+  collider: RAPIER.Collider | null;  // convex hull; removed + re-registered per rebuild
 }
 
 interface StairEntry {
@@ -2314,6 +2375,28 @@ SET_TOP:
     Return to IDLE
 
   On input:keydown Escape: return to IDLE
+```
+
+### ShapeTool.ts (v4.9.0)
+
+```
+One class behind three ToolIds (shape-cylinder / shape-wedge / shape-box) — a single
+toolbar "Shape" button with a variants popover (floor/platform pattern). Kind derives
+from the active ToolId on tool:select.
+
+States: IDLE → PLACING → IDLE
+
+cylinder:  click = CENTER → mousemove = radius (snapped, min 0.25) → click commits
+           radiusTop = radiusBottom = r, height 2, radialSegments 16
+wedge/box: two-click footprint rect (PlatformTool pattern, GRID 0.5, MIN_SIZE 0.5)
+           wedge: heightLow 0 → heightHigh 1.5, high edge on −Z (rotate after placing)
+           box:   height 2, taper 1, shear 0 (tune in the panel)
+
+Base elevation = first click's surfacePos.y (sit ON whatever was clicked); falls back
+to the active level's floor top. Ghost preview = the REAL ShapeBuilder.buildLocalGeometry
+in translucent blue (true cone/wedge silhouette), regenerated per mousemove with
+dispose-before-replace. Commit inside world.transaction("add shape") + tool:placed
+(auto-select via SelectionManager). Escape / RMB cancels.
 ```
 
 ### ObjectTool.ts
@@ -6380,6 +6463,8 @@ src/types.ts                  ← bus event selection:set
 
 - **Brush primitive (BSP-style editable solid)** — A freeform convex solid with direct vertex/edge/face editing. Move top and bottom vertices independently to create diagonals and wedges. Split faces and extrude. Distinct from platforms which are parametric. Closer to UE5 Modeling Mode or Quake-style brush editing.
 
+  > **v4.9.0 status:** the foundation shipped as Phase 22's `ShapeDef` (`src/builders/ShapeBuilder.ts`) — a `shape` entity type that already satisfies the local-space requirement below (local vertices + separate `position`/`rotation`, convex-hull collider from the local cloud). The brush phase extends `ShapeDef` with an optional local `mesh: { vertices, faces }` that supersedes the kind params ("Convert to Brush" = bake the kind generator's output once), reusing the same events/selection/gizmo/collider wiring unchanged. See `plans/phase-22-parametric-shapes.md` §7 for the sketch.
+
   **Critical architecture requirement:** Brush vertices must be stored in **local space** relative to the brush's own origin, not in world space. The brush has a `position`, `rotation`, and `scale` as a separate transform. Moving the brush updates `position` only — vertices don't change. Rotating updates `rotation` only — vertices don't change. Only vertex editing touches vertex data. `BrushBuilder` always builds geometry in local space, then Three.js applies the mesh transform on top. Rapier collider is rebuilt from final world-space positions (local vertices × transform) on any change.
 
   This is the correct architecture to avoid the rotation/move/corner-snapping bugs that affect the current platform and wall tools — those bugs happen because world-space coordinate storage means the mesh transform and the data get out of sync. Local-space storage keeps them permanently in sync. **Do not repeat the world-space storage pattern from platforms/floors/walls.**
@@ -6466,6 +6551,14 @@ export const physicsWorld = new PhysicsWorld();
 > **v4.4.0:** also `registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): Collider[]`
 > — per-object colliders (cuboid/ball/capsule) placed via `colliderWorldTransform` from
 > `src/physics/attachedColliderMath.ts`; `isSensor` entries use `createSensorCollider`.
+
+> **v4.9.0:** also `registerShape(shape: ShapeDef, localPoints: Float32Array): Collider | null`
+> — the repo's first non-analytic collider: `RAPIER.ColliderDesc.convexHull()` of the
+> LOCAL-space vertex cloud from `ShapeBuilder.localHullPoints`, with the def's
+> `position`/`rotation` set on the collider (same transform as the mesh — the two cannot
+> drift). All shape kinds are convex by construction so the hull is exact. Returns null
+> (mesh renders, no collision, console.warn) only on a degenerate cloud — params are
+> clamped upstream by `resolveShapeParams`.
 
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";

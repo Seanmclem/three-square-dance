@@ -534,6 +534,7 @@ entities). All synchronous — safe to call from `javascript_tool`.
 __world.addGroup({ id: "grp_a", name: "A" });
 __test.spawnObject({ id: "test_obj", x: 0, z: -3, groupIds: ["grp_a"] });
 __test.spawnPlatform({ id: "test_plat", x: 3 });
+__test.spawnShape({ id: "test_shape", kind: "cylinder", x: 5 });  // "cylinder" | "wedge" | "box"
 
 // Fire script actions through the REAL dispatch (incl. _resolveTargets group expansion),
 // no preview needed:

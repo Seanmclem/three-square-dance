@@ -89,3 +89,15 @@ select something else, and are never saved.
 - Clicking an object selects it even through gaps in the model (between an
   animal's legs, under a table top) — the click counts anywhere inside the
   object's bounding box, unless something else is genuinely in front (v4.4.2).
+
+## 6. Shape primitives (v4.9.0)
+
+Shapes (cylinder / wedge / box from the **Shape** toolbar button) get their collider
+automatically — an exact **convex hull** of the shape's geometry, mirrored to its
+position/rotation. Nothing to configure:
+
+- Any radial segment count collides exactly (a 3-seg prism is a triangle, not a cylinder).
+- **Ramps/wedges**: the player can walk up slopes up to the character's 45° max-climb
+  angle. Steeper wedges act as walls — that's the physics, not a bug. `atan(rise/depth)`:
+  1.5 m over 2.5 m ≈ 31° (walkable), 3 m over 2.5 m ≈ 50° (blocks).
+- Script `despawn_object` disables the collider too; `move_object` moves it (runtime-only).
