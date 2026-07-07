@@ -12,7 +12,7 @@ import type { DecalDef, DecalKind, ToolId, ScreenPos } from "@/types";
 // shift+scroll = rotate, [ / ] = rotate ±15°, click = stamp (stays armed),
 // Escape = disarm. Locks EditorCamera wheel-zoom while the ghost is on a surface.
 
-const TARGET_TYPES = new Set(["wall", "floor", "platform", "stair"]);
+const TARGET_TYPES = new Set(["wall", "floor", "platform", "stair", "shape"]);
 const ZOOM_LOCK_SOURCE = "decal-tool";
 const MIN_SIZE = 0.1, MAX_SIZE = 8;
 

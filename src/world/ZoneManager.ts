@@ -360,6 +360,7 @@ export class ZoneManager {
       this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => this._markDecalsDirty(zoneId, floorId)),
       this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._markDecalsDirty(zoneId, platformId)),
       this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => this._markDecalsDirty(zoneId, stairId)),
+      this._bus.on("shape:rebuilt",    ({ zoneId, shapeId })    => this._markDecalsDirty(zoneId, shapeId)),
       this._bus.on("group:visibility", ({ groupId, visible }) => {
         if (visible) this._hiddenGroups.delete(groupId);
         else this._hiddenGroups.add(groupId);
@@ -1428,7 +1429,7 @@ export class ZoneManager {
       if (!(child instanceof THREE.Mesh)) return;
       const u = child.userData as { editorType?: string; selectable?: boolean; ghostPick?: boolean };
       if (!u.selectable || u.ghostPick) return;
-      if (u.editorType === "wall" || u.editorType === "floor" || u.editorType === "platform" || u.editorType === "stair")
+      if (u.editorType === "wall" || u.editorType === "floor" || u.editorType === "platform" || u.editorType === "stair" || u.editorType === "shape")
         targets.push(child);
     });
     return targets;
