@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
 import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
-// is the active tool.
+// is the active tool. For placement groups (everything but Select), clicking the button
+// only OPENS the popover — no tool is armed until a variant is explicitly picked, and
+// Esc / clicking elsewhere closes the popover without arming anything.
 interface ToolDef { id: ToolId; label: string; shortcut: string; variants?: { id: ToolId; label: string }[] }
 
 const TOOLS: ToolDef[] = [
@@ -37,11 +39,30 @@ interface ToolbarProps {
 
 export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, hasGameSave, isPreview, spawnMode = "initial", onSpawnMode }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
+  // Placement-variant popover opened by its group button (no tool armed yet).
+  const [openMenu, setOpenMenu] = useState<ToolId | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   // Re-evaluated whenever the menu opens (opening flips showGameMenu → re-render),
   // so it reflects a save written since the last play session.
   const canContinue = showGameMenu && (hasGameSave?.() ?? false);
+
+  // Esc or a click outside the toolbar closes an un-armed variant popover.
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpenMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenMenu(null); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openMenu]);
+
   return (
-    <div style={{
+    <div ref={rootRef} style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
       background: "rgba(28,28,28,0.95)",
       borderRight: "1px solid rgba(255,255,255,0.08)",
@@ -52,31 +73,40 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
       {TOOLS.map(tool => {
         // For a variant group, the active variant (if any) drives the icon and re-click target.
         const activeVariantId = tool.variants?.find(v => v.id === activeTool)?.id;
+        // Placement groups arm nothing on button click — the popover picks the tool.
+        const menuFirst = !!tool.variants && tool.id !== "select";
+        const menuOpen  = openMenu === tool.id;
         const active = activeTool === tool.id
           || activeVariantId !== undefined
           || (tool.id === "zone"            && openPanel === "groups")
           || (tool.id === "object"          && openPanel === "assets")
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
+        const highlight = active || menuOpen;
         const Icon = TOOL_ICONS[activeVariantId ?? tool.id];
-        const color = active ? "#80aaff" : "#7a7a7a";
+        const color = highlight ? "#80aaff" : "#7a7a7a";
         const showSpawnMenu   = tool.id === "spawnpoint" && activeTool === "spawnpoint";
-        const showVariantMenu = !!tool.variants && active;
+        const showVariantMenu = !!tool.variants && (menuFirst ? (menuOpen || activeVariantId !== undefined) : active);
         return (
           <div key={tool.id} style={{ position: "relative", display: "flex" }}>
           <button
             title={tool.label}
-            // Re-clicking an active group keeps its current variant; otherwise select the primary.
-            onClick={() => onToolSelect(activeVariantId ?? tool.id)}
+            // Menu-first groups toggle their popover; Select re-clicks keep the current
+            // variant; single tools arm directly (and dismiss any open popover).
+            onClick={() => {
+              if (menuFirst) { setOpenMenu(menuOpen ? null : tool.id); return; }
+              setOpenMenu(null);
+              onToolSelect(activeVariantId ?? tool.id);
+            }}
             style={{
               width: 48, height: 48, border: "none", cursor: "pointer",
               borderRadius: 8, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center", gap: 2,
-              background: active ? "rgba(80,140,255,0.2)" : "transparent",
-              outline: active ? "1px solid rgba(80,140,255,0.45)" : "none",
+              background: highlight ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: highlight ? "1px solid rgba(80,140,255,0.45)" : "none",
               transition: "all 0.15s",
             }}
-            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
-            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+            onMouseEnter={e => { if (!highlight) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = "transparent"; }}
           >
             <Icon color={color} />
             <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
@@ -126,7 +156,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
                 return (
                   <button
                     key={v.id}
-                    onClick={() => onToolSelect(v.id)}
+                    onClick={() => { setOpenMenu(null); onToolSelect(v.id); }}
                     style={{
                       padding: "6px 10px", textAlign: "left", fontSize: 12, fontFamily: "monospace",
                       cursor: "pointer", border: "none", borderRadius: 4, whiteSpace: "nowrap",
@@ -141,7 +171,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
                 );
               })}
               <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
-                {activeTool.startsWith("poly-") ? "Click to place vertices; Enter to close." : "Click-drag to paint a region."}
+                {menuFirst && activeVariantId === undefined
+                  ? "Pick a type to place — Esc closes."
+                  : activeTool.startsWith("poly-") ? "Click to place vertices; Enter to close." : "Click-drag to paint a region."}
               </div>
             </div>
           )}

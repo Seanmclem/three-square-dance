@@ -9,6 +9,7 @@ import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { SelectionManager } from "@/editor/SelectionManager";
+import { isSelectMode } from "@/editor/selectMode";
 import { FloorTool } from "@/editor/FloorTool";
 import { PolygonFloorTool } from "@/editor/PolygonFloorTool";
 import { WallTool } from "@/editor/WallTool";
@@ -976,6 +977,12 @@ export default function App() {
         }
         const tag = (e.target as HTMLElement).tagName;
         if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          // Any armed placement tool bails back to Select (tools cancel their own
+          // in-progress ghost via the bus keydown; this exits the mode entirely).
+          if (!isSelectMode(activeTool)) {
+            setActiveTool('select');
+            busRef.current.emit('tool:select', { tool: 'select' });
+          }
           busRef.current.emit('object:deselected', {});
         }
         return;
@@ -1012,7 +1019,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave, handleUndo, handleRedo, handleCopy, handlePaste, handleDuplicate]);
+  }, [handleSave, handleUndo, handleRedo, handleCopy, handlePaste, handleDuplicate, activeTool]);
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
