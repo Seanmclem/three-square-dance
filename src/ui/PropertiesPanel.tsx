@@ -2356,8 +2356,8 @@ const COLLIDER_BTN = (active = false): React.CSSProperties => ({
 /** Re-derive size fields when a collider's shape changes so it stays roughly the same volume. */
 function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): AttachedCollider {
   if (shape === c.shape) return c;
-  // Leaving a hull: its size is already the points' AABB, so convert like a box.
-  const from = c.shape === "hull" ? "box" : c.shape;
+  // Leaving a hull/trimesh: its size is already the points' AABB, so convert like a box.
+  const from = (c.shape === "hull" || c.shape === "trimesh") ? "box" : c.shape;
   const s = c.size;
   let size: Vec3;
   if (shape === "box") {
@@ -2373,7 +2373,7 @@ function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): Att
       ? { x: Math.max(s.x, s.z) / 2, y: s.y, z: 0 }    // box → capsule r = max(w,d)/2, h = height
       : { x: s.x, y: s.x * 2, z: 0 };                  // sphere → capsule r, h = 2r
   }
-  return { ...c, shape, size, points: undefined };
+  return { ...c, shape, size, points: undefined, indices: undefined };
 }
 
 /** Switch a collider to an auto-fit hull: model-space points, offset reset, AABB size for display. */
@@ -2389,6 +2389,7 @@ function hullFromPoints(c: AttachedCollider, points: Vec3[]): AttachedCollider {
     offset: { x: 0, y: 0, z: 0 },
     size: { x: +(maxX - minX).toFixed(4), y: +(maxY - minY).toFixed(4), z: +(maxZ - minZ).toFixed(4) },
     rotationY: undefined,
+    indices: undefined,
   };
 }
 
@@ -2613,14 +2614,16 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               {numField(c, "oz", "Z", "#6b8aff")}
             </div>
           </div>
-          {c.shape === "hull" ? (
+          {c.shape === "hull" || c.shape === "trimesh" ? (
             <div>
-              <div style={LABEL}>HULL</div>
+              <div style={LABEL}>{c.shape === "hull" ? "HULL" : "MESH"}</div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span style={{ color: "#9090a0", fontSize: 10 }}>
-                  {c.points?.length ?? 0} points · auto-fit from model
+                  {c.shape === "hull"
+                    ? `${c.points?.length ?? 0} points · auto-fit from model`
+                    : `${Math.floor((c.indices?.length ?? 0) / 3)} tris · exact from bake`}
                 </span>
-                {hullPointsFor && (
+                {c.shape === "hull" && hullPointsFor && (
                   <button
                     style={{ ...COLLIDER_BTN(false), flex: "none", padding: "3px 10px" }}
                     title="Recompute the hull from the model's current geometry"

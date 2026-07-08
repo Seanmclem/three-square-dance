@@ -93,10 +93,12 @@ cost about the same as boxes at runtime, so use them freely.
 - Flat/degenerate models can't produce a hull — the button just no-ops (and physics
   falls back to a box if points ever degenerate).
 
-**Baked assets** (Bake → GLB) now ship one hull per source shape instead of boxes —
-tilted shapes collide exactly. Note a concave *face-brush* source still contributes
-its convex hull (its alcoves fill); bake concave structures from multiple convex
-shapes if the cavity needs collision.
+**Baked assets** (Bake → GLB) ship exact colliders per source shape (v4.19.0):
+convex **hulls** for parametric shapes/cloud brushes (tilted shapes collide
+exactly) and **trimeshes** for face-brushes — carved alcoves and steps keep their
+concavity, byte-identical to the live source's collision. Trimesh cards show
+"N tris · exact from bake" in the Colliders screen (display-only; the usual
+hollow-surface caveats apply — nothing spawned *inside* one gets pushed out).
 
 ## 5. Tips & gotchas
 

@@ -174,6 +174,28 @@ export class ColliderBuilder {
   }
 
   private static _attachedDesc(obj: WorldObject, c: AttachedCollider): RAPIER.ColliderDesc {
+    if (c.shape === "trimesh" && c.points?.length && c.indices?.length) {
+      // Exact concave surface (baked face-brushes, Phase 27b). Same frame math as
+      // the hull arm; FIX_INTERNAL_EDGES per registerShapeTrimesh.
+      const s = obj.scale;
+      const flat = new Float32Array(c.points.length * 3);
+      c.points.forEach((p, i) => {
+        flat[i * 3]     = (p.x + c.offset.x) * s.x;
+        flat[i * 3 + 1] = (p.y + c.offset.y) * s.y;
+        flat[i * 3 + 2] = (p.z + c.offset.z) * s.z;
+      });
+      try {
+        const tm = RAPIER.ColliderDesc.trimesh(flat, new Uint32Array(c.indices), RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES);
+        const D2R = Math.PI / 180;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          obj.rotation.x * D2R, obj.rotation.y * D2R, obj.rotation.z * D2R));
+        return tm
+          .setTranslation(obj.position.x, obj.position.y, obj.position.z)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+      } catch {
+        console.warn(`[ColliderBuilder] trimesh failed on ${obj.id} — falling back to box`);
+      }
+    }
     if (c.shape === "hull" && c.points?.length) {
       // Points are object-local pre-scale; scale componentwise THEN rotate with the
       // object (mesh TRS order: world = R·(S·p) + T) — exact under non-uniform scale.
@@ -195,9 +217,9 @@ export class ColliderBuilder {
       }
       console.warn(`[ColliderBuilder] degenerate hull points on ${obj.id} — falling back to box`);
     }
-    // Box/sphere/capsule — plus the degenerate-hull fallback, which reads as a box
-    // of the stored points-AABB size through the same transform math.
-    const prim = c.shape === "hull" ? { ...c, shape: "box" as const } : c;
+    // Box/sphere/capsule — plus the degenerate hull/trimesh fallback, which reads
+    // as a box of the stored points-AABB size through the same transform math.
+    const prim = (c.shape === "hull" || c.shape === "trimesh") ? { ...c, shape: "box" as const } : c;
     const { pos, quat, halfExtents } = colliderWorldTransform(obj, prim);
     const desc =
       prim.shape === "sphere"  ? RAPIER.ColliderDesc.ball(halfExtents.x) :

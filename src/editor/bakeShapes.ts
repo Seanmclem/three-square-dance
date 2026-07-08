@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { ShapeBuilder } from "@/builders/ShapeBuilder";
+import { ShapeBuilder, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { WorldState } from "@/world/WorldState";
 import type { AttachedCollider, SelectedRef, ShapeDef, Vec3 } from "@/types";
 
@@ -26,10 +26,10 @@ export interface BakeResult {
  * (bbox centerX/minY/centerZ) so the asset sits on surfaces, then merged by
  * material reference — the draw-call win: one mesh per distinct material.
  *
- * Colliders: one convex hull per source shape (Phase 27) — the shape's own
- * localHullPoints carried through its full rotation into asset space, so tilted
- * shapes collide exactly. Concave face-brushes get their convex hull (their
- * concavities fill — still a strictly better fit than a box).
+ * Colliders: one per source shape, exact in every case (Phase 27/27b) — convex
+ * hulls for parametric/cloud sources (localHullPoints through the full rotation
+ * into asset space), TRIMESH for face-brush sources (parity with their live
+ * collider, so carved alcoves/steps keep their concavity in the baked copy).
  *
  * Material fidelity: albedo/normal/roughness/metalness/AO and the baked metric
  * UVs survive export; displacement maps have no glTF 2.0 slot and are dropped
@@ -94,8 +94,10 @@ export async function bakeShapes(world: WorldState, refs: SelectedRef[]): Promis
     group.add(mesh);
   }
 
-  // 4. Compound colliders (asset-local space, one convex hull per source shape).
-  const colliders = picks.map(({ shape }, i) => shapeHullCollider(shape, pivot, i));
+  // 4. Compound colliders (asset-local space): trimesh for face-brushes (exact
+  // concave, matching their live collider), convex hull for everything else.
+  const colliders = picks.map(({ shape }, i) =>
+    isFaceBrush(shape) ? shapeTrimeshCollider(shape, pivot, i) : shapeHullCollider(shape, pivot, i));
 
   // 5. Export binary glTF. Textures embed; RepeatWrapping samplers preserve tiling.
   const exporter = new GLTFExporter();
@@ -150,6 +152,38 @@ function shapeHullCollider(shape: ShapeDef, pivot: THREE.Vector3, index: number)
     size:     { x: round4(size.x), y: round4(size.y), z: round4(size.z) },
     isSensor: false,
     points,
+  };
+}
+
+/**
+ * One trimesh collider for a face-brush source (Phase 27b): the brush's own
+ * vertices + fan indices (ShapeBuilder.localTrimesh — the same data its live
+ * collider uses) carried through the full rotation into asset space.
+ */
+function shapeTrimeshCollider(shape: ShapeDef, pivot: THREE.Vector3, index: number): AttachedCollider {
+  const tm = ShapeBuilder.localTrimesh(shape);
+  const rot = new THREE.Euler(shape.rotation.x * DEG2RAD, shape.rotation.y * DEG2RAD, shape.rotation.z * DEG2RAD, "XYZ");
+  const base = new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z).sub(pivot);
+
+  const box = new THREE.Box3();
+  const v = new THREE.Vector3();
+  const points: Vec3[] = [];
+  for (let i = 0; i < tm.vertices.length; i += 3) {
+    v.set(tm.vertices[i]!, tm.vertices[i + 1]!, tm.vertices[i + 2]!).applyEuler(rot).add(base);
+    box.expandByPoint(v);
+    points.push({ x: round4(v.x), y: round4(v.y), z: round4(v.z) });
+  }
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  return {
+    id:       `col_bake_${index}`,
+    shape:    "trimesh",
+    offset:   { x: 0, y: 0, z: 0 },
+    size:     { x: round4(size.x), y: round4(size.y), z: round4(size.z) },
+    isSensor: false,
+    points,
+    indices:  [...tm.indices],
   };
 }
 

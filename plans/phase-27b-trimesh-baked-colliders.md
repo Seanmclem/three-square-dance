@@ -1,9 +1,9 @@
 # Phase 27b — Trimesh Attached Colliders (exact concave baked brushes)
 
-> Status: **PLANNED** — target v4.19.0. Follow-up to phase 27: a baked concave
-> face-brush contributed its convex hull (alcoves filled), while its live source
-> collides exactly via trimesh. Close the gap so baked copies collide
-> byte-identically to their sources.
+> Status: **IMPLEMENTED** — shipped as **v4.19.0** (2026-07-08); acceptance record in
+> `test-plans/phase-27b-trimesh-baked-colliders.md`. No plan deviations. Context:
+> phase 27 baked concave face-brushes as convex hulls (alcoves filled) while their
+> live sources collide exactly via trimesh; this closes that gap.
 
 ## Design
 

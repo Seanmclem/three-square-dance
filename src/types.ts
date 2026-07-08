@@ -620,7 +620,7 @@ export interface ObjectProperties {
   triggerEventId: string | null;
 }
 
-export type AttachedColliderShape = "box" | "sphere" | "capsule" | "hull";
+export type AttachedColliderShape = "box" | "sphere" | "capsule" | "hull" | "trimesh";
 
 /** A collider attached to a placed object in the object's local space. */
 export interface AttachedCollider {
@@ -630,10 +630,13 @@ export interface AttachedCollider {
   size:       Vec3;                   // box: full extents; sphere: x = radius; capsule: x = radius, y = full height; hull: points AABB (display only)
   rotationY?: number;                 // deg, local yaw (box/capsule; ignored for sphere/hull)
   isSensor:   boolean;                // sensor fires on_player_enter/on_player_exit; solid blocks movement
-  // Hull only (Phase 27): convex hull vertices, object-local, pre-scale, relative
+  // Hull/trimesh only (Phase 27/27b): vertices, object-local, pre-scale, relative
   // to the object origin + offset. Encodes shape AND orientation — exact under
   // full rotation and non-uniform scale (scale composes before object rotation).
   points?:    Vec3[];
+  // Trimesh only (Phase 27b): triangle indices into points. Hollow-surface caveats
+  // match live face-brush trimeshes (nothing inside gets pushed out).
+  indices?:   number[];
 }
 
 export interface WorldObject {

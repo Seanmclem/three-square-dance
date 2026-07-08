@@ -281,10 +281,10 @@ export class ColliderEditor implements IEditorModule {
   private _buildWireframe(obj: WorldObject, c: AttachedCollider): void {
     const color = c.isSensor ? SENSOR_COLOR : SOLID_COLOR;
     let wire: THREE.Object3D;
-    if (c.shape === "hull") {
+    if (c.shape === "hull" || c.shape === "trimesh") {
       // Geometry in the object's scaled local frame; transform applied in _positionAll.
       const mat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4, depthTest: false });
-      wire = new THREE.Mesh(this._hullGeometry(obj, c) ?? new THREE.BoxGeometry(0.2, 0.2, 0.2), mat);
+      wire = new THREE.Mesh(this._pointsGeometry(obj, c) ?? new THREE.BoxGeometry(0.2, 0.2, 0.2), mat);
     } else if (c.shape === "box") {
       const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false });
       wire = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), mat);
@@ -338,16 +338,16 @@ export class ColliderEditor implements IEditorModule {
     for (const w of this._wireframes) {
       const c = byId.get(w.userData["colliderId"] as string);
       if (!c) { w.visible = false; continue; }
-      if (c.shape === "hull") {
-        // Hull geometry already encodes offset+scale in local space — the wireframe
-        // just wears the object's position/rotation. Rebuild geometry so offset/scale
-        // edits track live (capsule idiom below).
+      if (c.shape === "hull" || c.shape === "trimesh") {
+        // Point-based geometry already encodes offset+scale in local space — the
+        // wireframe just wears the object's position/rotation. Rebuild geometry so
+        // offset/scale edits track live (capsule idiom below).
         const D2R = Math.PI / 180;
         w.position.set(obj.position.x, obj.position.y, obj.position.z);
         w.quaternion.setFromEuler(new THREE.Euler(
           obj.rotation.x * D2R, obj.rotation.y * D2R, obj.rotation.z * D2R));
         w.scale.set(1, 1, 1);
-        const g = this._hullGeometry(obj, c);
+        const g = this._pointsGeometry(obj, c);
         if (g) {
           const m = w as THREE.Mesh;
           m.geometry.dispose();
@@ -386,10 +386,23 @@ export class ColliderEditor implements IEditorModule {
     }
   }
 
-  /** Hull wireframe geometry from the collider's points, offset + scale baked in (local frame). */
-  private _hullGeometry(obj: WorldObject, c: AttachedCollider): THREE.BufferGeometry | null {
-    if (!c.points || c.points.length < 4) return null;
+  /** Hull/trimesh wireframe geometry from the collider's points, offset + scale baked in (local frame). */
+  private _pointsGeometry(obj: WorldObject, c: AttachedCollider): THREE.BufferGeometry | null {
+    if (!c.points || c.points.length < 3) return null;
     const s = obj.scale;
+    if (c.shape === "trimesh" && c.indices?.length) {
+      const pos = new Float32Array(c.points.length * 3);
+      c.points.forEach((p, i) => {
+        pos[i * 3]     = (p.x + c.offset.x) * s.x;
+        pos[i * 3 + 1] = (p.y + c.offset.y) * s.y;
+        pos[i * 3 + 2] = (p.z + c.offset.z) * s.z;
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(c.indices);
+      return geo;
+    }
+    if (c.points.length < 4) return null;
     const pts = c.points.map(p => new THREE.Vector3(
       (p.x + c.offset.x) * s.x, (p.y + c.offset.y) * s.y, (p.z + c.offset.z) * s.z));
     try { return new ConvexGeometry(pts); } catch { return null; }
