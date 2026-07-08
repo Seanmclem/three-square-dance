@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { groupWallRuns, resolveRunNodeIds, buildNodesMap } from "@/utils/wallRuns";
 import type { EventBus } from "@/core/EventBus";
@@ -173,10 +174,10 @@ export class OpeningDragHandler implements IEditorModule {
 
   init(): void {
     this._unsubs.push(
-      this._bus.on("tool:select",      ({ tool })     => { this._activeTool = tool; if (tool !== "select") this._abort(); }),
+      this._bus.on("tool:select",      ({ tool })     => { this._activeTool = tool; if (!isSelectMode(tool)) this._abort(); }),
       this._bus.on("object:selected",  p             => { if (p.type === "opening") this._onArm(p); else this._abort(); }),
       this._bus.on("object:deselected",()            => this._abort()),
-      this._bus.on("input:mousedown",  ({ button, screenPos }) => { if (button === 0 && this._activeTool === "select") this._onDown(screenPos); }),
+      this._bus.on("input:mousedown",  ({ button, screenPos }) => { if (button === 0 && isSelectMode(this._activeTool)) this._onDown(screenPos); }),
       this._bus.on("input:mousemove",  ({ screenPos }) => this._onMove(screenPos)),
       this._bus.on("input:mouseup",    ({ button })  => { if (button === 0) this._onUp(); }),
       this._bus.on("input:keydown",    ({ code })    => { if (code === "Escape") this._abort(); }),

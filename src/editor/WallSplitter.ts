@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -53,7 +54,7 @@ export class WallSplitter implements IEditorModule {
   }
 
   private _onRightClick(screenPos: ScreenPos): void {
-    if (this._activeTool !== "select") return;
+    if (!isSelectMode(this._activeTool)) return;
 
     const rect = this._dom.getBoundingClientRect();
     this._mouse.x =  ((screenPos.x - rect.left) / rect.width)  * 2 - 1;

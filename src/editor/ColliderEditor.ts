@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { assetManager } from "@/core/AssetManager";
@@ -100,7 +101,7 @@ export class ColliderEditor implements IEditorModule {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool !== "select" && this._state === "DRAG") this._cancelDrag();
+        if (!isSelectMode(tool) && this._state === "DRAG") this._cancelDrag();
         this._sync();
       }),
       this._bus.on("object:selected", payload => {
@@ -240,7 +241,7 @@ export class ColliderEditor implements IEditorModule {
   // ── Data access ─────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    return this._activeTool === "select" && this._selectedId !== null && !this._previewing;
+    return isSelectMode(this._activeTool) && this._selectedId !== null && !this._previewing;
   }
 
   private _selectedObject(): WorldObject | undefined {

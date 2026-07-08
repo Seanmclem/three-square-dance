@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -60,7 +61,7 @@ export class TriggerVolumeResizer implements IEditorModule {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool !== "select" && this._state === "DRAG") this._cancelDrag();
+        if (!isSelectMode(tool) && this._state === "DRAG") this._cancelDrag();
         this._sync();
       }),
       this._bus.on("triggervolume:select", ({ id }) => { this._selectedId = id; this._sync(); }),
@@ -117,7 +118,7 @@ export class TriggerVolumeResizer implements IEditorModule {
   // ── Visibility ────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    return this._activeTool === "select" && this._selectedId !== null && !this._previewing;
+    return isSelectMode(this._activeTool) && this._selectedId !== null && !this._previewing;
   }
 
   private _selectedVolume(): TriggerVolume | undefined {

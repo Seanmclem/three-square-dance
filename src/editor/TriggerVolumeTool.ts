@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
@@ -96,7 +97,7 @@ export class TriggerVolumeTool {
         if (button !== 0 || this._state === "PLACING") return;
         // Only pick volumes under the Select or Trigger tools — never while another tool
         // (Spawn/Floor/Wall/…) is placing, so a placement click can't also select a volume.
-        if (this._toolId !== "select" && this._toolId !== "trigger-volume") return;
+        if (!isSelectMode(this._toolId) && this._toolId !== "trigger-volume") return;
         const vol = this._findVolumeAt(this._lastScreenPos);
         if (vol) {
           this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint

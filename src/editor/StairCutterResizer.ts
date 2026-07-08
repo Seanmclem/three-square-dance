@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -70,7 +71,7 @@ export class StairCutterResizer implements IEditorModule {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool !== "select" && this._state === "DRAG") this._cancelDrag();
+        if (!isSelectMode(tool) && this._state === "DRAG") this._cancelDrag();
         this._sync();
       }),
       this._bus.on("object:selected", ({ type, id, zoneId }) => {
@@ -129,7 +130,7 @@ export class StairCutterResizer implements IEditorModule {
   // ── State ─────────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    return this._activeTool === "select" && !this._previewing && !!this._cutter();
+    return isSelectMode(this._activeTool) && !this._previewing && !!this._cutter();
   }
 
   private _stair(): StairDef | undefined {

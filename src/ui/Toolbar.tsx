@@ -8,7 +8,7 @@ import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icon
 interface ToolDef { id: ToolId; label: string; shortcut: string; variants?: { id: ToolId; label: string }[] }
 
 const TOOLS: ToolDef[] = [
-  { id: "select",          label: "Select",   shortcut: "V" },
+  { id: "select",          label: "Select",   shortcut: "V", variants: [{ id: "select", label: "◇ Object  (1)" }, { id: "select-face", label: "▣ Face  (2)" }, { id: "select-vertex", label: "• Vertex  (3)" }] },
   { id: "floor",           label: "Floor",    shortcut: "F", variants: [{ id: "floor", label: "▭ Rectangle" }, { id: "poly-floor", label: "⬠ Polygon" }] },
   { id: "wall",            label: "Wall",     shortcut: "W" },
   { id: "platform",        label: "Platform", shortcut: "L", variants: [{ id: "platform", label: "▭ Rectangle" }, { id: "poly-platform", label: "⬠ Polygon" }] },

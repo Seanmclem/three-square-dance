@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { assetManager } from "@/core/AssetManager";
 import { decalOrientation } from "@/world/decals/DecalBuilder";
@@ -72,7 +73,7 @@ export class DecalTool {
       // its wall/floor pick — the TriggerVolumeTool pattern.
       this._bus.on("input:click", ({ button }) => {
         if (button !== 0) return;
-        if (this._toolId !== "select" && this._toolId !== "decal") return;
+        if (!isSelectMode(this._toolId) && this._toolId !== "decal") return;
         if (this._toolId === "decal" && this._textureId) return;   // armed = stamping, not selecting
         const dec = this._findSurfaceDecalAt(this._lastScreenPos);
         if (!dec) return;

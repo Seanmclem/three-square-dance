@@ -1,10 +1,11 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   IEditorModule, ToolId, EditorObjectType, ScreenPos,
-  SelectedObjectPayload, SelectedRef, WorldObject, WallDef, WallNode,
+  SelectedObjectPayload, SelectedRef, WorldObject, WallDef, WallNode, FaceGroup,
 } from "@/types";
 
 // "decal" sits above platform/wall/floor: decals lie coplanar with those surfaces,
@@ -39,6 +40,9 @@ export class SelectionManager implements IEditorModule {
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
   private _activeFloorLevel   = 0;
+  // Sub-object selection on the selected shape (Phase 23 face/vertex modes).
+  private _subFace:   number | null = null;
+  private _subVertex: number | null = null;
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -59,7 +63,16 @@ export class SelectionManager implements IEditorModule {
     this._unsub.push(
       this._bus.on("input:click",     ({ screenPos, shift, meta, ctrl }) => this._onClick(screenPos, shift || meta || ctrl)),
       this._bus.on("input:mousemove", ({ screenPos }) => this._onMove(screenPos)),
-      this._bus.on("tool:select",     ({ tool })      => { this._activeTool = tool; }),
+      this._bus.on("tool:select",     ({ tool })      => {
+        const changed = tool !== this._activeTool;
+        this._activeTool = tool;
+        // Mode switch clears sub-object selection (a fresh click re-establishes it);
+        // re-emit so the panel/highlighter/gizmos drop the stale face/vertex.
+        if (changed && (this._subFace !== null || this._subVertex !== null)) {
+          this._subFace = null; this._subVertex = null;
+          if (this._selected && this._extraRefs.length === 0) this._emitSelected(this._selected);
+        }
+      }),
       this._bus.on("floor:select",    ({ level })     => { this._activeFloorLevel = level; }),
       this._bus.on("object:updated",    ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",     ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
@@ -82,9 +95,18 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("object:deselected", ()           => {
         if (this._selected) { this._restore(this._selected); this._selected = null; }
         this._clearExtras();
+        this._subFace = null; this._subVertex = null;
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
+      // Sub-object selection sink (panel rows, vertex-handle clicks): store + re-emit
+      // object:selected so all consumers read one channel.
+      this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex }) => {
+        if (this._selected?.userData.editorId !== shapeId || this._selected.userData.zoneId !== zoneId) return;
+        this._subFace = faceIndex;
+        this._subVertex = vertexIndex;
+        this._emitSelected(this._selected);
+      }),
     );
   }
 
@@ -104,12 +126,28 @@ export class SelectionManager implements IEditorModule {
 
   private _onClick(screenPos: ScreenPos, additive = false): void {
     if (this._suppressNextClick) { this._suppressNextClick = false; return; }
-    if (this._activeTool !== "select") return;
+    if (!isSelectMode(this._activeTool)) return;
     const selectable = this._cast(screenPos);
     if (selectable.length === 0) { if (!additive) this._deselect(); return; }
-    const root = this._resolveRoot(this._pickByPriority(selectable).object);
-    if (additive) this._toggleInSelection(root);
-    else          this._select(root);
+    const hit  = this._pickByPriority(selectable);
+    const root = this._resolveRoot(hit.object);
+    // Face mode (Phase 23): resolve the hit triangle → logical brush face via the
+    // built mesh's faceGroups range map. Non-face-brush hits behave like object mode.
+    if (this._activeTool === "select-face" && !additive) {
+      const groups = hit.object.userData.faceGroups as FaceGroup[] | undefined;
+      const t = hit.faceIndex;
+      this._subFace = (groups && t != null)
+        ? groups.find(g => t >= g.start && t < g.start + g.count)?.faceIndex ?? null
+        : null;
+      this._subVertex = null;
+    } else if (!additive) {
+      this._subFace = null;
+      if (this._activeTool !== "select-vertex") this._subVertex = null;
+    }
+    if (additive) { this._toggleInSelection(root); return; }
+    // Same-root re-click with a different face still needs a re-emit.
+    if (this._selected === root && this._extraRefs.length === 0) { this._emitSelected(root); return; }
+    this._select(root);
   }
 
   /** Shift/Cmd-click: add an unselected entity to the set, or remove an already-selected one. */
@@ -203,7 +241,7 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _onMove(screenPos: ScreenPos): void {
-    if (this._activeTool !== "select") return;
+    if (!isSelectMode(this._activeTool)) return;
     const selectable = this._cast(screenPos);
     const hovered = selectable.length
       ? this._resolveRoot(this._pickByPriority(selectable).object)
@@ -289,6 +327,17 @@ export class SelectionManager implements IEditorModule {
   private _emitSelected(root: THREE.Object3D): void {
     const ud = root.userData;
     const wallTransform = ud.editorType === "wall" ? this._wallRunTransform(root) : undefined;
+    // Sub-object validity clamp (Phase 23): ops/undo can shrink the face/vertex
+    // arrays under a live selection — clamp on EVERY emit so consumers never see a
+    // dangling index.
+    let faceIndex: number | undefined, vertexIndex: number | undefined;
+    if (ud.editorType === "shape") {
+      const data = this._getDataRecord(root) as { mesh?: { vertices: unknown[]; faces?: unknown[] } } | null;
+      if (this._subFace != null && this._subFace >= (data?.mesh?.faces?.length ?? 0)) this._subFace = null;
+      if (this._subVertex != null && this._subVertex >= (data?.mesh?.vertices?.length ?? 0)) this._subVertex = null;
+      faceIndex   = this._subFace ?? undefined;
+      vertexIndex = this._subVertex ?? undefined;
+    }
     this._bus.emit("object:selected", {
       id:       ud.editorId,
       type:     ud.editorType,
@@ -305,6 +354,8 @@ export class SelectionManager implements IEditorModule {
       runWalls: this._getRunWalls(root),
       wallRunCenter:   wallTransform?.center,
       wallRunAngleDeg: wallTransform?.angleDeg,
+      faceIndex,
+      vertexIndex,
     });
   }
 

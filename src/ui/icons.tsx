@@ -149,8 +149,30 @@ export const IconShapeBox = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconSelectFace = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <polygon points="14,5 23,10 14,15 5,10" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.45"/>
+    <polygon points="5,10 14,15 14,21 5,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <polygon points="23,10 14,15 14,21 23,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+  </svg>
+);
+
+export const IconSelectVertex = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <polygon points="14,5 23,10 14,15 5,10" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <polygon points="5,10 14,15 14,21 5,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <polygon points="23,10 14,15 14,21 23,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <circle cx="14" cy="5" r="2.4" fill={color}/>
+    <circle cx="23" cy="10" r="2.4" fill={color}/>
+    <circle cx="5" cy="10" r="2.4" fill={color}/>
+    <circle cx="14" cy="15" r="2.4" fill={color}/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
+  "select-face":    IconSelectFace,
+  "select-vertex":  IconSelectVertex,
   floor:            IconFloor,
   "poly-floor":     IconPolyFloor,
   wall:             IconWall,

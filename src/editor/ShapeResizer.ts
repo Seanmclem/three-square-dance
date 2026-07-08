@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { resolveShapeParams, isBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
@@ -65,7 +66,7 @@ export class ShapeResizer implements IEditorModule {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool !== "select" && this._state === "DRAG") this._cancelDrag();
+        if (!isSelectMode(tool) && this._state === "DRAG") this._cancelDrag();
         this._sync();
       }),
       this._bus.on("object:selected", payload => {
@@ -121,7 +122,7 @@ export class ShapeResizer implements IEditorModule {
   // ── Visibility ──────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    if (this._activeTool !== "select" || !this._enabled || this._previewing) return false;
+    if (!isSelectMode(this._activeTool) || !this._enabled || this._previewing) return false;
     const s = this._selectedShape();
     return !!s && !isBrush(s);
   }

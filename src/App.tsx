@@ -18,6 +18,7 @@ import { StairTool } from "@/editor/StairTool";
 import { ShapeTool } from "@/editor/ShapeTool";
 import { ShapeResizer } from "@/editor/ShapeResizer";
 import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
+import { BrushFaceHighlighter } from "@/editor/BrushFaceHighlighter";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -212,6 +213,7 @@ export default function App() {
     const shapeTool          = new ShapeTool(scene.scene, world, bus, history);
     const shapeResizer       = new ShapeResizer(scene.scene, world, bus, scene.camera, canvas);
     const brushVertexEditor  = new BrushVertexEditor(scene.scene, world, bus, scene.camera, canvas);
+    const brushFaceHighlighter = new BrushFaceHighlighter(scene.scene, world, bus);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
@@ -264,6 +266,7 @@ export default function App() {
     shapeTool.init();
     shapeResizer.init();
     brushVertexEditor.init();
+    brushFaceHighlighter.init();
     objectTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -589,6 +592,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      brushFaceHighlighter.dispose();
       brushVertexEditor.dispose();
       shapeResizer.dispose();
       shapeTool.dispose();
@@ -992,6 +996,14 @@ export default function App() {
         if (e.code === 'KeyC')      { e.preventDefault(); handleCopy(); }
         else if (e.code === 'KeyV') { e.preventDefault(); handlePaste(); }
         else if (e.code === 'KeyD') { e.preventDefault(); handleDuplicate(); }
+      }
+      // Blender-style select-mode hotkeys (Phase 23): 1 = object, 2 = face, 3 = vertex.
+      if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        const mode = e.code === 'Digit1' ? 'select' : e.code === 'Digit2' ? 'select-face' : e.code === 'Digit3' ? 'select-vertex' : null;
+        if (mode) {
+          setActiveTool(mode);
+          busRef.current.emit('tool:select', { tool: mode });
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown);

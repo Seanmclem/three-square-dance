@@ -1,3 +1,4 @@
+import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -138,7 +139,7 @@ export class NodeDragger {
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool === "select") {
+        if (isSelectMode(tool)) {
           this._refresh();
         } else {
           if (this._state === "DRAG") this._cancelDrag();
@@ -146,11 +147,11 @@ export class NodeDragger {
         }
       }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._activeTool !== "select" || this._gizmoActive) return;
+        if (!isSelectMode(this._activeTool) || this._gizmoActive) return;
         this._onMouseMove(worldPos.x, worldPos.z);
       }),
       this._bus.on("input:mousedown", ({ button }) => {
-        if (this._activeTool !== "select" || button !== 0 || this._gizmoActive) return;
+        if (!isSelectMode(this._activeTool) || button !== 0 || this._gizmoActive) return;
         this._onMouseDown();
       }),
       // A gizmo drag (TransformControls) shares the canvas; without this, pressing on a
@@ -176,33 +177,33 @@ export class NodeDragger {
       // Skip in game mode: helpers are hidden there, and a mid-game zone transition
       // must not resurrect them as fresh (visible) meshes.
       this._bus.on("zone:loaded", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG" && !this._gameMode) this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG" && !this._gameMode) this._refresh();
       }),
       this._bus.on("preview:start", ({ mode }) => { if (mode === "game") this._gameMode = true; }),
       this._bus.on("preview:stop",  () => { this._gameMode = false; }),
       this._bus.on("platform:updated", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
       this._bus.on("floor:updated", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
       // Deleting a node-backed polygon prunes its nodes (WorldState); refresh so the
       // stale dots + edge lines for those nodes are cleared from the scene.
       this._bus.on("platform:removed", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
       this._bus.on("floor:removed", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
       this._bus.on("wall:rebuilt", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") this._refresh();
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
       // Deleting a wall run removes the walls then their nodes (separate removeNode calls
       // emit no event). Defer a microtask so the refresh runs after the whole delete, then
       // _refresh rebuilds dots from the remaining geometry — clearing the orphaned dots.
       this._bus.on("wall:removed", () => {
-        if (this._activeTool === "select" && this._state !== "DRAG") {
-          queueMicrotask(() => { if (this._activeTool === "select" && this._state !== "DRAG") this._refresh(); });
+        if (isSelectMode(this._activeTool) && this._state !== "DRAG") {
+          queueMicrotask(() => { if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh(); });
         }
       }),
     );
