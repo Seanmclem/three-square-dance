@@ -152,6 +152,8 @@ export default function App() {
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
+  // Serialized world as loaded by THIS tab — writeAutosave's no-change gate.
+  const autosaveBaselineRef = useRef<string | null>(null);
   const clipboardRef   = useRef<Clipboard | null>(null);
   const pasteCountRef  = useRef(0);
 
@@ -292,9 +294,15 @@ export default function App() {
     const writeAutosave = () => {
       if (!worldRef.current || restoringRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
+      // Only write when THIS tab changed the world since load (content-compared, so
+      // console/test-driven mutations count too). A tab that never edited must never
+      // write: a dormant tab's 60s tick / closing beforeunload would otherwise clobber
+      // newer autosaves from other tabs with its stale state (lost real edits twice).
+      if (json === autosaveBaselineRef.current) return;
       const ts = Date.now();
       localStorage.setItem('worldeditor_autosave', json);
       localStorage.setItem('worldeditor_autosave_ts', ts.toString());
+      autosaveBaselineRef.current = json;
       setLastAutosaveAt(ts);
     };
 
@@ -360,6 +368,10 @@ export default function App() {
       }
 
       if (!restored) await zones.loadZone(DEMO_ZONE_ID);
+
+      // Baseline for the autosave no-change gate: the world as this tab loaded it.
+      // (Not the raw savedJson string — restore may normalize fields.)
+      autosaveBaselineRef.current = JSON.stringify(world.toJSON());
 
       // After loading, try to recover the last file handle so Ctrl+S saves in-place
       try {

@@ -273,13 +273,17 @@ so the user's level remains exactly as it was before the test session.
 
 ### Other lessons
 
-- **After cleanup, wait for an autosave tick before closing the tab.** Deleting test
-  entities updates WorldState, but the periodic autosave is what persists it — closing
-  immediately can leave the *previous* autosave (test entities included) as the state
-  the user's next session loads. Poll the top-bar indicator until it reads
-  "autosaved just now", then verify `localStorage.worldeditor_autosave` contains only
-  the user's entities, then close. (A `test_m3` shape leaked into the user's world
-  exactly this way on 2026-07-07.)
+- **After cleanup, wait for an autosave tick before closing the tab — and beware
+  stale editor tabs.** Deleting test entities updates WorldState, but the periodic
+  autosave persists it: poll the top-bar indicator until "autosaved just now", verify
+  `localStorage.worldeditor_autosave` contains only the user's entities, then close.
+  A `test_m3` shape leaked into the user's world twice (2026-07-07/08) even after that
+  verification: another editor tab, dormant since before the cleanup, flushed its
+  stale in-memory world over the verified autosave (frozen tabs fire beforeunload when
+  Chrome discards/quits, and every tab used to tick a 60s unconditional write). Fixed
+  v4.14.1: `writeAutosave` is gated on a load-time content baseline, so a tab that
+  never changed the world never writes. The gate is content-compared (not React
+  `isDirty`), so console-driven test transactions still autosave normally.
 - **Go slow.** One action → read state → verify → next action. Never batch
   clicks across unverified UI state — a wrong assumption compounds.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and
