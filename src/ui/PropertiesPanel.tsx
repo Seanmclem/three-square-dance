@@ -7,7 +7,7 @@ import type {
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, extrudeFace } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -1540,14 +1540,68 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   );
 }
 
-// Split/Extrude buttons — wired to brushOps in the topology milestone; placed here
-// so the expanded row layout is final. Disabled until then.
+// Split H/V (quads only) + Extrude — the Phase 23 topology ops. Each op is a pure
+// brushOps call committed through onObjectUpdate (one undoable transaction). The
+// selected faceIndex stays on the primary child / the moved cap by construction.
 function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
   selected: SelectedObjectPayload; shape: ShapeDef; faceIndex: number;
   onObjectUpdate: (c: Partial<WorldObject>) => void;
 }) {
-  void selected; void shape; void faceIndex; void onObjectUpdate;
-  return null;
+  void selected;
+  const face = shape.mesh!.faces![faceIndex];
+  if (!face) return null;
+  const isQuad = face.verts.length === 4;
+
+  // Label which pair cuts "horizontally": pair 0 cuts mid(v0v1)→mid(v2v3). Local
+  // direction is used (yaw rotation doesn't change |y|; labels are cosmetic).
+  const verts = shape.mesh!.vertices;
+  let pair0IsH = true;
+  if (isQuad) {
+    const [a, b, c, d] = face.verts as [number, number, number, number];
+    const m1 = verts[a]!, m2 = verts[b]!, m3 = verts[c]!, m4 = verts[d]!;
+    const dir = {
+      x: (m3.x + m4.x) / 2 - (m1.x + m2.x) / 2,
+      y: (m3.y + m4.y) / 2 - (m1.y + m2.y) / 2,
+      z: (m3.z + m4.z) / 2 - (m1.z + m2.z) / 2,
+    };
+    const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
+    pair0IsH = Math.abs(dir.y / len) < 0.7;
+  }
+
+  const run = (result: { vertices: Vec3[]; faces: BrushFace[] } | null) => {
+    if (!result) return;   // validateMesh aborted — warning already logged
+    onObjectUpdate({ mesh: result } as unknown as Partial<WorldObject>);
+  };
+  const split = (pair: 0 | 1) => run(splitFaceQuad(shape.mesh!, faceIndex, pair));
+  const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, 0.25));
+
+  const OP_BTN: React.CSSProperties = {
+    flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
+    border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
+    color: "#c0c0c0", cursor: "pointer",
+  };
+  const OP_BTN_OFF: React.CSSProperties = { ...OP_BTN, color: "#505060", cursor: "default" };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+          onClick={() => split(pair0IsH ? 0 : 1)} title="Split between the horizontal-ish edge pair">
+          SPLIT ─
+        </button>
+        <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+          onClick={() => split(pair0IsH ? 1 : 0)} title="Split between the vertical-ish edge pair">
+          SPLIT │
+        </button>
+        <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m along its normal">
+          EXTRUDE
+        </button>
+      </div>
+      {!isQuad && (
+        <div style={{ color: "#404050", fontSize: 9 }}>Split works on 4-corner faces only.</div>
+      )}
+    </div>
+  );
 }
 
 // ── Per-face materials (Materials screen, Phase 23) ─────────────────────────
