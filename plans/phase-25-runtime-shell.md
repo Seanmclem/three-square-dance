@@ -1,7 +1,8 @@
 # Phase 25 — Standalone Runtime Shell (manifest + SceneRouter)
 
 > Status: **PLANNED** — not yet implemented.
-> Target version: v4.13.0. Assumes phase 24 (ControlSchemeManager, v4.12.0) lands
+> Target version: next free minor at implementation time (do not pin — versions
+> race ahead). Assumes phase 24 (ControlSchemeManager) lands
 > first — renumber if ordering changes.
 
 A lightweight web runtime, separate from the editor, served from the **same

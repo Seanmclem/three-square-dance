@@ -1,7 +1,8 @@
 # Phase 24 — Controller & Touchscreen Support (ControlSchemeManager)
 
 > Status: **PLANNED** — not yet implemented.
-> Target version: v4.12.0. Phase number assumes nothing lands between this and
+> Target version: next free minor at implementation time (v4.14.1 shipped as of
+> 2026-07-08 — do not pin). Phase number assumes nothing lands between this and
 > phase 23 (face/vertex sub-object editing, v4.11.0, in progress); renumber if
 > needed. (Originally drafted as phase 20 / v4.7.0; renumbered twice — decals
 > and shapes took 20–22, face/vertex editing took 23.)
