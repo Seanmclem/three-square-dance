@@ -4,7 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef, ShapeDef,
+  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
 import { facesFromCloud } from "@/editor/brushOps";
@@ -540,7 +540,7 @@ export function PropertiesPanel({
             />
           </>
         ) : currentScreen === "geo" ? (
-          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} />
+          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} activeTool={activeTool} materialList={materialList} />
         ) : currentScreen === "mat" ? (
           <MatScreen
             selected={selected}
@@ -549,6 +549,7 @@ export function PropertiesPanel({
             onAddMaterial={onImportMaterial}
             quality={quality}
             onQualityChange={onQualityChange}
+            bus={bus}
           />
         ) : currentScreen === "open" ? (
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
@@ -750,7 +751,7 @@ function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
 
 // ── GeoScreen ─────────────────────────────────────────────────────────────────
 
-function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpdate, getNodeLinks, zones, bus }: {
+function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpdate, getNodeLinks, zones, bus, activeTool, materialList }: {
   selected:        SelectedObjectPayload;
   onObjectUpdate:  (changes: Partial<WorldObject>) => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
@@ -758,6 +759,8 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   getNodeLinks?:   (zoneId: string, nodeId: string) => NodeLinks;
   zones?:          ZoneDef[];
   bus?:            EventBus;
+  activeTool?:     ToolId;
+  materialList?:   MaterialDef[];
 }) {
   if (selected.type === "wall")     return <WallGeoView     selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "floor")    return <FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />;
@@ -765,7 +768,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
-  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} />;
+  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} activeTool={activeTool} materialList={materialList} />;
   return null;
 }
 
@@ -1258,9 +1261,10 @@ const SHAPE_PARAM_FIELDS: Record<ShapeDef["kind"], Array<{ key: keyof ShapeDef; 
   ],
 };
 
-function ShapeGeoView({ selected, onObjectUpdate, bus }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus }) {
+function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus; activeTool?: ToolId; materialList?: MaterialDef[] }) {
   const shape  = selected.data as ShapeDef | null;
   const brush  = !!shape && isBrush(shape);
+  const faceBrush = !!shape?.mesh?.faces?.length;
   const fields = SHAPE_PARAM_FIELDS[shape?.kind ?? "box"];
   const resolved = shape ? resolveShapeParams(shape) : null;
   const [resizeOn, setResizeOn] = useState(false);
@@ -1345,6 +1349,14 @@ function ShapeGeoView({ selected, onObjectUpdate, bus }: { selected: SelectedObj
   };
 
   if (!shape) return null;
+
+  // Sub-object modes (Phase 23): face/vertex lists replace the param view.
+  if (faceBrush && activeTool === "select-face") {
+    return <FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} />;
+  }
+  if (faceBrush && activeTool === "select-vertex") {
+    return <VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} />;
+  }
 
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1444,6 +1456,235 @@ const SHAPE_ACTION_BTN: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
   color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", cursor: "pointer",
 };
+
+// ── Brush FACES list (face mode, Phase 23) ────────────────────────────────────
+// Rows hover-highlight the face in the canvas (shape:face-hover) and click-select
+// it (shape:sub-select → SelectionManager re-emits with faceIndex). The selected
+// face's row expands: corners, inline material + tile (WallSegmentRow idiom).
+// Split/Extrude buttons land with the topology ops milestone.
+
+function shapeFacesUpdate(shape: ShapeDef, faceIndex: number, patch: Partial<BrushFace>): { mesh: ShapeBrushMesh } {
+  const faces = shape.mesh!.faces!.map((f, i) => i === faceIndex ? { ...f, verts: [...f.verts], ...patch } : f);
+  return { mesh: { ...shape.mesh!, faces } };
+}
+
+function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; bus?: EventBus;
+  materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  const faces = shape.mesh!.faces!;
+  const sel = selected.faceIndex ?? null;
+  const { schedule, flush } = useFieldDebounce(300);
+  const [tileStr, setTileStr] = useState("");
+  useEffect(() => {
+    const f = sel !== null ? faces[sel] : undefined;
+    setTileStr(String(f?.materialOverrides?.tileScale ?? ""));
+  }, [sel, selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hover = (i: number | null) => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i });
+  const pick  = (i: number) => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i, vertexIndex: null });
+  const commitMat = (i: number, id: string) =>
+    onObjectUpdate(shapeFacesUpdate(shape, i, { material: id === "__inherit__" ? undefined : id, materialOverrides: undefined }) as unknown as Partial<WorldObject>);
+  const commitTile = (i: number, val: string) => {
+    const n = parseFloat(val);
+    const f = faces[i]!;
+    const ovr = Number.isFinite(n) && n > 0 ? { ...(f.materialOverrides ?? {}), tileScale: n } : undefined;
+    onObjectUpdate(shapeFacesUpdate(shape, i, { materialOverrides: ovr }) as unknown as Partial<WorldObject>);
+  };
+
+  return (
+    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}
+         onMouseLeave={() => hover(null)}>
+      <div style={LABEL}>FACES — click a row or a face in the canvas</div>
+      {faces.map((f, i) => {
+        const isSel = i === sel;
+        const matLabel = f.material ? getMaterialLabel(f.material, materialList) : "inherit";
+        return (
+          <div key={i}
+            onMouseEnter={() => hover(i)}
+            style={{
+              border: isSel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 5, background: isSel ? "rgba(80,140,255,0.08)" : "rgba(40,40,40,0.6)",
+            }}>
+            <button onClick={() => pick(i)}
+              style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "6px 8px", background: "none", border: "none", cursor: "pointer" }}>
+              <span style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>FACE {i + 1}</span>
+              <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>{f.verts.length} corners · {matLabel}</span>
+            </button>
+            {isSel && (
+              <div style={{ padding: "4px 8px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ color: "#505060", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <select value={f.material ?? "__inherit__"} onChange={e => commitMat(i, e.target.value)}
+                    style={{ flex: 1, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
+                    <option value="__inherit__">(shape material)</option>
+                    {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                  <span style={{ color: "#505060", fontSize: 9 }}>TILE</span>
+                  <input type="number" step={0.5} min={0.1} value={tileStr} placeholder="—"
+                    style={{ ...NUM_INPUT, width: 52, padding: "2px 4px", fontSize: 10 }}
+                    onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(i, e.target.value)); }}
+                    onBlur={e => flush(() => commitTile(i, e.target.value))}
+                  />
+                </div>
+                <ShapeFaceOps selected={selected} shape={shape} faceIndex={i} onObjectUpdate={onObjectUpdate} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ color: "#404050", fontSize: 9, lineHeight: 1.4 }}>
+        Drag the gizmo on the selected face to move it. Press 1/3 for object/vertex modes.
+      </div>
+    </div>
+  );
+}
+
+// Split/Extrude buttons — wired to brushOps in the topology milestone; placed here
+// so the expanded row layout is final. Disabled until then.
+function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; faceIndex: number;
+  onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  void selected; void shape; void faceIndex; void onObjectUpdate;
+  return null;
+}
+
+// ── Per-face materials (Materials screen, Phase 23) ─────────────────────────
+// "The materials list should have every face": one row per face with an inline
+// material picker + tile scale. Row hover highlights the face in the canvas.
+
+function FaceMaterialsView({ selected, shape, materialList, onObjectUpdate, bus }: {
+  selected: SelectedObjectPayload; shape: ShapeDef;
+  materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void;
+  bus?: EventBus;
+}) {
+  const faces = shape.mesh!.faces!;
+  const { schedule, flush } = useFieldDebounce(300);
+  const [tiles, setTiles] = useState<Record<number, string>>({});
+  useEffect(() => {
+    const t: Record<number, string> = {};
+    faces.forEach((f, i) => { t[i] = String(f.materialOverrides?.tileScale ?? ""); });
+    setTiles(t);
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const hover = (i: number | null) => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i });
+  const commitMat = (i: number, id: string) =>
+    onObjectUpdate(shapeFacesUpdate(shape, i, { material: id === "__inherit__" ? undefined : id, materialOverrides: undefined }) as unknown as Partial<WorldObject>);
+  const commitTile = (i: number, val: string) => {
+    const n = parseFloat(val);
+    const f = faces[i]!;
+    const ovr = Number.isFinite(n) && n > 0 ? { ...(f.materialOverrides ?? {}), tileScale: n } : undefined;
+    onObjectUpdate(shapeFacesUpdate(shape, i, { materialOverrides: ovr }) as unknown as Partial<WorldObject>);
+  };
+
+  return (
+    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={LABEL}>PER-FACE MATERIALS</div>
+      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>
+        Shape material: <span style={{ color: "#909090" }}>{getMaterialLabel(shape.material, materialList)}</span> (faces set to "(shape material)" inherit it)
+      </div>
+      <div onMouseLeave={() => hover(null)} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {faces.map((f, i) => (
+          <FaceMaterialRow
+            key={i} index={i} face={f} materialList={materialList}
+            onHover={() => hover(i)}
+            tile={tiles[i] ?? ""} setTile={v => setTiles(p => ({ ...p, [i]: v }))}
+            onMat={id => commitMat(i, id)}
+            onTile={(v, immediate) => immediate ? flush(() => commitTile(i, v)) : schedule(() => commitTile(i, v))}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FaceMaterialRow({ index, face, materialList, onHover, tile, setTile, onMat, onTile }: {
+  index: number; face: BrushFace; materialList: MaterialDef[];
+  onHover: () => void;
+  tile: string; setTile: (v: string) => void;
+  onMat: (id: string) => void; onTile: (v: string, immediate: boolean) => void;
+}) {
+  return (
+    <div
+      onMouseEnter={onHover}
+      style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, background: "rgba(40,40,40,0.6)", padding: "6px 8px", display: "flex", gap: 6, alignItems: "center" }}
+    >
+      <span style={{ color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", width: 52, flexShrink: 0 }}>FACE {index + 1}</span>
+      <select value={face.material ?? "__inherit__"} onChange={e => onMat(e.target.value)}
+        style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
+        <option value="__inherit__">(shape material)</option>
+        {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+      </select>
+      <span style={{ color: "#505060", fontSize: 9 }}>TILE</span>
+      <input type="number" step={0.5} min={0.1} value={tile} placeholder="—"
+        style={{ ...NUM_INPUT, width: 48, padding: "2px 4px", fontSize: 10 }}
+        onChange={e => { setTile(e.target.value); onTile(e.target.value, false); }}
+        onBlur={e => onTile(e.target.value, true)}
+      />
+    </div>
+  );
+}
+
+// ── Brush VERTICES list (vertex mode, Phase 23) ──────────────────────────────
+
+function VerticesList({ selected, shape, bus, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; bus?: EventBus;
+  onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  const verts = shape.mesh!.vertices;
+  const sel = selected.vertexIndex ?? null;
+  const { schedule, flush } = useFieldDebounce(300);
+  const [xyz, setXyz] = useState({ x: "", y: "", z: "" });
+  useEffect(() => {
+    const v = sel !== null ? verts[sel] : undefined;
+    setXyz({ x: String(v?.x ?? ""), y: String(v?.y ?? ""), z: String(v?.z ?? "") });
+  }, [sel, selected.id, verts[sel ?? -1]?.x, verts[sel ?? -1]?.y, verts[sel ?? -1]?.z]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = (i: number) => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: i });
+  const commitAxis = (axis: "x" | "y" | "z", val: string) => {
+    if (sel === null) return;
+    const n = parseFloat(val);
+    if (!Number.isFinite(n)) return;
+    const vertices = verts.map((v, i) => i === sel ? { ...v, [axis]: n } : v);
+    onObjectUpdate({ mesh: { ...shape.mesh!, vertices } } as unknown as Partial<WorldObject>);
+  };
+
+  return (
+    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={LABEL}>CORNERS — click a row or a sphere in the canvas</div>
+      {verts.map((v, i) => {
+        const isSel = i === sel;
+        return (
+          <div key={i} style={{
+            border: isSel ? "1px solid rgba(0,255,255,0.4)" : "1px solid rgba(255,255,255,0.07)",
+            borderRadius: 5, background: isSel ? "rgba(0,255,255,0.06)" : "rgba(40,40,40,0.6)",
+          }}>
+            <button onClick={() => pick(i)}
+              style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "5px 8px", background: "none", border: "none", cursor: "pointer" }}>
+              <span style={{ color: isSel ? "#7ff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>V{i + 1}</span>
+              <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>({v.x}, {v.y}, {v.z})</span>
+            </button>
+            {isSel && (
+              <div style={{ display: "flex", gap: 4, padding: "2px 8px 8px" }}>
+                {(["x", "y", "z"] as const).map(axis => (
+                  <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+                    <span style={{ color: axis === "x" ? "#ff6b6b" : axis === "y" ? "#6bff8a" : "#6b8aff", fontSize: 9 }}>{axis.toUpperCase()}</span>
+                    <input type="number" step={0.25} value={xyz[axis]}
+                      onChange={e => { const val = e.target.value; setXyz(p => ({ ...p, [axis]: val })); schedule(() => commitAxis(axis, val)); }}
+                      onBlur={e => flush(() => commitAxis(axis, e.target.value))}
+                      style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── StairGeoView ──────────────────────────────────────────────────────────────
 
@@ -2388,13 +2629,14 @@ function OpeningGeoView({ selected, onObjectUpdate }: { selected: SelectedObject
 
 // ── MatScreen ─────────────────────────────────────────────────────────────────
 
-function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, quality, onQualityChange }: {
+function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, quality, onQualityChange, bus }: {
   selected:        SelectedObjectPayload;
   materialList:    MaterialDef[];
   onObjectUpdate:  (changes: Partial<WorldObject>) => void;
   onAddMaterial:   () => void;
   quality:         QualityScale;
   onQualityChange: (q: QualityScale) => void;
+  bus?:            EventBus;
 }) {
   const { type } = selected;
   return (
@@ -2404,7 +2646,7 @@ function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, qual
         {type === "floor"    && <FloorMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "platform" && <PlatformMatView selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "stair"    && <StairMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
-        {type === "shape"    && <ShapeMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
+        {type === "shape"    && <ShapeMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} bus={bus} />}
       </div>
       <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={LABEL}>QUALITY</div>
@@ -2514,8 +2756,12 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
   );
 }
 
-function ShapeMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
+function ShapeMatView({ selected, materialList, onObjectUpdate, onAddMaterial, bus }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void; bus?: EventBus }) {
   const shape = selected.data as ShapeDef | null;
+  // Face-brushes: per-face materials replace TOP/BOTTOM + SIDES (Phase 23).
+  if (shape?.mesh?.faces?.length) {
+    return <FaceMaterialsView selected={selected} shape={shape} materialList={materialList} onObjectUpdate={onObjectUpdate} bus={bus} />;
+  }
   return (
     <>
       <MaterialSection
