@@ -1,7 +1,7 @@
-# Phase 24 — Standalone Runtime Shell (manifest + SceneRouter)
+# Phase 25 — Standalone Runtime Shell (manifest + SceneRouter)
 
 > Status: **PLANNED** — not yet implemented.
-> Target version: v4.12.0. Assumes phase 23 (ControlSchemeManager, v4.11.0) lands
+> Target version: v4.13.0. Assumes phase 24 (ControlSchemeManager, v4.12.0) lands
 > first — renumber if ordering changes.
 
 A lightweight web runtime, separate from the editor, served from the **same
@@ -377,23 +377,23 @@ shell's needs.
 
 Testing per TESTING.md: Chrome MCP on `localhost:7373`, `window.__runtime` /
 `window.__test` globals, `npm run typecheck`. Each sub-phase commits straight
-to main and gets its `test-plans/` doc at the end (21.6).
+to main and gets its `test-plans/` doc at the end (25.6).
 
-1. **21.1 — Decouple, zero behavior change.** SceneManager mode option,
+1. **25.1 — Decouple, zero behavior change.** SceneManager mode option,
    nullable `editorCamera`, PreviewController guard, AssetManager
    `setBaseUrl`/`_resolve`/`verifyFiles` (defaults preserve current behavior
    exactly).
    → verify: typecheck; full editor smoke pass via Chrome MCP (orbit, place
    wall, preview enter/exit, materials load); asset requests still hit
    `/assets/...` unchanged in the network log.
-2. **21.2 — Second entry, empty shell.** `runtime.html`,
+2. **25.2 — Second entry, empty shell.** `runtime.html`,
    `src/runtime/main.tsx`, minimal `RuntimeApp` (canvas + game-mode
    SceneManager + physics/material init + placeholder menu), vite
    `rollupOptions.input`.
    → verify: `/runtime.html` renders sky, **no** grid/ViewHelper/demo ground
    (scene-graph check via `window.__runtime`), no console errors, StrictMode
    clean; `npm run build` emits both entries; editor unaffected.
-3. **21.3 — Manifest + single-scene play.** `manifest.ts`, `public/demo/`
+3. **25.3 — Manifest + single-scene play.** `manifest.ts`, `public/demo/`
    fixture (one scene first, authored in the editor), MainMenu (Start),
    LoadingScreen/ErrorScreen, full engine wiring, HUD/Dialogue/Fade overlays,
    `installTestHelpers` + `window.__runtime`.
@@ -401,25 +401,25 @@ to main and gets its `test-plans/` doc at the end (21.6).
    spawns at `defaultSpawn`, walks, interacts (dialogue shows/advances),
    in-scene zone transitions still work; bad manifest URL → ErrorScreen;
    typecheck.
-4. **21.4 — SceneRouter + `load_scene`.** Types/ScriptEngine/ScriptPanel
+4. **25.4 — SceneRouter + `load_scene`.** Types/ScriptEngine/ScriptPanel
    edits, router with the §6 sequence, one-shot carry-over, second demo scene
    + portal trigger volume.
    → verify: walk into portal → fade → level_02 loads and spawns; a
    `set_state` in scene 1 gates a script in scene 2 (state persisted);
    collider/mesh counts identical across `A→B→A`; unknown sceneId →
    non-fatal; editor: authoring the action round-trips through save/load.
-5. **21.5 — Save/Continue + remote hardening.** `saveGame.ts` (sceneId +
+5. **25.5 — Save/Continue + remote hardening.** `saveGame.ts` (sceneId +
    pose), Continue path, Escape→menu, cross-origin pass.
    → verify: mid-game reload → Continue resumes correct scene/state/pose; New
    Game after Continue starts clean; serve `public/demo/` from a second local
    server (e.g. `python3 -m http.server 8000`) and load via
    `?manifest=http://localhost:8000/demo/manifest.json` — assets resolve, or
    the CORS error surfaces readably.
-6. **21.6 — Docs & tests.** Update `WORLD_EDITOR_ARCHITECTURE.md` per
-   `PLAN_UPDATE_GUIDE.md` — **both** the new Phase 24 section **and** the
+6. **25.6 — Docs & tests.** Update `WORLD_EDITOR_ARCHITECTURE.md` per
+   `PLAN_UPDATE_GUIDE.md` — **both** the new Phase 25 section **and** the
    file-level sections (SceneManager, PreviewController, AssetManager,
    ScriptEngine, EventBus table, new `src/runtime/` sections); version bump +
-   changelog; `test-plans/phase-24-runtime-shell.md`; `HUMAN_TESTING.md`
+   changelog; `test-plans/phase-25-runtime-shell.md`; `HUMAN_TESTING.md`
    walkthrough; note the runtime globals in `TESTING.md`.
 
 ---
@@ -431,10 +431,10 @@ to main and gets its `test-plans/` doc at the end (21.6).
   deterministic transition tests without walking; `window.__test.fire(...)`
   drives portals; character body position via existing globals confirms
   spawns. Snapshot dumps chunked ≤ ~1 KB per tool result.
-- **Regression firewall**: 21.1 is the only editor-touching step — full editor
+- **Regression firewall**: 25.1 is the only editor-touching step — full editor
   smoke pass there; after later phases only typecheck + a quick editor load,
   since `src/runtime/` is unreachable from the editor entry.
-- **Cross-origin is a real test, not a thought experiment** (21.5): second
+- **Cross-origin is a real test, not a thought experiment** (25.5): second
   local server, watch the network panel for resolved URLs.
 
 ---
@@ -464,7 +464,7 @@ to main and gets its `test-plans/` doc at the end (21.6).
    later if demo authoring demands it.
 2. **Should Escape pause (freeze the loop) rather than exit to menu?**
    Default: exit-to-menu with autosave — cheapest correct behavior; a real
-   pause needs input suppression that Phase 23's ControlSchemeManager
+   pause needs input suppression that Phase 24's ControlSchemeManager
    provides anyway.
 3. **Demo fixture**: hand-authored JSON vs exported from a real editor
    session. Default: author in the editor, save, commit the JSON — proves the
