@@ -39,7 +39,7 @@ interface StairEntry {
 }
 
 interface ShapeEntry {
-  mesh:     THREE.Mesh;
+  meshes:   THREE.Mesh[];   // [cap, side] — same transform, same editorId
   collider: RAPIER.Collider | null;
 }
 
@@ -299,7 +299,7 @@ export class ZoneManager {
           const she = this._loadedZones.get(zoneId)?.shapeEntries.get(id);
           if (she) {
             const p = changes.position;
-            she.mesh.position.set(p.x, p.y, p.z);
+            for (const m of she.meshes) m.position.set(p.x, p.y, p.z);
             she.collider?.setTranslation({ x: p.x, y: p.y, z: p.z });
             return;
           }
@@ -532,9 +532,9 @@ export class ZoneManager {
 
     // ── Shapes ────────────────────────────────────────────────────────────
     for (const shape of zone.shapes ?? []) {
-      const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
-      shapesGroup.add(mesh);
-      shapeEntries.set(shape.id, { mesh, collider });
+      const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
+      for (const m of meshes) shapesGroup.add(m);
+      shapeEntries.set(shape.id, { meshes, collider });
     }
 
     // ── Objects ───────────────────────────────────────────────────────────
@@ -931,9 +931,9 @@ export class ZoneManager {
   private async _addShape(zoneId: string, shape: ShapeDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
-    const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
-    entry.shapesGroup.add(mesh);
-    entry.shapeEntries.set(shape.id, { mesh, collider });
+    const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
+    for (const m of meshes) entry.shapesGroup.add(m);
+    entry.shapeEntries.set(shape.id, { meshes, collider });
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId: shape.id });
   }
@@ -949,23 +949,25 @@ export class ZoneManager {
     const shape = zone.shapes?.find(s => s.id === shapeId);
     if (!shape) return;
 
-    const { mesh, collider } = await ShapeBuilder.build(shape, zoneId);
+    const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
 
     // If a newer rebuild started while we were awaiting, discard this stale result
     if (this._shapeBuildTokens.get(shapeId) !== myToken) {
-      mesh.geometry.dispose();
-      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
-        (mesh.material as THREE.Material).dispose();
+      for (const m of meshes) {
+        m.geometry.dispose();
+        if ((m.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+          (m.material as THREE.Material).dispose();
+      }
       if (collider) physicsWorld.removeCollider(collider);
       return;
     }
 
-    // Atomically swap: remove old mesh then add the fresh one
+    // Atomically swap: remove old meshes then add the fresh ones
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
     this._removeShape(zoneId, shapeId);
-    entry.shapesGroup.add(mesh);
-    entry.shapeEntries.set(shapeId, { mesh, collider });
+    for (const m of meshes) entry.shapesGroup.add(m);
+    entry.shapeEntries.set(shapeId, { meshes, collider });
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId });
   }
@@ -978,12 +980,14 @@ export class ZoneManager {
     if (!she) return;
 
     if (she.collider) physicsWorld.removeCollider(she.collider);
-    const orig = this._dimmedMeshes.get(she.mesh);
-    if (orig) { she.mesh.material = orig; this._dimmedMeshes.delete(she.mesh); }
-    entry.shapesGroup.remove(she.mesh);
-    she.mesh.geometry.dispose();
-    if ((she.mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
-      (she.mesh.material as THREE.Material).dispose();
+    for (const m of she.meshes) {
+      const orig = this._dimmedMeshes.get(m);
+      if (orig) { m.material = orig; this._dimmedMeshes.delete(m); }
+      entry.shapesGroup.remove(m);
+      m.geometry.dispose();
+      if ((m.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (m.material as THREE.Material).dispose();
+    }
     entry.shapeEntries.delete(shapeId);
   }
 
@@ -1126,7 +1130,7 @@ export class ZoneManager {
       if (se) { se.group.visible = visible; for (const c of se.colliders) c.setEnabled(visible); return true; }
 
       const she = entry.shapeEntries.get(id);
-      if (she) { she.mesh.visible = visible; she.collider?.setEnabled(visible); return true; }
+      if (she) { for (const m of she.meshes) m.visible = visible; she.collider?.setEnabled(visible); return true; }
 
       const fc = entry.floorColliders.get(id);
       if (fc) {
@@ -1317,7 +1321,7 @@ export class ZoneManager {
 
       for (const shape of zone.shapes ?? []) {
         const she = entry.shapeEntries.get(shape.id);
-        if (she) she.mesh.visible = !this._isHidden(shape.groupIds);
+        if (she) { const v = !this._isHidden(shape.groupIds); for (const m of she.meshes) m.visible = v; }
       }
 
       // A merged wall run spans multiple walls — hide it only when every wall in the run is hidden.

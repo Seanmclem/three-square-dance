@@ -6,7 +6,7 @@ import type {
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef,
 } from "@/types";
-import { resolveShapeParams } from "@/builders/ShapeBuilder";
+import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -217,6 +217,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (platData)  return `${platData.size.width}×${platData.size.depth}`;
       if (stairData) return `${effectiveSteps(stairData)} steps`;
       if (shapeData) {
+        if (isBrush(shapeData)) return `brush · ${shapeData.mesh!.vertices.length} corners`;
         const p = resolveShapeParams(shapeData);
         if (shapeData.kind === "cylinder") return `r ${p.radiusBottom} · ${p.radialSegments} seg`;
         if (shapeData.kind === "wedge")    return `${p.width}×${p.depth} · h ${p.heightHigh}`;
@@ -288,7 +289,8 @@ function objectTypeLabel(selected: SelectedObjectPayload): string {
   if (type === "trigger-volume") return "TRIGGER VOLUME";
   if (type === "shape") {
     const d = selected.data as ShapeDef | null;
-    return `${(d?.kind ?? "shape").toUpperCase()} · LEVEL ${d?.floorLevel ?? 0}`;
+    const kind = d && isBrush(d) ? "brush" : (d?.kind ?? "shape");
+    return `${kind.toUpperCase()} · LEVEL ${d?.floorLevel ?? 0}`;
   }
   return type.toUpperCase();
 }
@@ -760,7 +762,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
-  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
+  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} />;
   return null;
 }
 
@@ -1253,10 +1255,40 @@ const SHAPE_PARAM_FIELDS: Record<ShapeDef["kind"], Array<{ key: keyof ShapeDef; 
   ],
 };
 
-function ShapeGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void }) {
+function ShapeGeoView({ selected, onObjectUpdate, bus }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus }) {
   const shape  = selected.data as ShapeDef | null;
+  const brush  = !!shape && isBrush(shape);
   const fields = SHAPE_PARAM_FIELDS[shape?.kind ?? "box"];
   const resolved = shape ? resolveShapeParams(shape) : null;
+  const [resizeOn, setResizeOn] = useState(false);
+  const [addArmed, setAddArmed] = useState(false);
+
+  // Resize handles + add-corner arming are per-selection editor state.
+  useEffect(() => {
+    setResizeOn(false);
+    setAddArmed(false);
+  }, [selected.id]);
+  // Clear the armed cursor / handles when this screen unmounts.
+  useEffect(() => () => {
+    bus?.emit("shape:add-corner", { armed: false });
+  }, [bus]);
+
+  const toggleResize = (on: boolean) => { setResizeOn(on); bus?.emit("shape:resize-toggle", { enabled: on }); };
+  const armAddCorner = () => {
+    const next = !addArmed;
+    setAddArmed(next);
+    bus?.emit("shape:add-corner", { armed: next });
+  };
+  const convertToBrush = () => {
+    if (!shape) return;
+    const pts = ShapeBuilder.localHullPoints(shape);
+    const vertices: Vec3[] = [];
+    for (let i = 0; i < pts.length; i += 3) {
+      vertices.push({ x: +pts[i]!.toFixed(3), y: +pts[i + 1]!.toFixed(3), z: +pts[i + 2]!.toFixed(3) });
+    }
+    onObjectUpdate({ mesh: { vertices } } as unknown as Partial<WorldObject>);
+  };
+  const revertToParams = () => onObjectUpdate({ mesh: undefined } as unknown as Partial<WorldObject>);
 
   const paramStrs = (): Record<string, string> => {
     const out: Record<string, string> = {};
@@ -1331,21 +1363,60 @@ function ShapeGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
         </div>
       ))}
 
-      <div>
-        <div style={LABEL}>{shape.kind.toUpperCase()} PARAMS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {fields.map(f => (
-            <div key={f.key}>
-              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{f.label}</div>
-              <input type="number" step={f.step} min={f.min} max={f.max} value={params[f.key] ?? ""}
-                style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                onChange={e => { const v = e.target.value; setParams(p => ({ ...p, [f.key]: v })); schedule(() => commitParam(f, v)); }}
-                onBlur={e => flush(() => commitParam(f, e.target.value))}
-                onKeyDown={e => { if (e.key === "Enter") flush(() => commitParam(f, (e.target as HTMLInputElement).value)); }}
-              />
-            </div>
-          ))}
+      {!brush && (
+        <div>
+          <div style={LABEL}>{shape.kind.toUpperCase()} PARAMS</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            {fields.map(f => (
+              <div key={f.key}>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{f.label}</div>
+                <input type="number" step={f.step} min={f.min} max={f.max} value={params[f.key] ?? ""}
+                  style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { const v = e.target.value; setParams(p => ({ ...p, [f.key]: v })); schedule(() => commitParam(f, v)); }}
+                  onBlur={e => flush(() => commitParam(f, e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitParam(f, (e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+            ))}
+          </div>
         </div>
+      )}
+
+      {!brush && (
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={resizeOn} onChange={e => toggleResize(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RESIZE HANDLES</span>
+        </label>
+      )}
+
+      <div>
+        <div style={LABEL}>BRUSH</div>
+        {!brush ? (
+          <>
+            <button style={SHAPE_ACTION_BTN} onClick={convertToBrush}>Convert to Brush</button>
+            <div style={{ color: "#404050", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
+              Bakes the {shape.kind}'s corners into an editable convex solid. Params above
+              stop applying; drag corners instead.
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", marginBottom: 6 }}>
+              {shape.mesh!.vertices.length} corners
+            </div>
+            <button
+              style={{ ...SHAPE_ACTION_BTN, ...(addArmed ? { background: "rgba(80,140,255,0.25)", color: "#80aaff" } : {}) }}
+              onClick={armAddCorner}
+            >
+              {addArmed ? "Click the brush to add… (Esc)" : "+ Add corner"}
+            </button>
+            <button style={{ ...SHAPE_ACTION_BTN, marginTop: 6 }} onClick={revertToParams}>Revert to {shape.kind} params</button>
+            <div style={{ color: "#404050", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
+              Drag a corner sphere to reshape (Alt = no snap). Right-click a corner to
+              delete it. The solid always stays convex.
+            </div>
+          </>
+        )}
       </div>
 
       <div>
@@ -1358,6 +1429,12 @@ function ShapeGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     </div>
   );
 }
+
+const SHAPE_ACTION_BTN: React.CSSProperties = {
+  width: "100%", padding: "7px 0", borderRadius: 5,
+  border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
+  color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+};
 
 // ── StairGeoView ──────────────────────────────────────────────────────────────
 
@@ -2431,15 +2508,30 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
 function ShapeMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
   const shape = selected.data as ShapeDef | null;
   return (
-    <MaterialSection
-      key={selected.id}
-      materialList={materialList}
-      currentMaterialId={shape?.material ?? "concrete_01"}
-      overrides={shape?.materialOverrides}
-      onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
-      onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
-      onAddMaterial={onAddMaterial}
-    />
+    <>
+      <MaterialSection
+        key={selected.id + ":caps"}
+        label="TOP / BOTTOM"
+        defaultExpanded={false}
+        materialList={materialList}
+        currentMaterialId={shape?.material ?? "concrete_01"}
+        overrides={shape?.materialOverrides}
+        onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
+        onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+        onAddMaterial={onAddMaterial}
+      />
+      <MaterialSection
+        key={selected.id + ":sides"}
+        label="SIDES"
+        defaultExpanded={false}
+        materialList={materialList}
+        currentMaterialId={shape?.sideMaterial ?? shape?.material ?? "concrete_01"}
+        overrides={shape?.sideMaterialOverrides}
+        onMaterialChange={id => onObjectUpdate({ sideMaterial: id, sideMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
+        onOverridesChange={ov => onObjectUpdate({ sideMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
+        onAddMaterial={onAddMaterial}
+      />
+    </>
   );
 }
 

@@ -1,18 +1,22 @@
 import * as THREE from "three";
+import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import type { ShapeDef, MeshUserData } from "@/types";
+import type { ShapeDef, MeshUserData, MaterialOverrides } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface ShapeBuildOutput {
-  mesh:     THREE.Mesh;
+  meshes:   THREE.Mesh[];   // [capMesh (selectable), sideMesh] — same transform, same editorId
   collider: RAPIER.Collider | null;
 }
 
 /** Below this radialSegments count, cylinder sides get flat per-face normals
  *  (crisp tri-prism / hex-pillar look); at or above, smooth analytic normals. */
 export const FLAT_SHADE_MAX_SEGMENTS = 11;
+
+/** Hull faces whose normal is at least this vertical count as "caps" (top/bottom material). */
+const CAP_NY = 0.5;
 
 export interface ResolvedShapeParams {
   radiusTop:      number;
@@ -53,12 +57,19 @@ export function resolveShapeParams(def: ShapeDef): ResolvedShapeParams {
   };
 }
 
-// ── Geometry accumulator ──────────────────────────────────────────────────────
+/** True when the def is in brush mode (local vertex cloud supersedes kind params). */
+export function isBrush(def: ShapeDef): boolean {
+  return (def.mesh?.vertices?.length ?? 0) >= 4;
+}
+
+// ── Geometry accumulators ─────────────────────────────────────────────────────
 // All faces are emitted with explicit per-corner normals/UVs (cylinder corners
 // differ per vertex, so PlatformBuilder's rect-UV pushFace doesn't fit).
 // Winding convention: corners CCW viewed from outside; indices (0,1,2),(0,2,3).
 
 interface GeoBuf { pos: number[]; nrm: number[]; uv: number[]; idx: number[]; vi: number }
+
+const newBuf = (): GeoBuf => ({ pos: [], nrm: [], uv: [], idx: [], vi: 0 });
 
 type V3 = readonly [number, number, number];
 
@@ -141,17 +152,30 @@ function makeGeo(b: GeoBuf): THREE.BufferGeometry {
   return geo;
 }
 
+/** Concatenate two GeoBufs (for the single-geometry ghost/merged path). */
+function mergeBufs(a: GeoBuf, b: GeoBuf): GeoBuf {
+  return {
+    pos: [...a.pos, ...b.pos],
+    nrm: [...a.nrm, ...b.nrm],
+    uv:  [...a.uv,  ...b.uv],
+    idx: [...a.idx, ...b.idx.map(i => i + a.vi)],
+    vi:  a.vi + b.vi,
+  };
+}
+
 // ── Per-kind local-space geometry (XZ-centered, base at y = 0) ────────────────
+// Each builder fills TWO buffers: `cap` (top/bottom faces — `material`) and
+// `side` (lateral faces — `sideMaterial`, falling back to `material`).
 
 const CONE_EPS = 1e-3;
 
-function buildCylinderGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeometry {
+function buildCylinderBufs(p: ResolvedShapeParams, tsCap: number, tsSide: number): { cap: GeoBuf; side: GeoBuf } {
   const { radiusTop: rT, radiusBottom: rB, height: h, radialSegments: seg } = p;
   const isCone = rT < CONE_EPS;
   const flat   = seg <= FLAT_SHADE_MAX_SEGMENTS;
   const slant  = Math.hypot(h, rB - rT);
-  const vs     = slant / ts;
-  const b: GeoBuf = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+  const vs     = slant / tsSide;
+  const cap = newBuf(), side = newBuf();
 
   // Smooth outward side normal at angle θ: derived from the frustum surface
   // tangents — normalize(h·cosθ, rB − rT, h·sinθ).
@@ -166,51 +190,47 @@ function buildCylinderGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeome
     const b1: V3 = [rB * Math.cos(t1), 0, rB * Math.sin(t1)];
     // Cylindrical metric unwrap: u = arc length in meters ÷ tileScale, per ring
     // (each ring uses its own circumference so cones keep metric density).
-    const ub0 = (t0 * rB) / ts, ub1 = (t1 * rB) / ts;
+    const ub0 = (t0 * rB) / tsSide, ub1 = (t1 * rB) / tsSide;
     const nFlat = sideNormal((t0 + t1) / 2);
     if (isCone) {
       const apex: V3 = [0, h, 0];
       const n0 = flat ? nFlat : sideNormal(t0);
       const n1 = flat ? nFlat : sideNormal(t1);
-      const nA = nFlat;
-      // CCW from outside: (b1, b0, apex)
-      pushTri(b, [b1, b0, apex], [n1, n0, nA], [[ub1, 0], [ub0, 0], [(ub0 + ub1) / 2, vs]]);
+      pushTri(side, [b1, b0, apex], [n1, n0, nFlat], [[ub1, 0], [ub0, 0], [(ub0 + ub1) / 2, vs]]);
     } else {
       const p0: V3 = [rT * Math.cos(t0), h, rT * Math.sin(t0)];
       const p1: V3 = [rT * Math.cos(t1), h, rT * Math.sin(t1)];
-      const ut0 = (t0 * rT) / ts, ut1 = (t1 * rT) / ts;
+      const ut0 = (t0 * rT) / tsSide, ut1 = (t1 * rT) / tsSide;
       const n0 = flat ? nFlat : sideNormal(t0);
       const n1 = flat ? nFlat : sideNormal(t1);
-      // CCW from outside: (b1, b0, t0, t1)
-      pushQuad(b, [b1, b0, p0, p1], [n1, n0, n0, n1],
+      pushQuad(side, [b1, b0, p0, p1], [n1, n0, n0, n1],
         [[ub1, 0], [ub0, 0], [ut0, vs], [ut1, vs]]);
     }
   }
 
   // Caps — triangle fans with planar XZ metric UVs (u = x/ts, v = z/ts).
-  const cap = (y: number, r: number, up: boolean) => {
+  const fan = (y: number, r: number, up: boolean) => {
     const n: V3 = [0, up ? 1 : -1, 0];
     const center: V3 = [0, y, 0];
     for (let i = 0; i < seg; i++) {
       const t0 = (i / seg) * Math.PI * 2, t1 = ((i + 1) / seg) * Math.PI * 2;
       const q0: V3 = [r * Math.cos(t0), y, r * Math.sin(t0)];
       const q1: V3 = [r * Math.cos(t1), y, r * Math.sin(t1)];
-      const uvOf = (v: V3): [number, number] => [v[0] / ts, v[2] / ts];
-      // Top cap winds (center, q1, q0) for +Y; bottom (center, q0, q1) for −Y.
+      const uvOf = (v: V3): [number, number] => [v[0] / tsCap, v[2] / tsCap];
       const tri: [V3, V3, V3] = up ? [center, q1, q0] : [center, q0, q1];
-      pushTri(b, tri, [n, n, n], [uvOf(tri[0]), uvOf(tri[1]), uvOf(tri[2])]);
+      pushTri(cap, tri, [n, n, n], [uvOf(tri[0]), uvOf(tri[1]), uvOf(tri[2])]);
     }
   };
-  cap(0, rB, false);
-  if (!isCone) cap(h, rT, true);
+  fan(0, rB, false);
+  if (!isCone) fan(h, rT, true);
 
-  return makeGeo(b);
+  return { cap, side };
 }
 
-function buildWedgeGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeometry {
+function buildWedgeBufs(p: ResolvedShapeParams, tsCap: number, tsSide: number): { cap: GeoBuf; side: GeoBuf } {
   const { width: w, depth: d, heightLow: hL, heightHigh: hH } = p;
   const hw = w / 2, hd = d / 2;
-  const b: GeoBuf = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+  const cap = newBuf(), side = newBuf();
   const isRamp = hL < 1e-4;
 
   const b00: V3 = [-hw, 0, -hd], b10: V3 = [hw, 0, -hd];
@@ -218,24 +238,24 @@ function buildWedgeGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeometry
   const k00: V3 = [-hw, hH, -hd], k10: V3 = [hw, hH, -hd];   // high edge (−Z)
   const k01: V3 = [-hw, hL, hd],  k11: V3 = [hw, hL, hd];    // low edge (+Z)
 
-  pushQuadMetric(b, b00, b10, b11, b01, ts);                 // bottom (−Y)
-  pushQuadMetric(b, b10, b00, k00, k10, ts);                 // back (−Z)
-  pushQuadMetric(b, k00, k01, k11, k10, ts);                 // sloped top
+  pushQuadMetric(cap, b00, b10, b11, b01, tsCap);            // bottom (−Y)
+  pushQuadMetric(cap, k00, k01, k11, k10, tsCap);            // sloped top (walkable face)
+  pushQuadMetric(side, b10, b00, k00, k10, tsSide);          // back (−Z)
   if (isRamp) {
-    pushTriMetric(b, b00, b01, k00, ts);                     // −X side (triangle)
-    pushTriMetric(b, b11, b10, k10, ts);                     // +X side (triangle)
+    pushTriMetric(side, b00, b01, k00, tsSide);              // −X side (triangle)
+    pushTriMetric(side, b11, b10, k10, tsSide);              // +X side (triangle)
   } else {
-    pushQuadMetric(b, b01, b11, k11, k01, ts);               // front (+Z)
-    pushQuadMetric(b, b00, b01, k01, k00, ts);               // −X side (trapezoid)
-    pushQuadMetric(b, b11, b10, k10, k11, ts);               // +X side (trapezoid)
+    pushQuadMetric(side, b01, b11, k11, k01, tsSide);        // front (+Z)
+    pushQuadMetric(side, b00, b01, k01, k00, tsSide);        // −X side (trapezoid)
+    pushQuadMetric(side, b11, b10, k10, k11, tsSide);        // +X side (trapezoid)
   }
-  return makeGeo(b);
+  return { cap, side };
 }
 
-function buildFlexBoxGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeometry {
+function buildFlexBoxBufs(p: ResolvedShapeParams, tsCap: number, tsSide: number): { cap: GeoBuf; side: GeoBuf } {
   const { width: w, depth: d, height: h, taperX: tx, taperZ: tz, shearX: sx, shearZ: sz } = p;
   const hw = w / 2, hd = d / 2;
-  const b: GeoBuf = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+  const cap = newBuf(), side = newBuf();
 
   const b00: V3 = [-hw, 0, -hd], b10: V3 = [hw, 0, -hd];
   const b11: V3 = [hw, 0, hd],   b01: V3 = [-hw, 0, hd];
@@ -244,35 +264,93 @@ function buildFlexBoxGeo(p: ResolvedShapeParams, ts: number): THREE.BufferGeomet
 
   // Top/bottom edges of every side face stay parallel to X or Z for any
   // taper/shear, so all six faces remain planar quads.
-  pushQuadMetric(b, b00, b10, b11, b01, ts);   // bottom (−Y)
-  pushQuadMetric(b, t00, t01, t11, t10, ts);   // top (+Y)
-  pushQuadMetric(b, b10, b00, t00, t10, ts);   // −Z
-  pushQuadMetric(b, b01, b11, t11, t01, ts);   // +Z
-  pushQuadMetric(b, b11, b10, t10, t11, ts);   // +X
-  pushQuadMetric(b, b00, b01, t01, t00, ts);   // −X
-  return makeGeo(b);
+  pushQuadMetric(cap, b00, b10, b11, b01, tsCap);    // bottom (−Y)
+  pushQuadMetric(cap, t00, t01, t11, t10, tsCap);    // top (+Y)
+  pushQuadMetric(side, b10, b00, t00, t10, tsSide);  // −Z
+  pushQuadMetric(side, b01, b11, t11, t01, tsSide);  // +Z
+  pushQuadMetric(side, b11, b10, t10, t11, tsSide);  // +X
+  pushQuadMetric(side, b00, b01, t01, t00, tsSide);  // −X
+  return { cap, side };
+}
+
+/**
+ * Brush mode: triangulate the convex hull of the local vertex cloud. Faces with
+ * |normal.y| ≥ CAP_NY go to the cap buffer, the rest to sides. Per-face metric
+ * UVs use a basis derived from the normal alone, so coplanar hull triangles
+ * share the same projection (no seams within a flat face).
+ */
+function buildHullBufs(def: ShapeDef, tsCap: number, tsSide: number): { cap: GeoBuf; side: GeoBuf } | null {
+  const verts = def.mesh!.vertices;
+  let hull: THREE.BufferGeometry;
+  try {
+    hull = new ConvexGeometry(verts.map(v => new THREE.Vector3(v.x, v.y, v.z)));
+  } catch {
+    console.warn(`ShapeBuilder: degenerate brush hull for "${def.id}" — falling back to kind params`);
+    return null;
+  }
+  const cap = newBuf(), side = newBuf();
+  const pos = hull.attributes["position"] as THREE.BufferAttribute;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  const n = new THREE.Vector3(), u = new THREE.Vector3(), v = new THREE.Vector3();
+  const UP = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0);
+  for (let i = 0; i < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+    n.crossVectors(_va.subVectors(b, a), _vb.subVectors(c, a)).normalize();
+    const isCap = Math.abs(n.y) >= CAP_NY;
+    const ts = isCap ? tsCap : tsSide;
+    // Deterministic per-normal basis → coplanar triangles get identical UVs.
+    if (Math.abs(n.y) > 0.99) u.copy(X); else u.crossVectors(UP, n).normalize();
+    v.crossVectors(n, u);
+    const uvOf = (p: THREE.Vector3): [number, number] => [p.dot(u) / ts, p.dot(v) / ts];
+    const nn: V3 = [n.x, n.y, n.z];
+    pushTri(isCap ? cap : side,
+      [[a.x, a.y, a.z], [b.x, b.y, b.z], [c.x, c.y, c.z]],
+      [nn, nn, nn], [uvOf(a), uvOf(b), uvOf(c)]);
+  }
+  hull.dispose();
+  return { cap, side };
+}
+
+function buildBufs(def: ShapeDef, tsCap: number, tsSide: number): { cap: GeoBuf; side: GeoBuf } {
+  if (isBrush(def)) {
+    const hull = buildHullBufs(def, tsCap, tsSide);
+    if (hull) return hull;
+  }
+  const p = resolveShapeParams(def);
+  switch (def.kind) {
+    case "cylinder": return buildCylinderBufs(p, tsCap, tsSide);
+    case "wedge":    return buildWedgeBufs(p, tsCap, tsSide);
+    case "box":      return buildFlexBoxBufs(p, tsCap, tsSide);
+  }
 }
 
 // ── Builder ───────────────────────────────────────────────────────────────────
 
 export class ShapeBuilder {
-  /** Pure local-space geometry — used by build(), the tool ghost preview, and tests. */
+  /** Merged single geometry — tool ghost + tests. */
   static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry {
-    const p = resolveShapeParams(def);
-    switch (def.kind) {
-      case "cylinder": return buildCylinderGeo(p, tileScale);
-      case "wedge":    return buildWedgeGeo(p, tileScale);
-      case "box":      return buildFlexBoxGeo(p, tileScale);
-    }
+    const { cap, side } = buildBufs(def, tileScale, tileScale);
+    return makeGeo(mergeBufs(cap, side));
+  }
+
+  /** Cap/side split for the two-material build. */
+  static buildLocalGeometrySplit(def: ShapeDef, tsCap: number, tsSide: number): { cap: THREE.BufferGeometry; side: THREE.BufferGeometry } {
+    const bufs = buildBufs(def, tsCap, tsSide);
+    return { cap: makeGeo(bufs.cap), side: makeGeo(bufs.side) };
   }
 
   /**
-   * Convex-hull vertex cloud in LOCAL space (rings/corners). All three kinds are
-   * convex by construction, so the hull is exact; ColliderBuilder.registerShape
+   * Convex-hull vertex cloud in LOCAL space (rings/corners, or the brush cloud).
+   * All shapes are convex, so the hull is exact; ColliderBuilder.registerShape
    * applies the def's position/rotation on the collider — same transform as the
    * mesh, so the two can never drift.
    */
   static localHullPoints(def: ShapeDef): Float32Array {
+    if (isBrush(def)) {
+      const pts: number[] = [];
+      for (const v of def.mesh!.vertices) pts.push(v.x, v.y, v.z);
+      return new Float32Array(pts);
+    }
     const p = resolveShapeParams(def);
     const pts: number[] = [];
     if (def.kind === "cylinder") {
@@ -299,40 +377,57 @@ export class ShapeBuilder {
   }
 
   static async build(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
-    const ovr     = shape.materialOverrides;
-    const baseDef = assetManager.getMaterialDef(shape.material);
-    const tileScale = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
+    const capOvr  = shape.materialOverrides;
+    const capDef  = assetManager.getMaterialDef(shape.material);
+    const tsCap   = capOvr?.tileScale ?? capDef?.tileScale ?? 1.0;
 
-    const mat = ovr
-      ? await assetManager.getMaterialWithOverrides(shape.material, ovr)
-          .catch(() => assetManager.getDefaultMaterial(0x667788))
-      : await assetManager.getMaterial(shape.material)
-          .catch(() => assetManager.getDefaultMaterial(0x667788));
+    const sideId  = shape.sideMaterial;
+    const sideOvr = shape.sideMaterialOverrides;
+    const sideDef = sideId ? assetManager.getMaterialDef(sideId) : null;
+    const tsSide  = sideOvr?.tileScale ?? sideDef?.tileScale ?? tsCap;
 
-    const geo = ShapeBuilder.buildLocalGeometry(shape, tileScale);
-    applyUVOffset(geo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
+    const loadMat = (id: string, ovr: MaterialOverrides | undefined) =>
+      ovr
+        ? assetManager.getMaterialWithOverrides(id, ovr).catch(() => assetManager.getDefaultMaterial(0x667788))
+        : assetManager.getMaterial(id).catch(() => assetManager.getDefaultMaterial(0x667788));
 
-    const mesh = new THREE.Mesh(geo, mat);
-    // Local-space contract: geometry stays local; position/rotation are the mesh
-    // transform (mirrored onto the collider), never baked into vertices.
-    mesh.position.set(shape.position.x, shape.position.y, shape.position.z);
-    mesh.rotation.set(
-      THREE.MathUtils.degToRad(shape.rotation.x),
-      THREE.MathUtils.degToRad(shape.rotation.y),
-      THREE.MathUtils.degToRad(shape.rotation.z),
-    );
-    mesh.castShadow    = true;
-    mesh.receiveShadow = true;
-    mesh.userData = {
-      editorId:      shape.id,
-      editorType:    "shape",
-      zoneId,
-      selectable:    true,
-      floorLevel:    shape.floorLevel ?? 0,
-      _ownsMaterial: !!ovr,
-    } satisfies MeshUserData;
+    const capMat  = await loadMat(shape.material, capOvr);
+    const sideMat = sideId ? await loadMat(sideId, sideOvr) : capMat;
+
+    const { cap, side } = ShapeBuilder.buildLocalGeometrySplit(shape, tsCap, tsSide);
+    applyUVOffset(cap,  capOvr?.offsetX ?? 0, capOvr?.offsetY ?? 0);
+    // Sides fall back to cap offsets when no separate side material (platform convention).
+    applyUVOffset(side, sideOvr?.offsetX ?? capOvr?.offsetX ?? 0, sideOvr?.offsetY ?? capOvr?.offsetY ?? 0);
+
+    const mk = (geo: THREE.BufferGeometry, mat: THREE.Material, owns: boolean): THREE.Mesh => {
+      const mesh = new THREE.Mesh(geo, mat);
+      // Local-space contract: geometry stays local; position/rotation are the mesh
+      // transform (mirrored onto the collider), never baked into vertices.
+      mesh.position.set(shape.position.x, shape.position.y, shape.position.z);
+      mesh.rotation.set(
+        THREE.MathUtils.degToRad(shape.rotation.x),
+        THREE.MathUtils.degToRad(shape.rotation.y),
+        THREE.MathUtils.degToRad(shape.rotation.z),
+      );
+      mesh.castShadow    = true;
+      mesh.receiveShadow = true;
+      // BOTH meshes are selectable (unlike platforms): clicking a side face should
+      // select the shape, and decals project onto selectable meshes only.
+      mesh.userData = {
+        editorId:      shape.id,
+        editorType:    "shape",
+        zoneId,
+        selectable:    true,
+        floorLevel:    shape.floorLevel ?? 0,
+        _ownsMaterial: owns,
+      } satisfies MeshUserData;
+      return mesh;
+    };
+
+    const capMesh  = mk(cap,  capMat,  !!capOvr);
+    const sideMesh = mk(side, sideMat, !!(sideId && sideOvr));
 
     const collider = ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape));
-    return { mesh, collider };
+    return { meshes: [capMesh, sideMesh], collider };
   }
 }

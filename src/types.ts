@@ -146,6 +146,10 @@ export interface BusEvents {
   "shape:updated":         { zoneId: string; id: string; changes: Partial<ShapeDef> };
   "shape:removed":         { zoneId: string; id: string };
   "shape:rebuilt":         { zoneId: string; shapeId: string };
+  // Geometry-panel toggle → ShapeResizer face handles (per current selection).
+  "shape:resize-toggle":   { enabled: boolean };
+  // Geometry-panel "add corner" arm → BrushVertexEditor (next click on the brush inserts a vertex).
+  "shape:add-corner":      { armed: boolean };
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
@@ -508,6 +512,16 @@ export interface StairDef {
 export type ShapeKind = "cylinder" | "wedge" | "box";
 
 /**
+ * Brush mode (v4.10.0): a LOCAL-space convex vertex cloud that supersedes the kind
+ * params when present. Geometry + collider are both the convex hull of these points,
+ * so any vertex arrangement stays a valid solid (interior/coplanar points are simply
+ * absorbed by the hull). `kind` is kept as provenance.
+ */
+export interface ShapeBrushMesh {
+  vertices: Vec3[];   // local space (same contract as generated geometry)
+}
+
+/**
  * A parametric solid (cylinder/cone, wedge/ramp, flexible box). Geometry is ALWAYS
  * generated in LOCAL space — footprint centered on the XZ origin, base at local
  * y = 0 (position.y = bottom, the platform convention). `position`/`rotation` are
@@ -521,11 +535,14 @@ export interface ShapeDef {
   label?:    string;            // optional human-friendly name; falls back to id
   kind:      ShapeKind;
   position:  Vec3;
-  rotation:  Euler3;            // degrees XYZ; gizmo edits Y, panel edits all three
-  material:  string;
+  rotation:  Euler3;            // degrees XYZ
+  material:  string;            // caps (top/bottom faces)
   materialOverrides?: MaterialOverrides;
+  sideMaterial?:          string;             // side faces; absent → same as material
+  sideMaterialOverrides?: MaterialOverrides;
   floorLevel?: number;
   groupIds?:   string[];
+  mesh?:     ShapeBrushMesh;    // brush mode — supersedes the kind params below
   // cylinder / cone
   radiusTop?:      number;      // default 1; 0 → cone (no top cap)
   radiusBottom?:   number;      // default 1

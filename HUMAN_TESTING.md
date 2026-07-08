@@ -174,8 +174,21 @@ wall-run/floor mesh.
      **shear X/Z** (leaning blocks).
    Plus position, full XYZ rotation, floor level; **Material** screen for the texture.
 4. Gizmos: **T** translate, **R** rotate (all three rings work — tip a cylinder onto
-   its side, lean a box). No scale gizmo — resize through the params. Delete, copy/paste (Cmd+C/V), duplicate (Cmd+D),
-   groups, and script despawn/move all work like other entities. Everything undoable.
+   its side, lean a box). No scale gizmo — resize through the params or the
+   **RESIZE HANDLES** checkbox in the Geometry screen: axis-colored cubes on each face;
+   drag to push/pull (opposite face stays pinned, cylinder handles change the radius,
+   the top handle changes height; Alt = no grid snap). Delete, copy/paste (Cmd+C/V),
+   duplicate (Cmd+D), groups, and script despawn/move all work like other entities.
+   Everything undoable.
+5. Materials: the **Material** screen has separate **TOP / BOTTOM** and **SIDES**
+   sections (like platforms) — e.g. brick sides with a concrete top.
+6. **Brush editing (arbitrary convex solids):** in the Geometry screen press
+   **Convert to Brush**. Amber spheres appear on every corner — drag one to reshape
+   (the solid re-derives as a convex hull live; Alt = no snap), **right-click** a corner
+   to delete it, **+ Add corner** then click anywhere on the brush to add one (it starts
+   on the surface — drag it outward to grow a new point). **Revert to … params** goes
+   back to the parametric shape. The solid always stays convex, and collision always
+   matches exactly.
 
 ---
 

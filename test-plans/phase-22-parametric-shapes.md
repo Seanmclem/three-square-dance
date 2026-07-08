@@ -76,6 +76,21 @@ persist — TESTING.md §3).
 - Existing content picks/undo/preview unaffected (shapes are additive arms everywhere;
   `removeShape` never touches `zone.nodes`). ✅
 
+## 6. Phase 22b (v4.10.0) — brush editing · resize handles · cap/side materials
+
+| # | Check | Expected | Status |
+|---|---|---|---|
+| 1 | Shape with `sideMaterial` | 2 meshes (cap 4 tris + side 8 tris on a box), 2 distinct materials, BOTH selectable | ✅ |
+| 2 | Convert to Brush (panel button) | `mesh.vertices` = 8 baked corners, hull mesh, 8 amber handles, panel switches to brush UI | ✅ |
+| 3 | Drag a corner sphere | Hull morphs live; vertex snapped 0.25 local; one undo step | ✅ (1,2,−1)→(2,3,−2.25) |
+| 4 | + Add corner → click a face | Vertex inserted at hit point (9 corners), selection kept | ✅ |
+| 5 | Right-click a corner | Deleted (min 4 enforced) | ✅ 9→8 |
+| 6 | RESIZE HANDLES checkbox | 5 axis-tinted face handles appear alongside the translate gizmo | ✅ |
+| 7 | +Y handle drag | height 2→3.5 snapped, base pinned | ✅ |
+| 8 | Radial handle drag (cylinder) | Both radii 1→2.25, center pinned | ✅ |
+| 9 | ±X handle drag (box) | width grows, opposite face byte-stable (−X face at exactly 17.000) | ✅ |
+| 10 | Console + vite overlay | clean | ✅ |
+
 ## Known limits (by design)
 
 - `change_material` script action stays object-only (same as platforms/stairs).

@@ -16,6 +16,8 @@ import { PlatformTool } from "@/editor/PlatformTool";
 import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
 import { ShapeTool } from "@/editor/ShapeTool";
+import { ShapeResizer } from "@/editor/ShapeResizer";
+import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -208,6 +210,8 @@ export default function App() {
     const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus, history);
     const stairTool          = new StairTool(scene.scene, world, bus, history);
     const shapeTool          = new ShapeTool(scene.scene, world, bus, history);
+    const shapeResizer       = new ShapeResizer(scene.scene, world, bus, scene.camera, canvas);
+    const brushVertexEditor  = new BrushVertexEditor(scene.scene, world, bus, scene.camera, canvas);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
@@ -258,6 +262,8 @@ export default function App() {
     polyPlatformTool.init();
     stairTool.init();
     shapeTool.init();
+    shapeResizer.init();
+    brushVertexEditor.init();
     objectTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -583,6 +589,8 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      brushVertexEditor.dispose();
+      shapeResizer.dispose();
       shapeTool.dispose();
       stairTool.dispose();
       polyPlatformTool.dispose();

@@ -66,6 +66,7 @@ export class GizmoManager implements IEditorModule {
   } | null = null;
 
   private _objInitialScale = new THREE.Vector3(1, 1, 1);
+  private readonly _tmp = new THREE.Vector3();
 
   private _unsubs: Array<() => void> = [];
 
@@ -1346,10 +1347,19 @@ export class GizmoManager implements IEditorModule {
    * body and further ring drags orbit the shape around it.
    */
   private _shapePivotWorld(shape: ShapeDef): THREE.Vector3 {
-    const p = resolveShapeParams(shape);
-    const h = shape.kind === "wedge" ? Math.max(p.heightLow, p.heightHigh) : p.height;
+    const center = new THREE.Vector3();
+    if (shape.mesh?.vertices?.length) {
+      // Brush mode: local bbox center of the vertex cloud.
+      const box = new THREE.Box3();
+      for (const v of shape.mesh.vertices) box.expandByPoint(this._tmp.set(v.x, v.y, v.z));
+      box.getCenter(center);
+    } else {
+      const p = resolveShapeParams(shape);
+      const h = shape.kind === "wedge" ? Math.max(p.heightLow, p.heightHigh) : p.height;
+      center.set(0, h / 2, 0);
+    }
     const D2R = Math.PI / 180;
-    const center = new THREE.Vector3(0, h / 2, 0).applyEuler(
+    center.applyEuler(
       new THREE.Euler(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ"),
     );
     return center.add(new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z));
