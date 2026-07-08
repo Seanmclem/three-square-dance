@@ -1183,13 +1183,23 @@ export class GizmoManager implements IEditorModule {
         break;
       }
       case "shape": {
-        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        // Full XYZ commit: read the tracked mesh's rotation after detach (like the
+        // object case) so X/Z ring drags stick — _pivotYaw() alone would drop them.
+        // The mesh's parent (shapesGroup) has an identity transform, so its local
+        // Euler (XYZ, same order ShapeBuilder applies) IS the world rotation.
+        const mesh = this._trackedMeshes[0]?.obj;
         const shape = this._getShape();
-        if (!shape) break;
-        // Absolute yaw from the pivot; X/Z tilt is panel-only — preserve it.
-        const rotY = THREE.MathUtils.radToDeg(this._pivotYaw());
+        if (!mesh || !shape) break;
+        const DEG = THREE.MathUtils.radToDeg;
+        const rx = DEG(mesh.rotation.x), ry = DEG(mesh.rotation.y), rz = DEG(mesh.rotation.z);
+        // No-op drag (ring clicked, not turned): don't write decomposition noise.
+        const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
+        if (near(rx, shape.rotation.x) && near(ry, shape.rotation.y) && near(rz, shape.rotation.z)) {
+          this._resetLiveRotate();
+          break;
+        }
         this._worldState.updateShape(this._selZoneId!, this._selId!, {
-          rotation: { x: shape.rotation.x, y: rotY, z: shape.rotation.z },
+          rotation: { x: rx, y: ry, z: rz },
         });
         break;
       }

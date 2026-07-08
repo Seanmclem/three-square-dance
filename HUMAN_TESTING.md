@@ -173,8 +173,8 @@ wall-run/floor mesh.
    - Box: width/depth/height + **taper X/Z** (pyramid/trapezoid tops) and
      **shear X/Z** (leaning blocks).
    Plus position, full XYZ rotation, floor level; **Material** screen for the texture.
-4. Gizmos: **T** translate, **R** rotate (yaw ring; X/Z tilt via the panel). No scale
-   gizmo — resize through the params. Delete, copy/paste (Cmd+C/V), duplicate (Cmd+D),
+4. Gizmos: **T** translate, **R** rotate (all three rings work — tip a cylinder onto
+   its side, lean a box). No scale gizmo — resize through the params. Delete, copy/paste (Cmd+C/V), duplicate (Cmd+D),
    groups, and script despawn/move all work like other entities. Everything undoable.
 
 ---
