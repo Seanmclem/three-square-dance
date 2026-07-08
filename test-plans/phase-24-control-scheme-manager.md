@@ -17,6 +17,13 @@ manual-frame stepping for one-frame edges). Re-run after changes to
   is also z-100. Match on content (`textContent.startsWith("▶")`).
 - `gamepaddisconnected` sets `_padCount` 0 and a stubbed pad never re-fires
   `gamepadconnected` on its own — re-dispatch the event after re-stubbing.
+- **Editing source while a preview session is live** makes Vite HMR dispose the
+  Rapier body under the still-registered old `updateFn` → one
+  `computedGrounded` TypeError, which **kills `SceneManager._loop`** (it
+  re-arms RAF after the callbacks, so any thrown callback ends the loop until
+  reload). Dev-only — the real exit() path unregisters before disposing. Exit
+  preview before editing source, and suspect a dead loop (FPS counter frozen)
+  whenever timing assertions read zero.
 
 ## Step 1 — kbm extraction (no behavior change)
 
