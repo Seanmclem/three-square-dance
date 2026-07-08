@@ -249,10 +249,11 @@ export class ColliderEditor implements IEditorModule {
     return this._world.zones.get(this._activeZoneId)?.objects.find(o => o.id === this._selectedId);
   }
 
-  /** Explicit colliders, or the implicit auto-box for collidable assets. */
+  /** Explicit colliders, else asset-preset colliders (Phase 26), else the implicit auto-box. */
   private _effectiveColliders(obj: WorldObject): { list: AttachedCollider[]; explicit: boolean } {
     if (obj.colliders !== undefined) return { list: obj.colliders, explicit: true };
     const def  = assetManager.getAssetDef(obj.assetId);
+    if (def?.colliders) return { list: def.colliders, explicit: false };
     const aabb = this._objectPlacer.getLocalAABB(obj.id);
     return def?.collidable && aabb
       ? { list: [defaultColliderFromAABB(aabb.center, aabb.size)], explicit: false }

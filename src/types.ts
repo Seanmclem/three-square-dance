@@ -82,6 +82,9 @@ export interface AssetDef {
   dateAdded:    string;
   animations?:  string[];   // GLTF clip names, populated at import (Phase 10.7)
   attribution?: Attribution;
+  // Asset-level preset colliders (Phase 26 baked assets: one box per source shape).
+  // Placement preference: obj.colliders ?? def.colliders ?? auto box. Local space.
+  colliders?:   AttachedCollider[];
 }
 
 export interface AssetManifest {

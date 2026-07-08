@@ -59,7 +59,10 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
-import { dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
+import { dataURLtoArrayBuffer, renderModelThumbnail } from "@/editor/thumbnailRenderer";
+import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
+import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
+import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
 import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef } from "@/types";
 
@@ -129,6 +132,8 @@ export default function App() {
   >(null);
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [texturesDir,     setTexturesDir]      = useState<FileSystemDirectoryHandle | null>(null);
+  // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
+  const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
   const [materialImporterOpen, setMaterialImporterOpen] = useState(false);
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
@@ -1487,6 +1492,68 @@ export default function App() {
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
   };
 
+  // ── Bake shapes → GLB (Phase 26) ──────────────────────────────────────────
+  // The bake itself never mutates the world (sources stay editable); outputs are
+  // independent so a cancelled save-picker doesn't kill the library write.
+  const handleBakeConfirm = async (opts: { name: string; toLibrary: boolean; toFile: boolean }): Promise<void> => {
+    const refs = bakeRefs;
+    setBakeRefs(null);
+    const world = worldRef.current;
+    if (!refs || !world) return;
+    try {
+      const { glb, group, colliders } = await bakeShapes(world, refs);
+      try {
+        if (opts.toFile) {
+          try {
+            if ("showSaveFilePicker" in window) {
+              const handle = await window.showSaveFilePicker({
+                suggestedName: `${opts.name}.glb`,
+                types: [{ description: "glTF Binary", accept: { "model/gltf-binary": [".glb"] } }],
+              });
+              const w = await handle.createWritable();
+              await w.write(glb);
+              await w.close();
+            } else {
+              const url = URL.createObjectURL(new Blob([glb], { type: "model/gltf-binary" }));
+              Object.assign(document.createElement("a"), { href: url, download: `${opts.name}.glb` }).click();
+              URL.revokeObjectURL(url);
+            }
+          } catch (e) {
+            if ((e as DOMException).name !== "AbortError") throw e;   // picker cancel → skip file only
+          }
+        }
+        if (opts.toLibrary) {
+          const dir = await ensureDir(modelsDir, setModelsDir);
+          if (dir) {
+            const thumbUrl = renderModelThumbnail(group);
+            const asset: AssetDef = {
+              id:           opts.name,
+              label:        opts.name,
+              category:     "Baked",
+              path:         `/assets/models/${opts.name}.glb`,
+              ...(thumbUrl ? { thumbnail: `/assets/models/${opts.name}_thumb.png` } : {}),
+              collidable:   true,
+              colliderType: "box",
+              tags:         ["baked"],
+              dateAdded:    new Date().toISOString(),
+              colliders,
+            };
+            await writeAssetToLibrary(dir, {
+              glbName: `${opts.name}.glb`,
+              glb,
+              ...(thumbUrl ? { thumbName: `${opts.name}_thumb.png`, thumbPng: dataURLtoArrayBuffer(thumbUrl) } : {}),
+            }, asset);
+            handleAssetsReload();
+          }
+        }
+      } finally {
+        disposeBakeGroup(group);
+      }
+    } catch (err) {
+      console.error("bake failed:", err);
+    }
+  };
+
   const handleConfirmMaterialEdit = async (patch: EditPatch): Promise<void> => {
     const pending = pendingMaterialEdit;
     setPendingMaterialEdit(null);
@@ -1839,6 +1906,7 @@ export default function App() {
         multiSelected={multiSelected}
         onCopy={handleCopy}
         onDuplicate={handleDuplicate}
+        onBake={refs => setBakeRefs(refs)}
         decalTextures={decalTextures}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         zones={zones}
@@ -2028,6 +2096,14 @@ SquareDance
           needsFolderGrant={!modelsDir}
           onCancel={() => setStagingAsset(null)}
           onSave={dataUrl => void handleSaveThumbnail(stagingAsset, dataUrl)}
+        />
+      )}
+
+      {bakeRefs && (
+        <BakeDialog
+          shapeCount={bakeRefs.length}
+          onConfirm={opts => void handleBakeConfirm(opts)}
+          onCancel={() => setBakeRefs(null)}
         />
       )}
 

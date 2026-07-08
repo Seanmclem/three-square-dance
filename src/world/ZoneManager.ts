@@ -1050,16 +1050,19 @@ export class ZoneManager {
 
   /**
    * Register an object's attached colliders: explicit colliders[] when set,
-   * else the implicit auto-fit box from the model's local AABB when the asset
-   * is collidable ([] = explicitly none). Sensor colliders join _volumeSensors
-   * so TriggerSystem fires on_player_enter/exit keyed to the object id.
+   * else the asset's preset colliders (baked assets ship compound boxes,
+   * Phase 26), else the implicit auto-fit box from the model's local AABB when
+   * the asset is collidable ([] = explicitly none). Sensor colliders join
+   * _volumeSensors so TriggerSystem fires on_player_enter/exit keyed to the
+   * object id.
    */
   private _buildObjectColliders(zoneId: string, obj: WorldObject, entry: ZoneEntry): void {
     let effective = obj.colliders;
     if (effective === undefined) {
       const def  = assetManager.getAssetDef(obj.assetId);
       const aabb = this._objectPlacer.getLocalAABB(obj.id);
-      effective = def?.collidable && aabb ? [defaultColliderFromAABB(aabb.center, aabb.size)] : [];
+      effective = def?.colliders
+        ?? (def?.collidable && aabb ? [defaultColliderFromAABB(aabb.center, aabb.size)] : []);
     }
     if (!effective.length) return;
     const colliders = ColliderBuilder.registerAttachedColliders(obj, effective);

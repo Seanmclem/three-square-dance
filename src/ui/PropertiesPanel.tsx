@@ -264,7 +264,9 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
         const n = obj.colliders.length;
         return n === 0 ? "none" : `${n} collider${n !== 1 ? "s" : ""}`;
       }
-      return assets.find(a => a.id === obj?.assetId)?.collidable ? "auto box" : "none";
+      const def = assets.find(a => a.id === obj?.assetId);
+      if (def?.colliders?.length) return `auto (${def.colliders.length} boxes)`;
+      return def?.collidable ? "auto box" : "none";
     }
   }
 }
@@ -337,6 +339,8 @@ interface PropertiesPanelProps {
   multiSelected?:           SelectedRef[];
   onCopy?:                  () => void;
   onDuplicate?:             () => void;
+  // Bake the given shape refs to a GLB asset (Phase 26) — opens the bake dialog.
+  onBake?:                  (refs: SelectedRef[]) => void;
   // Auto-fit box from the placed model's local AABB (null until the mesh is built).
   defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
 }
@@ -350,7 +354,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  decalTextures = [], multiSelected = [], onCopy, onDuplicate, defaultColliderFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -430,6 +434,9 @@ export function PropertiesPanel({
           </div>
           {onDuplicate && <button style={ACTION_BTN} onClick={onDuplicate}>Duplicate</button>}
           {onCopy      && <button style={ACTION_BTN} onClick={onCopy}>Copy</button>}
+          {onBake && multiSelected.every(r => r.type === "shape") && (
+            <button style={ACTION_BTN} onClick={() => onBake(multiSelected)}>Bake → GLB asset</button>
+          )}
           {onDelete    && (
             <button
               style={{ ...ACTION_BTN, color: "#ff6b6b", borderColor: "rgba(255,107,107,0.3)", marginBottom: 0 }}
@@ -539,6 +546,7 @@ export function PropertiesPanel({
               onCopyRunToFloor={onCopyRunToFloor}
               onFillRunWithFloor={onFillRunWithFloor}
               onDelete={onDelete}
+              onBake={onBake}
             />
           </>
         ) : currentScreen === "geo" ? (
@@ -605,13 +613,14 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onDelete }: {
+function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onDelete, onBake }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
   onCopyRunToFloor?:  (level: number) => void;
   onFillRunWithFloor?: () => void;
   onDelete?:          () => void;
+  onBake?:            (refs: SelectedRef[]) => void;
 }) {
   const wallData = selected.type === "wall" ? selected.data as WallDef : null;
   const [hovered, setHovered] = useState(false);
@@ -665,6 +674,17 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
                 })}
               </div>
             </div>
+          )}
+
+          {onBake && selected.type === "shape" && (
+            <button
+              onClick={() => onBake([{ id: selected.id, type: "shape", zoneId: selected.zoneId }])}
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                color: "#80aaff", fontSize: 11, fontFamily: "monospace",
+              }}
+            >Bake → GLB asset</button>
           )}
 
           {onDelete && (
@@ -2358,7 +2378,10 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
 }) {
   const objData    = selected.data as WorldObject | null;
   const colliders  = objData?.colliders;
-  const collidable = !!assets.find(a => a.id === objData?.assetId)?.collidable;
+  const assetDef   = assets.find(a => a.id === objData?.assetId);
+  const collidable = !!assetDef?.collidable;
+  // Asset-preset compound colliders (Phase 26 baked assets) beat the auto box.
+  const presetCols = assetDef?.colliders;
   const defCol     = defaultColliderFor?.(selected.id) ?? null;
 
   // Editor-session toggles (never persisted): hide the object's own move gizmo while
@@ -2477,13 +2500,18 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
         <div style={LABEL}>COLLISION</div>
         {objGizmoToggle}
         <div style={INFO}>
-          {collidable
-            ? "Auto box collider fitted from the model's bounds — the player collides with it in preview and game. Customize to edit shape, size or offset."
-            : "This asset isn't marked collidable, so it has no automatic collider. Add one to make it solid."}
+          {presetCols?.length
+            ? `This asset ships ${presetCols.length} preset collider${presetCols.length > 1 ? "s" : ""} (baked from its source shapes) — the player collides with them in preview and game. Customize to edit this copy's set.`
+            : collidable
+              ? "Auto box collider fitted from the model's bounds — the player collides with it in preview and game. Customize to edit shape, size or offset."
+              : "This asset isn't marked collidable, so it has no automatic collider. Add one to make it solid."}
         </div>
         {collidable ? (
           <>
-            <button style={ACTION_BTN} onClick={() => write([newBox()])}>Customize</button>
+            <button
+              style={ACTION_BTN}
+              onClick={() => write(presetCols?.length ? presetCols.map(c => ({ ...c, offset: { ...c.offset }, size: { ...c.size } })) : [newBox()])}
+            >Customize</button>
             <button style={{ ...ACTION_BTN, borderColor: "rgba(255,107,107,0.3)", background: "rgba(200,60,60,0.1)", color: "#cc7777" }} onClick={() => write([])}>
               Remove collision
             </button>
