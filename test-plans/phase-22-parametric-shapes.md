@@ -80,5 +80,7 @@ persist — TESTING.md §3).
 
 - `change_material` script action stays object-only (same as platforms/stairs).
 - No scale gizmo — size lives in params (brush contract).
-- Gizmo rotate ring edits yaw only; X/Z tilt via the panel fields.
-- Shapes are not decal targets (decals project onto wall/floor/platform/stair only).
+- ~~Gizmo rotate ring edits yaw only~~ — all three rings commit as of v4.9.2 (verified:
+  X-ring −54.88° sticks; follow-up yaw drag composes; collider quaternion matches exactly).
+- ~~Shapes are not decal targets~~ — decals stamp/project onto shapes as of v4.9.1
+  (verified: projection, move-away skip, re-project on return).
