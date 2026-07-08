@@ -953,6 +953,139 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateanimatedanimals.html",
         "license": "CC0"
       }
+    },
+    {
+      "id": "baked-structure2",
+      "label": "baked-structure2",
+      "category": "Baked",
+      "path": "/assets/models/baked-structure2.glb",
+      "thumbnail": "/assets/models/baked-structure2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "baked"
+      ],
+      "dateAdded": "2026-07-08T21:49:59.018Z",
+      "colliders": [
+        {
+          "id": "col_bake_0",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 2,
+            "z": 0
+          },
+          "size": {
+            "x": 8.3701,
+            "y": 4,
+            "z": 4
+          },
+          "rotationY": 180,
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "baked-structure3",
+      "label": "baked-structure3",
+      "category": "Baked",
+      "path": "/assets/models/baked-structure3.glb",
+      "thumbnail": "/assets/models/baked-structure3_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "baked"
+      ],
+      "dateAdded": "2026-07-08T23:00:21.877Z",
+      "colliders": [
+        {
+          "id": "col_bake_0",
+          "shape": "hull",
+          "offset": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "size": {
+            "x": 8.3701,
+            "y": 4,
+            "z": 4
+          },
+          "isSensor": false,
+          "points": [
+            {
+              "x": -4.1851,
+              "y": 0,
+              "z": -2
+            },
+            {
+              "x": 0.935,
+              "y": 0,
+              "z": 2
+            },
+            {
+              "x": -4.1851,
+              "y": 0,
+              "z": 2
+            },
+            {
+              "x": -4.1851,
+              "y": 4,
+              "z": -2
+            },
+            {
+              "x": 0.935,
+              "y": 4,
+              "z": -2
+            },
+            {
+              "x": -3.315,
+              "y": 3.3882,
+              "z": 1.4121
+            },
+            {
+              "x": 0.935,
+              "y": 0,
+              "z": -2
+            },
+            {
+              "x": 0.935,
+              "y": 4,
+              "z": 2
+            },
+            {
+              "x": 1.685,
+              "y": 2,
+              "z": -2
+            },
+            {
+              "x": 2.185,
+              "y": 2,
+              "z": 2
+            },
+            {
+              "x": 4.185,
+              "y": 2,
+              "z": -2
+            },
+            {
+              "x": 4.185,
+              "y": 3.3882,
+              "z": -2
+            },
+            {
+              "x": 4.185,
+              "y": 3.3882,
+              "z": 2
+            },
+            {
+              "x": 4.185,
+              "y": 2,
+              "z": 2
+            }
+          ]
+        }
+      ]
     }
   ]
 }
