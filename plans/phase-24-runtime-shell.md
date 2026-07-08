@@ -1,7 +1,7 @@
-# Phase 21 — Standalone Runtime Shell (manifest + SceneRouter)
+# Phase 24 — Standalone Runtime Shell (manifest + SceneRouter)
 
 > Status: **PLANNED** — not yet implemented.
-> Target version: v4.8.0. Assumes phase 20 (ControlSchemeManager, v4.7.0) lands
+> Target version: v4.12.0. Assumes phase 23 (ControlSchemeManager, v4.11.0) lands
 > first — renumber if ordering changes.
 
 A lightweight web runtime, separate from the editor, served from the **same
@@ -416,10 +416,10 @@ to main and gets its `test-plans/` doc at the end (21.6).
    `?manifest=http://localhost:8000/demo/manifest.json` — assets resolve, or
    the CORS error surfaces readably.
 6. **21.6 — Docs & tests.** Update `WORLD_EDITOR_ARCHITECTURE.md` per
-   `PLAN_UPDATE_GUIDE.md` — **both** the new Phase 21 section **and** the
+   `PLAN_UPDATE_GUIDE.md` — **both** the new Phase 24 section **and** the
    file-level sections (SceneManager, PreviewController, AssetManager,
    ScriptEngine, EventBus table, new `src/runtime/` sections); version bump +
-   changelog; `test-plans/phase-21-runtime-shell.md`; `HUMAN_TESTING.md`
+   changelog; `test-plans/phase-24-runtime-shell.md`; `HUMAN_TESTING.md`
    walkthrough; note the runtime globals in `TESTING.md`.
 
 ---
@@ -464,7 +464,7 @@ to main and gets its `test-plans/` doc at the end (21.6).
    later if demo authoring demands it.
 2. **Should Escape pause (freeze the loop) rather than exit to menu?**
    Default: exit-to-menu with autosave — cheapest correct behavior; a real
-   pause needs input suppression that Phase 20's ControlSchemeManager
+   pause needs input suppression that Phase 23's ControlSchemeManager
    provides anyway.
 3. **Demo fixture**: hand-authored JSON vs exported from a real editor
    session. Default: author in the editor, save, commit the JSON — proves the

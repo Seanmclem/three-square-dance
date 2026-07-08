@@ -1,8 +1,9 @@
-# Phase 20 — Controller & Touchscreen Support (ControlSchemeManager)
+# Phase 23 — Controller & Touchscreen Support (ControlSchemeManager)
 
 > Status: **PLANNED** — not yet implemented.
-> Target version: v4.7.0. Phase number assumes nothing lands between this and
-> phase 19 (floor geometry node-links); renumber if needed.
+> Target version: v4.11.0. Phase number assumes nothing lands between this and
+> phase 22b (brush editing, v4.10.0); renumber if needed. (Originally drafted as
+> phase 20 / v4.7.0 — renumbered after decals and shapes took 20–22.)
 
 Gamepad and touchscreen support for **preview/game mode**, built around a
 `ControlSchemeManager` that abstracts raw input into named game actions so the
@@ -394,10 +395,10 @@ export const DEFAULT_BINDINGS: BindingsConfig = { /* defaults per §5 */ };
 5. **Bindings persistence + Controls settings section + `window.__bindings`.**
    → verify: change sensitivity, reload, sticks.
 6. **Docs & tests:** update `WORLD_EDITOR_ARCHITECTURE.md` **per
-   `PLAN_UPDATE_GUIDE.md` — both the new Phase 20 section and the file-level
+   `PLAN_UPDATE_GUIDE.md` — both the new Phase 23 section and the file-level
    sections** for CharacterController, PreviewController, PreviewHUD,
    DialogueOverlay, EventBus table, plus a new `src/input/` section; bump
-   version + changelog. Write `test-plans/phase-20-control-scheme-manager.md`
+   version + changelog. Write `test-plans/phase-23-control-scheme-manager.md`
    and add a HUMAN_TESTING.md walkthrough. Commit straight to main (project
    convention — no branch).
 
