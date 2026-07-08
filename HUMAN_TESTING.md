@@ -189,8 +189,9 @@ wall-run/floor mesh.
    on the surface — drag it outward to grow a new point). **Revert to … params** goes
    back to the parametric shape. The solid always stays convex, and collision always
    matches exactly.
-7. **Face & vertex editing (Blender-style, v4.11.0):** the Select button has three
-   modes — **◇ Object (1) / ▣ Face (2) / • Vertex (3)** (popover or number keys).
+7. **Face, vertex & edge editing (Blender-style, v4.11.0 / v4.14.0):** the Select
+   button has four modes — **◇ Object (1) / ▣ Face (2) / • Vertex (3) / ╱ Edge (4)**
+   (popover or number keys).
    - **Face mode (2):** click any face of a brush — it highlights blue, a 3-axis gizmo
      appears on it (drag the whole face anywhere, Alt = no snap), and the Geometry
      screen lists every face with the selected one expanded: per-face **material +
@@ -201,7 +202,11 @@ wall-run/floor mesh.
      fine — collision follows exactly (walk into an alcove you cut).
    - **Vertex mode (3):** corner spheres show only in this mode; click one (cyan) for
      a 3-axis gizmo + an editable X/Y/Z row in the Geometry screen.
-   - The first face/vertex-mode click on an old convex-cloud brush upgrades it to
+   - **Edge mode (4):** click a brush face near an edge — the closest edge lights up
+     as a blue tube with a 3-axis gizmo at its midpoint; drag to move both endpoints
+     together (fold a box top edge down and you've made a wedge). Face and edge modes
+     also outline every brush edge in thin black lines so the targets are visible.
+   - The first face/vertex/edge-mode click on an old convex-cloud brush upgrades it to
      faces automatically (one undo step, looks identical). On face-brushes, corner
      delete/add is disabled — use Split/Extrude instead.
 
