@@ -101,3 +101,8 @@ position/rotation. Nothing to configure:
   angle. Steeper wedges act as walls — that's the physics, not a bug. `atan(rise/depth)`:
   1.5 m over 2.5 m ≈ 31° (walkable), 3 m over 2.5 m ≈ 50° (blocks).
 - Script `despawn_object` disables the collider too; `move_object` moves it (runtime-only).
+- **Face-edited brushes** (v4.11.0 — split/extrude/face drags) switch to an exact
+  **trimesh** collider so concave forms (alcoves, steps, dents) collide correctly.
+  Trimeshes are hollow surfaces: something spawned *inside* one won't be pushed out,
+  and paper-thin extrusions can be tunneled through at very high speed — give thin
+  walls a little thickness.

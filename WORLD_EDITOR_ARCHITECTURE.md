@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.10.0** — last updated 2026-07-07
+**Version 4.11.0** — last updated 2026-07-07
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -78,6 +78,7 @@
 - v4.9.3 — **Shape X/Z rotate: commit the orbited position too.** The gizmo pivot sits ABOVE the shape (top + 0.3), so X/Z ring drags orbit the shape's base origin around it during the live preview; v4.9.2 committed rotation only, so the rebuild re-anchored the rotation about the shape's own base and the mesh visibly shifted back on release (Y was immune — the origin lies on the yaw axis). The shape `_commitRotate` arm now writes `position` (read off the detached mesh) alongside `rotation`, making the commit exactly the release pose. Verified with a mouseup-instant snapshot: release pos = committed def = post-rebuild mesh, byte-identical (12, 0.977, 1.881 @ −54.9°X).
 - v4.9.4 — **Shape gizmo pivots at the transform-aware body center.** The pivot was `position + height + 0.3` — upright-only math: after an X/Z tilt the base origin and "top" no longer relate to where the body visually is, so the gizmo re-attached far from the shape and subsequent ring drags orbited the shape around it in a circle. New `_shapePivotWorld(shape)` = local mid-height center `(0, h/2, 0)` rotated by the shape's Euler + position, used by both `_onSelect` and `_reattachMeshes` — the gizmo always sits on the body and rotation always turns the shape about its own center. Verified on a 90°X-tilted box: pivot == mesh bbox center (12,0,1) exactly, and two composed ring drags (+3.8°Y then −70.8°Z) left the body center byte-identical.
 - v4.10.0 — **Phase 22b — Brush editing, resize handles, cap/side materials for shapes.** Three additions to the shape system. **(1) Quake/UE-style brush editing:** new optional `ShapeDef.mesh: ShapeBrushMesh { vertices: Vec3[] }` (local space) that **supersedes the kind params** when ≥4 vertices are present — geometry AND collider are both the **convex hull of the cloud** (`three/addons ConvexGeometry` triangulation with per-face metric UVs from a normal-derived basis, so coplanar hull triangles share one projection; `localHullPoints` returns the cloud verbatim, so mesh/physics stay exact for any arrangement — interior/coplanar points are absorbed, convexity is guaranteed by construction; degenerate hulls fall back to the kind params with a warn). Geometry panel gains **Convert to Brush** (bakes the kind's hull corners, one undoable step, `kind` kept as provenance) and **Revert to <kind> params** (`mesh: undefined`). New **`src/editor/BrushVertexEditor.ts`** (TriggerVolumeResizer idioms): an amber sphere handle per corner — **drag** = camera-facing-plane move snapped to 0.25 local (Alt = free) with **live hull rebuild** through drag-scoped begin/commitTransaction (one undo step; Escape restores + aborts); **right-click a corner deletes it** (min 4); **"+ Add corner"** (panel button → `shape:add-corner` bus event) arms a click-on-the-brush insertion — the new corner starts ON the hull (no visual change) and becomes real when dragged outward; a gizmo:dragging pulse swallows the click so SelectionManager doesn't re-pick. GizmoManager's `_shapePivotWorld` uses the cloud's local bbox center for brushes. **(2) Drag-resize handles** for parametric shapes: new **`src/editor/ShapeResizer.ts`** + a **RESIZE HANDLES** checkbox in the Geometry panel (`shape:resize-toggle`, per-selection, coexists with the translate gizmo via the `collider:handle-hover` yield + `gizmo:dragging` mute). Five axis-tinted face handles, **local-axis aware** (work at any XYZ rotation; drags project the mouse ray onto the rotated axis line — closest-point formula `t = (d·w0 − b·(rd·w0))/(1 − b²)`, sign verified the hard way): box/wedge ±X/±Z resize width/depth with the **opposite face pinned** (position shifts half the delta along the rotated axis — verified: −X face byte-stable at 17.000 while width grew), +Y = height (box/cylinder) or heightHigh (wedge) with the base pinned; cylinder's four radial handles shift **both radii together** (cones stay cones). Snap 0.25, Alt = free, live rebuild in one transaction. Brush shapes get no handles — their corners are the handles. **(3) Cap/side materials** (platform-style): `ShapeDef.sideMaterial?`/`sideMaterialOverrides?`; ShapeBuilder now emits **two meshes** per shape (cap = top/bottom faces + `material`, side = lateral faces + `sideMaterial ?? material`; hull faces split by `|normal.y| ≥ 0.5`; side UV offsets fall back to cap's) — `ShapeBuildOutput.meshes[]`, `ZoneManager.ShapeEntry.meshes[]` (hide/group/dim/move-fast-path loop them). **Both meshes are selectable** (deviation from platforms: clicking a side face selects the shape, and decals project onto shape sides). `ShapeMatView` = TOP/BOTTOM + SIDES MaterialSections. Verified in-browser through the real UI (panel buttons, checkbox, mouse drags): brick-sides/concrete-top box, Convert-to-Brush → corner drag morphs the hull live into a peaked solid, armed click added corner #9 on the clicked face, right-click deleted it, cylinder +Y drag 2→3.5 (base pinned) and radial drag r 1→2.25 (center pinned), zero console errors.
+- v4.11.0 — **Phase 23 — Blender-style face/vertex sub-object editing for shapes.** Brushes graduate from derived-hull point clouds to real polygonal meshes, opt-in and additive (shapes/brushes that never enter the new modes run the exact v4.10 code paths). **Data:** `ShapeBrushMesh.faces?: BrushFace[]` — explicit CCW-outward loops (`{ verts: number[], material?, materialOverrides? }`, every undirected edge traversed by exactly 2 loops); absent = legacy cloud. HARD RULE: `updateShape` replaces `mesh` wholesale, so every writer sends `{ mesh: { ...shape.mesh, vertices, faces } }` (dev-mode warn added in WorldState when faces would be dropped). **brushOps.ts** (new, pure): `facesFromCloud` (hull → dedupe → BFS coplanar merge → boundary-loop chaining → collinear cleanup; box→6 quads, winding preserved), `splitFaceQuad` (quads only; midpoint insertion **with T-junction propagation into every neighbor loop sharing a split edge** — verified: 2 pentagons appear, no cracks), `extrudeFace` (dup ring along the Newell normal + side quads; faceIdx stays on the moved cap), `validateMesh` (edge pairing + positive volume) gates every op commit. **Builder:** face-brushes render one mesh per (material, overrides) group (single-material stays 1 draw call) with per-face metric UVs from the normal-derived basis; `userData.faceGroups` maps triangle ranges → logical faces for picking; collider = `registerShapeTrimesh` (`ColliderDesc.trimesh` + `FIX_INTERNAL_EDGES`) — first trimesh in the repo, concave solids collide exactly (KCC blocked inside an L-notch at wall+capsule-radius exactly; NOTE: editor-time console raycasts only see colliders after one `world.step()` — the editor doesn't step; preview always does). **Select modes:** ToolIds `select-face`/`select-vertex` under the Select button's variants popover + Blender 1/2/3 hotkeys; `isSelectMode()` helper swept across all ~25 gating sites (SelectionManager, ColliderEditor, resizers, NodeDragger×11, WallSplitter, OpeningDragHandler, DecalTool, TriggerVolumeTool) — sub-modes behave exactly like Select for non-shape machinery. SelectionManager resolves `hit.faceIndex`→faceGroups→face, carries `faceIndex`/`vertexIndex` on `object:selected` with a **validity clamp on every emit**, and sinks the new `shape:sub-select` event (panel rows + vertex handles re-emit through one channel); mode switches clear sub-selection. **Gizmos:** `BrushFaceEditor` (translate TC on the face centroid; drag moves all face verts live in one transaction; owns the legacy-cloud **auto-bake** — first face/vertex-mode selection of a cloud bakes faces, one undoable step) and BrushVertexEditor gains vertex-mode-only handles (cyan selected corner) + a 3-axis TC on the selected corner; both suspend the entity gizmo via `gizmo:suspend` (BUGFIX: `GizmoManager._onSelect` now re-applies `_applyControlsEnabled()` after `attach()` — attach forced the controls visible, overriding suspenders that fired in the same object:selected dispatch). `BrushFaceHighlighter` overlays the selected (0.55) and panel-hovered (0.35) face polygons (SegmentHighlighter idiom, +0.01 normal lift). **Panel:** Geometry screen in face mode = FACES list (selected row expanded: corners, inline material+TILE, SPLIT ─/│ (quads only, hint otherwise), EXTRUDE); vertex mode = CORNERS list (selected row = debounced X/Y/Z inputs); Materials screen for face-brushes = per-face rows with inline pickers (hover highlights the face in-canvas; replaces TOP/BOTTOM+SIDES). Verified in-browser end-to-end through real UI paths: mode hotkeys + popover, face clicks resolve exact normals ((0,1,0)/(0,0,1)), face-TC drag raised a face 2→3 snapped, vertex-TC drag moved one corner 3→3.5, per-face brick face split the mesh into 10+2-tri groups, SPLIT produced 7 faces/2 pentagons/valid manifold, EXTRUDE +4 sides at exactly +0.25 (watertight step visually), undo chain returns to the pristine 6-face box, faces survive autosave round-trips. Known v1 limits: vertex delete/add-corner disabled on face-brushes (split/extrude are the topology tools), no negative extrude, quads-only split, non-planar quads shade flat.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -1306,6 +1307,14 @@ Builders tag child meshes too — GLTF models have deep mesh hierarchies that ra
 
 ## SelectionManager.ts
 
+> **v4.11.0:** the Select tool has three modes — `select` / `select-face` /
+> `select-vertex` (Toolbar variants + 1/2/3 hotkeys; `isSelectMode()` from
+> `src/editor/selectMode.ts` gates all selection-era machinery so sub-modes behave
+> exactly like plain Select for non-shape entities). Face mode resolves
+> `hit.faceIndex` → `userData.faceGroups` → logical brush face; `object:selected`
+> carries `faceIndex`/`vertexIndex` (clamped against the live mesh on every emit);
+> the `shape:sub-select` event is the single sink for panel-row/handle sub-selection.
+
 ### Raycast Priority
 
 When a click ray intersects multiple meshes, priority order (highest first):
@@ -1542,6 +1551,13 @@ class SelectionManager {
 > which the brush contract forbids). Pivot sits just above the shape's top
 > (`resolveShapeParams` height). Re-attach on `shape:rebuilt`; group multi-select
 > translate has a plain position-shift arm.
+> **v4.11.0:** two more TransformControls instances (ColliderEditor proxy pattern):
+> `BrushFaceEditor` (translate TC on the selected brush face's centroid — dragging
+> moves all face verts live) and BrushVertexEditor's corner TC. Both suspend the
+> entity gizmo via `gizmo:suspend` while active; `_onSelect` re-applies
+> `_applyControlsEnabled()` after `attach()` so a suspender firing in the same
+> object:selected dispatch isn't overridden (attach forces visibility).
+
 > **v4.9.2:** shape rotate commits **all three axes** — reads the tracked mesh's Euler
 > after `_detachFromPivot()` (the object-case pattern; the mesh's parent shapesGroup is
 > identity, so local Euler = world rotation) instead of `_pivotYaw()`, which only
@@ -2128,6 +2144,15 @@ collider (`registerShape`). They are **never baked into vertices** — moving up
   meters ÷ tileScale) so slanted tops and tapered/sheared sides tile at wall density.
   Wedge with `heightLow: 0` degenerates the front face away (side triangles). Box
   taper/shear keeps all four side faces planar (top/bottom edges stay axis-parallel).
+- **Face-brushes (v4.11.0)**: when `mesh.faces` is present (`isFaceBrush`), the loops
+  are authoritative — `_buildFaceBrush` groups faces by effective material
+  (`face.material ?? shape.material` + overrides key) into **one mesh per group**
+  (single-material brush = 1 draw call), fan-triangulates with flat Newell normals and
+  per-face metric UVs, stamps `userData.faceGroups` (triangle range → face index) for
+  face-mode picking, and registers a **trimesh** collider from `localTrimesh(def)`
+  (concave solids collide exactly). Topology lives in `src/editor/brushOps.ts`
+  (facesFromCloud / splitFaceQuad / extrudeFace / validateMesh — pure, fresh-array
+  outputs for the undo journal).
 
 ## ZoneManager.ts
 
@@ -6560,6 +6585,12 @@ export const physicsWorld = new PhysicsWorld();
 > **v4.4.0:** also `registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): Collider[]`
 > — per-object colliders (cuboid/ball/capsule) placed via `colliderWorldTransform` from
 > `src/physics/attachedColliderMath.ts`; `isSensor` entries use `createSensorCollider`.
+
+> **v4.11.0:** also `registerShapeTrimesh(shape, vertices, indices): Collider | null` —
+> the repo's first trimesh (`ColliderDesc.trimesh` + `TriMeshFlags.FIX_INTERNAL_EDGES`),
+> used for face-brushes whose split/extruded solids can be concave. Same transform
+> mirroring; convex-hull fallback on degenerate input. Editor gotcha: fresh colliders
+> only answer queries after one `world.step()` (the editor doesn't step; preview does).
 
 > **v4.9.0:** also `registerShape(shape: ShapeDef, localPoints: Float32Array): Collider | null`
 > — the repo's first non-analytic collider: `RAPIER.ColliderDesc.convexHull()` of the

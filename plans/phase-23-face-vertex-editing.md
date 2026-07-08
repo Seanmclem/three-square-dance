@@ -1,7 +1,12 @@
 # Phase 23 — Face/Vertex Sub-object Editing for Shapes (Blender-style)
 
-> Status: **IN PROGRESS** — approved 2026-07-07 against baseline v4.10.0.
-> Target version: v4.11.0.
+> Status: **IMPLEMENTED** — shipped as **v4.11.0** (2026-07-07), milestones M1–M6 all
+> verified in-browser; acceptance record in `test-plans/phase-23-face-vertex-editing.md`.
+> Deviations from plan: the Materials-screen per-face rows use a threaded `bus` prop for
+> hover (no window-event bridge); GizmoManager needed `_applyControlsEnabled()` after
+> `attach()` (suspend/listener-order race found in verification); the trimesh
+> FIX_INTERNAL_EDGES flag is kept (an apparent "dead shape" was actually the editor's
+> never-stepped query pipeline — documented in ColliderBuilder + TESTING notes).
 
 ## Context
 
