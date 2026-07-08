@@ -273,6 +273,13 @@ so the user's level remains exactly as it was before the test session.
 
 ### Other lessons
 
+- **After cleanup, wait for an autosave tick before closing the tab.** Deleting test
+  entities updates WorldState, but the periodic autosave is what persists it — closing
+  immediately can leave the *previous* autosave (test entities included) as the state
+  the user's next session loads. Poll the top-bar indicator until it reads
+  "autosaved just now", then verify `localStorage.worldeditor_autosave` contains only
+  the user's entities, then close. (A `test_m3` shape leaked into the user's world
+  exactly this way on 2026-07-07.)
 - **Go slow.** One action → read state → verify → next action. Never batch
   clicks across unverified UI state — a wrong assumption compounds.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and

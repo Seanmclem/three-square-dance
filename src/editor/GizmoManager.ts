@@ -796,6 +796,10 @@ export class GizmoManager implements IEditorModule {
 
     this._updateMeshOffsets();
     this._controls?.attach(this._pivot);
+    // attach() forces the controls visible — re-apply suspend/game gating (same race
+    // as _onSelect). This path runs on every shape:rebuilt, so during a face/vertex
+    // drag the suspended entity gizmo would otherwise pop back up mid-drag, inert.
+    this._applyControlsEnabled();
   }
 
   // ─── Drag handlers ────────────────────────────────────────────────────────
