@@ -312,6 +312,12 @@ export class WorldState {
     const zone  = this.zones.get(zoneId);
     const shape = zone?.shapes?.find(s => s.id === id);
     if (!shape) return;
+    // Guard the top Phase-23 hazard: `mesh` is replaced wholesale by the shallow
+    // merge, so a writer that sends vertices without the existing faces silently
+    // reverts a face-brush to a convex hull.
+    if (import.meta.env.DEV && changes.mesh && shape.mesh?.faces?.length && !changes.mesh.faces) {
+      console.warn(`WorldState.updateShape("${id}"): changes.mesh drops existing faces — face topology will be lost. Send { mesh: { ...shape.mesh, vertices } }.`);
+    }
     this._touch("shape", zoneId, id);
     Object.assign(shape, changes);
     this._bus.emit("shape:updated", { zoneId, id, changes });

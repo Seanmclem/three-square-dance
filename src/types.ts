@@ -308,6 +308,7 @@ export interface MeshUserData {
   openingId?:              string;
   wallId?:                 string;
   assetId?:                string;
+  faceGroups?:             FaceGroup[];  // face-brush meshes: triangle range → face (Phase 23)
   editorOnly?:             boolean;
   _hasCsgCuts?:            boolean;  // cap mesh with CSG-cut world-space geometry
   // Hidden-wall ghost: picked only when nothing solid is under the cursor, hidden in preview/game.
@@ -512,13 +513,36 @@ export interface StairDef {
 export type ShapeKind = "cylinder" | "wedge" | "box";
 
 /**
- * Brush mode (v4.10.0): a LOCAL-space convex vertex cloud that supersedes the kind
- * params when present. Geometry + collider are both the convex hull of these points,
- * so any vertex arrangement stays a valid solid (interior/coplanar points are simply
- * absorbed by the hull). `kind` is kept as provenance.
+ * One polygonal face of a face-brush (Phase 23): an ordered loop of indices into
+ * ShapeBrushMesh.vertices, CCW when viewed from OUTSIDE the solid (Newell normal
+ * points outward). Faces tile the full boundary; every undirected edge appears in
+ * exactly two loops (opposite directions).
+ */
+export interface BrushFace {
+  verts: number[];                       // ≥ 3, CCW outward loop
+  material?: string;                     // absent → shape.material
+  materialOverrides?: MaterialOverrides; // per-face tile/offset/maps
+}
+
+/**
+ * Brush mode (v4.10.0): a LOCAL-space vertex cloud that supersedes the kind params
+ * when present. Without `faces`, geometry + collider are the convex hull of the
+ * points (any arrangement stays a valid solid). With `faces` (Phase 23 — created by
+ * Convert to Brush / face-mode auto-bake), the loops are authoritative: geometry is
+ * their fan triangulation (concave solids allowed) and the collider is a trimesh.
+ * NOTE: WorldState.updateShape shallow-merges, so `changes.mesh` REPLACES this whole
+ * object — writers must always send BOTH `vertices` and `faces`.
  */
 export interface ShapeBrushMesh {
-  vertices: Vec3[];   // local space (same contract as generated geometry)
+  vertices: Vec3[];      // local space (same contract as generated geometry)
+  faces?:   BrushFace[]; // absent → legacy convex-cloud behavior (unchanged)
+}
+
+/** userData.faceGroups on a built face-brush mesh: triangle range → logical face. */
+export interface FaceGroup {
+  start:     number;   // first triangle index in this mesh
+  count:     number;   // triangles in the face's fan
+  faceIndex: number;   // index into ShapeBrushMesh.faces
 }
 
 /**

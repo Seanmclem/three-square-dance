@@ -237,7 +237,9 @@ export class BrushVertexEditor implements IEditorModule {
       ? { x: local.x, y: local.y, z: local.z }
       : { x: snap(local.x), y: snap(local.y), z: snap(local.z) };
     const vertices = shape.mesh!.vertices.map((old, i) => i === this._dragIndex ? v : old);
-    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { vertices } });
+    // Full-mesh write: updateShape replaces `mesh` wholesale — dropping `faces` here
+    // would silently revert a face-brush to a convex hull.
+    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
     this._sync();
   }
 
@@ -247,8 +249,9 @@ export class BrushVertexEditor implements IEditorModule {
   }
 
   private _cancelDrag(): void {
-    if (this._origVertices && this._zoneId && this._selectedId) {
-      this._world.updateShape(this._zoneId, this._selectedId, { mesh: { vertices: this._origVertices } });
+    const shape = this._selectedShape();
+    if (this._origVertices && shape && this._zoneId && this._selectedId) {
+      this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices: this._origVertices } });
     }
     this._world.abortTransaction();
     this._endDrag();
@@ -268,6 +271,9 @@ export class BrushVertexEditor implements IEditorModule {
   private _onAddCorner(screenPos: ScreenPos): void {
     const shape = this._selectedShape();
     if (!shape || !this._zoneId || !this._selectedId) return;
+    // Face-brushes: a loose corner has no face loop to live in — split/extrude are
+    // the topology tools there (Phase 23 v1 restriction).
+    if ((shape.mesh?.faces?.length ?? 0) > 0) { this._addArmed = false; document.body.style.cursor = ""; return; }
     this._setRayFrom(screenPos);
     const targets: THREE.Mesh[] = [];
     this._scene.traverse(o => {
@@ -282,7 +288,7 @@ export class BrushVertexEditor implements IEditorModule {
       : { x: snap(local.x), y: snap(local.y), z: snap(local.z) };
     this._world.transaction("add brush corner", () => {
       this._world.updateShape(this._zoneId!, this._selectedId!, {
-        mesh: { vertices: [...shape.mesh!.vertices, v] },
+        mesh: { ...shape.mesh!, vertices: [...shape.mesh!.vertices, v] },
       });
     });
     this._addArmed = false;
@@ -299,10 +305,13 @@ export class BrushVertexEditor implements IEditorModule {
     if (idx === null) return;
     const shape = this._selectedShape();
     if (!shape || !this._zoneId || !this._selectedId) return;
+    // Face-brushes: deleting a vertex would reindex the array and orphan face loops
+    // (Phase 23 v1 restriction — use split/extrude instead).
+    if ((shape.mesh?.faces?.length ?? 0) > 0) return;
     if (shape.mesh!.vertices.length <= MIN_VERTS) return;
     this._world.transaction("delete brush corner", () => {
       this._world.updateShape(this._zoneId!, this._selectedId!, {
-        mesh: { vertices: shape.mesh!.vertices.filter((_, i) => i !== idx) },
+        mesh: { ...shape.mesh!, vertices: shape.mesh!.vertices.filter((_, i) => i !== idx) },
       });
     });
     this._sync();

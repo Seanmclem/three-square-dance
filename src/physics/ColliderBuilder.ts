@@ -89,6 +89,36 @@ export class ColliderBuilder {
     return physicsWorld.createStaticCollider(desc);
   }
 
+  /**
+   * Face-brush shape (Phase 23): exact trimesh of the face fans — concave solids
+   * collide correctly (a convex hull would fill in dents/alcoves). Same transform
+   * mirroring as registerShape. Falls back to the convex hull on degenerate input.
+   *
+   * FIX_INTERNAL_EDGES (includes MERGE_DUPLICATE_VERTICES) stops the character
+   * controller catching on interior fan-triangulation edges of large flat faces.
+   *
+   * Editor-time query gotcha: colliders only enter the query pipeline after a
+   * `world.step()` — the editor doesn't step physics, so ad-hoc console raycasts
+   * against fresh colliders miss until one step runs (preview always steps).
+   */
+  static registerShapeTrimesh(shape: ShapeDef, vertices: Float32Array, indices: Uint32Array): RAPIER.Collider | null {
+    let desc: RAPIER.ColliderDesc | null = null;
+    try {
+      desc = RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES);
+    } catch {
+      console.warn(`ColliderBuilder: trimesh failed for shape "${shape.id}" — falling back to convex hull`);
+      desc = RAPIER.ColliderDesc.convexHull(vertices);
+    }
+    if (!desc) return null;
+    const D2R = Math.PI / 180;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
+    ));
+    desc.setTranslation(shape.position.x, shape.position.y, shape.position.z)
+        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+    return physicsWorld.createStaticCollider(desc);
+  }
+
   static registerStairSteps(stair: StairDef): RAPIER.Collider[] {
     const heightDiff = stair.end.y - stair.start.y;
     const horizDist  = Math.hypot(stair.end.x - stair.start.x, stair.end.z - stair.start.z);

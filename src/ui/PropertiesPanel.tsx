@@ -7,6 +7,7 @@ import type {
   DecalDef, DecalTexDef, ShapeDef,
 } from "@/types";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
+import { facesFromCloud } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -1282,11 +1283,17 @@ function ShapeGeoView({ selected, onObjectUpdate, bus }: { selected: SelectedObj
   const convertToBrush = () => {
     if (!shape) return;
     const pts = ShapeBuilder.localHullPoints(shape);
-    const vertices: Vec3[] = [];
+    const cloud: Vec3[] = [];
     for (let i = 0; i < pts.length; i += 3) {
-      vertices.push({ x: +pts[i]!.toFixed(3), y: +pts[i + 1]!.toFixed(3), z: +pts[i + 2]!.toFixed(3) });
+      cloud.push({ x: +pts[i]!.toFixed(3), y: +pts[i + 1]!.toFixed(3), z: +pts[i + 2]!.toFixed(3) });
     }
-    onObjectUpdate({ mesh: { vertices } } as unknown as Partial<WorldObject>);
+    // Phase 23: bake explicit face loops (seeded so cap/side materials keep looking
+    // the same). Degenerate hull → fall back to the plain convex cloud.
+    const faced = facesFromCloud(cloud, {
+      sideMaterial: shape.sideMaterial,
+      sideMaterialOverrides: shape.sideMaterialOverrides,
+    });
+    onObjectUpdate({ mesh: faced ?? { vertices: cloud } } as unknown as Partial<WorldObject>);
   };
   const revertToParams = () => onObjectUpdate({ mesh: undefined } as unknown as Partial<WorldObject>);
 

@@ -3,7 +3,8 @@ import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import type { ShapeDef, MeshUserData, MaterialOverrides } from "@/types";
+import { newellNormal } from "@/editor/brushOps";
+import type { ShapeDef, MeshUserData, MaterialOverrides, FaceGroup } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface ShapeBuildOutput {
@@ -60,6 +61,11 @@ export function resolveShapeParams(def: ShapeDef): ResolvedShapeParams {
 /** True when the def is in brush mode (local vertex cloud supersedes kind params). */
 export function isBrush(def: ShapeDef): boolean {
   return (def.mesh?.vertices?.length ?? 0) >= 4;
+}
+
+/** True when the brush has explicit face loops (Phase 23) — loops are authoritative. */
+export function isFaceBrush(def: ShapeDef): boolean {
+  return isBrush(def) && (def.mesh?.faces?.length ?? 0) >= 4;
 }
 
 // ── Geometry accumulators ─────────────────────────────────────────────────────
@@ -324,13 +330,61 @@ function buildBufs(def: ShapeDef, tsCap: number, tsSide: number): { cap: GeoBuf;
   }
 }
 
+// ── Face-brush geometry (Phase 23) ────────────────────────────────────────────
+// Deterministic per-normal UV basis (shared with the hull path): coplanar faces
+// get identical metric projections, so flat regions have no seams.
+function faceUVBasis(n: THREE.Vector3): { u: THREE.Vector3; v: THREE.Vector3 } {
+  const u = new THREE.Vector3(), v = new THREE.Vector3();
+  if (Math.abs(n.y) > 0.99) u.set(1, 0, 0);
+  else u.crossVectors(new THREE.Vector3(0, 1, 0), n).normalize();
+  v.crossVectors(n, u);
+  return { u, v };
+}
+
+/** Fan-triangulate one face loop into a GeoBuf with flat Newell normals + metric UVs. */
+function pushFaceLoop(buf: GeoBuf, def: ShapeDef, loop: number[], ts: number): number {
+  const verts = def.mesh!.vertices;
+  const n = newellNormal(verts, loop);
+  const nn: V3 = [n.x, n.y, n.z];
+  const { u, v } = faceUVBasis(n);
+  const p = new THREE.Vector3();
+  const uvOf = (vi: number): [number, number] => {
+    const w = verts[vi]!;
+    p.set(w.x, w.y, w.z);
+    return [p.dot(u) / ts, p.dot(v) / ts];
+  };
+  const at = (vi: number): V3 => [verts[vi]!.x, verts[vi]!.y, verts[vi]!.z];
+  for (let i = 1; i < loop.length - 1; i++) {
+    pushTri(buf, [at(loop[0]!), at(loop[i]!), at(loop[i + 1]!)], [nn, nn, nn],
+      [uvOf(loop[0]!), uvOf(loop[i]!), uvOf(loop[i + 1]!)]);
+  }
+  return loop.length - 2;   // triangles emitted
+}
+
 // ── Builder ───────────────────────────────────────────────────────────────────
 
 export class ShapeBuilder {
   /** Merged single geometry — tool ghost + tests. */
   static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry {
+    if (isFaceBrush(def)) {
+      const buf = newBuf();
+      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, f.verts, tileScale);
+      return makeGeo(buf);
+    }
     const { cap, side } = buildBufs(def, tileScale, tileScale);
     return makeGeo(mergeBufs(cap, side));
+  }
+
+  /** Flat vertex + fan-index arrays for the face-brush trimesh collider. */
+  static localTrimesh(def: ShapeDef): { vertices: Float32Array; indices: Uint32Array } {
+    const verts = def.mesh!.vertices;
+    const v = new Float32Array(verts.length * 3);
+    verts.forEach((p, i) => { v[i * 3] = p.x; v[i * 3 + 1] = p.y; v[i * 3 + 2] = p.z; });
+    const idx: number[] = [];
+    for (const f of def.mesh!.faces ?? []) {
+      for (let i = 1; i < f.verts.length - 1; i++) idx.push(f.verts[0]!, f.verts[i]!, f.verts[i + 1]!);
+    }
+    return { vertices: v, indices: new Uint32Array(idx) };
   }
 
   /** Cap/side split for the two-material build. */
@@ -377,6 +431,7 @@ export class ShapeBuilder {
   }
 
   static async build(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
+    if (isFaceBrush(shape)) return ShapeBuilder._buildFaceBrush(shape, zoneId);
     const capOvr  = shape.materialOverrides;
     const capDef  = assetManager.getMaterialDef(shape.material);
     const tsCap   = capOvr?.tileScale ?? capDef?.tileScale ?? 1.0;
@@ -429,5 +484,73 @@ export class ShapeBuilder {
 
     const collider = ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape));
     return { meshes: [capMesh, sideMesh], collider };
+  }
+
+  /**
+   * Face-brush build (Phase 23): faces grouped by effective material → one mesh per
+   * group (a single-material brush stays one mesh/draw call), fan-triangulated with
+   * flat Newell normals and per-face metric UVs. Each built mesh carries
+   * userData.faceGroups (triangle range → face index) for face-mode picking.
+   * Collider = exact trimesh of the same fans (concave solids collide correctly).
+   */
+  private static async _buildFaceBrush(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
+    const faces = shape.mesh!.faces!;
+
+    interface Group { matId: string; ovr?: MaterialOverrides; faceIdxs: number[] }
+    const groups = new Map<string, Group>();
+    faces.forEach((f, i) => {
+      // A face without its own material inherits the shape's material AND overrides.
+      const matId = f.material ?? shape.material;
+      const ovr   = f.material ? f.materialOverrides : (f.materialOverrides ?? shape.materialOverrides);
+      const key   = `${matId}|${JSON.stringify(ovr ?? null)}`;
+      const g = groups.get(key) ?? { matId, ovr, faceIdxs: [] };
+      g.faceIdxs.push(i);
+      groups.set(key, g);
+    });
+
+    const loadMat = (id: string, ovr: MaterialOverrides | undefined) =>
+      ovr
+        ? assetManager.getMaterialWithOverrides(id, ovr).catch(() => assetManager.getDefaultMaterial(0x667788))
+        : assetManager.getMaterial(id).catch(() => assetManager.getDefaultMaterial(0x667788));
+
+    const meshes: THREE.Mesh[] = [];
+    for (const g of groups.values()) {
+      const matDef = assetManager.getMaterialDef(g.matId);
+      const ts = g.ovr?.tileScale ?? matDef?.tileScale ?? 1.0;
+      const buf = newBuf();
+      const faceGroups: FaceGroup[] = [];
+      let triOffset = 0;
+      for (const fi of g.faceIdxs) {
+        const count = pushFaceLoop(buf, shape, faces[fi]!.verts, ts);
+        faceGroups.push({ start: triOffset, count, faceIndex: fi });
+        triOffset += count;
+      }
+      const geo = makeGeo(buf);
+      applyUVOffset(geo, g.ovr?.offsetX ?? 0, g.ovr?.offsetY ?? 0);
+      const mat  = await loadMat(g.matId, g.ovr);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(shape.position.x, shape.position.y, shape.position.z);
+      mesh.rotation.set(
+        THREE.MathUtils.degToRad(shape.rotation.x),
+        THREE.MathUtils.degToRad(shape.rotation.y),
+        THREE.MathUtils.degToRad(shape.rotation.z),
+      );
+      mesh.castShadow    = true;
+      mesh.receiveShadow = true;
+      mesh.userData = {
+        editorId:      shape.id,
+        editorType:    "shape",
+        zoneId,
+        selectable:    true,
+        floorLevel:    shape.floorLevel ?? 0,
+        _ownsMaterial: !!g.ovr,
+        faceGroups,
+      } satisfies MeshUserData;
+      meshes.push(mesh);
+    }
+
+    const tm = ShapeBuilder.localTrimesh(shape);
+    const collider = ColliderBuilder.registerShapeTrimesh(shape, tm.vertices, tm.indices);
+    return { meshes, collider };
   }
 }
