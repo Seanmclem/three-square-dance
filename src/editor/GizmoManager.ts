@@ -352,6 +352,10 @@ export class GizmoManager implements IEditorModule {
     this._updateMeshOffsets();
     this._syncAxisVisibility();
     this._controls?.attach(this._pivot);
+    // attach() forces the controls visible — re-apply suspend/game gating so a
+    // suspender that fired during this same object:selected dispatch (e.g. the
+    // face/vertex sub-object editors) isn't overridden by listener order.
+    this._applyControlsEnabled();
   }
 
   private _detach(): void {

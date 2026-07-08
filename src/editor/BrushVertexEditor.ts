@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { isBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -6,9 +7,11 @@ import type { IEditorModule, ToolId, ShapeDef, ScreenPos, Vec3 } from "@/types";
 
 const SNAP = 0.25;             // local-space grid for vertex edits (Alt = free)
 const HANDLE_R = 0.09;
-const COLOR       = 0xffaa33;  // brush-corner amber
-const COLOR_HOVER = 0xffffff;
+const COLOR        = 0xffaa33;  // brush-corner amber
+const COLOR_HOVER  = 0xffffff;
+const COLOR_SELECT = 0x00ffff;  // selected vertex (vertex mode)
 const MIN_VERTS = 4;
+const SUSPEND_SOURCE = "vertex-mode";
 
 const snap = (v: number): number => Math.round(v / SNAP) * SNAP;
 
@@ -42,6 +45,14 @@ export class BrushVertexEditor implements IEditorModule {
   private _dragPlane = new THREE.Plane();
   private _origVertices: Vec3[] | null = null;
 
+  // Vertex-mode extras (Phase 23): selected vertex + its 3-axis gizmo.
+  private _selectedVertex: number | null = null;
+  private _suspended = false;
+  private _controls: TransformControls | null = null;
+  private readonly _proxy = new THREE.Group();
+  private _tcDragging = false;
+  private _tcStart = new THREE.Vector3();
+
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _unsubs: Array<() => void> = [];
 
@@ -54,15 +65,41 @@ export class BrushVertexEditor implements IEditorModule {
   ) {}
 
   init(): void {
+    // Vertex-mode 3-axis gizmo on the selected corner (ColliderEditor proxy pattern).
+    this._scene.add(this._proxy);
+    this._controls = new TransformControls(this._camera as THREE.PerspectiveCamera, this._canvas);
+    this._controls.setMode("translate");
+    this._controls.setSize(0.4);
+    this._controls.setTranslationSnap(SNAP);
+    this._scene.add(this._controls);
+    this._controls.addEventListener("dragging-changed", e => {
+      const isDragging = (e as unknown as { value: boolean }).value;
+      this._bus.emit("gizmo:dragging", { isDragging });
+      if (isDragging) {
+        this._tcDragging = true;
+        this._tcStart.copy(this._proxy.position);
+        const shape = this._selectedShape();
+        this._origVertices = shape ? structuredClone(shape.mesh!.vertices) : null;
+        this._world.beginTransaction("move brush corner");
+      } else {
+        this._tcDragging = false;
+        this._origVertices = null;
+        this._world.commitTransaction();
+        this._sync();
+      }
+    });
+    this._controls.addEventListener("objectChange", () => this._onGizmoChange());
+
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
-        if (tool !== "select" && this._state === "DRAG") this._cancelDrag();
+        if (tool !== "select-vertex" && this._state === "DRAG") this._cancelDrag();
         this._sync();
       }),
       this._bus.on("object:selected", payload => {
         this._selectedId = payload.type === "shape" ? payload.id : null;
         this._zoneId = payload.zoneId;
+        this._selectedVertex = payload.type === "shape" ? (payload.vertexIndex ?? null) : null;
         this._addArmed = false;
         this._sync();
       }),
@@ -71,7 +108,7 @@ export class BrushVertexEditor implements IEditorModule {
         if (id === this._selectedId) { this._selectedId = null; this._sync(); }
       }),
       this._bus.on("shape:updated", ({ id }) => {
-        if (id === this._selectedId && this._state !== "DRAG") this._sync();
+        if (id === this._selectedId && this._state !== "DRAG" && !this._tcDragging) this._sync();
       }),
       this._bus.on("shape:add-corner", ({ armed }) => {
         this._addArmed = armed;
@@ -100,14 +137,15 @@ export class BrushVertexEditor implements IEditorModule {
         this._onDeleteCorner(screenPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._altDown = true;
+        if (code === "AltLeft" || code === "AltRight") { this._altDown = true; this._controls?.setTranslationSnap(null); }
         if (code === "Escape") {
           if (this._state === "DRAG") this._cancelDrag();
+          if (this._tcDragging) this._cancelTcDrag();
           if (this._addArmed) { this._addArmed = false; document.body.style.cursor = ""; }
         }
       }),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._altDown = false;
+        if (code === "AltLeft" || code === "AltRight") { this._altDown = false; this._controls?.setTranslationSnap(SNAP); }
       }),
     );
   }
@@ -117,15 +155,30 @@ export class BrushVertexEditor implements IEditorModule {
   dispose(): void {
     this._unsubs.forEach(u => u());
     this._unsubs.length = 0;
+    this._setSuspended(false);
+    if (this._controls) {
+      this._controls.detach();
+      this._scene.remove(this._controls);
+      this._controls.dispose();
+      this._controls = null;
+    }
+    this._scene.remove(this._proxy);
     this._clearHandles();
   }
 
   // ── State ───────────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    if (this._activeTool !== "select" || this._previewing) return false;
+    // Phase 23: corner handles live in VERTEX mode only (declutters object mode).
+    if (this._activeTool !== "select-vertex" || this._previewing) return false;
     const s = this._selectedShape();
     return !!s && isBrush(s);
+  }
+
+  private _setSuspended(on: boolean): void {
+    if (on === this._suspended) return;
+    this._suspended = on;
+    this._bus.emit("gizmo:suspend", { source: SUSPEND_SOURCE, suspended: on });
   }
 
   private _selectedShape(): ShapeDef | undefined {
@@ -145,8 +198,14 @@ export class BrushVertexEditor implements IEditorModule {
 
   private _sync(): void {
     const shape = this._shouldShow() ? this._selectedShape() : undefined;
-    if (!shape) { this._clearHandles(); return; }
+    this._setSuspended(!!shape);   // vertex mode + brush selected → entity gizmo yields
+    if (!shape) {
+      this._clearHandles();
+      if (!this._tcDragging) { this._controls?.detach(); if (this._controls) this._controls.visible = false; }
+      return;
+    }
     const verts = shape.mesh!.vertices;
+    if (this._selectedVertex !== null && this._selectedVertex >= verts.length) this._selectedVertex = null;
     // Rebuild the handle pool when the count changes; otherwise just reposition.
     if (this._handles.length !== verts.length) {
       this._clearHandles();
@@ -165,6 +224,19 @@ export class BrushVertexEditor implements IEditorModule {
     const m = this._shapeMatrix(shape);
     for (let i = 0; i < verts.length; i++) {
       this._handles[i]!.position.set(verts[i]!.x, verts[i]!.y, verts[i]!.z).applyMatrix4(m);
+      const mat = this._handles[i]!.material as THREE.MeshBasicMaterial;
+      mat.color.setHex(i === this._selectedVertex ? COLOR_SELECT : COLOR);
+    }
+    // 3-axis gizmo on the selected corner.
+    if (!this._tcDragging && this._controls) {
+      if (this._selectedVertex !== null) {
+        this._proxy.position.copy(this._handles[this._selectedVertex]!.position);
+        this._controls.attach(this._proxy);
+        this._controls.visible = true;
+      } else {
+        this._controls.detach();
+        this._controls.visible = false;
+      }
     }
   }
 
@@ -212,6 +284,15 @@ export class BrushVertexEditor implements IEditorModule {
     if (idx === null) return;
     const shape = this._selectedShape();
     if (!shape) return;
+    // Click = select (Blender-ish): route through the sub-select sink so the panel,
+    // gizmo and everything else read one channel. The already-selected vertex's own
+    // handle yields to its TransformControls (grabbing an axis arrow wins).
+    if (idx !== this._selectedVertex) {
+      this._selectedVertex = idx;
+      this._bus.emit("shape:sub-select", { zoneId: this._zoneId!, shapeId: this._selectedId!, faceIndex: null, vertexIndex: idx });
+    } else {
+      return;   // TC owns drags on the selected corner
+    }
     this._dragIndex = idx;
     this._origVertices = structuredClone(shape.mesh!.vertices);
     // Camera-facing plane through the vertex — free 3D drag in screen space.
@@ -222,6 +303,27 @@ export class BrushVertexEditor implements IEditorModule {
     this._state = "DRAG";
     this._world.beginTransaction("move brush corner");
     this._bus.emit("gizmo:dragging", { isDragging: true });
+  }
+
+  /** TC drag: move the selected corner along the gizmo axes (world Δ → local). */
+  private _onGizmoChange(): void {
+    if (!this._tcDragging || !this._origVertices || this._selectedVertex === null) return;
+    const shape = this._selectedShape();
+    if (!shape || !this._zoneId || !this._selectedId) return;
+    const world = this._proxy.position.clone().sub(this._tcStart);
+    const D2R = Math.PI / 180;
+    const inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")).invert();
+    const local = world.applyQuaternion(inv);
+    const o = this._origVertices[this._selectedVertex]!;
+    const v: Vec3 = { x: +(o.x + local.x).toFixed(4), y: +(o.y + local.y).toFixed(4), z: +(o.z + local.z).toFixed(4) };
+    const vertices = this._origVertices.map((old, i) => i === this._selectedVertex ? v : old);
+    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
+    // Reposition the handles live (skip the TC to keep the drag stable).
+    const m = this._shapeMatrix(shape);
+    for (let i = 0; i < vertices.length && i < this._handles.length; i++) {
+      this._handles[i]!.position.set(vertices[i]!.x, vertices[i]!.y, vertices[i]!.z).applyMatrix4(m);
+    }
   }
 
   private _onDragMove(screenPos: ScreenPos): void {
@@ -255,6 +357,18 @@ export class BrushVertexEditor implements IEditorModule {
     }
     this._world.abortTransaction();
     this._endDrag();
+  }
+
+  private _cancelTcDrag(): void {
+    const shape = this._selectedShape();
+    if (this._origVertices && shape && this._zoneId && this._selectedId) {
+      this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices: this._origVertices } });
+    }
+    this._world.abortTransaction();
+    this._tcDragging = false;
+    this._origVertices = null;
+    this._bus.emit("gizmo:dragging", { isDragging: false });
+    this._sync();
   }
 
   private _endDrag(): void {

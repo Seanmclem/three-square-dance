@@ -19,6 +19,7 @@ import { ShapeTool } from "@/editor/ShapeTool";
 import { ShapeResizer } from "@/editor/ShapeResizer";
 import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
 import { BrushFaceHighlighter } from "@/editor/BrushFaceHighlighter";
+import { BrushFaceEditor } from "@/editor/BrushFaceEditor";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -214,6 +215,7 @@ export default function App() {
     const shapeResizer       = new ShapeResizer(scene.scene, world, bus, scene.camera, canvas);
     const brushVertexEditor  = new BrushVertexEditor(scene.scene, world, bus, scene.camera, canvas);
     const brushFaceHighlighter = new BrushFaceHighlighter(scene.scene, world, bus);
+    const brushFaceEditor    = new BrushFaceEditor(scene.scene, world, bus, scene.camera, canvas);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
@@ -267,6 +269,7 @@ export default function App() {
     shapeResizer.init();
     brushVertexEditor.init();
     brushFaceHighlighter.init();
+    brushFaceEditor.init();
     objectTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -592,6 +595,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      brushFaceEditor.dispose();
       brushFaceHighlighter.dispose();
       brushVertexEditor.dispose();
       shapeResizer.dispose();
