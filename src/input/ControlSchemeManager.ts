@@ -6,6 +6,10 @@ import { KeyboardMouseSource } from "./KeyboardMouseSource";
 import { GamepadSource } from "./GamepadSource";
 import { TouchSource } from "./TouchSource";
 
+const LAST_SCHEME_KEY = "worldbuilder.lastScheme";
+// Index-aligned with the _sources array built in the constructor.
+const SOURCE_SCHEMES: ControlScheme[] = ["kbm", "gamepad", "touch"];
+
 /**
  * Preview-mode input hub. Owns one source per device class; every source is
  * always live and update() merges their contributions into a single
@@ -27,6 +31,7 @@ export class ControlSchemeManager {
   private readonly _sources: InputSource[];
   private _scheme: ControlScheme = "kbm";
   private _suppress = false;      // zone-transition fades freeze the player (InputManager idiom)
+  private _menuMode = false;      // dialogue open: movement/look/jump zeroed, confirm/cancel/menuNav live
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -45,12 +50,16 @@ export class ControlSchemeManager {
     this._unsub.push(
       this._bus.on("overlay:fade-in",  () => { this._suppress = true; }),
       this._bus.on("overlay:fade-out", () => { this._suppress = false; }),
+      this._bus.on("dialogue:show",    () => { this._menuMode = true; }),
+      this._bus.on("dialogue:closed",  () => { this._menuMode = false; }),
     );
     this._setScheme(this._guessScheme());
   }
 
-  /** Initial scheme guess: touch hardware → touch; connected pad → gamepad; else kbm. */
+  /** Initial scheme guess: last used → touch hardware → connected pad → kbm. */
   private _guessScheme(): ControlScheme {
+    const last = localStorage.getItem(LAST_SCHEME_KEY);
+    if (last === "kbm" || last === "gamepad" || last === "touch") return last;
     if (window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0) return "touch";
     for (const p of navigator.getGamepads()) if (p) return "gamepad";
     return "kbm";
@@ -58,6 +67,7 @@ export class ControlSchemeManager {
 
   private _setScheme(scheme: ControlScheme): void {
     this._scheme = scheme;
+    localStorage.setItem(LAST_SCHEME_KEY, scheme);
     this._bus.emit("input:scheme-changed", { scheme });
   }
 
@@ -65,13 +75,23 @@ export class ControlSchemeManager {
   update(dt: number): void {
     zeroActionState(this.state);
     if (this._suppress) {
-      // Sources still drain their accumulators so a fade doesn't release a
-      // burst of buffered look/zoom afterwards.
-      for (const s of this._sources) s.apply(this.state, dt);
+      // Sources still drain their accumulators (and activity flags) so a fade
+      // doesn't release buffered look/zoom or flip the scheme afterwards.
+      for (const s of this._sources) { s.apply(this.state, dt); s.hadActivity(); }
       zeroActionState(this.state);
       return;
     }
     for (const s of this._sources) s.apply(this.state, dt);
+
+    // Last input wins: whichever device actually actuated this frame becomes
+    // the labelled scheme (UI prompts, overlay visibility, pointer-lock policy).
+    // All sources stay live regardless. Deadzone already filters stick drift.
+    for (let i = 0; i < this._sources.length; i++) {
+      if (this._sources[i].hadActivity()) {
+        const scheme = SOURCE_SCHEMES[i];
+        if (scheme !== this._scheme) this._setScheme(scheme);
+      }
+    }
 
     // Clamp move to the unit disc: keyboard diagonals (±1,±1) normalize to
     // full speed exactly as before; analog magnitudes below 1 pass through.
@@ -82,6 +102,19 @@ export class ControlSchemeManager {
       m.x *= inv;
       m.y *= inv;
     }
+
+    // Menu mode (dialogue open): the player must not walk/jump/interact behind
+    // the dialogue; confirm advances it. confirm only fires as a bus action in
+    // menu mode — outside it the same buttons keep their gameplay meanings.
+    if (this._menuMode) {
+      if (this.state.confirmPressed) this._bus.emit("action:confirm", {});
+      const cancel = this.state.cancelPressed;
+      const nav    = this.state.menuNav;
+      zeroActionState(this.state);
+      this.state.cancelPressed = cancel;
+      this.state.menuNav = nav;
+    }
+    if (this.state.cancelPressed) this._bus.emit("action:cancel", {});
   }
 
   dispose(): void {

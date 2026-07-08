@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { EventBus } from "@/core/EventBus";
 
-interface Props { bus: EventBus; activeZoneName?: string }
+type Scheme = "kbm" | "gamepad" | "touch";
 
-export function PreviewHUD({ bus, activeZoneName }: Props) {
+// Scheme-specific glyphs for the two prompts the HUD renders. Touch has no
+// exit hint — the overlay's ✕ button is the affordance.
+const INTERACT_PREFIX: Record<Scheme, string> = { kbm: "[E]", gamepad: "[LB]", touch: "Tap ·" };
+const EXIT_HINT:       Record<Scheme, string | null> = { kbm: "Esc · exit", gamepad: "Start · exit", touch: null };
+
+interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme }
+
+export function PreviewHUD({ bus, activeZoneName, scheme }: Props) {
   const [zoneName,      setZoneName]      = useState<string | null>(null);
   const [interactLabel, setInteractLabel] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +71,7 @@ export function PreviewHUD({ bus, activeZoneName }: Props) {
           fontFamily: "monospace", letterSpacing: 1,
           background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 8px",
         }}>
-          [E] {interactLabel}
+          {INTERACT_PREFIX[scheme]} {interactLabel}
         </div>
       )}
 
@@ -80,14 +87,16 @@ export function PreviewHUD({ bus, activeZoneName }: Props) {
         </div>
       )}
 
-      {/* Esc to exit */}
-      <div style={{
-        position: "absolute", bottom: 16, right: 16,
-        color: "rgba(255,255,255,0.35)", fontSize: 11,
-        fontFamily: "monospace", letterSpacing: 1,
-      }}>
-        Esc · exit
-      </div>
+      {/* Exit hint (scheme-specific; touch relies on the overlay's ✕ button) */}
+      {EXIT_HINT[scheme] && (
+        <div style={{
+          position: "absolute", bottom: 16, right: 16,
+          color: "rgba(255,255,255,0.35)", fontSize: 11,
+          fontFamily: "monospace", letterSpacing: 1,
+        }}>
+          {EXIT_HINT[scheme]}
+        </div>
+      )}
     </div>
   );
 }

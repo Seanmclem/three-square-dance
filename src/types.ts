@@ -180,6 +180,12 @@ export interface BusEvents {
   "preview:zone-entered":  { zoneName: string };
   // Phase 24 — active control scheme label flipped (drives HUD prompts + touch overlay)
   "input:scheme-changed":  { scheme: "kbm" | "gamepad" | "touch" };
+  // Phase 24 — scheme-agnostic menu actions from ControlSchemeManager (gamepad A/Start, touch tap/✕).
+  // confirm fires only while a dialogue is open; cancel closes the dialogue or exits preview.
+  "action:confirm":        Record<string, never>;
+  "action:cancel":         Record<string, never>;
+  // Phase 24 — App closed the dialogue overlay (menu-mode gate for ControlSchemeManager)
+  "dialogue:closed":       Record<string, never>;
   "gizmo:dragging":        { isDragging: boolean };
   // A ColliderEditor face handle is under the cursor — GizmoManager suspends
   // TransformControls so the handle wins the pick (its pickers overlap on small objects).

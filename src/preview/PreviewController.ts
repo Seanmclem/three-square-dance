@@ -24,6 +24,8 @@ export class PreviewController {
   private _triggers:    TriggerSystem | null = null;
   private _input:       ControlSchemeManager | null = null;
   private _updateFn:    ((dt: number) => void) | null = null;
+  private _offScheme:   (() => void) | null = null;
+  private _onCanvasMouseDown: ((e: MouseEvent) => void) | null = null;
 
   constructor(
     private readonly _bus:   EventBus,
@@ -78,7 +80,18 @@ export class PreviewController {
 
     // Pointer lock is a kbm concern — touch has no pointer to lock (the call
     // throws on most mobile browsers) and gamepad doesn't need one.
-    if (input.activeScheme === "kbm") this._scene.renderer.domElement.requestPointerLock();
+    const canvas = this._scene.renderer.domElement;
+    if (input.activeScheme === "kbm") canvas.requestPointerLock();
+    // Live scheme switches: leaving kbm releases the lock; re-entering kbm
+    // can't re-lock from a key press alone (needs a gesture), so the next
+    // canvas mousedown re-acquires it.
+    this._offScheme = this._bus.on("input:scheme-changed", ({ scheme }) => {
+      if (scheme !== "kbm" && document.pointerLockElement) document.exitPointerLock();
+    });
+    this._onCanvasMouseDown = () => {
+      if (input.activeScheme === "kbm" && !document.pointerLockElement) canvas.requestPointerLock();
+    };
+    canvas.addEventListener("mousedown", this._onCanvasMouseDown);
 
     this._bus.emit("preview:start", { mode, resume: opts?.resume ?? false });
   }
@@ -96,6 +109,12 @@ export class PreviewController {
     this._scene.setPreviewCamera(null);
     this._controller.dispose();
     this._input?.dispose();
+    this._offScheme?.();
+    this._offScheme = null;
+    if (this._onCanvasMouseDown) {
+      this._scene.renderer.domElement.removeEventListener("mousedown", this._onCanvasMouseDown);
+      this._onCanvasMouseDown = null;
+    }
     this._controller = null;
     this._triggers   = null;
     this._input      = null;

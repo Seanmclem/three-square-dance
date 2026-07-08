@@ -144,6 +144,7 @@ export default function App() {
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const [previewScheme,   setPreviewScheme]    = useState<"kbm" | "gamepad" | "touch">("kbm");
+  const dialogueOpenRef = useRef(false);   // bus handlers need the current value, not a stale closure
   const [isGame,          setIsGame]           = useState(false);
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
@@ -422,7 +423,17 @@ export default function App() {
         scriptEngine.deactivate();
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
-      bus.on("dialogue:show", payload => setDialogueState(payload)),
+      // Gamepad Start / touch ✕ → close the dialogue if one is open, else exit preview.
+      bus.on("action:cancel", () => {
+        if (dialogueOpenRef.current) {
+          dialogueOpenRef.current = false;
+          setDialogueState(null);
+          bus.emit("dialogue:closed", {});
+        } else if (previewRef.current?.isActive) {
+          previewRef.current.exit();
+        }
+      }),
+      bus.on("dialogue:show", payload => { dialogueOpenRef.current = true; setDialogueState(payload); }),
       bus.on("overlay:fade-in", payload => setFadeState(payload)),
       bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
@@ -1899,6 +1910,7 @@ export default function App() {
         <PreviewHUD
           bus={busRef.current}
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
+          scheme={previewScheme}
         />
       )}
 
@@ -2013,7 +2025,12 @@ SquareDance
       )}
       <DialogueOverlay
         dialogue={dialogueState}
-        onClose={() => setDialogueState(null)}
+        bus={busRef.current}
+        onClose={() => {
+          dialogueOpenRef.current = false;
+          setDialogueState(null);
+          busRef.current.emit("dialogue:closed", {});
+        }}
       />
       <FadeOverlay
         fade={fadeState}

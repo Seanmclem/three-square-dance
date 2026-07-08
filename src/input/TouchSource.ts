@@ -15,18 +15,35 @@ export class TouchSource implements InputSource {
     jumpHeld: false,
     interactQueued: false,     // tap on the look region
     cancelQueued: false,       // ✕ button
+    activity: false,           // any pointerdown on the overlay (scheme-switch signal)
+  };
+
+  // Document-level: the overlay only mounts while the scheme is already
+  // "touch", so a touch anywhere (e.g. on the bare canvas after a keyboard
+  // press stole the scheme) must still register as touch activity.
+  private readonly _onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === "touch") this.shared.activity = true;
   };
 
   constructor(private readonly _bindings: BindingsConfig) {}
 
-  attach(): void {}
+  attach(): void {
+    document.addEventListener("pointerdown", this._onPointerDown);
+  }
 
   detach(): void {
+    document.removeEventListener("pointerdown", this._onPointerDown);
     const s = this.shared;
     s.move.x = s.move.y = 0;
     s.lookPx.x = s.lookPx.y = 0;
     s.jumpHeld = false;
-    s.interactQueued = s.cancelQueued = false;
+    s.interactQueued = s.cancelQueued = s.activity = false;
+  }
+
+  hadActivity(): boolean {
+    const a = this.shared.activity;
+    this.shared.activity = false;
+    return a;
   }
 
   apply(state: ActionState, _dt: number): void {

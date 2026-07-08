@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { EventBus } from "@/core/EventBus";
 
 interface DialogueState {
   speaker:   string;
@@ -9,10 +10,11 @@ interface DialogueState {
 
 export interface DialogueOverlayProps {
   dialogue: { speaker: string; lines: string[]; portrait?: string } | null;
+  bus:      EventBus;
   onClose:  () => void;
 }
 
-export function DialogueOverlay({ dialogue, onClose }: DialogueOverlayProps) {
+export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps) {
   const [state, setState] = useState<DialogueState | null>(null);
   const prevDialogue = useRef(dialogue);
 
@@ -35,17 +37,12 @@ export function DialogueOverlay({ dialogue, onClose }: DialogueOverlayProps) {
     }
   }
 
-  // Advance on E key
+  // Advance on action:confirm — ControlSchemeManager maps every scheme's
+  // confirm input onto this one bus event (kbm E/Space/Enter, gamepad A,
+  // touch tap), and only emits it while a dialogue is open (menu mode).
   useEffect(() => {
     if (!state) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "KeyE" || e.code === "Space" || e.code === "Enter") {
-        e.preventDefault();
-        advance();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return bus.on("action:confirm", advance);
   });
 
   if (!state) return null;

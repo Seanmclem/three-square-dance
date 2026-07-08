@@ -10,6 +10,7 @@ export interface BindingsConfig {
     move: { forward: string[]; back: string[]; left: string[]; right: string[] };
     jump:     string[];
     interact: string[];
+    confirm:  string[];        // dialogue advance (menu mode only)
     lookSensitivity: number;   // rad per px of mouse movement
   };
   gamepad: {
@@ -36,6 +37,7 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
     },
     jump:     ["Space"],
     interact: ["KeyE"],
+    confirm:  ["KeyE", "Space", "Enter"],   // the keys DialogueOverlay historically accepted
     lookSensitivity: 0.002,    // matches the pre-phase-24 hardcode
   },
   gamepad: {

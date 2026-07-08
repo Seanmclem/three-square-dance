@@ -15,6 +15,7 @@ const MAX_BUTTONS = 17;
  */
 export class GamepadSource implements InputSource {
   private _padCount = 0;
+  private _activity = false;
   // Previous-frame pressed flags for edge detection (fixed-size, reused — no per-frame allocation).
   private readonly _prev = new Array<boolean>(MAX_BUTTONS).fill(false);
 
@@ -50,12 +51,16 @@ export class GamepadSource implements InputSource {
     const b = this._bindings.gamepad;
 
     // Left stick → move. Stick up is -Y on the axis; ActionState forward is +y.
+    // NOTE: _deadzoned returns a shared scratch object — consume it fully
+    // (including the activity check) before the next call overwrites it.
     const move = this._deadzoned(pad.axes[AXIS_LX] ?? 0, pad.axes[AXIS_LY] ?? 0, b.deadzone);
+    if (move.x !== 0 || move.y !== 0) this._activity = true;
     state.move.x += move.x;
     state.move.y += -move.y;
 
     // Right stick → look, rate-based (rad/s at full deflection).
     const look = this._deadzoned(pad.axes[AXIS_RX] ?? 0, pad.axes[AXIS_RY] ?? 0, b.deadzone);
+    if (look.x !== 0 || look.y !== 0) this._activity = true;
     state.look.x += look.x * b.lookRate * dt;
     state.look.y += (b.invertLookY ? -look.y : look.y) * b.lookRate * dt;
 
@@ -69,7 +74,16 @@ export class GamepadSource implements InputSource {
 
     // Snapshot pressed flags for next frame's edge detection.
     const n = Math.min(pad.buttons.length, MAX_BUTTONS);
-    for (let i = 0; i < n; i++) this._prev[i] = pad.buttons[i].pressed;
+    for (let i = 0; i < n; i++) {
+      this._prev[i] = pad.buttons[i].pressed;
+      if (pad.buttons[i].pressed) this._activity = true;
+    }
+  }
+
+  hadActivity(): boolean {
+    const a = this._activity;
+    this._activity = false;
+    return a;
   }
 
   private _pickPad(): Gamepad | null {

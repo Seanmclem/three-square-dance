@@ -56,4 +56,7 @@ export interface InputSource {
   attach(): void;
   detach(): void;
   apply(state: ActionState, dt: number): void;
+  /** Did this device see a real actuation since the last call? Returns and
+   *  clears the flag — the manager uses it for last-input-wins scheme switching. */
+  hadActivity(): boolean;
 }
