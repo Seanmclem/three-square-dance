@@ -3,6 +3,7 @@ import type { ActionState, ControlScheme, InputSource } from "./actions";
 import { createActionState, zeroActionState } from "./actions";
 import type { BindingsConfig } from "./bindings";
 import { KeyboardMouseSource } from "./KeyboardMouseSource";
+import { GamepadSource } from "./GamepadSource";
 
 /**
  * Preview-mode input hub. Owns one source per device class; every source is
@@ -29,7 +30,7 @@ export class ControlSchemeManager {
     private readonly _bus: EventBus,
     bindings: BindingsConfig,
   ) {
-    this._sources = [new KeyboardMouseSource(bindings)];
+    this._sources = [new KeyboardMouseSource(bindings), new GamepadSource(bindings)];
   }
 
   get activeScheme(): ControlScheme { return this._scheme; }
