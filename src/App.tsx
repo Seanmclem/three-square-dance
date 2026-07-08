@@ -47,6 +47,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
+import { PauseMenu } from "@/ui/PauseMenu";
 import { DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
@@ -145,6 +146,8 @@ export default function App() {
   const [isPreview,       setIsPreview]        = useState(false);
   const [previewScheme,   setPreviewScheme]    = useState<"kbm" | "gamepad" | "touch">("kbm");
   const dialogueOpenRef = useRef(false);   // bus handlers need the current value, not a stale closure
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const pauseOpenRef = useRef(false);
   const [isGame,          setIsGame]           = useState(false);
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
@@ -419,19 +422,28 @@ export default function App() {
       bus.on("preview:stop",  () => {
         setIsPreview(false);
         setIsGame(false);
+        pauseOpenRef.current = false;
+        setPauseOpen(false);
         if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
         saveGame();
         scriptEngine.deactivate();
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
-      // Gamepad Start / touch ✕ → close the dialogue if one is open, else exit preview.
+      // Gamepad Start / kbm Enter / touch ⚙ → close the dialogue if one is
+      // open, else toggle the pause menu. (Esc still exits preview directly.)
       bus.on("action:cancel", () => {
         if (dialogueOpenRef.current) {
           dialogueOpenRef.current = false;
           setDialogueState(null);
           bus.emit("dialogue:closed", {});
+        } else if (pauseOpenRef.current) {
+          pauseOpenRef.current = false;
+          setPauseOpen(false);
+          bus.emit("pause:closed", {});
         } else if (previewRef.current?.isActive) {
-          previewRef.current.exit();
+          pauseOpenRef.current = true;
+          setPauseOpen(true);
+          bus.emit("pause:show", {});
         }
       }),
       bus.on("dialogue:show", payload => { dialogueOpenRef.current = true; setDialogueState(payload); }),
@@ -1920,6 +1932,23 @@ export default function App() {
           shared={previewRef.current.input.touch.shared}
           joystickRadius={previewRef.current.input.bindings.touch.joystickRadius}
           layout={previewRef.current.input.bindings.touch.layout}
+        />
+      )}
+
+      {isPreview && pauseOpen && (
+        <PauseMenu
+          bus={busRef.current}
+          onResume={() => {
+            pauseOpenRef.current = false;
+            setPauseOpen(false);
+            busRef.current.emit("pause:closed", {});
+          }}
+          onExit={() => {
+            pauseOpenRef.current = false;
+            setPauseOpen(false);
+            busRef.current.emit("pause:closed", {});
+            previewRef.current?.exit();
+          }}
         />
       )}
 

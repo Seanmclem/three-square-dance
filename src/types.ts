@@ -186,6 +186,10 @@ export interface BusEvents {
   "action:cancel":         Record<string, never>;
   // Phase 24 — App closed the dialogue overlay (menu-mode gate for ControlSchemeManager)
   "dialogue:closed":       Record<string, never>;
+  // Phase 24b — pause menu open/close (second menu-mode gate) + d-pad menu navigation
+  "pause:show":            Record<string, never>;
+  "pause:closed":          Record<string, never>;
+  "menu:nav":              { dir: -1 | 1 };
   "gizmo:dragging":        { isDragging: boolean };
   // A ColliderEditor face handle is under the cursor — GizmoManager suspends
   // TransformControls so the handle wins the pick (its pickers overlap on small objects).

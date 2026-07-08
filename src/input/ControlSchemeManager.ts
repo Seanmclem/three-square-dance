@@ -33,8 +33,12 @@ export class ControlSchemeManager {
   private readonly _sources: InputSource[];
   private _scheme: ControlScheme = "kbm";
   private _suppress = false;      // zone-transition fades freeze the player (InputManager idiom)
-  private _menuMode = false;      // dialogue open: movement/look/jump zeroed, confirm/cancel/menuNav live
+  // Menu mode = dialogue OR pause menu open: movement/look/jump zeroed, confirm/cancel/menuNav live
+  private _dialogueOpen = false;
+  private _pauseOpen    = false;
   private _unsub: Array<() => void> = [];
+
+  private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen; }
 
   constructor(
     _dom: HTMLCanvasElement,      // canvas — reserved for future pointer-lock re-entry wiring
@@ -53,8 +57,10 @@ export class ControlSchemeManager {
     this._unsub.push(
       this._bus.on("overlay:fade-in",  () => { this._suppress = true; }),
       this._bus.on("overlay:fade-out", () => { this._suppress = false; }),
-      this._bus.on("dialogue:show",    () => { this._menuMode = true; }),
-      this._bus.on("dialogue:closed",  () => { this._menuMode = false; }),
+      this._bus.on("dialogue:show",    () => { this._dialogueOpen = true; }),
+      this._bus.on("dialogue:closed",  () => { this._dialogueOpen = false; }),
+      this._bus.on("pause:show",       () => { this._pauseOpen = true; }),
+      this._bus.on("pause:closed",     () => { this._pauseOpen = false; }),
     );
     this._setScheme(this._guessScheme());
   }
@@ -106,11 +112,18 @@ export class ControlSchemeManager {
       m.y *= inv;
     }
 
-    // Menu mode (dialogue open): the player must not walk/jump/interact behind
-    // the dialogue; confirm advances it. confirm only fires as a bus action in
-    // menu mode — outside it the same buttons keep their gameplay meanings.
+    // Menu mode (dialogue or pause menu open): the player must not walk/jump/
+    // interact behind it; confirm activates/advances. confirm only fires as a
+    // bus action in menu mode — outside it the same buttons keep their
+    // gameplay meanings.
     if (this._menuMode) {
-      if (this.state.confirmPressed) this._bus.emit("action:confirm", {});
+      // Enter is bound to BOTH confirm and cancel (kbm): in menu mode the
+      // press means "activate/advance", so the simultaneous cancel is dropped.
+      if (this.state.confirmPressed) {
+        this._bus.emit("action:confirm", {});
+        this.state.cancelPressed = false;
+      }
+      if (this.state.menuNav !== 0) this._bus.emit("menu:nav", { dir: this.state.menuNav });
       const cancel = this.state.cancelPressed;
       const nav    = this.state.menuNav;
       zeroActionState(this.state);

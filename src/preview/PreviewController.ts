@@ -25,6 +25,7 @@ export class PreviewController {
   private _input:       ControlSchemeManager | null = null;
   private _updateFn:    ((dt: number) => void) | null = null;
   private _offScheme:   (() => void) | null = null;
+  private _offPause:    Array<() => void> = [];
   private _onCanvasMouseDown: ((e: MouseEvent) => void) | null = null;
 
   constructor(
@@ -88,6 +89,17 @@ export class PreviewController {
     this._offScheme = this._bus.on("input:scheme-changed", ({ scheme }) => {
       if (scheme !== "kbm" && document.pointerLockElement) document.exitPointerLock();
     });
+    // Pause menu needs a free cursor to click Resume/Exit. Re-lock on close is
+    // best-effort (works when closed by a click/keypress = user activation);
+    // if it fails, the existing canvas-mousedown handler re-acquires.
+    this._offPause.push(
+      this._bus.on("pause:show", () => {
+        if (document.pointerLockElement) document.exitPointerLock();
+      }),
+      this._bus.on("pause:closed", () => {
+        if (input.activeScheme === "kbm") canvas.requestPointerLock();
+      }),
+    );
     this._onCanvasMouseDown = () => {
       if (input.activeScheme === "kbm" && !document.pointerLockElement) canvas.requestPointerLock();
     };
@@ -111,6 +123,8 @@ export class PreviewController {
     this._input?.dispose();
     this._offScheme?.();
     this._offScheme = null;
+    this._offPause.forEach(u => u());
+    this._offPause = [];
     if (this._onCanvasMouseDown) {
       this._scene.renderer.domElement.removeEventListener("mousedown", this._onCanvasMouseDown);
       this._onCanvasMouseDown = null;

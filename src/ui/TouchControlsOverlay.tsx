@@ -131,7 +131,7 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
         JUMP
       </div>
 
-      {/* Exit */}
+      {/* Pause menu (cancel action → App toggles the pause overlay) */}
       <div
         onPointerDown={e => e.stopPropagation()}
         onPointerUp={e => { e.stopPropagation(); shared.cancelQueued = true; }}
@@ -140,7 +140,7 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
                  right: "calc(16px + env(safe-area-inset-right))",
                  width: 40, height: 40, fontSize: 16 }}
       >
-        ✕
+        ⚙
       </div>
     </div>
   );

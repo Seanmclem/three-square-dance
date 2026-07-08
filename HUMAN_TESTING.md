@@ -223,8 +223,9 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
 1. Connect the pad, enter preview (Play button or `P`), press any button — the
    HUD hints flip to gamepad.
 2. **Left stick** walk (analog — half stick = half speed), **right stick** look,
-   **RB** jump (A also works outside dialogue), **LB** interact, **Start** exit
-   (closes an open dialogue first; press again to exit).
+   **RB** jump (A also works outside dialogue), **LB** interact, **Start** opens
+   the **pause menu** (Resume / Exit — d-pad to highlight, A to pick; Start
+   again also resumes). An open dialogue closes first.
 3. In a dialogue: **A** advances/closes. Movement is frozen while it's open.
 4. Unplug mid-walk: the character stops immediately. Reconnect and press a
    button to resume.
@@ -236,8 +237,12 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
 2. **Left area**: touch anywhere to spawn the joystick under your thumb; drag
    to walk. **Rest of the screen**: drag to look (both thumbs at once works).
 3. **Tap** (don't drag) to interact when the prompt shows. **JUMP** button
-   bottom-right, **✕** top-right to exit (or to close a dialogue first).
+   bottom-right, **⚙** top-right opens the pause menu (Resume / Exit — tap a
+   button, or tap the backdrop to resume). An open dialogue closes first.
 4. Tap the dialogue box itself to advance it.
+
+On keyboard, **Enter** opens the same pause menu (Enter again = Resume);
+**Esc** still exits instantly.
 
 **Tuning:** select the **spawn point** → the panel's **CONTROLS (THIS DEVICE)**
 section has mouse/gamepad/touch sensitivities, gamepad deadzone + invert-Y,

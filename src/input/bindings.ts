@@ -11,7 +11,8 @@ export interface BindingsConfig {
     move: { forward: string[]; back: string[]; left: string[]; right: string[] };
     jump:     string[];
     interact: string[];
-    confirm:  string[];        // dialogue advance (menu mode only)
+    confirm:  string[];        // dialogue advance / menu activate (menu mode only)
+    cancel:   string[];        // pause-menu toggle (Esc keeps its direct-exit path in App.tsx)
     lookSensitivity: number;   // rad per px of mouse movement
   };
   gamepad: {
@@ -39,6 +40,9 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
     jump:     ["Space"],
     interact: ["KeyE"],
     confirm:  ["KeyE", "Space", "Enter"],   // the keys DialogueOverlay historically accepted
+    // Enter is BOTH confirm and cancel: in menu mode confirm wins (the manager
+    // drops the simultaneous cancel), outside it cancel opens the pause menu.
+    cancel:   ["Enter"],
     lookSensitivity: 0.002,    // matches the pre-phase-24 hardcode
   },
   gamepad: {

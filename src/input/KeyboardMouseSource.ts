@@ -15,6 +15,7 @@ export class KeyboardMouseSource implements InputSource {
   private _wheel   = 0;                 // accumulated deltaY since last apply()
   private _interactQueued = false;      // latched on keydown, consumed by apply()
   private _confirmQueued  = false;
+  private _cancelQueued   = false;
   private _activity = false;            // real kbm actuation since last hadActivity()
 
   private readonly _onMouseMove:   (e: MouseEvent) => void;
@@ -37,6 +38,7 @@ export class KeyboardMouseSource implements InputSource {
       this._keys.add(e.code);
       if (this._bindings.kbm.interact.includes(e.code)) this._interactQueued = true;
       if (this._bindings.kbm.confirm.includes(e.code))  this._confirmQueued  = true;
+      if (this._bindings.kbm.cancel.includes(e.code))   this._cancelQueued   = true;
       this._activity = true;
     };
     this._onKeyUp = e => this._keys.delete(e.code);
@@ -63,7 +65,7 @@ export class KeyboardMouseSource implements InputSource {
     this._keys.clear();
     this._lookPx.x = this._lookPx.y = 0;
     this._wheel = 0;
-    this._interactQueued = this._confirmQueued = this._activity = false;
+    this._interactQueued = this._confirmQueued = this._cancelQueued = this._activity = false;
   }
 
   hadActivity(): boolean {
@@ -93,6 +95,10 @@ export class KeyboardMouseSource implements InputSource {
     if (this._confirmQueued) {
       state.confirmPressed = true;
       this._confirmQueued  = false;
+    }
+    if (this._cancelQueued) {
+      state.cancelPressed = true;
+      this._cancelQueued   = false;
     }
   }
 

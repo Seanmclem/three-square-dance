@@ -4,9 +4,13 @@ import type { EventBus } from "@/core/EventBus";
 type Scheme = "kbm" | "gamepad" | "touch";
 
 // Scheme-specific glyphs for the two prompts the HUD renders. Touch has no
-// exit hint — the overlay's ✕ button is the affordance.
+// menu/exit hint — the overlay's ⚙ button is the affordance.
 const INTERACT_PREFIX: Record<Scheme, string> = { kbm: "[E]", gamepad: "[LB]", touch: "Tap ·" };
-const EXIT_HINT:       Record<Scheme, string | null> = { kbm: "Esc · exit", gamepad: "Start · exit", touch: null };
+const EXIT_HINT:       Record<Scheme, string | null> = {
+  kbm: "Enter · menu   Esc · exit",
+  gamepad: "Start · menu",
+  touch: null,
+};
 
 interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme }
 
