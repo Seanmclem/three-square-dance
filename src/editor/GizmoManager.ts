@@ -333,7 +333,8 @@ export class GizmoManager implements IEditorModule {
     } else if (type === "shape") {
       const shape = this._getShape();
       if (shape) {
-        py   = this._shapeTopY(shape) + 0.3;
+        const c = this._shapePivotWorld(shape);
+        px = c.x; py = c.y; pz = c.z;
         rotY = THREE.MathUtils.degToRad(shape.rotation.y);
       }
     } else if (type === "spawn") {
@@ -767,7 +768,7 @@ export class GizmoManager implements IEditorModule {
     } else if (type === "shape") {
       const shape = this._getShape();
       if (shape) {
-        this._pivot.position.set(shape.position.x, this._shapeTopY(shape) + 0.3, shape.position.z);
+        this._pivot.position.copy(this._shapePivotWorld(shape));
         this._pivot.rotation.set(0, THREE.MathUtils.degToRad(shape.rotation.y), 0);
         this._pivotStart.copy(this._pivot.position);
       }
@@ -1337,10 +1338,20 @@ export class GizmoManager implements IEditorModule {
       ?.shapes?.find(s => s.id === this._selId);
   }
 
-  /** World Y of a shape's top face (pivot sits just above it). */
-  private _shapeTopY(shape: ShapeDef): number {
+  /**
+   * World-space center of a shape's body — the local mid-height point transformed
+   * by the shape's rotation. The gizmo pivots here so rotation always turns the
+   * shape about its own visual center. Anchoring off position + height alone
+   * assumes an upright shape; after an X/Z tilt that lands the pivot far from the
+   * body and further ring drags orbit the shape around it.
+   */
+  private _shapePivotWorld(shape: ShapeDef): THREE.Vector3 {
     const p = resolveShapeParams(shape);
     const h = shape.kind === "wedge" ? Math.max(p.heightLow, p.heightHigh) : p.height;
-    return shape.position.y + h;
+    const D2R = Math.PI / 180;
+    const center = new THREE.Vector3(0, h / 2, 0).applyEuler(
+      new THREE.Euler(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ"),
+    );
+    return center.add(new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z));
   }
 }
