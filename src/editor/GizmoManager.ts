@@ -1198,7 +1198,13 @@ export class GizmoManager implements IEditorModule {
           this._resetLiveRotate();
           break;
         }
+        // The pivot sits ABOVE the shape (top + 0.3), so X/Z ring drags ORBIT the
+        // shape's base origin around it during the live preview. Commit the orbited
+        // position too — rotation alone would re-anchor about the shape's own base
+        // on rebuild and visibly shift it back (Y is immune: the origin lies on the
+        // yaw axis, so nothing orbits).
         this._worldState.updateShape(this._selZoneId!, this._selId!, {
+          position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
           rotation: { x: rx, y: ry, z: rz },
         });
         break;
