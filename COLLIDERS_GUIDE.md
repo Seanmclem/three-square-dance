@@ -100,6 +100,12 @@ concavity, byte-identical to the live source's collision. Trimesh cards show
 "N tris · exact from bake" in the Colliders screen (display-only; the usual
 hollow-surface caveats apply — nothing spawned *inside* one gets pushed out).
 
+Collider presets are computed **at bake time from the source shapes** and stored
+in the asset's `manifest.json` entry — **not inside the .glb** (glTF has no
+collider concept). Every copy placed in SquareDance gets them automatically; a
+.glb saved locally and opened in Blender/another engine carries only the visual
+model.
+
 ## 5. Tips & gotchas
 
 - **Hollow or thin props** (arches, doorframes, shelves): the auto box is solid
