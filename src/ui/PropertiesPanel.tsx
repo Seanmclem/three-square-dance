@@ -343,6 +343,8 @@ interface PropertiesPanelProps {
   onBake?:                  (refs: SelectedRef[]) => void;
   // Auto-fit box from the placed model's local AABB (null until the mesh is built).
   defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
+  // Auto-fit convex hull points from the model's geometry (Phase 27; null = unavailable).
+  hullPointsFor?:           (objectId: string) => Vec3[] | null;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -354,7 +356,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -582,6 +584,7 @@ export function PropertiesPanel({
             assets={assets}
             onObjectUpdate={onObjectUpdate}
             defaultColliderFor={defaultColliderFor}
+            hullPointsFor={hullPointsFor}
             bus={bus}
           />
         ) : null}
@@ -2340,7 +2343,7 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
 
 // ── CollidersScreen ───────────────────────────────────────────────────────────
 
-const COLLIDER_SHAPES: AttachedColliderShape[] = ["box", "sphere", "capsule"];
+const COLLIDER_SHAPES: AttachedColliderShape[] = ["box", "sphere", "capsule", "hull"];
 
 const COLLIDER_BTN = (active = false): React.CSSProperties => ({
   flex: 1, padding: "5px 0", borderRadius: 4, cursor: active ? "default" : "pointer",
@@ -2353,27 +2356,48 @@ const COLLIDER_BTN = (active = false): React.CSSProperties => ({
 /** Re-derive size fields when a collider's shape changes so it stays roughly the same volume. */
 function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): AttachedCollider {
   if (shape === c.shape) return c;
+  // Leaving a hull: its size is already the points' AABB, so convert like a box.
+  const from = c.shape === "hull" ? "box" : c.shape;
   const s = c.size;
   let size: Vec3;
   if (shape === "box") {
-    size = c.shape === "sphere"
+    size = from === "sphere"
       ? { x: s.x * 2, y: s.x * 2, z: s.x * 2 }        // sphere r → cube 2r
-      : { x: s.x * 2, y: s.y, z: s.x * 2 };            // capsule r,h → box 2r × h × 2r
+      : from === "capsule"
+        ? { x: s.x * 2, y: s.y, z: s.x * 2 }           // capsule r,h → box 2r × h × 2r
+        : { ...s };                                     // hull AABB → box verbatim
   } else if (shape === "sphere") {
-    size = { x: c.shape === "box" ? Math.max(s.x, s.y, s.z) / 2 : s.x, y: 0, z: 0 };
+    size = { x: from === "box" ? Math.max(s.x, s.y, s.z) / 2 : s.x, y: 0, z: 0 };
   } else {
-    size = c.shape === "box"
+    size = from === "box"
       ? { x: Math.max(s.x, s.z) / 2, y: s.y, z: 0 }    // box → capsule r = max(w,d)/2, h = height
       : { x: s.x, y: s.x * 2, z: 0 };                  // sphere → capsule r, h = 2r
   }
-  return { ...c, shape, size };
+  return { ...c, shape, size, points: undefined };
 }
 
-function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor, bus }: {
+/** Switch a collider to an auto-fit hull: model-space points, offset reset, AABB size for display. */
+function hullFromPoints(c: AttachedCollider, points: Vec3[]): AttachedCollider {
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+  }
+  return {
+    ...c, shape: "hull", points,
+    offset: { x: 0, y: 0, z: 0 },
+    size: { x: +(maxX - minX).toFixed(4), y: +(maxY - minY).toFixed(4), z: +(maxZ - minZ).toFixed(4) },
+    rotationY: undefined,
+  };
+}
+
+function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor, hullPointsFor, bus }: {
   selected:           SelectedObjectPayload;
   assets:             AssetDef[];
   onObjectUpdate:     (c: Partial<WorldObject>) => void;
   defaultColliderFor?: (objectId: string) => AttachedCollider | null;
+  hullPointsFor?:      (objectId: string) => Vec3[] | null;
   bus?:               EventBus;
 }) {
   const objData    = selected.data as WorldObject | null;
@@ -2561,12 +2585,25 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
             </span>
           </div>
           <div style={{ display: "flex", gap: 4 }}>
-            {COLLIDER_SHAPES.map(s => (
-              <button key={s} style={COLLIDER_BTN(c.shape === s)} disabled={c.shape === s}
-                onClick={() => write(colliders.map(x => x.id === c.id ? reshapeCollider(x, s) : x))}>
-                {s}
-              </button>
-            ))}
+            {COLLIDER_SHAPES.map(s => {
+              // Hull needs the model's geometry (built mesh) to auto-fit from.
+              const hullUnavailable = s === "hull" && !hullPointsFor;
+              return (
+                <button key={s} style={COLLIDER_BTN(c.shape === s)} disabled={c.shape === s || hullUnavailable}
+                  title={s === "hull" ? "Auto-fit a convex hull from the model's geometry" : undefined}
+                  onClick={() => {
+                    if (s === "hull") {
+                      const pts = hullPointsFor?.(selected.id);
+                      if (!pts) { console.warn("hull auto-fit unavailable (mesh not built or degenerate)"); return; }
+                      write(colliders.map(x => x.id === c.id ? hullFromPoints(x, pts) : x));
+                    } else {
+                      write(colliders.map(x => x.id === c.id ? reshapeCollider(x, s) : x));
+                    }
+                  }}>
+                  {s}
+                </button>
+              );
+            })}
           </div>
           <div>
             <div style={LABEL}>OFFSET</div>
@@ -2576,6 +2613,26 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               {numField(c, "oz", "Z", "#6b8aff")}
             </div>
           </div>
+          {c.shape === "hull" ? (
+            <div>
+              <div style={LABEL}>HULL</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={{ color: "#9090a0", fontSize: 10 }}>
+                  {c.points?.length ?? 0} points · auto-fit from model
+                </span>
+                {hullPointsFor && (
+                  <button
+                    style={{ ...COLLIDER_BTN(false), flex: "none", padding: "3px 10px" }}
+                    title="Recompute the hull from the model's current geometry"
+                    onClick={() => {
+                      const pts = hullPointsFor(selected.id);
+                      if (pts) write(colliders.map(x => x.id === c.id ? hullFromPoints(x, pts) : x));
+                    }}
+                  >Refit</button>
+                )}
+              </div>
+            </div>
+          ) : (
           <div>
             <div style={LABEL}>{c.shape === "box" ? "SIZE" : c.shape === "sphere" ? "RADIUS" : "RADIUS · HEIGHT"}</div>
             <div style={{ display: "flex", gap: 4 }}>
@@ -2595,6 +2652,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               )}
             </div>
           </div>
+          )}
           {c.shape === "box" && (
             <div>
               <div style={LABEL}>ROTATION (Y°)</div>

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
+import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
@@ -107,6 +108,55 @@ export class ObjectPlacer {
   getLocalAABB(objectId: string): { center: Vec3; size: Vec3 } | null {
     const aabb = this._meshes.get(objectId)?.userData["localAABB"];
     return (aabb as { center: Vec3; size: Vec3 } | undefined) ?? null;
+  }
+
+  /**
+   * Convex hull of the model's geometry in object-local (pre-scale) space —
+   * the auto-fit source for "hull" attached colliders (Phase 27). Vertices are
+   * stride-subsampled (~1.5k max inputs; skinned meshes read rest pose), reduced
+   * via ConvexGeometry, then deduped. Null until the mesh is built, on empty
+   * geometry, or when the hull is degenerate (flat/collinear models).
+   */
+  getLocalHullPoints(objectId: string): Vec3[] | null {
+    const root = this._meshes.get(objectId);
+    if (!root) return null;
+    root.updateWorldMatrix(true, true);
+    const rootInv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+
+    const parts: Array<{ attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute; rel: THREE.Matrix4 }> = [];
+    let total = 0;
+    root.traverse(o => {
+      if (!(o instanceof THREE.Mesh)) return;
+      const attr = o.geometry?.getAttribute("position");
+      if (!attr?.count) return;
+      parts.push({ attr, rel: new THREE.Matrix4().copy(rootInv).multiply(o.matrixWorld) });
+      total += attr.count;
+    });
+    if (total === 0) return null;
+
+    const stride = Math.max(1, Math.ceil(total / 1500));
+    const samples: THREE.Vector3[] = [];
+    for (const { attr, rel } of parts) {
+      for (let i = 0; i < attr.count; i += stride) {
+        samples.push(new THREE.Vector3().fromBufferAttribute(attr, i).applyMatrix4(rel));
+      }
+    }
+
+    try {
+      const hull = new ConvexGeometry(samples);
+      const pos = hull.getAttribute("position");
+      const seen = new Set<string>();
+      const out: Vec3[] = [];
+      for (let i = 0; i < pos.count; i++) {
+        const x = +pos.getX(i).toFixed(4), y = +pos.getY(i).toFixed(4), z = +pos.getZ(i).toFixed(4);
+        const key = `${x}|${y}|${z}`;
+        if (!seen.has(key)) { seen.add(key); out.push({ x, y, z }); }
+      }
+      hull.dispose();
+      return out.length >= 4 ? out : null;
+    } catch {
+      return null;   // degenerate input (flat / collinear)
+    }
   }
 
   /** Tear down an object's mixer/clip state. Geometry disposal is ZoneManager's job. */

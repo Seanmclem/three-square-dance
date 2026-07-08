@@ -2,6 +2,7 @@ import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { assetManager } from "@/core/AssetManager";
+import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { colliderWorldTransform, defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
@@ -280,7 +281,11 @@ export class ColliderEditor implements IEditorModule {
   private _buildWireframe(obj: WorldObject, c: AttachedCollider): void {
     const color = c.isSensor ? SENSOR_COLOR : SOLID_COLOR;
     let wire: THREE.Object3D;
-    if (c.shape === "box") {
+    if (c.shape === "hull") {
+      // Geometry in the object's scaled local frame; transform applied in _positionAll.
+      const mat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4, depthTest: false });
+      wire = new THREE.Mesh(this._hullGeometry(obj, c) ?? new THREE.BoxGeometry(0.2, 0.2, 0.2), mat);
+    } else if (c.shape === "box") {
       const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85, depthTest: false });
       wire = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), mat);
     } else {
@@ -333,6 +338,23 @@ export class ColliderEditor implements IEditorModule {
     for (const w of this._wireframes) {
       const c = byId.get(w.userData["colliderId"] as string);
       if (!c) { w.visible = false; continue; }
+      if (c.shape === "hull") {
+        // Hull geometry already encodes offset+scale in local space — the wireframe
+        // just wears the object's position/rotation. Rebuild geometry so offset/scale
+        // edits track live (capsule idiom below).
+        const D2R = Math.PI / 180;
+        w.position.set(obj.position.x, obj.position.y, obj.position.z);
+        w.quaternion.setFromEuler(new THREE.Euler(
+          obj.rotation.x * D2R, obj.rotation.y * D2R, obj.rotation.z * D2R));
+        w.scale.set(1, 1, 1);
+        const g = this._hullGeometry(obj, c);
+        if (g) {
+          const m = w as THREE.Mesh;
+          m.geometry.dispose();
+          m.geometry = g;
+        }
+        continue;
+      }
       const t = colliderWorldTransform(obj, c);
       w.position.set(t.pos.x, t.pos.y, t.pos.z);
       w.quaternion.set(t.quat.x, t.quat.y, t.quat.z, t.quat.w);
@@ -362,6 +384,15 @@ export class ColliderEditor implements IEditorModule {
       h.position.set(t.pos.x + p.x, t.pos.y + p.y, t.pos.z + p.z);
       h.visible = true;
     }
+  }
+
+  /** Hull wireframe geometry from the collider's points, offset + scale baked in (local frame). */
+  private _hullGeometry(obj: WorldObject, c: AttachedCollider): THREE.BufferGeometry | null {
+    if (!c.points || c.points.length < 4) return null;
+    const s = obj.scale;
+    const pts = c.points.map(p => new THREE.Vector3(
+      (p.x + c.offset.x) * s.x, (p.y + c.offset.y) * s.y, (p.z + c.offset.z) * s.z));
+    try { return new ConvexGeometry(pts); } catch { return null; }
   }
 
   // ── Picking ─────────────────────────────────────────────────────────────────

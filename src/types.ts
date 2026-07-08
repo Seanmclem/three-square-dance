@@ -620,16 +620,20 @@ export interface ObjectProperties {
   triggerEventId: string | null;
 }
 
-export type AttachedColliderShape = "box" | "sphere" | "capsule";  // "hull" reserved for later
+export type AttachedColliderShape = "box" | "sphere" | "capsule" | "hull";
 
 /** A collider attached to a placed object in the object's local space. */
 export interface AttachedCollider {
   id:         string;                 // col_<uuid8> — stable handle for list edits + drag handles
   shape:      AttachedColliderShape;
   offset:     Vec3;                   // local, pre-scale, relative to object origin
-  size:       Vec3;                   // box: full extents; sphere: x = radius; capsule: x = radius, y = full height
-  rotationY?: number;                 // deg, local yaw (box/capsule; ignored for sphere)
+  size:       Vec3;                   // box: full extents; sphere: x = radius; capsule: x = radius, y = full height; hull: points AABB (display only)
+  rotationY?: number;                 // deg, local yaw (box/capsule; ignored for sphere/hull)
   isSensor:   boolean;                // sensor fires on_player_enter/on_player_exit; solid blocks movement
+  // Hull only (Phase 27): convex hull vertices, object-local, pre-scale, relative
+  // to the object origin + offset. Encodes shape AND orientation — exact under
+  // full rotation and non-uniform scale (scale composes before object rotation).
+  points?:    Vec3[];
 }
 
 export interface WorldObject {

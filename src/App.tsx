@@ -1935,6 +1935,7 @@ export default function App() {
           const aabb = objectPlacerRef.current?.getLocalAABB(objectId);
           return aabb ? defaultColliderFromAABB(aabb.center, aabb.size) : null;
         }}
+        hullPointsFor={objectId => objectPlacerRef.current?.getLocalHullPoints(objectId) ?? null}
       />
       <CoordinateDisplay coords={coords} />
       </>}

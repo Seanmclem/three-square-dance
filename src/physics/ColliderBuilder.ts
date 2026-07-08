@@ -166,16 +166,44 @@ export class ColliderBuilder {
   /** Register a placed object's attached colliders (world transform composed from the object). */
   static registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): RAPIER.Collider[] {
     return colliders.map(c => {
-      const { pos, quat, halfExtents } = colliderWorldTransform(obj, c);
-      const desc =
-        c.shape === "box"    ? RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z) :
-        c.shape === "sphere" ? RAPIER.ColliderDesc.ball(halfExtents.x) :
-                               RAPIER.ColliderDesc.capsule(halfExtents.y, halfExtents.x);
-      desc.setTranslation(pos.x, pos.y, pos.z).setRotation(quat);
+      const desc = ColliderBuilder._attachedDesc(obj, c);
       return c.isSensor
         ? physicsWorld.createSensorCollider(desc)
         : physicsWorld.createStaticCollider(desc);
     });
+  }
+
+  private static _attachedDesc(obj: WorldObject, c: AttachedCollider): RAPIER.ColliderDesc {
+    if (c.shape === "hull" && c.points?.length) {
+      // Points are object-local pre-scale; scale componentwise THEN rotate with the
+      // object (mesh TRS order: world = R·(S·p) + T) — exact under non-uniform scale.
+      const s = obj.scale;
+      const flat = new Float32Array(c.points.length * 3);
+      c.points.forEach((p, i) => {
+        flat[i * 3]     = (p.x + c.offset.x) * s.x;
+        flat[i * 3 + 1] = (p.y + c.offset.y) * s.y;
+        flat[i * 3 + 2] = (p.z + c.offset.z) * s.z;
+      });
+      const hull = RAPIER.ColliderDesc.convexHull(flat);
+      if (hull) {
+        const D2R = Math.PI / 180;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          obj.rotation.x * D2R, obj.rotation.y * D2R, obj.rotation.z * D2R));
+        return hull
+          .setTranslation(obj.position.x, obj.position.y, obj.position.z)
+          .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+      }
+      console.warn(`[ColliderBuilder] degenerate hull points on ${obj.id} — falling back to box`);
+    }
+    // Box/sphere/capsule — plus the degenerate-hull fallback, which reads as a box
+    // of the stored points-AABB size through the same transform math.
+    const prim = c.shape === "hull" ? { ...c, shape: "box" as const } : c;
+    const { pos, quat, halfExtents } = colliderWorldTransform(obj, prim);
+    const desc =
+      prim.shape === "sphere"  ? RAPIER.ColliderDesc.ball(halfExtents.x) :
+      prim.shape === "capsule" ? RAPIER.ColliderDesc.capsule(halfExtents.y, halfExtents.x) :
+                                 RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z);
+    return desc.setTranslation(pos.x, pos.y, pos.z).setRotation(quat);
   }
 
   static registerTerrain(

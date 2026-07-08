@@ -6,8 +6,6 @@ import type { WorldState } from "@/world/WorldState";
 import type { AttachedCollider, SelectedRef, ShapeDef, Vec3 } from "@/types";
 
 const DEG2RAD = Math.PI / 180;
-/** Rotations within this many degrees of upright count as yaw-only (exact box collider). */
-const TILT_EPS_DEG = 0.01;
 
 export interface BakeResult {
   glb:       ArrayBuffer;
@@ -28,9 +26,10 @@ export interface BakeResult {
  * (bbox centerX/minY/centerZ) so the asset sits on surfaces, then merged by
  * material reference — the draw-call win: one mesh per distinct material.
  *
- * Colliders: one box per source shape. Yaw-only shapes get an exact local box
- * with rotationY; tilted shapes fall back to their asset-space AABB
- * (AttachedCollider can't express XZ tilt — "hull" stays reserved).
+ * Colliders: one convex hull per source shape (Phase 27) — the shape's own
+ * localHullPoints carried through its full rotation into asset space, so tilted
+ * shapes collide exactly. Concave face-brushes get their convex hull (their
+ * concavities fill — still a strictly better fit than a box).
  *
  * Material fidelity: albedo/normal/roughness/metalness/AO and the baked metric
  * UVs survive export; displacement maps have no glTF 2.0 slot and are dropped
@@ -95,8 +94,8 @@ export async function bakeShapes(world: WorldState, refs: SelectedRef[]): Promis
     group.add(mesh);
   }
 
-  // 4. Compound colliders (asset-local space, one box per source shape).
-  const colliders = picks.map(({ shape }, i) => shapeBoxCollider(shape, pivot, i));
+  // 4. Compound colliders (asset-local space, one convex hull per source shape).
+  const colliders = picks.map(({ shape }, i) => shapeHullCollider(shape, pivot, i));
 
   // 5. Export binary glTF. Textures embed; RepeatWrapping samplers preserve tiling.
   const exporter = new GLTFExporter();
@@ -123,40 +122,34 @@ function normalizeForMerge(geo: THREE.BufferGeometry): THREE.BufferGeometry {
   return out;
 }
 
-/** One box collider for a source shape, in asset-local space (pivot subtracted). */
-function shapeBoxCollider(shape: ShapeDef, pivot: THREE.Vector3, index: number): AttachedCollider {
+/**
+ * One convex-hull collider for a source shape, in asset-local space: the shape's
+ * hull points carried through its FULL rotation + position, pivot subtracted —
+ * exact for any tilt. size stores the points' AABB (panel display only).
+ */
+function shapeHullCollider(shape: ShapeDef, pivot: THREE.Vector3, index: number): AttachedCollider {
   const pts = ShapeBuilder.localHullPoints(shape);
-  const yawOnly = Math.abs(shape.rotation.x) < TILT_EPS_DEG && Math.abs(shape.rotation.z) < TILT_EPS_DEG;
+  const rot = new THREE.Euler(shape.rotation.x * DEG2RAD, shape.rotation.y * DEG2RAD, shape.rotation.z * DEG2RAD, "XYZ");
+  const base = new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z).sub(pivot);
 
   const box = new THREE.Box3();
   const v = new THREE.Vector3();
-  if (yawOnly) {
-    // Local AABB of the shape's own geometry — exact under yaw (rotationY carries it).
-    for (let i = 0; i < pts.length; i += 3) box.expandByPoint(v.set(pts[i]!, pts[i + 1]!, pts[i + 2]!));
-  } else {
-    // Tilted: conservative AABB of the fully rotated points in asset space.
-    const rot = new THREE.Euler(shape.rotation.x * DEG2RAD, shape.rotation.y * DEG2RAD, shape.rotation.z * DEG2RAD, "XYZ");
-    for (let i = 0; i < pts.length; i += 3) box.expandByPoint(v.set(pts[i]!, pts[i + 1]!, pts[i + 2]!).applyEuler(rot));
+  const points: Vec3[] = [];
+  for (let i = 0; i < pts.length; i += 3) {
+    v.set(pts[i]!, pts[i + 1]!, pts[i + 2]!).applyEuler(rot).add(base);
+    box.expandByPoint(v);
+    points.push({ x: round4(v.x), y: round4(v.y), z: round4(v.z) });
   }
-  const center = new THREE.Vector3();
   const size = new THREE.Vector3();
-  box.getCenter(center);
   box.getSize(size);
-
-  // Offset = shape origin in asset space + the box center carried through the
-  // shape's yaw (yaw-only case; tilted centers are already in asset orientation).
-  const offset = yawOnly
-    ? center.applyEuler(new THREE.Euler(0, shape.rotation.y * DEG2RAD, 0))
-    : center;
-  offset.add(new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z)).sub(pivot);
 
   return {
     id:       `col_bake_${index}`,
-    shape:    "box",
-    offset:   { x: round4(offset.x), y: round4(offset.y), z: round4(offset.z) },
-    size:     { x: round4(size.x),   y: round4(size.y),   z: round4(size.z) },
-    ...(yawOnly && Math.abs(shape.rotation.y) > 1e-4 ? { rotationY: shape.rotation.y } : {}),
+    shape:    "hull",
+    offset:   { x: 0, y: 0, z: 0 },
+    size:     { x: round4(size.x), y: round4(size.y), z: round4(size.z) },
     isSensor: false,
+    points,
   };
 }
 
