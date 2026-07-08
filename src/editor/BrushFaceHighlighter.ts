@@ -10,21 +10,25 @@ const LIFT = 0.01;   // offset along the face normal so the overlay never z-figh
 const EDGE_LIFT = 0.012;   // edges sit just above the face fills
 
 /**
- * Canvas overlay for brush faces (Phase 23): a translucent blue polygon over the
- * SELECTED face (from object:selected.faceIndex) and a fainter one over the panel-
- * HOVERED face (shape:face-hover). In face-select mode the whole selected brush also
- * gets thin black outlines around every face's edges, so the pickable faces read at
- * a glance. SegmentHighlighter idiom — throwaway meshes/lines, rebuilt from data on
- * every change, disposed on clear; never pickable. No per-frame work.
+ * Canvas overlay for brush faces + edges (Phase 23/23b): a translucent blue polygon
+ * over the SELECTED face (from object:selected.faceIndex) and a fainter one over the
+ * panel-HOVERED face (shape:face-hover); in edge mode a bright blue tube over the
+ * SELECTED edge (object:selected.edgeVerts). In face/edge select modes the whole
+ * selected brush also gets thin black outlines around every face's edges, so the
+ * pickable sub-objects read at a glance. SegmentHighlighter idiom — throwaway
+ * meshes/lines, rebuilt from data on every change, disposed on clear; never pickable.
+ * No per-frame work.
  */
 export class BrushFaceHighlighter implements IEditorModule {
   private _tool: ToolId = "select";
   private _shape:    { zoneId: string; shapeId: string } | null = null;
   private _selected: { zoneId: string; shapeId: string; faceIndex: number } | null = null;
   private _hovered:  { zoneId: string; shapeId: string; faceIndex: number } | null = null;
+  private _selEdge:  { zoneId: string; shapeId: string; edge: [number, number] } | null = null;
   private _selMesh:   THREE.Mesh | null = null;
   private _hoverMesh: THREE.Mesh | null = null;
   private _edgeLines: THREE.LineSegments | null = null;
+  private _edgeTube:  THREE.Mesh | null = null;
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -43,9 +47,12 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._selected = (payload.type === "shape" && payload.faceIndex !== undefined)
           ? { zoneId: payload.zoneId, shapeId: payload.id, faceIndex: payload.faceIndex }
           : null;
+        this._selEdge = (payload.type === "shape" && payload.edgeVerts !== undefined)
+          ? { zoneId: payload.zoneId, shapeId: payload.id, edge: payload.edgeVerts }
+          : null;
         this._refresh();
       }),
-      this._bus.on("object:deselected", () => { this._shape = null; this._selected = null; this._hovered = null; this._refresh(); }),
+      this._bus.on("object:deselected", () => { this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._refresh(); }),
       this._bus.on("shape:face-hover", ({ zoneId, shapeId, faceIndex }) => {
         this._hovered = faceIndex === null ? null : { zoneId, shapeId, faceIndex };
         this._refresh();
@@ -57,9 +64,10 @@ export class BrushFaceHighlighter implements IEditorModule {
         if (this._shape?.shapeId === id) this._shape = null;
         if (this._selected?.shapeId === id) this._selected = null;
         if (this._hovered?.shapeId === id) this._hovered = null;
+        if (this._selEdge?.shapeId === id) this._selEdge = null;
         this._refresh();
       }),
-      this._bus.on("preview:start", () => { this._clear("sel"); this._clear("hover"); this._clearEdges(); }),
+      this._bus.on("preview:start", () => { this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); }),
       this._bus.on("preview:stop",  () => this._refresh()),
     );
   }
@@ -72,18 +80,23 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clear("sel");
     this._clear("hover");
     this._clearEdges();
+    this._clearEdgeTube();
   }
 
   private _refresh(): void {
     this._clear("sel");
     this._clear("hover");
     this._clearEdges();
+    this._clearEdgeTube();
     if (this._selected) this._selMesh = this._buildOverlay(this._selected, SELECT_OPACITY);
     // Don't double-draw when hovering the already-selected face.
     if (this._hovered && (this._hovered.shapeId !== this._selected?.shapeId || this._hovered.faceIndex !== this._selected?.faceIndex)) {
       this._hoverMesh = this._buildOverlay(this._hovered, HOVER_OPACITY);
     }
-    if (this._tool === "select-face" && this._shape) this._edgeLines = this._buildEdges(this._shape);
+    if ((this._tool === "select-face" || this._tool === "select-edge") && this._shape) {
+      this._edgeLines = this._buildEdges(this._shape);
+    }
+    if (this._selEdge) this._edgeTube = this._buildEdgeTube(this._selEdge);
   }
 
   private _clearEdges(): void {
@@ -92,6 +105,14 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._edgeLines.geometry.dispose();
     (this._edgeLines.material as THREE.Material).dispose();
     this._edgeLines = null;
+  }
+
+  private _clearEdgeTube(): void {
+    if (!this._edgeTube) return;
+    this._scene.remove(this._edgeTube);
+    this._edgeTube.geometry.dispose();
+    (this._edgeTube.material as THREE.Material).dispose();
+    this._edgeTube = null;
   }
 
   private _clear(which: "sel" | "hover"): void {
@@ -170,5 +191,41 @@ export class BrushFaceHighlighter implements IEditorModule {
     lines.userData = { selectable: false, editorOnly: true, hideInGame: true };
     this._scene.add(lines);
     return lines;
+  }
+
+  /**
+   * Bright blue tube over the selected edge (edge mode). A thin world-space cylinder
+   * reads at any zoom, unlike 1px WebGL lines; depthTest off so it's never half-buried
+   * in the two faces it borders.
+   */
+  private _buildEdgeTube(target: { zoneId: string; shapeId: string; edge: [number, number] }): THREE.Mesh | null {
+    const shape = this._world.zones.get(target.zoneId)?.shapes?.find(s => s.id === target.shapeId) as ShapeDef | undefined;
+    const verts = shape?.mesh?.vertices;
+    const [ia, ib] = target.edge;
+    if (!shape || !verts || !verts[ia] || !verts[ib]) return null;
+
+    const D2R = Math.PI / 180;
+    const mat = new THREE.Matrix4().compose(
+      new THREE.Vector3(shape.position.x, shape.position.y, shape.position.z),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")),
+      new THREE.Vector3(1, 1, 1),
+    );
+    const a = new THREE.Vector3(verts[ia]!.x, verts[ia]!.y, verts[ia]!.z).applyMatrix4(mat);
+    const b = new THREE.Vector3(verts[ib]!.x, verts[ib]!.y, verts[ib]!.z).applyMatrix4(mat);
+    const dir = b.clone().sub(a);
+    const len = dir.length();
+    if (len < 1e-6) return null;
+
+    const tube = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.025, len, 6),
+      new THREE.MeshBasicMaterial({ color: 0x4d8cff, depthTest: false, depthWrite: false }),
+    );
+    tube.renderOrder = 4;
+    tube.position.copy(a).add(b).multiplyScalar(0.5);
+    tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    tube.userData = { selectable: false, editorOnly: true, hideInGame: true };
+    this._scene.add(tube);
+    return tube;
   }
 }

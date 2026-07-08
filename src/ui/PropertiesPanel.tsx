@@ -45,8 +45,9 @@ interface ToolInfo { desc: string; hint: string }
 
 const TOOL_INFO: Record<ToolId, ToolInfo> = {
   select:      { desc: "Click any object to select it. Use gizmos to transform.",  hint: "Nothing selected" },
-  "select-face":   { desc: "Face mode: click a brush face to select it (other objects select normally). 1/2/3 switch modes.", hint: "Click a brush face" },
-  "select-vertex": { desc: "Vertex mode: click a brush corner sphere to select it. 1/2/3 switch modes.", hint: "Click a brush corner" },
+  "select-face":   { desc: "Face mode: click a brush face to select it (other objects select normally). 1-4 switch modes.", hint: "Click a brush face" },
+  "select-vertex": { desc: "Vertex mode: click a brush corner sphere to select it. 1-4 switch modes.", hint: "Click a brush corner" },
+  "select-edge":   { desc: "Edge mode: click a brush face near an edge to select that edge (other objects select normally). 1-4 switch modes.", hint: "Click near a brush edge" },
   floor:       { desc: "Click and drag to paint a rectangular floor region.",      hint: "Click to place floor origin" },
   "poly-floor": { desc: "Click to place vertices. Enter or click first dot to close.", hint: "Click to add first vertex" },
   wall:        { desc: "Click to set wall start, click again to set end.",         hint: "Click to place wall start" },

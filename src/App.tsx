@@ -21,6 +21,7 @@ import { ShapeResizer } from "@/editor/ShapeResizer";
 import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
 import { BrushFaceHighlighter } from "@/editor/BrushFaceHighlighter";
 import { BrushFaceEditor } from "@/editor/BrushFaceEditor";
+import { BrushEdgeEditor } from "@/editor/BrushEdgeEditor";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -217,6 +218,7 @@ export default function App() {
     const brushVertexEditor  = new BrushVertexEditor(scene.scene, world, bus, scene.camera, canvas);
     const brushFaceHighlighter = new BrushFaceHighlighter(scene.scene, world, bus);
     const brushFaceEditor    = new BrushFaceEditor(scene.scene, world, bus, scene.camera, canvas);
+    const brushEdgeEditor    = new BrushEdgeEditor(scene.scene, world, bus, scene.camera, canvas);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
@@ -271,6 +273,7 @@ export default function App() {
     brushVertexEditor.init();
     brushFaceHighlighter.init();
     brushFaceEditor.init();
+    brushEdgeEditor.init();
     objectTool.init();
     nodeDragger.init();
     openingDragger.init();
@@ -596,6 +599,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      brushEdgeEditor.dispose();
       brushFaceEditor.dispose();
       brushFaceHighlighter.dispose();
       brushVertexEditor.dispose();
@@ -1010,7 +1014,7 @@ export default function App() {
       }
       // Blender-style select-mode hotkeys (Phase 23): 1 = object, 2 = face, 3 = vertex.
       if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-        const mode = e.code === 'Digit1' ? 'select' : e.code === 'Digit2' ? 'select-face' : e.code === 'Digit3' ? 'select-vertex' : null;
+        const mode = e.code === 'Digit1' ? 'select' : e.code === 'Digit2' ? 'select-face' : e.code === 'Digit3' ? 'select-vertex' : e.code === 'Digit4' ? 'select-edge' : null;
         if (mode) {
           setActiveTool(mode);
           busRef.current.emit('tool:select', { tool: mode });

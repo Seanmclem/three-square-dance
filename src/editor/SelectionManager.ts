@@ -40,9 +40,10 @@ export class SelectionManager implements IEditorModule {
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
   private _activeFloorLevel   = 0;
-  // Sub-object selection on the selected shape (Phase 23 face/vertex modes).
+  // Sub-object selection on the selected shape (Phase 23 face/vertex/edge modes).
   private _subFace:   number | null = null;
   private _subVertex: number | null = null;
+  private _subEdge:   [number, number] | null = null;   // unordered vertex-index pair
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -67,9 +68,9 @@ export class SelectionManager implements IEditorModule {
         const changed = tool !== this._activeTool;
         this._activeTool = tool;
         // Mode switch clears sub-object selection (a fresh click re-establishes it);
-        // re-emit so the panel/highlighter/gizmos drop the stale face/vertex.
-        if (changed && (this._subFace !== null || this._subVertex !== null)) {
-          this._subFace = null; this._subVertex = null;
+        // re-emit so the panel/highlighter/gizmos drop the stale face/vertex/edge.
+        if (changed && (this._subFace !== null || this._subVertex !== null || this._subEdge !== null)) {
+          this._subFace = null; this._subVertex = null; this._subEdge = null;
           if (this._selected && this._extraRefs.length === 0) this._emitSelected(this._selected);
         }
       }),
@@ -95,16 +96,17 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("object:deselected", ()           => {
         if (this._selected) { this._restore(this._selected); this._selected = null; }
         this._clearExtras();
-        this._subFace = null; this._subVertex = null;
+        this._subFace = null; this._subVertex = null; this._subEdge = null;
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
       // Sub-object selection sink (panel rows, vertex-handle clicks): store + re-emit
       // object:selected so all consumers read one channel.
-      this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex }) => {
+      this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex, edge }) => {
         if (this._selected?.userData.editorId !== shapeId || this._selected.userData.zoneId !== zoneId) return;
         this._subFace = faceIndex;
         this._subVertex = vertexIndex;
+        this._subEdge = edge ?? null;
         this._emitSelected(this._selected);
       }),
     );
@@ -140,14 +142,56 @@ export class SelectionManager implements IEditorModule {
         ? groups.find(g => t >= g.start && t < g.start + g.count)?.faceIndex ?? null
         : null;
       this._subVertex = null;
+      this._subEdge = null;
+    } else if (this._activeTool === "select-edge" && !additive) {
+      // Edge mode: resolve the hit face, then snap to its boundary edge nearest the
+      // hit point. Every face click selects an edge — no pixel threshold needed.
+      this._subEdge = this._resolveEdge(hit);
+      this._subFace = null;
+      this._subVertex = null;
     } else if (!additive) {
       this._subFace = null;
+      this._subEdge = null;
       if (this._activeTool !== "select-vertex") this._subVertex = null;
     }
     if (additive) { this._toggleInSelection(root); return; }
     // Same-root re-click with a different face still needs a re-emit.
     if (this._selected === root && this._extraRefs.length === 0) { this._emitSelected(root); return; }
     this._select(root);
+  }
+
+  /**
+   * Edge mode (Phase 23b): hit triangle → logical face via faceGroups, then the face
+   * loop's boundary edge whose world-space segment is closest to the hit point.
+   * Returns the edge as a sorted vertex-index pair, or null off face-brushes.
+   */
+  private _resolveEdge(hit: THREE.Intersection): [number, number] | null {
+    const groups = hit.object.userData.faceGroups as FaceGroup[] | undefined;
+    const t = hit.faceIndex;
+    if (!groups || t == null) return null;
+    const fi = groups.find(g => t >= g.start && t < g.start + g.count)?.faceIndex;
+    if (fi === undefined) return null;
+    const zone = this._worldState.zones.get(hit.object.userData.zoneId as string);
+    const shape = zone?.shapes?.find(s => s.id === hit.object.userData.editorId);
+    const face = shape?.mesh?.faces?.[fi];
+    if (!shape || !face) return null;
+
+    const verts = shape.mesh!.vertices;
+    const world = (i: number) => new THREE.Vector3(verts[i]!.x, verts[i]!.y, verts[i]!.z)
+      .applyMatrix4(hit.object.matrixWorld);
+    const seg = new THREE.Line3();
+    const closest = new THREE.Vector3();
+    let best: [number, number] | null = null;
+    let bestD = Infinity;
+    for (let i = 0; i < face.verts.length; i++) {
+      const a = face.verts[i]!;
+      const b = face.verts[(i + 1) % face.verts.length]!;
+      seg.set(world(a), world(b));
+      seg.closestPointToPoint(hit.point, true, closest);
+      const d = closest.distanceToSquared(hit.point);
+      if (d < bestD) { bestD = d; best = a < b ? [a, b] : [b, a]; }
+    }
+    return best;
   }
 
   /** Shift/Cmd-click: add an unselected entity to the set, or remove an already-selected one. */
@@ -330,13 +374,23 @@ export class SelectionManager implements IEditorModule {
     // Sub-object validity clamp (Phase 23): ops/undo can shrink the face/vertex
     // arrays under a live selection — clamp on EVERY emit so consumers never see a
     // dangling index.
-    let faceIndex: number | undefined, vertexIndex: number | undefined;
+    let faceIndex: number | undefined, vertexIndex: number | undefined, edgeVerts: [number, number] | undefined;
     if (ud.editorType === "shape") {
-      const data = this._getDataRecord(root) as { mesh?: { vertices: unknown[]; faces?: unknown[] } } | null;
+      const data = this._getDataRecord(root) as { mesh?: { vertices: unknown[]; faces?: { verts: number[] }[] } } | null;
       if (this._subFace != null && this._subFace >= (data?.mesh?.faces?.length ?? 0)) this._subFace = null;
       if (this._subVertex != null && this._subVertex >= (data?.mesh?.vertices?.length ?? 0)) this._subVertex = null;
+      if (this._subEdge != null) {
+        // An edge is valid while some face loop still traverses its vertex pair.
+        const [a, b] = this._subEdge;
+        const alive = data?.mesh?.faces?.some(f => f.verts.some((v, i) => {
+          const w = f.verts[(i + 1) % f.verts.length]!;
+          return (v === a && w === b) || (v === b && w === a);
+        }));
+        if (!alive) this._subEdge = null;
+      }
       faceIndex   = this._subFace ?? undefined;
       vertexIndex = this._subVertex ?? undefined;
+      edgeVerts   = this._subEdge ?? undefined;
     }
     this._bus.emit("object:selected", {
       id:       ud.editorId,
@@ -356,6 +410,7 @@ export class SelectionManager implements IEditorModule {
       wallRunAngleDeg: wallTransform?.angleDeg,
       faceIndex,
       vertexIndex,
+      edgeVerts,
     });
   }
 

@@ -91,7 +91,7 @@ export interface AssetManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "select-face" | "select-vertex" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box";
+export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -150,9 +150,10 @@ export interface BusEvents {
   "shape:resize-toggle":   { enabled: boolean };
   // Sub-object selection change (canvas face click, vertex-handle click, or a panel
   // row click). SelectionManager is the sink: it stores the sub-selection and
-  // re-emits object:selected with faceIndex/vertexIndex — one channel for all
-  // consumers. null clears.
-  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null };
+  // re-emits object:selected with faceIndex/vertexIndex/edgeVerts — one channel for
+  // all consumers. null clears. Edges have no stored identity: an edge IS its
+  // (unordered) vertex-index pair, valid while some face loop traverses it.
+  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
   // Geometry-panel "add corner" arm → BrushVertexEditor (next click on the brush inserts a vertex).
@@ -290,10 +291,11 @@ export interface SelectedObjectPayload {
   scale: Scale3;
   data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
-  // Sub-object selection (Phase 23, shapes only): which face/vertex is selected in
-  // the face/vertex select modes. Clamped against the live mesh on every emit.
+  // Sub-object selection (Phase 23, shapes only): which face/vertex/edge is selected
+  // in the face/vertex/edge select modes. Clamped against the live mesh on every emit.
   faceIndex?:   number;
   vertexIndex?: number;
+  edgeVerts?:   [number, number];   // unordered vertex-index pair (edges have no stored identity)
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
   // Populated only for type === "wall"; position.y (elevation) is already meaningful.

@@ -169,10 +169,20 @@ export const IconSelectVertex = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconSelectEdge = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <polygon points="14,5 23,10 14,15 5,10" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <polygon points="5,10 14,15 14,21 5,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <polygon points="23,10 14,15 14,21 23,16" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.4"/>
+    <line x1="14" y1="15" x2="14" y2="21" stroke={color} strokeWidth="2.6" strokeLinecap="round"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   "select-face":    IconSelectFace,
   "select-vertex":  IconSelectVertex,
+  "select-edge":    IconSelectEdge,
   floor:            IconFloor,
   "poly-floor":     IconPolyFloor,
   wall:             IconWall,
