@@ -1622,7 +1622,9 @@ function FaceMaterialsView({ selected, shape, materialList, onObjectUpdate, bus 
     setTiles(t);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sel = selected.faceIndex ?? null;
   const hover = (i: number | null) => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i });
+  const pick  = (i: number) => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i, vertexIndex: null });
   const commitMat = (i: number, id: string) =>
     onObjectUpdate(shapeFacesUpdate(shape, i, { material: id === "__inherit__" ? undefined : id, materialOverrides: undefined }) as unknown as Partial<WorldObject>);
   const commitTile = (i: number, val: string) => {
@@ -1637,12 +1639,15 @@ function FaceMaterialsView({ selected, shape, materialList, onObjectUpdate, bus 
       <div style={LABEL}>PER-FACE MATERIALS</div>
       <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>
         Shape material: <span style={{ color: "#909090" }}>{getMaterialLabel(shape.material, materialList)}</span> (faces set to "(shape material)" inherit it)
+        {sel !== null && <> · selected: <span style={{ color: "#80aaff" }}>FACE {sel + 1}</span></>}
       </div>
       <div onMouseLeave={() => hover(null)} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {faces.map((f, i) => (
           <FaceMaterialRow
             key={i} index={i} face={f} materialList={materialList}
+            isSel={i === sel}
             onHover={() => hover(i)}
+            onPick={() => pick(i)}
             tile={tiles[i] ?? ""} setTile={v => setTiles(p => ({ ...p, [i]: v }))}
             onMat={id => commitMat(i, id)}
             onTile={(v, immediate) => immediate ? flush(() => commitTile(i, v)) : schedule(() => commitTile(i, v))}
@@ -1653,18 +1658,26 @@ function FaceMaterialsView({ selected, shape, materialList, onObjectUpdate, bus 
   );
 }
 
-function FaceMaterialRow({ index, face, materialList, onHover, tile, setTile, onMat, onTile }: {
+function FaceMaterialRow({ index, face, materialList, isSel, onHover, onPick, tile, setTile, onMat, onTile }: {
   index: number; face: BrushFace; materialList: MaterialDef[];
-  onHover: () => void;
+  isSel: boolean; onHover: () => void; onPick: () => void;
   tile: string; setTile: (v: string) => void;
   onMat: (id: string) => void; onTile: (v: string, immediate: boolean) => void;
 }) {
   return (
     <div
       onMouseEnter={onHover}
-      style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, background: "rgba(40,40,40,0.6)", padding: "6px 8px", display: "flex", gap: 6, alignItems: "center" }}
+      style={{
+        border: isSel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.07)",
+        borderRadius: 5,
+        background: isSel ? "rgba(80,140,255,0.08)" : "rgba(40,40,40,0.6)",
+        padding: "6px 8px", display: "flex", gap: 6, alignItems: "center",
+      }}
     >
-      <span style={{ color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", width: 52, flexShrink: 0 }}>FACE {index + 1}</span>
+      <button onClick={onPick} title="Select this face"
+        style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 10, fontFamily: "monospace", width: 52, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
+        FACE {index + 1}
+      </button>
       <select value={face.material ?? "__inherit__"} onChange={e => onMat(e.target.value)}
         style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
         <option value="__inherit__">(shape material)</option>
