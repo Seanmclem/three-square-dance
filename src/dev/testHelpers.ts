@@ -4,6 +4,7 @@ import type { ScriptEngine } from "@/scripting/ScriptEngine";
 import { GAMESAVE_KEY, type GameState } from "@/scripting/GameState";
 import type { PreviewController } from "@/preview/PreviewController";
 import type { LeftPanelId, ScriptAction, TriggerType, PlatformDef, ShapeDef, ShapeKind, WorldObject } from "@/types";
+import { bakeShapes } from "@/editor/bakeShapes";
 
 /**
  * DEV-only browser test harness. Installs `window.__test` with shortcuts for the
@@ -78,6 +79,10 @@ export function installTestHelpers({ bus, world, scriptEngine, preview, gameStat
       world.addObject(zoneId(), obj);
       return id;
     },
+
+    /** Bake shape ids (active zone) → { glb, group, colliders, size } — Phase 26 console harness. */
+    bake: (shapeIds: string[]) =>
+      bakeShapes(world, shapeIds.map(id => ({ id, type: "shape" as const, zoneId: zoneId() }))),
 
     /** Remove every test_* entity and grp_* group across all zones; restores the demo. */
     cleanup: (): void => {

@@ -431,7 +431,21 @@ export class ShapeBuilder {
   }
 
   static async build(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
-    if (isFaceBrush(shape)) return ShapeBuilder._buildFaceBrush(shape, zoneId);
+    const meshes = await ShapeBuilder.buildMeshes(shape, zoneId);
+    if (isFaceBrush(shape)) {
+      const tm = ShapeBuilder.localTrimesh(shape);
+      return { meshes, collider: ColliderBuilder.registerShapeTrimesh(shape, tm.vertices, tm.indices) };
+    }
+    return { meshes, collider: ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape)) };
+  }
+
+  /**
+   * Render meshes only — identical to build() minus physics registration. The
+   * bake-to-GLB path (Phase 26) uses this to get pristine display meshes without
+   * leaking collider bodies into the physics world.
+   */
+  static async buildMeshes(shape: ShapeDef, zoneId: string): Promise<THREE.Mesh[]> {
+    if (isFaceBrush(shape)) return ShapeBuilder._buildFaceBrushMeshes(shape, zoneId);
     const capOvr  = shape.materialOverrides;
     const capDef  = assetManager.getMaterialDef(shape.material);
     const tsCap   = capOvr?.tileScale ?? capDef?.tileScale ?? 1.0;
@@ -481,9 +495,7 @@ export class ShapeBuilder {
 
     const capMesh  = mk(cap,  capMat,  !!capOvr);
     const sideMesh = mk(side, sideMat, !!(sideId && sideOvr));
-
-    const collider = ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape));
-    return { meshes: [capMesh, sideMesh], collider };
+    return [capMesh, sideMesh];
   }
 
   /**
@@ -491,9 +503,10 @@ export class ShapeBuilder {
    * group (a single-material brush stays one mesh/draw call), fan-triangulated with
    * flat Newell normals and per-face metric UVs. Each built mesh carries
    * userData.faceGroups (triangle range → face index) for face-mode picking.
-   * Collider = exact trimesh of the same fans (concave solids collide correctly).
+   * Collider (added by build()) = exact trimesh of the same fans (concave solids
+   * collide correctly).
    */
-  private static async _buildFaceBrush(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
+  private static async _buildFaceBrushMeshes(shape: ShapeDef, zoneId: string): Promise<THREE.Mesh[]> {
     const faces = shape.mesh!.faces!;
 
     interface Group { matId: string; ovr?: MaterialOverrides; faceIdxs: number[] }
@@ -548,9 +561,6 @@ export class ShapeBuilder {
       } satisfies MeshUserData;
       meshes.push(mesh);
     }
-
-    const tm = ShapeBuilder.localTrimesh(shape);
-    const collider = ColliderBuilder.registerShapeTrimesh(shape, tm.vertices, tm.indices);
-    return { meshes, collider };
+    return meshes;
   }
 }
