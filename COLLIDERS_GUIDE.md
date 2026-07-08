@@ -34,7 +34,7 @@ Once customized, each collider is a card with:
 
 | Control | What it does |
 |---|---|
-| **Box / Sphere / Capsule** | Shape. Switching keeps roughly the same size. |
+| **Box / Sphere / Capsule / Hull** | Shape. Switching keeps roughly the same size; **Hull** auto-fits a convex hull from the model's geometry (v4.18.0) — see below. |
 | **OFFSET X/Y/Z** | Local position relative to the object's origin — moves/rotates/scales with the object. |
 | **SIZE** | Box: W/H/D · Sphere: R · Capsule: R + H |
 | **ROTATION (Y°)** | Local yaw (box only). |
@@ -77,6 +77,26 @@ select something else, and are never saved.
    script with trigger `on_player_enter` or `on_player_exit`.
 3. Walk in/out during Preview/Game — the script fires for this object.
    Works alongside solid colliders on the same object.
+
+## 4b. Hull colliders (v4.18.0)
+
+Switch any collider card to **hull** and it auto-fits a convex hull to the placed
+model's geometry — the collider matches the model's silhouette instead of its
+bounding box. **Refit** recomputes it (e.g. after swapping the asset). Static hulls
+cost about the same as boxes at runtime, so use them freely.
+
+- Best for **convex-ish props**: rocks, crates, statues, barrels.
+- A hull can't be concave: around an arch it fills the doorway. For openings that
+  matter, keep using 2–3 manual boxes.
+- Offset + the **Move** gizmo still work; size/rotation fields don't apply (the
+  points carry the shape). Hulls stay exact under any rotation and non-uniform scale.
+- Flat/degenerate models can't produce a hull — the button just no-ops (and physics
+  falls back to a box if points ever degenerate).
+
+**Baked assets** (Bake → GLB) now ship one hull per source shape instead of boxes —
+tilted shapes collide exactly. Note a concave *face-brush* source still contributes
+its convex hull (its alcoves fill); bake concave structures from multiple convex
+shapes if the cavity needs collision.
 
 ## 5. Tips & gotchas
 

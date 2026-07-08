@@ -1,6 +1,10 @@
 # Phase 27 — Convex Hull Colliders (objects + baked assets)
 
-> Status: **PLANNED** — target v4.18.0. (27 is the next free slot: 24/24b/25/26 taken.)
+> Status: **IMPLEMENTED** — shipped as **v4.18.0** (2026-07-08); acceptance record in
+> `test-plans/phase-27-hull-colliders.md`. Deviations: physics fallback for degenerate
+> hull points is a points-AABB box routed through `colliderWorldTransform` (plan left
+> it unspecified); hull wireframes rebuild geometry in `_positionAll` (capsule idiom)
+> so offset/scale edits track live; M1+M2 landed as one commit.
 
 Fill the reserved `"hull"` slot in `AttachedColliderShape`: an opt-in per-collider
 shape in the Colliders menu that auto-fits a convex hull from the placed model's

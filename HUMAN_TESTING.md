@@ -219,6 +219,13 @@ wall-run/floor mesh.
    source shape (tilted shapes get a slightly generous axis-aligned box) — and
    the Colliders screen shows `auto (N boxes)`; Customize edits a copy's own set.
    The original shapes are kept; re-baking with the same name replaces the asset.
+   *(v4.18.0: new bakes ship exact convex **hulls** per source shape instead of
+   boxes — tilted shapes collide precisely.)*
+9. **Hull colliders (v4.18.0):** select any placed model → Colliders → Customize →
+   switch the card to **hull**. The wireframe snaps to the model's silhouette
+   (auto-fit convex hull, ~free at runtime). **Refit** recomputes it. Great for
+   rocks/props; use manual boxes where a gap must stay walkable (hulls fill
+   concavities like archways).
 
 ---
 
