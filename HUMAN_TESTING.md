@@ -209,6 +209,16 @@ wall-run/floor mesh.
    - The first face/vertex/edge-mode click on an old convex-cloud brush upgrades it to
      faces automatically (one undo step, looks identical). On face-brushes, corner
      delete/add is disabled — use Split/Extrude instead.
+8. **Bake to GLB (v4.17.0):** build a structure out of shapes, select them all
+   (or one), then **Actions → Bake → GLB asset** (also on the multi-select panel
+   when everything selected is a shape). Name it and pick outputs: *Add to asset
+   library* (appears in the Asset Browser under "Baked" — place copies like any
+   model) and/or *Save .glb file locally* (standard glTF binary, opens in
+   Blender). Merging is by material, so a many-brush structure becomes ~one mesh
+   per material per copy. Baked assets carry **preset colliders** — one box per
+   source shape (tilted shapes get a slightly generous axis-aligned box) — and
+   the Colliders screen shows `auto (N boxes)`; Customize edits a copy's own set.
+   The original shapes are kept; re-baking with the same name replaces the asset.
 
 ---
 

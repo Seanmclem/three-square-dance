@@ -1,7 +1,19 @@
 # Phase 26 — Bake Shapes/Brushes to GLB (reusable assets)
 
-> Status: **PLANNED** — target v4.17.0. (Phase numbering: 24 = control schemes,
-> 24b = pause menu, 25 = runtime shell; 26 is the next free slot.)
+> Status: **IMPLEMENTED** — shipped as **v4.17.0** (2026-07-08); acceptance record in
+> `test-plans/phase-26-bake-to-glb.md`. (Phase numbering: 24 = control schemes,
+> 24b = pause menu, 25 = runtime shell.)
+> Notable deviations from plan during implementation:
+> - `ShapeBuilder.build()` was refactored to compose a new public
+>   `buildMeshes()` (meshes only, no physics registration) — the plan's "call
+>   build()" would have leaked collider bodies into the physics world.
+> - `ColliderEditor._effectiveColliders` also gained the `def.colliders`
+>   preference (viewport wireframes were plan-omitted but needed for parity).
+> - `__test.bake(ids)` console harness added for M1/M2 verification.
+> - FSA picker paths (save-locally, library dir grant) are native OS dialogs and
+>   could not be machine-verified — flagged for a first human bake; the write
+>   pattern is ModelImporterModal's proven one and the data path was verified by
+>   direct file installation + manifest round-trip.
 
 Turn a selection of shapes/brushes into a single GLB asset: geometry merged by
 material (the draw-call win), textures/normal maps/UVs embedded, registered in
