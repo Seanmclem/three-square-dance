@@ -4,6 +4,7 @@ import { createActionState, zeroActionState } from "./actions";
 import type { BindingsConfig } from "./bindings";
 import { KeyboardMouseSource } from "./KeyboardMouseSource";
 import { GamepadSource } from "./GamepadSource";
+import { TouchSource } from "./TouchSource";
 
 /**
  * Preview-mode input hub. Owns one source per device class; every source is
@@ -20,17 +21,21 @@ export class ControlSchemeManager {
   /** Stable identity — CharacterController holds a reference and reads it every frame. */
   readonly state: ActionState = createActionState();
 
+  /** The touch source's shared store — written directly by TouchControlsOverlay. */
+  readonly touch: TouchSource;
+
   private readonly _sources: InputSource[];
   private _scheme: ControlScheme = "kbm";
   private _suppress = false;      // zone-transition fades freeze the player (InputManager idiom)
   private _unsub: Array<() => void> = [];
 
   constructor(
-    _dom: HTMLCanvasElement,      // canvas — claimed by the touch source in a later step
+    _dom: HTMLCanvasElement,      // canvas — reserved for future pointer-lock re-entry wiring
     private readonly _bus: EventBus,
     bindings: BindingsConfig,
   ) {
-    this._sources = [new KeyboardMouseSource(bindings), new GamepadSource(bindings)];
+    this.touch = new TouchSource(bindings);
+    this._sources = [new KeyboardMouseSource(bindings), new GamepadSource(bindings), this.touch];
   }
 
   get activeScheme(): ControlScheme { return this._scheme; }
@@ -41,6 +46,19 @@ export class ControlSchemeManager {
       this._bus.on("overlay:fade-in",  () => { this._suppress = true; }),
       this._bus.on("overlay:fade-out", () => { this._suppress = false; }),
     );
+    this._setScheme(this._guessScheme());
+  }
+
+  /** Initial scheme guess: touch hardware → touch; connected pad → gamepad; else kbm. */
+  private _guessScheme(): ControlScheme {
+    if (window.matchMedia?.("(pointer: coarse)").matches || navigator.maxTouchPoints > 0) return "touch";
+    for (const p of navigator.getGamepads()) if (p) return "gamepad";
+    return "kbm";
+  }
+
+  private _setScheme(scheme: ControlScheme): void {
+    this._scheme = scheme;
+    this._bus.emit("input:scheme-changed", { scheme });
   }
 
   /** Must run before CharacterController.update() in the same frame. */

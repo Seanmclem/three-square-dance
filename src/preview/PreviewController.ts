@@ -33,6 +33,7 @@ export class PreviewController {
   ) {}
 
   get isActive(): boolean { return this._controller !== null; }
+  get input(): ControlSchemeManager | null { return this._input; }
 
   enter(mode: "preview" | "game", opts?: { resume?: boolean }): void {
     if (this._controller) return;
@@ -75,7 +76,9 @@ export class PreviewController {
     this._triggers   = triggers;
     this._input      = input;
 
-    this._scene.renderer.domElement.requestPointerLock();
+    // Pointer lock is a kbm concern — touch has no pointer to lock (the call
+    // throws on most mobile browsers) and gamepad doesn't need one.
+    if (input.activeScheme === "kbm") this._scene.renderer.domElement.requestPointerLock();
 
     this._bus.emit("preview:start", { mode, resume: opts?.resume ?? false });
   }

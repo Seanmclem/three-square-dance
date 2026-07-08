@@ -178,6 +178,8 @@ export interface BusEvents {
   "preview:start":         { mode: "preview" | "game"; resume?: boolean };
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };
+  // Phase 24 — active control scheme label flipped (drives HUD prompts + touch overlay)
+  "input:scheme-changed":  { scheme: "kbm" | "gamepad" | "touch" };
   "gizmo:dragging":        { isDragging: boolean };
   // A ColliderEditor face handle is under the cursor — GizmoManager suspends
   // TransformControls so the handle wins the pick (its pickers overlap on small objects).

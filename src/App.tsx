@@ -46,6 +46,8 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
+import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
+import { DEFAULT_BINDINGS } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
@@ -141,6 +143,7 @@ export default function App() {
   const [isDirty,         setIsDirty]          = useState(false);
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
+  const [previewScheme,   setPreviewScheme]    = useState<"kbm" | "gamepad" | "touch">("kbm");
   const [isGame,          setIsGame]           = useState(false);
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
@@ -418,6 +421,7 @@ export default function App() {
         saveGame();
         scriptEngine.deactivate();
       }),
+      bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
       bus.on("dialogue:show", payload => setDialogueState(payload)),
       bus.on("overlay:fade-in", payload => setFadeState(payload)),
       bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
@@ -1895,6 +1899,14 @@ export default function App() {
         <PreviewHUD
           bus={busRef.current}
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
+        />
+      )}
+
+      {isPreview && previewScheme === "touch" && previewRef.current?.input && (
+        <TouchControlsOverlay
+          shared={previewRef.current.input.touch.shared}
+          joystickRadius={DEFAULT_BINDINGS.touch.joystickRadius}
+          layout={DEFAULT_BINDINGS.touch.layout}
         />
       )}
 
