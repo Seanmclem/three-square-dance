@@ -134,6 +134,8 @@ export default function App() {
   const [texturesDir,     setTexturesDir]      = useState<FileSystemDirectoryHandle | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
+  // Hint pill shown while a bake-related native picker is open (which dialog is which).
+  const [bakeHint,        setBakeHint]         = useState<string | null>(null);
   const [materialImporterOpen, setMaterialImporterOpen] = useState(false);
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
@@ -1506,10 +1508,12 @@ export default function App() {
         if (opts.toFile) {
           try {
             if ("showSaveFilePicker" in window) {
+              setBakeHint(`Choose where to save ${opts.name}.glb (local copy)…`);
               const handle = await window.showSaveFilePicker({
                 suggestedName: `${opts.name}.glb`,
                 types: [{ description: "glTF Binary", accept: { "model/gltf-binary": [".glb"] } }],
               });
+              setBakeHint(null);
               const w = await handle.createWritable();
               await w.write(glb);
               await w.close();
@@ -1523,7 +1527,9 @@ export default function App() {
           }
         }
         if (opts.toLibrary) {
+          if (!modelsDir) setBakeHint("Select your assets/models folder so the asset can join the library…");
           const dir = await ensureDir(modelsDir, setModelsDir);
+          setBakeHint(null);
           if (dir) {
             const thumbUrl = renderModelThumbnail(group);
             const asset: AssetDef = {
@@ -1547,10 +1553,12 @@ export default function App() {
           }
         }
       } finally {
+        setBakeHint(null);   // covers picker-cancel paths that skip the inline clears
         disposeBakeGroup(group);
       }
     } catch (err) {
       console.error("bake failed:", err);
+      setBakeHint(null);
     }
   };
 
@@ -2105,6 +2113,17 @@ SquareDance
           onConfirm={opts => void handleBakeConfirm(opts)}
           onCancel={() => setBakeRefs(null)}
         />
+      )}
+
+      {bakeHint && (
+        <div style={{
+          position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 70,
+          background: "rgba(28,28,28,0.97)", border: "1px solid rgba(80,140,255,0.45)",
+          borderRadius: 6, padding: "8px 16px", boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+          color: "#cfe0ff", fontSize: 12, fontFamily: "monospace", pointerEvents: "none",
+        }}>
+          {bakeHint}
+        </div>
       )}
 
       {pendingMaterialEdit && (
