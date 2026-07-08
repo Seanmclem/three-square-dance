@@ -4,12 +4,14 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import type { PlayerSettings, LocomotionState } from "@/types";
 import type { EventBus } from "@/core/EventBus";
+import type { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { CharacterBody } from "./CharacterBody";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
+const MAX_PITCH = Math.PI * 80 / 180;   // look-up/down clamp
 const CAM_SKIN = 0.2;   // gap kept in front of an occluding wall
 // Vertical camera smoothing — the capsule climbs/descends stairs in per-step pulses
 // (bursts of ~0.1m/frame between flat frames); a rigidly-locked camera turns that into
@@ -51,9 +53,8 @@ export class CharacterController {
   private _yaw     = 0;
   private _pitch   = 0;
   private _velY    = 0;
-  // Edge-triggered jump: must release Space before it fires again (no auto-bounce on landing).
+  // Edge-triggered jump: must release the jump input before it fires again (no auto-bounce on landing).
   private _jumpArmed = true;
-  private readonly _keys = new Set<string>();
 
   private readonly _interactSeen = new Set<string>();   // dedupe interactables when rebuilding the cache
   private readonly _ray = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3()); // reused spring-arm ray
@@ -76,10 +77,6 @@ export class CharacterController {
 
   readonly camera: THREE.PerspectiveCamera;
 
-  private readonly _onMouseMove: (e: MouseEvent) => void;
-  private readonly _onKeyDown:   (e: KeyboardEvent) => void;
-  private readonly _onKeyUp:     (e: KeyboardEvent) => void;
-  private readonly _onWheel:     (e: WheelEvent) => void;
   private _offTeleport: (() => void) | null = null;
   private _offSavePos:  (() => void) | null = null;
 
@@ -87,6 +84,7 @@ export class CharacterController {
     private readonly _settings: PlayerSettings,
     private readonly _scene: THREE.Scene,
     private readonly _bus: EventBus,
+    private readonly _input: ControlSchemeManager,
   ) {
     this.camera = new THREE.PerspectiveCamera(
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
@@ -94,22 +92,6 @@ export class CharacterController {
 
     this._body = new CharacterBody(_settings.characterScale ?? 1);
     this._desiredDist = _settings.thirdPersonDistance;
-
-    this._onMouseMove = (e: MouseEvent) => {
-      this._yaw   -= e.movementX * 0.002;
-      this._pitch -= e.movementY * 0.002;
-      this._pitch  = Math.max(-Math.PI * 80 / 180, Math.min(Math.PI * 80 / 180, this._pitch));
-    };
-    this._onWheel = (e: WheelEvent) => {
-      this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + e.deltaY * 0.005));
-    };
-    this._onKeyDown = (e: KeyboardEvent) => {
-      this._keys.add(e.code);
-      if (e.code === "KeyE" && this._interactTargetId) {
-        this._bus.emit("character:interact", { objectId: this._interactTargetId });
-      }
-    };
-    this._onKeyUp = (e: KeyboardEvent) => this._keys.delete(e.code);
   }
 
   init(spawnPos: THREE.Vector3, facingDeg: number): void {
@@ -139,26 +121,30 @@ export class CharacterController {
       const p = this._body.position;
       gameState.set(key, { x: p.x, y: p.y - capsuleBottom, z: p.z, facing: THREE.MathUtils.radToDeg(this._yaw) });
     });
-    document.addEventListener("mousemove", this._onMouseMove);
-    document.addEventListener("keydown",   this._onKeyDown);
-    document.addEventListener("keyup",     this._onKeyUp);
-    document.addEventListener("wheel",     this._onWheel, { passive: true });
     void this._loadModel();
   }
 
   update(dt: number): void {
-    const speed = this._settings.moveSpeed;
-    const dir   = _tmpDir.set(0, 0, 0);
+    const actions = this._input.state;   // merged per-frame input (kbm/gamepad/touch)
 
-    if (this._keys.has("KeyW") || this._keys.has("ArrowUp"))    dir.z -= 1;
-    if (this._keys.has("KeyS") || this._keys.has("ArrowDown"))  dir.z += 1;
-    if (this._keys.has("KeyA") || this._keys.has("ArrowLeft"))  dir.x -= 1;
-    if (this._keys.has("KeyD") || this._keys.has("ArrowRight")) dir.x += 1;
+    this._yaw   -= actions.look.x;
+    this._pitch -= actions.look.y;
+    this._pitch  = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, this._pitch));
+    if (actions.zoomDelta !== 0) {
+      this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + actions.zoomDelta));
+    }
+    if (actions.interactPressed && this._interactTargetId) {
+      this._bus.emit("character:interact", { objectId: this._interactTargetId });
+    }
+
+    const speed = this._settings.moveSpeed;
+    // move is unit-clamped; magnitude < 1 (analog stick/joystick) scales walk speed
+    const dir   = _tmpDir.set(actions.move.x, 0, -actions.move.y);
     const isMoving = dir.lengthSq() > 0;
-    if (isMoving) dir.normalize().multiplyScalar(speed * dt);
+    if (isMoving) dir.multiplyScalar(speed * dt);
     dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
 
-    const jumpHeld = this._keys.has("Space");
+    const jumpHeld = actions.jump;
     if (!jumpHeld) this._jumpArmed = true;   // re-arm on release
     if (this._body.isGrounded) {
       if (jumpHeld && this._jumpArmed) {
@@ -389,16 +375,11 @@ export class CharacterController {
   }
 
   dispose(): void {
-    document.removeEventListener("mousemove", this._onMouseMove);
-    document.removeEventListener("keydown",   this._onKeyDown);
-    document.removeEventListener("keyup",     this._onKeyUp);
-    document.removeEventListener("wheel",     this._onWheel);
     this._offTeleport?.(); this._offTeleport = null;
     this._offSavePos?.();  this._offSavePos  = null;
     if (this._modelRoot) this._scene.remove(this._modelRoot);
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);
     this._body.dispose();
-    this._keys.clear();
   }
 }

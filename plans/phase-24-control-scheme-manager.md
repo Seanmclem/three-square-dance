@@ -3,7 +3,7 @@
 > Status: **PLANNED** — not yet implemented.
 > Target version: next free minor at implementation time (v4.14.1 shipped as of
 > 2026-07-08 — do not pin). Phase number assumes nothing lands between this and
-> phase 23 (face/vertex sub-object editing, v4.11.0, in progress); renumber if
+> phase 23 (face/vertex sub-object editing, shipped v4.11–v4.14); renumber if
 > needed. (Originally drafted as phase 20 / v4.7.0; renumbered twice — decals
 > and shapes took 20–22, face/vertex editing took 23.)
 
@@ -51,7 +51,7 @@ with Chrome touch emulation works.
 | `src/preview/PreviewController.ts` | Creates the controller, calls `requestPointerLock()` unconditionally on enter (`:70`). | Pointer lock is wrong for touch (unsupported) and unnecessary for gamepad. |
 | `src/ui/PreviewHUD.tsx` | Hardcodes `[E] {label}` (`:67`) and `Esc · exit` (`:89`). | Prompts must follow the active scheme. |
 | `src/ui/DialogueOverlay.tsx` | Own `window` keydown listener for E/Space/Enter (`:39-49`); click also advances. | Needs a gamepad path (confirm button) — keyboard/tap already work. |
-| `src/App.tsx` | `Escape` keydown exits preview (`:916`). | Needs gamepad (Start) and touch (on-screen button) equivalents. |
+| `src/App.tsx` | `Escape` keydown exits preview (`:989`). | Needs gamepad (Start) and touch (on-screen button) equivalents. |
 | `src/core/InputManager.ts` | Editor-only DOM → bus event fan-out. | **Unchanged.** ControlSchemeManager is its preview-mode sibling, not a replacement. Reuse its patterns: typed bus events, `_suppress` on `overlay:fade-in/out`, drag-vs-click threshold. |
 
 ---

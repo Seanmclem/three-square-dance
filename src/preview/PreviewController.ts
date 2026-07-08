@@ -5,6 +5,8 @@ import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
 import { CharacterController } from "./CharacterController";
 import { TriggerSystem } from "./TriggerSystem";
+import { ControlSchemeManager } from "@/input/ControlSchemeManager";
+import { DEFAULT_BINDINGS } from "@/input/bindings";
 
 const DEFAULT_SETTINGS = {
   cameraMode:          "fps" as const,
@@ -20,6 +22,7 @@ const DEFAULT_SETTINGS = {
 export class PreviewController {
   private _controller:  CharacterController | null = null;
   private _triggers:    TriggerSystem | null = null;
+  private _input:       ControlSchemeManager | null = null;
   private _updateFn:    ((dt: number) => void) | null = null;
 
   constructor(
@@ -49,7 +52,10 @@ export class PreviewController {
       spawnPos = new THREE.Vector3(f.x, f.y + 1.5, f.z);
     }
 
-    const controller = new CharacterController(settings, this._scene.scene, this._bus);
+    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, DEFAULT_BINDINGS);
+    input.init();
+
+    const controller = new CharacterController(settings, this._scene.scene, this._bus, input);
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);
@@ -59,6 +65,7 @@ export class PreviewController {
     this._scene.setPreviewCamera(controller.camera);
 
     const updateFn = (dt: number) => {
+      input.update(dt);        // merge device input BEFORE the controller reads it
       controller.update(dt);
       triggers.update();
     };
@@ -66,6 +73,7 @@ export class PreviewController {
     this._updateFn   = updateFn;
     this._controller = controller;
     this._triggers   = triggers;
+    this._input      = input;
 
     this._scene.renderer.domElement.requestPointerLock();
 
@@ -84,8 +92,10 @@ export class PreviewController {
 
     this._scene.setPreviewCamera(null);
     this._controller.dispose();
+    this._input?.dispose();
     this._controller = null;
     this._triggers   = null;
+    this._input      = null;
 
     this._bus.emit("preview:stop", {});
   }
