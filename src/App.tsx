@@ -47,7 +47,7 @@ import { Toolbar } from "@/ui/Toolbar";
 import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
-import { DEFAULT_BINDINGS } from "@/input/bindings";
+import { DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
@@ -261,6 +261,7 @@ export default function App() {
       g.__objectPlacer = objectPlacer; g.__history = history;
       g.__gameState = gameState;
       g.__copyPaste = { copySelection, pasteClipboard };
+      g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
     }
 
@@ -1917,8 +1918,8 @@ export default function App() {
       {isPreview && previewScheme === "touch" && previewRef.current?.input && (
         <TouchControlsOverlay
           shared={previewRef.current.input.touch.shared}
-          joystickRadius={DEFAULT_BINDINGS.touch.joystickRadius}
-          layout={DEFAULT_BINDINGS.touch.layout}
+          joystickRadius={previewRef.current.input.bindings.touch.joystickRadius}
+          layout={previewRef.current.input.bindings.touch.layout}
         />
       )}
 

@@ -11,6 +11,7 @@ import { facesFromCloud, splitFaceQuad, extrudeFace } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
+import { ControlsSection } from "@/ui/ControlsSection";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -3707,6 +3708,8 @@ function SpawnSettingsView({
           {animSlots.map(({ slot, label }) => animField(slot, label))}
         </div>
       )}
+
+      <ControlsSection />
     </div>
   );
 }

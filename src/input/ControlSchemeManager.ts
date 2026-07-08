@@ -27,6 +27,8 @@ export class ControlSchemeManager {
 
   /** The touch source's shared store — written directly by TouchControlsOverlay. */
   readonly touch: TouchSource;
+  /** The bindings this session was built with (loaded once at preview enter). */
+  readonly bindings: BindingsConfig;
 
   private readonly _sources: InputSource[];
   private _scheme: ControlScheme = "kbm";
@@ -39,6 +41,7 @@ export class ControlSchemeManager {
     private readonly _bus: EventBus,
     bindings: BindingsConfig,
   ) {
+    this.bindings = bindings;
     this.touch = new TouchSource(bindings);
     this._sources = [new KeyboardMouseSource(bindings), new GamepadSource(bindings), this.touch];
   }

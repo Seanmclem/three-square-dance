@@ -6,7 +6,7 @@ import type { ZoneManager } from "@/world/ZoneManager";
 import { CharacterController } from "./CharacterController";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
-import { DEFAULT_BINDINGS } from "@/input/bindings";
+import { loadBindings } from "@/input/bindings";
 
 const DEFAULT_SETTINGS = {
   cameraMode:          "fps" as const,
@@ -55,7 +55,7 @@ export class PreviewController {
       spawnPos = new THREE.Vector3(f.x, f.y + 1.5, f.z);
     }
 
-    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, DEFAULT_BINDINGS);
+    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, loadBindings());
     input.init();
 
     const controller = new CharacterController(settings, this._scene.scene, this._bus, input);

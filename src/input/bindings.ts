@@ -1,8 +1,9 @@
 /**
  * Per-scheme input bindings. A player/device preference, NOT world data — it
- * never enters the SceneFile. Persistence (localStorage merge over defaults)
- * lands with the Controls settings UI; until then consumers take
- * DEFAULT_BINDINGS.
+ * never enters the SceneFile. Persisted to localStorage and merged over
+ * DEFAULT_BINDINGS on load so newly-added fields pick up their defaults.
+ * Read once per preview session (ControlSchemeManager construction) — edits
+ * apply the next time preview starts.
  */
 export interface BindingsConfig {
   kbm: {
@@ -57,3 +58,30 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
     layout: "right-jump",
   },
 };
+
+const BINDINGS_KEY = "worldbuilder.bindings.v1";
+
+/** Stored config merged over defaults — unknown/missing fields fall back cleanly. */
+export function loadBindings(): BindingsConfig {
+  const d = structuredClone(DEFAULT_BINDINGS);
+  try {
+    const raw = localStorage.getItem(BINDINGS_KEY);
+    if (!raw) return d;
+    const s = JSON.parse(raw) as Partial<BindingsConfig>;
+    return {
+      kbm:     { ...d.kbm,     ...s.kbm,     move:    { ...d.kbm.move,        ...s.kbm?.move } },
+      gamepad: { ...d.gamepad, ...s.gamepad, buttons: { ...d.gamepad.buttons, ...s.gamepad?.buttons } },
+      touch:   { ...d.touch,   ...s.touch },
+    };
+  } catch {
+    return d;
+  }
+}
+
+export function saveBindings(b: BindingsConfig): void {
+  localStorage.setItem(BINDINGS_KEY, JSON.stringify(b));
+}
+
+export function resetBindings(): void {
+  localStorage.removeItem(BINDINGS_KEY);
+}
