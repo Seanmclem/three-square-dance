@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
 import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
 // is the active tool. For placement groups (everything but Select), clicking the button
-// only OPENS the popover — no tool is armed until a variant is explicitly picked, and
-// Esc / clicking elsewhere closes the popover without arming anything.
+// only OPENS the popover — no tool is armed until a variant is explicitly picked. Select
+// arms its current variant (object by default) on click and opens the popover for mode
+// switching. An open popover closes on Esc or ANY click (inside or outside it).
 interface ToolDef { id: ToolId; label: string; shortcut: string; variants?: { id: ToolId; label: string }[] }
 
 const TOOLS: ToolDef[] = [
@@ -41,28 +42,26 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
   const [showGameMenu, setShowGameMenu] = useState(false);
   // Placement-variant popover opened by its group button (no tool armed yet).
   const [openMenu, setOpenMenu] = useState<ToolId | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   // Re-evaluated whenever the menu opens (opening flips showGameMenu → re-render),
   // so it reflects a save written since the last play session.
   const canContinue = showGameMenu && (hasGameSave?.() ?? false);
 
-  // Esc or a click outside the toolbar closes an un-armed variant popover.
+  // Esc or any click — inside or outside the popover — closes an open menu. Buttons
+  // that OPEN a menu stopPropagation() so their own click doesn't immediately close it.
   useEffect(() => {
-    if (!openMenu) return;
-    const onDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpenMenu(null);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpenMenu(null); };
-    document.addEventListener("mousedown", onDown);
+    if (!openMenu && !showGameMenu) return;
+    const close = () => { setOpenMenu(null); setShowGameMenu(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("click", close);
     document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("click", close);
       document.removeEventListener("keydown", onKey);
     };
-  }, [openMenu]);
+  }, [openMenu, showGameMenu]);
 
   return (
-    <div ref={rootRef} style={{
+    <div style={{
       position: "absolute", left: 0, top: 0, bottom: 0, width: 64,
       background: "rgba(28,28,28,0.95)",
       borderRight: "1px solid rgba(255,255,255,0.08)",
@@ -84,18 +83,25 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         const highlight = active || menuOpen;
         const Icon = TOOL_ICONS[activeVariantId ?? tool.id];
         const color = highlight ? "#80aaff" : "#7a7a7a";
-        const showSpawnMenu   = tool.id === "spawnpoint" && activeTool === "spawnpoint";
-        const showVariantMenu = !!tool.variants && (menuFirst ? (menuOpen || activeVariantId !== undefined) : active);
+        const showSpawnMenu   = tool.id === "spawnpoint" && activeTool === "spawnpoint" && menuOpen;
+        const showVariantMenu = !!tool.variants && menuOpen;
         return (
           <div key={tool.id} style={{ position: "relative", display: "flex" }}>
           <button
             title={tool.label}
-            // Menu-first groups toggle their popover; Select re-clicks keep the current
-            // variant; single tools arm directly (and dismiss any open popover).
-            onClick={() => {
-              if (menuFirst) { setOpenMenu(menuOpen ? null : tool.id); return; }
-              setOpenMenu(null);
-              onToolSelect(activeVariantId ?? tool.id);
+            // Menu-first groups toggle their popover without arming; Select arms its
+            // current variant (object by default) AND toggles its popover; Spawn arms
+            // and toggles its mode popover; other single tools arm directly.
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowGameMenu(false);
+              if (tool.variants) {
+                if (!menuFirst) onToolSelect(activeVariantId ?? tool.id);
+                setOpenMenu(menuOpen ? null : tool.id);
+                return;
+              }
+              onToolSelect(tool.id);
+              setOpenMenu(tool.id === "spawnpoint" && !menuOpen ? tool.id : null);
             }}
             style={{
               width: 48, height: 48, border: "none", cursor: "pointer",
@@ -171,8 +177,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
                 );
               })}
               <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
-                {menuFirst && activeVariantId === undefined
-                  ? "Pick a type to place — Esc closes."
+                {tool.id === "select" ? "Pick a selection mode."
+                  : activeVariantId === undefined ? "Pick a type to place — Esc closes."
                   : activeTool.startsWith("poly-") ? "Click to place vertices; Enter to close." : "Click-drag to paint a region."}
               </div>
             </div>
@@ -256,7 +262,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         </button>
         <button
           title="More play options"
-          onClick={() => setShowGameMenu(v => !v)}
+          onClick={(e) => { e.stopPropagation(); setOpenMenu(null); setShowGameMenu(v => !v); }}
           style={{
             width: 14, height: 36,
             border: `1px solid ${isPreview ? "rgba(80,200,120,0.7)" : "rgba(80,200,120,0.3)"}`,
