@@ -212,6 +212,40 @@ wall-run/floor mesh.
 
 ---
 
+## Workflow: play with a gamepad or touchscreen (Phase 24)
+
+Preview/game mode works with keyboard+mouse, a gamepad, or a touchscreen. The
+active scheme switches to **whatever you touched last** — HUD prompts follow
+(`[E]` / `[LB]` / `Tap ·` interact, `Esc` / `Start` exit hints).
+
+**Gamepad** (standard mapping, e.g. Xbox/PS):
+
+1. Connect the pad, enter preview (Play button or `P`), press any button — the
+   HUD hints flip to gamepad.
+2. **Left stick** walk (analog — half stick = half speed), **right stick** look,
+   **RB** jump (A also works outside dialogue), **LB** interact, **Start** exit
+   (closes an open dialogue first; press again to exit).
+3. In a dialogue: **A** advances/closes. Movement is frozen while it's open.
+4. Unplug mid-walk: the character stops immediately. Reconnect and press a
+   button to resume.
+
+**Touchscreen** (tablet/phone, or Chrome DevTools device emulation):
+
+1. Enter preview — on a touch device the touch controls appear automatically
+   (no pointer lock).
+2. **Left area**: touch anywhere to spawn the joystick under your thumb; drag
+   to walk. **Rest of the screen**: drag to look (both thumbs at once works).
+3. **Tap** (don't drag) to interact when the prompt shows. **JUMP** button
+   bottom-right, **✕** top-right to exit (or to close a dialogue first).
+4. Tap the dialogue box itself to advance it.
+
+**Tuning:** select the **spawn point** → the panel's **CONTROLS (THIS DEVICE)**
+section has mouse/gamepad/touch sensitivities, gamepad deadzone + invert-Y,
+joystick size, and a left/right-handed jump-button layout. These are saved on
+the device (not in the world) and apply the next time you press Play.
+
+---
+
 ## Adding more workflows
 
 Keep this doc to **reusable, feature-level UI walkthroughs** (the steps a person clicks).

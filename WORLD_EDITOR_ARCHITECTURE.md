@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.14.1** — last updated 2026-07-08
+**Version 4.15.0** — last updated 2026-07-08
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -84,6 +84,7 @@
 - v4.13.0 — **Placement variant menus no longer arm a tool on open + Esc exits placement tools.** The Floor/Platform/Shape toolbar buttons used to arm their primary variant (e.g. cylinder) the moment they were clicked, with no way to close the popover without placing something. Now those buttons only OPEN the popover (`menuFirst` groups — Select keeps its old behavior); nothing is armed until a variant is explicitly picked, and Esc or clicking outside the toolbar closes the popover (document-level listeners while open; hint reads "Pick a type to place — Esc closes."). Additionally App's Escape handler now bails any armed non-select tool back to Select (tools still cancel their in-progress ghost via the bus keydown first), so "I decided I don't want a shape" is always one Esc away. Verified in-browser: opening the Shape menu emits zero tool:select, Esc/click-away close without placing, picking Cylinder arms it, Esc returns to select.
 - v4.14.0 — **Phase 23b — Edge select/drag mode (Blender-style, 4th Select variant).** New `select-edge` ToolId (Select popover "╱ Edge (4)" + Digit4 hotkey; `isSelectMode` extended — all non-shape machinery unchanged). **No data-model change:** an edge IS its unordered vertex-index pair, derived from face loops; `object:selected` carries `edgeVerts?: [number, number]` and `shape:sub-select` gains an optional `edge` field (existing emitters unaffected). SelectionManager `_resolveEdge`: hit triangle → logical face via faceGroups → the face loop's boundary edge closest to the hit point in world space (every face click selects an edge — no pixel threshold), with a liveness clamp on every emit (edge valid while some face loop traverses the pair — survives topology ops that keep it, drops cleanly otherwise). **`BrushEdgeEditor`** (new, BrushFaceEditor's proxy pattern): translate TC at the edge midpoint moves the edge's 2 verts live in one transaction (snap 0.25, Alt free, Escape cancels), suspends the entity gizmo (`gizmo:suspend` "edge-mode"), owns the cloud auto-bake for edge-mode selections. **BrushFaceHighlighter**: black face-boundary outlines now show in edge mode too, plus a bright blue tube (`CylinderGeometry` r=0.025, depthTest off) over the selected edge — WebGL 1px lines don't read as selection. Verified in-browser end-to-end: Digit4 + variant popover, cloud auto-bake on first edge click, nearest-edge resolution, real TC drag moved exactly the edge's 2 verts (y 2→0.25 snapped, all others byte-stable), single visible gizmo throughout, one undo restores, overlays clear on mode switch/deselect.
 - v4.14.1 — **Autosave no longer clobbered by stale editor tabs.** Root cause of the twice-recurring test-entity resurrection (and a real data-loss hazard: ANY dormant editor tab — e.g. frozen by Chrome Memory Saver since yesterday — flushed its stale in-memory world over newer autosaves via the unconditional 60s tick / closing beforeunload, silently reverting edits made in other tabs). `writeAutosave` now gates on a load-time content baseline (`autosaveBaselineRef`, re-baselined on every write): a tab that never changed the world never writes. Deliberately content-compared rather than gated on React `isDirty`, which console/test-driven `world.transaction()` mutations never set. Verified: untouched tab holds through a full tick (ts frozen); an edit resumes writes on the next tick. Last-writer-wins between two actively-edited tabs is unchanged (pre-existing).
+- v4.15.0 — **Phase 24 — Controller & touchscreen support (ControlSchemeManager).** Preview/game-mode input abstracted behind new **`src/input/`** (the editor's InputManager is untouched — this is its preview-mode sibling, alive only between `PreviewController.enter()`/`exit()`): sources (`KeyboardMouseSource` — the listeners extracted verbatim from CharacterController; `GamepadSource` — `navigator.getGamepads()` polled per frame (Chrome returns snapshots — never cache the pad object), radial deadzone 0.15 **with rescale** (per-axis deadzones cause diagonal drift), prev-frame diff for button edges, `gamepaddisconnected` zeroes state so an unplugged held stick can't ghost-walk; `TouchSource` — a plain shared store written imperatively by the React overlay, ecctrl-style, no bus traffic per pointer-move) all merge each frame into ONE **`ActionState`** struct (`move` unit-disc analog — magnitude scales walk speed, so half-stick walks at half speed; `look` per-frame radians delta unifying mouse px·0.002 / stick rad·s⁻¹·dt / touch px·sens; held `jump` — edge stays in CharacterController's `_jumpArmed`; one-frame edges `interactPressed/confirmPressed/cancelPressed/menuNav`), consumed by **CharacterController, which no longer owns any DOM listeners**. Defaults: gamepad **LB=interact, RB=jump** (bumpers per spec; A doubles as jump outside dialogue + confirm inside), left/right sticks move/look, d-pad → `menuNav`, Start=cancel; touch = **floating virtual joystick** (spawn-at-touch, left 40%), **drag-to-look** elsewhere (multi-touch by pointerId — two-thumb move+look works), **tap = interact** (≤5px/250ms, the InputManager `_DRAG_THRESHOLD` idiom — a swipe never interacts), JUMP + ✕ buttons (`TouchControlsOverlay.tsx`, safe-area-inset padded, mounted only while `previewScheme==="touch"`; `joyOrigin` deliberately lives in a ref AND state — a pointermove can arrive before React re-renders). **Scheme = a label, never a gate**: all sources stay live; last-input-wins switching via per-source `hadActivity()` (deadzone-filtered so stick drift can't flip it; unlocked mousemove doesn't count — only locked motion/keys/wheel/real `pointerType:"mouse"` presses; touch claims via a document-level `pointerdown pointerType:"touch"` listener since the overlay isn't mounted while another scheme is active), persisted `worldbuilder.lastScheme`, initial guess last-used → coarse-pointer/maxTouchPoints → connected pad → kbm. **Pointer lock is kbm-only** (mobile Safari/Chrome throw on it): released on leaving kbm, re-acquired on the next canvas mousedown (lock needs a user gesture — a keypress alone can't re-lock). **Menu mode**: `dialogue:show`/`dialogue:closed` gate — movement/look/jump/interact zeroed behind an open dialogue, `action:confirm` emitted ONLY in menu mode (kbm E/Space/Enter, gamepad A, touch tap — **DialogueOverlay's own window keydown listener is gone**, one bus path for all schemes; the E-that-opens-a-dialogue can't insta-advance it because the manager runs before the controller each frame), `action:cancel` (Start/✕) closes the dialogue else exits preview (Esc keeps its App.tsx path). New events: `input:scheme-changed`, `action:confirm`, `action:cancel`, `dialogue:closed`. **PreviewHUD** prompts follow the scheme (`[E]`/`[LB]`/`Tap ·` interact prefix; `Esc · exit`/`Start · exit`/hidden-on-touch). **Bindings** (`src/input/bindings.ts`): `BindingsConfig` per scheme, `loadBindings()` = localStorage `worldbuilder.bindings.v1` deep-merged over `DEFAULT_BINDINGS` (partial/garbage-tolerant), read once per preview session; **CONTROLS (THIS DEVICE)** section (`ControlsSection.tsx`) in the spawn/player panel — sensitivities, deadzone, invert-Y, joystick radius, touch layout, reset — a device preference, never SceneFile data; `window.__bindings` dev global. Suppression: manager zeroes state on `overlay:fade-in` and drains source accumulators+activity during fades (no post-fade input burst or scheme flip). Every step verified in-browser (real DOM/PointerEvents + stubbed `navigator.getGamepads`, deterministic manual-frame stepping for edges): kbm parity vs pre-refactor constants (3.55m/0.6s, −0.4 rad/200px, +1.5 zoom), gamepad deadzone-rescale exact ((0.5−0.15)/0.85=0.412), two-thumb touch, scheme flips + persistence, dialogue advance/close/exit from every scheme, custom sensitivity round-trip (0.01 → exactly −1.0 rad/100px). Known: `viewport-fit=cover` added to index.html; per-key rebinding UI deferred (data model supports it).
 - v4.11.1 — **Materials screen shows the selected face.** The per-face materials list didn't indicate which face was selected in face mode; the selected face's row now gets the blue highlight (same styling as the Geometry FACES list), the header shows "selected: FACE n", and clicking a row's FACE label sub-selects that face (same `shape:sub-select` channel).
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
@@ -898,9 +899,16 @@ world-editor/
 │   ├── scripting/
 │   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch
 │   │   └── GameState.ts            ← Generic runtime state store (see GAMEPLAY_STATE.md; replaced GameStateManager)
+│   ├── input/                      ← preview-mode input (Phase 24; editor input = core/InputManager)
+│   │   ├── actions.ts              ← ActionState struct + InputSource interface
+│   │   ├── bindings.ts             ← BindingsConfig, defaults, localStorage load/save
+│   │   ├── ControlSchemeManager.ts ← per-frame source merge, scheme label, menu mode
+│   │   ├── KeyboardMouseSource.ts
+│   │   ├── GamepadSource.ts        ← navigator.getGamepads() polling, deadzone+rescale
+│   │   └── TouchSource.ts          ← shared store written by TouchControlsOverlay
 │   ├── preview/
-│   │   ├── PreviewController.ts
-│   │   ├── CharacterController.ts  ← input + camera; delegates physics to CharacterBody
+│   │   ├── PreviewController.ts    ← owns the ControlSchemeManager session (Phase 24)
+│   │   ├── CharacterController.ts  ← consumes ActionState (no DOM listeners); physics via CharacterBody
 │   │   ├── FadeOverlay.tsx         ← fade_screen renderer (overlay:fade-in)
 │   │   └── TriggerSystem.ts        ← door/zone trigger detection via Rapier sensors
 │   ├── dev/
@@ -908,6 +916,8 @@ world-editor/
 │   ├── ui/
 │   │   ├── EditorUI.tsx
 │   │   ├── Toolbar.tsx
+│   │   ├── TouchControlsOverlay.tsx ← virtual joystick / jump / ✕ (Phase 24)
+│   │   ├── ControlsSection.tsx     ← device-local bindings knobs (Phase 24)
 │   │   ├── PropertiesPanel.tsx
 │   │   ├── FloorLevelSelector.tsx
 │   │   ├── ZonePanel.tsx
@@ -1669,6 +1679,10 @@ class EventBus {
 | `input:wheel` | InputManager → all | `{ delta, shift, ctrl, alt, meta }` (modifiers added v4.7.0 for shift+scroll decal rotate) |
 | `input:keydown` | InputManager → all | `{ code, key, shift, ctrl, alt }` |
 | `input:keyup` | InputManager → all | `{ code }` |
+| `input:scheme-changed` | ControlSchemeManager → React | `{ scheme: "kbm"\|"gamepad"\|"touch" }` — label flip: HUD prompts, touch overlay, pointer-lock policy |
+| `action:confirm` | ControlSchemeManager → DialogueOverlay | `{}` — dialogue advance (any scheme); emitted only while a dialogue is open |
+| `action:cancel` | ControlSchemeManager → App | `{}` — Start/✕: close dialogue else exit preview |
+| `dialogue:closed` | App → ControlSchemeManager | `{}` — menu-mode gate off |
 | `history:restore` | internal | `{}` — fired after undo/redo; ZoneManager reloads active zone |
 | `decal:added` | internal | `{ zoneId, decal }` |
 | `decal:updated` | internal | `{ zoneId, id, changes }` |
@@ -1681,6 +1695,10 @@ class EventBus {
 ---
 
 ## InputManager.ts
+
+**Editor-mode only.** Preview/game-mode input lives in `src/input/`
+(ControlSchemeManager, Phase 24) — a sibling with the same idioms (typed bus
+events, fade suppression), not a consumer of these events.
 
 Centralizes all DOM input so tools don't each add their own listeners. Tools subscribe to bus events instead of DOM events directly. InputManager can suppress all input during transitions by simply not emitting.
 
@@ -2611,141 +2629,59 @@ const MATERIAL_REGISTRY = {
 
 ## CharacterController.ts
 
-```js
-class CharacterController {
-  constructor(scene, camera, collisionWorld, inputManager, bus, settings) {
-    this._settings = settings; // from worldState.world.playerSettings
-    this._velocity = new THREE.Vector3();
-    this._position = new THREE.Vector3();
-    this._yaw = 0;
-    this._pitch = 0;
-    this._grounded = false;
-    this._active = false;
-    this._capsuleRadius = 0.3;
-    this._capsuleHeight = 1.8;
-  }
+Preview-mode player: movement, spring-arm/FPS camera, avatar animation state
+machine, interact scanning. Physics is delegated to `CharacterBody` (Rapier
+KCC). **Since Phase 24 it owns no DOM listeners** — the constructor takes the
+session's `ControlSchemeManager` and `update(dt)` reads its per-frame
+`ActionState`:
 
-  spawn(position) {
-    this._position.copy(position);
-    this._velocity.set(0, 0, 0);
-    this._active = true;
-    this._bus.on('input:mousemove', this._onMouseMove = ({ delta }) => {
-      if (document.pointerLockElement) {
-        this._yaw   -= delta.x * 0.002;
-        this._pitch  = Math.max(-1.4, Math.min(1.4, this._pitch - delta.y * 0.002));
-      }
-    });
-  }
-
-  despawn() {
-    this._active = false;
-    this._bus.off('input:mousemove', this._onMouseMove);
-  }
-
-  update(dt) {
-    if (!this._active) return;
-
-    // --- Input ---
-    const s = this._settings;
-    const fwd  = new THREE.Vector3(-Math.sin(this._yaw), 0, -Math.cos(this._yaw));
-    const right = new THREE.Vector3(-Math.cos(this._yaw), 0,  Math.sin(this._yaw));
-    const move  = new THREE.Vector3();
-    if (this._input.isKeyDown('KeyW')) move.add(fwd);
-    if (this._input.isKeyDown('KeyS')) move.sub(fwd);
-    if (this._input.isKeyDown('KeyA')) move.sub(right);
-    if (this._input.isKeyDown('KeyD')) move.add(right);
-    if (move.lengthSq() > 0) move.normalize().multiplyScalar(s.moveSpeed);
-
-    this._velocity.x = move.x;
-    this._velocity.z = move.z;
-
-    // --- Gravity ---
-    this._velocity.y -= 20 * dt;
-
-    // --- Ground check ---
-    const groundY = this._collisionWorld.getGroundHeight(this._position.x, this._position.z);
-    const feetY = this._position.y - this._capsuleHeight / 2;
-    if (feetY <= groundY) {
-      this._position.y = groundY + this._capsuleHeight / 2;
-      this._velocity.y = Math.max(0, this._velocity.y);
-      this._grounded = true;
-    } else {
-      this._grounded = false;
-    }
-
-    // --- Jump ---
-    if (this._grounded && this._input.isKeyDown('Space')) {
-      this._velocity.y = Math.sqrt(2 * 20 * s.jumpHeight);
-    }
-
-    // --- Apply velocity ---
-    this._position.addScaledVector(this._velocity, dt);
-
-    // --- Camera ---
-    if (s.cameraMode === 'fps') {
-      this._camera.position.set(
-        this._position.x,
-        this._position.y + this._capsuleHeight * 0.4,
-        this._position.z
-      );
-      this._camera.rotation.order = 'YXZ';
-      this._camera.rotation.y = this._yaw;
-      this._camera.rotation.x = this._pitch;
-    } else {
-      const offset = new THREE.Vector3(
-        -Math.sin(this._yaw) * s.thirdPersonDistance,
-        s.thirdPersonHeight,
-        -Math.cos(this._yaw) * s.thirdPersonDistance
-      );
-      this._camera.position.copy(this._position).add(offset);
-      this._camera.lookAt(this._position.x, this._position.y + 1.0, this._position.z);
-    }
-
-    // --- Trigger check ---
-    const trigger = this._collisionWorld.checkTriggers(this._position);
-    if (trigger?.triggerType === 'door' && trigger.transitionId) {
-      this._bus.emit('character:triggerdoor', { transitionId: trigger.transitionId });
-    }
-  }
-}
+```ts
+const actions = this._input.state;      // merged kbm/gamepad/touch
+this._yaw   -= actions.look.x;          // per-frame radians delta (sources pre-scale)
+this._pitch -= actions.look.y;          // clamped ±80°
+this._desiredDist += actions.zoomDelta; // third-person zoom, clamped 1.5–12
+if (actions.interactPressed && this._interactTargetId)
+  this._bus.emit("character:interact", { objectId: this._interactTargetId });
+const dir = _tmpDir.set(actions.move.x, 0, -actions.move.y);  // unit-clamped analog
+if (dir.lengthSq() > 0) dir.multiplyScalar(speed * dt);        // magnitude scales speed
+const jumpHeld = actions.jump;          // edge-arming stays here (_jumpArmed)
 ```
 
----
+`move` magnitude < 1 (stick/joystick partial deflection) walks proportionally
+slower; keyboard input always arrives at magnitude 1. Everything else — camera
+Y smoothing, spring-arm occlusion, animation phases (ground/jump/airidle/land),
+interact cache (rebuilt 4×/s), `character:teleport` / `character:save-position`
+handlers — is unchanged from Phases 10–13.
 
 ## PreviewController.ts
 
-```js
-class PreviewController {
-  constructor(sceneManager, editorCamera, characterController, collisionWorld, worldState, bus) { ... }
+Enter/exit lifecycle for preview & game mode. Owns the per-session input stack
+(Phase 24):
 
-  async enter() {
-    this._bus.emit('preview:start', {});
-    await document.body.requestPointerLock();
-    this._collisionWorld.buildFromZone(this._worldState.activeZoneId);
-    const spawnPos = this._editorCamera.focus.clone();
-    spawnPos.y = this._collisionWorld.getGroundHeight(spawnPos.x, spawnPos.z) + 0.9;
-    this._characterController.spawn(spawnPos);
-    this._sceneManager.onUpdate(dt => this._characterController.update(dt));
-    this._bus.on('character:triggerdoor', ({ transitionId }) => {
-      this._transitionManager.trigger(transitionId);
-    });
-    this._bus.on('input:keydown', ({ code }) => { if (code === 'Escape') this.exit(); });
-    document.addEventListener('pointerlockchange', this._onLockChange = () => {
-      if (!document.pointerLockElement) this.exit();
-    });
-  }
-
-  exit() {
-    this._characterController.despawn();
-    this._collisionWorld.clear();
-    document.exitPointerLock();
-    document.removeEventListener('pointerlockchange', this._onLockChange);
-    this._bus.emit('preview:stop', {});
-  }
+```ts
+enter(mode) {
+  const input = new ControlSchemeManager(canvas, bus, loadBindings());
+  input.init();                                    // attach sources, guess scheme
+  const controller = new CharacterController(settings, scene, bus, input);
+  controller.init(spawnPos, facingDeg);
+  scene.onUpdate(dt => { input.update(dt); controller.update(dt); triggers.update(); });
+  if (input.activeScheme === "kbm") canvas.requestPointerLock();   // kbm-only
 }
 ```
 
----
+- `input.update(dt)` MUST run before `controller.update(dt)` — the controller
+  reads the state the manager just merged.
+- **Pointer-lock policy:** requested only while the active scheme is `kbm`
+  (mobile browsers throw on it; gamepad doesn't need it). On a live scheme
+  switch away from kbm the lock is released; switching back can't re-lock from
+  a keypress (needs a user gesture), so a canvas `mousedown` listener
+  re-acquires it.
+- `exit()` disposes controller + manager, unhooks the scheme/mousedown
+  listeners, restores the editor camera, emits `preview:stop`.
+- `get input()` exposes the manager so App can hand `TouchControlsOverlay` the
+  touch shared store + bindings.
+- Spawn: game mode uses `defaultSpawn` (foot-level +capsuleBottom); preview
+  falls back to editor-camera focus +1.5m.
 
 ## React UI Components
 
@@ -2789,11 +2725,38 @@ All number inputs: local string state while typing, commit on blur/Enter. Change
 ### PreviewHUD.tsx
 
 Visible only when `preview:start` event fires. Hidden on `preview:stop`.
+Takes a `scheme` prop (App's `previewScheme`, fed by `input:scheme-changed`)
+— prompts follow the active control scheme (Phase 24).
 
-- Centered crosshair: two 1px lines, 16px each, rgba(255,255,255,0.7)
-- Bottom-center: zone name (fades in on `preview:zone-entered`, fades out after 3s)
-- Top-left: current floor level indicator
-- Bottom-right: "Esc to exit" hint, small monospace
+- Centered crosshair: two 1px lines, 18px, rgba(255,255,255,0.75)
+- Zone-name toast on `preview:zone-entered` (3s), top-left zone label
+- Interact prompt on `character:interact-range`: `[E]` / `[LB]` / `Tap ·` prefix per scheme
+- Exit hint bottom-right: `Esc · exit` (kbm) / `Start · exit` (gamepad) / hidden on touch (the overlay's ✕ is the affordance)
+
+### TouchControlsOverlay.tsx (Phase 24)
+
+Mounted by App only while preview is active AND the scheme is `touch`
+(`zIndex 60`, below DialogueOverlay's 100; `touch-action:none` so the browser
+never scrolls/zooms mid-play). Writes the `TouchSource` shared store
+imperatively — no bus traffic per pointer-move, no React re-render per frame
+(the joystick knob is styled via ref; the origin lives in a ref AND state
+because a pointermove can arrive before React re-renders).
+
+- Floating joystick: pointerdown in the left 40% spawns the base at the touch
+  point; offset/radius (clamped) → analog `move`; ghost hint circle when idle
+- Look: any other pointer drags → `lookPx` accumulation; tracked by `pointerId`
+  so joystick + look thumbs work simultaneously
+- Tap (≤5px, ≤250ms) on the look region → `interactQueued` (+confirm)
+- JUMP button (bottom, side per `bindings.touch.layout`) → `jumpHeld`;
+  ✕ button (top-right) → `cancelQueued`; both `env(safe-area-inset-*)` padded
+
+### ControlsSection.tsx (Phase 24)
+
+`CONTROLS (THIS DEVICE)` block at the bottom of the spawn/player-settings view.
+Edits `loadBindings()`/`saveBindings()` (localStorage `worldbuilder.bindings.v1`)
+— a device preference, never SceneFile data; applies on the next preview enter.
+Fields: mouse sensitivity, gamepad look rate + deadzone + invert-Y, touch
+sensitivity + joystick radius + layout, reset-to-defaults.
 
 ### SaveLoadPanel.tsx (in TopBar)
 
@@ -5146,11 +5109,13 @@ export class CharacterBody {
 
 #### CharacterController.ts
 
-Reads input, computes movement, delegates physics to `CharacterBody`, updates camera and optional model mesh.
+Reads the per-frame `ActionState` from ControlSchemeManager (Phase 24 — kbm,
+gamepad and touch all arrive pre-merged), computes movement, delegates physics
+to `CharacterBody`, updates camera and optional model mesh.
 
 ```ts
 update(dt: number): void {
-  // 1. Read WASD → local direction
+  // 1. Read actions.move (unit-disc analog) → local direction
   // 2. Rotate by yaw → world direction
   // 3. Apply move speed
   // 4. Accumulate gravity (velocity.y -= 20 * dt unless grounded)
@@ -5163,7 +5128,7 @@ update(dt: number): void {
 }
 ```
 
-**Mouse look** (pointer lock):
+**Look** (mouse under pointer lock / right stick / touch drag — all arrive as `actions.look` radian deltas):
 - `dx` → yaw, `dy` → pitch (clamped ±80°)
 - FPS: camera rotation = yaw + pitch directly
 - Third-person: camera orbits character at `thirdPersonDistance` + `thirdPersonHeight`

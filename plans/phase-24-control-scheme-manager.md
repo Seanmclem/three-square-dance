@@ -1,11 +1,24 @@
 # Phase 24 — Controller & Touchscreen Support (ControlSchemeManager)
 
-> Status: **PLANNED** — not yet implemented.
-> Target version: next free minor at implementation time (v4.14.1 shipped as of
-> 2026-07-08 — do not pin). Phase number assumes nothing lands between this and
-> phase 23 (face/vertex sub-object editing, shipped v4.11–v4.14); renumber if
-> needed. (Originally drafted as phase 20 / v4.7.0; renumbered twice — decals
-> and shapes took 20–22, face/vertex editing took 23.)
+> Status: **IMPLEMENTED** — shipped as **v4.15.0** (2026-07-08), steps 1–6 all
+> verified in-browser; see `test-plans/phase-24-control-scheme-manager.md` for
+> the acceptance record. (Originally drafted as phase 20 / v4.7.0; renumbered
+> twice — decals and shapes took 20–22, face/vertex editing took 23.)
+> Notable deviations from this plan during implementation:
+> - Sources gained a `hadActivity()` method (returns-and-clears) for the
+>   last-input-wins switch — the plan left attribution unspecified.
+> - kbm got an explicit `confirm` binding (`E`/`Space`/`Enter`) and
+>   DialogueOverlay's own window keydown listener was removed entirely —
+>   dialogue advance is ONE bus path (`action:confirm`) for all schemes, and
+>   the event fires only in menu mode (prevents E-that-opens from advancing).
+> - `dialogue:closed` bus event added (App → manager menu-mode gate).
+> - TouchSource keeps a document-level `pointerdown pointerType:"touch"`
+>   listener so touch can reclaim the scheme while its overlay is unmounted.
+> - The `action:cancel` → close-dialogue-or-exit branch lives in App.tsx
+>   (`dialogueOpenRef`), not the manager.
+> - §12 fakeInput harness not built — stubbed `navigator.getGamepads` +
+>   deterministic manual-frame stepping (`input.update(1/60)`) covered it.
+> - Deferred as planned: per-key rebinding UI, pinch zoom, trigger zoom.
 
 Gamepad and touchscreen support for **preview/game mode**, built around a
 `ControlSchemeManager` that abstracts raw input into named game actions so the
