@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "id": "demo-adventure",
+  "name": "Runtime Demo",
+  "version": "1.0.0",
+  "description": "A tiny two-level demo of the standalone runtime shell.",
+  "author": "SquareDance",
+  "entryScene": "level_01",
+  "scenes": {
+    "level_01": "scenes/level_01.json"
+  },
+  "assetsBase": "/"
+}

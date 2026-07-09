@@ -1,0 +1,166 @@
+{
+  "metadata": {
+    "name": "Runtime Demo — Level 1",
+    "version": "1.0",
+    "author": "SquareDance",
+    "created": "2026-07-08T00:00:00.000Z",
+    "lastModified": "2026-07-08T00:00:00.000Z",
+    "uvVersion": 1
+  },
+  "world": {
+    "size": { "width": 200, "depth": 200 },
+    "ambientLight": { "color": "#aabbcc", "intensity": 1.2 },
+    "sunLight": { "color": "#fff4e0", "intensity": 3, "position": { "x": 30, "y": 50, "z": 20 } },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012,
+    "playerSettings": {
+      "cameraMode": "fps",
+      "moveSpeed": 6,
+      "jumpHeight": 1.2,
+      "fov": 75,
+      "thirdPersonDistance": 4,
+      "thirdPersonHeight": 2
+    },
+    "stateSchema": {
+      "visited_l1": { "type": "number", "default": 0 }
+    },
+    "defaultSpawn": { "position": { "x": 0, "y": 0, "z": 3.5 }, "facingDeg": 0 }
+  },
+  "terrain": null,
+  "zones": [
+    {
+      "id": "l1",
+      "name": "Level One",
+      "type": "outdoor",
+      "bounds": { "x": -250, "z": -250, "width": 500, "depth": 500 },
+      "nodes": [
+        { "id": "l1_n_sw", "x": -6, "z": 5 },
+        { "id": "l1_n_se", "x": 6, "z": 5 },
+        { "id": "l1_n_ne", "x": 6, "z": -5 },
+        { "id": "l1_n_nw", "x": -6, "z": -5 }
+      ],
+      "floors": [
+        {
+          "id": "l1_floor",
+          "level": 0,
+          "elevation": 0,
+          "ceilingHeight": null,
+          "floorMesh": {
+            "shape": "polygon",
+            "points": [
+              { "x": -6, "z": 5 },
+              { "x": 6, "z": 5 },
+              { "x": 6, "z": -5 },
+              { "x": -6, "z": -5 }
+            ],
+            "nodeIds": ["l1_n_sw", "l1_n_se", "l1_n_ne", "l1_n_nw"],
+            "material": "concrete_01"
+          }
+        }
+      ],
+      "walls": [
+        {
+          "id": "l1_wall_n",
+          "startNodeId": "l1_n_nw",
+          "endNodeId": "l1_n_ne",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "l1_wall_e",
+          "startNodeId": "l1_n_ne",
+          "endNodeId": "l1_n_se",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "l1_wall_w",
+          "startNodeId": "l1_n_sw",
+          "endNodeId": "l1_n_nw",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        }
+      ],
+      "platforms": [],
+      "stairs": [],
+      "objects": [],
+      "shapes": [
+        {
+          "id": "l1_ramp",
+          "kind": "wedge",
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "material": "concrete_01",
+          "floorLevel": 0,
+          "position": { "x": 3.5, "y": 0, "z": 0 },
+          "width": 2.5,
+          "depth": 4,
+          "heightLow": 0,
+          "heightHigh": 1.2
+        },
+        {
+          "id": "l1_pillar",
+          "kind": "cylinder",
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "material": "concrete_01",
+          "floorLevel": 0,
+          "position": { "x": -3.5, "y": 0, "z": -1 },
+          "radiusTop": 0.4,
+          "radiusBottom": 0.5,
+          "height": 2.5,
+          "radialSegments": 12
+        }
+      ],
+      "triggerVolumes": [
+        {
+          "id": "l1_greeter",
+          "label": "Greeter",
+          "position": { "x": 0, "y": 1, "z": 0 },
+          "size": { "x": 3, "y": 2, "z": 2 },
+          "zoneId": "l1",
+          "scripts": [
+            {
+              "id": "l1_script_greet",
+              "label": "Welcome dialogue",
+              "zoneId": "l1",
+              "enabled": true,
+              "trigger": { "type": "on_player_enter" },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "show_dialogue",
+                  "dialogue": {
+                    "speaker": "Runtime",
+                    "lines": [
+                      "Welcome to the standalone runtime shell.",
+                      "This level was loaded from a manifest URL."
+                    ]
+                  }
+                },
+                { "type": "set_state", "stateKey": "visited_l1", "stateValue": 1 }
+              ],
+              "oneShot": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "transitions": [],
+  "groups": []
+}
