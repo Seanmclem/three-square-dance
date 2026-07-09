@@ -7425,6 +7425,8 @@ scale this combines with the culling concern above.
 A second Vite entry (`runtime.html` → `src/runtime/main.tsx`) that plays worlds
 without the editor. Full design + phased acceptance record:
 `plans/phase-25-runtime-shell.md` and `test-plans/phase-25-runtime-shell.md`.
+Hosting a game remotely (bundle layout, S3/Netlify/GitHub Pages, CORS):
+**`PUBLISHING_GUIDE.md`**.
 
 ### Pieces
 
