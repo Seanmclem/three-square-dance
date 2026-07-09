@@ -526,6 +526,13 @@ export interface StairUndersideDef {
   thickness: number;              // diagonal only: clearance below the steps (stringer depth, m)
 }
 
+// ─── Stair landings + switchback stairwells (Phase 29) ──────────────────────
+export type StairTurn = "left" | "right";
+export interface StairLandingDef {
+  depth:  number;   // meters along the flight's exit direction
+  width?: number;   // lateral span override — honored only when flights === 1 (default: stair.width)
+}
+
 export interface StairDef {
   id:          string;
   label?:      string;   // optional human-friendly name; falls back to id
@@ -538,6 +545,10 @@ export interface StairDef {
   hasRailing:  boolean;
   railing?:    StairRailingDef;   // railing config; absent → builder defaults
   underside?:  StairUndersideDef; // underside style; absent → "open" (current behavior)
+  landing?:    StairLandingDef;   // auto landing at the top of every flight; absent → none
+  flights?:    number;            // switchback flight count (>= 1); absent → 1
+  turn?:       StairTurn;         // switchback chirality; absent → "left"; meaningful only when flights > 1
+  gap?:        number;            // clear void width between opposed flights (m); absent → 0.2
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
