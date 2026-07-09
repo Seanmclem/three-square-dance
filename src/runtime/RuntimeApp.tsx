@@ -101,6 +101,16 @@ export default function RuntimeApp() {
     doSaveRef.current = doSave;
     let gameAutosaveTimer: ReturnType<typeof setInterval> | null = null;
 
+    // Menu backdrop vantage: nothing drives the default camera in game mode,
+    // so after exit-to-menu it would sit at the origin INSIDE the still-loaded
+    // level (close-up wall / volume fills). Frame it high and pulled back over
+    // the spawn instead — the level reads as a diorama behind the menu.
+    const frameMenuCamera = () => {
+      const spawn = world.world?.defaultSpawn?.position ?? { x: 0, y: 0, z: 0 };
+      scene.camera.position.set(spawn.x + 9, spawn.y + 8, spawn.z + 9);
+      scene.camera.lookAt(spawn.x, spawn.y + 1, spawn.z);
+    };
+
     const unsub = [
       // Script re-index/activation on scene entry is owned by SceneRouter —
       // this handler is UI state + save cadence only (unlike App.tsx's).
@@ -121,6 +131,7 @@ export default function RuntimeApp() {
         // currentSceneId still points at the scene being torn down).
         if (!routerRef.current?.transitioning) {
           doSave();
+          frameMenuCamera();
           setShell("menu");
         }
       }),
