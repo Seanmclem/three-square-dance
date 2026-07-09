@@ -80,3 +80,13 @@ rejections from CDP-driven preview entry (documented in TESTING.md).
   start+end and rotate pivots both about their midpoint, then `_rebuildStair`
   regenerates everything from the def (same path the panel edits exercised
   repeatedly). Code-inspection + panel-driven rebuild evidence only.
+
+## Addendum — v4.23.1 (rail toggles, user feedback)
+
+- `landingPerimeter` (default OFF): 3-flight switchback rebuilt with default →
+  outer rails terminate at each landing boundary (per-flight segments), no
+  perimeter ring; ON restores the continuous 3-edge wrap. ✅
+- `balustersInner`/`balustersOuter` (default to legacy `balusters`): perimeter
+  ON + outer OFF → bare perimeter bars, posted inner rail (screenshot). ✅
+- Both driven via `__world.updateStair`; legacy worlds unchanged (new fields
+  absent ⇒ both sides = `balusters`). Typecheck clean.

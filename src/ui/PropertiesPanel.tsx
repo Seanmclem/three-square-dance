@@ -1793,7 +1793,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [rotStr,    setRotStr]    = useState(String(initDims.rotation));
   const [hasRailing,  setHasRailing]  = useState(stair?.hasRailing ?? false);
   const [railTopRail,   setRailTopRail]   = useState(stair?.railing?.topRail   ?? true);
-  const [railBalusters, setRailBalusters] = useState(stair?.railing?.balusters ?? true);
+  const [railPostsIn,   setRailPostsIn]   = useState(stair?.railing?.balustersInner ?? stair?.railing?.balusters ?? true);
+  const [railPostsOut,  setRailPostsOut]  = useState(stair?.railing?.balustersOuter ?? stair?.railing?.balusters ?? true);
+  const [railPerimeter, setRailPerimeter] = useState(stair?.railing?.landingPerimeter ?? false);
   const [railHeight,    setRailHeight]    = useState(String(stair?.railing?.height        ?? 0.9));
   const [railInterval,  setRailInterval]  = useState(String(stair?.railing?.stepInterval  ?? 1));
   const [railBarT,      setRailBarT]      = useState(String(stair?.railing?.barThickness  ?? 0.1));
@@ -1827,7 +1829,9 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     { const d = stairDims(stair.start, stair.end); setHeightStr(String(d.height)); setLengthStr(String(d.length)); setRotStr(String(d.rotation)); }
     setHasRailing(stair.hasRailing);
     setRailTopRail(stair.railing?.topRail   ?? true);
-    setRailBalusters(stair.railing?.balusters ?? true);
+    setRailPostsIn(stair.railing?.balustersInner ?? stair.railing?.balusters ?? true);
+    setRailPostsOut(stair.railing?.balustersOuter ?? stair.railing?.balusters ?? true);
+    setRailPerimeter(stair.railing?.landingPerimeter ?? false);
     setRailHeight(String(stair.railing?.height        ?? 0.9));
     setRailInterval(String(stair.railing?.stepInterval  ?? 1));
     setRailBarT(String(stair.railing?.barThickness  ?? 0.1));
@@ -1939,7 +1943,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const commitWidth  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ width: n } as unknown as Partial<WorldObject>); };
   const toggleRailing = (checked: boolean) => { setHasRailing(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
 
-  const RAIL_DEFAULTS = { topRail: true, balusters: true, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15 };
+  const RAIL_DEFAULTS = { topRail: true, balusters: true, balustersInner: true, balustersOuter: true, landingPerimeter: false, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15 };
   const updateRailing = (patch: Partial<typeof RAIL_DEFAULTS>) => {
     const cur = { ...RAIL_DEFAULTS, ...(stair.railing ?? {}) };
     onObjectUpdate({ railing: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
@@ -2147,8 +2151,12 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <span style={{ color: "#9a9a9a", fontSize: 10 }}>Top rail</span>
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={railBalusters} onChange={e => { setRailBalusters(e.target.checked); updateRailing({ balusters: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-              <span style={{ color: "#9a9a9a", fontSize: 10 }}>Balusters</span>
+              <input type="checkbox" checked={railPostsIn} onChange={e => { setRailPostsIn(e.target.checked); updateRailing({ balustersInner: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#9a9a9a", fontSize: 10 }}>Inner balusters</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={railPostsOut} onChange={e => { setRailPostsOut(e.target.checked); updateRailing({ balustersOuter: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#9a9a9a", fontSize: 10 }}>Outer balusters</span>
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
@@ -2307,6 +2315,12 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 </div>
               )}
             </div>
+            {stair.hasRailing && (
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={railPerimeter} onChange={e => { setRailPerimeter(e.target.checked); updateRailing({ landingPerimeter: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+                <span style={{ color: "#9a9a9a", fontSize: 10 }}>Landing perimeter rail</span>
+              </label>
+            )}
             {(stair.flights ?? 1) > 1 && (
               <div style={{ color: "#404050", fontSize: 9 }}>
                 Steps &amp; rise are per flight · Top Y: {(stair.start.y + (stair.flights ?? 1) * rise).toFixed(2)} m · Total rise: {((stair.flights ?? 1) * rise).toFixed(2)} m

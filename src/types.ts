@@ -511,7 +511,10 @@ export interface StairCutterDef {
 
 export interface StairRailingDef {
   topRail:       boolean;   // top cap rail along the slope
-  balusters:     boolean;   // vertical posts
+  balusters:     boolean;   // vertical posts (legacy master toggle — default for the per-side flags)
+  balustersInner?:   boolean;  // posts on the inner/void side (default: balusters)
+  balustersOuter?:   boolean;  // posts on the outer side (default: balusters)
+  landingPerimeter?: boolean;  // rail the landing's outer perimeter edges (default: false — outer rails stop at the landing)
   height:        number;    // rail height above the step nosings (m)
   stepInterval:  number;    // a baluster every N steps (>= 1)
   barThickness:  number;    // top-rail cross-section (m)

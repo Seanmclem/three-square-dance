@@ -377,6 +377,9 @@ export class StairBuilder {
       const r           = stair.railing;
       const showTopRail = r?.topRail   ?? true;
       const showPosts   = r?.balusters ?? true;
+      // Per-side baluster toggles; inner = the turn side (void side of a switchback).
+      const postsInner  = r?.balustersInner ?? showPosts;
+      const postsOuter  = r?.balustersOuter ?? showPosts;
       const handrailH   = r?.height        ?? 0.9;    // top rail height above the step nosings
       const railBarT    = r?.barThickness  ?? 0.1;    // top-rail cross-section
       const postT       = r?.postThickness ?? 0.06;   // baluster cross-section
@@ -418,6 +421,10 @@ export class StairBuilder {
         );
 
         for (let side = -1; side <= 1; side += 2) {
+          // Local +Z is right of travel; the turn side (= inner) is right for
+          // turn:"right", left otherwise.
+          const sideIsInner = (side === 1) === ((stair.turn ?? "left") === "right");
+          const sidePosts   = sideIsInner ? postsInner : postsOuter;
           const localZ = side * Math.max(postT / 2, hd - sideInset);   // inset from the step edge
 
           // Anchor on the centre of step i's tread (local x = 0), at the outer edge.
@@ -430,7 +437,7 @@ export class StairBuilder {
           };
 
           // Balusters: every Nth step, always including the top step for support.
-          if (showPosts) {
+          if (sidePosts) {
             const placePost = (i: number): void => {
               const [nx, ny, nz] = treadAnchor(i);
               addRail(new THREE.BoxGeometry(postT, handrailH, postT), nx, ny + handrailH / 2, nz);
@@ -459,14 +466,13 @@ export class StairBuilder {
         // length so interior corners close without visible miter gaps.
         const rl = computeRailPaths(stair, layout);
 
-        if (showPosts) {
-          for (const p of rl.posts) {
-            addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
-          }
+        for (const { position: p, side } of rl.posts) {
+          if (!(side === "inner" ? postsInner : postsOuter)) continue;
+          addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
         }
 
         if (showTopRail) {
-          for (const path of rl.paths) {
+          for (const { points: path } of rl.paths) {
             for (let i = 0; i + 1 < path.length; i++) {
               const a = path[i], b = path[i + 1];
               const segX = b.x - a.x, segY = b.y - a.y, segZ = b.z - a.z;

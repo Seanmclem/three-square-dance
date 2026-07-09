@@ -149,9 +149,10 @@ export function computeStairLayout(stair: StairDef): StairLayout {
 //   - Single flight + landing (balcony): both side rails continue onto the
 //     landing and wrap its three exposed edges; the entry edge stays open.
 
+export type RailSide = "inner" | "outer";
 export interface StairRailLayout {
-  paths: Vec3[][];   // polylines; consecutive points = one rail segment
-  posts: Vec3[];     // baluster/corner post base positions (deduped)
+  paths: { points: Vec3[]; side: RailSide }[];        // polylines; consecutive points = one rail segment
+  posts: { position: Vec3; side: RailSide }[];        // post base positions (deduped per side)
 }
 
 interface RailCfg {
@@ -179,9 +180,13 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   const stepRise = rise / numSteps;
   const stepDepth = run / numSteps;
 
+  // Landing perimeter rails (outer landing edges) are opt-in — real stairwells
+  // have walls there; without them the outer rail just stops at each landing.
+  const perimeter = r?.landingPerimeter ?? false;
+
   // Frame-space path points, converted to world at the end.
   type P = { u: number; v: number; y: number };
-  const paths: P[][] = [];
+  const paths: { pts: P[]; side: RailSide }[] = [];
 
   const uLow  = (k: number) => (k % 2 === 0 ? 0 : run);       // flight k's low-end boundary
   const uHigh = (k: number) => (k % 2 === 0 ? run : 0);       // flight k's high-end boundary
@@ -197,19 +202,23 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   };
 
   if (flightsCount === 1) {
-    // Balcony: each side rail continues onto the landing; one of them also
-    // spans the far edge, meeting the other at the shared far corner.
+    // Balcony. s = +1 is the turn side ("inner" for consistency), s = -1 outer.
+    // With perimeter ON each side rail continues onto the landing (one spans the
+    // far edge, meeting the other at the shared corner); OFF they stop at the edge.
     const lw = Math.max(width, stair.landing?.width ?? width);
     for (const s of [1, -1] as const) {
+      const side: RailSide = s === 1 ? "inner" : "outer";
       const vFlight  = s * (width / 2 - cfg.inset);
       const vLanding = s * (lw / 2 - cfg.inset);
       const pts: P[] = [freeEnd(vFlight), { u: run, v: vFlight, y: topY(0) }];
-      if (Math.abs(vLanding - vFlight) > 1e-6)
-        pts.push({ u: run, v: vLanding, y: topY(0) });          // lateral jog on a wider landing
-      pts.push({ u: run + D - cfg.inset, v: vLanding, y: topY(0) });
-      if (s === 1)                                               // far edge, once
-        pts.push({ u: run + D - cfg.inset, v: -(lw / 2 - cfg.inset), y: topY(0) });
-      paths.push(pts);
+      if (perimeter) {
+        if (Math.abs(vLanding - vFlight) > 1e-6)
+          pts.push({ u: run, v: vLanding, y: topY(0) });        // lateral jog on a wider landing
+        pts.push({ u: run + D - cfg.inset, v: vLanding, y: topY(0) });
+        if (s === 1)                                             // far edge, once
+          pts.push({ u: run + D - cfg.inset, v: -(lw / 2 - cfg.inset), y: topY(0) });
+      }
+      paths.push({ pts, side });
     }
   } else {
     // Rail v-lines per flight parity: inner hugs the void, outer hugs the perimeter.
@@ -222,18 +231,29 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
       inner.push({ u: uHigh(k), v: vInner(k + 1), y: topY(k) });   // level across the void edge
       // …and straight up flight k+1 (next loop iteration), or free end here on the top landing.
     }
-    paths.push(inner);
+    paths.push({ pts: inner, side: "inner" });
 
-    const outer: P[] = [freeEnd(vOuter(0))];
-    for (let k = 0; k < flightsCount; k++) {
-      const y = topY(k);
-      outer.push({ u: uHigh(k), v: vOuter(k),     y });   // arrive at landing k
-      outer.push({ u: uFar(k),  v: vOuter(k),     y });   // side edge along arriving flight's line
-      outer.push({ u: uFar(k),  v: vOuter(k + 1), y });   // far edge
-      outer.push({ u: uHigh(k), v: vOuter(k + 1), y });   // side edge onto next flight's line
-      // Top landing: this last vertex is the corner of the open exit edge — terminate.
+    if (perimeter) {
+      // One continuous outer path wrapping every landing's three outer edges.
+      const outer: P[] = [freeEnd(vOuter(0))];
+      for (let k = 0; k < flightsCount; k++) {
+        const y = topY(k);
+        outer.push({ u: uHigh(k), v: vOuter(k),     y });   // arrive at landing k
+        outer.push({ u: uFar(k),  v: vOuter(k),     y });   // side edge along arriving flight's line
+        outer.push({ u: uFar(k),  v: vOuter(k + 1), y });   // far edge
+        outer.push({ u: uHigh(k), v: vOuter(k + 1), y });   // side edge onto next flight's line
+        // Top landing: this last vertex is the corner of the open exit edge — terminate.
+      }
+      paths.push({ pts: outer, side: "outer" });
+    } else {
+      // Per-flight outer rails that stop at each landing boundary.
+      for (let k = 0; k < flightsCount; k++) {
+        const start: P = k === 0
+          ? freeEnd(vOuter(0))
+          : { u: uLow(k), v: vOuter(k), y: topY(k - 1) };
+        paths.push({ pts: [start, { u: uHigh(k), v: vOuter(k), y: topY(k) }], side: "outer" });
+      }
     }
-    paths.push(outer);
   }
 
   // ── Posts ──────────────────────────────────────────────────────────────────
@@ -241,16 +261,18 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   // (legacy rhythm: every Nth step + the top step); spaced posts on long
   // level runs. Deduped — paths share corners with themselves at zero-length
   // segments and with each other at the balcony far corner.
-  const posts: P[] = [];
+  const posts: { p: P; side: RailSide }[] = [];
   const seen = new Set<string>();
+  let curSide: RailSide = "inner";
   const addPost = (p: P): void => {
-    const key = `${Math.round(p.u * 500)}:${Math.round(p.v * 500)}:${Math.round(p.y * 500)}`;
+    const key = `${curSide}:${Math.round(p.u * 500)}:${Math.round(p.v * 500)}:${Math.round(p.y * 500)}`;
     if (seen.has(key)) return;
     seen.add(key);
-    posts.push(p);
+    posts.push({ p, side: curSide });
   };
 
-  for (const pts of paths) {
+  for (const { pts, side } of paths) {
+    curSide = side;
     for (const p of pts) addPost(p);
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i], b = pts[i + 1];
@@ -292,5 +314,8 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   }
 
   const toW = (p: P): Vec3 => frameToWorld(frame, p.u, p.v, p.y);
-  return { paths: paths.map(pts => pts.map(toW)), posts: posts.map(toW) };
+  return {
+    paths: paths.map(({ pts, side }) => ({ points: pts.map(toW), side })),
+    posts: posts.map(({ p, side }) => ({ position: toW(p), side })),
+  };
 }
