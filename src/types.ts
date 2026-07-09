@@ -557,6 +557,8 @@ export interface StairDef {
   riserMaterialOverrides?: MaterialOverrides;
   landingMaterial?:          string;            // landing slabs; absent → body material
   landingMaterialOverrides?: MaterialOverrides;
+  railingMaterial?:          string;            // rails/posts; absent → built-in metal grey
+  railingMaterialOverrides?: MaterialOverrides;
   csgCutter?:              StairCutterDef;
   groupIds?:               string[];
 }

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
+import type { StairRailBarrier } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
 import { computeStairLayout, computeRailPaths, frameToWorld, isPlainStair } from "@/builders/stairLayout";
@@ -401,6 +402,7 @@ export class StairBuilder {
     // ── Railings ─────────────────────────────────────────────────────────────
     // An open railing per side: a thin top rail following the slope, carried by
     // vertical balusters spaced up the run.
+    const railBarriers: StairRailBarrier[] = [];
     if (stair.hasRailing) {
       const r           = stair.railing;
       const showTopRail = r?.topRail   ?? true;
@@ -415,11 +417,26 @@ export class StairBuilder {
       const sideInset   = r?.sideInset ?? 0.1;         // inward offset from the step's side edge
       const overhang    = r?.overhang  ?? 0.15;        // top-rail extension past the end posts, each end
 
-      const railMat = new THREE.MeshStandardMaterial({
-        color: 0x9aabb8, roughness: 0.4, metalness: 0.4,
-      });
+      // Rail/post material — an authored material if set, else the built-in
+      // metal grey. Overrides clone (owned); a plain authored material is the
+      // shared cached instance (not owned); the built-in grey is owned.
+      const railMatId = stair.railingMaterial;
+      const railMatOvr = stair.railingMaterialOverrides;
+      let railMat: THREE.Material;
+      let railMatOwned: boolean;
+      if (railMatId) {
+        railMat = railMatOvr
+          ? await assetManager.getMaterialWithOverrides(railMatId, railMatOvr)
+              .catch(() => assetManager.getDefaultMaterial(0x9aabb8))
+          : await assetManager.getMaterial(railMatId)
+              .catch(() => assetManager.getDefaultMaterial(0x9aabb8));
+        railMatOwned = !!railMatOvr;
+      } else {
+        railMat = new THREE.MeshStandardMaterial({ color: 0x9aabb8, roughness: 0.4, metalness: 0.4 });
+        railMatOwned = true;
+      }
 
-      let ownsMat = true;
+      let ownsMat = railMatOwned;
       const addRail = (
         geo: THREE.BufferGeometry,
         x: number, y: number, z: number,
@@ -435,6 +452,30 @@ export class StairBuilder {
         } satisfies MeshUserData;
         ownsMat = false;
         meshes.push(mesh);
+      };
+
+      // A thin barrier wall under one rail run (A→B along the walking/anchor
+      // line), from the surface up to handrailH, so the character can't pass
+      // through the rail. `quat`/`yAxis` come from the same slope basis the
+      // visible rail uses; the wall is centered half a handrail height up
+      // along yAxis. Built regardless of the topRail/baluster visual toggles.
+      const railBarrierThk = Math.max(postT, railBarT);
+      const addBarrier = (
+        ax: number, ay: number, az: number,
+        bx: number, by: number, bz: number,
+        quat: THREE.Quaternion, yAxis: THREE.Vector3,
+      ): void => {
+        const len = Math.hypot(bx - ax, by - ay, bz - az);
+        if (len < 1e-6) return;
+        railBarriers.push({
+          center: {
+            x: (ax + bx) / 2 + yAxis.x * (handrailH / 2),
+            y: (ay + by) / 2 + yAxis.y * (handrailH / 2),
+            z: (az + bz) / 2 + yAxis.z * (handrailH / 2),
+          },
+          half: { x: len / 2, y: handrailH / 2, z: railBarrierThk / 2 },
+          quat: { x: quat.x, y: quat.y, z: quat.z, w: quat.w },
+        });
       };
 
       if (plain) {
@@ -485,6 +526,15 @@ export class StairBuilder {
               (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
             );
           }
+
+          // Collision barrier along the run (visual toggles don't affect it).
+          if (numSteps >= 2) {
+            const [ax, ay, az] = treadAnchor(0);
+            const [bx, by, bz] = treadAnchor(numSteps - 1);
+            const dl = Math.hypot(bx - ax, by - ay, bz - az) || 1;
+            const ex = ((bx - ax) / dl) * overhang, ey = ((by - ay) / dl) * overhang, ez = ((bz - az) / dl) * overhang;
+            addBarrier(ax - ex, ay - ey, az - ez, bx + ex, by + ey, bz + ez, slopeQuat, yAxis);
+          }
         }
       } else {
         // ── Path railing (Phase 29): continuous polylines over flights and
@@ -499,24 +549,25 @@ export class StairBuilder {
           addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
         }
 
-        if (showTopRail) {
-          for (const { points: path } of rl.paths) {
-            for (let i = 0; i + 1 < path.length; i++) {
-              const a = path[i], b = path[i + 1];
-              const segX = b.x - a.x, segY = b.y - a.y, segZ = b.z - a.z;
-              const len = Math.hypot(segX, segY, segZ);
-              if (len < 1e-6) continue;
-              const xAxis = new THREE.Vector3(segX, segY, segZ).normalize();
-              const zAxis = new THREE.Vector3(-segZ, 0, segX).normalize();   // horizontal side
-              const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-              const quat = new THREE.Quaternion().setFromRotationMatrix(
-                new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
-              );
+        for (const { points: path } of rl.paths) {
+          for (let i = 0; i + 1 < path.length; i++) {
+            const a = path[i], b = path[i + 1];
+            const segX = b.x - a.x, segY = b.y - a.y, segZ = b.z - a.z;
+            const len = Math.hypot(segX, segY, segZ);
+            if (len < 1e-6) continue;
+            const xAxis = new THREE.Vector3(segX, segY, segZ).normalize();
+            const zAxis = new THREE.Vector3(-segZ, 0, segX).normalize();   // horizontal side
+            const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+            const quat = new THREE.Quaternion().setFromRotationMatrix(
+              new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
+            );
+            if (showTopRail) {
               addRail(
                 new THREE.BoxGeometry(len + railBarT, railBarT, railBarT),
                 (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
               );
             }
+            addBarrier(a.x, a.y, a.z, b.x, b.y, b.z, quat, yAxis);
           }
         }
       }
@@ -551,6 +602,7 @@ export class StairBuilder {
     }
 
     const colliders = ColliderBuilder.registerStairSteps(stair);
+    if (railBarriers.length) colliders.push(...ColliderBuilder.registerStairRailings(railBarriers));
     return { meshes, colliders };
   }
 }

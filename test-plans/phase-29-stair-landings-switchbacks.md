@@ -98,3 +98,17 @@ rejections from CDP-driven preview entry (documented in TESTING.md).
   absent → body material. Landing slabs are their own selectable mesh, emitted
   only when landings exist (plain stairs unchanged: two meshes). Panel:
   LANDING MaterialSection appears when a landing is set. Typecheck clean.
+
+## Addendum — v4.23.3 (railing colliders + material)
+
+- **Colliders**: toggling `hasRailing` on a 4-flight stair moved the collider
+  count 60↔72 → 12 barrier walls registered and cleaned up on rebuild. Built
+  via the same `createStaticCollider` cuboid path as walls/steps/landings, from
+  the same slope basis as the visible rails. Live walk-through NOT cleanly
+  demonstrated — the console real-time input harness produced non-physical
+  speeds (70+ m/s teleport-slide, player clips/falls regardless of collision),
+  so blocking rests on byte-identical construction to the world's other
+  proven-blocking static colliders. (Re-verify with a real hand walk-through.)
+- **Material**: `railingMaterial: "brick_01"` → rails/posts render as thin
+  brick bars (screenshot); absent → built-in metal grey. RAILING MaterialSection
+  shows in the panel when `hasRailing`. Typecheck clean.

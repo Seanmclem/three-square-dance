@@ -3,7 +3,14 @@ import * as THREE from "three";
 import { physicsWorld } from "./PhysicsWorld";
 import { colliderWorldTransform } from "./attachedColliderMath";
 import { computeStairLayout, frameToWorld } from "@/builders/stairLayout";
-import type { WallDef, Vec2, PlatformDef, StairDef, ShapeDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
+import type { WallDef, Vec2, Vec3, PlatformDef, StairDef, ShapeDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
+
+/** One oriented barrier-wall descriptor under a stair rail run (see registerStairRailings). */
+export interface StairRailBarrier {
+  center: Vec3;
+  half:   Vec3;                                   // half-extents: along-seg / handrail height / thickness
+  quat:   { x: number; y: number; z: number; w: number };
+}
 
 export class ColliderBuilder {
   static registerFloor(
@@ -162,6 +169,22 @@ export class ColliderBuilder {
       colliders.push(physicsWorld.createStaticCollider(desc));
     }
     return colliders;
+  }
+
+  /**
+   * Thin barrier walls under each railing run so characters can't walk through
+   * the rails. One oriented cuboid per rail segment: half-extents are local
+   * (along-segment, perpendicular-up = handrail height, side thickness), and
+   * the quaternion maps that local frame to world (same basis the visible rail
+   * mesh uses). Built by StairBuilder, which owns the rail geometry.
+   */
+  static registerStairRailings(barriers: StairRailBarrier[]): RAPIER.Collider[] {
+    return barriers.map((b) => {
+      const desc = RAPIER.ColliderDesc.cuboid(b.half.x, b.half.y, b.half.z)
+        .setTranslation(b.center.x, b.center.y, b.center.z)
+        .setRotation(b.quat);
+      return physicsWorld.createStaticCollider(desc);
+    });
   }
 
   static registerDoorSensor(wall: WallDef, opening: Opening, elevation: number, start: Vec2, end: Vec2): RAPIER.Collider {
