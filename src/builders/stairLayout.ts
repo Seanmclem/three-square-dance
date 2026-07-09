@@ -288,9 +288,25 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     posts.push({ p, side: curSide });
   };
 
+  // Posts at a rail's free END tuck inward along the last segment, so the
+  // post sits under the bar's full section instead of poking past the tip.
+  const endPostInset = postT / 2 + 0.3 * (r?.barThickness ?? 0.1);
+  const pullIn = (p: P, toward: P): P => {
+    const du = toward.u - p.u, dv = toward.v - p.v, dy = toward.y - p.y;
+    const d = Math.hypot(du, dv, dy);
+    if (d < endPostInset * 2) return p;   // too short to pull into
+    const t = endPostInset / d;
+    return { u: p.u + du * t, v: p.v + dv * t, y: p.y + dy * t };
+  };
+
   for (const { pts, side, freeStart } of paths) {
     curSide = side;
-    for (let i = freeStart ? 1 : 0; i < pts.length; i++) addPost(pts[i]);
+    for (let i = freeStart ? 1 : 0; i < pts.length; i++) {
+      let p = pts[i];
+      if (pts.length >= 2 && i === pts.length - 1) p = pullIn(p, pts[i - 1]);
+      else if (pts.length >= 2 && i === 0)         p = pullIn(p, pts[1]);
+      addPost(p);
+    }
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i], b = pts[i + 1];
       const horiz = Math.hypot(b.u - a.u, b.v - a.v);
