@@ -54,10 +54,17 @@ export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps
     <div
       onClick={advance}
       style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
+        // Floating box near the bottom — centered with side margins (never
+        // edge-to-edge), lifted off the bottom edge + touch safe-area.
+        position: "absolute",
+        bottom: "calc(40px + env(safe-area-inset-bottom, 0px))",
+        left: "50%", transform: "translateX(-50%)",
+        width: "min(720px, calc(100% - 64px))",
         background: "rgba(10,10,20,0.92)",
-        borderTop: "1px solid rgba(255,255,255,0.12)",
-        padding: "20px 32px 24px",
+        border: "1px solid rgba(255,255,255,0.12)",
+        borderRadius: 10,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
+        padding: "18px 24px 20px",
         cursor: "pointer",
         zIndex: 100,
         display: "flex", gap: 20, alignItems: "flex-start",
