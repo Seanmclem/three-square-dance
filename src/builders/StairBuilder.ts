@@ -416,6 +416,7 @@ export class StairBuilder {
       const stepEvery   = Math.max(1, Math.round(r?.stepInterval ?? 1));
       const sideInset   = r?.sideInset ?? 0.1;         // inward offset from the step's side edge
       const overhang    = r?.overhang  ?? 0.15;        // top-rail extension past the end posts, each end
+      const endAngle    = ((r?.overhangAngle ?? 0) * Math.PI) / 180;   // droop of the rail-end return below its run (0 = flat)
 
       // Rail/post material — an authored material if set, else the built-in
       // metal grey. Overrides clone (owned); a plain authored material is the
@@ -478,6 +479,33 @@ export class StairBuilder {
         });
       };
 
+      // Render one top-rail bar between two ABSOLUTE world points (already at
+      // rail height — unlike the main-segment path which adds handrailH).
+      const addRailSeg = (a: THREE.Vector3, b: THREE.Vector3): void => {
+        const seg = new THREE.Vector3().subVectors(b, a);
+        const len = seg.length();
+        if (len < 1e-6) return;
+        const xAxis = seg.clone().normalize();
+        const zAxis = new THREE.Vector3(-seg.z, 0, seg.x).normalize();
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+        const quat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+        addRail(new THREE.BoxGeometry(len + railBarT, railBarT, railBarT),
+          (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, quat);
+      };
+
+      // A downward "return" at a free rail end: from the rail endpoint `end`
+      // (already at rail height), continue in the run's horizontal direction
+      // (from `prev`→`end`) but drooping by `endAngle`, for `overhang` length —
+      // so the handrail curls down instead of jutting out. No-op when flat.
+      const addEndReturn = (prev: THREE.Vector3, end: THREE.Vector3): void => {
+        if (endAngle <= 1e-4) return;
+        const h = new THREE.Vector3(end.x - prev.x, 0, end.z - prev.z);
+        if (h.lengthSq() < 1e-8) return;
+        h.normalize();
+        const dir = new THREE.Vector3(h.x * Math.cos(endAngle), -Math.sin(endAngle), h.z * Math.cos(endAngle));
+        addRailSeg(end, end.clone().addScaledVector(dir, overhang));
+      };
+
       if (plain) {
         // ── Legacy single-flight railing (pre-Phase-29, unchanged) ──────────
         // Orthonormal basis aligned to the slope:
@@ -520,11 +548,20 @@ export class StairBuilder {
           if (showTopRail && numSteps >= 2) {
             const [ax, ay, az] = treadAnchor(0);
             const [bx, by, bz] = treadAnchor(numSteps - 1);
-            const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
-            addRail(
-              new THREE.BoxGeometry(len, railBarT, railBarT),
-              (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
-            );
+            if (endAngle > 1e-4) {
+              // Rail runs anchor→anchor; the ends droop down instead of a flat overhang.
+              const A = new THREE.Vector3(ax, ay + handrailH, az);
+              const B = new THREE.Vector3(bx, by + handrailH, bz);
+              addRailSeg(A, B);
+              addEndReturn(A, B);   // top end continues uphill + down
+              addEndReturn(B, A);   // bottom end continues downhill + down
+            } else {
+              const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
+              addRail(
+                new THREE.BoxGeometry(len, railBarT, railBarT),
+                (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
+              );
+            }
           }
 
           // Collision barrier along the run (visual toggles don't affect it).
@@ -568,6 +605,12 @@ export class StairBuilder {
               );
             }
             addBarrier(a.x, a.y, a.z, b.x, b.y, b.z, quat, yAxis);
+          }
+          // Drooping returns at this run's two free ends (rail-height points).
+          if (showTopRail && endAngle > 1e-4 && path.length >= 2) {
+            const rh = (p: typeof path[0]) => new THREE.Vector3(p.x, p.y + handrailH, p.z);
+            addEndReturn(rh(path[1]), rh(path[0]));                                   // start end
+            addEndReturn(rh(path[path.length - 2]), rh(path[path.length - 1]));       // terminal end
           }
         }
       }
