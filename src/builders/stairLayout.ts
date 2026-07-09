@@ -139,9 +139,11 @@ export function computeStairLayout(stair: StairDef): StairLayout {
 // (u = low end, y = flight base) to (u = high end, y = flight top), so sloped
 // segments meet the landings' level segments perfectly at the corners.
 //
-//   - Inner path (around the void): up flight k on the void side → level
-//     across the landing's void-edge → up flight k+1 → … → free end after the
-//     top landing's crossing.
+//   - Inner path (around the void): up flight k on the void side → the rail
+//     levels out at the landing edge and eases a short horizontal run onto the
+//     landing → level across behind the void → ease back → up flight k+1 → …
+//     → free end after the top landing's crossing. The ease keeps every bend
+//     planar so rail miters always line up.
 //   - Outer path: up flight k's outer side → level around the landing's three
 //     outer perimeter edges (the last leg lies on flight k+1's outer rail
 //     line) → up flight k+1 → … → terminates at the top landing's open exit
@@ -226,11 +228,20 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     const vInner = (k: number) => (k % 2 === 0 ? width / 2 - cfg.inset : off - width / 2 + cfg.inset);
     const vOuter = (k: number) => (k % 2 === 0 ? -width / 2 + cfg.inset : off + width / 2 - cfg.inset);
 
+    // The diagonal levels out at the landing edge and eases a short horizontal
+    // run onto the landing before turning, so every bend is planar (flat 90°s
+    // and same-heading slope→level) — 3D bends never appear and corner miters
+    // always line up.
+    const ease = Math.min(0.3, D * 0.4);
     const inner: P[] = [freeEnd(vInner(0))];
     for (let k = 0; k < flightsCount; k++) {
-      inner.push({ u: uHigh(k), v: vInner(k),     y: topY(k) });   // arrive at landing k
-      inner.push({ u: uHigh(k), v: vInner(k + 1), y: topY(k) });   // level across the void edge
-      // …and straight up flight k+1 (next loop iteration), or free end here on the top landing.
+      const uE = uHigh(k) + (k % 2 === 0 ? ease : -ease);            // into the landing
+      inner.push({ u: uHigh(k), v: vInner(k),     y: topY(k) });     // slope levels out at landing k
+      inner.push({ u: uE,       v: vInner(k),     y: topY(k) });     // horizontal ease onto the landing
+      inner.push({ u: uE,       v: vInner(k + 1), y: topY(k) });     // level across behind the void
+      if (k + 1 < flightsCount)
+        inner.push({ u: uHigh(k), v: vInner(k + 1), y: topY(k) });   // ease back to flight k+1's start
+      // …then straight up flight k+1, or free end after the crossing on the top landing.
     }
     paths.push({ pts: inner, side: "inner", freeStart: true });
 

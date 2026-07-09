@@ -575,15 +575,25 @@ export class StairBuilder {
         }
 
         // One rail bar between two lifted path vertices, built in world space
-        // around the segment midpoint (mesh gets no rotation). Each end is a
-        // chamfered free tip (both tip corners clipped 45°) or a miter cut on
-        // the bisector plane with the adjacent segment's direction `adj`.
+        // around the segment midpoint (mesh gets no rotation). End kinds:
+        //   free  — chamfered tip (both tip corners clipped 45°)
+        //   miter — bisector-plane cut shared with the adjacent bar; only used
+        //           when the sections actually match on that plane (planar bends)
+        //   run   — level bar runs straight through a 3D corner: extend railH
+        //           past the vertex, square end (its own clean piece)
+        //   butt  — sloped bar dies into the through-running level bar: vertical
+        //           cut flush with that bar's side face (railH back, horizontally)
+        type BarEnd =
+          | { kind: "free" }
+          | { kind: "miter"; adj: THREE.Vector3 }
+          | { kind: "run" }
+          | { kind: "butt" };
         const chamf = 0.3 * railBarT;
         const railH = railBarT / 2;
         const railBar = (
           a: THREE.Vector3, b: THREE.Vector3,
           xAxis: THREE.Vector3, yAxis: THREE.Vector3, zAxis: THREE.Vector3,
-          adjA: THREE.Vector3 | null, adjB: THREE.Vector3 | null,
+          endA: BarEnd, endB: BarEnd,
         ): THREE.BufferGeometry => {
           const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
           const len = a.distanceTo(b);
@@ -595,33 +605,61 @@ export class StairBuilder {
               .addScaledVector(yAxis, sy * yr)
               .addScaledVector(zAxis, sz * railH)
               .sub(mid);
-          const addEnd = (v: THREE.Vector3, adj: THREE.Vector3 | null, inward: 1 | -1): void => {
-            if (adj) {
-              const n = new THREE.Vector3().addVectors(xAxis, adj);
+          const secOffset = (sy: number, sz: number): THREE.Vector3 => new THREE.Vector3()
+            .addScaledVector(yAxis, sy * railH).addScaledVector(zAxis, sz * railH);
+          const addEnd = (v: THREE.Vector3, end: BarEnd, inward: 1 | -1): void => {
+            if (end.kind === "miter") {
+              const n = new THREE.Vector3().addVectors(xAxis, end.adj);
               const nd = n.lengthSq() > 1e-8 ? n.normalize().dot(xAxis) : 0;
               if (Math.abs(nd) > 1e-4) {
                 // Long edges v+o+t·x̂ cut by the plane through v with normal n.
                 for (const sy of [1, -1]) for (const sz of [1, -1]) {
-                  const o = new THREE.Vector3()
-                    .addScaledVector(yAxis, sy * railH).addScaledVector(zAxis, sz * railH);
+                  const o = secOffset(sy, sz);
                   pts.push(at(v, -n.dot(o) / nd, sy, sz));
                 }
                 return;
               }
+              // degenerate 180° bend → square cut below
+            } else if (end.kind === "butt") {
+              const H  = new THREE.Vector3(xAxis.x, 0, xAxis.z);
+              const hx = H.length();
+              if (hx > 1e-6) {
+                H.divideScalar(hx);
+                // Vertical plane through v + inward·railH·Ĥ with normal Ĥ.
+                for (const sy of [1, -1]) for (const sz of [1, -1]) {
+                  const o = secOffset(sy, sz);
+                  pts.push(at(v, (inward * railH - o.dot(H)) / xAxis.dot(H), sy, sz));
+                }
+                return;
+              }
             }
-            const tip = !adj && len >= 3 * chamf;   // chamfered free tip (square when too short)
+            const tip = end.kind === "free" && len >= 3 * chamf;   // square when too short
+            const dx0 = end.kind === "run" ? -inward * railH : 0;
             for (const sy of [1, -1]) for (const sz of [1, -1]) {
               if (tip) {
                 pts.push(at(v, 0, sy, sz, railH - chamf));   // small end face
                 pts.push(at(v, inward * chamf, sy, sz));     // full-section shoulder
               } else {
-                pts.push(at(v, 0, sy, sz));
+                pts.push(at(v, dx0, sy, sz));
               }
             }
           };
-          addEnd(a, adjA, 1);
-          addEnd(b, adjB, -1);
+          addEnd(a, endA, 1);
+          addEnd(b, endB, -1);
           return new ConvexGeometry(pts);
+        };
+
+        // A corner is mitered only when the two bars' sections line up on the
+        // bisector plane: both level (plan bend) or same horizontal heading
+        // (slope→level bend in a vertical plane). At 3D corners (heading turns
+        // while sloped — the void crossings) the pieces separate instead: the
+        // level bar runs through, the sloped bar butts into its side.
+        const EPS = 1e-6;
+        const planarBend = (d1: THREE.Vector3, d2: THREE.Vector3): boolean => {
+          if (Math.abs(d1.y) < EPS && Math.abs(d2.y) < EPS) return true;
+          const cross = d1.x * d2.z - d1.z * d2.x;
+          const dot   = d1.x * d2.x + d1.z * d2.z;
+          return Math.abs(cross) < EPS && dot > 0;
         };
 
         for (const { points: path } of rl.paths) {
@@ -646,12 +684,16 @@ export class StairBuilder {
               new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
             );
             if (showTopRail) {
+              const endOf = (adjIdx: number): BarEnd => {
+                if (adjIdx < 0 || adjIdx >= segs.length) return { kind: "free" };
+                const adj = segs[adjIdx].dir;
+                if (planarBend(dir, adj)) return { kind: "miter", adj };
+                return Math.abs(dir.y) < EPS ? { kind: "run" } : { kind: "butt" };
+              };
               const up = new THREE.Vector3(0, handrailH, 0);
               const geo = railBar(
                 new THREE.Vector3().copy(a).add(up), new THREE.Vector3().copy(b).add(up),
-                xAxis, yAxis, zAxis,
-                i > 0 ? segs[i - 1].dir : null,
-                i < segs.length - 1 ? segs[i + 1].dir : null,
+                xAxis, yAxis, zAxis, endOf(i - 1), endOf(i + 1),
               );
               addRail(geo, (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2);
             }
