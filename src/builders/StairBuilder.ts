@@ -585,11 +585,12 @@ export class StairBuilder {
               new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
             );
             if (showTopRail) {
-              // Free path ends (no adjacent segment) get the chamfered tip —
-              // sloped or level (e.g. the inner rail's top-landing crossing);
-              // mitered interior corners stay square.
+              // Every bar end gets the chamfered tip — free ends and the
+              // +barT/2 corner stubs alike (the stubs protrude past the joint
+              // and read as square ends otherwise). The full-thickness overlap
+              // still closes the corner.
               addRail(
-                railBarGeo(len + railBarT, i === 0, i === path.length - 2),
+                railBarGeo(len + railBarT, true, true),
                 (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
               );
             }
