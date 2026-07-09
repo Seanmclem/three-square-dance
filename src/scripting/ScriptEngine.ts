@@ -235,6 +235,12 @@ export class ScriptEngine {
         });
         break;
 
+      case "load_scene":
+        // Cross-scene routing (runtime shell). Only the runtime's SceneRouter
+        // listens — in editor preview this is a deliberate no-op.
+        if (action.sceneId) this._bus.emit("scene:load-request", { sceneId: action.sceneId });
+        break;
+
       case "teleport_player": {
         // Destination: literal position, or a stored Vec3/pose via positionKey (overrides).
         let dest: Vec3 | undefined = action.position;

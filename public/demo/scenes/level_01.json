@@ -128,6 +128,26 @@
       ],
       "triggerVolumes": [
         {
+          "id": "l1_portal",
+          "label": "Portal to Level 2",
+          "position": { "x": 0, "y": 1, "z": -3.5 },
+          "size": { "x": 2, "y": 2, "z": 1.5 },
+          "zoneId": "l1",
+          "visual": { "enabled": true, "style": "gradient", "color": "#5a3d8f", "fadeDir": "up", "opacity": 0.5, "fadeHeight": 1, "animate": true },
+          "scripts": [
+            {
+              "id": "l1_script_portal",
+              "label": "To Level 2",
+              "zoneId": "l1",
+              "enabled": true,
+              "trigger": { "type": "on_player_enter" },
+              "conditions": [],
+              "actions": [{ "type": "load_scene", "sceneId": "level_02" }],
+              "oneShot": false
+            }
+          ]
+        },
+        {
           "id": "l1_greeter",
           "label": "Greeter",
           "position": { "x": 0, "y": 1, "z": 0 },

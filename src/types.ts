@@ -217,6 +217,7 @@ export interface BusEvents {
   "scene:load":            { json: unknown };
   "scene:saved":           { json: SceneFile };
   "scene:loaded":          { metadata: SceneMetadata };
+  "scene:load-request":    { sceneId: string };   // load_scene action → runtime SceneRouter (no editor listener)
   "world:loaded":          { metadata: SceneMetadata };
   "materials:loaded":      { materials: MaterialDef[] };
   "quality:changed":       { quality: QualityScale };
@@ -764,7 +765,8 @@ export type ActionType =
   | 'fade_screen'
   | 'teleport_player'
   | 'show_ui'
-  | 'run_script';
+  | 'run_script'
+  | 'load_scene';
 
 // ─── Generic gameplay state ───────────────────────────────────────────────────
 
@@ -830,6 +832,7 @@ export interface ScriptAction {
   fadeDuration?: number;
   uiElementId?:  string;
   script?:       string;
+  sceneId?:      string;      // load_scene: runtime-manifest scene key (not validated in the editor)
 }
 
 export interface ScriptDef {

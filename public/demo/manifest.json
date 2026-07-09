@@ -7,7 +7,8 @@
   "author": "SquareDance",
   "entryScene": "level_01",
   "scenes": {
-    "level_01": "scenes/level_01.json"
+    "level_01": "scenes/level_01.json",
+    "level_02": "scenes/level_02.json"
   },
   "assetsBase": "/"
 }

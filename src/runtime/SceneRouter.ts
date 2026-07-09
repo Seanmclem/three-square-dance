@@ -33,7 +33,13 @@ export class SceneRouter {
   private _transitioning = false;
   private _offLoadRequest: (() => void) | null = null;
 
-  constructor(private readonly deps: SceneRouterDeps) {}
+  constructor(private readonly deps: SceneRouterDeps) {
+    // load_scene script action → route. Unknown ids are non-fatal: log and
+    // stay in the current scene (go() throws before any teardown).
+    this._offLoadRequest = deps.bus.on("scene:load-request", ({ sceneId }) => {
+      void this.go(sceneId);
+    });
+  }
 
   get currentSceneId(): string | null { return this._currentSceneId; }
   /** True while go() is mid-teardown/build — preview:stop during a transition
@@ -43,12 +49,20 @@ export class SceneRouter {
   async go(sceneId: string, opts?: { newGame?: boolean; resume?: boolean }): Promise<void> {
     // A portal volume can fire load_scene twice before teardown starts.
     if (this._transitioning) return;
-    this._transitioning = true;
     const { bus, world, zones, preview, scriptEngine, manifest } = this.deps;
 
+    // Resolve BEFORE any teardown: an unknown scene id (authored free-text in
+    // the editor) is non-fatal — log it and stay in the current scene.
+    let targetUrl: URL;
     try {
-      const targetUrl = manifest.sceneUrl(sceneId); // throws on unknown id, before any teardown
+      targetUrl = manifest.sceneUrl(sceneId);
+    } catch (err) {
+      console.error(`SceneRouter: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
 
+    this._transitioning = true;
+    try {
       this.deps.onLoading?.();
       if (preview.isActive) {
         bus.emit("overlay:fade-in", { color: "#000000", duration: 0.3 });

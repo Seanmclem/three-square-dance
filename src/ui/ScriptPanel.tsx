@@ -136,6 +136,7 @@ const ACTION_TYPES: ActionType[] = [
   "despawn_object",
   "fade_screen",
   "fire_event",
+  "load_scene",
   "move_object",
   "open_door",
   "play_animation",
@@ -1612,6 +1613,24 @@ function ActionFields({
           value={action.eventId ?? ""}
           onChange={(e) => set({ eventId: e.target.value })}
         />
+      );
+
+    case "load_scene":
+      // Cross-scene routing for the runtime shell. The scene id is a key of
+      // the runtime manifest, which doesn't exist at author time — free text,
+      // not validated here. No-op in editor preview.
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <input
+            style={S.field}
+            placeholder="Scene id (runtime manifest key)"
+            value={action.sceneId ?? ""}
+            onChange={(e) => set({ sceneId: e.target.value })}
+          />
+          <div style={{ fontSize: 10, color: "#5f7090" }}>
+            Runtime only — must match a scene key in the game&apos;s manifest. Not validated here.
+          </div>
+        </div>
       );
 
     case "despawn_object":

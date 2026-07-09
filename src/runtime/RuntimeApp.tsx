@@ -123,7 +123,7 @@ export default function RuntimeApp() {
       g.__scene = scene.scene; g.__camera = scene.camera; g.__renderer = scene.renderer;
       g.__world = world; g.__zones = zones; g.__bus = bus;
       g.__scriptEngine = scriptEngine; g.__preview = preview; g.__gameState = gameState;
-      g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, router: null, manifest: null };
+      g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, physicsWorld, router: null, manifest: null };
       // Dynamic import: testHelpers statically imports @/editor/bakeShapes —
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.
       void import("@/dev/testHelpers").then(({ installTestHelpers }) =>

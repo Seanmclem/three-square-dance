@@ -43,8 +43,19 @@ export class PhysicsWorld {
     return this._world.createCollider(desc, body);
   }
 
-  removeCollider(collider: RAPIER.Collider): void { this._world.removeCollider(collider, true); }
-  removeRigidBody(body: RAPIER.RigidBody):   void { this._world.removeRigidBody(body); }
+  removeCollider(collider: RAPIER.Collider): void {
+    const parent = collider.parent();
+    this._world.removeCollider(collider, true);
+    // createStaticCollider/createSensorCollider allocate a dedicated fixed
+    // body per collider — remove it once empty, or every zone unload leaks
+    // one body per collider (compounds per runtime scene transition).
+    if (parent && parent.numColliders() === 0) this._world.removeRigidBody(parent);
+  }
+  removeRigidBody(body: RAPIER.RigidBody): void {
+    // Idempotent: the body may already be gone via removeCollider's empty-
+    // parent cleanup (e.g. CharacterBody.dispose removes collider then body).
+    if (body.isValid()) this._world.removeRigidBody(body);
+  }
 
   dispose(): void {
     if (this._initialized) {
