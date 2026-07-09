@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairUndersideMode, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
+  PlatformDef, StairDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
@@ -1802,6 +1802,12 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [railOverhang,  setRailOverhang]  = useState(String(stair?.railing?.overhang      ?? 0.15));
   const [undersideMode, setUndersideMode] = useState<StairUndersideMode>(stair?.underside?.mode ?? "open");
   const [undersideThk,  setUndersideThk]  = useState(String(stair?.underside?.thickness ?? 0.25));
+  const [hasLanding,  setHasLanding]  = useState(!!(stair?.landing));
+  const [landDepth,   setLandDepth]   = useState(String(stair?.landing?.depth ?? stair?.width ?? 2.5));
+  const [landWidth,   setLandWidth]   = useState(stair?.landing?.width != null ? String(stair.landing.width) : "");
+  const [flightsStr,  setFlightsStr]  = useState(String(stair?.flights ?? 1));
+  const [turnDir,     setTurnDir]     = useState<StairTurn>(stair?.turn ?? "left");
+  const [gapStr,      setGapStr]      = useState(String(stair?.gap ?? 0.2));
   const [linked,      setLinked]      = useState(false);
   const [hasCutter,   setHasCutter]   = useState(!!(stair?.csgCutter));
   const [cutW,  setCutW]  = useState(String(stair?.csgCutter?.width  ?? stair?.width ?? 2.5));
@@ -1830,6 +1836,12 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setRailOverhang(String(stair.railing?.overhang ?? 0.15));
     setUndersideMode(stair.underside?.mode ?? "open");
     setUndersideThk(String(stair.underside?.thickness ?? 0.25));
+    setHasLanding(!!(stair.landing));
+    setLandDepth(String(stair.landing?.depth ?? stair.width));
+    setLandWidth(stair.landing?.width != null ? String(stair.landing.width) : "");
+    setFlightsStr(String(stair.flights ?? 1));
+    setTurnDir(stair.turn ?? "left");
+    setGapStr(String(stair.gap ?? 0.2));
     setLinked(false);
     setHasCutter(!!(stair.csgCutter));
     setCutW(String(stair.csgCutter?.width  ?? stair.width));
@@ -1945,6 +1957,51 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     onObjectUpdate({ underside: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
   };
   const commitUndersideThk = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateUnderside({ thickness: n }); };
+
+  // ── Landing & flights (Phase 29) ────────────────────────────────────────────
+  // A landing at the top of every flight; flights > 1 = switchback stairwell.
+  // Flights require a landing: enabling flights auto-adds one, removing the
+  // landing resets flights to 1 (single update → single undo step).
+  const curLanding = () => stair.landing ?? { depth: stair.width };
+  const toggleLanding = (checked: boolean) => {
+    setHasLanding(checked);
+    if (checked) {
+      const d = parseFloat(landDepth) > 0 ? parseFloat(landDepth) : stair.width;
+      setLandDepth(String(d));
+      const w = parseFloat(landWidth);
+      onObjectUpdate({ landing: { depth: d, ...(Number.isFinite(w) && w > 0 ? { width: w } : {}) } } as unknown as Partial<WorldObject>);
+    } else {
+      setFlightsStr("1");
+      onObjectUpdate({ landing: undefined, flights: 1 } as unknown as Partial<WorldObject>);
+    }
+  };
+  const commitLandDepth = (val: string) => {
+    const n = parseFloat(val);
+    if (!Number.isFinite(n) || n <= 0 || !stair.landing) return;
+    onObjectUpdate({ landing: { ...curLanding(), depth: n } } as unknown as Partial<WorldObject>);
+  };
+  const commitLandWidth = (val: string) => {
+    if (!stair.landing) return;
+    const n = parseFloat(val);
+    const { width: _omit, ...rest } = curLanding();
+    onObjectUpdate({
+      landing: Number.isFinite(n) && n > 0 ? { ...rest, width: n } : rest,
+    } as unknown as Partial<WorldObject>);
+  };
+  const commitFlights = (val: string) => {
+    const n = Math.round(parseFloat(val));
+    if (!Number.isFinite(n) || n < 1) return;
+    const patch: Record<string, unknown> = { flights: n };
+    if (n > 1 && !stair.landing) {
+      setHasLanding(true);
+      const d = parseFloat(landDepth) > 0 ? parseFloat(landDepth) : stair.width;
+      setLandDepth(String(d));
+      patch.landing = { depth: d };
+    }
+    onObjectUpdate(patch as unknown as Partial<WorldObject>);
+  };
+  const commitTurn = (t: StairTurn) => { setTurnDir(t); onObjectUpdate({ turn: t } as unknown as Partial<WorldObject>); };
+  const commitGap = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) onObjectUpdate({ gap: n } as unknown as Partial<WorldObject>); };
 
   const commitCutter = (field: "width" | "depth" | "height", val: string) => {
     const n = parseFloat(val);
@@ -2176,6 +2233,85 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               onBlur={e => flush(() => commitUndersideThk(e.target.value))}
               onKeyDown={e => { if (e.key === "Enter") flush(() => commitUndersideThk((e.target as HTMLInputElement).value)); }}
             />
+          </div>
+        )}
+      </div>
+
+      {/* Landing & flights */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={hasLanding} onChange={e => toggleLanding(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: hasLanding ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>LANDING &amp; FLIGHTS</span>
+        </label>
+        {hasLanding && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>LANDING DEPTH</div>
+                <input type="number" step={0.5} min={0.5} value={landDepth} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setLandDepth(e.target.value); schedule(() => commitLandDepth(e.target.value)); }}
+                  onBlur={e => flush(() => commitLandDepth(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitLandDepth((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              {(stair.flights ?? 1) <= 1 ? (
+                <div>
+                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>LANDING WIDTH</div>
+                  <input type="number" step={0.5} min={0} value={landWidth} placeholder="auto" style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                    onChange={e => { setLandWidth(e.target.value); schedule(() => commitLandWidth(e.target.value)); }}
+                    onBlur={e => flush(() => commitLandWidth(e.target.value))}
+                    onKeyDown={e => { if (e.key === "Enter") flush(() => commitLandWidth((e.target as HTMLInputElement).value)); }}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>VOID GAP</div>
+                  <input type="number" step={0.1} min={0} value={gapStr} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                    onChange={e => { setGapStr(e.target.value); schedule(() => commitGap(e.target.value)); }}
+                    onBlur={e => flush(() => commitGap(e.target.value))}
+                    onKeyDown={e => { if (e.key === "Enter") flush(() => commitGap((e.target as HTMLInputElement).value)); }}
+                  />
+                </div>
+              )}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>FLIGHTS</div>
+                <input type="number" step={1} min={1} value={flightsStr} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+                  onChange={e => { setFlightsStr(e.target.value); schedule(() => commitFlights(e.target.value)); }}
+                  onBlur={e => flush(() => commitFlights(e.target.value))}
+                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitFlights((e.target as HTMLInputElement).value)); }}
+                />
+              </div>
+              {(stair.flights ?? 1) > 1 && (
+                <div>
+                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>TURN</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {([["left","Left"],["right","Right"]] as const).map(([t, lbl]) => {
+                      const isCurrent = t === turnDir;
+                      return (
+                        <button key={t} disabled={isCurrent}
+                          onClick={() => commitTurn(t)}
+                          style={{
+                            flex: 1, padding: "4px 0", borderRadius: 4,
+                            cursor: isCurrent ? "default" : "pointer",
+                            fontFamily: "monospace", fontSize: 10, border: "none",
+                            background: isCurrent ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.6)",
+                            color: isCurrent ? "#80aaff" : "#9a9a9a",
+                            outline: isCurrent ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                          }}
+                        >{lbl}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            {(stair.flights ?? 1) > 1 && (
+              <div style={{ color: "#404050", fontSize: 9 }}>
+                Steps &amp; rise are per flight · Top Y: {(stair.start.y + (stair.flights ?? 1) * rise).toFixed(2)} m · Total rise: {((stair.flights ?? 1) * rise).toFixed(2)} m
+              </div>
+            )}
           </div>
         )}
       </div>
