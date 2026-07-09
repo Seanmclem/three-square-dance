@@ -46,7 +46,16 @@ export class SceneRouter {
    *  must not bounce the shell back to the menu. */
   get transitioning(): boolean { return this._transitioning; }
 
-  async go(sceneId: string, opts?: { newGame?: boolean; resume?: boolean }): Promise<void> {
+  async go(
+    sceneId: string,
+    opts?: {
+      newGame?: boolean;
+      resume?: boolean;
+      /** Continue-from-save: one-shots + pose from the runtime save blob
+       *  (state is restored by the caller before go(), values survive). */
+      restore?: { firedOneShots: string[]; pose?: { x: number; y: number; z: number; facing: number } };
+    },
+  ): Promise<void> {
     // A portal volume can fire load_scene twice before teardown starts.
     if (this._transitioning) return;
     const { bus, world, zones, preview, scriptEngine, manifest } = this.deps;
@@ -107,10 +116,15 @@ export class SceneRouter {
       gameState.configureSchema(world.world?.stateSchema ?? DEFAULT_STATE_SCHEMA);
 
       scriptEngine.activate();
-      if (!opts?.newGame) scriptEngine.restoreFiredOneShots(fired);
+      if (opts?.restore) scriptEngine.restoreFiredOneShots(opts.restore.firedOneShots);
+      else if (!opts?.newGame) scriptEngine.restoreFiredOneShots(fired);
 
       this._currentSceneId = sceneId;
       preview.enter("game", { resume: opts?.resume });
+      if (opts?.restore?.pose) {
+        const p = opts.restore.pose;
+        bus.emit("character:teleport", { position: { x: p.x, y: p.y, z: p.z }, facing: p.facing });
+      }
 
       // First entry of a run only; scene→scene transitions don't re-fire it.
       if (opts?.newGame || opts?.resume) scriptEngine.onGameStart();

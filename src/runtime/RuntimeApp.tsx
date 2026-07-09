@@ -17,6 +17,7 @@ import { FpsCounter } from "@/ui/FpsCounter";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
 import { loadManifest, type LoadedManifest } from "./manifest";
 import { SceneRouter } from "./SceneRouter";
+import { writeRuntimeSave, loadRuntimeSave, clearRuntimeSave, type RuntimeSave } from "./saveGame";
 import { MainMenu } from "./ui/MainMenu";
 import { LoadingScreen } from "./ui/LoadingScreen";
 import { ErrorScreen } from "./ui/ErrorScreen";
@@ -38,6 +39,8 @@ export default function RuntimeApp() {
   const sceneRef   = useRef<SceneManager | null>(null);
   const dialogueOpenRef = useRef(false);
   const pauseOpenRef    = useRef(false);
+  const manifestRef     = useRef<LoadedManifest | null>(null);
+  const doSaveRef       = useRef<(() => void) | null>(null);
 
   const [shell, setShell]           = useState<ShellState>("boot");
   const [error, setError]           = useState<string>("");
@@ -47,6 +50,7 @@ export default function RuntimeApp() {
   const [fadeState, setFadeState]   = useState<FadeRequest | null>(null);
   const [pauseOpen, setPauseOpen]   = useState(false);
   const [zoneName, setZoneName]     = useState<string | undefined>(undefined);
+  const [hasSave, setHasSave]       = useState(false);
 
   const getRenderInfo = useCallback(() => {
     const r = sceneRef.current?.renderer;
@@ -75,20 +79,50 @@ export default function RuntimeApp() {
     scene.onUpdate(dt => objectPlacer.update(dt));
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
 
+    // Runtime game save: pose is captured through the existing
+    // character:save-position mechanism (foot-level, round-trips through
+    // character:teleport). Written every 30s while playing, on exits, and on
+    // each scene entry (so the saved sceneId is never stale).
+    const POSE_KEY = "__runtime_pose";
+    const doSave = () => {
+      const m = manifestRef.current;
+      const sceneId = routerRef.current?.currentSceneId;
+      if (!m || !sceneId) return;
+      if (previewRef.current?.isActive) bus.emit("character:save-position", { key: POSE_KEY });
+      const pose = gameState.get(POSE_KEY) as RuntimeSave["pose"] | null;
+      writeRuntimeSave(m.manifest.id, {
+        sceneId,
+        state: gameState.snapshot(),
+        firedOneShots: scriptEngine.getFiredOneShots(),
+        pose: pose ?? undefined,
+      });
+      setHasSave(true);
+    };
+    doSaveRef.current = doSave;
+    let gameAutosaveTimer: ReturnType<typeof setInterval> | null = null;
+
     const unsub = [
       // Script re-index/activation on scene entry is owned by SceneRouter —
-      // this handler is UI state only (unlike App.tsx's).
+      // this handler is UI state + save cadence only (unlike App.tsx's).
       bus.on("preview:start", () => {
         setZoneName(world.activeZoneId ? world.zones.get(world.activeZoneId)?.name : undefined);
+        if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
+        gameAutosaveTimer = setInterval(doSave, 30_000);
+        doSave();
       }),
       bus.on("preview:stop", () => {
         pauseOpenRef.current = false;
         setPauseOpen(false);
         dialogueOpenRef.current = false;
         setDialogueState(null);
+        if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
         // During a router transition preview:stop is part of teardown — stay
-        // in "loading" rather than flashing the menu.
-        if (!routerRef.current?.transitioning) setShell("menu");
+        // in "loading" rather than flashing the menu (and don't save mid-swap:
+        // currentSceneId still points at the scene being torn down).
+        if (!routerRef.current?.transitioning) {
+          doSave();
+          setShell("menu");
+        }
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
       // Gamepad Start / kbm Enter / touch ⚙ → close dialogue, else toggle pause.
@@ -112,8 +146,12 @@ export default function RuntimeApp() {
     ];
 
     // Esc = direct exit to menu (kbm), mirroring the editor's preview exit.
+    // Save first — while active, doSave captures a fresh pose.
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Escape" && previewRef.current?.isActive) previewRef.current.exit();
+      if (e.code === "Escape" && previewRef.current?.isActive) {
+        doSave();
+        previewRef.current.exit();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
 
@@ -167,7 +205,9 @@ export default function RuntimeApp() {
           onError:   msg => { setError(msg); setShell("error"); },
         });
         routerRef.current = router;
+        manifestRef.current = loaded;
         setManifest(loaded);
+        setHasSave(loadRuntimeSave(loaded.manifest.id) !== null);
         document.title = loaded.manifest.name;
         if (import.meta.env.DEV) {
           const rt = (window as unknown as Record<string, unknown>).__runtime as Record<string, unknown>;
@@ -181,10 +221,12 @@ export default function RuntimeApp() {
 
     return () => {
       active = false;
+      if (gameAutosaveTimer) clearInterval(gameAutosaveTimer);
       unsub.forEach(u => u());
       window.removeEventListener("keydown", onKeyDown);
       routerRef.current?.dispose();
       routerRef.current = null;
+      doSaveRef.current = null;
       preview.exit();
       scene.dispose();
     };
@@ -194,8 +236,23 @@ export default function RuntimeApp() {
     const router = routerRef.current;
     const m = manifest;
     if (!router || !m) return;
+    clearRuntimeSave(m.manifest.id);
+    setHasSave(false);
     gameState.reset();
     void router.go(m.manifest.entryScene, { newGame: true });
+  };
+
+  const handleContinue = () => {
+    const router = routerRef.current;
+    const m = manifest;
+    if (!router || !m) return;
+    const save = loadRuntimeSave(m.manifest.id);
+    if (!save) { handleStart(); return; }
+    gameState.restore(save.state); // values persist through go() (no reset on resume)
+    void router.go(save.sceneId, {
+      resume: true,
+      restore: { firedOneShots: save.firedOneShots, pose: save.pose },
+    });
   };
 
   const input = previewRef.current?.input ?? null;
@@ -207,9 +264,9 @@ export default function RuntimeApp() {
       {shell === "menu" && (
         <MainMenu
           manifest={manifest?.manifest ?? null}
-          hasSave={false /* Continue arrives with the runtime save (25.5) */}
+          hasSave={hasSave}
           onStart={handleStart}
-          onContinue={() => {}}
+          onContinue={handleContinue}
         />
       )}
       {shell === "loading" && <LoadingScreen />}
@@ -244,6 +301,7 @@ export default function RuntimeApp() {
             pauseOpenRef.current = false;
             setPauseOpen(false);
             busRef.current.emit("pause:closed", {});
+            doSaveRef.current?.();      // fresh pose while still active
             previewRef.current?.exit(); // preview:stop handler routes to menu
           }}
         />
