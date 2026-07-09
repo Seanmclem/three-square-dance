@@ -457,12 +457,19 @@ export class StairBuilder {
         nrm.needsUpdate = true;
       };
       const X_AXIS = new THREE.Vector3(1, 0, 0);
-      const Y_AXIS = new THREE.Vector3(0, 1, 0);
-      const postGeo = (): THREE.BufferGeometry => {
-        const g = new THREE.BoxGeometry(postT, handrailH, postT);
-        roundNormals(g, Y_AXIS);
-        return g;
-      };
+      // Octagonal cross-section for all rail bars (across-flats = barThickness,
+      // flat top face): with the radial normals the bars read as true cylinders
+      // even up close, at a fraction of a real cylinder's cost.
+      const SEC_R = (railBarT / 2) / Math.cos(Math.PI / 8);
+      const SEC: [number, number][] = Array.from({ length: 8 }, (_, i) => {
+        const a = Math.PI / 8 + i * (Math.PI / 4);
+        return [SEC_R * Math.sin(a), SEC_R * Math.cos(a)];
+      });
+      // Posts: 8-sided prisms (CylinderGeometry's side normals are already
+      // smooth, so they shade round out of the box).
+      const postR = (postT / 2) / Math.cos(Math.PI / 8);
+      const postGeo = (): THREE.BufferGeometry =>
+        new THREE.CylinderGeometry(postR, postR, handrailH, 8);
 
       let ownsMat = railMatOwned;
       const addRail = (
@@ -506,30 +513,28 @@ export class StairBuilder {
         });
       };
 
-      // Top-rail bar geometry: barT×barT cross-section along local X, spanning
-      // exactly ±len/2 (callers bake any miter extension into len). A tapered
-      // end keeps the square end's reach but clips BOTH tip corners with 45°
-      // chamfers — top and bottom — leaving a shorter vertical end face.
+      // Top-rail bar geometry along local X, spanning exactly ±len/2 (callers
+      // bake any miter extension into len). Octagonal cross-section; a tapered
+      // free end keeps its reach but chamfers all around (the tip section
+      // shrinks toward the axis over the last `chamf` of length).
       const railBarGeo = (len: number, taperStart: boolean, taperEnd: boolean): THREE.BufferGeometry => {
-        const T = railBarT, h = T / 2;
-        const c = 0.3 * T;                             // 45° corner chamfer at a free end
+        const c = 0.3 * railBarT;
         if (len < 3 * c) taperStart = taperEnd = false;
-        if (!taperStart && !taperEnd) {
-          const box = new THREE.BoxGeometry(len, railBarT, railBarT);
-          roundNormals(box, X_AXIS);
-          return box;
-        }
-        const s = new THREE.Shape();                   // side profile (x along bar, y up), CCW
-        const x0 = -len / 2, x1 = len / 2;
-        s.moveTo(x0 + (taperStart ? c : 0), -h);
-        s.lineTo(x1 - (taperEnd ? c : 0), -h);
-        if (taperEnd) { s.lineTo(x1, -h + c); s.lineTo(x1, h - c); s.lineTo(x1 - c, h); }
-        else s.lineTo(x1, h);
-        if (taperStart) { s.lineTo(x0 + c, h); s.lineTo(x0, h - c); s.lineTo(x0, -h + c); }
-        else s.lineTo(x0, h);
-        s.closePath();
-        const geo = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false });
-        geo.translate(0, 0, -T / 2);
+        const tipScale = Math.max(0.2, 1 - c / SEC_R);
+        const pts: THREE.Vector3[] = [];
+        const end = (x: number, taper: boolean, inward: 1 | -1): void => {
+          for (const [oy, oz] of SEC) {
+            if (taper) {
+              pts.push(new THREE.Vector3(x, oy * tipScale, oz * tipScale));
+              pts.push(new THREE.Vector3(x + inward * c, oy, oz));
+            } else {
+              pts.push(new THREE.Vector3(x, oy, oz));
+            }
+          }
+        };
+        end(-len / 2, taperStart, 1);
+        end(len / 2, taperEnd, -1);
+        const geo = new ConvexGeometry(pts);
         roundNormals(geo, X_AXIS);
         return geo;
       };
@@ -630,24 +635,22 @@ export class StairBuilder {
           const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
           const len = a.distanceTo(b);
           const pts: THREE.Vector3[] = [];
-          // Point at `v` offset dx along the bar and (sy·yr, sz·railH) across it.
-          const at = (v: THREE.Vector3, dx: number, sy: number, sz: number, yr = railH): THREE.Vector3 =>
+          // Point at `v` offset dx along the bar and (oy, oz) across it.
+          const at = (v: THREE.Vector3, dx: number, oy: number, oz: number): THREE.Vector3 =>
             new THREE.Vector3().copy(v)
               .addScaledVector(xAxis, dx)
-              .addScaledVector(yAxis, sy * yr)
-              .addScaledVector(zAxis, sz * railH)
+              .addScaledVector(yAxis, oy)
+              .addScaledVector(zAxis, oz)
               .sub(mid);
-          const secOffset = (sy: number, sz: number): THREE.Vector3 => new THREE.Vector3()
-            .addScaledVector(yAxis, sy * railH).addScaledVector(zAxis, sz * railH);
           const addEnd = (v: THREE.Vector3, end: BarEnd, inward: 1 | -1): void => {
             if (end.kind === "miter") {
               const n = new THREE.Vector3().addVectors(xAxis, end.adj);
               const nd = n.lengthSq() > 1e-8 ? n.normalize().dot(xAxis) : 0;
               if (Math.abs(nd) > 1e-4) {
                 // Long edges v+o+t·x̂ cut by the plane through v with normal n.
-                for (const sy of [1, -1]) for (const sz of [1, -1]) {
-                  const o = secOffset(sy, sz);
-                  pts.push(at(v, -n.dot(o) / nd, sy, sz));
+                for (const [oy, oz] of SEC) {
+                  const o = new THREE.Vector3().addScaledVector(yAxis, oy).addScaledVector(zAxis, oz);
+                  pts.push(at(v, -n.dot(o) / nd, oy, oz));
                 }
                 return;
               }
@@ -658,21 +661,22 @@ export class StairBuilder {
               if (hx > 1e-6) {
                 H.divideScalar(hx);
                 // Vertical plane through v + inward·railH·Ĥ with normal Ĥ.
-                for (const sy of [1, -1]) for (const sz of [1, -1]) {
-                  const o = secOffset(sy, sz);
-                  pts.push(at(v, (inward * railH - o.dot(H)) / xAxis.dot(H), sy, sz));
+                for (const [oy, oz] of SEC) {
+                  const o = new THREE.Vector3().addScaledVector(yAxis, oy).addScaledVector(zAxis, oz);
+                  pts.push(at(v, (inward * railH - o.dot(H)) / xAxis.dot(H), oy, oz));
                 }
                 return;
               }
             }
             const tip = end.kind === "free" && len >= 3 * chamf;   // square when too short
             const dx0 = end.kind === "run" ? -inward * railH : 0;
-            for (const sy of [1, -1]) for (const sz of [1, -1]) {
+            const tipScale = Math.max(0.2, 1 - chamf / SEC_R);
+            for (const [oy, oz] of SEC) {
               if (tip) {
-                pts.push(at(v, 0, sy, sz, railH - chamf));   // small end face
-                pts.push(at(v, inward * chamf, sy, sz));     // full-section shoulder
+                pts.push(at(v, 0, oy * tipScale, oz * tipScale));   // shrunk end face
+                pts.push(at(v, inward * chamf, oy, oz));            // full-section shoulder
               } else {
-                pts.push(at(v, dx0, sy, sz));
+                pts.push(at(v, dx0, oy, oz));
               }
             }
           };
