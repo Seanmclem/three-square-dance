@@ -1,6 +1,16 @@
 # Phase 29 — Parametric Stair Landings + Switchback Stairwells
 
-> **Status: PLANNED** — implementation starting 2026-07-09.
+> **Status: IMPLEMENTED** — shipped 2026-07-09. Verified in-browser end-to-end;
+> acceptance record in `test-plans/phase-29-stair-landings-switchbacks.md`.
+> Notable deviations from plan:
+> - No gooseneck logic was needed at slope→level rail corners — the tread-anchor
+>   line passes through `(u = run, y = topY)` exactly, so sloped rails meet the
+>   landing-level rails at the corner vertex natively.
+> - `closed` underside on upper flights/landings downgrades to the diagonal
+>   soffit (a to-ground column under flight k ≥ 2 would swallow the flight
+>   directly below); only flight 0 / landing 0 reach the ground.
+> - Panel puts VOID GAP and LANDING WIDTH in one shared slot (width is only
+>   meaningful at flights = 1, gap only at flights > 1).
 
 Origin: user request — "have a set of stairs have option to also add a
 configurably sized platform on the end and have the rail follow accordingly,
