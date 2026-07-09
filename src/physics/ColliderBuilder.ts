@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import * as THREE from "three";
 import { physicsWorld } from "./PhysicsWorld";
 import { colliderWorldTransform } from "./attachedColliderMath";
+import { computeStairLayout, frameToWorld } from "@/builders/stairLayout";
 import type { WallDef, Vec2, PlatformDef, StairDef, ShapeDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
 
 export class ColliderBuilder {
@@ -120,24 +121,44 @@ export class ColliderBuilder {
   }
 
   static registerStairSteps(stair: StairDef): RAPIER.Collider[] {
-    const heightDiff = stair.end.y - stair.start.y;
-    const horizDist  = Math.hypot(stair.end.x - stair.start.x, stair.end.z - stair.start.z);
-    const angle      = Math.atan2(stair.end.z - stair.start.z, stair.end.x - stair.start.x);
-    const defaultStepH = 0.2;
-    const numSteps   = stair.numSteps ?? Math.max(1, Math.round(heightDiff / defaultStepH));
-    const stepRise   = heightDiff / numSteps;
-    const stepDepth  = horizDist / numSteps;
+    const layout = computeStairLayout(stair);
     const colliders: RAPIER.Collider[] = [];
 
-    for (let i = 0; i < numSteps; i++) {
-      const t = (i + 0.5) / numSteps;
-      const desc = RAPIER.ColliderDesc.cuboid(stepDepth / 2, stepRise / 2, stair.width / 2)
-        .setTranslation(
-          stair.start.x + (stair.end.x - stair.start.x) * t,
-          stair.start.y + (i + 0.5) * stepRise,
-          stair.start.z + (stair.end.z - stair.start.z) * t,
-        )
-        .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
+    // One cuboid per step, per flight. Geometry comes from the shared layout
+    // (flight 1 of a plain stair is exactly the def's start/end, so legacy
+    // stairs produce byte-identical descriptors).
+    for (const f of layout.flights) {
+      const heightDiff = f.end.y - f.start.y;
+      const horizDist  = Math.hypot(f.end.x - f.start.x, f.end.z - f.start.z);
+      const angle      = Math.atan2(f.end.z - f.start.z, f.end.x - f.start.x);
+      const numSteps   = layout.numSteps;
+      const stepRise   = heightDiff / numSteps;
+      const stepDepth  = horizDist / numSteps;
+
+      for (let i = 0; i < numSteps; i++) {
+        const t = (i + 0.5) / numSteps;
+        const desc = RAPIER.ColliderDesc.cuboid(stepDepth / 2, stepRise / 2, stair.width / 2)
+          .setTranslation(
+            f.start.x + (f.end.x - f.start.x) * t,
+            f.start.y + (i + 0.5) * stepRise,
+            f.start.z + (f.end.z - f.start.z) * t,
+          )
+          .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
+        colliders.push(physicsWorld.createStaticCollider(desc));
+      }
+    }
+
+    // One cuboid per landing slab, axis-aligned in the stairwell frame.
+    const A = layout.frame.angle;
+    for (const l of layout.landings) {
+      const c = frameToWorld(layout.frame, (l.uMin + l.uMax) / 2, (l.vMin + l.vMax) / 2, (l.topY + l.bottomY) / 2);
+      const desc = RAPIER.ColliderDesc.cuboid(
+        (l.uMax - l.uMin) / 2,
+        (l.topY - l.bottomY) / 2,
+        (l.vMax - l.vMin) / 2,
+      )
+        .setTranslation(c.x, c.y, c.z)
+        .setRotation({ x: 0, y: Math.sin(-A / 2), z: 0, w: Math.cos(-A / 2) });
       colliders.push(physicsWorld.createStaticCollider(desc));
     }
     return colliders;

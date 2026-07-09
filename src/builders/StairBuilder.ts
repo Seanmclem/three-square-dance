@@ -2,7 +2,9 @@ import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import type { StairDef, MeshUserData } from "@/types";
+import { computeStairLayout, computeRailPaths, frameToWorld, isPlainStair } from "@/builders/stairLayout";
+import type { LandingSpec } from "@/builders/stairLayout";
+import type { StairDef, StairUndersideMode, MeshUserData, Vec3 } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface StairBuildOutput {
@@ -97,16 +99,22 @@ export class StairBuilder {
               .catch(() => assetManager.getDefaultMaterial(0x6a7a8a)))
       : mat;
 
+    // Flight/landing layout (Phase 29). A plain stair (single flight, no
+    // landing) yields exactly one FlightSpec equal to the def's start/end, so
+    // the legacy geometry falls out unchanged.
+    const layout = computeStairLayout(stair);
+    const plain  = isPlainStair(stair);
+
+    // Flight-1 constants — used by the legacy railing branch and the CSG cutter.
     const heightDiff = stair.end.y - stair.start.y;
     const dx         = stair.end.x - stair.start.x;
     const dz         = stair.end.z - stair.start.z;
     const horizDist  = Math.hypot(dx, dz);
     const angle      = Math.atan2(dz, dx);
 
-    const numSteps  = stair.numSteps ?? Math.max(1, Math.round(heightDiff / STEP_HEIGHT));
+    const numSteps  = layout.numSteps;
     const stepRise  = heightDiff / numSteps;
     const stepDepth = horizDist / numSteps;
-    const hw = stepDepth / 2;
     const hh = stepRise  / 2;
     const hd = stair.width / 2;
 
@@ -116,12 +124,37 @@ export class StairBuilder {
     // soffit drops that far below the inner step corners, so the internal drop below the
     // nosing line is clearance + stepRise (always > stepRise → side panels never invert).
     const undersideMode = stair.underside?.mode ?? "open";
-    const stringerGap   = Math.max(stair.underside?.thickness ?? 0.25, 0.02);
-    const effThk        = stringerGap + stepRise;
+
+    // Transform a local point + world step-center offset into world coords,
+    // in flight 1's frame (legacy railing branch).
+    const cosA1 = Math.cos(angle);
+    const sinA1 = Math.sin(angle);
+    const toWorld1 = (
+      lx: number, ly: number, lz: number,
+      cx: number, cy: number, cz: number,
+    ): [number, number, number] => [
+      lx * cosA1 - lz * sinA1 + cx,
+      ly + cy,
+      lx * sinA1 + lz * cosA1 + cz,
+    ];
+
+    const body:  StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    const riser: StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+
+    // ── One flight of steps (the pre-Phase-29 per-step loop, verbatim, with
+    // the flight's own start/end in place of the def's) ─────────────────────
+    const emitFlight = (fStart: Vec3, fEnd: Vec3, mode: StairUndersideMode): void => {
+    const fdx         = fEnd.x - fStart.x;
+    const fdz         = fEnd.z - fStart.z;
+    const fAngle      = Math.atan2(fdz, fdx);
+    const hw          = stepDepth / 2;
+
+    const stringerGap = Math.max(stair.underside?.thickness ?? 0.25, 0.02);
+    const effThk      = stringerGap + stepRise;
 
     // Rotation matrix for rotation.y = -angle  (local → world direction)
-    const cosA =  Math.cos(angle);
-    const sinA =  Math.sin(angle);
+    const cosA =  Math.cos(fAngle);
+    const sinA =  Math.sin(fAngle);
 
     // Transform a local point + world step-center offset into world coords
     const toWorld = (
@@ -148,14 +181,13 @@ export class StairBuilder {
     const nSideP  = toWorldN(0, 0, 1);   // +Z side
     const nSideN  = toWorldN(0, 0, -1);  // -Z side
 
-    const body:  StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
-    const riser: StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    const undersideMode = mode;
 
     for (let i = 0; i < numSteps; i++) {
       const t  = (i + 0.5) / numSteps;
-      const cx = stair.start.x + dx * t;
-      const cy = stair.start.y + (i + 0.5) * stepRise;
-      const cz = stair.start.z + dz * t;
+      const cx = fStart.x + fdx * t;
+      const cy = fStart.y + (i + 0.5) * stepRise;
+      const cz = fStart.z + fdz * t;
 
       // 8 corner points in world space (local coords → world)
       const [pTFL_x, pTFL_y, pTFL_z] = toWorld(-hw,  hh, -hd, cx, cy, cz); // top front left
@@ -196,8 +228,8 @@ export class StairBuilder {
       } else {
         // Solid wedge ("diagonal") or solid to floor ("closed"). Side bottom corners are
         // constant in local coords across steps, so the soffit tiles into one watertight plane.
-        const lyFB = undersideMode === "closed" ? stair.start.y - cy : hh - effThk;       // front-bottom
-        const lyBB = undersideMode === "closed" ? stair.start.y - cy : 3 * hh - effThk;   // back-bottom
+        const lyFB = undersideMode === "closed" ? fStart.y - cy : hh - effThk;       // front-bottom
+        const lyBB = undersideMode === "closed" ? fStart.y - cy : 3 * hh - effThk;   // back-bottom
         const [sFBL_x, sFBL_y, sFBL_z] = toWorld(-hw, lyFB, -hd, cx, cy, cz);
         const [sFBR_x, sFBR_y, sFBR_z] = toWorld(-hw, lyFB,  hd, cx, cy, cz);
         const [sBBL_x, sBBL_y, sBBL_z] = toWorld( hw, lyBB, -hd, cx, cy, cz);
@@ -206,9 +238,9 @@ export class StairBuilder {
         // Continuous world-space UVs so the texture flows up the whole stringer instead of
         // restarting each step. Sides: u = run distance, v = world height. Soffit: u = run, v = width.
         const uF   = (i * stepDepth) / ts, uB = ((i + 1) * stepDepth) / ts;
-        const vTop = (pTFR_y - stair.start.y) / ts;
-        const vFB  = (sFBR_y - stair.start.y) / ts;
-        const vBB  = (sBBR_y - stair.start.y) / ts;
+        const vTop = (pTFR_y - fStart.y) / ts;
+        const vFB  = (sFBR_y - fStart.y) / ts;
+        const vBB  = (sBBR_y - fStart.y) / ts;
 
         // +Z right side trapezoid (top edge = step profile, bottom edge = stringer line)
         pushQuadUV(body,
@@ -241,8 +273,8 @@ export class StairBuilder {
         }
         // Front cap (-X) — diagonal only: fills the sub-floor nose below the step-0 riser
         if (undersideMode === "diagonal" && i === 0) {
-          const [fcTL_x, fcTL_y, fcTL_z] = toWorld(-hw, stair.start.y - cy, -hd, cx, cy, cz);
-          const [fcTR_x, fcTR_y, fcTR_z] = toWorld(-hw, stair.start.y - cy,  hd, cx, cy, cz);
+          const [fcTL_x, fcTL_y, fcTL_z] = toWorld(-hw, fStart.y - cy, -hd, cx, cy, cz);
+          const [fcTR_x, fcTR_y, fcTR_z] = toWorld(-hw, fStart.y - cy,  hd, cx, cy, cz);
           pushQuad(body,
             fcTL_x,fcTL_y,fcTL_z, fcTR_x,fcTR_y,fcTR_z, sFBR_x,sFBR_y,sFBR_z, sFBL_x,sFBL_y,sFBL_z,
             ...nRiser, ww, (effThk - stepRise) / ts);
@@ -254,6 +286,62 @@ export class StairBuilder {
         pTFL_x,pTFL_y,pTFL_z, pTFR_x,pTFR_y,pTFR_z, pBFR_x,pBFR_y,pBFR_z, pBFL_x,pBFL_y,pBFL_z,
         ...nRiser, rWw, rWh);
     }
+    };  // end emitFlight
+
+    // ── One landing slab (Phase 29) ─────────────────────────────────────────
+    // A box in the stairwell frame, emitted into the body accumulator so it
+    // shares the tread material/overrides and stays part of the selectable
+    // body mesh. Quad winding is corrected per-face because a "left" turn
+    // mirrors the frame (turnVec = -right ⇒ determinant -1).
+    const emitLanding = (l: LandingSpec): void => {
+      const F = layout.frame;
+      const pt = (u: number, v: number, y: number): [number, number, number] => {
+        const w = frameToWorld(F, u, v, y);
+        return [w.x, w.y, w.z];
+      };
+      // Push a quad with the desired outward normal, swapping winding if the
+      // frame mirroring flipped it. Rendered normal of pushQuad ∝ (c-a)×(b-a).
+      const quadN = (
+        a: [number, number, number], b: [number, number, number],
+        c: [number, number, number], d: [number, number, number],
+        n: [number, number, number], uScl: number, vScl: number,
+      ): void => {
+        const gx = (c[1]-a[1])*(b[2]-a[2]) - (c[2]-a[2])*(b[1]-a[1]);
+        const gy = (c[2]-a[2])*(b[0]-a[0]) - (c[0]-a[0])*(b[2]-a[2]);
+        const gz = (c[0]-a[0])*(b[1]-a[1]) - (c[1]-a[1])*(b[0]-a[0]);
+        const flip = gx*n[0] + gy*n[1] + gz*n[2] < 0;
+        const [B, D] = flip ? [d, b] : [b, d];
+        pushQuad(body, ...a, ...B, ...c, ...D, ...n, uScl, vScl);
+      };
+
+      const du = l.uMax - l.uMin, dv = l.vMax - l.vMin, dh = l.topY - l.bottomY;
+      const T00 = pt(l.uMin, l.vMin, l.topY),    T10 = pt(l.uMax, l.vMin, l.topY);
+      const T11 = pt(l.uMax, l.vMax, l.topY),    T01 = pt(l.uMin, l.vMax, l.topY);
+      const B00 = pt(l.uMin, l.vMin, l.bottomY), B10 = pt(l.uMax, l.vMin, l.bottomY);
+      const B11 = pt(l.uMax, l.vMax, l.bottomY), B01 = pt(l.uMin, l.vMax, l.bottomY);
+
+      const dirN:  [number, number, number] = [F.dir.x, 0, F.dir.z];
+      const dirNn: [number, number, number] = [-F.dir.x, 0, -F.dir.z];
+      const tN:    [number, number, number] = [F.turnVec.x, 0, F.turnVec.z];
+      const tNn:   [number, number, number] = [-F.turnVec.x, 0, -F.turnVec.z];
+
+      quadN(T00, T10, T11, T01, [0, 1, 0],  du / ts, dv / ts);   // top (walking surface)
+      quadN(B00, B01, B11, B10, [0, -1, 0], du / ts, dv / ts);   // underside
+      quadN(T00, T10, B10, B00, tNn,  du / ts, dh / ts);         // side v = vMin
+      quadN(T01, T11, B11, B01, tN,   du / ts, dh / ts);         // side v = vMax
+      quadN(T00, T01, B01, B00, dirNn, dv / ts, dh / ts);        // side u = uMin
+      quadN(T10, T11, B11, B10, dirN,  dv / ts, dh / ts);        // side u = uMax
+    };
+
+    // Emit every flight (upper flights downgrade "closed" to the diagonal
+    // soffit — a closed column under flight k ≥ 1 would swallow the flight or
+    // landing directly beneath it) and every landing.
+    for (let k = 0; k < layout.flights.length; k++) {
+      const effMode: StairUndersideMode =
+        undersideMode === "closed" && k > 0 ? "diagonal" : undersideMode;
+      emitFlight(layout.flights[k].start, layout.flights[k].end, effMode);
+    }
+    for (const l of layout.landings) emitLanding(l);
 
     const meshes: THREE.Mesh[] = [];
 
@@ -300,15 +388,6 @@ export class StairBuilder {
         color: 0x9aabb8, roughness: 0.4, metalness: 0.4,
       });
 
-      // Orthonormal basis aligned to the slope:
-      //   xAxis → up the slope, zAxis → horizontal side, yAxis → perpendicular up.
-      const xAxis = new THREE.Vector3(dx, heightDiff, dz).normalize();
-      const zAxis = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
-      const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
-      const slopeQuat = new THREE.Quaternion().setFromRotationMatrix(
-        new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
-      );
-
       let ownsMat = true;
       const addRail = (
         geo: THREE.BufferGeometry,
@@ -327,38 +406,84 @@ export class StairBuilder {
         meshes.push(mesh);
       };
 
-      for (let side = -1; side <= 1; side += 2) {
-        const localZ = side * Math.max(postT / 2, hd - sideInset);   // inset from the step edge
+      if (plain) {
+        // ── Legacy single-flight railing (pre-Phase-29, unchanged) ──────────
+        // Orthonormal basis aligned to the slope:
+        //   xAxis → up the slope, zAxis → horizontal side, yAxis → perpendicular up.
+        const xAxis = new THREE.Vector3(dx, heightDiff, dz).normalize();
+        const zAxis = new THREE.Vector3(-Math.sin(angle), 0, Math.cos(angle));
+        const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+        const slopeQuat = new THREE.Quaternion().setFromRotationMatrix(
+          new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
+        );
 
-        // Anchor on the centre of step i's tread (local x = 0), at the outer edge.
-        const treadAnchor = (i: number): [number, number, number] => {
-          const t  = (i + 0.5) / numSteps;
-          const cx = stair.start.x + dx * t;
-          const cy = stair.start.y + (i + 0.5) * stepRise;
-          const cz = stair.start.z + dz * t;
-          return toWorld(0, hh, localZ, cx, cy, cz);
-        };
+        for (let side = -1; side <= 1; side += 2) {
+          const localZ = side * Math.max(postT / 2, hd - sideInset);   // inset from the step edge
 
-        // Balusters: every Nth step, always including the top step for support.
-        if (showPosts) {
-          const placePost = (i: number): void => {
-            const [nx, ny, nz] = treadAnchor(i);
-            addRail(new THREE.BoxGeometry(postT, handrailH, postT), nx, ny + handrailH / 2, nz);
+          // Anchor on the centre of step i's tread (local x = 0), at the outer edge.
+          const treadAnchor = (i: number): [number, number, number] => {
+            const t  = (i + 0.5) / numSteps;
+            const cx = stair.start.x + dx * t;
+            const cy = stair.start.y + (i + 0.5) * stepRise;
+            const cz = stair.start.z + dz * t;
+            return toWorld1(0, hh, localZ, cx, cy, cz);
           };
-          for (let i = 0; i < numSteps; i += stepEvery) placePost(i);
-          if ((numSteps - 1) % stepEvery !== 0) placePost(numSteps - 1);
+
+          // Balusters: every Nth step, always including the top step for support.
+          if (showPosts) {
+            const placePost = (i: number): void => {
+              const [nx, ny, nz] = treadAnchor(i);
+              addRail(new THREE.BoxGeometry(postT, handrailH, postT), nx, ny + handrailH / 2, nz);
+            };
+            for (let i = 0; i < numSteps; i += stepEvery) placePost(i);
+            if ((numSteps - 1) % stepEvery !== 0) placePost(numSteps - 1);
+          }
+
+          // Top rail — spans first→last tread anchor + a symmetric overhang each end,
+          // raised by handrailH. Grows about the fixed midpoint, so the end posts don't move.
+          if (showTopRail && numSteps >= 2) {
+            const [ax, ay, az] = treadAnchor(0);
+            const [bx, by, bz] = treadAnchor(numSteps - 1);
+            const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
+            addRail(
+              new THREE.BoxGeometry(len, railBarT, railBarT),
+              (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
+            );
+          }
+        }
+      } else {
+        // ── Path railing (Phase 29): continuous polylines over flights and
+        // landings — sloped runs, level landing runs, corner posts. Path
+        // vertices sit at walking-surface height; rails render `handrailH`
+        // above, posts rise from the vertex. Segments get +barThickness
+        // length so interior corners close without visible miter gaps.
+        const rl = computeRailPaths(stair, layout);
+
+        if (showPosts) {
+          for (const p of rl.posts) {
+            addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
+          }
         }
 
-        // Top rail — spans first→last tread anchor + a symmetric overhang each end,
-        // raised by handrailH. Grows about the fixed midpoint, so the end posts don't move.
-        if (showTopRail && numSteps >= 2) {
-          const [ax, ay, az] = treadAnchor(0);
-          const [bx, by, bz] = treadAnchor(numSteps - 1);
-          const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
-          addRail(
-            new THREE.BoxGeometry(len, railBarT, railBarT),
-            (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
-          );
+        if (showTopRail) {
+          for (const path of rl.paths) {
+            for (let i = 0; i + 1 < path.length; i++) {
+              const a = path[i], b = path[i + 1];
+              const segX = b.x - a.x, segY = b.y - a.y, segZ = b.z - a.z;
+              const len = Math.hypot(segX, segY, segZ);
+              if (len < 1e-6) continue;
+              const xAxis = new THREE.Vector3(segX, segY, segZ).normalize();
+              const zAxis = new THREE.Vector3(-segZ, 0, segX).normalize();   // horizontal side
+              const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+              const quat = new THREE.Quaternion().setFromRotationMatrix(
+                new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
+              );
+              addRail(
+                new THREE.BoxGeometry(len + railBarT, railBarT, railBarT),
+                (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
+              );
+            }
+          }
         }
       }
     }
