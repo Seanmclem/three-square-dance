@@ -437,6 +437,33 @@ export class StairBuilder {
         railMatOwned = true;
       }
 
+      // Fake-round shading: side-face normals bent radially outward from the
+      // bar's long axis, so square bars and posts light like cylinders while
+      // the silhouette stays boxy (classic cheap-rail trick). Faces whose
+      // normal points mostly along the axis — end caps, tip chamfers, miter
+      // cuts — keep their flat shading so ends still read as cut.
+      const roundNormals = (geo: THREE.BufferGeometry, axis: THREE.Vector3): void => {
+        const pos = geo.attributes.position, nrm = geo.attributes.normal;
+        const v = new THREE.Vector3(), n = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          n.set(nrm.getX(i), nrm.getY(i), nrm.getZ(i));
+          if (Math.abs(n.dot(axis)) > 0.5) continue;
+          v.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+          v.addScaledVector(axis, -v.dot(axis));   // radial from the centerline
+          if (v.lengthSq() < 1e-12) continue;
+          v.normalize();
+          nrm.setXYZ(i, v.x, v.y, v.z);
+        }
+        nrm.needsUpdate = true;
+      };
+      const X_AXIS = new THREE.Vector3(1, 0, 0);
+      const Y_AXIS = new THREE.Vector3(0, 1, 0);
+      const postGeo = (): THREE.BufferGeometry => {
+        const g = new THREE.BoxGeometry(postT, handrailH, postT);
+        roundNormals(g, Y_AXIS);
+        return g;
+      };
+
       let ownsMat = railMatOwned;
       const addRail = (
         geo: THREE.BufferGeometry,
@@ -487,7 +514,11 @@ export class StairBuilder {
         const T = railBarT, h = T / 2;
         const c = 0.3 * T;                             // 45° corner chamfer at a free end
         if (len < 3 * c) taperStart = taperEnd = false;
-        if (!taperStart && !taperEnd) return new THREE.BoxGeometry(len, railBarT, railBarT);
+        if (!taperStart && !taperEnd) {
+          const box = new THREE.BoxGeometry(len, railBarT, railBarT);
+          roundNormals(box, X_AXIS);
+          return box;
+        }
         const s = new THREE.Shape();                   // side profile (x along bar, y up), CCW
         const x0 = -len / 2, x1 = len / 2;
         s.moveTo(x0 + (taperStart ? c : 0), -h);
@@ -499,6 +530,7 @@ export class StairBuilder {
         s.closePath();
         const geo = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false });
         geo.translate(0, 0, -T / 2);
+        roundNormals(geo, X_AXIS);
         return geo;
       };
 
@@ -533,7 +565,7 @@ export class StairBuilder {
           if (sidePosts) {
             const placePost = (i: number): void => {
               const [nx, ny, nz] = treadAnchor(i);
-              addRail(new THREE.BoxGeometry(postT, handrailH, postT), nx, ny + handrailH / 2, nz);
+              addRail(postGeo(), nx, ny + handrailH / 2, nz);
             };
             for (let i = 0; i < numSteps; i += stepEvery) placePost(i);
             if ((numSteps - 1) % stepEvery !== 0) placePost(numSteps - 1);
@@ -571,7 +603,7 @@ export class StairBuilder {
 
         for (const { position: p, side } of rl.posts) {
           if (!(side === "inner" ? postsInner : postsOuter)) continue;
-          addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
+          addRail(postGeo(), p.x, p.y + handrailH / 2, p.z);
         }
 
         // One rail bar between two lifted path vertices, built in world space
@@ -646,7 +678,9 @@ export class StairBuilder {
           };
           addEnd(a, endA, 1);
           addEnd(b, endB, -1);
-          return new ConvexGeometry(pts);
+          const geo = new ConvexGeometry(pts);
+          roundNormals(geo, xAxis);
+          return geo;
         };
 
         // A corner is mitered only when the two bars' sections line up on the
