@@ -296,6 +296,9 @@ put the JSON somewhere fetchable, and hand-write a `manifest.json` like
 `assetsBase`). Cross-scene portals are trigger volumes with a **load_scene**
 action — the Scene id field must match a manifest key (the editor can't
 validate it; a typo just logs an error in the runtime and stays put).
+**Step-by-step local loop** (save into `public/my-game/`, iterate on the dev
+server, no hosting needed): `PUBLISHING_GUIDE.md` §0. Remote hosting + CORS:
+the rest of that guide.
 
 ---
 

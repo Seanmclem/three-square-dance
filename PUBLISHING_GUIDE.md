@@ -4,6 +4,69 @@ How to publish a world so anyone can play it in the standalone runtime
 (Phase 25): what goes in the bundle, how to host it on S3 / Netlify /
 GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 
+**Just want to play your own levels locally while you build them?** That's
+§0, right below — no hosting, no CORS, no build step.
+
+---
+
+## 0. Local first — develop, save, and play on the dev server
+
+The dev server already serves everything the runtime needs. The whole loop is:
+save your world **into `public/`**, add a small manifest next to it, open
+`runtime.html`. No second server, no CORS, no `npm run build`.
+
+### One-time setup (per game)
+
+1. Make a folder in the repo: `public/my-game/scenes/`.
+2. Author your level in the editor (`localhost:7373`) as usual. It needs a
+   **spawn point** (Spawn tool) or the runtime spawns at the origin.
+3. **Save the world directly into that folder**: Ctrl+S → in the file picker,
+   navigate to `<repo>/public/my-game/scenes/` and save as `level_01.json`.
+   (The editor's save output *is* the runtime scene format — nothing to
+   convert.)
+4. Create `public/my-game/manifest.json`:
+
+```json
+{
+  "manifestVersion": 1,
+  "id": "my-game-dev",
+  "name": "My Game (dev)",
+  "entryScene": "level_01",
+  "scenes": { "level_01": "scenes/level_01.json" },
+  "assetsBase": "/"
+}
+```
+
+   `"assetsBase": "/"` points the asset tree at the dev server's own
+   `/assets` — your imported models, materials, and decals all just work,
+   exactly as they do in editor preview.
+
+5. Open **`http://localhost:7373/runtime.html?manifest=/my-game/manifest.json`**
+   → Start. That's your game in the real shell: manifest boot, main menu,
+   saves, portals — everything a published copy would do.
+
+### The iteration loop
+
+- Edit in the editor tab → **Ctrl+S** (after the first save it re-saves
+  in-place, no picker) → switch to the runtime tab → **reload the page** →
+  Start. Files under `public/` are served statically — a browser refresh picks
+  up the new JSON; there's no hot reload for them.
+- The editor and runtime tabs coexist fine on the same origin: the runtime
+  never touches the editor's autosave, and its own save lives under
+  `runtime_gamesave:<manifest.id>`. Tip: while iterating on level layout, use
+  **New Game** rather than Continue — a stale save can resume you at a spot
+  that no longer exists in the re-saved level.
+- Multi-level games: save each world as its own JSON in `scenes/`, list it in
+  the manifest, and wire portals with `load_scene` trigger volumes (see
+  HUMAN_TESTING.md's runtime workflow). Scene ids in the volumes must match
+  the manifest keys.
+- Committing: `public/my-game/` will ship inside `dist/` on the next build
+  (like `public/demo/` does). Keep personal scratch levels out of git or out
+  of `public/` if you don't want that.
+
+When the game feels done, everything below is just "move that folder
+somewhere public and add one header."
+
 ---
 
 ## The short version
