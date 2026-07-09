@@ -231,17 +231,22 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     // The diagonal levels out at the landing edge and eases a short horizontal
     // run onto the landing before turning, so every bend is planar (flat 90°s
     // and same-heading slope→level) — 3D bends never appear and corner miters
-    // always line up.
+    // always line up. The TOP landing gets no wrap: the rail runs one straight
+    // tread-depth onto the landing and just ends (classic top-of-stairs
+    // handrail extension) — the void hook there read as clutter.
     const ease = Math.min(0.3, D * 0.4);
     const inner: P[] = [freeEnd(vInner(0))];
     for (let k = 0; k < flightsCount; k++) {
-      const uE = uHigh(k) + (k % 2 === 0 ? ease : -ease);            // into the landing
+      const last = k + 1 === flightsCount;
+      const e    = last ? Math.min(stepDepth, D * 0.9) : ease;
+      const uE   = uHigh(k) + (k % 2 === 0 ? e : -e);                // into the landing
       inner.push({ u: uHigh(k), v: vInner(k),     y: topY(k) });     // slope levels out at landing k
-      inner.push({ u: uE,       v: vInner(k),     y: topY(k) });     // horizontal ease onto the landing
-      inner.push({ u: uE,       v: vInner(k + 1), y: topY(k) });     // level across behind the void
-      if (k + 1 < flightsCount)
+      inner.push({ u: uE,       v: vInner(k),     y: topY(k) });     // horizontal run onto the landing
+      if (!last) {
+        inner.push({ u: uE,       v: vInner(k + 1), y: topY(k) });   // level across behind the void
         inner.push({ u: uHigh(k), v: vInner(k + 1), y: topY(k) });   // ease back to flight k+1's start
-      // …then straight up flight k+1, or free end after the crossing on the top landing.
+      }
+      // …then straight up flight k+1; on the top landing the straight run ends free.
     }
     paths.push({ pts: inner, side: "inner", freeStart: true });
 
