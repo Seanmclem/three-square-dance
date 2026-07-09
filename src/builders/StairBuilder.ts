@@ -99,6 +99,19 @@ export class StairBuilder {
               .catch(() => assetManager.getDefaultMaterial(0x6a7a8a)))
       : mat;
 
+    // Landing material — mirrors the riser fallback chain (absent → body).
+    const landOvr   = stair.landingMaterialOverrides;
+    const landMatId = stair.landingMaterial;
+    const landBaseDef = landMatId ? assetManager.getMaterialDef(landMatId) : null;
+    const landTs = landOvr?.tileScale ?? landBaseDef?.tileScale ?? ts;
+    const landMat: THREE.Material = landMatId
+      ? (landOvr
+          ? await assetManager.getMaterialWithOverrides(landMatId, landOvr)
+              .catch(() => assetManager.getDefaultMaterial(0x6a7a8a))
+          : await assetManager.getMaterial(landMatId)
+              .catch(() => assetManager.getDefaultMaterial(0x6a7a8a)))
+      : mat;
+
     // Flight/landing layout (Phase 29). A plain stair (single flight, no
     // landing) yields exactly one FlightSpec equal to the def's start/end, so
     // the legacy geometry falls out unchanged.
@@ -138,8 +151,9 @@ export class StairBuilder {
       lx * sinA1 + lz * cosA1 + cz,
     ];
 
-    const body:  StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
-    const riser: StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    const body:    StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    const riser:   StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    const landAcc: StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
 
     // ── One flight of steps (the pre-Phase-29 per-step loop, verbatim, with
     // the flight's own start/end in place of the def's) ─────────────────────
@@ -311,7 +325,7 @@ export class StairBuilder {
         const gz = (c[0]-a[0])*(b[1]-a[1]) - (c[1]-a[1])*(b[0]-a[0]);
         const flip = gx*n[0] + gy*n[1] + gz*n[2] < 0;
         const [B, D] = flip ? [d, b] : [b, d];
-        pushQuad(body, ...a, ...B, ...c, ...D, ...n, uScl, vScl);
+        pushQuad(landAcc, ...a, ...B, ...c, ...D, ...n, uScl, vScl);
       };
 
       const du = l.uMax - l.uMin, dv = l.vMax - l.vMin, dh = l.topY - l.bottomY;
@@ -325,12 +339,12 @@ export class StairBuilder {
       const tN:    [number, number, number] = [F.turnVec.x, 0, F.turnVec.z];
       const tNn:   [number, number, number] = [-F.turnVec.x, 0, -F.turnVec.z];
 
-      quadN(T00, T10, T11, T01, [0, 1, 0],  du / ts, dv / ts);   // top (walking surface)
-      quadN(B00, B01, B11, B10, [0, -1, 0], du / ts, dv / ts);   // underside
-      quadN(T00, T10, B10, B00, tNn,  du / ts, dh / ts);         // side v = vMin
-      quadN(T01, T11, B11, B01, tN,   du / ts, dh / ts);         // side v = vMax
-      quadN(T00, T01, B01, B00, dirNn, dv / ts, dh / ts);        // side u = uMin
-      quadN(T10, T11, B11, B10, dirN,  dv / ts, dh / ts);        // side u = uMax
+      quadN(T00, T10, T11, T01, [0, 1, 0],  du / landTs, dv / landTs);   // top (walking surface)
+      quadN(B00, B01, B11, B10, [0, -1, 0], du / landTs, dv / landTs);   // underside
+      quadN(T00, T10, B10, B00, tNn,  du / landTs, dh / landTs);         // side v = vMin
+      quadN(T01, T11, B11, B01, tN,   du / landTs, dh / landTs);         // side v = vMax
+      quadN(T00, T01, B01, B00, dirNn, dv / landTs, dh / landTs);        // side u = uMin
+      quadN(T10, T11, B11, B10, dirN,  dv / landTs, dh / landTs);        // side u = uMax
     };
 
     // Emit every flight (upper flights downgrade "closed" to the diagonal
@@ -369,6 +383,20 @@ export class StairBuilder {
       selectable: false, floorLevel: 0, _ownsMaterial: !!(riserMatId && riserOvr),
     } satisfies MeshUserData;
     meshes.push(riserMesh);
+
+    // Landing slabs get their own mesh so they can carry their own material.
+    if (landAcc.vi > 0) {
+      const landGeo = accumToGeo(landAcc);
+      applyUVOffset(landGeo, landOvr?.offsetX ?? ovr?.offsetX ?? 0, landOvr?.offsetY ?? ovr?.offsetY ?? 0);
+      const landMesh = new THREE.Mesh(landGeo, landMat);
+      landMesh.castShadow    = true;
+      landMesh.receiveShadow = true;
+      landMesh.userData = {
+        editorId: stair.id, editorType: "stair", zoneId,
+        selectable: true, floorLevel: 0, _ownsMaterial: !!(landMatId && landOvr),
+      } satisfies MeshUserData;
+      meshes.push(landMesh);
+    }
 
     // ── Railings ─────────────────────────────────────────────────────────────
     // An open railing per side: a thin top rail following the slope, carried by

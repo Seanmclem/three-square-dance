@@ -3060,6 +3060,19 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
       />
+      {stair?.landing && (
+        <MaterialSection
+          key={selected.id + ":landing"}
+          label="LANDING"
+          defaultExpanded={false}
+          materialList={materialList}
+          currentMaterialId={stair?.landingMaterial ?? stair?.material ?? "concrete_01"}
+          overrides={stair?.landingMaterialOverrides}
+          onMaterialChange={id => onObjectUpdate({ landingMaterial: id, landingMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
+          onOverridesChange={ov => onObjectUpdate({ landingMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
+          onAddMaterial={onAddMaterial}
+        />
+      )}
     </>
   );
 }

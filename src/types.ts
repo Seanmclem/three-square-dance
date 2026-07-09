@@ -555,6 +555,8 @@ export interface StairDef {
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
+  landingMaterial?:          string;            // landing slabs; absent → body material
+  landingMaterialOverrides?: MaterialOverrides;
   csgCutter?:              StairCutterDef;
   groupIds?:               string[];
 }

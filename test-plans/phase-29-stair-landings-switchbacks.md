@@ -90,3 +90,11 @@ rejections from CDP-driven preview entry (documented in TESTING.md).
   ON + outer OFF → bare perimeter bars, posted inner rail (screenshot). ✅
 - Both driven via `__world.updateStair`; legacy worlds unchanged (new fields
   absent ⇒ both sides = `balusters`). Typecheck clean.
+
+## Addendum — v4.23.2 (independent landing material)
+
+- `landingMaterial: "white_smooth_concrete"` via `__world.updateStair` on the
+  user's 4-flight stairwell → white landings, concrete treads (screenshot);
+  absent → body material. Landing slabs are their own selectable mesh, emitted
+  only when landings exist (plain stairs unchanged: two meshes). Panel:
+  LANDING MaterialSection appears when a landing is set. Typecheck clean.

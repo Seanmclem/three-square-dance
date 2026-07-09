@@ -1364,7 +1364,7 @@ export default function App() {
           ...zone.walls.map(w => w.material),
           ...zone.floors.map(f => f.floorMesh.material),
           ...zone.platforms.flatMap(p => [p.material, p.sideMaterial]),
-          ...zone.stairs.flatMap(s => [s.material, s.riserMaterial]),
+          ...zone.stairs.flatMap(s => [s.material, s.riserMaterial, s.landingMaterial]),
         ].filter(m => m && idSet.has(m));
         if (hits.length) { count += hits.length; zones.add(zone.name); }
       }
