@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import type { StairRailBarrier } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
@@ -563,8 +564,9 @@ export class StairBuilder {
         // ── Path railing (Phase 29): continuous polylines over flights and
         // landings — sloped runs, level landing runs, corner posts. Path
         // vertices sit at walking-surface height; rails render `handrailH`
-        // above, posts rise from the vertex. Segments get +barThickness
-        // length so interior corners close without visible miter gaps.
+        // above, posts rise from the vertex. Interior corners are mitered on
+        // the bisector plane shared by both bars (no stubs); free path ends
+        // get the chamfered tip.
         const rl = computeRailPaths(stair, layout);
 
         for (const { position: p, side } of rl.posts) {
@@ -572,27 +574,86 @@ export class StairBuilder {
           addRail(new THREE.BoxGeometry(postT, handrailH, postT), p.x, p.y + handrailH / 2, p.z);
         }
 
+        // One rail bar between two lifted path vertices, built in world space
+        // around the segment midpoint (mesh gets no rotation). Each end is a
+        // chamfered free tip (both tip corners clipped 45°) or a miter cut on
+        // the bisector plane with the adjacent segment's direction `adj`.
+        const chamf = 0.3 * railBarT;
+        const railH = railBarT / 2;
+        const railBar = (
+          a: THREE.Vector3, b: THREE.Vector3,
+          xAxis: THREE.Vector3, yAxis: THREE.Vector3, zAxis: THREE.Vector3,
+          adjA: THREE.Vector3 | null, adjB: THREE.Vector3 | null,
+        ): THREE.BufferGeometry => {
+          const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
+          const len = a.distanceTo(b);
+          const pts: THREE.Vector3[] = [];
+          // Point at `v` offset dx along the bar and (sy·yr, sz·railH) across it.
+          const at = (v: THREE.Vector3, dx: number, sy: number, sz: number, yr = railH): THREE.Vector3 =>
+            new THREE.Vector3().copy(v)
+              .addScaledVector(xAxis, dx)
+              .addScaledVector(yAxis, sy * yr)
+              .addScaledVector(zAxis, sz * railH)
+              .sub(mid);
+          const addEnd = (v: THREE.Vector3, adj: THREE.Vector3 | null, inward: 1 | -1): void => {
+            if (adj) {
+              const n = new THREE.Vector3().addVectors(xAxis, adj);
+              const nd = n.lengthSq() > 1e-8 ? n.normalize().dot(xAxis) : 0;
+              if (Math.abs(nd) > 1e-4) {
+                // Long edges v+o+t·x̂ cut by the plane through v with normal n.
+                for (const sy of [1, -1]) for (const sz of [1, -1]) {
+                  const o = new THREE.Vector3()
+                    .addScaledVector(yAxis, sy * railH).addScaledVector(zAxis, sz * railH);
+                  pts.push(at(v, -n.dot(o) / nd, sy, sz));
+                }
+                return;
+              }
+            }
+            const tip = !adj && len >= 3 * chamf;   // chamfered free tip (square when too short)
+            for (const sy of [1, -1]) for (const sz of [1, -1]) {
+              if (tip) {
+                pts.push(at(v, 0, sy, sz, railH - chamf));   // small end face
+                pts.push(at(v, inward * chamf, sy, sz));     // full-section shoulder
+              } else {
+                pts.push(at(v, 0, sy, sz));
+              }
+            }
+          };
+          addEnd(a, adjA, 1);
+          addEnd(b, adjB, -1);
+          return new ConvexGeometry(pts);
+        };
+
         for (const { points: path } of rl.paths) {
+          // Non-degenerate segments with unit directions, for miter adjacency.
+          const segs: { a: THREE.Vector3; b: THREE.Vector3; dir: THREE.Vector3 }[] = [];
           for (let i = 0; i + 1 < path.length; i++) {
-            const a = path[i], b = path[i + 1];
-            const segX = b.x - a.x, segY = b.y - a.y, segZ = b.z - a.z;
-            const len = Math.hypot(segX, segY, segZ);
-            if (len < 1e-6) continue;
-            const xAxis = new THREE.Vector3(segX, segY, segZ).normalize();
-            const zAxis = new THREE.Vector3(-segZ, 0, segX).normalize();   // horizontal side
+            const d = new THREE.Vector3(
+              path[i + 1].x - path[i].x, path[i + 1].y - path[i].y, path[i + 1].z - path[i].z);
+            if (d.lengthSq() < 1e-12) continue;
+            segs.push({
+              a: new THREE.Vector3(path[i].x, path[i].y, path[i].z),
+              b: new THREE.Vector3(path[i + 1].x, path[i + 1].y, path[i + 1].z),
+              dir: d.normalize(),
+            });
+          }
+          for (let i = 0; i < segs.length; i++) {
+            const { a, b, dir } = segs[i];
+            const xAxis = dir;
+            const zAxis = new THREE.Vector3(-dir.z, 0, dir.x).normalize();   // horizontal side
             const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
             const quat = new THREE.Quaternion().setFromRotationMatrix(
               new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
             );
             if (showTopRail) {
-              // Every bar end gets the chamfered tip — free ends and the
-              // +barT/2 corner stubs alike (the stubs protrude past the joint
-              // and read as square ends otherwise). The full-thickness overlap
-              // still closes the corner.
-              addRail(
-                railBarGeo(len + railBarT, true, true),
-                (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
+              const up = new THREE.Vector3(0, handrailH, 0);
+              const geo = railBar(
+                new THREE.Vector3().copy(a).add(up), new THREE.Vector3().copy(b).add(up),
+                xAxis, yAxis, zAxis,
+                i > 0 ? segs[i - 1].dir : null,
+                i < segs.length - 1 ? segs[i + 1].dir : null,
               );
+              addRail(geo, (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2);
             }
             addBarrier(a.x, a.y, a.z, b.x, b.y, b.z, quat, yAxis);
           }
