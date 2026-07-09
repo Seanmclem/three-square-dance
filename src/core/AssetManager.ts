@@ -18,10 +18,25 @@ export class AssetManager {
   private _missingMaterialIds = new Set<string>();
   private _fallbackMat: THREE.MeshStandardMaterial | null = null;
   private _quality: QualityScale = 'high';
+  private _baseUrl: string | null = null;
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
   init(renderer: THREE.WebGLRenderer): void {
     this._renderer = renderer;
+  }
+
+  /**
+   * Base URL for the /assets/** tree (runtime shell: a remote manifest's
+   * assetsBase). Unset = same-origin absolute paths, the editor's behavior.
+   */
+  setBaseUrl(url: string): void {
+    this._baseUrl = url;
+  }
+
+  /** Resolve an asset path against the base URL (no-op when no base is set). */
+  private _resolve(path: string): string {
+    if (!this._baseUrl) return path;
+    return new URL(path.replace(/^\//, ''), this._baseUrl).href;
   }
 
   setQuality(q: QualityScale): void {
@@ -36,9 +51,9 @@ export class AssetManager {
   getQuality(): QualityScale { return this._quality; }
 
   /** Fetch manifest.json, populate the material registry, return the list. */
-  async initMaterials(): Promise<MaterialDef[]> {
+  async initMaterials(opts?: { verifyFiles?: boolean }): Promise<MaterialDef[]> {
     try {
-      const res = await fetch('/assets/textures/manifest.json');
+      const res = await fetch(this._resolve('/assets/textures/manifest.json'));
       if (!res.ok) {
         console.warn('AssetManager: no manifest found — material picker will be empty');
         this._materialRegistry = {};
@@ -47,8 +62,11 @@ export class AssetManager {
       const manifest: MaterialManifest = await res.json();
       // Filter out entries whose texture files are missing on disk (e.g. gitignored,
       // closed-source). They silently vanish from the UI; the manifest is left untouched.
-      const checks = await Promise.all(manifest.materials.map(m =>
-        this._fileExists(this._resolveQualityPath(m.maps.albedo.path))));
+      // verifyFiles:false skips the HEAD checks (cross-origin hosts may 405 them).
+      const checks = opts?.verifyFiles === false
+        ? manifest.materials.map(() => true)
+        : await Promise.all(manifest.materials.map(m =>
+            this._fileExists(this._resolveQualityPath(m.maps.albedo.path))));
       const present = manifest.materials.filter((_, i) => checks[i]);
       this._missingMaterialIds = new Set(manifest.materials.filter((_, i) => !checks[i]).map(m => m.id));
       if (this._missingMaterialIds.size)
@@ -86,9 +104,9 @@ export class AssetManager {
   }
 
   /** Fetch models/manifest.json, populate the asset registry, return the list. */
-  async initAssets(): Promise<AssetDef[]> {
+  async initAssets(opts?: { verifyFiles?: boolean }): Promise<AssetDef[]> {
     try {
-      const res = await fetch('/assets/models/manifest.json');
+      const res = await fetch(this._resolve('/assets/models/manifest.json'));
       if (!res.ok) {
         console.warn('AssetManager: no model manifest found');
         this._assetRegistry = {};
@@ -96,7 +114,9 @@ export class AssetManager {
       }
       const manifest: AssetManifest = await res.json();
       // Filter out entries whose model file is missing on disk (gitignored / closed-source).
-      const checks = await Promise.all(manifest.assets.map(a => this._fileExists(a.path)));
+      const checks = opts?.verifyFiles === false
+        ? manifest.assets.map(() => true)
+        : await Promise.all(manifest.assets.map(a => this._fileExists(a.path)));
       const present = manifest.assets.filter((_, i) => checks[i]);
       this._missingAssetIds = new Set(manifest.assets.filter((_, i) => !checks[i]).map(a => a.id));
       if (this._missingAssetIds.size)
@@ -111,16 +131,18 @@ export class AssetManager {
   }
 
   /** Fetch decals/manifest.json, populate the decal-texture registry, return the list. */
-  async initDecals(): Promise<DecalTexDef[]> {
+  async initDecals(opts?: { verifyFiles?: boolean }): Promise<DecalTexDef[]> {
     try {
-      const res = await fetch('/assets/decals/manifest.json');
+      const res = await fetch(this._resolve('/assets/decals/manifest.json'));
       if (!res.ok) {
         console.warn('AssetManager: no decal manifest found — decal picker will be empty');
         this._decalRegistry = {};
         return [];
       }
       const manifest: DecalManifest = await res.json();
-      const checks  = await Promise.all(manifest.decals.map(d => this._fileExists(d.path)));
+      const checks  = opts?.verifyFiles === false
+        ? manifest.decals.map(() => true)
+        : await Promise.all(manifest.decals.map(d => this._fileExists(d.path)));
       const present = manifest.decals.filter((_, i) => checks[i]);
       const missing = manifest.decals.filter((_, i) => !checks[i]);
       if (missing.length)
@@ -145,7 +167,7 @@ export class AssetManager {
   /** HEAD-check a static file's existence (used to hide manifest entries with missing files). */
   private async _fileExists(url: string): Promise<boolean> {
     try {
-      const res = await fetch(url, { method: 'HEAD' });
+      const res = await fetch(this._resolve(url), { method: 'HEAD' });
       return res.ok;
     } catch {
       return false;
@@ -183,7 +205,7 @@ export class AssetManager {
     const key = `${url}:${colorSpace}`;
     const cached = this._textureCache.get(key);
     if (cached) return cached;
-    const tex = await this._textureLoader.loadAsync(url);
+    const tex = await this._textureLoader.loadAsync(this._resolve(url));
     tex.wrapS      = THREE.RepeatWrapping;
     tex.wrapT      = THREE.RepeatWrapping;
     tex.colorSpace = colorSpace;
@@ -332,7 +354,7 @@ export class AssetManager {
     if (mtlPath) {
       try {
         const { MTLLoader } = await import("three/addons/loaders/MTLLoader.js");
-        const materials = await new MTLLoader().loadAsync(mtlPath) as { preload(): void };
+        const materials = await new MTLLoader().loadAsync(this._resolve(mtlPath)) as { preload(): void };
         materials.preload();
         loader.setMaterials(materials as Parameters<typeof loader.setMaterials>[0]);
       } catch (err) {
@@ -340,7 +362,7 @@ export class AssetManager {
       }
     }
 
-    const obj = await loader.loadAsync(path);
+    const obj = await loader.loadAsync(this._resolve(path));
     // MeshPhongMaterial doesn't use the scene env map; convert to Standard so IBL applies.
     obj.traverse(child => {
       if (!(child instanceof THREE.Mesh)) return;
@@ -373,7 +395,7 @@ export class AssetManager {
     const loader = this._gltfLoader as { loadAsync: (url: string) => Promise<unknown> };
     const def  = this._assetRegistry[assetId];
     const url  = def?.path ?? `/assets/models/${assetId}.glb`;
-    const gltf = await loader.loadAsync(url);
+    const gltf = await loader.loadAsync(this._resolve(url));
     this._gltfCache.set(assetId, gltf);
     return gltf;
   }

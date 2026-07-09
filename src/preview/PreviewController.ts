@@ -51,9 +51,14 @@ export class PreviewController {
       const capsuleBottom = (0.6 + 0.3) * (settings.characterScale ?? 1); // (halfHeight + radius) * scale
       spawnPos = new THREE.Vector3(s.position.x, s.position.y + capsuleBottom, s.position.z);
       facingDeg = s.facingDeg;
-    } else {
+    } else if (this._scene.editorCamera) {
       const f = this._scene.editorCamera.focus;
       spawnPos = new THREE.Vector3(f.x, f.y + 1.5, f.z);
+    } else {
+      // Game-mode SceneManager has no editor camera; a scene without a
+      // defaultSpawn lands here — spawn at origin rather than crash.
+      console.warn("[PreviewController] no defaultSpawn in scene — spawning at origin");
+      spawnPos = new THREE.Vector3(0, 1.5, 0);
     }
 
     const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, loadBindings());

@@ -14,7 +14,8 @@ export class SceneManager {
   public readonly scene:        THREE.Scene;
   public readonly camera:       THREE.PerspectiveCamera;
   public readonly renderer:     THREE.WebGLRenderer;
-  public readonly editorCamera: EditorCamera;
+  /** null in game mode (runtime shell) — the character camera drives rendering there. */
+  public readonly editorCamera: EditorCamera | null;
 
   private readonly _clock:           THREE.Clock;
   private readonly _updateCallbacks: UpdateCallback[] = [];
@@ -25,10 +26,11 @@ export class SceneManager {
   private readonly _onResize: () => void;
 
   private readonly _sunLight:     THREE.DirectionalLight;
-  private readonly _viewHelper:   ViewHelper;
-  private readonly _viewHelperEl: HTMLDivElement;
+  private readonly _viewHelper:   ViewHelper | null = null;
+  private readonly _viewHelperEl: HTMLDivElement | null = null;
 
-  constructor(canvas: HTMLCanvasElement, bus: EventBus) {
+  constructor(canvas: HTMLCanvasElement, bus: EventBus, opts?: { mode?: "editor" | "game" }) {
+    const editor = (opts?.mode ?? "editor") === "editor";
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -41,18 +43,20 @@ export class SceneManager {
     this.scene = new THREE.Scene();
 
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
-    this.editorCamera = new EditorCamera(this.camera, canvas, bus);
+    this.editorCamera = editor ? new EditorCamera(this.camera, canvas, bus) : null;
 
     this._sunLight  = this._setupLighting();
     this._setupSky();
-    this._setupGrid();
+    if (editor) this._setupGrid();   // grid helpers + demo ground are editor furniture
 
-    const helperEl = document.createElement("div");
-    helperEl.style.cssText =
-      "position:absolute;left:0;bottom:0;width:172px;height:128px;pointer-events:none;z-index:1;";
-    canvas.parentElement?.appendChild(helperEl);
-    this._viewHelperEl = helperEl;
-    this._viewHelper = new ViewHelper(this.camera, helperEl as unknown as HTMLCanvasElement);
+    if (editor) {
+      const helperEl = document.createElement("div");
+      helperEl.style.cssText =
+        "position:absolute;left:0;bottom:0;width:172px;height:128px;pointer-events:none;z-index:1;";
+      canvas.parentElement?.appendChild(helperEl);
+      this._viewHelperEl = helperEl;
+      this._viewHelper = new ViewHelper(this.camera, helperEl as unknown as HTMLCanvasElement);
+    }
 
     this._onResize = this._handleResize.bind(this);
     window.addEventListener("resize", this._onResize);
@@ -153,8 +157,8 @@ export class SceneManager {
 
   setPreviewCamera(cam: THREE.PerspectiveCamera | null): void {
     this._previewCamera = cam;
-    this.editorCamera.enabled = (cam === null);
-    this._viewHelperEl.style.display = cam ? "none" : "";
+    if (this.editorCamera) this.editorCamera.enabled = (cam === null);
+    if (this._viewHelperEl) this._viewHelperEl.style.display = cam ? "none" : "";
     if (cam === null) {
       // Restore editor camera aspect
       const w = this.renderer.domElement.clientWidth;
@@ -167,11 +171,11 @@ export class SceneManager {
   private _loop(): void {
     if (this._disposed) return;
     const dt = this._clock.getDelta();
-    if (!this._previewCamera) this.editorCamera.update(dt);
+    if (!this._previewCamera) this.editorCamera?.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
     this.renderer.clear();
     this.renderer.render(this.scene, this._previewCamera ?? this.camera);
-    if (!this._previewCamera) this._viewHelper.render(this.renderer);
+    if (!this._previewCamera) this._viewHelper?.render(this.renderer);
     this._raf = requestAnimationFrame(this._loopBound);
   }
 
@@ -187,9 +191,9 @@ export class SceneManager {
   dispose(): void {
     this._disposed = true;
     cancelAnimationFrame(this._raf);
-    this.editorCamera.dispose();
+    this.editorCamera?.dispose();
     window.removeEventListener("resize", this._onResize);
-    this._viewHelperEl.remove();
+    this._viewHelperEl?.remove();
     this.renderer.dispose();
   }
 }
