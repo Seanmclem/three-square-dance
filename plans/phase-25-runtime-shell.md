@@ -2,8 +2,12 @@
 
 > Status: **PLANNED** — not yet implemented.
 > Target version: next free minor at implementation time (do not pin — versions
-> race ahead). Assumes phase 24 (ControlSchemeManager) lands
-> first — renumber if ordering changes.
+> race ahead). Phase 24 (ControlSchemeManager) shipped as v4.15.0, so its
+> input system is a given, not an assumption.
+> **Reconciled 2026-07-08 against v4.19.0** (decals, shapes, brush/face/edge
+> editing, ControlSchemeManager + pause menu, bake-to-GLB, hull/trimesh
+> colliders all shipped since the original draft) — line anchors and the
+> overlay/input design below reflect current code.
 
 A lightweight web runtime, separate from the editor, served from the **same
 repo as a second Vite entry** (`runtime.html` + `src/runtime/`). It boots from
@@ -34,7 +38,13 @@ builds the shell around it.
 - `SceneRouter` with full teardown/reload between scene files; a new
   `load_scene` script action so authored content can trigger scene changes.
 - DOM/React main menu (title, description, Start, Continue), loading screen,
-  error screens; `PreviewHUD` / `DialogueOverlay` / `FadeOverlay` reused as-is.
+  error screens; the full preview overlay set reused: `PreviewHUD` (needs its
+  phase-24 `scheme` prop), `DialogueOverlay` (advances on `action:confirm`;
+  runtime emits `dialogue:closed` in onClose), `FadeOverlay`
+  (`src/preview/FadeOverlay.tsx`), `TouchControlsOverlay` (gated on active
+  scheme === "touch" — without it touch input is dead), and `PauseMenu` +
+  App's `action:cancel` handler pattern (runtime routes "exit" to the menu
+  screen instead of the editor).
 - Runtime game save (state + fired one-shots + current scene + pose),
   namespaced per manifest id, separate from the editor's localStorage keys.
 
@@ -61,26 +71,32 @@ non-game "preview" mode (editor-camera spawn fallback) stays editor-only.
 | Where | Today | Problem |
 |---|---|---|
 | `src/core/SceneManager.ts:44` | Hard-wires `new EditorCamera(this.camera, canvas, bus)`; also ViewHelper (`:55`), grid + demo ground (`_setupGrid`) | The one real editor coupling in the engine layer. Runtime needs a SceneManager with no editor camera, no ViewHelper, no grid/ground. |
-| `src/preview/PreviewController.ts:48` | Non-game preview path reads `this._scene.editorCamera.focus` | NPEs once `editorCamera` is nullable. Runtime only calls `enter("game")`, but the type must be honest. |
-| `src/core/AssetManager.ts` | `fetch('/assets/textures/manifest.json')`, `/assets/models/...` — absolute-from-origin paths; HEAD existence checks (`_fileExists`) | No base-URL indirection: remote manifests can't resolve assets, and cross-origin HEAD checks spuriously hide assets (some hosts 405 HEAD). |
-| `src/App.tsx` (1903 lines) | The only composition root; owns save/load, preview lifecycle (`preview:start` handler `:358`), dialogue/fade state | Nothing wrong — the decision is to **not** refactor it. Runtime duplicates ~120 lines of glue instead (§3.1). |
+| `src/preview/PreviewController.ts:48` | Non-game preview path reads `this._scene.editorCamera.focus`. (Since phase 24, `enter()` also constructs `ControlSchemeManager` + `loadBindings()` internally and passes it to `CharacterController` — the runtime inherits kbm/gamepad/touch for free.) | NPEs once `editorCamera` is nullable. Runtime only calls `enter("game")`, but the type must be honest. |
+| `src/core/AssetManager.ts` | `fetch('/assets/textures/manifest.json')` (`:41`), models manifest (`:91`), **decals manifest (`:116`)** — absolute-from-origin paths; HEAD existence checks (`_fileExists`, `:146`); texture map paths (`loadTexture` `:186`), model defaults (`loadModel`/`loadGLTF` `:306`/`:375`), OBJ/MTL paths (`:325-343`) | No base-URL indirection: remote manifests can't resolve assets, and cross-origin HEAD checks spuriously hide assets (some hosts 405 HEAD). Collider presets ride the models manifest (COLLIDERS_GUIDE), so they come free once the manifest fetch is base-resolved. |
+| `src/App.tsx` (2167 lines) | The only composition root; owns save/load, preview lifecycle (`preview:start` handler `:411-428`), dialogue/fade/pause state, `action:cancel` handling (`:441-455`) | Nothing wrong — the decision is to **not** refactor it. Runtime duplicates ~150 lines of glue instead (§3.1). |
 | `vite.config.ts` | Single implicit entry (`index.html`) | Needs `build.rollupOptions.input` with a second `runtime.html` entry. |
 | `src/types.ts` (`ActionType`, `ScriptAction`, `BusEvents`) | No cross-scene action; `TransitionDef` (`:550`) covers zone→zone within one file only | Need `load_scene` action + `scene:load-request` bus event. |
 | `src/scripting/GameState.ts:5` | `GAMESAVE_KEY = "worldeditor_gamesave"`; App.tsx also owns `worldeditor_autosave` | Runtime saves must not collide with editor saves on the same origin (dev serves both entries). |
 
 What already exists and is reused untouched (verified: zero `@/editor` /
 `@/ui` imports): `WorldState` (`toJSON`/`loadFromJSON` of `SceneFile`),
-`ZoneManager` + the pure builders, `PreviewController`/`CharacterController`/
-`TriggerSystem`/`ObjectPlacer`, `ScriptEngine` + `gameState`, `physicsWorld`
-(StrictMode-safe `init()`), `WorldLoader` migrations, and the bus-driven React
-overlays (`PreviewHUD`, `DialogueOverlay`, `FadeOverlay`).
+`ZoneManager` + the pure builders (its `loadZone`/`unloadZone` fully handle
+the new `ZoneDef.shapes`/`ZoneDef.decals` arrays incl. hull/trimesh collider
+teardown), `PreviewController`/`CharacterController`/`TriggerSystem`/
+`ObjectPlacer`, the whole `src/input/` system (owned by `PreviewController`),
+`ScriptEngine` + `gameState`, `physicsWorld` (StrictMode-safe `init()`),
+`WorldLoader` migrations, and the bus-driven React overlays (`PreviewHUD`,
+`DialogueOverlay`, `FadeOverlay`, `TouchControlsOverlay`, `PauseMenu`).
+One caveat: `src/dev/testHelpers.ts` statically imports `@/editor/bakeShapes`
+— the runtime loads it via DEV-gated dynamic import so no editor code lands
+in the runtime chunk graph (§5.7).
 
 ---
 
 ## 3. Key decisions
 
 1. **Runtime gets its own small composition root; App.tsx is not refactored.**
-   The engine classes are already editor-clean; App.tsx's 1903 lines are ~90%
+   The engine classes are already editor-clean; App.tsx's 2167 lines are ~90%
    editor tooling and React state fan-out. A shared `createEngine()` factory
    would thread ~10 constructor params to save ~120 lines of duplication while
    putting every editor feature at regression risk. Duplicating the glue
@@ -92,7 +108,7 @@ overlays (`PreviewHUD`, `DialogueOverlay`, `FadeOverlay`).
    zero editor churn). Game mode skips EditorCamera, ViewHelper, and
    `_setupGrid()` (grid helpers *and* the demo ground plane — runtime worlds
    bring their own floors). `editorCamera` becomes `EditorCamera | null`; only
-   two external references exist (`App.tsx:234` dev global,
+   two external references exist (`App.tsx:269` dev global,
    `PreviewController.ts:48`). Render loop needs only guards
    (`this.editorCamera?.update(dt)`, skip ViewHelper render). **Before Start,
    the canvas renders sky + lighting with the static default camera — that's
@@ -197,29 +213,51 @@ public/demo/
 
 1. Read `?manifest=` from `location.search`. Absent → menu renders a URL
    input (v1's stand-in for the launcher).
-2. `loadManifest()`; `assetManager.setBaseUrl(loaded.assetsBaseUrl.href)`.
-3. Construct engine (mirrors `App.tsx:168-230`, minus every editor tool):
-   `EventBus`, `new SceneManager(canvas, bus, { mode: "game" })`,
-   `assetManager.init(renderer)`, `WorldState`, `ObjectPlacer`, `ZoneManager`,
-   `PreviewController`, `ScriptEngine`, `gameState.attach(bus)`, plus
-   `scene.onUpdate` hooks for `physicsWorld.step`, `objectPlacer.update`, and
+2. `loadManifest()`; `assetManager.setBaseUrl(loaded.assetsBaseUrl.href)` —
+   **before any assetManager init call** (unlike App, which fires
+   `initMaterials()` before its async block, the runtime must await the
+   manifest first so the base URL is set).
+3. Construct engine (mirrors `App.tsx:194-258`, minus every editor tool and
+   `HistoryManager`): `EventBus`, `new SceneManager(canvas, bus,
+   { mode: "game" })`, `assetManager.init(renderer)`, `WorldState`,
+   `ObjectPlacer`, `ZoneManager`, `PreviewController` (which owns
+   `ControlSchemeManager` since phase 24 — the runtime constructs no input
+   code), `ScriptEngine`, `gameState.attach(bus)`, plus `scene.onUpdate`
+   hooks for `physicsWorld.step`, `objectPlacer.update`, and
    `zones.updateVolumeVisuals`.
-4. `await Promise.all([physicsWorld.init(), assetManager.initMaterials(),
-   assetManager.initAssets()])` — same race-avoidance as `App.tsx:313`
-   (materials must be registered before builders run), guarded by the same
-   StrictMode `active` flag pattern (`App.tsx:304`).
+4. Mirror App's init shape (`App.tsx:353-399`): store
+   `materialsReady = assetManager.initMaterials()`, fire `initAssets()` +
+   `initDecals()` without awaiting, then
+   `await Promise.all([physicsWorld.init(), materialsReady])` under the
+   StrictMode `active`-flag pattern (`App.tsx:353`).
 5. Show menu over the sky-only canvas. **Start** → clear runtime save,
    `gameState.reset()`, `router.go(entryScene, { newGame: true })`.
    **Continue** → restore save (§8), `router.go(save.sceneId, { resume: true })`.
 6. React overlays mounted alongside the canvas, wired to the same bus exactly
-   as App.tsx does: `PreviewHUD`, `DialogueOverlay`, `FadeOverlay` — ~40 lines,
-   all bus-driven, no editor imports.
+   as App.tsx does (all bus-driven, no editor imports):
+   - `PreviewHUD` — now needs the phase-24 `scheme` prop; track the active
+     scheme via an `input:scheme-changed` subscription.
+   - `DialogueOverlay` — advances on the `action:confirm` bus event (phase
+     24); the runtime's `onClose` must emit `dialogue:closed` (feeds
+     `ControlSchemeManager` menu-mode).
+   - `FadeOverlay` (`src/preview/FadeOverlay.tsx`) — fed by `overlay:fade-in`.
+   - `TouchControlsOverlay` — gated on `scheme === "touch" && preview.input`,
+     props `{ shared, joystickRadius, layout }` from `preview.input.touch` /
+     `preview.input.bindings.touch` (mirror App ~`:2007`). Without it, touch
+     input is dead.
+   - `PauseMenu` + the `action:cancel` handler pattern (App `:441-455`: close
+     dialogue → close pause → open pause via `pause:show`); the runtime's
+     pause-menu "exit" goes to the menu screen instead of the editor.
+   - DEV only: `FpsCounter`.
 7. DEV globals per TESTING.md conventions:
    `window.__runtime = { router, manifest, bus, world, zones, preview,
-   scriptEngine, gameState }`, plus reuse `installTestHelpers(...)` so the
-   existing `window.__test` recipes work in the runtime tab too.
-8. Escape while playing → `preview.exit()` + back to menu (Continue reflects
-   the auto-saved position). This is v1's whole pause system.
+   scriptEngine, gameState }`, plus `installTestHelpers(...)` loaded via a
+   DEV-gated **dynamic** import (it statically imports `@/editor/bakeShapes`;
+   a lazy chunk keeps editor code out of the runtime graph) so the existing
+   `window.__test` recipes work in the runtime tab too.
+8. Exit while playing: Escape (kbm) and the pause menu's exit (all schemes)
+   → `preview.exit()` + back to menu (Continue reflects the auto-saved
+   position).
 
 ---
 
@@ -249,13 +287,14 @@ export class SceneRouter {
    `setPreviewCamera(null)` (game-mode SceneManager keeps rendering with the
    default camera; harmless behind the fade).
 5. Unload **all** loaded zones — `unloadZone` removes every mesh, Rapier
-   collider, and door/volume sensor (verified `ZoneManager.ts:500`).
+   collider (incl. shape hulls/trimeshes), door/volume sensor, and
+   decal/surface-patch maps (verified `ZoneManager.ts:576-641`).
 6. `fetch(manifest.sceneUrl(sceneId))`; parse; run migrations exactly as
-   `App.tsx:637-640` (`migrateWallNodes`, `migrateUVs`, `pruneOrphanNodes`).
+   `App.tsx:744-749` (`migrateWallNodes`, `migrateUVs`, `pruneOrphanNodes`).
 7. `world.loadFromJSON(file)` (emits `world:loaded`; sets
    `activeZoneId = zones[0]`).
 8. `await zones.loadZone(world.activeZoneId)`.
-9. Re-index scripts (mirror `App.tsx:363-368`): `clearIndex(); loadWorld(...);
+9. Re-index scripts (mirror `App.tsx:417-420`): `clearIndex(); loadWorld(...);
    loadZone(activeZone)`.
 10. `gameState.configureSchema(world.world?.stateSchema ?? DEFAULT)` —
     **no reset**; new keys seed defaults, existing values persist.
@@ -264,12 +303,12 @@ export class SceneRouter {
     clears the set) — unless `newGame`.
 12. `preview.enter("game")` (spawns at `world.defaultSpawn`; emits
     `preview:start` — the runtime's handler starts the 30s game-autosave,
-    mirroring `App.tsx:374`). On `resume`, follow with `character:teleport`
+    mirroring `App.tsx:427`). On `resume`, follow with `character:teleport`
     to the saved pose if one exists.
 13. First entry of a run only (`newGame || resume` from the menu):
     `scriptEngine.onGameStart()`. Every entry: fire `on_level_load` for the
     active zone — do **not** synthesize `bus.emit("zone:enter")`, which would
-    also trip ZoneManager's zone-swap handler (`ZoneManager.ts:323`).
+    also trip ZoneManager's zone-swap handler (`ZoneManager.ts:386`).
 14. Hide LoadingScreen; `bus.emit("overlay:fade-out", …)`.
 
 Router subscribes to `bus.on("scene:load-request", ({ sceneId }) =>
@@ -296,12 +335,12 @@ the current scene.
 |---|---|
 | `src/core/SceneManager.ts` | Ctor gains `opts?: { mode?: "editor" \| "game" }` (default `"editor"`). Game mode: skip `new EditorCamera` (field becomes `editorCamera: EditorCamera \| null`), skip ViewHelper + its DOM element, skip `_setupGrid()`. Guards: `this.editorCamera?.update(dt)` in the loop, `?.` in `setPreviewCamera`/`dispose`, skip ViewHelper render. |
 | `src/preview/PreviewController.ts` | `:48` fallback becomes `this._scene.editorCamera?.focus ?? new THREE.Vector3(0, 0, 0)` (runtime only calls `enter("game")`; this keeps the type honest). Missing `defaultSpawn` in game mode: fail soft — spawn at origin + console warn. |
-| `src/core/AssetManager.ts` | `setBaseUrl(url: string)` (default = document origin) + private `_resolve(path)` applied at every fetch/loader URL (`initMaterials`, `initAssets`, `_fileExists`, texture + model load paths). `initMaterials`/`initAssets` gain `opts?: { verifyFiles?: boolean }` (runtime passes `false` — cross-origin HEAD checks would spuriously hide assets). |
+| `src/core/AssetManager.ts` | `setBaseUrl(url: string)` (default = document origin) + private `_resolve(path)` applied at **every** fetch/loader URL: `initMaterials` (`:41`), `initAssets` (`:91`), `initDecals` (`:116`), `_fileExists` (`:146`), `loadTexture` (`:186` + `_buildMaterial` map paths), `loadModel`/`loadGLTF` defaults (`:306`/`:375`), OBJ/MTL paths (`:325-343`). `initMaterials`/`initAssets`/`initDecals` gain `opts?: { verifyFiles?: boolean }` (runtime passes `false` — cross-origin HEAD checks would spuriously hide assets). |
 | `src/types.ts` | `ActionType += 'load_scene'`; `ScriptAction.sceneId?`; `BusEvents["scene:load-request"]`. |
 | `src/scripting/ScriptEngine.ts` | One dispatch case (§6). |
 | `src/ui/ScriptPanel.tsx` | `load_scene` entry + text field. |
 | `vite.config.ts` | `build: { rollupOptions: { input: { main: resolve(__dirname, "index.html"), runtime: resolve(__dirname, "runtime.html") } } }`. Dev server needs nothing — `localhost:7373/runtime.html` just works. |
-| `src/App.tsx` | `:234` dev global tolerates null editorCamera. Otherwise **untouched**. |
+| `src/App.tsx` | `:269` dev global tolerates null editorCamera. Otherwise **untouched**. |
 
 Everything else is new files under `src/runtime/` + `public/demo/` (§5).
 
@@ -314,8 +353,9 @@ Everything else is new files under `src/runtime/` + `public/demo/` (§5).
 | `worldeditor_autosave` / `_ts` | Editor (unchanged) | Scene JSON autosave |
 | `worldeditor_gamesave` | Editor preview (unchanged) | Editor-preview play save |
 | `runtime_gamesave:<manifest.id>` | **Runtime (new)** | `{ version: 1, ts, sceneId, state: gameState.snapshot(), firedOneShots, pose?: {x,y,z,facing} }` |
+| `worldbuilder.bindings.v1` | Shared (phase 24) | Input bindings — a **device pref**, deliberately shared between editor preview and runtime (not world data, no namespacing needed). |
 
-`src/runtime/saveGame.ts` (~30 lines, modeled on `App.tsx:281-301` but adding
+`src/runtime/saveGame.ts` (~30 lines, modeled on `App.tsx:330-348` but adding
 `sceneId` + pose read on the 30s tick). Namespacing by `manifest.id` means two
 different games on the same origin never clobber each other, and neither
 touches editor keys. Menu's Continue button = save key exists.
@@ -329,9 +369,11 @@ touches editor keys. Menu's Continue button = save key exists.
 | `scene:load-request` | ScriptEngine (`load_scene` action) → SceneRouter | `{ sceneId: string }` |
 
 Everything else reuses existing events (`preview:start/stop`, `world:loaded`,
-`dialogue:show`, `overlay:fade-in/out`, `zone:activated`). Deliberately no
-`scene:loaded` event in v1 — `world:loaded` + `preview:start` cover the
-shell's needs.
+`dialogue:show`/`dialogue:closed`, `overlay:fade-in/out`, `zone:activated`,
+`input:scheme-changed`, `action:confirm`/`action:cancel`,
+`pause:show`/`pause:closed`). Note: a `scene:loaded` event already exists in
+`BusEvents` (types.ts:219) with a different, editor-side meaning — the new
+event is deliberately named `scene:load-request` to avoid colliding with it.
 
 ---
 
@@ -339,8 +381,18 @@ shell's needs.
 
 - [ ] **StrictMode double-mount**: RuntimeApp keeps StrictMode for parity;
   replicate App.tsx's `active` flag around the async boot IIFE
-  (`App.tsx:304`). `physicsWorld.init()` is already re-entrant-safe (returns
+  (`App.tsx:353`). `physicsWorld.init()` is already re-entrant-safe (returns
   the in-flight promise).
+- [ ] **Touch is dead without `TouchControlsOverlay`**: mount it gated on the
+  active scheme (tracked via `input:scheme-changed`) — reusing
+  PreviewController's input is not enough on its own.
+- [ ] **Dialogue advance needs `dialogue:closed`**: the overlay advances on
+  `action:confirm`, which ControlSchemeManager only emits in menu mode —
+  entered on `dialogue:show`, exited on `dialogue:closed`. The runtime's
+  onClose must emit it (mirror App).
+- [ ] **`installTestHelpers` drags in `@/editor/bakeShapes`**: load it via a
+  DEV-gated dynamic import in the runtime; verify the prod runtime chunks
+  contain no `@/editor` code (grep dist).
 - [ ] **Physics singleton across scene loads**: collider count must return to
   baseline after teardown — verify across `A→B→A` cycles; a leak compounds
   per transition.
@@ -363,7 +415,7 @@ shell's needs.
   must never write `worldeditor_autosave`.
 - [ ] **Timers across transitions**: `deactivate()` clears script timers
   (verified); the runtime's own 30s autosave interval is cleared on
-  `preview:stop` and re-created per scene entry (mirror `App.tsx:374-381`).
+  `preview:stop` and re-created per scene entry (mirror `App.tsx:427-437`).
 - [ ] **Missing `defaultSpawn`** in a scene file: fail soft (origin + warn),
   don't crash (§7 PreviewController edit).
 - [ ] **Sky-only canvas before Start** renders at full RAF rate — acceptable
@@ -396,12 +448,14 @@ to main and gets its `test-plans/` doc at the end (25.6).
    clean; `npm run build` emits both entries; editor unaffected.
 3. **25.3 — Manifest + single-scene play.** `manifest.ts`, `public/demo/`
    fixture (one scene first, authored in the editor), MainMenu (Start),
-   LoadingScreen/ErrorScreen, full engine wiring, HUD/Dialogue/Fade overlays,
-   `installTestHelpers` + `window.__runtime`.
+   LoadingScreen/ErrorScreen, full engine wiring, all five overlays
+   (HUD+scheme / Dialogue+`dialogue:closed` / Fade / TouchControls / PauseMenu
+   with `action:cancel` handling), `window.__runtime` + DEV-dynamic
+   `installTestHelpers`.
    → verify: `/runtime.html?manifest=/demo/manifest.json` → Start → character
-   spawns at `defaultSpawn`, walks, interacts (dialogue shows/advances),
-   in-scene zone transitions still work; bad manifest URL → ErrorScreen;
-   typecheck.
+   spawns at `defaultSpawn`, walks, interacts (dialogue shows/advances via
+   confirm), pause opens/closes and exits to menu, in-scene zone transitions
+   still work; bad manifest URL → ErrorScreen; typecheck.
 4. **25.4 — SceneRouter + `load_scene`.** Types/ScriptEngine/ScriptPanel
    edits, router with the §6 sequence, one-shot carry-over, second demo scene
    + portal trigger volume.
@@ -463,10 +517,10 @@ to main and gets its `test-plans/` doc at the end (25.6).
    scene, like `TransitionDef.spawnPoint` one level down)? Default: no — v1
    always uses the target scene's `defaultSpawn`; add `load_scene.spawnId`
    later if demo authoring demands it.
-2. **Should Escape pause (freeze the loop) rather than exit to menu?**
-   Default: exit-to-menu with autosave — cheapest correct behavior; a real
-   pause needs input suppression that Phase 24's ControlSchemeManager
-   provides anyway.
+2. **Pause behavior?** Resolved by phase 24b shipping `PauseMenu`: the
+   runtime reuses it via the `action:cancel` flow (works on kbm/gamepad/
+   touch), with its exit option routed to the runtime menu. Escape (kbm)
+   remains a direct exit-to-menu with autosave, mirroring the editor.
 3. **Demo fixture**: hand-authored JSON vs exported from a real editor
    session. Default: author in the editor, save, commit the JSON — proves the
    "export already works" claim.
