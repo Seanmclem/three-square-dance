@@ -184,9 +184,10 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   // have walls there; without them the outer rail just stops at each landing.
   const perimeter = r?.landingPerimeter ?? false;
 
-  // Frame-space path points, converted to world at the end.
+  // Frame-space path points, converted to world at the end. `freeStart` marks
+  // paths whose first vertex is an overhang tip (freeEnd) — no post there.
   type P = { u: number; v: number; y: number };
-  const paths: { pts: P[]; side: RailSide }[] = [];
+  const paths: { pts: P[]; side: RailSide; freeStart?: boolean }[] = [];
 
   const uLow  = (k: number) => (k % 2 === 0 ? 0 : run);       // flight k's low-end boundary
   const uHigh = (k: number) => (k % 2 === 0 ? run : 0);       // flight k's high-end boundary
@@ -218,7 +219,7 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
         if (s === 1)                                             // far edge, once
           pts.push({ u: run + D - cfg.inset, v: -(lw / 2 - cfg.inset), y: topY(0) });
       }
-      paths.push({ pts, side });
+      paths.push({ pts, side, freeStart: true });
     }
   } else {
     // Rail v-lines per flight parity: inner hugs the void, outer hugs the perimeter.
@@ -231,7 +232,7 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
       inner.push({ u: uHigh(k), v: vInner(k + 1), y: topY(k) });   // level across the void edge
       // …and straight up flight k+1 (next loop iteration), or free end here on the top landing.
     }
-    paths.push({ pts: inner, side: "inner" });
+    paths.push({ pts: inner, side: "inner", freeStart: true });
 
     if (perimeter) {
       // One continuous outer path wrapping every landing's three outer edges.
@@ -244,14 +245,14 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
         outer.push({ u: uHigh(k), v: vOuter(k + 1), y });   // side edge onto next flight's line
         // Top landing: this last vertex is the corner of the open exit edge — terminate.
       }
-      paths.push({ pts: outer, side: "outer" });
+      paths.push({ pts: outer, side: "outer", freeStart: true });
     } else {
       // Per-flight outer rails that stop at each landing boundary.
       for (let k = 0; k < flightsCount; k++) {
         const start: P = k === 0
           ? freeEnd(vOuter(0))
           : { u: uLow(k), v: vOuter(k), y: topY(k - 1) };
-        paths.push({ pts: [start, { u: uHigh(k), v: vOuter(k), y: topY(k) }], side: "outer" });
+        paths.push({ pts: [start, { u: uHigh(k), v: vOuter(k), y: topY(k) }], side: "outer", freeStart: k === 0 });
       }
     }
   }
@@ -271,17 +272,20 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     posts.push({ p, side: curSide });
   };
 
-  for (const { pts, side } of paths) {
+  for (const { pts, side, freeStart } of paths) {
     curSide = side;
-    for (const p of pts) addPost(p);
+    for (let i = freeStart ? 1 : 0; i < pts.length; i++) addPost(pts[i]);
     for (let i = 0; i + 1 < pts.length; i++) {
       const a = pts[i], b = pts[i + 1];
       const horiz = Math.hypot(b.u - a.u, b.v - a.v);
       if (horiz < 1e-6) continue;
       if (Math.abs(b.y - a.y) > 1e-6) {
-        // Sloped segment — posts at the tread anchors it passes over.
-        for (let i2 = 0; i2 < numSteps; i2 += cfg.stepEvery) addAnchorPost(a, b, i2);
-        if ((numSteps - 1) % cfg.stepEvery !== 0) addAnchorPost(a, b, numSteps - 1);
+        // Sloped segment — posts at the tread anchors it passes over. Anchors
+        // that crowd a corner post half a step away are skipped: the top
+        // anchor always (segment tops are landing corners), and the bottom
+        // anchor unless that end is a free overhang tip (which has no post).
+        const first = freeStart && i === 0 ? 0 : cfg.stepEvery;
+        for (let i2 = first; i2 < Math.max(1, numSteps - 1); i2 += cfg.stepEvery) addAnchorPost(a, b, i2);
       } else {
         // Level segment — evenly spaced interior posts, corners already placed.
         const spacing = cfg.stepEvery * stepDepth;
