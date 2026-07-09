@@ -478,6 +478,30 @@ export class StairBuilder {
         });
       };
 
+      // Top-rail bar geometry: barT×barT cross-section along local X, spanning
+      // ±len/2. Connected ends extend +barT/2 so corner miters close; free ends
+      // of sloped runs are tapered instead of square — a raked end face meeting
+      // an underside chamfer — so the bottom corner doesn't jut past the end.
+      const railBarGeo = (len: number, taperStart: boolean, taperEnd: boolean): THREE.BufferGeometry => {
+        if (!taperStart && !taperEnd) return new THREE.BoxGeometry(len + railBarT, railBarT, railBarT);
+        const T = railBarT, h = T / 2;
+        const rake    = 0.4 * T;                                          // end-face setback at the chamfer point
+        const chamfer = Math.max(rake, Math.min(1.2 * T, len * 0.35));    // underside chamfer, clamped for short bars
+        const s = new THREE.Shape();                                      // side profile (x along bar, y up), CCW
+        const x0 = -len / 2 - (taperStart ? 0 : h);
+        const x1 =  len / 2 + (taperEnd   ? 0 : h);
+        s.moveTo(x0 + (taperStart ? chamfer : 0), -h);
+        s.lineTo(x1 - (taperEnd ? chamfer : 0), -h);
+        if (taperEnd) s.lineTo(x1 - rake, -h + 0.35 * T);
+        s.lineTo(x1, h);
+        s.lineTo(x0, h);
+        if (taperStart) s.lineTo(x0 + rake, -h + 0.35 * T);
+        s.closePath();
+        const geo = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false });
+        geo.translate(0, 0, -T / 2);
+        return geo;
+      };
+
       if (plain) {
         // ── Legacy single-flight railing (pre-Phase-29, unchanged) ──────────
         // Orthonormal basis aligned to the slope:
@@ -522,7 +546,7 @@ export class StairBuilder {
             const [bx, by, bz] = treadAnchor(numSteps - 1);
             const len = Math.hypot(bx - ax, by - ay, bz - az) + 2 * overhang;
             addRail(
-              new THREE.BoxGeometry(len, railBarT, railBarT),
+              railBarGeo(len, true, true),
               (ax + bx) / 2, (ay + by) / 2 + handrailH, (az + bz) / 2, slopeQuat,
             );
           }
@@ -562,8 +586,11 @@ export class StairBuilder {
               new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis),
             );
             if (showTopRail) {
+              // Free ends (no adjacent segment) of sloped runs get the taper;
+              // level runs and mitered corners stay square.
+              const sloped = Math.abs(segY) > 1e-6;
               addRail(
-                new THREE.BoxGeometry(len + railBarT, railBarT, railBarT),
+                railBarGeo(len, sloped && i === 0, sloped && i === path.length - 2),
                 (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
               );
             }
