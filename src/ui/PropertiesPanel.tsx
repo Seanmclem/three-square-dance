@@ -12,6 +12,7 @@ import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
 import { ControlsSection } from "@/ui/ControlsSection";
+import { CreditsModal } from "@/ui/CreditsModal";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -65,7 +66,6 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   "shape-box":      { desc: "Click and drag a footprint. Taper/shear in the panel after placing.",     hint: "Click to place box corner" },
 };
 
-const PLACEHOLDER_ASSETS = ["Wall Segment", "Floor Tile", "Door Frame", "Window", "Staircase", "Platform"] as const;
 
 // ── Transform helpers ─────────────────────────────────────────────────────────
 
@@ -363,6 +363,7 @@ export function PropertiesPanel({
   const [groupsOpen, setGroupsOpen]   = useState(false);
   const [labelDraft, setLabelDraft]   = useState("");
   const [editingLabel, setEditingLabel] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -509,7 +510,7 @@ export function PropertiesPanel({
             position={selected.position} onPositionChange={onSpawnPositionChange}
           />
         ) : !selected ? (
-          <ToolView activeTool={activeTool} />
+          <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)} />
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
             selected={selected}
@@ -590,6 +591,9 @@ export function PropertiesPanel({
         ) : null}
       </div>
 
+      {showCredits && (
+        <CreditsModal materials={materialList} assets={assets} onClose={() => setShowCredits(false)} />
+      )}
     </div>
   );
 }
@@ -4467,7 +4471,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
 
 // ── ToolView ──────────────────────────────────────────────────────────────────
 
-function ToolView({ activeTool }: { activeTool: ToolId }) {
+function ToolView({ activeTool, onShowCredits }: { activeTool: ToolId; onShowCredits?: () => void }) {
   const info = TOOL_INFO[activeTool];
   return (
     <>
@@ -4477,19 +4481,23 @@ function ToolView({ activeTool }: { activeTool: ToolId }) {
           {info.hint}
         </div>
       </div>
-      <div style={{ margin: "10px 16px 0", paddingTop: 2 }}>
-        <div style={{ ...LABEL, marginBottom: 8 }}>ASSETS</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          {PLACEHOLDER_ASSETS.map(name => (
-            <div key={name} style={{ padding: "8px 6px", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6, color: "#7a7a7a", fontSize: 10, textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.3)"; e.currentTarget.style.color = "#80aaff"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#7a7a7a"; }}
-            >
-              {name}
-            </div>
-          ))}
+      {/* Home for global editor settings/links — grows over time; credits first. */}
+      {activeTool === "select" && onShowCredits && (
+        <div style={{ margin: "10px 16px 0", paddingTop: 2 }}>
+          <div style={{ ...LABEL, marginBottom: 8 }}>EDITOR</div>
+          <button
+            onClick={onShowCredits}
+            style={{ width: "100%", padding: "8px 10px", background: "rgba(46,46,46,0.9)",
+                     border: "1px solid rgba(255,255,255,0.06)", borderRadius: 6,
+                     color: "#a0a0a0", fontFamily: "monospace", fontSize: 11, letterSpacing: 1,
+                     textAlign: "left", cursor: "pointer", transition: "all 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.3)"; e.currentTarget.style.color = "#80aaff"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "#a0a0a0"; }}
+          >
+            CREDITS — imported asset &amp; material authors
+          </button>
         </div>
-      </div>
+      )}
     </>
   );
 }
