@@ -101,14 +101,13 @@ export default function RuntimeApp() {
     doSaveRef.current = doSave;
     let gameAutosaveTimer: ReturnType<typeof setInterval> | null = null;
 
-    // Menu backdrop vantage: nothing drives the default camera in game mode,
-    // so after exit-to-menu it would sit at the origin INSIDE the still-loaded
-    // level (close-up wall / volume fills). Frame it high and pulled back over
-    // the spawn instead — the level reads as a diorama behind the menu.
-    const frameMenuCamera = () => {
-      const spawn = world.world?.defaultSpawn?.position ?? { x: 0, y: 0, z: 0 };
-      scene.camera.position.set(spawn.x + 9, spawn.y + 8, spawn.z + 9);
-      scene.camera.lookAt(spawn.x, spawn.y + 1, spawn.z);
+    // Menu backdrop: unload the world on exit-to-menu. Nothing drives the
+    // default camera in game mode, so a still-loaded level would render from
+    // the origin — inside walls/volume fills. Unloading gives the same clean
+    // sky as first boot; Start/Continue re-fetch and rebuild via the router.
+    const unloadToMenu = () => {
+      scriptEngine.deactivate(); // stop timers etc. — router re-activates on the next go()
+      for (const id of [...world.zones.keys()]) zones.unloadZone(id);
     };
 
     const unsub = [
@@ -131,7 +130,7 @@ export default function RuntimeApp() {
         // currentSceneId still points at the scene being torn down).
         if (!routerRef.current?.transitioning) {
           doSave();
-          frameMenuCamera();
+          unloadToMenu();
           setShell("menu");
         }
       }),
