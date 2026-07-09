@@ -7,6 +7,7 @@ import type {
   IEditorModule, SelectedObjectPayload, SelectedRef,
   PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
 } from "@/types";
+import { isGameplayMode } from "@/types";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
@@ -172,7 +173,7 @@ export class GizmoManager implements IEditorModule {
       // Game mode: hide the gizmo (Preview keeps it). Restore on exit — visible only if
       // something is still attached, so an existing selection's gizmo reappears.
       this._bus.on("preview:start", ({ mode }) => {
-        if (mode === "game") { this._inGame = true; this._applyControlsEnabled(); }
+        if (isGameplayMode(mode)) { this._inGame = true; this._applyControlsEnabled(); }
       }),
       this._bus.on("preview:stop", () => {
         this._inGame = false;

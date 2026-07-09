@@ -32,6 +32,15 @@ export function installTestHelpers({ bus, world, scriptEngine, preview, gameStat
     enterPreview: () => preview.enter("preview"),
     /** Enter game mode (uses defaultSpawn) and fire on_game_start. */
     enterGame:    () => { preview.enter("game"); scriptEngine.onGameStart(); },
+    /** Enter occlusion-test mode (Phase 28) — game semantics, editor-camera vantage. */
+    enterOcclusion: () => { preview.enter("occlusion"); scriptEngine.onGameStart(); },
+    /** Occlusion-mode sub-state: { subMode: "player"|"camera", cullView: boolean }. */
+    occlusionState: () => preview.occlusionState,
+    /** Toggle the cull-as-player render pass without the C key. */
+    setCullView:  (on: boolean) => preview.setCullView(on),
+    /** Teleport the live character (position at foot level; facing in degrees). */
+    teleport:     (x: number, y: number, z: number, facing = 0) =>
+      bus.emit("character:teleport", { position: { x, y, z }, facing }),
     exitPreview:  () => preview.exit(),
     /** Fire a trigger through the real index (e.g. fire("on_interact", objectId)). */
     fire:         (trigger: TriggerType, targetId: string | null = null) => scriptEngine.fire(trigger, targetId),

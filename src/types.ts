@@ -99,6 +99,11 @@ export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
 export type CameraMode = "fps" | "thirdperson";
+// Phase 28 — "occlusion" is New Game rendered from a detached editor-camera vantage
+// (the character's camera keeps running as an unrendered "logic camera").
+export type PreviewMode = "preview" | "game" | "occlusion";
+/** Gameplay semantics (defaultSpawn, hide editor furniture, gizmo/node-dot lockout) — everything but plain preview. */
+export const isGameplayMode = (m: PreviewMode): boolean => m !== "preview";
 export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
 export type TransitionEffect = "fade" | "none";
 
@@ -178,9 +183,12 @@ export interface BusEvents {
   "zone:enter":            { zoneId: string };
   "transition:added":      { transition: TransitionDef };
   "spawn:updated":         { position: Vec3 };
-  "preview:start":         { mode: "preview" | "game"; resume?: boolean };
+  "preview:start":         { mode: PreviewMode; resume?: boolean };
   "preview:stop":          Record<string, never>;
   "preview:zone-entered":  { zoneName: string };
+  // Phase 28 — occlusion-test mode HUD state: which thing the mouse/keys drive
+  // (Tab) and whether the cull-as-player render pass is on (C).
+  "occlusion:state":       { subMode: "player" | "camera"; cullView: boolean };
   // Phase 24 — active control scheme label flipped (drives HUD prompts + touch overlay)
   "input:scheme-changed":  { scheme: "kbm" | "gamepad" | "touch" };
   // Phase 24 — scheme-agnostic menu actions from ControlSchemeManager (gamepad A/Start, touch tap/✕).

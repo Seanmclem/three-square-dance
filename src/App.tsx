@@ -64,7 +64,8 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode } from "@/types";
+import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 
@@ -156,6 +157,8 @@ export default function App() {
   const [pauseOpen, setPauseOpen] = useState(false);
   const pauseOpenRef = useRef(false);
   const [isGame,          setIsGame]           = useState(false);
+  const [previewMode,     setPreviewMode]      = useState<PreviewMode | null>(null);
+  const previewModeRef = useRef<PreviewMode | null>(null);   // preview:stop needs the session's mode (save gating)
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
@@ -265,6 +268,7 @@ export default function App() {
     if (import.meta.env.DEV) {
       const g = window as unknown as Record<string, unknown>;
       g.__scene = scene.scene; g.__camera = scene.camera;
+      g.__sceneManager = scene;   // activeRenderCamera / cullStats (Phase 28 assertions)
       g.__renderer = scene.renderer; g.__world = world; g.__zones = zones;
       g.__editorCamera = scene.editorCamera;
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
@@ -410,7 +414,9 @@ export default function App() {
     const unsub = [
       bus.on("preview:start", ({ mode, resume }) => {
         setIsPreview(true);
-        setIsGame(mode === "game");
+        setIsGame(isGameplayMode(mode));
+        setPreviewMode(mode);
+        previewModeRef.current = mode;
         // Re-index from current world state — zone:activated fires at startup before
         // any volumes/scripts exist in the editor, so the index is always stale by preview time.
         const activeZone = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
@@ -424,15 +430,18 @@ export default function App() {
         // and Preview always start fresh — no silent auto-continue. loadGame must run after
         // activate() (which clears fired one-shots) so a resumed save's progress survives.
         if (resume && loadGame()) { /* resumed */ } else { gameState.reset(); }
-        gameAutosaveTimer = setInterval(saveGame, 30_000);
+        // Occlusion-test runs are debug sessions — never let them clobber the Continue save.
+        if (mode !== "occlusion") gameAutosaveTimer = setInterval(saveGame, 30_000);
       }),
       bus.on("preview:stop",  () => {
         setIsPreview(false);
         setIsGame(false);
+        setPreviewMode(null);
         pauseOpenRef.current = false;
         setPauseOpen(false);
         if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
-        saveGame();
+        if (previewModeRef.current !== "occlusion") saveGame();
+        previewModeRef.current = null;
         scriptEngine.deactivate();
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
@@ -848,6 +857,12 @@ export default function App() {
 
   const handleContinue = useCallback((): void => {
     previewRef.current?.enter("game", { resume: true });
+    scriptEngineRef.current?.onGameStart();
+  }, []);
+
+  // Phase 28 — New Game watched from a detached editor-camera vantage.
+  const handleOcclusionTest = useCallback((): void => {
+    previewRef.current?.enter("occlusion", { resume: false });
     scriptEngineRef.current?.onGameStart();
   }, []);
 
@@ -1831,6 +1846,7 @@ export default function App() {
         onPreview={handlePreviewEnter}
         onNewGame={handleNewGame}
         onContinue={handleContinue}
+        onOcclusionTest={handleOcclusionTest}
         hasGameSave={hasGameSave}
         isPreview={isPreview}
         spawnMode={spawnMode}
@@ -2001,6 +2017,7 @@ export default function App() {
           bus={busRef.current}
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
           scheme={previewScheme}
+          mode={previewMode ?? "game"}
         />
       )}
 

@@ -25,6 +25,15 @@ export class SceneManager {
   private _previewCamera:   THREE.PerspectiveCamera | null = null;
   private readonly _onResize: () => void;
 
+  // Phase 28 — occlusion-test cull view: hide world meshes outside this camera's
+  // frustum for the render, restore right after. All scratch preallocated.
+  private _cullCamera: THREE.PerspectiveCamera | null = null;
+  private readonly _cullFrustum = new THREE.Frustum();
+  private readonly _cullMat     = new THREE.Matrix4();
+  private readonly _cullSphere  = new THREE.Sphere();
+  private readonly _cullHidden: THREE.Object3D[] = [];   // only ever holds meshes WE hid this frame
+  private _cullStats: { tested: number; hidden: number } | null = null;
+
   private readonly _sunLight:     THREE.DirectionalLight;
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
@@ -168,13 +177,67 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Phase 28 — occlusion-test mode's "cull as player" view (C toggle). While set,
+   * each frame replicates the renderer's own bounding-sphere-vs-frustum test from
+   * `cam` (the character's logic camera) and hides the failing world meshes for
+   * the render, so a detached vantage shows what the player's render would cull.
+   * null = off (the default; _loop is then byte-for-byte the pre-phase-28 path).
+   */
+  setCullOverrideCamera(cam: THREE.PerspectiveCamera | null): void {
+    this._cullCamera = cam;
+    if (!cam) {
+      this._restoreCullOverride();   // defensive — normally empty between frames
+      this._cullStats = null;
+    }
+  }
+
+  /** Last frame's cull-override counts (null when the cull view is off). */
+  get cullStats(): { tested: number; hidden: number } | null { return this._cullStats; }
+
+  /** The camera _loop will render with this frame. */
+  get activeRenderCamera(): THREE.PerspectiveCamera { return this._previewCamera ?? this.camera; }
+
+  private _applyCullOverride(): void {
+    const cam = this._cullCamera;
+    if (!cam) return;
+    this.scene.updateMatrixWorld();   // renderer skips already-clean matrices, so no double cost
+    cam.updateMatrixWorld();
+    this._cullMat.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this._cullFrustum.setFromProjectionMatrix(this._cullMat);
+    let tested = 0, hidden = 0;
+    this.scene.traverse(o => {
+      if (!(o as THREE.Mesh).isMesh) return;   // meshes only — grid/CameraHelper are LineSegments
+      const ud = o.userData as MeshUserData & { hideInGame?: boolean };
+      if (!ud.editorId || ud.hideInGame || ud.editorOnly) return;   // world geometry only
+      if (!o.visible || !o.frustumCulled) return;                   // respect script-hidden + opt-outs
+      tested++;
+      const geom = (o as THREE.Mesh).geometry;
+      if (!geom.boundingSphere) geom.computeBoundingSphere();
+      this._cullSphere.copy(geom.boundingSphere!).applyMatrix4(o.matrixWorld);
+      if (!this._cullFrustum.intersectsSphere(this._cullSphere)) {
+        o.visible = false;
+        this._cullHidden.push(o);
+        hidden++;
+      }
+    });
+    this._cullStats = { tested, hidden };
+  }
+
+  private _restoreCullOverride(): void {
+    for (const o of this._cullHidden) o.visible = true;   // only meshes that WERE visible got pushed
+    this._cullHidden.length = 0;
+  }
+
   private _loop(): void {
     if (this._disposed) return;
     const dt = this._clock.getDelta();
     if (!this._previewCamera) this.editorCamera?.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
+    this._applyCullOverride();                 // no-op unless the occlusion cull view is on
     this.renderer.clear();
     this.renderer.render(this.scene, this._previewCamera ?? this.camera);
+    this._restoreCullOverride();               // restore before anything else reads .visible
     if (!this._previewCamera) this._viewHelper?.render(this.renderer);
     this._raf = requestAnimationFrame(this._loopBound);
   }

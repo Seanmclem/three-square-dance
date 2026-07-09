@@ -16,6 +16,7 @@ import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
+import { isGameplayMode } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 // A run is one or more compatible walls merged into a single mesh.
@@ -369,7 +370,7 @@ export class ZoneManager {
       this._bus.on("preview:start", ({ mode }) => {
         this._setEditorOnlyVisible(false);
         this._setHiddenWallGhostsVisible(false);
-        if (mode === "game") this._setHideInGameVisible(false);
+        if (isGameplayMode(mode)) this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
         this._restoreDespawned();

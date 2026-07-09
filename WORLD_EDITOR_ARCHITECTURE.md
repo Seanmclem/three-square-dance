@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.20.2** — last updated 2026-07-08
+**Version 4.21.0** — last updated 2026-07-09
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -94,6 +94,7 @@
 - v4.20.0 — **Phase 25 — Standalone Runtime Shell (manifest + SceneRouter).** A second Vite entry (**`runtime.html`** → **`src/runtime/`**) that plays worlds without the editor: boots from a **manifest.json at any URL** (`?manifest=` param; CORS permitting), shows a DOM main menu from manifest metadata (name/description/author; Start / Continue / New Game; URL input when no param — v1's launcher stand-in), and routes between **whole scene files** via a new **`SceneRouter`** — one level above zone transitions. The runtime is its own ~250-line composition root (`RuntimeApp.tsx`) constructing the same engine classes as App.tsx minus every editor tool: game-mode SceneManager, WorldState, ObjectPlacer, ZoneManager, PreviewController (which owns ControlSchemeManager since phase 24 — kbm/gamepad/touch work unmodified), ScriptEngine, gameState; overlays reused: PreviewHUD(+scheme), DialogueOverlay(+`dialogue:closed` emit), FadeOverlay, TouchControlsOverlay (scheme-gated), PauseMenu + the `action:cancel` handler pattern (exit → menu screen). **Engine decoupling (25.1, zero editor change):** `SceneManager` ctor gains `opts?: { mode?: "editor"|"game" }` — game mode skips EditorCamera (field now `EditorCamera | null`), ViewHelper, and `_setupGrid()` (grid + demo ground); `PreviewController` spawn falls back `editorCamera?.focus` → origin soft-fail (warn, no crash) when a scene lacks `defaultSpawn`; **`AssetManager.setBaseUrl(url)`** + private `_resolve(path)` at every fetch/loader site (all three manifests, `_fileExists`, textures, GLB/OBJ/MTL) so `/assets/**` resolves against a remote origin (default = document origin, byte-identical editor behavior), and `initMaterials/initAssets/initDecals` gain `{ verifyFiles?: boolean }` (runtime passes `false` — cross-origin HEAD checks 405 on some hosts and would hide every asset). **SceneRouter.go(sceneId)** sequence: re-entrancy guard (portals double-fire) → resolve URL first (unknown authored id = non-fatal, stays in scene) → fade + LoadingScreen → capture fired one-shots → `deactivate/clearIndex` → `preview.exit()` → unload ALL zones → fetch scene JSON → editor's exact migration pipeline (`migrateWallNodes`/`migrateUVs`/`pruneOrphanNodes`) → `loadFromJSON` → `loadZone(zones[0])` → re-index scripts (router owns script lifecycle; runtime's `preview:start` handler is UI-state only, unlike App's) → `configureSchema` **without reset** (cross-scene `gameState` persistence is the point) → `activate` + restore one-shots (so cross-scene oneShots never re-fire) → `enter("game")` (+`character:teleport` to saved pose on Continue) → `onGameStart()` only on newGame/resume → `fire("on_level_load", zoneId)` (never synthesize `zone:enter` — it would trip ZoneManager's swap handler). **New script action `load_scene`** (`ActionType` + `ScriptAction.sceneId` + bus `scene:load-request`): one ScriptEngine dispatch case; ScriptPanel free-text field ("runtime manifest key — not validated here"); silent no-op in editor preview (no listener). **Per-manifest saves** (`src/runtime/saveGame.ts`): `runtime_gamesave:<manifest.id>` = `{ version, ts, sceneId, state, firedOneShots, pose }` — pose captured via the existing `character:save-position` mechanism (reserved key `__runtime_pose`, foot-level, round-trips through `character:teleport`); written every 30s + on scene entry + before every exit; Continue restores scene+state+one-shots+pose across full page reloads; New Game clears + `gameState.reset()`. **PhysicsWorld leak fix (pre-existing, exposed by scene cycling):** `createStaticCollider`/`createSensorCollider` allocate a dedicated fixed body per collider but `removeCollider` left it behind — now removes the empty parent body, and `removeRigidBody` is idempotent (`body.isValid()` guard) so CharacterBody's collider-then-body dispose stays safe. Verified A→B→A→B: mesh/collider/body counts identical per scene visit. **Vite:** `build.rollupOptions.input` = main + runtime; the runtime chunk graph contains no editor UI (`main-*.js` not referenced; DEV-only `installTestHelpers` loaded via dynamic import because it statically imports `@/editor/bakeShapes`). **Committed demo** `public/demo/` (manifest + level_01 ⇄ level_02 wired by portal trigger volumes with `load_scene`; state-gated dialogue in level_02 proves cross-scene state). Verified in-browser end-to-end, including a true cross-origin run (second local server with CORS headers — manifest, scenes, asset manifests, textures all resolved against it) and ErrorScreen paths (bad URL, invalid JSON, CORS named explicitly). Dev globals: `window.__runtime` (+ classic `__scene`/`__world`/… so TESTING.md recipes work in the runtime tab). Future work (unchanged from the plan doc): launcher/library + registry, ref-counted asset cache + preloading, 3D menu scenes, editor "Export manifest".
 - v4.20.1 — **Runtime menu backdrop: vantage camera on exit-to-menu.** Nothing drives the game-mode default camera, so after exiting to the menu it sat at the origin *inside* the still-loaded level (close-up brick / trigger-volume fills, floor-coplanar view). `RuntimeApp`'s exit-to-menu path framed it at `spawn + (9, 8, 9)` looking at the spawn — the level as a diorama behind the menu card. **Superseded by v4.20.2** (user preferred the clean-sky menu).
 - v4.20.2 — **Runtime menu backdrop: unload the world on exit-to-menu (replaces v4.20.1's vantage camera).** `RuntimeApp`'s exit-to-menu path now calls `scriptEngine.deactivate()` (stops script timers that would otherwise keep firing behind the menu — the router re-activates on the next `go()`) and unloads every loaded zone, so the menu always sits over the same clean sky as first boot (verified: 0 level meshes / 0 colliders / 0 bodies at menu; Continue re-fetches and resumes correctly). The vantage-camera code is removed.
+- v4.21.0 — **Phase 28 — Occlusion Test play mode (detached debug vantage).** Third `PreviewMode` (`"occlusion"`, `isGameplayMode()` helper in types.ts): New Game gameplay semantics (defaultSpawn, on_game_start, hideInGame furniture hidden, gizmo/node-dot lockout — the `mode === "game"` branches in ZoneManager/NodeDragger/GizmoManager/App flipped to `isGameplayMode(mode)`, tautological for existing modes) but the **editor orbit camera stays the rendered camera** — `PreviewController` skips `setPreviewCamera()`, so SceneManager's `_previewCamera === null` path renders the vantage while the character's camera keeps updating unrendered as the *logic camera* (spring-arm pull-in included; CharacterController unchanged). A `THREE.CameraHelper` on the logic camera (frustumCulled=false, no editorId, disposed on exit) shows the player's view from outside. **Tab** toggles sub-modes: `player` (editorCamera disabled + frozen — its `update()` gates on `enabled` — pointer lock requested, normal game input) / `camera` (lock released, orbit controls live, character input zeroed via `zeroActionState` after `input.update` so document-level WASD can't double-drive). Pointer-lock re-lock sites share a `_wantsLock()` predicate so RMB-orbit clicks in camera sub-mode don't re-lock. **C** toggles the *cull-as-player view*: `SceneManager.setCullOverrideCamera(logicCam)` + `_applyCullOverride()`/`_restoreCullOverride()` around `renderer.render` in `_loop` — replicates the renderer's bounding-sphere-vs-frustum test from the logic camera over meshes with `userData.editorId` (skipping hideInGame/editorOnly/already-hidden/frustumCulled=false), hides failures for the frame, restores immediately after render (script-driven visibility never corrupted; preallocated Frustum/Matrix4/Sphere scratch; `cullStats {tested,hidden}` getter; culled meshes drop out of that frame's shadow map — accepted for a debug view). Default OFF — with the toggle off `_loop` is a single null-check from the pre-phase path, so preview/game/runtime perf is untouched. `occlusion:state {subMode,cullView}` bus event drives a PreviewHUD amber badge (`OCCLUSION TEST — CONTROLLING: PLAYER|CAMERA · CULL VIEW ON|OFF`), crosshair hidden in this mode, `Tab`/`C` hints added; HUD `mode` prop optional (default `"game"`) so RuntimeApp is untouched. Toolbar ▶-menu gains "Occlusion Test"; runtime-shell guard falls back to `"game"` when `editorCamera` is null; **game saves are never written by an occlusion run** (App gates the 30s interval + exit save on mode). Dev hooks: `__sceneManager` global; `__test.enterOcclusion()/occlusionState()/setCullView()/teleport()`. Verified in-browser end-to-end (editor cam renders, cullStats responds to facing, despawned mesh survives cull restore, W drives player XOR camera per sub-mode, Esc exits clean, game save byte-identical, preview/game regress clean). Plan: `plans/phase-28-occlusion-test-mode.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -1824,6 +1825,42 @@ class InputManager {
 
 ---
 
+## SceneManager.ts
+
+Owns the renderer, scene, RAF loop, lighting/sky/grid setup, and camera selection.
+`_loop()` each frame: `editorCamera?.update(dt)` (only when no preview camera),
+update callbacks (physics step, character, mixers), then
+`renderer.render(scene, _previewCamera ?? camera)`. `setPreviewCamera(cam)` is the
+preview/game camera swap: stores the character camera, disables editor-camera input,
+hides the ViewHelper; `null` restores all three + editor aspect. Ctor `opts.mode:
+"editor" | "game"` (Phase 25) — game mode (runtime shell) has no EditorCamera /
+ViewHelper / grid.
+
+**Cull-as-player override (Phase 28, occlusion-test mode only).**
+`setCullOverrideCamera(logicCam | null)` arms a pre/post-render pass in `_loop`:
+
+```ts
+this._applyCullOverride();     // no-op unless armed (single null check otherwise)
+this.renderer.clear();
+this.renderer.render(this.scene, this._previewCamera ?? this.camera);
+this._restoreCullOverride();   // restore before anything else reads .visible
+```
+
+The apply pass replicates the renderer's own culling test from the *logic* camera
+(the character's unrendered camera): builds a `Frustum` from
+`projectionMatrix × matrixWorldInverse`, then for every Mesh with
+`userData.editorId` — skipping `hideInGame`/`editorOnly`, meshes already hidden
+(script state is respected, never resurrected), and `frustumCulled === false`
+opt-outs — tests the world-space bounding sphere and sets `visible = false` on
+failures, recording exactly what it hid. Restore flips only those back right after
+the render, so scripts/panels never observe the mutation. All scratch objects
+(Frustum/Matrix4/Sphere/array) preallocated — no per-frame alloc. `cullStats`
+getter exposes `{ tested, hidden }` (null when off); `activeRenderCamera` getter
+exposes `_previewCamera ?? camera` for tests. Known accepted side effect: a mesh
+hidden for the frame also drops out of that frame's shadow map.
+
+---
+
 ## EditorCamera.ts
 
 ### Controls
@@ -1867,6 +1904,14 @@ update(dt) {
 Disable all camera inputs when `gizmo:dragging` = true (subscribe to bus).
 
 Both `_handleKeyDown` and `_handleKeyUp` also guard against input-field focus via `_isTypingTarget(e)` — identical to the same guard in `InputManager`. This prevents Arrow/WASD keys typed inside any `<input>`, `<select>`, or `<textarea>` from moving the camera.
+
+`enabled` gates both the input handlers AND `update()` (early return) — so a
+disabled editor camera is fully frozen, not just deaf. `setPreviewCamera` drives
+it for preview/game; **occlusion-test mode (Phase 28) reuses this camera as the
+rendered debug vantage** and toggles `enabled` per sub-mode: `camera` sub-mode =
+live orbit controls, `player` sub-mode = frozen vantage while game input drives
+the character. (Console reframing via the TESTING.md §3.5 recipe only applies
+while `enabled` — i.e. in camera sub-mode.)
 
 ### Floor Clip Plane
 
@@ -2290,7 +2335,7 @@ Each platform rebuild increments a token. Async `PlatformBuilder.build()` captur
 - `_getStairCuttersForPlatform(zoneId, platform)` → `CutInfo[]` (includes tiling + inner face data for PlatformBuilder)
 
 **Preview toggle**
-`preview:start` → iterate all stairEntries, set `mesh.visible = false` for any mesh with `userData.editorOnly === true` (CSG wireframes etc.)
+`preview:start` → iterate all stairEntries, set `mesh.visible = false` for any mesh with `userData.editorOnly === true` (CSG wireframes etc.). The grid/`hideInGame` hiding (`_setHideInGameVisible(false)`) fires for gameplay modes — `isGameplayMode(mode)` since Phase 28, i.e. game AND occlusion, not preview.
 `preview:stop` → restore visibility
 
 **Overlay decal lifecycle (v4.7.0)**
@@ -2694,10 +2739,17 @@ Y smoothing, spring-arm occlusion, animation phases (ground/jump/airidle/land),
 interact cache (rebuilt 4×/s), `character:teleport` / `character:save-position`
 handlers — is unchanged from Phases 10–13.
 
+Movement/facing derive from the controller's own `_yaw`/`_pitch`, never from a
+rendered camera — which is why occlusion-test mode (Phase 28) works with **zero
+changes to this file**: its `camera` simply isn't handed to the renderer and
+becomes the "logic camera" (still written every frame, spring-arm included;
+visualized by PreviewController's CameraHelper).
+
 ## PreviewController.ts
 
-Enter/exit lifecycle for preview & game mode. Owns the per-session input stack
-(Phase 24):
+Enter/exit lifecycle for the three play modes — `enter(mode: PreviewMode)` where
+`PreviewMode = "preview" | "game" | "occlusion"` (Phase 28). Owns the per-session
+input stack (Phase 24):
 
 ```ts
 enter(mode) {
@@ -2721,11 +2773,45 @@ enter(mode) {
   listeners, restores the editor camera, emits `preview:stop`.
 - `get input()` exposes the manager so App can hand `TouchControlsOverlay` the
   touch shared store + bindings.
-- Spawn: game mode uses `defaultSpawn` (foot-level +capsuleBottom); preview
-  falls back to editor-camera focus +1.5m. **Phase 25:** `SceneManager.editorCamera`
-  is nullable (game-mode runtime shell), so the fallback chain is
+- Spawn: gameplay modes (`isGameplayMode` — game AND occlusion) use `defaultSpawn`
+  (foot-level +capsuleBottom); preview falls back to editor-camera focus +1.5m.
+  **Phase 25:** `SceneManager.editorCamera` is nullable (game-mode runtime shell),
+  so the fallback chain is
   `defaultSpawn → editorCamera?.focus → origin soft-fail (console.warn)` — a
   runtime scene without a `defaultSpawn` spawns at (0, 1.5, 0) instead of crashing.
+
+### Occlusion-test mode (Phase 28)
+
+`enter("occlusion")` = New Game semantics with a detached rendered camera. It
+**skips `setPreviewCamera()`** — SceneManager's null-preview-camera path keeps
+rendering the editor camera (the vantage, holding whatever pose the user was
+editing from) while the character camera runs unrendered as the *logic camera*
+(spring-arm and all; CharacterController is unchanged). Runtime-shell guard: no
+`editorCamera` → warn + fall back to `"game"`.
+
+- **CameraHelper** on the logic camera (`frustumCulled = false`, plain userData so
+  the cull pass ignores it and it can't leak into world state) added on enter,
+  disposed on exit. The updateFn calls `controller.camera.updateMatrixWorld()`
+  before `helper.update()` — nothing else refreshes an unrendered camera's matrix.
+- **Tab sub-modes** (window keydown, capture phase, removed on exit):
+  `player` — `editorCamera.enabled = false` (frozen vantage), pointer lock
+  requested (valid: synchronous inside the real keydown), normal game input;
+  `camera` — lock released, `editorCamera.enabled = true` (orbit/pan/zoom/WASD
+  drive the vantage), and the updateFn calls `zeroActionState(input.state)` after
+  `input.update` so the character holds still (KeyboardMouseSource listens on
+  `document` regardless of lock — without zeroing, WASD would drive both at once).
+  All three pointer-lock re-lock sites (enter, `pause:closed`, canvas mousedown)
+  share `_wantsLock()` (`mode !== "occlusion" || subMode === "player"`) so an
+  RMB-orbit click in camera sub-mode never re-locks.
+- **C** toggles the cull-as-player view via `setCullView(on)` →
+  `SceneManager.setCullOverrideCamera(controller.camera | null)`. Default OFF.
+- Every sub-mode/cull change emits `occlusion:state { subMode, cullView }`
+  (PreviewHUD badge). `mode` / `occlusionState` getters for tests.
+- `exit()` additionally: `setCullOverrideCamera(null)`, dispose the helper,
+  remove the Tab/C listener, reset mode state. The existing `setPreviewCamera(null)`
+  call restores `editorCamera.enabled` + aspect (idempotent).
+- Esc needs no new code: App's window keydown exits on the same press that
+  releases pointer lock, exactly like game mode.
 
 ## React UI Components
 
@@ -2770,12 +2856,20 @@ All number inputs: local string state while typing, commit on blur/Enter. Change
 
 Visible only when `preview:start` event fires. Hidden on `preview:stop`.
 Takes a `scheme` prop (App's `previewScheme`, fed by `input:scheme-changed`)
-— prompts follow the active control scheme (Phase 24).
+— prompts follow the active control scheme (Phase 24) — and an optional
+`mode?: PreviewMode` prop (Phase 28; defaults to `"game"` so RuntimeApp needs
+no edit).
 
-- Centered crosshair: two 1px lines, 18px, rgba(255,255,255,0.75)
+- Centered crosshair: two 1px lines, 18px, rgba(255,255,255,0.75) — **hidden in
+  occlusion mode** (the rendered view isn't the player's, a crosshair would lie)
 - Zone-name toast on `preview:zone-entered` (3s), top-left zone label
 - Interact prompt on `character:interact-range`: `[E]` / `[LB]` / `Tap ·` prefix per scheme
-- Exit hint bottom-right: `Enter · menu   Esc · exit` (kbm) / `Start · menu` (gamepad) / hidden on touch (the overlay's ⚙ is the affordance)
+- Exit hint bottom-right: `Enter · menu   Esc · exit` (kbm) / `Start · menu` (gamepad) / hidden on touch (the overlay's ⚙ is the affordance); occlusion mode prepends `Tab · player/camera   C · cull view`
+- **Occlusion badge** (Phase 28): amber top-center
+  `OCCLUSION TEST — CONTROLLING: PLAYER|CAMERA · CULL VIEW ON|OFF`, driven by
+  `occlusion:state`; local state defaults to `{ player, false }` to match
+  PreviewController's enter state (the mount happens after the initial
+  `preview:start`, so there's no missed emit)
 
 ### PauseMenu.tsx (Phase 24b)
 
@@ -7465,6 +7559,80 @@ Hosting a game remotely (bundle layout, S3/Netlify/GitHub Pages, CORS):
   (`load_scene`), a state-gated dialogue in level_02 proving cross-scene state.
 - Future work (see plan doc §13): launcher/library + registry, ref-counted
   asset cache + next-scene preloading, 3D menu scenes, editor "Export manifest".
+
+---
+
+## Occlusion Test Mode — Phase 28
+
+> Shipped as v4.21.0. Plan: `plans/phase-28-occlusion-test-mode.md`; acceptance:
+> `test-plans/phase-28-occlusion-test-mode.md`.
+
+A third play mode (Toolbar ▶-menu → **Occlusion Test**): identical to New Game
+except the **rendered camera is the editor orbit camera** — a detached debug
+vantage — while the character runs normally with its camera updating unrendered
+as the *logic camera*. Purpose: watch player-view-driven behavior (spring-arm
+occlusion, frustum culling, zone hide/dim, trigger-driven despawns) from outside
+the player's view, where observing it doesn't change it.
+
+### Design in one paragraph
+
+`PreviewMode = "preview" | "game" | "occlusion"` + `isGameplayMode()` (types.ts);
+every `mode === "game"` branch that meant "gameplay semantics" now uses the
+helper (ZoneManager / NodeDragger / GizmoManager / App — tautological for the
+existing modes). `PreviewController.enter("occlusion")` skips
+`setPreviewCamera()`, so SceneManager's null-preview path keeps rendering the
+editor camera and running its orbit update; everything else about the session
+(ControlSchemeManager, CharacterController, TriggerSystem, scripts, saves-load
+flow) is the ordinary game-mode stack. A `THREE.CameraHelper` visualizes the
+logic camera. **All player-driven systems run 100% natural code paths** — the
+only synthetic piece is the opt-in cull view below.
+
+### Controls
+
+| Key | Action |
+|---|---|
+| **Tab** | Toggle what mouse/keys control: `player` (pointer lock, normal game input; vantage frozen — `EditorCamera.update()` gates on `enabled`) ↔ `camera` (lock released, RMB orbit / MMB pan / wheel / WASD drive the vantage; character input zeroed via `zeroActionState` so it holds still) |
+| **C** | Toggle the cull-as-player view (below). Default OFF |
+| **Esc** | Exit (same App handler as game mode — fires on the lock-release press) |
+
+HUD: amber top-center badge `OCCLUSION TEST — CONTROLLING: … · CULL VIEW …`
+(`occlusion:state` bus event), crosshair hidden, Tab/C hints by the exit hint.
+
+### Cull-as-player view (C)
+
+Three.js culls against the *rendered* camera inside `render()` — player-view
+culling simply doesn't exist in a frame rendered from the vantage. The C toggle
+recreates it: `SceneManager.setCullOverrideCamera(logicCam)` arms a pre-render
+pass replicating the renderer's bounding-sphere-vs-frustum test from the logic
+camera over world meshes (`userData.editorId`, skipping hideInGame/editorOnly/
+already-hidden/`frustumCulled === false`), hides failures, renders, restores
+immediately — script visibility state is never corrupted (verified: a despawned
+mesh stays hidden through the pass). Same math as three.js internals, but a
+parallel implementation — hence opt-in and labeled in the HUD. `cullStats`
+exposes `{ tested, hidden }`. Side effect: culled meshes skip that frame's
+shadow map.
+
+### Deliberate deviations & guards
+
+- **Game saves are never written by an occlusion run** (App gates the 30s
+  interval and the exit save on the mode) — a debug session must not clobber
+  the user's Continue save. Everything else matches New Game, including
+  `on_game_start`.
+- **Runtime shell**: `enter("occlusion")` without an `editorCamera` warns and
+  falls back to `"game"`. RuntimeApp itself is untouched (PreviewHUD's `mode`
+  prop is optional).
+- **Perf**: with cull view off, the only always-running addition anywhere is a
+  null-check early-return per frame in `_loop`; scratch objects preallocated.
+
+### Files touched
+
+`types.ts` (PreviewMode/isGameplayMode/`occlusion:state`), `SceneManager.ts`
+(cull override + `cullStats`/`activeRenderCamera`), `PreviewController.ts`
+(mode, Tab/C machine, `_wantsLock()`, helper lifecycle), `ZoneManager.ts` /
+`NodeDragger.ts` / `GizmoManager.ts` (isGameplayMode flips), `App.tsx`
+(handler, `previewMode` state, save gating, `__sceneManager`), `Toolbar.tsx`
+(menu item), `PreviewHUD.tsx` (badge/hints/crosshair), `dev/testHelpers.ts`
+(`enterOcclusion`/`occlusionState`/`setCullView`/`teleport`).
 
 ---
 

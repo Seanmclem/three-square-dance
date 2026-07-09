@@ -3,6 +3,7 @@ import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { ToolId, Vec2 } from "@/types";
+import { isGameplayMode } from "@/types";
 
 const SNAP_RADIUS = 0.5;
 const EDGE_RADIUS = 0.35; // lower than SNAP_RADIUS so nodes take priority
@@ -179,7 +180,7 @@ export class NodeDragger {
       this._bus.on("zone:loaded", () => {
         if (isSelectMode(this._activeTool) && this._state !== "DRAG" && !this._gameMode) this._refresh();
       }),
-      this._bus.on("preview:start", ({ mode }) => { if (mode === "game") this._gameMode = true; }),
+      this._bus.on("preview:start", ({ mode }) => { if (isGameplayMode(mode)) this._gameMode = true; }),
       this._bus.on("preview:stop",  () => { this._gameMode = false; }),
       this._bus.on("platform:updated", () => {
         if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();

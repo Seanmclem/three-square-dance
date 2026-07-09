@@ -29,16 +29,17 @@ interface ToolbarProps {
   openPanel:     LeftPanelId;
   onToolSelect:  (tool: ToolId) => void;
   onPanelToggle: (panelId: LeftPanelId) => void;
-  onPreview?:    () => void;
-  onNewGame?:    () => void;
-  onContinue?:   () => void;
+  onPreview?:       () => void;
+  onNewGame?:       () => void;
+  onContinue?:      () => void;
+  onOcclusionTest?: () => void;
   hasGameSave?:  () => boolean;
   isPreview?:    boolean;
   spawnMode?:    "initial" | "checkpoint";
   onSpawnMode?:  (mode: "initial" | "checkpoint") => void;
 }
 
-export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, hasGameSave, isPreview, spawnMode = "initial", onSpawnMode }: ToolbarProps) {
+export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, onOcclusionTest, hasGameSave, isPreview, spawnMode = "initial", onSpawnMode }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
   // Placement-variant popover opened by its group button (no tool armed yet).
   const [openMenu, setOpenMenu] = useState<ToolId | null>(null);
@@ -309,6 +310,16 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               onMouseEnter={e => { if (canContinue) (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
               onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
             >▶ Continue</button>
+            <button
+              title="New Game watched from a detached debug camera — verify culling/occlusion from the player's view (Tab toggles player/camera control, C toggles cull view)"
+              onClick={() => { setShowGameMenu(false); onOcclusionTest?.(); }}
+              style={{
+                width: "100%", padding: "6px 12px", background: "none", border: "none",
+                color: "#ccc", cursor: "pointer", textAlign: "left", fontSize: 12,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = "rgba(80,200,120,0.15)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = "none"; }}
+            >▶ Occlusion Test</button>
           </div>
         )}
       </div>
