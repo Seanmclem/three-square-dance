@@ -1806,7 +1806,6 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [railPostT,     setRailPostT]     = useState(String(stair?.railing?.postThickness ?? 0.06));
   const [railSideInset, setRailSideInset] = useState(String(stair?.railing?.sideInset     ?? 0.1));
   const [railOverhang,  setRailOverhang]  = useState(String(stair?.railing?.overhang      ?? 0.15));
-  const [railEndAngle,  setRailEndAngle]  = useState(String(stair?.railing?.overhangAngle  ?? 0));
   const [undersideMode, setUndersideMode] = useState<StairUndersideMode>(stair?.underside?.mode ?? "open");
   const [undersideThk,  setUndersideThk]  = useState(String(stair?.underside?.thickness ?? 0.25));
   const [hasLanding,  setHasLanding]  = useState(!!(stair?.landing));
@@ -1843,7 +1842,6 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setRailPostT(String(stair.railing?.postThickness ?? 0.06));
     setRailSideInset(String(stair.railing?.sideInset ?? 0.1));
     setRailOverhang(String(stair.railing?.overhang ?? 0.15));
-    setRailEndAngle(String(stair.railing?.overhangAngle ?? 0));
     setUndersideMode(stair.underside?.mode ?? "open");
     setUndersideThk(String(stair.underside?.thickness ?? 0.25));
     setHasLanding(!!(stair.landing));
@@ -1949,7 +1947,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const commitWidth  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ width: n } as unknown as Partial<WorldObject>); };
   const toggleRailing = (checked: boolean) => { setHasRailing(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
 
-  const RAIL_DEFAULTS = { topRail: true, balusters: true, balustersInner: true, balustersOuter: true, landingPerimeter: false, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15, overhangAngle: 0 };
+  const RAIL_DEFAULTS = { topRail: true, balusters: true, balustersInner: true, balustersOuter: true, landingPerimeter: false, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15 };
   const updateRailing = (patch: Partial<typeof RAIL_DEFAULTS>) => {
     const cur = { ...RAIL_DEFAULTS, ...(stair.railing ?? {}) };
     onObjectUpdate({ railing: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
@@ -1960,7 +1958,6 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const commitRailPostT = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) updateRailing({ postThickness: n }); };
   const commitRailSideInset = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ sideInset: n }); };
   const commitRailOverhang = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) updateRailing({ overhang: n }); };
-  const commitRailEndAngle = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0 && n <= 90) updateRailing({ overhangAngle: n }); };
 
   const UNDERSIDE_DEFAULTS = { mode: "open" as StairUndersideMode, thickness: 0.25 };
   const updateUnderside = (patch: Partial<typeof UNDERSIDE_DEFAULTS>) => {
@@ -2212,14 +2209,6 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                   onChange={e => { setRailOverhang(e.target.value); schedule(() => commitRailOverhang(e.target.value)); }}
                   onBlur={e => flush(() => commitRailOverhang(e.target.value))}
                   onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailOverhang((e.target as HTMLInputElement).value)); }}
-                />
-              </div>
-              <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>END DROP°</div>
-                <input type="number" step={5} min={0} max={90} value={railEndAngle} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                  onChange={e => { setRailEndAngle(e.target.value); schedule(() => commitRailEndAngle(e.target.value)); }}
-                  onBlur={e => flush(() => commitRailEndAngle(e.target.value))}
-                  onKeyDown={e => { if (e.key === "Enter") flush(() => commitRailEndAngle((e.target as HTMLInputElement).value)); }}
                 />
               </div>
             </div>

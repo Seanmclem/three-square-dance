@@ -521,7 +521,6 @@ export interface StairRailingDef {
   postThickness: number;    // baluster cross-section (m)
   sideInset:     number;    // inward offset of the rail from the step's side edge (m)
   overhang:      number;    // how far the top rail extends past the end posts, each end (m)
-  overhangAngle?: number;   // droop of the rail-end return below its run, degrees (0/absent = flat overhang; e.g. 45–90 curls the end down)
 }
 
 export type StairUndersideMode = "open" | "diagonal" | "closed";
