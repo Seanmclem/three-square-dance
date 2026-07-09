@@ -480,21 +480,21 @@ export class StairBuilder {
 
       // Top-rail bar geometry: barT×barT cross-section along local X, spanning
       // exactly ±len/2 (callers bake any miter extension into len). A tapered
-      // end keeps its tip where the square end was — only the corner is eased:
-      // a slightly raked end face meeting a 45° chamfer on the bottom corner.
+      // end keeps the square end's reach but clips BOTH tip corners with 45°
+      // chamfers — top and bottom — leaving a shorter vertical end face.
       const railBarGeo = (len: number, taperStart: boolean, taperEnd: boolean): THREE.BufferGeometry => {
         const T = railBarT, h = T / 2;
-        const rake = 0.15 * T, chamfer = 0.4 * T;      // end-face rake / bottom-corner cut
-        if (len < 2.5 * (rake + chamfer)) taperStart = taperEnd = false;
+        const c = 0.3 * T;                             // 45° corner chamfer at a free end
+        if (len < 3 * c) taperStart = taperEnd = false;
         if (!taperStart && !taperEnd) return new THREE.BoxGeometry(len, railBarT, railBarT);
         const s = new THREE.Shape();                   // side profile (x along bar, y up), CCW
-        const x0 = -len / 2, x1 = len / 2, kinkY = -h + 0.4 * T;
-        s.moveTo(x0 + (taperStart ? rake + chamfer : 0), -h);
-        s.lineTo(x1 - (taperEnd ? rake + chamfer : 0), -h);
-        if (taperEnd) s.lineTo(x1 - rake, kinkY);
-        s.lineTo(x1, h);
-        s.lineTo(x0, h);
-        if (taperStart) s.lineTo(x0 + rake, kinkY);
+        const x0 = -len / 2, x1 = len / 2;
+        s.moveTo(x0 + (taperStart ? c : 0), -h);
+        s.lineTo(x1 - (taperEnd ? c : 0), -h);
+        if (taperEnd) { s.lineTo(x1, -h + c); s.lineTo(x1, h - c); s.lineTo(x1 - c, h); }
+        else s.lineTo(x1, h);
+        if (taperStart) { s.lineTo(x0 + c, h); s.lineTo(x0, h - c); s.lineTo(x0, -h + c); }
+        else s.lineTo(x0, h);
         s.closePath();
         const geo = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false });
         geo.translate(0, 0, -T / 2);
