@@ -1,0 +1,190 @@
+{
+  "metadata": {
+    "name": "New World",
+    "version": "1.0",
+    "author": "",
+    "created": "2026-07-09T12:55:07.026Z",
+    "lastModified": "2026-07-09T12:55:07.026Z",
+    "uvVersion": 1
+  },
+  "world": {
+    "size": {
+      "width": 200,
+      "depth": 200
+    },
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 1.2
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 3,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012,
+    "playerSettings": {
+      "cameraMode": "fps",
+      "moveSpeed": 6,
+      "jumpHeight": 1.2,
+      "fov": 75,
+      "thirdPersonDistance": 4,
+      "thirdPersonHeight": 2
+    },
+    "stateSchema": {
+      "health": {
+        "type": "number",
+        "default": 100,
+        "min": 0,
+        "max": 100
+      }
+    }
+  },
+  "terrain": null,
+  "zones": [
+    {
+      "id": "demo",
+      "name": "Demo Zone",
+      "type": "outdoor",
+      "bounds": {
+        "x": -250,
+        "z": -250,
+        "width": 500,
+        "depth": 500
+      },
+      "nodes": [
+        {
+          "id": "6338573b-44c4-4adc-83a6-ecabb70f5075",
+          "x": -21.5,
+          "z": -20
+        },
+        {
+          "id": "0c4aff35-6b5f-44bc-9d8b-27ce495e0534",
+          "x": 14.5,
+          "z": -20
+        },
+        {
+          "id": "7db001a0-422a-4b09-bcb1-b68883f779d8",
+          "x": 14.5,
+          "z": 13
+        },
+        {
+          "id": "6d477baf-1296-4f3f-b49d-6ecfaad28786",
+          "x": -21.5,
+          "z": 13
+        }
+      ],
+      "floors": [
+        {
+          "id": "63f85cee-5786-4b40-9283-a613caeff276",
+          "level": 0,
+          "elevation": 0.14076765179447648,
+          "ceilingHeight": null,
+          "floorMesh": {
+            "shape": "rect",
+            "points": [
+              {
+                "x": -21.5,
+                "z": -20
+              },
+              {
+                "x": 14.5,
+                "z": -20
+              },
+              {
+                "x": 14.5,
+                "z": 13
+              },
+              {
+                "x": -21.5,
+                "z": 13
+              }
+            ],
+            "nodeIds": [
+              "6338573b-44c4-4adc-83a6-ecabb70f5075",
+              "0c4aff35-6b5f-44bc-9d8b-27ce495e0534",
+              "7db001a0-422a-4b09-bcb1-b68883f779d8",
+              "6d477baf-1296-4f3f-b49d-6ecfaad28786"
+            ],
+            "material": "white_smooth_concrete"
+          },
+          "materialOverrides": {
+            "tileScale": 10
+          }
+        }
+      ],
+      "walls": [],
+      "platforms": [
+        {
+          "id": "plat_8af769a3",
+          "position": {
+            "x": -6.151002142076543,
+            "y": 2.7363585444949097,
+            "z": -4.475922103907855
+          },
+          "size": {
+            "width": 5.9,
+            "depth": 3
+          },
+          "thickness": 0.3,
+          "material": "concrete_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        }
+      ],
+      "stairs": [
+        {
+          "id": "stair_25ad198c",
+          "start": {
+            "x": -4.5,
+            "y": 0.15403936331664703,
+            "z": 5
+          },
+          "end": {
+            "x": -4.499999999999999,
+            "y": 3.0132717115221705,
+            "z": -3
+          },
+          "width": 2.5,
+          "style": "straight",
+          "material": "concrete_01",
+          "hasRailing": true,
+          "underside": {
+            "mode": "diagonal",
+            "thickness": 0.25
+          }
+        },
+        {
+          "id": "stair_ae6bc166",
+          "start": {
+            "x": -7.962754506870307,
+            "y": 2.845709220242048,
+            "z": -2.975452314953662
+          },
+          "end": {
+            "x": -7.962754506870307,
+            "y": 5.7049415684475715,
+            "z": 5.024547685046338
+          },
+          "width": 2.5,
+          "style": "straight",
+          "material": "concrete_01",
+          "hasRailing": true,
+          "underside": {
+            "mode": "diagonal",
+            "thickness": 0.25
+          }
+        }
+      ],
+      "objects": []
+    }
+  ],
+  "transitions": [],
+  "groups": []
+}
