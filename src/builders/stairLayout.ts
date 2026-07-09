@@ -250,26 +250,68 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     }
     paths.push({ pts: inner, side: "inner", freeStart: true });
 
+    // TOP landing: its four edges are individually toggleable. The three
+    // perimeter edges default to `landingPerimeter`; the 4th "close" rail
+    // spans the stairwell mouth — from the exit corner across the phantom
+    // flight and void to the arriving flight's inner rail line.
+    const kT    = flightsCount - 1;
+    const yT    = topY(kT);
+    const tl    = r?.topLanding;
+    const topOn = [tl?.sideArrive ?? perimeter, tl?.far ?? perimeter, tl?.sideExit ?? perimeter, tl?.close ?? false];
+    const topV: P[] = [
+      { u: uHigh(kT), v: vOuter(kT),     y: yT },
+      { u: uFar(kT),  v: vOuter(kT),     y: yT },
+      { u: uFar(kT),  v: vOuter(kT + 1), y: yT },
+      { u: uHigh(kT), v: vOuter(kT + 1), y: yT },
+      { u: uHigh(kT), v: vInner(kT),     y: yT },
+    ];
+    // Consecutive ON edges share a polyline (mitered corners); an OFF edge
+    // breaks the chain. When the first edge is ON, it continues the outer
+    // path that arrives at topV[0] instead of starting a new piece.
+    const emitTopEdges = (arrive: P[] | null): void => {
+      let chain: P[] | null = null;
+      let glued = false;
+      const flush = (): void => {
+        if (chain && !glued) paths.push({ pts: chain, side: "outer" });
+        chain = null; glued = false;
+      };
+      for (let i = 0; i < 4; i++) {
+        if (!topOn[i]) { flush(); continue; }
+        if (!chain) {
+          if (i === 0 && arrive) { chain = arrive; glued = true; }
+          else chain = [topV[i]];
+        }
+        chain.push(topV[i + 1]);
+      }
+      flush();
+    };
+
     if (perimeter) {
-      // One continuous outer path wrapping every landing's three outer edges.
+      // One continuous outer path wrapping every intermediate landing's three
+      // outer edges; the top landing's edges come from the toggles.
       const outer: P[] = [freeEnd(vOuter(0))];
       for (let k = 0; k < flightsCount; k++) {
         const y = topY(k);
         outer.push({ u: uHigh(k), v: vOuter(k),     y });   // arrive at landing k
+        if (k === kT) break;                                // top landing: toggled edges take over
         outer.push({ u: uFar(k),  v: vOuter(k),     y });   // side edge along arriving flight's line
         outer.push({ u: uFar(k),  v: vOuter(k + 1), y });   // far edge
         outer.push({ u: uHigh(k), v: vOuter(k + 1), y });   // side edge onto next flight's line
-        // Top landing: this last vertex is the corner of the open exit edge — terminate.
       }
       paths.push({ pts: outer, side: "outer", freeStart: true });
+      emitTopEdges(outer);
     } else {
       // Per-flight outer rails that stop at each landing boundary.
+      let lastPts: P[] | null = null;
       for (let k = 0; k < flightsCount; k++) {
         const start: P = k === 0
           ? freeEnd(vOuter(0))
           : { u: uLow(k), v: vOuter(k), y: topY(k - 1) };
-        paths.push({ pts: [start, { u: uHigh(k), v: vOuter(k), y: topY(k) }], side: "outer", freeStart: k === 0 });
+        const pts = [start, { u: uHigh(k), v: vOuter(k), y: topY(k) }];
+        paths.push({ pts, side: "outer", freeStart: k === 0 });
+        if (k === kT) lastPts = pts;
       }
+      emitTopEdges(lastPts);
     }
   }
 

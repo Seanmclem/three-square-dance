@@ -515,6 +515,15 @@ export interface StairRailingDef {
   balustersInner?:   boolean;  // posts on the inner/void side (default: balusters)
   balustersOuter?:   boolean;  // posts on the outer side (default: balusters)
   landingPerimeter?: boolean;  // rail the landing's outer perimeter edges (default: false — outer rails stop at the landing)
+  // Per-edge rails on the TOP landing (flights > 1). The first three default
+  // to landingPerimeter; `close` is the extra 4th rail across the stairwell
+  // mouth (from the exit corner to the arriving flight's inner rail line).
+  topLanding?: {
+    sideArrive?: boolean;   // side edge along the arriving flight
+    far?:        boolean;   // far edge
+    sideExit?:   boolean;   // side edge opposite the arriving flight
+    close?:      boolean;   // across the stairwell mouth (default: false)
+  };
   height:        number;    // rail height above the step nosings (m)
   stepInterval:  number;    // a baluster every N steps (>= 1)
   barThickness:  number;    // top-rail cross-section (m)

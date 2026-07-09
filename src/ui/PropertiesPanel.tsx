@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
@@ -1800,6 +1800,11 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const [railPostsIn,   setRailPostsIn]   = useState(stair?.railing?.balustersInner ?? stair?.railing?.balusters ?? true);
   const [railPostsOut,  setRailPostsOut]  = useState(stair?.railing?.balustersOuter ?? stair?.railing?.balusters ?? true);
   const [railPerimeter, setRailPerimeter] = useState(stair?.railing?.landingPerimeter ?? false);
+  const [railTop4, setRailTop4] = useState(() => {
+    const per = stair?.railing?.landingPerimeter ?? false;
+    const tl  = stair?.railing?.topLanding;
+    return { sideArrive: tl?.sideArrive ?? per, far: tl?.far ?? per, sideExit: tl?.sideExit ?? per, close: tl?.close ?? false };
+  });
   const [railHeight,    setRailHeight]    = useState(String(stair?.railing?.height        ?? 0.9));
   const [railInterval,  setRailInterval]  = useState(String(stair?.railing?.stepInterval  ?? 1));
   const [railBarT,      setRailBarT]      = useState(String(stair?.railing?.barThickness  ?? 0.1));
@@ -1836,6 +1841,11 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
     setRailPostsIn(stair.railing?.balustersInner ?? stair.railing?.balusters ?? true);
     setRailPostsOut(stair.railing?.balustersOuter ?? stair.railing?.balusters ?? true);
     setRailPerimeter(stair.railing?.landingPerimeter ?? false);
+    {
+      const per = stair.railing?.landingPerimeter ?? false;
+      const tl  = stair.railing?.topLanding;
+      setRailTop4({ sideArrive: tl?.sideArrive ?? per, far: tl?.far ?? per, sideExit: tl?.sideExit ?? per, close: tl?.close ?? false });
+    }
     setRailHeight(String(stair.railing?.height        ?? 0.9));
     setRailInterval(String(stair.railing?.stepInterval  ?? 1));
     setRailBarT(String(stair.railing?.barThickness  ?? 0.1));
@@ -1948,7 +1958,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
   const toggleRailing = (checked: boolean) => { setHasRailing(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
 
   const RAIL_DEFAULTS = { topRail: true, balusters: true, balustersInner: true, balustersOuter: true, landingPerimeter: false, height: 0.9, stepInterval: 1, barThickness: 0.1, postThickness: 0.06, sideInset: 0.1, overhang: 0.15 };
-  const updateRailing = (patch: Partial<typeof RAIL_DEFAULTS>) => {
+  const updateRailing = (patch: Partial<StairRailingDef>) => {
     const cur = { ...RAIL_DEFAULTS, ...(stair.railing ?? {}) };
     onObjectUpdate({ railing: { ...cur, ...patch } } as unknown as Partial<WorldObject>);
   };
@@ -2324,6 +2334,23 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 <input type="checkbox" checked={railPerimeter} onChange={e => { setRailPerimeter(e.target.checked); updateRailing({ landingPerimeter: e.target.checked }); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
                 <span style={{ color: "#9a9a9a", fontSize: 10 }}>Landing perimeter rail</span>
               </label>
+            )}
+            {stair.hasRailing && (stair.flights ?? 1) > 1 && (
+              <div>
+                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>TOP LANDING RAILS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px" }}>
+                  {([["sideArrive", "Arrive side"], ["far", "Far"], ["sideExit", "Exit side"], ["close", "Stairwell"]] as const).map(([key, label]) => (
+                    <label key={key} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                      <input type="checkbox" checked={railTop4[key]} onChange={e => {
+                        const next = { ...railTop4, [key]: e.target.checked };
+                        setRailTop4(next);
+                        updateRailing({ topLanding: next });
+                      }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+                      <span style={{ color: "#9a9a9a", fontSize: 10 }}>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             )}
             {(stair.flights ?? 1) > 1 && (
               <div style={{ color: "#404050", fontSize: 9 }}>
