@@ -16,4 +16,12 @@ export default defineConfig({
       "@": resolve(__dirname, "src"),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main:    resolve(__dirname, "index.html"),
+        runtime: resolve(__dirname, "runtime.html"),
+      },
+    },
+  },
 });
