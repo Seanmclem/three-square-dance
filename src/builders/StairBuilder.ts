@@ -479,23 +479,22 @@ export class StairBuilder {
       };
 
       // Top-rail bar geometry: barT×barT cross-section along local X, spanning
-      // ±len/2. Connected ends extend +barT/2 so corner miters close; free ends
-      // of sloped runs are tapered instead of square — a raked end face meeting
-      // an underside chamfer — so the bottom corner doesn't jut past the end.
+      // exactly ±len/2 (callers bake any miter extension into len). A tapered
+      // end keeps its tip where the square end was — only the corner is eased:
+      // a slightly raked end face meeting a 45° chamfer on the bottom corner.
       const railBarGeo = (len: number, taperStart: boolean, taperEnd: boolean): THREE.BufferGeometry => {
-        if (!taperStart && !taperEnd) return new THREE.BoxGeometry(len + railBarT, railBarT, railBarT);
         const T = railBarT, h = T / 2;
-        const rake    = 0.4 * T;                                          // end-face setback at the chamfer point
-        const chamfer = Math.max(rake, Math.min(1.2 * T, len * 0.35));    // underside chamfer, clamped for short bars
-        const s = new THREE.Shape();                                      // side profile (x along bar, y up), CCW
-        const x0 = -len / 2 - (taperStart ? 0 : h);
-        const x1 =  len / 2 + (taperEnd   ? 0 : h);
-        s.moveTo(x0 + (taperStart ? chamfer : 0), -h);
-        s.lineTo(x1 - (taperEnd ? chamfer : 0), -h);
-        if (taperEnd) s.lineTo(x1 - rake, -h + 0.35 * T);
+        const rake = 0.15 * T, chamfer = 0.4 * T;      // end-face rake / bottom-corner cut
+        if (len < 2.5 * (rake + chamfer)) taperStart = taperEnd = false;
+        if (!taperStart && !taperEnd) return new THREE.BoxGeometry(len, railBarT, railBarT);
+        const s = new THREE.Shape();                   // side profile (x along bar, y up), CCW
+        const x0 = -len / 2, x1 = len / 2, kinkY = -h + 0.4 * T;
+        s.moveTo(x0 + (taperStart ? rake + chamfer : 0), -h);
+        s.lineTo(x1 - (taperEnd ? rake + chamfer : 0), -h);
+        if (taperEnd) s.lineTo(x1 - rake, kinkY);
         s.lineTo(x1, h);
         s.lineTo(x0, h);
-        if (taperStart) s.lineTo(x0 + rake, -h + 0.35 * T);
+        if (taperStart) s.lineTo(x0 + rake, kinkY);
         s.closePath();
         const geo = new THREE.ExtrudeGeometry(s, { depth: T, bevelEnabled: false });
         geo.translate(0, 0, -T / 2);
@@ -590,7 +589,7 @@ export class StairBuilder {
               // level runs and mitered corners stay square.
               const sloped = Math.abs(segY) > 1e-6;
               addRail(
-                railBarGeo(len, sloped && i === 0, sloped && i === path.length - 2),
+                railBarGeo(len + railBarT, sloped && i === 0, sloped && i === path.length - 2),
                 (a.x + b.x) / 2, (a.y + b.y) / 2 + handrailH, (a.z + b.z) / 2, quat,
               );
             }
