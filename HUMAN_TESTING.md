@@ -269,6 +269,36 @@ the device (not in the world) and apply the next time you press Play.
 
 ---
 
+## Workflow: play a world in the standalone runtime (Phase 25)
+
+The runtime shell plays worlds **without the editor** — it's a second page on
+the same dev server.
+
+1. Open **`http://localhost:7373/runtime.html?manifest=/demo/manifest.json`**.
+   You get a main menu built from the manifest (title, description, Start).
+   With no `?manifest=` param, the page shows a URL input instead — paste any
+   manifest URL (remote origins work if the host sends CORS headers).
+2. **Start** → you spawn in Level One. Controls are identical to editor
+   preview (WASD/mouse, gamepad, touch — phase 24 works here unchanged).
+3. Walk forward through the glowing **purple box** — that's a trigger volume
+   with a `load_scene` action: fade to black, Level Two loads. The dialogue
+   there only appears if you crossed the greeter volume in Level One first —
+   game state carries across scenes.
+4. The **green box** in Level Two portals back. **Enter** (or gamepad Start /
+   touch ⚙) opens the pause menu; **Exit** (or Esc) returns to the main menu.
+5. Progress auto-saves every 30s and on exit — the menu then shows
+   **Continue** (resumes the exact scene, spot, and state, even after a full
+   page reload) and **New Game** (starts clean).
+
+**Authoring your own:** save a world normally (it must have a spawn point),
+put the JSON somewhere fetchable, and hand-write a `manifest.json` like
+`public/demo/manifest.json` (scene ids → URLs, `entryScene`, optional
+`assetsBase`). Cross-scene portals are trigger volumes with a **load_scene**
+action — the Scene id field must match a manifest key (the editor can't
+validate it; a typo just logs an error in the runtime and stays put).
+
+---
+
 ## Adding more workflows
 
 Keep this doc to **reusable, feature-level UI walkthroughs** (the steps a person clicks).

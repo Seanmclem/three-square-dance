@@ -135,6 +135,31 @@ this Mac, per the note above).
 | `window.__preview` | `PreviewController` | `enter("preview"\|"game")` / `exit()` |
 | `window.__test` | object | Test harness — see Section 8 |
 
+### Runtime shell tab (`runtime.html`, Phase 25)
+
+The standalone runtime is a second entry on the same server:
+`localhost:7373/runtime.html?manifest=/demo/manifest.json`. Its DEV globals:
+the classic set above (`__scene`/`__camera`/`__world`/`__zones`/`__bus`/
+`__scriptEngine`/`__preview`/`__gameState`) **plus**
+`window.__runtime = { bus, world, zones, preview, scriptEngine, gameState,
+physicsWorld, router, manifest }`. `window.__test` is installed too (dynamic
+import). Useful patterns:
+
+- `__runtime.router.go("level_02")` — deterministic scene transitions without
+  walking; check `__runtime.router.currentSceneId` after.
+- Collider/body-leak probe across transitions:
+  `__runtime.physicsWorld.world.colliders.len()` / `.bodies.len()` — counts
+  must be identical on every revisit of the same scene. (Use the global, NOT a
+  console `import("/src/physics/PhysicsWorld.ts")` — once Vite has HMR-stamped
+  the page's module graph, an un-versioned import returns a second,
+  uninitialized module instance.)
+- The runtime tab writes only `runtime_gamesave:<manifest.id>` — it can't
+  clobber the editor's autosave, so the §3 snapshot protocol is only needed
+  for editor tabs opened in the same session.
+- Held-key movement via separate `javascript_tool` calls runs 1–3s longer than
+  intended (tool round-trip latency) — walked players fall off small floors.
+  Prefer `__bus.emit("character:teleport", { position, facing })` for poses.
+
 ---
 
 ## 3. Chrome-MCP golden path (read this first)

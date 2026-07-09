@@ -1,13 +1,38 @@
 # Phase 25 — Standalone Runtime Shell (manifest + SceneRouter)
 
-> Status: **PLANNED** — not yet implemented.
-> Target version: next free minor at implementation time (do not pin — versions
-> race ahead). Phase 24 (ControlSchemeManager) shipped as v4.15.0, so its
-> input system is a given, not an assumption.
-> **Reconciled 2026-07-08 against v4.19.0** (decals, shapes, brush/face/edge
-> editing, ControlSchemeManager + pause menu, bake-to-GLB, hull/trimesh
-> colliders all shipped since the original draft) — line anchors and the
-> overlay/input design below reflect current code.
+> Status: **IMPLEMENTED** — shipped as **v4.20.0** (2026-07-08), steps 25.1–25.6
+> all verified in-browser; see `test-plans/phase-25-runtime-shell.md` for the
+> acceptance record. (Reconciled 2026-07-08 against v4.19.0 before
+> implementation; originally drafted 2026-07-07 as phase 21 / v4.8.0.)
+> Notable deviations from this plan during implementation:
+> - `SceneRouter` was built in step 25.3 (the initial scene load already goes
+>   through `go()`); 25.4 added only the `load_scene` action/types/panel field
+>   and the `scene:load-request` subscription.
+> - **Pre-existing PhysicsWorld leak fixed** (25.4): `createStaticCollider`/
+>   `createSensorCollider` allocate a dedicated fixed body per collider, but
+>   `removeCollider` left it behind — every zone unload leaked one body per
+>   collider (invisible in editor zone swaps, compounding per runtime scene
+>   transition). `removeCollider` now removes the empty parent body;
+>   `removeRigidBody` is idempotent (`isValid()` guard) for CharacterBody's
+>   collider-then-body dispose order.
+> - The router owns script re-index/activation across scene loads; the
+>   runtime's `preview:start` handler is UI state + save cadence only (§5.6's
+>   "wired exactly as App.tsx" was wrong for this handler).
+> - `go()` gained `opts.restore` (one-shots + pose) so Continue restores
+>   through the router; pose rides the existing `character:save-position` /
+>   `character:teleport` pair via reserved gameState key `__runtime_pose` — no
+>   new engine surface.
+> - `on_level_load` fires with the zone id (matching the editor's
+>   `zone:enter` path), not null.
+> - The no-param menu's URL input navigates with a full reload
+>   (`?manifest=…`) rather than booting in place.
+> - Demo fixture: hand-authored JSON validated through the real engine load
+>   path (not click-authored in the editor).
+> - `verifyFiles:false` is passed unconditionally in the runtime (not only
+>   for cross-origin bases).
+> - `physicsWorld` added to the `window.__runtime` dev global (un-versioned
+>   dynamic `import()` of a module Vite has HMR-stamped returns a second,
+>   uninitialized instance — learned mid-test).
 
 A lightweight web runtime, separate from the editor, served from the **same
 repo as a second Vite entry** (`runtime.html` + `src/runtime/`). It boots from

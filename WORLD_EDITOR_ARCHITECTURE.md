@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.19.0** — last updated 2026-07-08
+**Version 4.20.0** — last updated 2026-07-08
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -91,6 +91,7 @@
 - v4.17.1 — **Bake pickers get an in-app hint pill.** The two native dialogs a bake can open are indistinguishable OS chrome (user report: "which save is this?"); a fixed top-center pill now names each while its picker is up — "Choose where to save <name>.glb (local copy)…" before `showSaveFilePicker`, "Select your assets/models folder so the asset can join the library…" before the `ensureDir` directory grant (shown only when the folder isn't already granted). Cleared inline after each picker plus in the outer finally/catch so cancel/error paths never strand it.
 - v4.18.0 — **Phase 27 — Convex hull colliders (objects + baked assets).** Fills the reserved `"hull"` slot in `AttachedColliderShape`: `AttachedCollider.points?: Vec3[]` (object-local, pre-scale, relative to origin+offset — encodes shape AND orientation). **Physics** (`ColliderBuilder._attachedDesc`): `RAPIER.ColliderDesc.convexHull((p+offset)·scale)` positioned at the object's translation/rotation — scale composes before rotation like mesh TRS, so hulls stay exact under full rotation AND non-uniform scale (rotated boxes never could); degenerate points fall back to a points-AABB box with a warn. **Opt-in only**: nothing existing changes — hull happens when a user switches a collider card to Hull or a new bake ships hull presets. **Panel**: the collider card's shape row gains **hull** — switching auto-fits from the model via new `ObjectPlacer.getLocalHullPoints` (vertices stride-sampled to ≤1.5k in object-local space → ConvexGeometry → deduped, typically <100 points; null on unbuilt/degenerate meshes) — hull cards show "N points · auto-fit" + **Refit**, hide size/rotationY (offset + Move gizmo still work). **ColliderEditor**: hull wireframes render the actual ConvexGeometry (rebuilt on reposition, capsule idiom); no face handles. **Baked assets now ship exact hulls**: `bakeShapes` emits one hull per source shape (`localHullPoints` carried through the FULL rotation into asset space) — supersedes phase 26's box presets and fixes the tilted-AABB compromise; concave face-brushes get their convex hull (strictly better than a box). Verified in-browser: Rapier hull raycasts match THREE ConvexGeometry ground truth at every probe (2.612/2.633/2.922 exact), tilted hull misses at its AABB corner where the old box over-collided; real imported rock (`rock_2`): 91-point auto-fit through real panel clicks, hull top 1.843 vs AABB 1.961 and clean miss at the AABB corner, cyan wireframe hugging the silhouette. Runtime cost: static hulls ≈ boxes (user-settled — fit was the feature, not speed).
 - v4.19.0 — **Phase 27b — Trimesh attached colliders: baked concave brushes collide exactly.** Closes phase 27's one imprecision (user report: a carved face-brush's baked copy filled its alcove — hulls are convex). `AttachedColliderShape` += `"trimesh"` with `AttachedCollider.indices?: number[]` (triangles into `points`); `ColliderBuilder._attachedDesc` trimesh arm mirrors the hull arm's frame math (`(p+offset)·scale` at the object's translation/rotation) with `FIX_INTERNAL_EDGES`, box fallback on failure. **Bake rule**: face-brush sources → trimesh (vertices/fan indices from `ShapeBuilder.localTrimesh` — the same data their live collider uses — carried through the full rotation into asset space); parametric/cloud sources → hull as before. So a baked structure now collides byte-identically to its sources in every case. ColliderEditor renders trimesh wireframes from points+indices (`_pointsGeometry`, ex-`_hullGeometry`); the panel card shows "N tris · exact from bake" (trimesh isn't user-switchable — no auto-fit from arbitrary render meshes yet; converting away goes through the points-AABB like hulls, Refit is hull-only). Verified in-browser on a hand-authored concave L-prism face-brush baked → preset attached to a placed object: both solid arms hit at exactly 2, the carved notch column passes clean through (a hull reported 2), a horizontal ray inside the notch hits the inner wall at exactly 0.9; panel card + wireframe render. Hollow-surface caveats unchanged from live face-brush trimeshes.
+- v4.20.0 — **Phase 25 — Standalone Runtime Shell (manifest + SceneRouter).** A second Vite entry (**`runtime.html`** → **`src/runtime/`**) that plays worlds without the editor: boots from a **manifest.json at any URL** (`?manifest=` param; CORS permitting), shows a DOM main menu from manifest metadata (name/description/author; Start / Continue / New Game; URL input when no param — v1's launcher stand-in), and routes between **whole scene files** via a new **`SceneRouter`** — one level above zone transitions. The runtime is its own ~250-line composition root (`RuntimeApp.tsx`) constructing the same engine classes as App.tsx minus every editor tool: game-mode SceneManager, WorldState, ObjectPlacer, ZoneManager, PreviewController (which owns ControlSchemeManager since phase 24 — kbm/gamepad/touch work unmodified), ScriptEngine, gameState; overlays reused: PreviewHUD(+scheme), DialogueOverlay(+`dialogue:closed` emit), FadeOverlay, TouchControlsOverlay (scheme-gated), PauseMenu + the `action:cancel` handler pattern (exit → menu screen). **Engine decoupling (25.1, zero editor change):** `SceneManager` ctor gains `opts?: { mode?: "editor"|"game" }` — game mode skips EditorCamera (field now `EditorCamera | null`), ViewHelper, and `_setupGrid()` (grid + demo ground); `PreviewController` spawn falls back `editorCamera?.focus` → origin soft-fail (warn, no crash) when a scene lacks `defaultSpawn`; **`AssetManager.setBaseUrl(url)`** + private `_resolve(path)` at every fetch/loader site (all three manifests, `_fileExists`, textures, GLB/OBJ/MTL) so `/assets/**` resolves against a remote origin (default = document origin, byte-identical editor behavior), and `initMaterials/initAssets/initDecals` gain `{ verifyFiles?: boolean }` (runtime passes `false` — cross-origin HEAD checks 405 on some hosts and would hide every asset). **SceneRouter.go(sceneId)** sequence: re-entrancy guard (portals double-fire) → resolve URL first (unknown authored id = non-fatal, stays in scene) → fade + LoadingScreen → capture fired one-shots → `deactivate/clearIndex` → `preview.exit()` → unload ALL zones → fetch scene JSON → editor's exact migration pipeline (`migrateWallNodes`/`migrateUVs`/`pruneOrphanNodes`) → `loadFromJSON` → `loadZone(zones[0])` → re-index scripts (router owns script lifecycle; runtime's `preview:start` handler is UI-state only, unlike App's) → `configureSchema` **without reset** (cross-scene `gameState` persistence is the point) → `activate` + restore one-shots (so cross-scene oneShots never re-fire) → `enter("game")` (+`character:teleport` to saved pose on Continue) → `onGameStart()` only on newGame/resume → `fire("on_level_load", zoneId)` (never synthesize `zone:enter` — it would trip ZoneManager's swap handler). **New script action `load_scene`** (`ActionType` + `ScriptAction.sceneId` + bus `scene:load-request`): one ScriptEngine dispatch case; ScriptPanel free-text field ("runtime manifest key — not validated here"); silent no-op in editor preview (no listener). **Per-manifest saves** (`src/runtime/saveGame.ts`): `runtime_gamesave:<manifest.id>` = `{ version, ts, sceneId, state, firedOneShots, pose }` — pose captured via the existing `character:save-position` mechanism (reserved key `__runtime_pose`, foot-level, round-trips through `character:teleport`); written every 30s + on scene entry + before every exit; Continue restores scene+state+one-shots+pose across full page reloads; New Game clears + `gameState.reset()`. **PhysicsWorld leak fix (pre-existing, exposed by scene cycling):** `createStaticCollider`/`createSensorCollider` allocate a dedicated fixed body per collider but `removeCollider` left it behind — now removes the empty parent body, and `removeRigidBody` is idempotent (`body.isValid()` guard) so CharacterBody's collider-then-body dispose stays safe. Verified A→B→A→B: mesh/collider/body counts identical per scene visit. **Vite:** `build.rollupOptions.input` = main + runtime; the runtime chunk graph contains no editor UI (`main-*.js` not referenced; DEV-only `installTestHelpers` loaded via dynamic import because it statically imports `@/editor/bakeShapes`). **Committed demo** `public/demo/` (manifest + level_01 ⇄ level_02 wired by portal trigger volumes with `load_scene`; state-gated dialogue in level_02 proves cross-scene state). Verified in-browser end-to-end, including a true cross-origin run (second local server with CORS headers — manifest, scenes, asset manifests, textures all resolved against it) and ErrorScreen paths (bad URL, invalid JSON, CORS named explicitly). Dev globals: `window.__runtime` (+ classic `__scene`/`__world`/… so TESTING.md recipes work in the runtime tab). Future work (unchanged from the plan doc): launcher/library + registry, ref-counted asset cache + preloading, 3D menu scenes, editor "Export manifest".
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -198,6 +199,7 @@ export interface BusEvents {
   "scene:load":            { json: unknown };
   "scene:saved":           { json: SceneFile };
   "scene:loaded":          { metadata: SceneMetadata };
+  "scene:load-request":    { sceneId: string };   // load_scene action → runtime SceneRouter (no editor listener)
   "world:loaded":          { metadata: SceneMetadata };
   "materials:loaded":      { materials: MaterialDef[] };
   "quality:changed":       { quality: QualityScale };
@@ -677,7 +679,8 @@ export type ActionType =
   | 'teleport_player'
   | 'show_ui'
   | 'give_item'
-  | 'run_script';        // JavaScript escape hatch
+  | 'run_script'         // JavaScript escape hatch
+  | 'load_scene';        // runtime shell: route to another manifest scene (no-op in editor preview)
 
 export interface ScriptTrigger {
   type:       TriggerType;
@@ -856,12 +859,22 @@ export interface IEditorModule {
 ```
 world-editor/
 ├── index.html
-├── vite.config.ts
+├── runtime.html                    ← second Vite entry: the standalone runtime shell (Phase 25)
+├── vite.config.ts                  ← build.rollupOptions.input = { main, runtime }
 ├── package.json
 ├── WORLD_EDITOR_ARCHITECTURE.md
+├── public/
+│   └── demo/                       ← committed runtime demo: manifest.json + scenes/level_01/02 (Phase 25)
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx
+│   ├── runtime/                    ← runtime shell composition root (Phase 25; editor-free)
+│   │   ├── main.tsx                ← createRoot(<RuntimeApp/>)
+│   │   ├── RuntimeApp.tsx          ← the "small App.tsx": engine construction + shell states + overlays
+│   │   ├── manifest.ts             ← RuntimeManifest schema, loadManifest(url), relative-URL resolution
+│   │   ├── SceneRouter.ts          ← file-level scene routing (teardown → fetch → migrate → load → enter)
+│   │   ├── saveGame.ts             ← runtime_gamesave:<manifest.id> blob (sceneId + state + oneShots + pose)
+│   │   └── ui/                     ← MainMenu / LoadingScreen / ErrorScreen (DOM overlays)
 │   ├── core/
 │   │   ├── SceneManager.ts
 │   │   ├── AssetManager.ts
@@ -967,6 +980,13 @@ const bus = new EventBus();
 const sm = new SceneManager(canvasRef.current, bus);
 // Expose bus to React via Context
 ```
+
+**Phase 25:** the ctor takes `opts?: { mode?: "editor" | "game" }` (default
+`"editor"`). Game mode — used by the runtime shell — skips the EditorCamera
+(the `editorCamera` field is `EditorCamera | null`), the ViewHelper, and
+`_setupGrid()` (grid helpers + the demo ground plane); the RAF loop guards all
+three with `?.`. Before a character camera is set, a game-mode canvas renders
+just sky + lighting with the static default camera.
 
 React components call `bus.emit(...)` to send instructions to Three.js. Three.js calls `bus.emit(...)` to update React UI. React never holds a reference to any `THREE.*` object.
 
@@ -1674,6 +1694,7 @@ class EventBus {
 | `scene:load` | React → Three.js | `{ json }` |
 | `scene:saved` | Three.js → React | `{ json }` |
 | `scene:loaded` | Three.js → React | `{ metadata }` |
+| `scene:load-request` | ScriptEngine (`load_scene`) → runtime SceneRouter | `{ sceneId }` — no editor listener; no-op in editor preview |
 | `world:loaded` | internal | `{ metadata }` |
 | `terrain:sculpt` | internal | `{ x, z, radius, delta }` |
 | `input:click` | InputManager → all | `{ screenPos, worldPos, button }` |
@@ -2561,6 +2582,17 @@ re-positioned on `decal:updated`.
 
 ## AssetManager.ts
 
+**Base-URL resolution (Phase 25):** `setBaseUrl(url)` + a private `_resolve(path)`
+applied at **every** fetch/loader site — the three manifest fetches
+(textures/models/decals), `_fileExists` HEAD checks, `loadTexture`, and the
+GLB/OBJ/MTL loaders. Default base = document origin (no base set ⇒ paths pass
+through unchanged, byte-identical editor behavior); the runtime shell sets it to
+the manifest's `assetsBase` so the whole `/assets/**` tree resolves against a
+remote origin. `initMaterials` / `initAssets` / `initDecals` also take
+`opts?: { verifyFiles?: boolean }` — the runtime passes `false` because
+cross-origin HEAD checks 405 on some static hosts, and a false negative hides
+every asset (magenta world).
+
 ```js
 class AssetManager {
   constructor() {
@@ -2688,7 +2720,10 @@ enter(mode) {
 - `get input()` exposes the manager so App can hand `TouchControlsOverlay` the
   touch shared store + bindings.
 - Spawn: game mode uses `defaultSpawn` (foot-level +capsuleBottom); preview
-  falls back to editor-camera focus +1.5m.
+  falls back to editor-camera focus +1.5m. **Phase 25:** `SceneManager.editorCamera`
+  is nullable (game-mode runtime shell), so the fallback chain is
+  `defaultSpawn → editorCamera?.focus → origin soft-fail (console.warn)` — a
+  runtime scene without a `defaultSpawn` spawns at (0, 1.5, 0) instead of crashing.
 
 ## React UI Components
 
@@ -5437,6 +5472,7 @@ Key behaviours:
 | `show_ui` | `bus.emit('ui:show', { elementId })` |
 | `give_item` | `gameStateManager.addItem(itemId)` |
 | `run_script` | Sandboxed `new Function('ctx', body)(ctx)` |
+| `load_scene` | `bus.emit('scene:load-request', { sceneId })` — runtime SceneRouter routes to another manifest scene; no editor listener, so a no-op in editor preview (Phase 25) |
 
 ---
 
@@ -6546,6 +6582,18 @@ export class PhysicsWorld {
     return this._world.createCollider(desc, body);
   }
 
+  // Phase 25: each helper above allocates a DEDICATED fixed body per collider,
+  // so removeCollider also removes the parent body once it's empty — without
+  // this, every zone unload leaked one body per collider (invisible in the
+  // editor's rare zone swaps; compounded per runtime scene transition).
+  // removeRigidBody is idempotent (body.isValid() guard) so CharacterBody's
+  // collider-then-body dispose order stays safe.
+  removeCollider(collider: RAPIER.Collider): void {
+    const parent = collider.parent();
+    this._world.removeCollider(collider, true);
+    if (parent && parent.numColliders() === 0) this._world.removeRigidBody(parent);
+  }
+
   createSensorCollider(desc: RAPIER.ColliderDesc): RAPIER.Collider {
     desc.setSensor(true);
     const body = this._world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
@@ -7369,11 +7417,50 @@ scale this combines with the culling concern above.
 
 ---
 
-## Future: Scene Loader
+## Runtime Shell (src/runtime/) — Phase 25
 
-Each JSON file is one complete level. A future **Scene Loader** will manage loading different level JSONs and passing player state (inventory, flags, spawn position) between them. This replaces the current concept of multiple geographic zones within one file.
+> This section supersedes the old "Future: Scene Loader" note — the scene
+> loader exists now, as the **SceneRouter** inside the standalone runtime shell.
 
-The current `ZoneDef` / `ZoneManager` will be retained as the per-level geometry container. The Scene Loader will be responsible for unloading one `ZoneDef`-based level and loading another, preserving cross-scene game state via a separate persistence layer.
+A second Vite entry (`runtime.html` → `src/runtime/main.tsx`) that plays worlds
+without the editor. Full design + phased acceptance record:
+`plans/phase-25-runtime-shell.md` and `test-plans/phase-25-runtime-shell.md`.
+
+### Pieces
+
+| File | Role |
+|---|---|
+| `RuntimeApp.tsx` | Composition root (the "small App.tsx"): constructs SceneManager(`mode:"game"`), WorldState, ObjectPlacer, ZoneManager, PreviewController, ScriptEngine, `gameState.attach(bus)`; shell states `boot → menu → loading → playing → error`; mounts PreviewHUD(+scheme), DialogueOverlay(+`dialogue:closed`), FadeOverlay, TouchControlsOverlay (scheme-gated), PauseMenu (+`action:cancel` handler, exit → menu); Escape/pause-exit save-then-exit; 30s runtime autosave. Script re-index/activation across scene loads is owned by **SceneRouter**, not the `preview:start` handler (unlike App.tsx). |
+| `manifest.ts` | `RuntimeManifest` v1 (`manifestVersion/id/name/entryScene/scenes/assetsBase` + display metadata); `loadManifest(url)` fetch + loud shallow validation; all relative URLs resolve against the manifest's own URL (`new URL(rel, manifestUrl)`); `assetsBase` default = manifest directory. |
+| `SceneRouter.ts` | `go(sceneId, { newGame?, resume?, restore? })`: resolve URL (unknown id non-fatal) → fade/loading → capture one-shots → deactivate+clearIndex → `preview.exit()` → unload ALL zones → fetch + editor migration pipeline → `loadFromJSON` → `loadZone(zones[0])` → re-index → `configureSchema` (never `reset`) → activate + restore one-shots → `enter("game")` (+pose teleport on Continue) → `onGameStart` (newGame/resume only) → `fire("on_level_load", zoneId)`. Subscribes `scene:load-request`. Never synthesizes `zone:enter` (would trip ZoneManager's swap handler). Re-entrancy-guarded (`transitioning` getter — the shell's `preview:stop` handler checks it to avoid flashing the menu mid-swap). |
+| `saveGame.ts` | `runtime_gamesave:<manifest.id>` = `{ version:1, ts, sceneId, state, firedOneShots, pose? }`. Pose rides the existing `character:save-position` mechanism (reserved gameState key `__runtime_pose`, foot-level, round-trips through `character:teleport`). |
+| `ui/` | `MainMenu` (manifest metadata; Start / Continue / New Game; manifest-URL input when `?manifest=` absent — the launcher stand-in), `LoadingScreen`, `ErrorScreen` (names CORS explicitly on fetch TypeError). |
+
+### Boot & conventions
+
+- URL: `runtime.html?manifest=<url>` — any origin, CORS permitting. Asset base
+  = manifest `assetsBase` via `assetManager.setBaseUrl` (set **before** any
+  manifest fetch); `verifyFiles:false` (cross-origin HEAD 405s).
+- Scene entry convention: first zone in the SceneFile is the entry zone
+  (`loadFromJSON` sets `activeZoneId = zones[0]`); spawn = `world.defaultSpawn`
+  (origin soft-fail if absent).
+- Cross-scene state: the `gameState` singleton persists through `go()` by
+  construction (`configureSchema` only seeds missing keys); fired one-shots are
+  captured/restored around `activate()` so they never re-fire on revisit.
+- Input: `PreviewController` owns `ControlSchemeManager` (phase 24), so
+  kbm/gamepad/touch work unmodified; `worldbuilder.bindings.v1` is a shared
+  device pref between editor and runtime (intentionally not namespaced).
+- Bundle: the runtime chunk graph contains no editor UI (`main-*.js` is not
+  referenced by `runtime.html`); DEV `installTestHelpers` loads via dynamic
+  import (it statically imports `@/editor/bakeShapes`). Known accepted rider:
+  `SceneManager`'s static `EditorCamera`/ViewHelper imports ride along unused.
+- DEV globals: `window.__runtime = { bus, world, zones, preview, scriptEngine,
+  gameState, physicsWorld, router, manifest }` + the classic `__scene`/`__world`/…
+  set, so TESTING.md recipes work in a runtime tab.
+- Demo fixture: `public/demo/` — two scenes wired by portal trigger volumes
+  (`load_scene`), a state-gated dialogue in level_02 proving cross-scene state.
+- Future work (see plan doc §13): launcher/library + registry, ref-counted
+  asset cache + next-scene preloading, 3D menu scenes, editor "Export manifest".
 
 ---
 
