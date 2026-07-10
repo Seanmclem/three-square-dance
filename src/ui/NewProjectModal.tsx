@@ -2,7 +2,7 @@ import { useState } from "react";
 import { slugifyId } from "@/project/ProjectStore";
 
 interface NewProjectModalProps {
-  onConfirm: (name: string, parentDir: FileSystemDirectoryHandle) => void;
+  onConfirm: (name: string, parentDir: FileSystemDirectoryHandle, startBlank: boolean) => void;
   onCancel:  () => void;
 }
 
@@ -15,6 +15,7 @@ interface NewProjectModalProps {
 export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
   const [name, setName] = useState("");
   const [dir, setDir]   = useState<FileSystemDirectoryHandle | null>(null);
+  const [startBlank, setStartBlank] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const ready = !!name.trim() && !!dir;
@@ -29,7 +30,7 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
   };
 
   const confirm = () => {
-    if (ready) onConfirm(name.trim(), dir!);
+    if (ready) onConfirm(name.trim(), dir!, startBlank);
   };
 
   return (
@@ -95,6 +96,36 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
           </div>
           {error && (
             <div style={{ color: "#cc6666", fontSize: 10, marginTop: 6 }}>{error}</div>
+          )}
+        </div>
+
+        <div>
+          <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>SCENE 1</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {([
+              { blank: false, label: "Current world", hint: "The world you're editing becomes the project's first scene" },
+              { blank: true,  label: "Blank scene",   hint: "Start the project from an empty scene (like New)" },
+            ] as const).map(o => (
+              <button
+                key={o.label}
+                title={o.hint}
+                onClick={() => setStartBlank(o.blank)}
+                style={{
+                  flex: 1, padding: "6px 0", borderRadius: 4, cursor: "pointer",
+                  fontFamily: "monospace", fontSize: 10, letterSpacing: 0.5,
+                  border: "none",
+                  background: startBlank === o.blank ? "rgba(80,140,255,0.2)" : "rgba(46,46,46,0.9)",
+                  color: startBlank === o.blank ? "#80aaff" : "#646464",
+                  outline: startBlank === o.blank ? "1px solid rgba(80,140,255,0.33)" : "1px solid rgba(255,255,255,0.07)",
+                }}
+              >{o.label}</button>
+            ))}
+          </div>
+          {startBlank && (
+            <div style={{ color: "#8a7a50", fontSize: 10, lineHeight: 1.5, marginTop: 6 }}>
+              The world you're editing now will be replaced — save it first if it
+              isn't already part of a project or file.
+            </div>
           )}
         </div>
 

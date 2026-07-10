@@ -988,22 +988,31 @@ export default function App() {
    *  (each native dialog gets its own click = its own user activation). */
   const handleProjectNew = useCallback((): void => setNewProjectOpen(true), []);
 
-  const handleProjectCreate = useCallback(async (name: string, parent: FileSystemDirectoryHandle): Promise<void> => {
+  const handleProjectCreate = useCallback(async (name: string, parent: FileSystemDirectoryHandle, startBlank: boolean): Promise<void> => {
     setNewProjectOpen(false);
     try {
       await closeProject();
       const store = await ProjectStore.create(parent, name);
-      // Adopt the current world as scene 1
-      const world = worldRef.current!;
-      const sceneId = uniqueSceneId(slugifyId(world.metadata?.name ?? "") || "scene_01", store.sceneIds);
-      await store.addScene(sceneId, world.toJSON());
+      let sceneId: string;
+      if (startBlank) {
+        // Fresh scene 1 (the "New" semantics) — replaces the current world in the editor
+        const fresh = makeFreshScene("Scene 1");
+        sceneId = "scene_01";
+        await store.addScene(sceneId, fresh);
+        await handleLoadFromJSON(fresh);
+      } else {
+        // Adopt the current world as scene 1 (single-scene → project migration)
+        const world = worldRef.current!;
+        sceneId = uniqueSceneId(slugifyId(world.metadata?.name ?? "") || "scene_01", store.sceneIds);
+        await store.addScene(sceneId, world.toJSON());
+      }
       adoptProject(store, sceneId);
       setIsDirty(false);
     } catch (e: unknown) {
       console.error('New project failed:', e);
       window.alert(`New project failed: ${(e as Error).message}`);
     }
-  }, [closeProject, adoptProject]);
+  }, [closeProject, adoptProject, handleLoadFromJSON]);
 
   const handleProjectOpen = useCallback(async (): Promise<void> => {
     try {
@@ -2393,7 +2402,7 @@ export default function App() {
       {newProjectOpen && (
         <NewProjectModal
           onCancel={() => setNewProjectOpen(false)}
-          onConfirm={(name, dir) => void handleProjectCreate(name, dir)}
+          onConfirm={(name, dir, startBlank) => void handleProjectCreate(name, dir, startBlank)}
         />
       )}
 
