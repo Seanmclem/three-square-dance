@@ -988,23 +988,19 @@ export default function App() {
    *  (each native dialog gets its own click = its own user activation). */
   const handleProjectNew = useCallback((): void => setNewProjectOpen(true), []);
 
-  const handleProjectCreate = useCallback(async (name: string, parent: FileSystemDirectoryHandle, startBlank: boolean): Promise<void> => {
+  const handleProjectCreate = useCallback(async (name: string, parent: FileSystemDirectoryHandle, startBlank: boolean, sceneId: string): Promise<void> => {
     setNewProjectOpen(false);
     try {
       await closeProject();
       const store = await ProjectStore.create(parent, name);
-      let sceneId: string;
       if (startBlank) {
         // Fresh scene 1 (the "New" semantics) — replaces the current world in the editor
         const fresh = makeFreshScene("Scene 1");
-        sceneId = "scene_01";
         await store.addScene(sceneId, fresh);
         await handleLoadFromJSON(fresh);
       } else {
         // Adopt the current world as scene 1 (single-scene → project migration)
-        const world = worldRef.current!;
-        sceneId = uniqueSceneId(slugifyId(world.metadata?.name ?? "") || "scene_01", store.sceneIds);
-        await store.addScene(sceneId, world.toJSON());
+        await store.addScene(sceneId, worldRef.current!.toJSON());
       }
       adoptProject(store, sceneId);
       setIsDirty(false);
@@ -2401,8 +2397,9 @@ export default function App() {
 
       {newProjectOpen && (
         <NewProjectModal
+          defaultSceneId={slugifyId(worldRef.current?.metadata?.name ?? "") || "scene_01"}
           onCancel={() => setNewProjectOpen(false)}
-          onConfirm={(name, dir, startBlank) => void handleProjectCreate(name, dir, startBlank)}
+          onConfirm={(name, dir, startBlank, sceneId) => void handleProjectCreate(name, dir, startBlank, sceneId)}
         />
       )}
 

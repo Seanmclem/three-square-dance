@@ -2,7 +2,9 @@ import { useState } from "react";
 import { slugifyId } from "@/project/ProjectStore";
 
 interface NewProjectModalProps {
-  onConfirm: (name: string, parentDir: FileSystemDirectoryHandle, startBlank: boolean) => void;
+  /** Prefill for the scene-1 id — the slug of the current world's name (App knows it). */
+  defaultSceneId: string;
+  onConfirm: (name: string, parentDir: FileSystemDirectoryHandle, startBlank: boolean, sceneId: string) => void;
   onCancel:  () => void;
 }
 
@@ -12,13 +14,22 @@ interface NewProjectModalProps {
  * transient-user-activation rule (which broke the old prompt-then-pick flow,
  * v4.27.1) can never bite: every native dialog gets its own fresh gesture.
  */
-export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
+export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProjectModalProps) {
   const [name, setName] = useState("");
   const [dir, setDir]   = useState<FileSystemDirectoryHandle | null>(null);
   const [startBlank, setStartBlank] = useState(false);
+  const [sceneId, setSceneId] = useState(defaultSceneId);
+  const [sceneIdTouched, setSceneIdTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ready = !!name.trim() && !!dir;
+  const ready = !!name.trim() && !!dir && !!slugifyId(sceneId.trim());
+
+  const pickStart = (blank: boolean) => {
+    setStartBlank(blank);
+    // Untouched id follows the mode: adopted world keeps its name's slug,
+    // a blank scene defaults to scene_01.
+    if (!sceneIdTouched) setSceneId(blank ? "scene_01" : defaultSceneId);
+  };
 
   const pickFolder = async () => {
     try {
@@ -30,7 +41,7 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
   };
 
   const confirm = () => {
-    if (ready) onConfirm(name.trim(), dir!, startBlank);
+    if (ready) onConfirm(name.trim(), dir!, startBlank, slugifyId(sceneId.trim()));
   };
 
   return (
@@ -109,7 +120,7 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
               <button
                 key={o.label}
                 title={o.hint}
-                onClick={() => setStartBlank(o.blank)}
+                onClick={() => pickStart(o.blank)}
                 style={{
                   flex: 1, padding: "6px 0", borderRadius: 4, cursor: "pointer",
                   fontFamily: "monospace", fontSize: 10, letterSpacing: 0.5,
@@ -127,6 +138,26 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
               isn't already part of a project or file.
             </div>
           )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+            <span style={{ color: "#646464", fontSize: 10, letterSpacing: 1, whiteSpace: "nowrap" }}>SCENE 1 ID</span>
+            <input
+              type="text"
+              value={sceneId}
+              onChange={e => { setSceneId(e.target.value); setSceneIdTouched(true); }}
+              onKeyDown={e => { if (e.key === "Enter") confirm(); if (e.key === "Escape") onCancel(); }}
+              style={{
+                flex: 1, boxSizing: "border-box",
+                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 4, color: "#d8d8d8", fontSize: 11, padding: "5px 8px",
+                outline: "none", fontFamily: "monospace",
+              }}
+            />
+          </div>
+          <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5, marginTop: 4 }}>
+            The scene's permanent id — its filename and what load_scene portals
+            reference (renaming later isn't supported yet). Saved as{" "}
+            <span style={{ color: "#8090a8" }}>scenes/{slugifyId(sceneId.trim()) || "…"}.json</span>.
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>

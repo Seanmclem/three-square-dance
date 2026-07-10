@@ -329,8 +329,10 @@ the device (not in the world) and apply the next time you press Play.
    ▶ Play work instantly), and pick what **SCENE 1** should be — **Current
    world** (the world you're editing becomes the first scene; the
    single-scene → project migration) or **Blank scene** (fresh start, like
-   New). Then **Create project**. The TopBar now shows the project name, a
-   scene dropdown (★ = entry scene), **+**, **▶**, and **⋯**.
+   New). The **SCENE 1 ID** field is that scene's permanent id (filename +
+   what `load_scene` references) — edit it here, because renaming later isn't
+   supported. Then **Create project**. The TopBar now shows the project name,
+   a scene dropdown (★ = entry scene), **+**, **▶**, and **⋯**.
 2. **+** adds a scene (fresh world) and switches to it. Switching scenes via
    the dropdown **auto-saves the one you're leaving** — no prompt. Save
    (Ctrl+S) writes the current scene + `game.json` + `manifest.json` into the
