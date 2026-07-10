@@ -5,6 +5,8 @@ import type { BindingsConfig } from "./bindings";
 const AXIS_LX = 0, AXIS_LY = 1, AXIS_RX = 2, AXIS_RY = 3;
 const BTN_DPAD_UP = 12, BTN_DPAD_DOWN = 13;
 const MAX_BUTTONS = 17;
+// Left-stick menu navigation: edge fires when |LY| crosses this (re-arms on return).
+const STICK_NAV_THRESHOLD = 0.5;
 
 /**
  * Gamepad input for preview mode. The Gamepad API is poll-only, so all work
@@ -18,6 +20,7 @@ export class GamepadSource implements InputSource {
   private _activity = false;
   // Previous-frame pressed flags for edge detection (fixed-size, reused — no per-frame allocation).
   private readonly _prev = new Array<boolean>(MAX_BUTTONS).fill(false);
+  private _prevNavY = 0;   // previous-frame raw LY, for stick menu-nav edges
 
   private readonly _onConnect:    () => void;
   private readonly _onDisconnect: () => void;
@@ -27,6 +30,7 @@ export class GamepadSource implements InputSource {
     this._onDisconnect = () => {
       this._padCount = Math.max(0, this._padCount - 1);
       this._prev.fill(false);   // stale edges must not fire against the next pad
+      this._prevNavY = 0;
     };
   }
 
@@ -42,6 +46,7 @@ export class GamepadSource implements InputSource {
     window.removeEventListener("gamepadconnected",    this._onConnect);
     window.removeEventListener("gamepaddisconnected", this._onDisconnect);
     this._prev.fill(false);
+    this._prevNavY = 0;
   }
 
   apply(state: ActionState, dt: number): void {
@@ -71,6 +76,13 @@ export class GamepadSource implements InputSource {
     if (this._anyEdge(pad, b.buttons.cancel))   state.cancelPressed   = true;
     if (this._edge(pad, BTN_DPAD_UP))   state.menuNav = -1;
     if (this._edge(pad, BTN_DPAD_DOWN)) state.menuNav =  1;
+    // Left stick also navigates menus (console convention). Edge on crossing
+    // the threshold — one step per flick, re-arms when the stick returns.
+    // Raw axis (stick up = -Y), deliberately ignoring the walk deadzone.
+    const navY = pad.axes[AXIS_LY] ?? 0;
+    if (navY <= -STICK_NAV_THRESHOLD && this._prevNavY > -STICK_NAV_THRESHOLD) state.menuNav = -1;
+    if (navY >=  STICK_NAV_THRESHOLD && this._prevNavY <  STICK_NAV_THRESHOLD) state.menuNav =  1;
+    this._prevNavY = navY;
 
     // Snapshot pressed flags for next frame's edge detection.
     const n = Math.min(pad.buttons.length, MAX_BUTTONS);

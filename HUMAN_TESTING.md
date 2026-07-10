@@ -142,8 +142,9 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 5. **▶ Preview**, press **E** on the object. **Expect:** lines advance with **E**; on the
    last line the options appear — the gated option is hidden the first time. Pick
    "I'm new here." → node 2 plays. Talk again: the gated option is now visible
-   (its flag was set); pick it and the dialogue ends. Arrow the highlight with the
-   d-pad/menu-nav on gamepad, click rows with the mouse, tap them on touch.
+   (its flag was set); pick it and the dialogue ends. Move the highlight with
+   **arrow keys or W/S** (E picks), the d-pad or a left-stick flick on gamepad,
+   click rows with the mouse, tap them on touch.
 6. Optional: a LEVEL script with trigger `on_dialogue_end` (target = your dialogue)
    fires whenever that conversation closes — including if the player cancels out.
 
@@ -267,7 +268,8 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
    HUD hints flip to gamepad.
 2. **Left stick** walk (analog — half stick = half speed), **right stick** look,
    **RB** jump (A also works outside dialogue), **LB** interact, **Start** opens
-   the **pause menu** (Resume / Exit — d-pad to highlight, A to pick; Start
+   the **pause menu** (Resume / Exit — d-pad or stick flick to highlight, A to
+   pick; Start
    again also resumes). An open dialogue closes first.
 3. In a dialogue: **A** advances lines / picks the highlighted response option
    (**d-pad** moves the highlight when options are shown). Movement is frozen
@@ -288,6 +290,7 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
    tap an option row to pick it.
 
 On keyboard, **Enter** opens the same pause menu (Enter again = Resume);
+**arrow keys or W/S** move its highlight, **E/Space/Enter** pick;
 **Esc** still exits instantly.
 
 **Tuning:** select the **spawn point** → the panel's **CONTROLS (THIS DEVICE)**

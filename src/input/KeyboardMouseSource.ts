@@ -16,6 +16,7 @@ export class KeyboardMouseSource implements InputSource {
   private _interactQueued = false;      // latched on keydown, consumed by apply()
   private _confirmQueued  = false;
   private _cancelQueued   = false;
+  private _menuNavQueued: -1 | 0 | 1 = 0;  // OS key-repeat re-queues → held arrow scrolls
   private _activity = false;            // real kbm actuation since last hadActivity()
 
   private readonly _onMouseMove:   (e: MouseEvent) => void;
@@ -39,6 +40,8 @@ export class KeyboardMouseSource implements InputSource {
       if (this._bindings.kbm.interact.includes(e.code)) this._interactQueued = true;
       if (this._bindings.kbm.confirm.includes(e.code))  this._confirmQueued  = true;
       if (this._bindings.kbm.cancel.includes(e.code))   this._cancelQueued   = true;
+      if (this._bindings.kbm.menuNav.up.includes(e.code))   this._menuNavQueued = -1;
+      if (this._bindings.kbm.menuNav.down.includes(e.code)) this._menuNavQueued =  1;
       this._activity = true;
     };
     this._onKeyUp = e => this._keys.delete(e.code);
@@ -66,6 +69,7 @@ export class KeyboardMouseSource implements InputSource {
     this._lookPx.x = this._lookPx.y = 0;
     this._wheel = 0;
     this._interactQueued = this._confirmQueued = this._cancelQueued = this._activity = false;
+    this._menuNavQueued = 0;
   }
 
   hadActivity(): boolean {
@@ -99,6 +103,10 @@ export class KeyboardMouseSource implements InputSource {
     if (this._cancelQueued) {
       state.cancelPressed = true;
       this._cancelQueued   = false;
+    }
+    if (this._menuNavQueued !== 0) {
+      state.menuNav = this._menuNavQueued;
+      this._menuNavQueued = 0;
     }
   }
 

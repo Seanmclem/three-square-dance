@@ -13,6 +13,7 @@ export interface BindingsConfig {
     interact: string[];
     confirm:  string[];        // dialogue advance / menu activate (menu mode only)
     cancel:   string[];        // pause-menu toggle (Esc keeps its direct-exit path in App.tsx)
+    menuNav:  { up: string[]; down: string[] };  // dialogue-option / menu highlight (menu mode only)
     lookSensitivity: number;   // rad per px of mouse movement
   };
   gamepad: {
@@ -43,6 +44,9 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
     // Enter is BOTH confirm and cancel: in menu mode confirm wins (the manager
     // drops the simultaneous cancel), outside it cancel opens the pause menu.
     cancel:   ["Enter"],
+    // Movement keys double as menu nav — harmless, since movement is zeroed
+    // in menu mode and menuNav is ignored outside it.
+    menuNav:  { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"] },
     lookSensitivity: 0.002,    // matches the pre-phase-24 hardcode
   },
   gamepad: {
@@ -73,7 +77,8 @@ export function loadBindings(): BindingsConfig {
     if (!raw) return d;
     const s = JSON.parse(raw) as Partial<BindingsConfig>;
     return {
-      kbm:     { ...d.kbm,     ...s.kbm,     move:    { ...d.kbm.move,        ...s.kbm?.move } },
+      kbm:     { ...d.kbm,     ...s.kbm,     move:    { ...d.kbm.move,        ...s.kbm?.move },
+                                             menuNav: { ...d.kbm.menuNav,     ...s.kbm?.menuNav } },
       gamepad: { ...d.gamepad, ...s.gamepad, buttons: { ...d.gamepad.buttons, ...s.gamepad?.buttons } },
       touch:   { ...d.touch,   ...s.touch },
     };

@@ -124,7 +124,8 @@ ending). Target it at a specific dialogue from the dropdown, or leave it as
 Enter preview/game (▶) and interact:
 
 - **E / A / tap** advances lines; on the last line the response options appear.
-- **Arrow keys / d-pad** move the highlight; **E / A** picks. Mouse click or
+- **Arrow keys or W/S** (keyboard), **d-pad or a left-stick flick** (gamepad)
+  move the highlight; **E / A** picks. Mouse click or
   tap picks a row directly.
 - Movement is frozen while a dialogue is open; **Enter / Start / ✕** closes it
   (that's the "cancel" that still fires `on_dialogue_end`).

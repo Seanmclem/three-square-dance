@@ -12,7 +12,8 @@ interface Props {
 /**
  * Minimal pause menu (Phase 24b). Opened/closed by App via action:cancel
  * (gamepad Start, kbm Enter, touch ⚙). While open the ControlSchemeManager is
- * in menu mode: d-pad → menu:nav moves the highlight, confirm (A / E / Enter /
+ * in menu mode: menu:nav (kbm arrows/W/S, d-pad, left-stick flick) moves the
+ * highlight, confirm (A / E / Enter /
  * tap) activates. Mouse/touch can also click the buttons or the backdrop
  * (backdrop = resume). Esc keeps its direct exit-preview path.
  */
