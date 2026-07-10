@@ -57,8 +57,17 @@ export class PhysicsWorld {
     return this._world.createRigidBody(desc);
   }
 
-  /** Attach a collider to an existing body (desc translation/rotation are body-relative). */
+  /**
+   * Attach a collider to an existing body (desc translation/rotation are body-relative).
+   * Only movers use this path, so mover colliders also enable KINEMATIC_KINEMATIC
+   * contacts here — the kinematic player capsule needs real contact manifolds with
+   * moving geometry for push-out (v4.25.1). Pairs stay broad-phase gated: no narrow-
+   * phase work happens until the AABBs actually touch.
+   */
   createColliderOn(desc: RAPIER.ColliderDesc, body: RAPIER.RigidBody): RAPIER.Collider {
+    desc.setActiveCollisionTypes(
+      RAPIER.ActiveCollisionTypes.DEFAULT | RAPIER.ActiveCollisionTypes.KINEMATIC_KINEMATIC,
+    );
     return this._world.createCollider(desc, body);
   }
 

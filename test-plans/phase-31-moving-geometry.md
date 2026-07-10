@@ -41,6 +41,23 @@ moves (the real world's `step()` never ran).
 | 15 | Console: no new errors (only the pre-existing Toolbar style warning + the documented pointer-lock automation artifact) | ✅ |
 | 16 | Perf: `MoverSystem.update` allocates nothing per frame (module scratch objects); 240-frame manual-step loops ran instantly with 4 movers | ✅ (counter eyeball deferred — hidden tab) |
 
+## v4.25.1 addendum — push-out + performance pass (2026-07-10)
+
+User report after playing: the spinning wall passed through a stationary player
+(kinematic-kinematic pairs have no solver contacts; the KCC only resolves the
+player's own movement). Fixed with contact-manifold depenetration + a perf pass.
+
+| # | Check | Result |
+|---|---|---|
+| A1 | Spinning wall push: player teleported to r=1.2 inside the sweep gets shoved around and out past r=2.32; trajectory never crosses the wall (max transient center-dip 0.02m on isolated frames) | ✅ |
+| A2 | Door closes on a player standing in the doorway: end face bulldozes them from x=2 to x=0.49 — flush against the panel edge (0.8 − capsule 0.3), `playerInsideDoorAtEnd: false` | ✅ |
+| A3 | Lift-riding regression with contacts active: foot-vs-slab offset −0.001…+0.045m over a full cycle, grounded throughout — no carry/push fight | ✅ |
+| A4 | `anyRunning()` gate: false in editor mode and after `stop_mover` on all four demo movers (controller skips raycast + contact scan entirely) | ✅ |
+| A5 | `carryDelta`/`isMoverBody` via `_byHandle` Map (O(1)); idle movers skipped in `update()`; `delta` zeroed on every running→stopped path | ✅ (code-verified + A3/A4) |
+| A6 | Zero per-frame allocations: persistent contact callbacks, reused `{x,y,z}` setter objects | ✅ (code-verified) |
+| A7 | `preview:stop` reset + `running` re-seed still correct after stops/toggles; autosave byte-identical after the whole session (no world mutations) | ✅ |
+| A8 | Console clean (no mover/rapier errors) | ✅ |
+
 ## Not covered / deferred
 
 - FPS-counter eyeball with many concurrent movers (hidden tab — no rAF); code

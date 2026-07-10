@@ -160,14 +160,23 @@ export class CharacterController {
     }
     dir.y = this._velY * dt;
 
-    // Ride moving platforms (Phase 31): standing on a mover's kinematic body
-    // adds its per-frame translation delta to the desired move, so the KCC
-    // still collision-resolves the combined motion. Translation only — a
-    // spinning platform doesn't rotate the player (deferred).
-    if (this._movers && this._body.isGrounded) {
-      const h = this._body.groundBodyHandle();
-      const carry = h !== null ? this._movers.carryDelta(h) : null;
-      if (carry) dir.add(carry);
+    // Moving geometry (Phase 31 / v4.25.1) — the whole block is gated on a mover
+    // actually running this frame, so a world without live movers pays nothing
+    // (no ground raycast, no contact scan).
+    if (this._movers?.anyRunning()) {
+      // Ride: standing on a mover's kinematic body adds its per-frame translation
+      // delta to the desired move, so the KCC still collision-resolves the
+      // combined motion. Translation only — spin doesn't rotate the player.
+      if (this._body.isGrounded) {
+        const h = this._body.groundBodyHandle();
+        const carry = h !== null ? this._movers.carryDelta(h) : null;
+        if (carry) dir.add(carry);
+      }
+      // Push: geometry that swept INTO the capsule since the last step shoves the
+      // player out along the contact normal (depenetration read from the step's
+      // contact manifolds). Routed through `dir` so walls still block the shove.
+      const push = this._body.moverPush(this._movers.isMoverBody);
+      if (push.lengthSq() > 0) dir.add(push);
     }
 
     this._body.move(dir);

@@ -2,6 +2,10 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 
+// Deepest allowed shove per frame — a wall sweeping ~cm/frame needs far less; the cap
+// only guards against explosive ejection from a deep overlap (e.g. after a teleport).
+const MAX_PUSH_PER_FRAME = 0.3;
+
 export class CharacterBody {
   readonly capsuleRadius:     number;
   readonly capsuleHalfHeight: number;
@@ -10,6 +14,47 @@ export class CharacterBody {
   private _collider!: RAPIER.Collider;
   private _kcc!:      RAPIER.KinematicCharacterController;
   private readonly _downRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+
+  // ── Moving-geometry push-out (v4.25.1) — persistent callbacks + scratch state so
+  // the per-frame contact scan allocates nothing. Contacts only exist for pairs whose
+  // AABBs touch (broad-phase gated), so the scan is O(overlapping movers), usually 0.
+  private _pushIsMover: ((bodyHandle: number) => boolean) | null = null;
+  private readonly _pushOut = new THREE.Vector3();
+  private readonly _onPushManifold = (manifold: RAPIER.TempContactManifold, flipped: boolean) => {
+    let deepest = 0;
+    for (let i = 0; i < manifold.numContacts(); i++) {
+      const d = manifold.contactDist(i);
+      if (d < deepest) deepest = d;
+    }
+    if (deepest >= 0) return;
+    // normal() points from the manifold's first shape to its second; `flipped` means
+    // our capsule is the SECOND shape. Push the player AWAY from the mover.
+    const n = manifold.normal();
+    const s = flipped ? -deepest : deepest;   // capsule-first: normal points capsule→mover → push along −normal
+    this._pushOut.x += n.x * s;
+    this._pushOut.y += n.y * s;
+    this._pushOut.z += n.z * s;
+  };
+  private readonly _onPushPair = (other: RAPIER.Collider) => {
+    const parent = other.parent();
+    if (!parent || !this._pushIsMover!(parent.handle)) return;
+    physicsWorld.world.contactPair(this._collider, other, this._onPushManifold);
+  };
+
+  /**
+   * Depenetration vector from any mover collider currently overlapping the capsule
+   * (post-step contact manifolds). Returns a reused scratch vector — consume it
+   * before the next call. Zero-length when nothing overlaps.
+   */
+  moverPush(isMoverBody: (bodyHandle: number) => boolean): THREE.Vector3 {
+    this._pushOut.set(0, 0, 0);
+    this._pushIsMover = isMoverBody;
+    physicsWorld.world.contactPairsWith(this._collider, this._onPushPair);
+    this._pushIsMover = null;
+    const len = this._pushOut.length();
+    if (len > MAX_PUSH_PER_FRAME) this._pushOut.multiplyScalar(MAX_PUSH_PER_FRAME / len);
+    return this._pushOut;
+  }
 
   constructor(private readonly _scale = 1) {
     this.capsuleRadius     = 0.3 * _scale;
@@ -22,7 +67,12 @@ export class CharacterBody {
       .setTranslation(spawnPos.x, spawnPos.y, spawnPos.z);
     this._body     = physicsWorld.world.createRigidBody(bodyDesc);
     this._collider = physicsWorld.world.createCollider(
-      RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius),
+      // KINEMATIC_KINEMATIC: generate contact manifolds vs kinematic mover bodies
+      // (moving-geometry push-out, v4.25.1). Mover colliders set the same flag.
+      RAPIER.ColliderDesc.capsule(this.capsuleHalfHeight, this.capsuleRadius)
+        .setActiveCollisionTypes(
+          RAPIER.ActiveCollisionTypes.DEFAULT | RAPIER.ActiveCollisionTypes.KINEMATIC_KINEMATIC,
+        ),
       this._body,
     );
     this._kcc = physicsWorld.world.createCharacterController(0.01);

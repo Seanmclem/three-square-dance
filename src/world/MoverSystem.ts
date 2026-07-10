@@ -12,6 +12,10 @@ const _deltaQ   = new THREE.Quaternion();
 const _invQ     = new THREE.Quaternion();
 const _pos      = new THREE.Vector3();
 const _v        = new THREE.Vector3();
+// Reused plain objects for the Rapier setters — they copy the fields into WASM
+// synchronously, so sharing one literal avoids 2 allocations per mover per frame.
+const _tv = { x: 0, y: 0, z: 0 };
+const _tq = { x: 0, y: 0, z: 0, w: 1 };
 
 interface MeshRest { obj: THREE.Object3D; pos: THREE.Vector3; quat: THREE.Quaternion }
 
@@ -40,12 +44,24 @@ interface MoverEntry {
  */
 export class MoverSystem {
   private readonly _entries = new Map<string, MoverEntry>();
+  // body handle → entry, for O(1) carry/push lookups from the character controller.
+  private readonly _byHandle = new Map<number, MoverEntry>();
   private _active = false;
 
   constructor(bus: EventBus) {
     bus.on("preview:start", () => { this._active = true; });
     bus.on("preview:stop",  () => { this._active = false; this._resetAll(); });
     bus.on("mover:set",     ({ targetId, op }) => this._setOp(targetId, op));
+  }
+
+  /** Bound once — handed to CharacterBody's contact scan without a per-frame closure. */
+  readonly isMoverBody = (bodyHandle: number): boolean => this._byHandle.has(bodyHandle);
+
+  /** True when any mover can move this frame — gates ALL per-frame carry/push work. */
+  anyRunning(): boolean {
+    if (!this._active) return false;
+    for (const e of this._entries.values()) if (e.running) return true;
+    return false;
   }
 
   /** meshes' current transforms are captured as the rest pose — call after the builder finished posing them. */
@@ -60,7 +76,9 @@ export class MoverSystem {
     const oq = originQuat
       ? new THREE.Quaternion(originQuat.x, originQuat.y, originQuat.z, originQuat.w)
       : new THREE.Quaternion();
-    this._entries.set(entityId, {
+    const prev = this._entries.get(entityId);
+    if (prev?.body) this._byHandle.delete(prev.body.handle);
+    const entry: MoverEntry = {
       def,
       meshes: meshes.map(m => ({ obj: m, pos: m.position.clone(), quat: m.quaternion.clone() })),
       body,
@@ -70,10 +88,14 @@ export class MoverSystem {
       t: 0, progress: 0, dir: 1, angle: 0,
       prevPos: new THREE.Vector3(origin.x, origin.y, origin.z),
       delta:   new THREE.Vector3(),
-    });
+    };
+    this._entries.set(entityId, entry);
+    if (body) this._byHandle.set(body.handle, entry);
   }
 
   unregister(entityId: string): void {
+    const e = this._entries.get(entityId);
+    if (e?.body) this._byHandle.delete(e.body.handle);
     this._entries.delete(entityId);
   }
 
@@ -84,18 +106,24 @@ export class MoverSystem {
    * grounded character must add to ride it. Null when the handle isn't a mover.
    */
   carryDelta(bodyHandle: number): THREE.Vector3 | null {
-    for (const e of this._entries.values()) {
-      if (e.body && e.body.handle === bodyHandle) return e.delta;
-    }
-    return null;
+    return this._byHandle.get(bodyHandle)?.delta ?? null;
   }
 
-  /** Runs every frame in both shells, registered BEFORE physicsWorld.step. */
+  /**
+   * Runs every frame in both shells, registered BEFORE physicsWorld.step.
+   * Idle entries (not running) cost nothing: their pose was applied on the frame
+   * they stopped (or at reset) and their carry delta is zeroed on every
+   * running→stopped transition, so skipping them is safe.
+   */
   update(dt: number): void {
     if (!this._active || this._entries.size === 0) return;
     for (const e of this._entries.values()) {
-      if (e.running) this._advance(e, dt);
+      if (!e.running) continue;
+      this._advance(e, dt);
       this._applyPose(e);
+      // Stopped this frame (a "once" slide reached an end): the final pose is
+      // applied above; kill the residual delta so a rider stops being carried.
+      if (!e.running) e.delta.set(0, 0, 0);
     }
   }
 
@@ -153,8 +181,10 @@ export class MoverSystem {
     _pos.copy(e.origin).add(_slideOff);
     _bodyQ.copy(e.originQuat).multiply(_spinQ);
     if (e.body) {
-      e.body.setNextKinematicTranslation({ x: _pos.x, y: _pos.y, z: _pos.z });
-      e.body.setNextKinematicRotation({ x: _bodyQ.x, y: _bodyQ.y, z: _bodyQ.z, w: _bodyQ.w });
+      _tv.x = _pos.x; _tv.y = _pos.y; _tv.z = _pos.z;
+      e.body.setNextKinematicTranslation(_tv);
+      _tq.x = _bodyQ.x; _tq.y = _bodyQ.y; _tq.z = _bodyQ.z; _tq.w = _bodyQ.w;
+      e.body.setNextKinematicRotation(_tq);
     }
     e.delta.copy(_pos).sub(e.prevPos);
     e.prevPos.copy(_pos);
@@ -192,7 +222,7 @@ export class MoverSystem {
     const e = this._entries.get(targetId);
     if (!e) return;
     if (op === "start") { e.running = true; return; }
-    if (op === "stop")  { e.running = false; return; }
+    if (op === "stop")  { e.running = false; e.delta.set(0, 0, 0); return; }
     // toggle: a "once" slide heads for the other end (door open/close);
     // everything else pauses/resumes.
     if (e.def.kind === "slide" && (e.def.mode ?? "loop") === "once") {
@@ -203,5 +233,6 @@ export class MoverSystem {
       return;
     }
     e.running = !e.running;
+    if (!e.running) e.delta.set(0, 0, 0);   // paused mid-motion: no residual carry
   }
 }
