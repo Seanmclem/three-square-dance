@@ -43,6 +43,25 @@ export class PhysicsWorld {
     return this._world.createCollider(desc, body);
   }
 
+  /**
+   * One kinematic body per mover entity, carrying the entity's full rest pose;
+   * its colliders attach body-relative via createColliderOn so MoverSystem can
+   * drive the body exactly like the mesh.
+   */
+  createKinematicBody(
+    pos: { x: number; y: number; z: number },
+    rot?: { x: number; y: number; z: number; w: number },
+  ): RAPIER.RigidBody {
+    const desc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos.x, pos.y, pos.z);
+    if (rot) desc.setRotation(rot);
+    return this._world.createRigidBody(desc);
+  }
+
+  /** Attach a collider to an existing body (desc translation/rotation are body-relative). */
+  createColliderOn(desc: RAPIER.ColliderDesc, body: RAPIER.RigidBody): RAPIER.Collider {
+    return this._world.createCollider(desc, body);
+  }
+
   removeCollider(collider: RAPIER.Collider): void {
     const parent = collider.parent();
     this._world.removeCollider(collider, true);

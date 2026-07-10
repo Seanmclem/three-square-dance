@@ -3,6 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
+import type { MoverSystem } from "@/world/MoverSystem";
 import { CharacterController } from "./CharacterController";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
@@ -43,6 +44,7 @@ export class PreviewController {
     private readonly _world: WorldState,
     private readonly _scene: SceneManager,
     private readonly _zones: ZoneManager,
+    private readonly _movers: MoverSystem | null = null,
   ) {}
 
   get isActive(): boolean { return this._controller !== null; }
@@ -85,7 +87,7 @@ export class PreviewController {
     const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, loadBindings());
     input.init();
 
-    const controller = new CharacterController(settings, this._scene.scene, this._bus, input);
+    const controller = new CharacterController(settings, this._scene.scene, this._bus, input, this._movers);
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);

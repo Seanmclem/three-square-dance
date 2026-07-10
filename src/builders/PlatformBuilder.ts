@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
+import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { csgSubtract } from "@/utils/csg";
 import { applyUVOffset } from "@/builders/UVUtils";
@@ -9,6 +10,10 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 export interface PlatformBuildOutput {
   meshes:    THREE.Mesh[];
   collider:  RAPIER.Collider;
+  // Present when the platform has an active mover (Phase 31) — the kinematic
+  // body the collider is parented to. CSG-cut and polygon platforms bake
+  // world-space geometry and can't animate, so they never get one.
+  moverBody?: RAPIER.RigidBody;
 }
 
 export interface CutInfo {
@@ -398,6 +403,18 @@ export class PlatformBuilder {
       }
     }
 
+    // Mover path (Phase 31): kinematic body carrying position + yaw; the
+    // collider attaches body-relative. Only for plain slabs — CSG-cut and
+    // polygon platforms bake world-space geometry that a mover can't animate.
+    if (platform.mover?.enabled && !capInWorldSpace && !isPolygon) {
+      const angle = ((platform.rotation?.y ?? 0) * Math.PI) / 180;
+      const moverBody = physicsWorld.createKinematicBody(
+        platform.position,
+        { x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) },
+      );
+      const collider = ColliderBuilder.registerPlatform(platform, true, moverBody);
+      return { meshes, collider, moverBody };
+    }
     const collider = ColliderBuilder.registerPlatform(platform, !capInWorldSpace);
     return { meshes, collider };
   }

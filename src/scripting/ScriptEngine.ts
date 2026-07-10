@@ -316,6 +316,18 @@ export class ScriptEngine {
           this._bus.emit("object:despawn", { id });
         break;
 
+      // Phase 31 — scripted geometry motion. MoverSystem is the only listener;
+      // targets without a registered mover are silently ignored there.
+      case "start_mover":
+      case "stop_mover":
+      case "toggle_mover": {
+        const op = action.type === "start_mover" ? "start"
+                 : action.type === "stop_mover"  ? "stop" : "toggle";
+        for (const id of this._resolveTargets(action.targetId))
+          this._bus.emit("mover:set", { targetId: id, op });
+        break;
+      }
+
       case "move_object": {
         if (action.position) {
           const zoneId = this._state.activeZoneId ?? "";

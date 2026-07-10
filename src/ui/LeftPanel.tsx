@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -42,6 +42,7 @@ interface LeftPanelProps {
   triggerVolumes:       TriggerVolume[];
   zoneObjects:          WorldObject[];
   zonePlatforms:        PlatformDef[];
+  zoneShapes:           ShapeDef[];
   zoneStairs:           StairDef[];
   zoneWalls:            WallDef[];
   zoneFloors:           FloorDef[];
@@ -64,7 +65,7 @@ export function LeftPanel({
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
   zoneScripts, zoneDialogues, objectScripts, selectedObjectId,
-  activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
+  activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
   decalTextures, selectedDecalId, onDecalSelect,
@@ -163,6 +164,7 @@ export function LeftPanel({
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
                 zonePlatforms={zonePlatforms}
+                zoneShapes={zoneShapes}
                 zoneStairs={zoneStairs}
                 zoneWalls={zoneWalls}
                 zoneFloors={zoneFloors}

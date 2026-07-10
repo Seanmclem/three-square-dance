@@ -1,5 +1,22 @@
 # Phase 31 — Moving Geometry / Animated World Objects
 
+> **Status: IMPLEMENTED** — shipped 2026-07-10 (v4.25.0). Verified in-browser
+> end-to-end; acceptance record in `test-plans/phase-31-moving-geometry.md`.
+> Notable deviations from plan:
+> - Movers are excluded for **CSG-cut and polygon/node-backed platforms**
+>   (world-space-baked geometry can't animate); the panel hides MOTION for
+>   polygon platforms and PlatformBuilder skips the kinematic body for both.
+> - The kinematic body carries the **full rest pose** (position + rotation)
+>   with purely local collider descs — simpler animation math than the
+>   plan's body-at-origin sketch.
+> - `ActionTargetPicker` had no Shapes optgroup at all — `zoneShapes` was
+>   threaded through the whole App→LeftPanel→ScriptPanel chain (the despawn
+>   picker now lists shapes too; runtime already supported hiding them).
+> - Object movers register even with zero colliders (mesh-only animation);
+>   sensors never join the mover body (stay fixed).
+> - Demo movers (lift, ferry, spinning wall, trigger-toggled door) were left
+>   in the working world by user request.
+
 Origin: user request — "Moving geometry / animated world objects — basic
 scripted movement for placed objects and platforms; rising/falling platforms,
 spinning walls, sliding doors, oscillating hazards; Rapier kinematic bodies

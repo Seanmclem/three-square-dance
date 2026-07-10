@@ -287,6 +287,8 @@ export interface BusEvents {
   "group:updated":         { id: string; name: string };
   "group:visibility":      { groupId: string; visible: boolean };
   "object:play-animation": { id: string; clipName: string; loop?: boolean; hold?: boolean; blend?: number };
+  // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
+  "mover:set":             { targetId: string; op: "start" | "stop" | "toggle" };
   "state:changed":         { key: string; value: JsonValue };
 }
 
@@ -502,6 +504,7 @@ export interface PlatformDef {
   sideMaterial?:          string;
   sideMaterialOverrides?: MaterialOverrides;
   groupIds?:              string[];
+  mover?:                 MoverDef;
 }
 
 export interface StairCutterDef {
@@ -651,6 +654,29 @@ export interface ShapeDef {
   taperZ?: number;
   shearX?: number;              // top-face offset in meters, default 0
   shearZ?: number;
+  mover?:  MoverDef;
+}
+
+// ─── Movers — scripted geometry motion (Phase 31) ────────────────────────────
+
+export type MoverKind = "slide" | "spin";
+
+// Optional per-entity motion. The authored position/rotation is the rest pose;
+// at runtime the MoverSystem drives the mesh + a kinematic Rapier body and never
+// writes back to WorldState. Runs only in preview/game.
+export interface MoverDef {
+  enabled: boolean;
+  kind:    MoverKind;
+  axis:    "x" | "y" | "z";   // entity-local axis (rotated by entity rotation)
+  // slide
+  distance?: number;          // meters of travel from rest, default 2
+  duration?: number;          // seconds per leg, default 2
+  dwell?:    number;          // seconds paused at each end, default 0
+  mode?:     "loop" | "once"; // loop = ping-pong forever; once = stop at far end (toggle reverses)
+  phase?:    number;          // 0..1 initial cycle offset (loop only), default 0
+  // spin
+  speed?:    number;          // deg/sec, sign = direction, default 45
+  autoStart?: boolean;        // default true; false = idle until start_mover/toggle_mover
 }
 
 export interface ObjectProperties {
@@ -696,6 +722,7 @@ export interface WorldObject {
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
   // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
   colliders?: AttachedCollider[];
+  mover?:     MoverDef;
 }
 
 export interface ZoneDef {
@@ -808,7 +835,10 @@ export type ActionType =
   | 'teleport_player'
   | 'show_ui'
   | 'run_script'
-  | 'load_scene';
+  | 'load_scene'
+  | 'start_mover'
+  | 'stop_mover'
+  | 'toggle_mover';
 
 // ─── Generic gameplay state ───────────────────────────────────────────────────
 

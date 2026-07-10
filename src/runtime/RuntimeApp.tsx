@@ -5,6 +5,7 @@ import { assetManager } from "@/core/AssetManager";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
+import { MoverSystem } from "@/world/MoverSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { PreviewController } from "@/preview/PreviewController";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
@@ -68,13 +69,16 @@ export default function RuntimeApp() {
 
     const world        = new WorldState(bus);
     const objectPlacer = new ObjectPlacer(bus);
-    const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer);
-    const preview      = new PreviewController(bus, world, scene, zones);
+    const movers       = new MoverSystem(bus);
+    const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
+    const preview      = new PreviewController(bus, world, scene, zones, movers);
     previewRef.current = preview;
     const scriptEngine = new ScriptEngine(bus, world);
     gameState.attach(bus);
     zones.init();
 
+    // Movers BEFORE the physics step (same ordering as App.tsx — Phase 31)
+    scene.onUpdate(dt => movers.update(dt));
     scene.onUpdate(dt => physicsWorld.step(dt));
     scene.onUpdate(dt => objectPlacer.update(dt));
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
@@ -171,6 +175,7 @@ export default function RuntimeApp() {
       g.__scene = scene.scene; g.__camera = scene.camera; g.__renderer = scene.renderer;
       g.__world = world; g.__zones = zones; g.__bus = bus;
       g.__scriptEngine = scriptEngine; g.__preview = preview; g.__gameState = gameState;
+      g.__movers = movers;
       g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, physicsWorld, router: null, manifest: null };
       // Dynamic import: testHelpers statically imports @/editor/bakeShapes —
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.

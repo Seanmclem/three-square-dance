@@ -13,6 +13,7 @@ import type {
   TriggerVolume,
   WorldObject,
   PlatformDef,
+  ShapeDef,
   StairDef,
   WallDef,
   FloorDef,
@@ -150,8 +151,11 @@ const ACTION_TYPES: ActionType[] = [
   "show_dialogue",
   "show_ui",
   "spawn_npc",
+  "start_mover",
+  "stop_mover",
   "store_position",
   "teleport_player",
+  "toggle_mover",
 ];
 
 const COMPARE_OPS: CompareOp[] = [">=", "<=", ">", "<", "==", "!="];
@@ -205,6 +209,7 @@ export interface ScriptPanelProps {
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -231,6 +236,7 @@ export function ScriptPanel({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -348,6 +354,7 @@ export function ScriptPanel({
               dialogue={editingDialogue}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
+              zoneShapes={zoneShapes}
               zoneStairs={zoneStairs}
               zoneWalls={zoneWalls}
               zoneFloors={zoneFloors}
@@ -383,6 +390,7 @@ export function ScriptPanel({
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
+          zoneShapes={zoneShapes}
           zoneStairs={zoneStairs}
           zoneWalls={zoneWalls}
           zoneFloors={zoneFloors}
@@ -707,6 +715,7 @@ function ScriptEditor({
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -724,6 +733,7 @@ function ScriptEditor({
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -972,6 +982,7 @@ function ScriptEditor({
               action={a}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
+              zoneShapes={zoneShapes}
               zoneStairs={zoneStairs}
               zoneWalls={zoneWalls}
               zoneFloors={zoneFloors}
@@ -1120,6 +1131,7 @@ function ActionTargetPicker({
   zoneObjects,
   groups,
   zonePlatforms = [],
+  zoneShapes = [],
   zoneStairs = [],
   zoneWalls = [],
   zoneFloors = [],
@@ -1130,6 +1142,7 @@ function ActionTargetPicker({
   zoneObjects: WorldObject[];
   groups: GroupDef[];
   zonePlatforms?: PlatformDef[];
+  zoneShapes?: ShapeDef[];
   zoneStairs?: StairDef[];
   zoneWalls?: WallDef[];
   zoneFloors?: FloorDef[];
@@ -1139,6 +1152,7 @@ function ActionTargetPicker({
   const known =
     groups.some((g) => g.id === targetId) ||
     zoneObjects.some((o) => o.id === targetId) ||
+    zoneShapes.some((s) => s.id === targetId) ||
     zonePlatforms.some((p) => p.id === targetId) ||
     zoneStairs.some((s) => s.id === targetId) ||
     zoneWalls.some((w) => w.id === targetId) ||
@@ -1175,6 +1189,15 @@ function ActionTargetPicker({
           {zonePlatforms.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label || "Platform"} ({short(p.id)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {zoneShapes.length > 0 && (
+        <optgroup label="Shapes">
+          {zoneShapes.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label || s.kind} ({short(s.id)})
             </option>
           ))}
         </optgroup>
@@ -1392,6 +1415,7 @@ function ActionRow({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -1406,6 +1430,7 @@ function ActionRow({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -1457,6 +1482,7 @@ function ActionRow({
         action={action}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneShapes={zoneShapes}
         zoneStairs={zoneStairs}
         zoneWalls={zoneWalls}
         zoneFloors={zoneFloors}
@@ -1475,6 +1501,7 @@ function ActionFields({
   action,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -1488,6 +1515,7 @@ function ActionFields({
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -1517,10 +1545,23 @@ function ActionFields({
       zoneObjects={zoneObjects}
       groups={groups}
       zonePlatforms={zonePlatforms}
+      zoneShapes={zoneShapes}
       zoneStairs={zoneStairs}
       zoneWalls={zoneWalls}
       zoneFloors={zoneFloors}
       triggerVolumes={triggerVolumes}
+      onChange={(id) => set({ targetId: id })}
+    />
+  );
+  // start/stop/toggle_mover targets the entity types that can carry a mover
+  // (objects, platforms, shapes — Phase 31).
+  const moverTargetPicker = (
+    <ActionTargetPicker
+      targetId={action.targetId ?? ""}
+      zoneObjects={zoneObjects}
+      groups={groups}
+      zonePlatforms={zonePlatforms}
+      zoneShapes={zoneShapes}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -1726,6 +1767,11 @@ function ActionFields({
 
     case "despawn_object":
       return despawnTargetPicker;
+
+    case "start_mover":
+    case "stop_mover":
+    case "toggle_mover":
+      return moverTargetPicker;
 
     case "open_door":
     case "close_door":
@@ -2074,6 +2120,7 @@ function DialogueEditor({
   dialogue,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -2089,6 +2136,7 @@ function DialogueEditor({
   dialogue: DialogueTreeDef;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -2219,6 +2267,7 @@ function DialogueEditor({
               isStart={node.id === dialogue.startNode}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
+              zoneShapes={zoneShapes}
               zoneStairs={zoneStairs}
               zoneWalls={zoneWalls}
               zoneFloors={zoneFloors}
@@ -2265,6 +2314,7 @@ function DialogueNodeCard({
   isStart,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -2281,6 +2331,7 @@ function DialogueNodeCard({
   isStart: boolean;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -2389,6 +2440,7 @@ function DialogueNodeCard({
           dialogue={dialogue}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
+          zoneShapes={zoneShapes}
           zoneStairs={zoneStairs}
           zoneWalls={zoneWalls}
           zoneFloors={zoneFloors}
@@ -2416,6 +2468,7 @@ function DialogueOptionRow({
   dialogue,
   zoneObjects,
   zonePlatforms,
+  zoneShapes,
   zoneStairs,
   zoneWalls,
   zoneFloors,
@@ -2431,6 +2484,7 @@ function DialogueOptionRow({
   dialogue: DialogueTreeDef;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
   zoneStairs: StairDef[];
   zoneWalls: WallDef[];
   zoneFloors: FloorDef[];
@@ -2544,6 +2598,7 @@ function DialogueOptionRow({
           action={a}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
+          zoneShapes={zoneShapes}
           zoneStairs={zoneStairs}
           zoneWalls={zoneWalls}
           zoneFloors={zoneFloors}

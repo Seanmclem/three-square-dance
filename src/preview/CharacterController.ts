@@ -6,6 +6,7 @@ import type { PlayerSettings, LocomotionState } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import type { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { CharacterBody } from "./CharacterBody";
+import type { MoverSystem } from "@/world/MoverSystem";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
@@ -85,6 +86,7 @@ export class CharacterController {
     private readonly _scene: THREE.Scene,
     private readonly _bus: EventBus,
     private readonly _input: ControlSchemeManager,
+    private readonly _movers: MoverSystem | null = null,
   ) {
     this.camera = new THREE.PerspectiveCamera(
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
@@ -157,6 +159,16 @@ export class CharacterController {
       this._velY -= 20 * dt;
     }
     dir.y = this._velY * dt;
+
+    // Ride moving platforms (Phase 31): standing on a mover's kinematic body
+    // adds its per-frame translation delta to the desired move, so the KCC
+    // still collision-resolves the combined motion. Translation only — a
+    // spinning platform doesn't rotate the player (deferred).
+    if (this._movers && this._body.isGrounded) {
+      const h = this._body.groundBodyHandle();
+      const carry = h !== null ? this._movers.carryDelta(h) : null;
+      if (carry) dir.add(carry);
+    }
 
     this._body.move(dir);
     const pos = this._body.position;

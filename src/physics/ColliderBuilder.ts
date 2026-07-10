@@ -56,12 +56,19 @@ export class ColliderBuilder {
     });
   }
 
-  static registerPlatform(platform: PlatformDef, applyRotation = true): RAPIER.Collider {
+  static registerPlatform(platform: PlatformDef, applyRotation = true, body?: RAPIER.RigidBody): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(
       platform.size.width / 2,
       platform.thickness / 2,
       platform.size.depth / 2,
-    ).setTranslation(
+    );
+    // Mover path (Phase 31): the kinematic body carries position + yaw, the
+    // collider is body-relative — only the slab's local lift above the origin.
+    if (body) {
+      desc.setTranslation(0, platform.thickness / 2, 0);
+      return physicsWorld.createColliderOn(desc, body);
+    }
+    desc.setTranslation(
       platform.position.x,
       platform.position.y + platform.thickness / 2,
       platform.position.z,
@@ -82,12 +89,15 @@ export class ColliderBuilder {
    * degenerate point clouds (params are clamped upstream, so this is a
    * shouldn't-happen guard: the mesh still renders, just without collision).
    */
-  static registerShape(shape: ShapeDef, localPoints: Float32Array): RAPIER.Collider | null {
+  static registerShape(shape: ShapeDef, localPoints: Float32Array, body?: RAPIER.RigidBody): RAPIER.Collider | null {
     const desc = RAPIER.ColliderDesc.convexHull(localPoints);
     if (!desc) {
       console.warn(`ColliderBuilder: convex hull failed for shape "${shape.id}" — no collider`);
       return null;
     }
+    // Mover path (Phase 31): the kinematic body carries the full rest pose;
+    // the hull points are already shape-local, so the desc stays at identity.
+    if (body) return physicsWorld.createColliderOn(desc, body);
     const D2R = Math.PI / 180;
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
@@ -109,7 +119,7 @@ export class ColliderBuilder {
    * `world.step()` — the editor doesn't step physics, so ad-hoc console raycasts
    * against fresh colliders miss until one step runs (preview always steps).
    */
-  static registerShapeTrimesh(shape: ShapeDef, vertices: Float32Array, indices: Uint32Array): RAPIER.Collider | null {
+  static registerShapeTrimesh(shape: ShapeDef, vertices: Float32Array, indices: Uint32Array, body?: RAPIER.RigidBody): RAPIER.Collider | null {
     let desc: RAPIER.ColliderDesc | null = null;
     try {
       desc = RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES);
@@ -118,6 +128,8 @@ export class ColliderBuilder {
       desc = RAPIER.ColliderDesc.convexHull(vertices);
     }
     if (!desc) return null;
+    // Mover path (Phase 31): body-relative, same as registerShape.
+    if (body) return physicsWorld.createColliderOn(desc, body);
     const D2R = Math.PI / 180;
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
@@ -229,9 +241,23 @@ export class ColliderBuilder {
     return physicsWorld.createSensorCollider(desc);
   }
 
-  /** Register a placed object's attached colliders (world transform composed from the object). */
-  static registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): RAPIER.Collider[] {
+  /**
+   * Register a placed object's attached colliders (world transform composed from
+   * the object). Mover path (Phase 31): pass the entity's kinematic `body` — descs
+   * are then built object-LOCAL (a zero-pose clone of the object feeds the same
+   * transform math) and attached body-relative. Sensors stay on their own fixed
+   * body: a sensor riding a mover is out of scope, and KINEMATIC_FIXED collision
+   * filtering assumes a fixed parent.
+   */
+  static registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[], body?: RAPIER.RigidBody): RAPIER.Collider[] {
+    const localObj: WorldObject | null = body
+      ? { ...obj, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } }
+      : null;
     return colliders.map(c => {
+      if (localObj && !c.isSensor) {
+        const desc = ColliderBuilder._attachedDesc(localObj, c);
+        return physicsWorld.createColliderOn(desc, body!);
+      }
       const desc = ColliderBuilder._attachedDesc(obj, c);
       return c.isSensor
         ? physicsWorld.createSensorCollider(desc)

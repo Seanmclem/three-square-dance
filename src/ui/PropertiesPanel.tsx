@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
@@ -1142,6 +1142,129 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
 
 // ── PlatformGeoView ───────────────────────────────────────────────────────────
 
+// ── MoverSection (Phase 31) ───────────────────────────────────────────────────
+// Shared MOTION block for platform / shape / object views. Always commits the
+// COMPLETE mover object (updateObject/updatePlatform/updateShape shallow-merge
+// nested fields wholesale — same hazard as ShapeDef.mesh). Movers run only in
+// preview/game; the editor shows the rest pose.
+
+const MOVER_DEFAULTS: Required<MoverDef> = {
+  enabled: true, kind: "slide", axis: "y",
+  distance: 2, duration: 2, dwell: 0, mode: "loop", phase: 0,
+  speed: 45, autoStart: true,
+};
+
+const MOVER_SEG_BTN = (active: boolean): React.CSSProperties => ({
+  flex: 1, padding: "4px 0", borderRadius: 4,
+  cursor: active ? "default" : "pointer",
+  fontFamily: "monospace", fontSize: 10, border: "none",
+  background: active ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.6)",
+  color: active ? "#80aaff" : "#9a9a9a",
+  outline: active ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
+});
+
+function MoverSection({ entityId, mover, onCommit }: {
+  entityId: string;
+  mover: MoverDef | undefined;
+  onCommit: (m: MoverDef) => void;
+}) {
+  const cur: Required<MoverDef> = { ...MOVER_DEFAULTS, ...mover };
+  const enabled = mover?.enabled ?? false;
+  const [distStr,  setDistStr]  = useState(String(cur.distance));
+  const [durStr,   setDurStr]   = useState(String(cur.duration));
+  const [dwellStr, setDwellStr] = useState(String(cur.dwell));
+  const [phaseStr, setPhaseStr] = useState(String(cur.phase));
+  const [speedStr, setSpeedStr] = useState(String(cur.speed));
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    const c = { ...MOVER_DEFAULTS, ...mover };
+    setDistStr(String(c.distance)); setDurStr(String(c.duration));
+    setDwellStr(String(c.dwell));   setPhaseStr(String(c.phase));
+    setSpeedStr(String(c.speed));
+  }, [entityId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commit = (changes: Partial<MoverDef>) => onCommit({ ...cur, ...changes });
+  const commitNum = (field: "distance" | "duration" | "dwell" | "phase" | "speed", val: string) => {
+    const n = parseFloat(val);
+    if (Number.isFinite(n)) commit({ [field]: n });
+  };
+  const numField = (label: string, val: string, setter: (v: string) => void, field: "distance" | "duration" | "dwell" | "phase" | "speed", step: number, min?: number) => (
+    <div>
+      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{label}</div>
+      <input type="number" step={step} min={min} value={val} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
+        onChange={e => { setter(e.target.value); schedule(() => commitNum(field, e.target.value)); }}
+        onBlur={e => flush(() => commitNum(field, e.target.value))}
+        onKeyDown={e => { if (e.key === "Enter") flush(() => commitNum(field, (e.target as HTMLInputElement).value)); }}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <input type="checkbox" checked={enabled} onChange={e => commit({ enabled: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+        <span style={{ color: enabled ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>MOTION</span>
+      </label>
+      {enabled && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <div>
+              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>KIND</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {([["slide", "Slide"], ["spin", "Spin"]] as const).map(([k, lbl]) => (
+                  <button key={k} disabled={k === cur.kind} onClick={() => commit({ kind: k })} style={MOVER_SEG_BTN(k === cur.kind)}>{lbl}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>AXIS (local)</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["x", "y", "z"] as const).map(a => (
+                  <button key={a} disabled={a === cur.axis} onClick={() => commit({ axis: a })} style={MOVER_SEG_BTN(a === cur.axis)}>{a.toUpperCase()}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {cur.kind === "slide" ? (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {numField("DISTANCE (m)", distStr, setDistStr, "distance", 0.5)}
+                {numField("DURATION (s)", durStr, setDurStr, "duration", 0.5, 0.05)}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div>
+                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>MODE</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {([["loop", "Loop"], ["once", "Once"]] as const).map(([m, lbl]) => (
+                      <button key={m} disabled={m === cur.mode} onClick={() => commit({ mode: m })} style={MOVER_SEG_BTN(m === cur.mode)}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+                {numField("DWELL (s)", dwellStr, setDwellStr, "dwell", 0.25, 0)}
+              </div>
+              {cur.mode === "loop" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {numField("PHASE (0–1)", phaseStr, setPhaseStr, "phase", 0.1, 0)}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {numField("SPEED (deg/s)", speedStr, setSpeedStr, "speed", 15)}
+            </div>
+          )}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={cur.autoStart} onChange={e => commit({ autoStart: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+            <span style={{ color: "#9a9a9a", fontSize: 10 }}>Auto-start (off = wait for script)</span>
+          </label>
+          <div style={{ color: "#404050", fontSize: 9 }}>Runs in preview/game only · editor shows the rest pose</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void }) {
   const plat = selected.data as PlatformDef | null;
   const [posStr,   setPosStr]   = useState({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
@@ -1258,6 +1381,12 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
           onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
         }} />
       </div>
+
+      {/* Motion (Phase 31) — polygon platforms bake world-space geometry and can't animate */}
+      {plat && !plat.points?.length && (
+        <MoverSection entityId={selected.id} mover={plat.mover}
+          onCommit={m => onObjectUpdate({ mover: m } as unknown as Partial<WorldObject>)} />
+      )}
     </div>
   );
 }
@@ -1476,6 +1605,12 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
           onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
         }} />
       </div>
+
+      {/* Motion (Phase 31) */}
+      {shape && (
+        <MoverSection entityId={selected.id} mover={shape.mover}
+          onCommit={m => onObjectUpdate({ mover: m } as unknown as Partial<WorldObject>)} />
+      )}
     </div>
   );
 }
@@ -2518,6 +2653,12 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           />
         )}
       </div>
+
+      {/* Motion (Phase 31) */}
+      {objData && (
+        <MoverSection entityId={selected.id} mover={objData.mover}
+          onCommit={m => onObjectUpdate({ mover: m })} />
+      )}
     </div>
   );
 }

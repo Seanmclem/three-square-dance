@@ -9,6 +9,7 @@ export class CharacterBody {
   private _body!:     RAPIER.RigidBody;
   private _collider!: RAPIER.Collider;
   private _kcc!:      RAPIER.KinematicCharacterController;
+  private readonly _downRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
 
   constructor(private readonly _scale = 1) {
     this.capsuleRadius     = 0.3 * _scale;
@@ -40,6 +41,22 @@ export class CharacterBody {
       y: pos.y + mv.y,
       z: pos.z + mv.z,
     });
+  }
+
+  /**
+   * Rigid-body handle of whatever is directly under the capsule (single short
+   * downward ray, sensors + self excluded) — how the carry logic identifies a
+   * moving platform (Phase 31). Null when airborne or over a parentless collider.
+   */
+  groundBodyHandle(): number | null {
+    const t = this._body.translation();
+    this._downRay.origin.x = t.x; this._downRay.origin.y = t.y; this._downRay.origin.z = t.z;
+    const maxToi = this.capsuleHalfHeight + this.capsuleRadius + 0.35 * this._scale;
+    const hit = physicsWorld.world.castRay(
+      this._downRay, maxToi, true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._collider,
+    );
+    return hit ? (hit.collider.parent()?.handle ?? null) : null;
   }
 
   /** Hard-snap the capsule to a world position (script teleport / respawn). */

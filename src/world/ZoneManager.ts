@@ -13,6 +13,7 @@ import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
 import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
 import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MAX_SURFACE_DECALS } from "@/world/decals/surfaceDecals";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
+import type { MoverSystem } from "@/world/MoverSystem";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
@@ -176,7 +177,32 @@ export class ZoneManager {
     private readonly _worldState:   WorldState,
     private readonly _bus:          EventBus,
     private readonly _objectPlacer: ObjectPlacer,
+    private readonly _movers:       MoverSystem,
   ) {}
+
+  // ── Mover registration (Phase 31) ─────────────────────────────────────────
+  // Called after a builder finished posing meshes; rest poses are captured from
+  // the live transforms. `register` overwrites, so rebuild paths re-register
+  // with the fresh meshes/body automatically.
+
+  private _syncPlatformMover(platform: PlatformDef, meshes: THREE.Mesh[], moverBody?: RAPIER.RigidBody): void {
+    // moverBody absent = mover disabled, or a CSG-cut/polygon platform (world-
+    // space-baked geometry — excluded from movers, see PlatformBuilder).
+    if (!moverBody || !platform.mover) return;
+    const a = ((platform.rotation?.y ?? 0) * Math.PI) / 180;
+    this._movers.register(platform.id, platform.mover, meshes, moverBody,
+      platform.position, { x: 0, y: Math.sin(a / 2), z: 0, w: Math.cos(a / 2) });
+  }
+
+  private _syncShapeMover(shape: ShapeDef, meshes: THREE.Mesh[], moverBody?: RAPIER.RigidBody): void {
+    if (!shape.mover?.enabled) return;
+    const D2R = Math.PI / 180;
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
+    ));
+    // moverBody may be null (degenerate hull) — the mesh still animates.
+    this._movers.register(shape.id, shape.mover, meshes, moverBody ?? null, shape.position, q);
+  }
 
   init(): void {
     this._unsubs.push(
@@ -296,7 +322,9 @@ export class ZoneManager {
         // Script move_object targeting a SHAPE (runtime-only, like object moves):
         // local-space geometry means repositioning is a pure transform update on
         // mesh + collider — no rebuild, and WorldState stays untouched by design.
-        if (changes.position) {
+        // Skipped for mover shapes: their collider is parented to a kinematic
+        // body (setTranslation would fight it) and the mover owns the transform.
+        if (changes.position && !this._movers.has(id)) {
           const she = this._loadedZones.get(zoneId)?.shapeEntries.get(id);
           if (she) {
             const p = changes.position;
@@ -305,7 +333,7 @@ export class ZoneManager {
             return;
           }
         }
-        if (changes.position || changes.rotation || changes.scale || changes.colliders) {
+        if (changes.position || changes.rotation || changes.scale || changes.colliders || changes.mover) {
           const entry = this._loadedZones.get(zoneId);
           const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
           if (entry && obj) {
@@ -517,9 +545,10 @@ export class ZoneManager {
     // ── Platforms ─────────────────────────────────────────────────────────
     for (const platform of zone.platforms) {
       const resolved = resolvePlatformNodes(platform, zone);
-      const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId);
+      const { meshes, collider, moverBody } = await PlatformBuilder.build(resolved, zoneId);
       for (const m of meshes) platformsGroup.add(m);
       platformEntries.set(platform.id, { meshes, collider });
+      this._syncPlatformMover(resolved, meshes, moverBody);
     }
 
     // ── Stairs ────────────────────────────────────────────────────────────
@@ -533,9 +562,10 @@ export class ZoneManager {
 
     // ── Shapes ────────────────────────────────────────────────────────────
     for (const shape of zone.shapes ?? []) {
-      const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
+      const { meshes, collider, moverBody } = await ShapeBuilder.build(shape, zoneId);
       for (const m of meshes) shapesGroup.add(m);
       shapeEntries.set(shape.id, { meshes, collider });
+      this._syncShapeMover(shape, meshes, moverBody);
     }
 
     // ── Objects ───────────────────────────────────────────────────────────
@@ -577,6 +607,11 @@ export class ZoneManager {
   unloadZone(zoneId: string): void {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
+
+    // Movers first — their kinematic bodies are freed by the collider removals below.
+    for (const id of entry.platformEntries.keys()) this._movers.unregister(id);
+    for (const id of entry.shapeEntries.keys())    this._movers.unregister(id);
+    for (const id of entry.objectMeshes.keys())    this._movers.unregister(id);
 
     this._removeDoorSensors(zoneId);
     this._removeTriggerVolumes(zoneId);
@@ -858,10 +893,11 @@ export class ZoneManager {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
     const cutters = this._getStairCuttersForPlatform(zoneId, platform);
-    const { meshes, collider } = await PlatformBuilder.build(platform, zoneId, cutters);
+    const { meshes, collider, moverBody } = await PlatformBuilder.build(platform, zoneId, cutters);
     for (const c of cutters) { c.mesh.geometry.dispose(); (c.mesh.material as THREE.Material).dispose(); }
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platform.id, { meshes, collider });
+    this._syncPlatformMover(platform, meshes, moverBody);
     this._applyDimming();
     this._bus.emit("platform:rebuilt", { zoneId, platformId: platform.id });
   }
@@ -884,7 +920,7 @@ export class ZoneManager {
     const cutters = this._getStairCuttersForPlatform(zoneId, resolved);
 
     // Build the geometry/material (potentially async due to material loading)
-    const { meshes, collider } = await PlatformBuilder.build(resolved, zoneId, cutters);
+    const { meshes, collider, moverBody } = await PlatformBuilder.build(resolved, zoneId, cutters);
     for (const c of cutters) { c.mesh.geometry.dispose(); (c.mesh.material as THREE.Material).dispose(); }
 
     // If a newer rebuild started while we were awaiting, discard this stale result
@@ -904,6 +940,7 @@ export class ZoneManager {
     this._removePlatform(zoneId, platformId);
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platformId, { meshes, collider });
+    this._syncPlatformMover(resolved, meshes, moverBody);
     this._applyDimming();
     this._bus.emit("platform:rebuilt", { zoneId, platformId });
   }
@@ -915,6 +952,7 @@ export class ZoneManager {
     const pe = entry.platformEntries.get(platformId);
     if (!pe) return;
 
+    this._movers.unregister(platformId);
     physicsWorld.removeCollider(pe.collider);
     for (const mesh of pe.meshes) {
       const orig = this._dimmedMeshes.get(mesh);
@@ -932,9 +970,10 @@ export class ZoneManager {
   private async _addShape(zoneId: string, shape: ShapeDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
-    const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
+    const { meshes, collider, moverBody } = await ShapeBuilder.build(shape, zoneId);
     for (const m of meshes) entry.shapesGroup.add(m);
     entry.shapeEntries.set(shape.id, { meshes, collider });
+    this._syncShapeMover(shape, meshes, moverBody);
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId: shape.id });
   }
@@ -950,7 +989,7 @@ export class ZoneManager {
     const shape = zone.shapes?.find(s => s.id === shapeId);
     if (!shape) return;
 
-    const { meshes, collider } = await ShapeBuilder.build(shape, zoneId);
+    const { meshes, collider, moverBody } = await ShapeBuilder.build(shape, zoneId);
 
     // If a newer rebuild started while we were awaiting, discard this stale result
     if (this._shapeBuildTokens.get(shapeId) !== myToken) {
@@ -969,6 +1008,7 @@ export class ZoneManager {
     this._removeShape(zoneId, shapeId);
     for (const m of meshes) entry.shapesGroup.add(m);
     entry.shapeEntries.set(shapeId, { meshes, collider });
+    this._syncShapeMover(shape, meshes, moverBody);
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId });
   }
@@ -980,6 +1020,7 @@ export class ZoneManager {
     const she = entry.shapeEntries.get(shapeId);
     if (!she) return;
 
+    this._movers.unregister(shapeId);
     if (she.collider) physicsWorld.removeCollider(she.collider);
     for (const m of she.meshes) {
       const orig = this._dimmedMeshes.get(m);
@@ -1065,8 +1106,25 @@ export class ZoneManager {
       effective = def?.colliders
         ?? (def?.collidable && aabb ? [defaultColliderFromAABB(aabb.center, aabb.size)] : []);
     }
+    // Mover path (Phase 31): solid colliders parent to one kinematic body; the
+    // mesh root animates even when the object has no colliders at all. The
+    // unconditional unregister clears a stale entry when the mover was just
+    // disabled (no-op otherwise).
+    this._movers.unregister(obj.id);
+    let moverBody: RAPIER.RigidBody | undefined;
+    const mesh = entry.objectMeshes.get(obj.id);
+    if (obj.mover?.enabled && mesh) {
+      if (effective.some(c => !c.isSensor)) {
+        const D2R = Math.PI / 180;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+          obj.rotation.x * D2R, obj.rotation.y * D2R, obj.rotation.z * D2R, "XYZ",
+        ));
+        moverBody = physicsWorld.createKinematicBody(obj.position, { x: q.x, y: q.y, z: q.z, w: q.w });
+      }
+      this._movers.register(obj.id, obj.mover, [mesh], moverBody ?? null, obj.position);
+    }
     if (!effective.length) return;
-    const colliders = ColliderBuilder.registerAttachedColliders(obj, effective);
+    const colliders = ColliderBuilder.registerAttachedColliders(obj, effective, moverBody);
     colliders.forEach((c, i) => {
       if (effective![i]!.isSensor) this._volumeSensors.set(c.handle, obj.id);
     });
@@ -1088,6 +1146,7 @@ export class ZoneManager {
     if (!entry) return;
     const mesh = entry.objectMeshes.get(objectId);
     if (!mesh) return;
+    this._movers.unregister(objectId);
     this._removeObjectColliders(entry, objectId);
     this._objectPlacer.remove(objectId);
     entry.objectsGroup.remove(mesh);

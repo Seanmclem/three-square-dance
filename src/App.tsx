@@ -8,6 +8,7 @@ import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
+import { MoverSystem } from "@/world/MoverSystem";
 import { SelectionManager } from "@/editor/SelectionManager";
 import { isSelectMode } from "@/editor/selectMode";
 import { FloorTool } from "@/editor/FloorTool";
@@ -215,7 +216,8 @@ export default function App() {
     worldRef.current = world;
     const objectPlacer = new ObjectPlacer(bus);
     objectPlacerRef.current = objectPlacer;
-    const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer);
+    const movers    = new MoverSystem(bus);
+    const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     zonesRef.current = zones;
     const history   = new HistoryManager(world, syncHistory);
     historyRef.current = history;
@@ -223,7 +225,7 @@ export default function App() {
     bus.on("world:loaded",  () => { history.clear(); syncHistory(); });
     bus.on("scene:loaded",  () => { history.clear(); syncHistory(); });
 
-    const preview = new PreviewController(bus, world, scene, zones);
+    const preview = new PreviewController(bus, world, scene, zones, movers);
     previewRef.current = preview;
     const input     = new InputManager(canvas, scene.camera, bus, scene.scene);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
@@ -275,6 +277,7 @@ export default function App() {
       g.__bus = bus; g.__scriptEngine = scriptEngine; g.__preview = preview;
       g.__objectPlacer = objectPlacer; g.__history = history;
       g.__gameState = gameState;
+      g.__movers = movers;
       g.__copyPaste = { copySelection, pasteClipboard };
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
@@ -403,6 +406,9 @@ export default function App() {
       } catch { /* IDB or FSA not available */ }
     })();
 
+    // Movers BEFORE the physics step — setNextKinematicTranslation targets must
+    // be fresh when the step consumes them (Phase 31)
+    scene.onUpdate(dt => movers.update(dt));
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
     // Advance object animation mixers every frame (editor + preview)
@@ -1830,6 +1836,7 @@ export default function App() {
   const activeZone = zones.find(z => z.id === activeZoneId);
   const zoneObjects = activeZone?.objects ?? [];
   const zonePlatforms = activeZone?.platforms ?? [];
+  const zoneShapes = activeZone?.shapes ?? [];
   const zoneStairs = activeZone?.stairs ?? [];
   const zoneWalls = activeZone?.walls ?? [];
   const zoneFloors = activeZone?.floors ?? [];
@@ -1901,6 +1908,7 @@ export default function App() {
         triggerVolumes={triggerVolumes}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
+        zoneShapes={zoneShapes}
         zoneStairs={zoneStairs}
         zoneWalls={zoneWalls}
         zoneFloors={zoneFloors}

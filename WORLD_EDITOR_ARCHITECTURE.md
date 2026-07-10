@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.23.3** — last updated 2026-07-09
+**Version 4.25.0** — last updated 2026-07-10
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -117,6 +117,7 @@
 - v4.23.10 — **Chamfer corner stubs too:** the `+barT/2` miter stubs protruding past landing corner joints were still square and read as unchamfered ends. Every rail-bar end now chamfers (`railBarGeo(len + barT, true, true)` for all path segments); the full-thickness overlap still closes the corner. Verified in-browser at a landing corner joint.
 - v4.24.0 — **Phase 30 — Branching dialogue trees.** Replaces the linear `lines[]` dialogue stub (the "Branching dialogue → Phase 12" limitation) with a real conversation system: multiple response options, options gated by conditions on gameState flags, options that run script actions when picked (set flags / give-receive "items" as gameState counters — no inventory system, per the v4.1 design), chained nodes. **Types** (`src/types.ts`): `DialogueTreeDef { id (dlg_<uuid8>), label, speaker, portrait?, startNode, nodes }`, `DialogueNode { id, lines[], speaker?/portrait? overrides, options[] }`, `DialogueOption { id, text, conditions?: ScriptCondition[] (ALL must pass or hidden), actions?: ScriptAction[] (run on pick), next?: node id (absent or missing node = end) }` — branching happens only via options; a node with zero visible options ends after its last line. Storage: **zone-level registry** `ZoneDef.dialogues?`; `ScriptAction.dialogueId?` references it (`dialogue?: DialogueDef` kept as a deprecated runtime fallback). New trigger **`on_dialogue_end`** (targetId = dialogue id; fires on close, including cancel — but not for legacy inline dialogues). Bus: `dialogue:show` payload += `options?: { text, hasNext }[]` (condition-pre-filtered; `hasNext` computed against existing nodes so a dangling `next` degrades to "end"); new `dialogue:choose { index }`. **Runtime**: new **`src/scripting/DialogueRunner.ts`** owned by ScriptEngine (attach/detach in `activate`/`deactivate`) walks the tree — emits `dialogue:show` per node, hears `dialogue:choose`, dispatches the option's actions through the engine (guards made public as `checkConditions`/`runActions`), advances or lets the overlay close; on `dialogue:closed` fires `on_dialogue_end` (`wrapLegacyDialogue` wraps inline data with id `""` → no end trigger). Conditions re-checked per node display, so a flag set mid-conversation gates later options in the same dialogue; an option effect that itself shows a dialogue restarts the runner (last-writer-wins). `ScriptEngine.findDialogue(id)` scans all zones at dispatch (cross-zone/world-script safe). **DialogueOverlay** shows the option list once the last line renders: `menu:nav` moves the highlight (wrap), `action:confirm`/row-click emits `dialogue:choose` (box-click advance disabled while options are up), `hasNext:false` selection also closes. Zero input-layer work — ControlSchemeManager's dialogue menu-mode already emits both events for kbm/gamepad/touch; RuntimeApp needed no change (types dialogue state off `DialogueOverlayProps["dialogue"]`). **Migration** `migrateDialogues(file)` in WorldLoader, called at both pipeline sites (App.tsx load + SceneRouter): shape-guarded per action (`dialogue && !dialogueId`, no version bump), wraps each legacy inline dialogue into a single-node tree in the owning zone (world-script dialogues park in zones[0]). **Editor**: ScriptPanel gains a 4th **DIALOGUE** tab — DialogueList/DialogueEditor mirroring ScriptList/ScriptEditor; node cards (lines textarea, speaker override, delete disabled on the start node) with per-node OptionRows (response text; next-node dropdown incl. "— end conversation —" and red `(missing!)` preservation; nested Show-if reusing `ConditionRow`; On-pick reusing `ActionRow`); render-time-only validation (dangling-`next` badge/warning + unreachable-nodes note — never blocks saves); the `show_dialogue` ActionFields case is now a dialogue-picker dropdown (custom id preserved) and `on_dialogue_end` joins TRIGGER_TYPES with a dialogue TargetPicker case. Editor persistence mirrors the scripts pattern (App `zoneDialogues` state + `handleZoneDialoguesChange` direct mutation + `setIsDirty`, threaded through LeftPanel; serialization free via `toJSON()`). Verified in-browser end-to-end: gated option hidden on first pass, visible after its flag is set mid-conversation; option effects set `met_npc` and granted coins +5 via `adjust_number`; `on_dialogue_end` fired on end-option and on cancel; pause menu stayed closed on cancel-with-dialogue-open (Phase 24b invariant); migration verified on a synthetic legacy file; DIALOGUE-tab UI exercised via real clicks. Plan: `plans/phase-30-dialogue-trees.md`.
 - v4.24.1 — **Dialogue: demo scenes converted to the registry format; runtime inline fallback removed; authoring guide.** The only real legacy data — `public/demo/scenes/level_01/02.json`'s inline `show_dialogue` dialogues — now uses `ZoneDef.dialogues` + `dialogueId` natively (level_01's greeter upgraded to a two-node **branching** tree, `dlg_l1_welcome`, so the demo showcases Phase 30; level_02's carryover dialogue converted 1:1). With both load pipelines running `migrateDialogues`, the runtime inline fallback was dead code and is removed: `wrapLegacyDialogue` deleted from DialogueRunner, `show_dialogue` dispatch no longer reads `action.dialogue` (resolves `dialogueId` or warns), and the runner's fire of `on_dialogue_end` is unconditional (no more id-`""` legacy case). `ScriptAction.dialogue?` stays as a deprecated type field — it's the migration's *input* — but nothing at runtime reads it. New **`DIALOGUES.md`**: human-friendly authoring guide (mental model, DIALOGUE-tab walkthrough, NPC hookup, items-as-counters pattern, validation gotchas, JSON reference). Verified in-browser in the runtime shell: New Game → greeter fires → both options render → "What's the purple box?" chains to n2 → close sets nothing extra; `router.go("level_02")` → carryover dialogue resolves from the new registry; console clean.
+- v4.25.0 — **Phase 31 — Moving geometry / animated world objects.** Authored, scripted movement for placed geometry — rising/falling platforms, spinning walls, sliding doors, oscillating hazards — with **Rapier kinematic bodies updated each frame to match the mesh**, plus player translation-carry so moving platforms are rideable. **Schema** (`src/types.ts`, additive — no migration): `MoverDef { enabled, kind: "slide"|"spin", axis (entity-local), distance?/duration?/dwell?/mode?("loop" ping-pong | "once" stop-at-far-end)/phase? (slide), speed? deg/s (spin), autoStart? }` as `mover?` on **WorldObject / PlatformDef / ShapeDef** (walls/floors/stairs excluded; spinning walls & door panels are authored as box shapes/platforms). The authored `position`/`rotation` is the **rest pose**; movers never write WorldState — they drive mesh + kinematic body only, run **only between `preview:start`/`preview:stop`** (both modes), and snap everything back to rest on stop. Slide travels along the entity-LOCAL axis (a rotated door slides along its own width) with sinusoidal ease-in-out + optional end dwell; spin is linear deg/s about the local axis. **Physics**: `PhysicsWorld.createKinematicBody(pos, rot?)` (`kinematicPositionBased`, carries the full rest pose) + `createColliderOn(desc, body)`; `removeCollider`'s empty-parent cleanup frees kinematic bodies too. `ColliderBuilder.registerPlatform/registerShape/registerShapeTrimesh` take an optional `body` and then build the desc **body-relative** (platform: slab lift only; shapes: identity — points already local); `registerAttachedColliders(obj, colliders, body?)` builds descs from a zero-pose clone of the object through the same `colliderWorldTransform` math (solid colliders share ONE kinematic body per object; **sensors stay on their own fixed body**). `PlatformBuilder`/`ShapeBuilder` create the body when `mover?.enabled` and return it as `moverBody` in the build output — **CSG-cut and polygon/node-backed platforms never get one** (world-space-baked geometry can't animate; the panel hides MOTION for polygon platforms). **New `src/world/MoverSystem.ts`**: registry keyed by entity id (`register` captures per-mesh rest transforms — off-origin meshes like platform railings orbit correctly under spin via delta-rotation-about-origin; `register` overwrites so rebuilds re-register), `update(dt)` runs **before `physicsWorld.step`** in BOTH shells (App.tsx + RuntimeApp.tsx register it first; the step consumes fresh `setNextKinematicTranslation/Rotation` targets), zero per-frame allocations (module scratch objects), `mover:set { targetId, op }` bus handler (`toggle` on a `once` slide heads for the other end = door open/close), per-body `carryDelta` map, full rest reset + hard body teleport on `preview:stop`. **ZoneManager** (ctor gains `MoverSystem`): build paths register (`_syncPlatformMover`/`_syncShapeMover`/object path inside `_buildObjectColliders`, which also creates the object's kinematic body), remove/unload paths unregister; the `object:updated` collider-rebuild condition extended with `changes.mover`; the shape-move fast path (`move_object` on shapes) is **skipped for mover shapes** (their collider is body-parented — `setTranslation` would fight the mover). **Player carry** (translation only — spinning platforms don't rotate the player, deferred): `CharacterBody.groundBodyHandle()` (one short downward ray, sensors+self excluded) → `CharacterController.update` adds the mover's per-frame delta into the desired move **before** `computeColliderMovement`, so the KCC still resolves walls while carried; `MoverSystem` is threaded App→PreviewController→CharacterController. **Scripting**: `ActionType` += `start_mover`/`stop_mover`/`toggle_mover` → one dispatch case emitting `mover:set` per `_resolveTargets` id (group fan-out); ScriptPanel offers them with an object+group+platform+shape target picker — `ActionTargetPicker` gained a **Shapes optgroup** (`zoneShapes` threaded through the App→LeftPanel→ScriptPanel chain; the despawn picker now lists shapes too, which `_setEntityHidden` already supported at runtime). **Editor UI**: shared `MoverSection` (LANDING & FLIGHTS pattern) in the Platform/Shape/Object geometry screens — MOTION checkbox, Slide/Spin + axis + Loop/Once segmented buttons, debounced distance/duration/dwell/phase/speed fields, auto-start; always commits the **whole** `mover` object (nested-field shallow-merge hazard). `window.__movers` DEV global in both shells. Verified in-browser (hidden-tab manual stepping — note: `import('/src/physics/PhysicsWorld.ts')` returned a DEAD duplicate module this session; the live instance needs the HMR-versioned URL from `performance.getEntriesByType('resource')`): slide eases rest→rest+distance with dwell and the body tracking the mesh exactly; spin quaternions advance in lockstep; a `once` door toggles open exactly `distance` and back, via `runAction` AND via a trigger-volume script through the real index; preview:stop resets poses/timers exactly; the player rides the ferry through a full cycle incl. reversal and rides the lift up AND down grounded (no micro-falls); platform edit → rebuild re-registers at the new origin with zero body leak (52→52); a real click→Geometry→MOTION panel edit persisted the full mover object; a cold reload re-registers all movers from the autosave; the runtime shell boots MoverSystem clean. Demo movers (lift, ferry, spinning wall, trigger-toggled sliding door) left in the working world by user request. Plan: `plans/phase-31-moving-geometry.md`.
 - v4.24.2 — **Keyboard + gamepad-stick menu navigation** (gap found answering "how do I select dialogue options with the keyboard": you couldn't — `menuNav` was only ever produced by the gamepad d-pad, so kbm players could only pick the highlighted/first option or use the mouse). (1) **kbm**: `BindingsConfig.kbm` += `menuNav: { up, down }` (defaults `ArrowUp`/`KeyW` and `ArrowDown`/`KeyS` — movement keys are safe to reuse since movement is zeroed in menu mode and `menuNav` is ignored outside it); `KeyboardMouseSource` queues nav edges on keydown exactly like `confirm` (OS key-repeat re-queues, so a held arrow scrolls); `loadBindings` deep-merges the new nested field so stored configs pick up defaults. (2) **Gamepad left stick**: `GamepadSource` fires `menuNav` when raw LY crosses ±`STICK_NAV_THRESHOLD` (0.5) — edge-only with re-arm on return to center (one step per flick, no per-frame repeat), prev-Y cleared on detach/disconnect like button edges. Touch had no gap (option rows / menu buttons are tappable). Benefits both consumers of `menu:nav`: DialogueOverlay options **and** PauseMenu (Resume/Exit is now keyboard-navigable too). Verified in-browser through the real listener chain (real `KeyboardEvent`s on `document` + manually stepped `__preview.input.update()` on the hidden tab; stubbed `navigator.getGamepads` for the stick): ArrowDown/KeyW moved the dialogue highlight, E selected, pause menu arrowed Exit↔Resume and Enter resumed, stick flick emitted exactly one nav per crossing across held frames. Watch out when testing this synthetically: nav + confirm dispatched in the SAME synchronous snippet reads a stale React closure (confirm fires against the pre-nav selection) — real key presses span renders; drive them in separate tool calls.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
@@ -911,6 +912,7 @@ world-editor/
 │   │   ├── WorldLoader.ts
 │   │   ├── WorldSerializer.ts
 │   │   ├── ZoneManager.ts
+│   │   ├── MoverSystem.ts          ← scripted geometry motion: kinematic bodies follow mover defs each frame (Phase 31)
 │   │   ├── TransitionManager.ts
 │   │   ├── TerrainBuilder.ts
 │   │   └── decals/
@@ -937,9 +939,9 @@ world-editor/
 │   │   ├── DecalTool.ts            ← click-to-stamp decals: quad ghost, scroll=size / shift+scroll=rotate (Phase 20)
 │   │   └── TransitionTool.ts
 │   ├── physics/
-│   │   ├── PhysicsWorld.ts         ← Rapier world singleton, step loop, debug draw
-│   │   ├── ColliderBuilder.ts      ← mesh → Rapier collider (called by every builder)
-│   │   └── CharacterBody.ts        ← Rapier KinematicCharacterController wrapper
+│   │   ├── PhysicsWorld.ts         ← Rapier world singleton, step loop, debug draw; kinematic mover bodies (Phase 31)
+│   │   ├── ColliderBuilder.ts      ← mesh → Rapier collider (called by every builder); body-relative mover paths (Phase 31)
+│   │   └── CharacterBody.ts        ← Rapier KinematicCharacterController wrapper + groundBodyHandle() (Phase 31)
 │   ├── scripting/
 │   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch
 │   │   └── GameState.ts            ← Generic runtime state store (see GAMEPLAY_STATE.md; replaced GameStateManager)
@@ -1736,6 +1738,7 @@ class EventBus {
 | `action:cancel` | ControlSchemeManager → App | `{}` — Start/✕: close dialogue else exit preview |
 | `dialogue:closed` | App → ControlSchemeManager, DialogueRunner | `{}` — menu-mode gate off; DialogueRunner fires `on_dialogue_end` (Phase 30) |
 | `dialogue:choose` | DialogueOverlay → DialogueRunner | `{ index }` — picked option (into the filtered options shown; Phase 30) |
+| `mover:set` | ScriptEngine → MoverSystem | `{ targetId, op: "start"\|"stop"\|"toggle" }` — start/stop/toggle_mover actions, targetId pre-expanded from groups (Phase 31) |
 | `pause:show` / `pause:closed` | App ↔ ControlSchemeManager/PreviewController | `{}` — pause menu open/close (menu-mode gate; pointer lock released/re-acquired) |
 | `menu:nav` | ControlSchemeManager → PauseMenu, DialogueOverlay | `{ dir: -1\|1 }` — menu/option highlight (menu mode only): kbm arrows/W/S, gamepad d-pad or left-stick flick (v4.24.2) |
 | `history:restore` | internal | `{}` — fired after undo/redo; ZoneManager reloads active zone |
@@ -2083,6 +2086,12 @@ export interface FloorBuildOutput {
 
 ## PlatformBuilder.ts
 
+> **v4.25.0 (Phase 31):** when `platform.mover?.enabled` on a plain slab (NOT CSG-cut,
+> NOT polygon — those bake world-space geometry a mover can't animate), `build()` creates
+> a kinematic body carrying position+yaw via `physicsWorld.createKinematicBody`, registers
+> the collider body-relative, and returns it as `moverBody` in `PlatformBuildOutput` so
+> ZoneManager can register the mover.
+
 ```ts
 // src/builders/PlatformBuilder.ts
 
@@ -2256,6 +2265,11 @@ class ObjectPlacer {
 
 Parametric shape primitives — cylinder/cone, wedge/ramp, flexible box (`ShapeDef.kind`).
 
+> **v4.25.0 (Phase 31):** when `shape.mover?.enabled` (any kind, incl. face-brushes),
+> `build()` creates a kinematic body at the shape's full rest pose and attaches the
+> local-space hull/trimesh body-relative; returned as `moverBody` in `ShapeBuildOutput`.
+> A degenerate hull (no collider) drops the orphan body — the mesh still animates.
+
 ```ts
 // src/builders/ShapeBuilder.ts
 export function resolveShapeParams(def: ShapeDef): ResolvedShapeParams;  // defaults + clamps
@@ -2301,6 +2315,32 @@ collider (`registerShape`). They are **never baked into vertices** — moving up
   outputs for the undo journal).
 
 ## ZoneManager.ts
+
+> **v4.25.0 (Phase 31):** ctor gains a 5th arg `movers: MoverSystem`. Every
+> platform/shape/object build path registers an enabled mover after the builder poses the
+> meshes (`_syncPlatformMover` — only when the builder returned a `moverBody`;
+> `_syncShapeMover` — even with a null body; objects inside `_buildObjectColliders`, which
+> also creates the object's kinematic body when it has solid colliders). Remove paths,
+> `_removeObject` and `unloadZone` unregister; rebuilds re-register automatically because
+> `register` overwrites. `object:updated` rebuilds colliders on `changes.mover` too, and
+> its shape-move fast path is skipped for mover shapes (`_movers.has(id)`) — their collider
+> is parented to the kinematic body.
+
+## MoverSystem.ts
+
+`src/world/MoverSystem.ts` (Phase 31) — scripted geometry motion. Registry keyed by entity
+id; each entry holds the `MoverDef`, the entity's kinematic body (nullable), and per-mesh
+rest transforms captured at registration (off-origin meshes — e.g. a platform's railing —
+orbit the entity origin correctly under spin via the world-space delta rotation).
+`update(dt)` no-ops unless active (armed on `preview:start`, disarmed + full rest reset with
+a hard body teleport on `preview:stop`) and runs **before `physicsWorld.step`** in both
+shells so the step consumes fresh `setNextKinematicTranslation/Rotation` targets. Slide:
+sinusoidal ease-in-out along the entity-local axis, `loop` ping-pong with optional `dwell`
+and `phase` offset, or `once` (stops at either end; `toggle` heads for the other end —
+doors). Spin: linear deg/s about the local axis. Zero per-frame allocations (module-level
+scratch `Vector3`/`Quaternion`s). Subscribes `mover:set { targetId, op }` from the script
+actions. `carryDelta(bodyHandle)` exposes each mover's per-frame world translation for the
+CharacterController platform-carry. DEV global: `window.__movers`.
 
 ### Internal Entry Types
 
@@ -2863,6 +2903,13 @@ editing from) while the character camera runs unrendered as the *logic camera*
 ## React UI Components
 
 ### PropertiesPanel.tsx
+
+> **v4.25.0 (Phase 31):** shared `MoverSection` component (LANDING & FLIGHTS pattern) added
+> to `PlatformGeoView` (hidden for polygon platforms), `ShapeGeoView`, and `ObjectGeoView` —
+> MOTION enable checkbox (seeds `MOVER_DEFAULTS`), Slide/Spin + X/Y/Z + Loop/Once segmented
+> buttons, debounced distance/duration/dwell/phase/speed fields, auto-start checkbox. Every
+> commit writes the **complete** `mover` object via `onObjectUpdate({ mover })` (nested-field
+> shallow-merge hazard, same as `ShapeDef.mesh`).
 
 Subscribes to `object:selected` and `object:deselected`. Renders a view based on `selected.type`:
 
@@ -5322,6 +5369,13 @@ Reads the per-frame `ActionState` from ControlSchemeManager (Phase 24 — kbm,
 gamepad and touch all arrive pre-merged), computes movement, delegates physics
 to `CharacterBody`, updates camera and optional model mesh.
 
+> **v4.25.0 (Phase 31):** optional 5th ctor param `movers: MoverSystem | null` (threaded
+> App/RuntimeApp → PreviewController). While grounded, `update()` resolves the ground
+> body via `CharacterBody.groundBodyHandle()` and, if it's a registered mover, adds the
+> mover's per-frame translation delta into `dir` **before** `body.move(dir)` — the KCC
+> still collision-resolves the combined motion, so the player rides risers and sliders.
+> Translation carry only: a spinning platform does not rotate/orbit the player (deferred).
+
 ```ts
 update(dt: number): void {
   // 1. Read actions.move (unit-disc analog) → local direction
@@ -5630,6 +5684,7 @@ Key behaviours:
 | `give_item` | `gameStateManager.addItem(itemId)` |
 | `run_script` | Sandboxed `new Function('ctx', body)(ctx)` |
 | `load_scene` | `bus.emit('scene:load-request', { sceneId })` — runtime SceneRouter routes to another manifest scene; no editor listener, so a no-op in editor preview (Phase 25) |
+| `start_mover` / `stop_mover` / `toggle_mover` | per `_resolveTargets(targetId)` id (group fan-out): `bus.emit('mover:set', { targetId, op })` — MoverSystem is the only listener; non-mover targets are ignored there (Phase 31) |
 
 ---
 
@@ -6712,6 +6767,11 @@ These never replace each other. BVH makes the editor fast. Rapier makes the worl
 
 ### PhysicsWorld.ts
 
+> **v4.25.0 (Phase 31):** also `createKinematicBody(pos, rot?)` — one `kinematicPositionBased`
+> body per mover entity, carrying the entity's full rest pose — and `createColliderOn(desc, body)`
+> to attach body-relative colliders. `removeCollider`'s empty-parent cleanup frees these
+> kinematic bodies exactly like the per-collider fixed bodies, so no teardown changes were needed.
+
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";
 
@@ -6777,6 +6837,14 @@ export const physicsWorld = new PhysicsWorld();
 ```
 
 ### ColliderBuilder.ts
+
+> **v4.25.0 (Phase 31):** `registerPlatform`, `registerShape`, `registerShapeTrimesh` and
+> `registerAttachedColliders` accept an optional kinematic `body`; when present the desc is
+> built **body-relative** (platform: `(0, thickness/2, 0)` slab lift, no rotation — the body
+> carries position+yaw; shapes: identity — hull/trimesh points are already shape-local;
+> attached colliders: a zero-pose clone of the object runs through the same
+> `colliderWorldTransform`/local-points math) and attached via `physicsWorld.createColliderOn`.
+> Sensors never join a mover body — they stay on their own fixed body.
 
 > **v4.4.0:** also `registerAttachedColliders(obj: WorldObject, colliders: AttachedCollider[]): Collider[]`
 > — per-object colliders (cuboid/ball/capsule) placed via `colliderWorldTransform` from
@@ -6943,6 +7011,11 @@ if (colliders.terrain)                         physicsWorld.removeCollider(colli
 ```
 
 ### CharacterBody.ts
+
+> **v4.25.0 (Phase 31):** also `groundBodyHandle(): number | null` — one short downward
+> Rapier ray from the capsule center (sensors + own collider excluded, reused `RAPIER.Ray`)
+> returning the parent rigid-body handle of whatever the player stands on. CharacterController
+> uses it to look up moving-platform carry deltas in MoverSystem.
 
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";

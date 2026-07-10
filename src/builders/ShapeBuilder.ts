@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
+import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
 import { newellNormal } from "@/editor/brushOps";
@@ -10,6 +11,9 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 export interface ShapeBuildOutput {
   meshes:   THREE.Mesh[];   // [capMesh (selectable), sideMesh] — same transform, same editorId
   collider: RAPIER.Collider | null;
+  // Present when the shape has an active mover (Phase 31) — the kinematic body
+  // the collider is parented to (absent if the collider itself failed).
+  moverBody?: RAPIER.RigidBody;
 }
 
 /** Below this radialSegments count, cylinder sides get flat per-face normals
@@ -432,11 +436,29 @@ export class ShapeBuilder {
 
   static async build(shape: ShapeDef, zoneId: string): Promise<ShapeBuildOutput> {
     const meshes = await ShapeBuilder.buildMeshes(shape, zoneId);
+    // Mover path (Phase 31): kinematic body carrying the full rest pose; the
+    // local-space hull/trimesh attaches body-relative.
+    let moverBody: RAPIER.RigidBody | undefined;
+    if (shape.mover?.enabled) {
+      const D2R = Math.PI / 180;
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
+      ));
+      moverBody = physicsWorld.createKinematicBody(shape.position, { x: q.x, y: q.y, z: q.z, w: q.w });
+    }
+    let collider: RAPIER.Collider | null;
     if (isFaceBrush(shape)) {
       const tm = ShapeBuilder.localTrimesh(shape);
-      return { meshes, collider: ColliderBuilder.registerShapeTrimesh(shape, tm.vertices, tm.indices) };
+      collider = ColliderBuilder.registerShapeTrimesh(shape, tm.vertices, tm.indices, moverBody);
+    } else {
+      collider = ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape), moverBody);
     }
-    return { meshes, collider: ColliderBuilder.registerShape(shape, ShapeBuilder.localHullPoints(shape)) };
+    if (moverBody && !collider) {
+      // Degenerate hull — nothing attached, drop the orphan body (mesh still animates).
+      physicsWorld.removeRigidBody(moverBody);
+      moverBody = undefined;
+    }
+    return moverBody ? { meshes, collider, moverBody } : { meshes, collider };
   }
 
   /**
