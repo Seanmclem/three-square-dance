@@ -6,7 +6,7 @@ import type {
 } from "@/types";
 import { gameState } from "./GameState";
 import { DialogueRunner } from "./DialogueRunner";
-import { invKey } from "./inventory";
+import { invKey, itemRegistry } from "./inventory";
 
 function isVec3(v: unknown): v is Vec3 {
   return !!v && typeof v === "object"
@@ -340,7 +340,7 @@ export class ScriptEngine {
       case "take_item": {
         if (!action.itemId) break;
         const key   = invKey(action.itemId);
-        const item  = this._state.world?.items?.find(i => i.id === action.itemId);
+        const item  = itemRegistry(this._state).find(i => i.id === action.itemId);
         if (!item) console.warn(`[ScriptEngine] ${action.type}: item '${action.itemId}' not in registry (operating on raw key)`);
         const cur   = Number(gameState.get(key) ?? 0);
         const count = action.count ?? 1;

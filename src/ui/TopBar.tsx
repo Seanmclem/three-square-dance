@@ -15,6 +15,19 @@ interface TopBarProps {
   canRedo:         boolean;
   isDirty?:        boolean;
   lastAutosaveAt?: number | null;
+  // Projects (Phase 33) — all optional; absent = classic single-scene rendering.
+  project?: { name: string; sceneIds: string[]; currentSceneId: string; entryScene: string } | null;
+  projectPendingName?: string | null;
+  onProjectNew?:       () => void;
+  onProjectOpen?:      () => void;
+  onProjectReopen?:    () => void;
+  onProjectClose?:     () => void;
+  onProjectPlay?:      () => void;
+  onProjectPublish?:   () => void;
+  onSceneSwitch?:      (id: string) => void;
+  onSceneAdd?:         () => void;
+  onSceneDelete?:      (id: string) => void;
+  onEntrySceneChange?: (id: string) => void;
 }
 
 const FLOORS = [
@@ -39,9 +52,44 @@ function useAutosaveLabel(lastAutosaveAt: number | null | undefined): string | n
   return `autosaved ${min}m ago`;
 }
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt }: TopBarProps) {
+const popBtn: React.CSSProperties = {
+  display: "block", width: "100%", textAlign: "left",
+  padding: "6px 12px", border: "none", background: "transparent",
+  color: "#a0a0b8", fontSize: 11, cursor: "pointer", letterSpacing: 0.5,
+  fontFamily: "monospace", whiteSpace: "nowrap",
+};
+
+/** Minimal popover: absolutely positioned panel under its anchor, closed by any
+ *  outside pointerdown (first popover pattern in the codebase — Phase 33). */
+function Popover({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div ref={ref} style={{
+      position: "absolute", top: 40, left: 0, zIndex: 50, minWidth: 160,
+      background: "rgba(20,22,30,0.98)", border: "1px solid rgba(100,160,255,0.25)",
+      borderRadius: 6, padding: "4px 0", boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
+  project, projectPendingName, onProjectNew, onProjectOpen, onProjectReopen, onProjectClose, onProjectPlay, onProjectPublish,
+  onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const autosaveLabel = useAutosaveLabel(lastAutosaveAt);
+  const [projMenuOpen, setProjMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,6 +132,120 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         </span>
       )}
       <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />
+
+      {/* Projects (Phase 33) */}
+      {onProjectNew && !project && (
+        <div style={{ position: "relative" }}>
+          {projectPendingName ? (
+            <button
+              onClick={onProjectReopen}
+              title={`Regrant folder access to reopen "${projectPendingName}"`}
+              style={{
+                padding: "4px 10px", border: "1px solid rgba(255,204,102,0.4)",
+                borderRadius: 6, background: "rgba(255,204,102,0.08)", color: "#ffcc66",
+                fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
+                maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              REOPEN “{projectPendingName}”
+            </button>
+          ) : (
+            <button
+              onClick={() => setProjMenuOpen(o => !o)}
+              style={{
+                padding: "4px 10px", border: "1px solid rgba(255,255,255,0.09)",
+                borderRadius: 6, background: "transparent", color: "#7a7a7a",
+                fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
+              }}
+            >
+              PROJ ▾
+            </button>
+          )}
+          <Popover open={projMenuOpen} onClose={() => setProjMenuOpen(false)}>
+            <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectNew?.(); }}>New Project…</button>
+            <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectOpen?.(); }}>Open Project…</button>
+          </Popover>
+        </div>
+      )}
+      {project && (
+        <>
+          <span
+            title={`Project: ${project.name}`}
+            style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace", letterSpacing: 1,
+                     maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {project.name}
+          </span>
+          <select
+            value={project.currentSceneId}
+            onChange={e => onSceneSwitch?.(e.target.value)}
+            title="Switch scene (current scene saves first)"
+            style={{
+              background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 6, color: "#c0c0c0", fontSize: 11, padding: "4px 6px",
+              fontFamily: "monospace", outline: "none", maxWidth: 140,
+            }}
+          >
+            {project.sceneIds.map(id => (
+              <option key={id} value={id}>
+                {id}{id === project.entryScene ? " ★" : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={onSceneAdd}
+            title="Add scene"
+            style={{ width: 24, height: 24, border: "1px solid rgba(255,255,255,0.09)", borderRadius: 6,
+                     background: "transparent", color: "#7a7a7a", fontSize: 13, cursor: "pointer" }}
+          >
+            +
+          </button>
+          <button
+            onClick={onProjectPlay}
+            title="Play project in the runtime shell (saves first)"
+            style={{ width: 24, height: 24, border: "1px solid rgba(80,200,120,0.35)", borderRadius: 6,
+                     background: "rgba(80,200,120,0.08)", color: "#50c878", fontSize: 11, cursor: "pointer" }}
+          >
+            ▶
+          </button>
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setMoreMenuOpen(o => !o)}
+              title="Project menu"
+              style={{ width: 24, height: 24, border: "1px solid rgba(255,255,255,0.09)", borderRadius: 6,
+                       background: "transparent", color: "#7a7a7a", fontSize: 12, cursor: "pointer" }}
+            >
+              ⋯
+            </button>
+            <Popover open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)}>
+              <div style={{ ...popBtn, cursor: "default", color: "#606070", display: "flex", alignItems: "center", gap: 6 }}>
+                Entry scene
+                <select
+                  value={project.entryScene}
+                  onChange={e => { onEntrySceneChange?.(e.target.value); }}
+                  style={{ background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.12)",
+                           borderRadius: 4, color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", outline: "none" }}
+                >
+                  {project.sceneIds.map(id => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </div>
+              <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish?.(); }}>Publish…</button>
+              <button
+                style={{ ...popBtn,
+                         color: project.currentSceneId === project.entryScene || project.sceneIds.length <= 1 ? "#44444f" : "#cc6666",
+                         cursor: project.currentSceneId === project.entryScene || project.sceneIds.length <= 1 ? "default" : "pointer" }}
+                disabled={project.currentSceneId === project.entryScene || project.sceneIds.length <= 1}
+                title="Deletes the current scene's file (entry scene can't be deleted)"
+                onClick={() => { setMoreMenuOpen(false); onSceneDelete?.(project.currentSceneId); }}
+              >
+                Delete scene “{project.currentSceneId}”…
+              </button>
+              <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectClose?.(); }}>Close project</button>
+            </Popover>
+          </div>
+        </>
+      )}
+      {(onProjectNew || project) && <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />}
 
       <span style={{ color: "#7a7a7a", fontSize: 11, letterSpacing: 1 }}>FLOOR</span>
       {FLOORS.map(({ level, label }) => (

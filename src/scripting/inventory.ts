@@ -18,11 +18,29 @@ export interface OwnedItem {
 }
 
 /**
+ * Merge the game-level registry (game.json) under the scene's own — scene wins
+ * on a duplicate id (replaces in place, keeping game order); scene-only items
+ * are appended (Phase 33).
+ */
+export function mergeItemDefs(game: ItemDef[] | undefined, scene: ItemDef[] | undefined): ItemDef[] {
+  if (!game?.length)  return scene ?? [];
+  if (!scene?.length) return game;
+  const out = game.map(g => scene.find(s => s.id === g.id) ?? g);
+  for (const s of scene) if (!game.some(g => g.id === s.id)) out.push(s);
+  return out;
+}
+
+/** The effective item registry: game-level (project/manifest) + scene-level. */
+export function itemRegistry(world: WorldState): ItemDef[] {
+  return mergeItemDefs(world.gameItems, world.world?.items);
+}
+
+/**
  * Everything the player currently holds (count > 0), joined against the
  * world's item registry. Pure read — the bag UI's only data source.
  */
 export function ownedItems(world: WorldState): OwnedItem[] {
-  const registry = world.world?.items ?? [];
+  const registry = itemRegistry(world);
   const out: OwnedItem[] = [];
   for (const [key, value] of Object.entries(gameState.snapshot())) {
     if (!key.startsWith(INV_PREFIX)) continue;

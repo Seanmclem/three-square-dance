@@ -234,6 +234,7 @@ export interface ScriptPanelProps {
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
   worldItems: ItemDef[];
   onWorldItemsChange: (items: ItemDef[]) => void;
+  projectSceneIds?: string[];
 }
 
 type TabId = "level" | "object" | "dialogue" | "state" | "items";
@@ -263,6 +264,7 @@ export function ScriptPanel({
   onStateSchemaChange,
   worldItems,
   onWorldItemsChange,
+  projectSceneIds,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -383,6 +385,7 @@ export function ScriptPanel({
               assets={assets}
               zoneDialogues={zoneDialogues}
               worldItems={worldItems}
+              projectSceneIds={projectSceneIds}
               onBack={() => setEditingDialogueId(null)}
               onChange={(d) =>
                 onZoneDialoguesChange(zoneDialogues.map((x) => (x.id === d.id ? d : x)))
@@ -419,6 +422,7 @@ export function ScriptPanel({
           assets={assets}
           zoneDialogues={zoneDialogues}
           worldItems={worldItems}
+          projectSceneIds={projectSceneIds}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -745,6 +749,7 @@ function ScriptEditor({
   assets,
   zoneDialogues,
   worldItems,
+  projectSceneIds,
   ownerIsEntity,
   selectedObjectId,
   onBack,
@@ -764,6 +769,7 @@ function ScriptEditor({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
   onBack: () => void;
@@ -1016,6 +1022,7 @@ function ScriptEditor({
               assets={assets}
               zoneDialogues={zoneDialogues}
               worldItems={worldItems}
+              projectSceneIds={projectSceneIds}
               onChange={(na) =>
                 set(
                   "actions",
@@ -1507,6 +1514,7 @@ function ActionRow({
   assets,
   zoneDialogues,
   worldItems,
+  projectSceneIds,
   onChange,
   onRemove,
 }: {
@@ -1523,6 +1531,7 @@ function ActionRow({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -1576,6 +1585,7 @@ function ActionRow({
         assets={assets}
         zoneDialogues={zoneDialogues}
         worldItems={worldItems}
+        projectSceneIds={projectSceneIds}
         onChange={onChange}
       />
     </div>
@@ -1596,6 +1606,7 @@ function ActionFields({
   assets,
   zoneDialogues,
   worldItems,
+  projectSceneIds,
   onChange,
 }: {
   action: ScriptAction;
@@ -1611,6 +1622,7 @@ function ActionFields({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   onChange: (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void {
@@ -1862,9 +1874,32 @@ function ActionFields({
       );
 
     case "load_scene":
-      // Cross-scene routing for the runtime shell. The scene id is a key of
-      // the runtime manifest, which doesn't exist at author time — free text,
-      // not validated here. No-op in editor preview.
+      // Cross-scene routing for the runtime shell. With a project open the ids
+      // are known (Phase 33) → dropdown; otherwise the classic free text.
+      if (projectSceneIds?.length) {
+        const cur = action.sceneId ?? "";
+        const known = projectSceneIds.includes(cur);
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <select
+              style={S.select}
+              value={cur}
+              onChange={(e) => set({ sceneId: e.target.value || undefined })}
+            >
+              <option value="">— pick scene —</option>
+              {projectSceneIds.map((id) => (
+                <option key={id} value={id}>{id}</option>
+              ))}
+              {cur && !known && (
+                <option value={cur}>{cur} (not in project)</option>
+              )}
+            </select>
+            <div style={{ fontSize: 10, color: "#5f7090" }}>
+              Runtime only — routes between this project&apos;s scenes. No-op in editor preview.
+            </div>
+          </div>
+        );
+      }
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <input
@@ -2233,6 +2268,7 @@ function DialogueList({
 function DialogueEditor({
   dialogue,
   worldItems,
+  projectSceneIds,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2250,6 +2286,7 @@ function DialogueEditor({
 }: {
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
   zoneShapes: ShapeDef[];
@@ -2381,6 +2418,7 @@ function DialogueEditor({
               node={node}
               dialogue={dialogue}
               worldItems={worldItems}
+              projectSceneIds={projectSceneIds}
               isStart={node.id === dialogue.startNode}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
@@ -2429,6 +2467,7 @@ function DialogueNodeCard({
   node,
   dialogue,
   worldItems,
+  projectSceneIds,
   isStart,
   zoneObjects,
   zonePlatforms,
@@ -2447,6 +2486,7 @@ function DialogueNodeCard({
   node: DialogueNode;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   isStart: boolean;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -2558,6 +2598,7 @@ function DialogueNodeCard({
           option={opt}
           dialogue={dialogue}
           worldItems={worldItems}
+          projectSceneIds={projectSceneIds}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
           zoneShapes={zoneShapes}
@@ -2587,6 +2628,7 @@ function DialogueOptionRow({
   option,
   dialogue,
   worldItems,
+  projectSceneIds,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2604,6 +2646,7 @@ function DialogueOptionRow({
   option: DialogueOption;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  projectSceneIds?: string[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
   zoneShapes: ShapeDef[];
@@ -2731,6 +2774,7 @@ function DialogueOptionRow({
           assets={assets}
           zoneDialogues={zoneDialogues}
           worldItems={worldItems}
+          projectSceneIds={projectSceneIds}
           onChange={(na) =>
             set({ actions: actions.map((x, j) => (j === i ? na : x)) })
           }

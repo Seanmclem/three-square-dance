@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "id": "pj-fixture",
+  "name": "Project Fixture",
+  "version": "1.0.0",
+  "description": "Phase 33 regression fixture \u2014 manifest-linked game.json",
+  "entryScene": "scene_01",
+  "scenes": {
+    "scene_01": "scenes/scene_01.json",
+    "scene_02": "scenes/scene_02.json"
+  },
+  "assetsBase": "/",
+  "game": "game.json"
+}

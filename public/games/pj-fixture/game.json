@@ -1,0 +1,17 @@
+{
+  "gameVersion": 1,
+  "items": [
+    {
+      "id": "itm_key",
+      "label": "Fixture Key",
+      "description": "Shared via game.json",
+      "stackSize": 1
+    }
+  ],
+  "stateSchema": {
+    "quest.stage": {
+      "type": "number",
+      "default": 0
+    }
+  }
+}

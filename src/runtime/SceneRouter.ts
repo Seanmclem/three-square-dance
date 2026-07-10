@@ -102,6 +102,10 @@ export class SceneRouter {
       for (const zone of file.zones) pruneOrphanNodes(zone);
 
       world.loadFromJSON(file); // sets activeZoneId = zones[0]
+      // Shared game config (manifest-linked game.json, Phase 33) — session-only
+      // fields, merged under the scene's own registry/schema by the readers.
+      world.gameItems       = this.deps.manifest.game?.items;
+      world.gameStateSchema = this.deps.manifest.game?.stateSchema;
       if (!world.activeZoneId) throw new Error(`Scene "${sceneId}" has no zones`);
       await zones.loadZone(world.activeZoneId);
 
@@ -114,7 +118,14 @@ export class SceneRouter {
 
       // NO reset here — cross-scene persistence is the point. New keys from
       // this scene's schema seed their defaults; existing values survive.
-      gameState.configureSchema(world.world?.stateSchema ?? DEFAULT_STATE_SCHEMA);
+      // Game-level schema defaults spread UNDER the scene's own (scene wins);
+      // the classic DEFAULT only applies when neither exists.
+      const gameSchema  = world.gameStateSchema;
+      const sceneSchema = world.world?.stateSchema;
+      gameState.configureSchema({
+        ...(gameSchema ?? {}),
+        ...(sceneSchema ?? (gameSchema ? {} : DEFAULT_STATE_SCHEMA)),
+      });
 
       scriptEngine.activate();
       if (opts?.restore) scriptEngine.restoreFiredOneShots(opts.restore.firedOneShots);

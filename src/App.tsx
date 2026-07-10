@@ -80,6 +80,7 @@ import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues } from "@/world/WorldLoader";
+import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject, requestProjectPermission } from "@/project/ProjectStore";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
@@ -170,6 +171,11 @@ export default function App() {
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
+  // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
+  interface ProjectCtx { store: ProjectStore; sceneId: string; rev: number }
+  const [project, setProject] = useState<ProjectCtx | null>(null);
+  const projectRef = useRef<ProjectCtx | null>(null);
+  const [projectPending, setProjectPending] = useState<{ name: string; dir: FileSystemDirectoryHandle; sceneId: string } | null>(null);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
@@ -408,6 +414,28 @@ export default function App() {
           if (perm === 'granted') fileHandleRef.current = storedHandle;
         }
       } catch { /* IDB or FSA not available */ }
+
+      // Project restore (Phase 33): permission still granted → adopt silently
+      // (the autosave above already restored the active scene — don't reload it);
+      // permission lost → pending banner, requestPermission needs a user gesture.
+      try {
+        const last = await restoreLastProject();
+        if (last) {
+          if (last.granted) {
+            const store = await ProjectStore.open(last.dir);
+            const sceneId = store.sceneIds.includes(last.sceneId) ? last.sceneId : store.entryScene;
+            const ctx = { store, sceneId, rev: 0 };
+            projectRef.current = ctx;
+            setProject(ctx);
+            fileHandleRef.current = null;
+            world.gameItems       = store.game.items;
+            world.gameStateSchema = store.game.stateSchema;
+            setWorldItems(store.game.items ?? []);
+          } else {
+            setProjectPending({ name: last.name, dir: last.dir, sceneId: last.sceneId });
+          }
+        }
+      } catch (e) { console.warn('Project restore failed:', e); }
     })();
 
     // Movers BEFORE the physics step — setNextKinematicTranslation targets must
@@ -436,7 +464,16 @@ export default function App() {
         if (activeZone) scriptEngine.loadZone(activeZone);
         scriptEngine.activate();
         // Apply this level's authored state schema (defaults + clamps) before reset/restore.
-        gameState.configureSchema(world.world?.stateSchema ?? DEFAULT_STATE_SCHEMA);
+        // Project game.json defaults spread UNDER the scene's own (scene wins); the
+        // classic DEFAULT only applies when neither exists (mirrors SceneRouter).
+        {
+          const gameSchema  = world.gameStateSchema;
+          const sceneSchema = world.world?.stateSchema;
+          gameState.configureSchema({
+            ...(gameSchema ?? {}),
+            ...(sceneSchema ?? (gameSchema ? {} : DEFAULT_STATE_SCHEMA)),
+          });
+        }
         // Continue only when the launch explicitly asked to resume (Continue). New Game
         // and Preview always start fresh — no silent auto-continue. loadGame must run after
         // activate() (which clears fired one-shots) so a resumed save's progress survives.
@@ -536,7 +573,10 @@ export default function App() {
         setActiveZoneId(world.activeZoneId);
         setGroups([...world.groups]);
         setStateSchema(world.world?.stateSchema ?? {});
-        setWorldItems(world.world?.items ?? []);
+        // Project open → the ITEMS tab edits the game.json registry, not the scene's
+        setWorldItems(projectRef.current
+          ? (projectRef.current.store.game.items ?? [])
+          : (world.world?.items ?? []));
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setZoneDialogues(z?.dialogues ?? []);
@@ -800,15 +840,32 @@ export default function App() {
   }, []);
 
   // Kept for TopBar's <input type="file"> fallback path
+  /** Drop project context (saving the current scene first unless `skipSave`). */
+  const closeProject = useCallback(async (opts?: { skipSave?: boolean }): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    if (!opts?.skipSave) {
+      try { await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON()); } catch (e) { console.warn('Scene save on project close failed:', e); }
+    }
+    projectRef.current = null;
+    setProject(null);
+    if (worldRef.current) {
+      worldRef.current.gameItems = undefined;
+      worldRef.current.gameStateSchema = undefined;
+    }
+    void clearLastProject();
+  }, []);
+
   const handleLoad = useCallback((json: unknown): void => {
-    void handleLoadFromJSON(json);
-  }, [handleLoadFromJSON]);
+    void closeProject().then(() => handleLoadFromJSON(json));
+  }, [handleLoadFromJSON, closeProject]);
 
   const handleLoadFSA = useCallback(async (): Promise<void> => {
     try {
       const [handle] = await window.showOpenFilePicker({
         types: [{ description: 'World JSON', accept: { 'application/json': ['.json'] } }],
       });
+      await closeProject();   // loading a standalone file leaves the project
       fileHandleRef.current = handle;
       const file = await handle.getFile();
       const text = await file.text();
@@ -816,13 +873,34 @@ export default function App() {
     } catch (e: unknown) {
       if ((e as DOMException).name !== 'AbortError') console.error('Load failed:', e);
     }
-  }, [handleLoadFromJSON]);
+  }, [handleLoadFromJSON, closeProject]);
 
   const handleSave = useCallback(async (): Promise<void> => {
     const world = worldRef.current;
     if (!world) return;
     const json = JSON.stringify(world.toJSON(), null, 2);
     const name = world.toJSON().metadata?.name ?? 'world';
+
+    // Project open → write-through to the project folder (scene + game + manifest);
+    // the single-file picker path below is skipped entirely.
+    const proj = projectRef.current;
+    if (proj) {
+      try {
+        await proj.store.saveScene(proj.sceneId, world.toJSON());
+        await proj.store.writeGame();
+        await proj.store.writeManifest();
+        void persistLastProject(proj.store.dir, proj.store.name, proj.sceneId);
+      } catch (e) {
+        console.error('Project save failed:', e);
+        return;
+      }
+      const ts0 = Date.now();
+      localStorage.setItem('worldeditor_autosave', json);
+      localStorage.setItem('worldeditor_autosave_ts', ts0.toString());
+      setLastAutosaveAt(ts0);
+      setIsDirty(false);
+      return;
+    }
 
     try {
       if (!fileHandleRef.current && 'showSaveFilePicker' in window) {
@@ -857,25 +935,200 @@ export default function App() {
     setIsDirty(false);
   }, []);
 
+  const makeFreshScene = (name: string): SceneFile => ({
+    metadata: { name, version: "1.0", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() },
+    world: {
+      size: { width: 200, depth: 200 },
+      ambientLight: { color: "#aabbcc", intensity: 1.2 },
+      sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
+      skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+      playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
+      stateSchema: DEFAULT_STATE_SCHEMA,
+    },
+    terrain: null,
+    zones: [createDemoZone()],
+    transitions: [],
+  });
+
   const handleNew = useCallback((): void => {
+    void closeProject();   // New leaves the project (current scene saved first)
     localStorage.removeItem('worldeditor_autosave');
     localStorage.removeItem('worldeditor_autosave_ts');
-    const freshScene: SceneFile = {
-      metadata: { name: "New World", version: "1.0", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() },
-      world: {
-        size: { width: 200, depth: 200 },
-        ambientLight: { color: "#aabbcc", intensity: 1.2 },
-        sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
-        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
-        stateSchema: DEFAULT_STATE_SCHEMA,
-      },
-      terrain: null,
-      zones: [createDemoZone()],
-      transitions: [],
-    };
-    void handleLoadFromJSON(freshScene);
+    void handleLoadFromJSON(makeFreshScene("New World"));
+  }, [handleLoadFromJSON, closeProject]);
+
+  // ── Projects (Phase 33) ─────────────────────────────────────────────────────
+
+  /** Adopt an opened/created store as the active project context. */
+  const adoptProject = useCallback((store: ProjectStore, sceneId: string): void => {
+    const ctx = { store, sceneId, rev: 0 };
+    projectRef.current = ctx;
+    setProject(ctx);
+    setProjectPending(null);
+    fileHandleRef.current = null;
+    if (worldRef.current) {
+      worldRef.current.gameItems       = store.game.items;
+      worldRef.current.gameStateSchema = store.game.stateSchema;
+    }
+    setWorldItems(store.game.items ?? []);
+    void persistLastProject(store.dir, store.name, sceneId);
+  }, []);
+
+  const bumpProject = (): void => {
+    const p = projectRef.current;
+    if (!p) return;
+    const next = { ...p, rev: p.rev + 1 };
+    projectRef.current = next;
+    setProject(next);
+  };
+
+  const handleProjectNew = useCallback(async (): Promise<void> => {
+    const name = window.prompt("Project name?\n\nNext, pick the folder projects live in — choose <repo>/public/games for instant ▶ Play in the runtime.");
+    if (!name?.trim()) return;
+    try {
+      const parent = await window.showDirectoryPicker({ mode: "readwrite" });
+      await closeProject();
+      const store = await ProjectStore.create(parent, name.trim());
+      // Adopt the current world as scene 1
+      const world = worldRef.current!;
+      const sceneId = uniqueSceneId(slugifyId(world.metadata?.name ?? "") || "scene_01", store.sceneIds);
+      await store.addScene(sceneId, world.toJSON());
+      adoptProject(store, sceneId);
+      setIsDirty(false);
+    } catch (e: unknown) {
+      if ((e as DOMException).name !== 'AbortError') console.error('New project failed:', e);
+    }
+  }, [closeProject, adoptProject]);
+
+  const handleProjectOpen = useCallback(async (): Promise<void> => {
+    try {
+      const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+      const store = await ProjectStore.open(dir);
+      await closeProject();
+      const sceneId = store.entryScene;
+      const file = await store.loadScene(sceneId);
+      await handleLoadFromJSON(file);
+      adoptProject(store, sceneId);
+    } catch (e: unknown) {
+      if ((e as DOMException).name !== 'AbortError') {
+        console.error('Open project failed:', e);
+        window.alert(`Open project failed: ${(e as Error).message}`);
+      }
+    }
+  }, [closeProject, adoptProject, handleLoadFromJSON]);
+
+  /** Reopen banner click — the user gesture Chrome needs for requestPermission. */
+  const handleProjectReopen = useCallback(async (): Promise<void> => {
+    const pending = projectPending;
+    if (!pending) return;
+    if (!(await requestProjectPermission(pending.dir))) return;
+    try {
+      const store = await ProjectStore.open(pending.dir);
+      const sceneId = store.sceneIds.includes(pending.sceneId) ? pending.sceneId : store.entryScene;
+      // Do NOT reload the scene — the autosave already restored it (possibly fresher).
+      adoptProject(store, sceneId);
+    } catch (e) {
+      console.error('Reopen project failed:', e);
+      setProjectPending(null);
+    }
+  }, [projectPending, adoptProject]);
+
+  const handleProjectSceneSwitch = useCallback(async (target: string): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj || target === proj.sceneId) return;
+    try {
+      await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());  // write-through, no prompt
+      const file = await proj.store.loadScene(target);
+      await handleLoadFromJSON(file);
+      const world = worldRef.current!;
+      world.gameItems       = proj.store.game.items;
+      world.gameStateSchema = proj.store.game.stateSchema;
+      const next = { ...proj, sceneId: target };
+      projectRef.current = next;
+      setProject(next);
+      void persistLastProject(proj.store.dir, proj.store.name, target);
+    } catch (e) {
+      console.error('Scene switch failed:', e);
+    }
   }, [handleLoadFromJSON]);
+
+  const handleProjectSceneAdd = useCallback(async (): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    const name = window.prompt("New scene name?");
+    if (!name?.trim()) return;
+    try {
+      await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());
+      const id = uniqueSceneId(slugifyId(name.trim()), proj.store.sceneIds);
+      await proj.store.addScene(id, makeFreshScene(name.trim()));
+      await handleProjectSceneSwitch(id);
+      bumpProject();
+    } catch (e) {
+      console.error('Add scene failed:', e);
+    }
+  }, [handleProjectSceneSwitch]);
+
+  const handleProjectSceneDelete = useCallback(async (id: string): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    if (id === proj.store.entryScene || proj.store.sceneIds.length <= 1) return;  // UI also blocks
+    if (!window.confirm(`Delete scene "${id}" from the project? The file is removed.`)) return;
+    try {
+      if (id === proj.sceneId) await handleProjectSceneSwitch(proj.store.entryScene);
+      await proj.store.removeScene(id);
+      bumpProject();
+    } catch (e) {
+      console.error('Delete scene failed:', e);
+    }
+  }, [handleProjectSceneSwitch]);
+
+  const handleEntrySceneChange = useCallback(async (id: string): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    proj.store.setEntryScene(id);
+    await proj.store.writeManifest();
+    bumpProject();
+  }, []);
+
+  const handleProjectPlay = useCallback(async (): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    await handleSave();   // runtime must see the latest
+    const url = `/games/${proj.store.id}/manifest.json`;
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      const m = res.ok ? await res.json() as { id?: string } : null;
+      if (m?.id === proj.store.id) {
+        window.open(`/runtime.html?manifest=${encodeURIComponent(url)}`, '_blank');
+        return;
+      }
+    } catch { /* fall through */ }
+    window.alert(`This project isn't served at ${url}.\n\nCreate projects under <repo>/public/games/ for instant Play, or use Publish… and open the runtime against the published copy (PUBLISHING_GUIDE.md §0).`);
+  }, [handleSave]);
+
+  const handleProjectPublish = useCallback(async (): Promise<void> => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    try {
+      await handleSave();
+      const target = await window.showDirectoryPicker({ mode: "readwrite" });
+      // Refuse to silently clobber a DIFFERENT game's published copy
+      try {
+        const existing = await target.getFileHandle("manifest.json");
+        const m = JSON.parse(await (await existing.getFile()).text()) as { id?: string };
+        if (m.id && m.id !== proj.store.id &&
+            !window.confirm(`"${target.name}" already contains a manifest for "${m.id}". Overwrite with "${proj.store.id}"?`)) return;
+      } catch { /* no existing manifest — fine */ }
+      const n = await proj.store.publishTo(target);
+      window.alert(`Published ${n} files to "${target.name}".\n\nAssets are NOT copied — imported models/materials/decals must be hosted per PUBLISHING_GUIDE.md (assetsBase).`);
+    } catch (e: unknown) {
+      if ((e as DOMException).name !== 'AbortError') console.error('Publish failed:', e);
+    }
+  }, [handleSave]);
+
+  const handleProjectClose = useCallback(async (): Promise<void> => {
+    await closeProject();
+  }, [closeProject]);
 
 
   const handlePreviewEnter = useCallback((): void => {
@@ -1823,6 +2076,16 @@ export default function App() {
   const handleWorldItemsChange = (items: ItemDef[]): void => {
     const world = worldRef.current;
     if (!world?.world) return;
+    // Project open → the ITEMS tab edits the shared game.json registry (written on
+    // Save; not undoable — game config sits outside the scene's undo journal).
+    const proj = projectRef.current;
+    if (proj) {
+      proj.store.game.items = items;
+      world.gameItems = items;
+      setWorldItems(items);
+      setIsDirty(true);
+      return;
+    }
     world.transaction("edit items", () => { world.world!.items = items; });
     setWorldItems(items);
     syncHistory();
@@ -1951,6 +2214,7 @@ export default function App() {
         onStateSchemaChange={handleStateSchemaChange}
         worldItems={worldItems}
         onWorldItemsChange={handleWorldItemsChange}
+        projectSceneIds={project ? project.store.sceneIds : undefined}
         decalTextures={decalTextures}
         selectedDecalId={selectedDecalId}
         onDecalSelect={handleDecalSelect}
@@ -1969,6 +2233,23 @@ export default function App() {
         canRedo={canRedo}
         isDirty={isDirty}
         lastAutosaveAt={lastAutosaveAt}
+        project={project ? {
+          name: project.store.name,
+          sceneIds: project.store.sceneIds,
+          currentSceneId: project.sceneId,
+          entryScene: project.store.entryScene,
+        } : null}
+        projectPendingName={projectPending?.name ?? null}
+        onProjectNew={() => void handleProjectNew()}
+        onProjectOpen={() => void handleProjectOpen()}
+        onProjectReopen={() => void handleProjectReopen()}
+        onProjectClose={() => void handleProjectClose()}
+        onProjectPlay={() => void handleProjectPlay()}
+        onProjectPublish={() => void handleProjectPublish()}
+        onSceneSwitch={id => void handleProjectSceneSwitch(id)}
+        onSceneAdd={() => void handleProjectSceneAdd()}
+        onSceneDelete={id => void handleProjectSceneDelete(id)}
+        onEntrySceneChange={id => void handleEntrySceneChange(id)}
       />
       <PropertiesPanel
         activeTool={activeTool}

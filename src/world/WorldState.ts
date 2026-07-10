@@ -4,6 +4,7 @@ import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, ShapeDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks,
+  ItemDef, StateSchema,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -18,6 +19,12 @@ export class WorldState {
   readonly transitions = new Map<string, TransitionDef>();
   activeZoneId: string | null = null;
   groups: GroupDef[] = [];
+
+  // Project/game-level shared config (game.json, Phase 33) — session-only, set
+  // by App (project open) and SceneRouter (runtime). NOT serialized: toJSON()
+  // hand-builds its output from the listed fields (activeZoneId precedent).
+  gameItems?:       ItemDef[];
+  gameStateSchema?: Record<string, StateSchema>;
 
   // ── Undo journal ────────────────────────────────────────────────────────────
   private _history:  HistoryManager | null = null;

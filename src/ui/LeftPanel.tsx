@@ -53,6 +53,7 @@ interface LeftPanelProps {
   stateSchema:          Record<string, StateSchema>;
   onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
   worldItems:           ItemDef[];
+  projectSceneIds?:     string[];
   onWorldItemsChange:   (items: ItemDef[]) => void;
   // decals panel
   decalTextures:   DecalTexDef[];
@@ -70,7 +71,7 @@ export function LeftPanel({
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
-  worldItems, onWorldItemsChange,
+  worldItems, onWorldItemsChange, projectSceneIds,
   decalTextures, selectedDecalId, onDecalSelect,
 }: LeftPanelProps) {
   const open = panelId !== null;
@@ -180,6 +181,7 @@ export function LeftPanel({
                 stateSchema={stateSchema}
                 onStateSchemaChange={onStateSchemaChange}
                 worldItems={worldItems}
+                projectSceneIds={projectSceneIds}
                 onWorldItemsChange={onWorldItemsChange}
               />
             )}

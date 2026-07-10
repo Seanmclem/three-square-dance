@@ -33,3 +33,10 @@ interface Window {
   showSaveFilePicker(options?: SaveFilePickerOptions):   Promise<FileSystemFileHandle>;
   showOpenFilePicker(options?: OpenFilePickerOptions):   Promise<FileSystemFileHandle[]>;
 }
+
+// Permission API on handles (Chromium) — queryPermission was previously
+// inline-cast in App.tsx; requestPermission added for project reopen (Phase 33).
+interface FileSystemHandle {
+  queryPermission(descriptor?: { mode?: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission(descriptor?: { mode?: "read" | "readwrite" }): Promise<PermissionState>;
+}

@@ -1,3 +1,5 @@
+import type { GameConfig } from "@/types";
+
 /**
  * Runtime manifest (v1) — the shell's boot descriptor. A tiny JSON file,
  * loadable from any URL (CORS permitting), that names the experience and maps
@@ -19,12 +21,17 @@ export interface RuntimeManifest {
   /** Base for the /assets/** tree (texture/model/decal manifests and all
    *  their paths). Default: the manifest's directory. */
   assetsBase?:  string;
+  /** URL of a shared GameConfig (game.json) — items + stateSchema defaults
+   *  merged under every scene's own config (Phase 33). Relative to the manifest. */
+  game?:        string;
 }
 
 export interface LoadedManifest {
   manifest:      RuntimeManifest;
   url:           URL;
   assetsBaseUrl: URL;
+  /** Parsed game.json, or null (absent / failed to load — never fatal). */
+  game:          GameConfig | null;
   sceneUrl(id: string): URL;
 }
 
@@ -58,10 +65,26 @@ export async function loadManifest(rawUrl: string): Promise<LoadedManifest> {
   const manifest = m as RuntimeManifest;
   const assetsBaseUrl = new URL(manifest.assetsBase ?? "./", url);
 
+  // Shared game config — best-effort: a missing/broken game.json must never
+  // brick a game whose scenes are fine.
+  let game: GameConfig | null = null;
+  if (manifest.game) {
+    try {
+      const gres = await fetch(new URL(manifest.game, url).href);
+      if (!gres.ok) throw new Error(`HTTP ${gres.status}`);
+      const g = await gres.json() as Partial<GameConfig>;
+      if (g.gameVersion !== 1) throw new Error(`unsupported gameVersion ${String(g.gameVersion)}`);
+      game = g as GameConfig;
+    } catch (err) {
+      console.warn(`[manifest] game config '${manifest.game}' skipped:`, err);
+    }
+  }
+
   return {
     manifest,
     url,
     assetsBaseUrl,
+    game,
     sceneUrl(id: string): URL {
       const rel = manifest.scenes[id];
       if (!rel) throw new Error(`Unknown scene id "${id}" — not in the manifest`);

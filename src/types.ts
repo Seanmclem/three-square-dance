@@ -899,6 +899,17 @@ export interface ItemDef {
   stackSize?:   number;   // max count clamped on give; absent = unlimited
 }
 
+/**
+ * Cross-scene shared game config (Phase 33) — `game.json` in a project folder,
+ * linked from the runtime manifest (`RuntimeManifest.game`). Merged UNDER each
+ * scene's own config at load time (scene wins on duplicate item id / schema key).
+ */
+export interface GameConfig {
+  gameVersion:  1;
+  items?:       ItemDef[];
+  stateSchema?: Record<string, StateSchema>;
+}
+
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */
 export interface DialogueDef {
   speaker:   string;

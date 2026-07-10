@@ -322,6 +322,34 @@ the device (not in the world) and apply the next time you press Play.
 
 ---
 
+## Workflow: author a multi-scene project (Phase 33)
+
+1. TopBar → **PROJ ▾ → New Project…** — name it, then in the folder picker
+   choose **`<repo>/public/games`** (that's what makes ▶ Play work instantly).
+   Your current world becomes scene 1; the TopBar now shows the project name,
+   a scene dropdown (★ = entry scene), **+**, **▶**, and **⋯**.
+2. **+** adds a scene (fresh world) and switches to it. Switching scenes via
+   the dropdown **auto-saves the one you're leaving** — no prompt. Save
+   (Ctrl+S) writes the current scene + `game.json` + `manifest.json` into the
+   project folder.
+3. **Wire a portal**: place a trigger volume, `on_player_enter` →
+   `load_scene` — with a project open the scene id is a **dropdown**, not
+   free text.
+4. **Shared items**: with a project open, the SCRIPTS → ITEMS tab edits the
+   project-wide `game.json` registry — define "Gold Coin" once, use it from
+   every scene. (Per-scene item overrides still merge in but aren't editable
+   while a project is open.)
+5. **▶ Play** saves and opens the runtime shell on your project. Walk through
+   the portal — scene 2 loads, your items/state carry over.
+6. **⋯ → Publish…** copies the project's JSON to any folder you pick (assets
+   are NOT copied — see PUBLISHING_GUIDE.md). **⋯ → Close project** returns
+   to classic single-file editing.
+7. Reopen behavior: after a browser restart the TopBar shows an amber
+   **REOPEN "name"** button — click it and re-grant folder access once.
+8. Known limitation: don't edit one project from two tabs (last writer wins).
+
+---
+
 ## Workflow: play a world in the standalone runtime (Phase 25)
 
 The runtime shell plays worlds **without the editor** — it's a second page on

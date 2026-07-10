@@ -11,6 +11,16 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 
 ## 0. Local first — develop, save, and play on the dev server
 
+> **The editor automates all of this now (Phase 33 — Projects).** TopBar →
+> **PROJ ▾ → New Project…**, pick `<repo>/public/games` in the folder dialog,
+> and you get the folder layout below with an auto-generated manifest, a shared
+> `game.json` (cross-scene items + state defaults), a scene switcher, a
+> dropdown-driven `load_scene` picker, and a **▶ Play** button that opens the
+> runtime. **Publish…** (⋯ menu) copies the project's JSON to any folder you
+> pick — note it copies *manifests and scenes only*, never `/assets/**` (see
+> §"What goes in the bundle"). The manual steps below remain valid as the
+> by-hand appendix and for understanding what the editor generates.
+
 The dev server already serves everything the runtime needs. The whole loop is:
 save your world **into `public/`**, add a small manifest next to it, open
 `runtime.html`. No second server, no CORS, no `npm run build`.

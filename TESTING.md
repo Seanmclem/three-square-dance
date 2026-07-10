@@ -637,3 +637,12 @@ manifest patched, PNG signatures) and on in-memory state (e.g. `<img>` srcs). Ca
 
 First used for the v4.3.2 thumbnail re-stage save chain (see
 `test-plans/phase-15-thumbnail-stager.md`).
+
+Phase 33 projects reuse the same stub for the whole project lifecycle (New
+Project / scene switch / Publish all go through `showDirectoryPicker`), and
+OPFS directory handles even round-trip through IndexedDB with `queryPermission`
+returning `"granted"`, so the reload-restore path is fully automatable. The
+runtime side can't boot an OPFS project (not HTTP-served) — test manifest/
+game.json merging against the committed fixture
+`runtime.html?manifest=/games/pj-fixture/manifest.json` instead
+(see `test-plans/phase-33-projects.md`).
