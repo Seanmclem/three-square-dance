@@ -1,4 +1,6 @@
-import type { ZoneDef, WallNode, SceneFile, MaterialOverrides } from "@/types";
+import type {
+  ZoneDef, WallNode, SceneFile, MaterialOverrides, ScriptAction, DialogueTreeDef,
+} from "@/types";
 
 /**
  * Remove nodes not referenced by any wall, floor, or platform. Returns count pruned.
@@ -44,6 +46,38 @@ export function migrateUVs(file: SceneFile): void {
   }
 
   if (file.metadata) file.metadata.uvVersion = 1;
+}
+
+/**
+ * Migrates legacy inline `show_dialogue` dialogue ({ speaker, lines }) into the zone-level
+ * DialogueTreeDef registry: one single-node tree per action, action gains `dialogueId` and
+ * loses `dialogue`. Shape-guarded per action (no version bump). World-level scripts park
+ * their trees in the first zone (runtime resolution scans all zones). Mutates in place.
+ */
+export function migrateDialogues(file: SceneFile): void {
+  const intoZone = (zone: ZoneDef, action: ScriptAction): void => {
+    if (action.type !== "show_dialogue" || !action.dialogue || action.dialogueId) return;
+    const d = action.dialogue;
+    const tree: DialogueTreeDef = {
+      id: `dlg_${crypto.randomUUID().slice(0, 8)}`,
+      label: d.speaker || "Dialogue",
+      speaker: d.speaker,
+      ...(d.portrait ? { portrait: d.portrait } : {}),
+      startNode: "n1",
+      nodes: [{ id: "n1", lines: d.lines, options: [] }],
+    };
+    (zone.dialogues ??= []).push(tree);
+    action.dialogueId = tree.id;
+    delete action.dialogue;
+  };
+
+  for (const zone of file.zones) {
+    for (const s of zone.scripts ?? []) s.actions.forEach(a => intoZone(zone, a));
+    for (const o of zone.objects) for (const s of o.scripts ?? []) s.actions.forEach(a => intoZone(zone, a));
+    for (const v of zone.triggerVolumes ?? []) for (const s of v.scripts ?? []) s.actions.forEach(a => intoZone(zone, a));
+  }
+  if (file.zones[0])
+    for (const s of file.world?.scripts ?? []) s.actions.forEach(a => intoZone(file.zones[0], a));
 }
 
 /** Migrates a parsed scene JSON from old `start`/`end` wall format to node-based. */

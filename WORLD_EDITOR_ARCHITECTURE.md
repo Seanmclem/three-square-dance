@@ -115,6 +115,7 @@
 - v4.23.12 — **Planar rail bends via landing ease** (user feedback on v4.23.11 — miters at the 3D void-crossing corners looked skewed, “the angles don't match”; their suggestion: level the diagonal out at the top). `computeRailPaths`' inner path now levels out at the landing edge and eases a short horizontal run (`ease = min(0.3, 0.4·D)`) onto the landing before turning: slope→level same-heading bend, flat 90° behind the void, ease back down the next flight — every bend is planar so miter sections always line up. StairBuilder classifies corners with `planarBend` (both level, or same horizontal heading) and only miters those; a genuinely 3D bend (possible only in hand-edited data now) falls back to separate pieces — the level bar runs through (+railH square extension), the sloped bar butts into its side with a vertical cut. Verified in-browser: the void wrap is clean picture-frame seams; top-landing crossing still ends in a chamfered tip.
 - v4.23.11 — **Mitered rail corner joints** (user feedback on v4.23.10 — chamfered stubs on the horizontal landing rails looked wrong; joints should be “accurately joined”). Path-railing bars are now built per segment in world space via `ConvexGeometry` (`railBar` in StairBuilder; same addons import as ShapeBuilder): an **interior corner** end is cut on the bisector plane `n = normalize(d_in + d_out)` through the shared vertex — both adjacent bars use the same plane, so the seam closes with no stubs or overlap (verified numerically: all 8 cut vertices coplanar within 1e-15 for level-90°, slope→level, and slope→lateral-3D corners) — and a **free path end** keeps the v4.23.8 chamfered tip (45° clips of `0.3·barT` on both tip corners; square when the bar is shorter than `3·chamf`, or on a degenerate 180° corner). Meshes carry no rotation (vertices are pre-oriented, positioned at the segment midpoint); rail barriers keep the old quat basis; the legacy plain-stair branch keeps `railBarGeo`. Verified in-browser on the user's 4-flight stair: landing joints are clean picture-frame seams, bottom tips + the top-landing crossing's free end chamfered.
 - v4.23.10 — **Chamfer corner stubs too:** the `+barT/2` miter stubs protruding past landing corner joints were still square and read as unchamfered ends. Every rail-bar end now chamfers (`railBarGeo(len + barT, true, true)` for all path segments); the full-thickness overlap still closes the corner. Verified in-browser at a landing corner joint.
+- v4.24.0 — **Phase 30 — Branching dialogue trees.** Replaces the linear `lines[]` dialogue stub (the "Branching dialogue → Phase 12" limitation) with a real conversation system: multiple response options, options gated by conditions on gameState flags, options that run script actions when picked (set flags / give-receive "items" as gameState counters — no inventory system, per the v4.1 design), chained nodes. **Types** (`src/types.ts`): `DialogueTreeDef { id (dlg_<uuid8>), label, speaker, portrait?, startNode, nodes }`, `DialogueNode { id, lines[], speaker?/portrait? overrides, options[] }`, `DialogueOption { id, text, conditions?: ScriptCondition[] (ALL must pass or hidden), actions?: ScriptAction[] (run on pick), next?: node id (absent or missing node = end) }` — branching happens only via options; a node with zero visible options ends after its last line. Storage: **zone-level registry** `ZoneDef.dialogues?`; `ScriptAction.dialogueId?` references it (`dialogue?: DialogueDef` kept as a deprecated runtime fallback). New trigger **`on_dialogue_end`** (targetId = dialogue id; fires on close, including cancel — but not for legacy inline dialogues). Bus: `dialogue:show` payload += `options?: { text, hasNext }[]` (condition-pre-filtered; `hasNext` computed against existing nodes so a dangling `next` degrades to "end"); new `dialogue:choose { index }`. **Runtime**: new **`src/scripting/DialogueRunner.ts`** owned by ScriptEngine (attach/detach in `activate`/`deactivate`) walks the tree — emits `dialogue:show` per node, hears `dialogue:choose`, dispatches the option's actions through the engine (guards made public as `checkConditions`/`runActions`), advances or lets the overlay close; on `dialogue:closed` fires `on_dialogue_end` (`wrapLegacyDialogue` wraps inline data with id `""` → no end trigger). Conditions re-checked per node display, so a flag set mid-conversation gates later options in the same dialogue; an option effect that itself shows a dialogue restarts the runner (last-writer-wins). `ScriptEngine.findDialogue(id)` scans all zones at dispatch (cross-zone/world-script safe). **DialogueOverlay** shows the option list once the last line renders: `menu:nav` moves the highlight (wrap), `action:confirm`/row-click emits `dialogue:choose` (box-click advance disabled while options are up), `hasNext:false` selection also closes. Zero input-layer work — ControlSchemeManager's dialogue menu-mode already emits both events for kbm/gamepad/touch; RuntimeApp needed no change (types dialogue state off `DialogueOverlayProps["dialogue"]`). **Migration** `migrateDialogues(file)` in WorldLoader, called at both pipeline sites (App.tsx load + SceneRouter): shape-guarded per action (`dialogue && !dialogueId`, no version bump), wraps each legacy inline dialogue into a single-node tree in the owning zone (world-script dialogues park in zones[0]). **Editor**: ScriptPanel gains a 4th **DIALOGUE** tab — DialogueList/DialogueEditor mirroring ScriptList/ScriptEditor; node cards (lines textarea, speaker override, delete disabled on the start node) with per-node OptionRows (response text; next-node dropdown incl. "— end conversation —" and red `(missing!)` preservation; nested Show-if reusing `ConditionRow`; On-pick reusing `ActionRow`); render-time-only validation (dangling-`next` badge/warning + unreachable-nodes note — never blocks saves); the `show_dialogue` ActionFields case is now a dialogue-picker dropdown (custom id preserved) and `on_dialogue_end` joins TRIGGER_TYPES with a dialogue TargetPicker case. Editor persistence mirrors the scripts pattern (App `zoneDialogues` state + `handleZoneDialoguesChange` direct mutation + `setIsDirty`, threaded through LeftPanel; serialization free via `toJSON()`). Verified in-browser end-to-end: gated option hidden on first pass, visible after its flag is set mid-conversation; option effects set `met_npc` and granted coins +5 via `adjust_number`; `on_dialogue_end` fired on end-option and on cancel; pause menu stayed closed on cancel-with-dialogue-open (Phase 24b invariant); migration verified on a synthetic legacy file; DIALOGUE-tab UI exercised via real clicks. Plan: `plans/phase-30-dialogue-trees.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -963,9 +964,9 @@ world-editor/
 │   │   ├── FloorLevelSelector.tsx
 │   │   ├── ZonePanel.tsx
 │   │   ├── AssetBrowser.tsx
-│   │   ├── ScriptPanel.tsx         ← World/Zone/Object tabs, script list + editor drill-down
+│   │   ├── ScriptPanel.tsx         ← LEVEL/SELECTED/DIALOGUE/STATE tabs, script + dialogue-tree list/editor drill-down
 │   │   ├── DecalBrowser.tsx        ← decal texture picker (Overlay/Surface toggle, category pills)
-│   │   ├── DialogueOverlay.tsx     ← in-game dialogue bar (speaker + lines, E to advance)
+│   │   ├── DialogueOverlay.tsx     ← in-game dialogue box (per-node lines + response options; confirm advances/selects, menu:nav highlights — Phase 30)
 │   │   ├── SaveLoadPanel.tsx
 │   │   └── PreviewHUD.tsx
 │   ├── assets/
@@ -1729,9 +1730,10 @@ class EventBus {
 | `input:keydown` | InputManager → all | `{ code, key, shift, ctrl, alt }` |
 | `input:keyup` | InputManager → all | `{ code }` |
 | `input:scheme-changed` | ControlSchemeManager → React | `{ scheme: "kbm"\|"gamepad"\|"touch" }` — label flip: HUD prompts, touch overlay, pointer-lock policy |
-| `action:confirm` | ControlSchemeManager → DialogueOverlay | `{}` — dialogue advance (any scheme); emitted only while a dialogue is open |
+| `action:confirm` | ControlSchemeManager → DialogueOverlay | `{}` — dialogue advance / option select (any scheme); emitted only while a dialogue is open |
 | `action:cancel` | ControlSchemeManager → App | `{}` — Start/✕: close dialogue else exit preview |
-| `dialogue:closed` | App → ControlSchemeManager | `{}` — menu-mode gate off |
+| `dialogue:closed` | App → ControlSchemeManager, DialogueRunner | `{}` — menu-mode gate off; DialogueRunner fires `on_dialogue_end` (Phase 30) |
+| `dialogue:choose` | DialogueOverlay → DialogueRunner | `{ index }` — picked option (into the filtered options shown; Phase 30) |
 | `pause:show` / `pause:closed` | App ↔ ControlSchemeManager/PreviewController | `{}` — pause menu open/close (menu-mode gate; pointer lock released/re-acquired) |
 | `menu:nav` | ControlSchemeManager → PauseMenu | `{ dir: -1\|1 }` — d-pad menu navigation (menu mode only) |
 | `history:restore` | internal | `{}` — fired after undo/redo; ZoneManager reloads active zone |
@@ -5609,7 +5611,7 @@ Key behaviours:
 | Action | Implementation |
 |---|---|
 | `play_sound` | `bus.emit('audio:play', { id, position })` |
-| `show_dialogue` | `bus.emit('dialogue:show', { speaker, lines })` |
+| `show_dialogue` | resolves `action.dialogueId` via `findDialogue()` → `DialogueRunner.start(tree)`; the runner emits `dialogue:show` per node with condition-filtered `options[]` (legacy inline `action.dialogue` wraps to a single-node tree — Phase 30) |
 | `move_object` | Find mesh by editorId, tween to target position |
 | `play_animation` | Find mixer by editorId, play named clip |
 | `spawn_npc` | `bus.emit('npc:spawn', { npcId, position })` — Phase 13 |
@@ -5636,9 +5638,10 @@ src/
   scripting/
     ScriptEngine.ts         ← runtime execution
     GameState.ts            ← generic runtime state store + game save (see GAMEPLAY_STATE.md)
+    DialogueRunner.ts       ← branching dialogue-tree walker (Phase 30; owned by ScriptEngine)
   ui/
-    ScriptPanel.tsx         ← script list + editor, in left panel slot
-    DialogueOverlay.tsx     ← in-game dialogue display
+    ScriptPanel.tsx         ← script + dialogue-tree list/editor, in left panel slot
+    DialogueOverlay.tsx     ← in-game dialogue display (node lines + response options)
   editor/
     TriggerVolumeTool.ts    ← place/resize trigger volumes
 ```
@@ -5654,7 +5657,8 @@ src/
 
 // Phase 10.5
 "audio:play":               { id: string; position?: Vec3 };
-"dialogue:show":            { speaker: string; lines: string[] };
+"dialogue:show":            { speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] };  // options added Phase 30
+"dialogue:choose":          { index: number };   // Phase 30 — overlay → DialogueRunner option pick
 "object:despawn":           { id: string };
 "npc:spawn":                { npcId: string; position: Vec3 };
 "ui:show":                  { elementId: string };
@@ -5677,7 +5681,7 @@ Actions and triggers that are registered but not yet implemented, and where they
 | `open_door` / `close_door` | console.warn | Phase 13 (NPC + door animation system) |
 | `spawn_npc` | console.warn | Phase 13 (NPC system) |
 | `on_health_zero` | never fires | Phase 13 (NPC/enemy health system) |
-| Branching dialogue | linear `lines[]` only | Phase 12 (Dialogue system redesign) |
+| Branching dialogue | **implemented** | Phase 30 — shipped (`DialogueTreeDef` zone registry + `DialogueRunner`; see v4.24.0) |
 
 > **Note on `change_material`:** the original "small — call `worldState.updateObject`" note was wrong. `WorldObject` has no material field (objects are GLTF assets via `assetId`), so the action needs a new `material?: string` field (registry reference, matching `WallDef.material`; not the plural `MaterialOverrides`) plus runtime mesh-swap plumbing in `ObjectPlacer`. Specced in Phase 10.9.
 

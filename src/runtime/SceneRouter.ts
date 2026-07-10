@@ -5,7 +5,7 @@ import type { PreviewController } from "@/preview/PreviewController";
 import type { ScriptEngine } from "@/scripting/ScriptEngine";
 import type { SceneFile, WorldConfig } from "@/types";
 import { gameState, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
-import { migrateWallNodes, migrateUVs, pruneOrphanNodes } from "@/world/WorldLoader";
+import { migrateWallNodes, migrateUVs, migrateDialogues, pruneOrphanNodes } from "@/world/WorldLoader";
 import type { LoadedManifest } from "./manifest";
 
 export interface SceneRouterDeps {
@@ -98,6 +98,7 @@ export class SceneRouter {
       // Same migration pipeline the editor runs on load.
       migrateWallNodes(file.zones);
       migrateUVs(file);
+      migrateDialogues(file);
       for (const zone of file.zones) pruneOrphanNodes(zone);
 
       world.loadFromJSON(file); // sets activeZoneId = zones[0]

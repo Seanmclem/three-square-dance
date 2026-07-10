@@ -253,7 +253,12 @@ export interface BusEvents {
   "zonetool:name-confirmed": { name: string; type: ZoneType };
   "zone:jump":             { zoneId: string };
   "audio:play":            { id: string; position?: Vec3 };
-  "dialogue:show":         { speaker: string; lines: string[]; portrait?: string };
+  "dialogue:show":         { speaker: string; lines: string[]; portrait?: string;
+                             // Branching trees: response options for the current node,
+                             // pre-filtered by conditions. hasNext=false ⇒ selecting ends.
+                             options?: { text: string; hasNext: boolean }[] };
+  // Overlay → DialogueRunner: player picked options[index] of the shown node
+  "dialogue:choose":       { index: number };
   "object:despawn":        { id: string };
   "ui:show":               { elementId: string };
   "trigger:volume-enter":  { volumeId: string };
@@ -709,6 +714,7 @@ export interface ZoneDef {
   checkpoints?:    CheckpointDef[];
   decals?:         DecalDef[];
   shapes?:         ShapeDef[];
+  dialogues?:      DialogueTreeDef[];
 }
 
 export interface TransitionDef {
@@ -774,7 +780,8 @@ export type TriggerType =
   | 'on_health_zero'
   | 'on_state_changed'
   | 'on_level_load'
-  | 'on_game_start';
+  | 'on_game_start'
+  | 'on_dialogue_end';   // targetId = dialogue tree id
 
 export type ConditionType =
   | 'has_state'
@@ -837,10 +844,38 @@ export interface ScriptCondition {
   stateValue?: JsonValue;  // compare_number (compared as number)
 }
 
+/** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */
 export interface DialogueDef {
   speaker:   string;
   lines:     string[];
   portrait?: string;
+}
+
+// ─── Branching dialogue trees ────────────────────────────────────────────────
+
+export interface DialogueOption {
+  id:          string;             // stable key for the editor
+  text:        string;
+  conditions?: ScriptCondition[];  // ALL must pass or the option is hidden
+  actions?:    ScriptAction[];     // run on select, through ScriptEngine dispatch
+  next?:       string;             // DialogueNode id; undefined/'' or missing node = end
+}
+
+export interface DialogueNode {
+  id:        string;
+  lines:     string[];             // shown sequentially (confirm to advance) before options
+  speaker?:  string;               // per-node override of tree speaker
+  portrait?: string;               // per-node override
+  options:   DialogueOption[];     // empty (or all condition-filtered) = ends after last line
+}
+
+export interface DialogueTreeDef {
+  id:        string;               // dlg_<uuid8>
+  label:     string;               // editor display name
+  speaker:   string;
+  portrait?: string;
+  startNode: string;               // node id
+  nodes:     DialogueNode[];
 }
 
 export interface ScriptAction {
@@ -851,7 +886,8 @@ export interface ScriptAction {
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
   sound?:        string;
-  dialogue?:     DialogueDef;
+  dialogue?:     DialogueDef;  // @deprecated — runtime fallback only; migrated to dialogueId
+  dialogueId?:   string;       // show_dialogue: DialogueTreeDef id (zone registry)
   material?:     string;
   position?:     Vec3;
   positionKey?:  string;      // teleport_player: read destination Vec3 from this state key (overrides position)

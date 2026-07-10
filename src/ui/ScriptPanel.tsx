@@ -19,6 +19,9 @@ import type {
   CheckpointDef,
   GroupDef,
   AssetDef,
+  DialogueTreeDef,
+  DialogueNode,
+  DialogueOption,
 } from "@/types";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -119,6 +122,7 @@ const TRIGGER_TYPES: TriggerType[] = [
   "on_level_load",
   "on_game_start",
   "on_health_zero",
+  "on_dialogue_end",
 ];
 
 const CONDITION_TYPES: ConditionType[] = [
@@ -173,10 +177,28 @@ function blankScript(zoneId: string): ScriptDef {
   };
 }
 
+function blankDialogue(): DialogueTreeDef {
+  return {
+    id: `dlg_${crypto.randomUUID().slice(0, 8)}`,
+    label: "New Dialogue",
+    speaker: "",
+    startNode: "n1",
+    nodes: [{ id: "n1", lines: [""], options: [] }],
+  };
+}
+
+/** First free auto node id (n1, n2, …). */
+function nextNodeId(nodes: DialogueNode[]): string {
+  let k = 1;
+  while (nodes.some((n) => n.id === `n${k}`)) k++;
+  return `n${k}`;
+}
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 export interface ScriptPanelProps {
   zoneScripts: ScriptDef[];
+  zoneDialogues: DialogueTreeDef[];
   objectScripts: ScriptDef[] | null;
   selectedObjectId: string | null;
   activeZoneId: string | null;
@@ -190,17 +212,19 @@ export interface ScriptPanelProps {
   groups: GroupDef[];
   assets: AssetDef[];
   onZoneScriptsChange: (scripts: ScriptDef[]) => void;
+  onZoneDialoguesChange: (dialogues: DialogueTreeDef[]) => void;
   onObjectScriptsChange: (objectId: string, scripts: ScriptDef[]) => void;
   stateSchema: Record<string, StateSchema>;
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
 }
 
-type TabId = "level" | "object" | "state";
+type TabId = "level" | "object" | "dialogue" | "state";
 
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
 export function ScriptPanel({
   zoneScripts,
+  zoneDialogues,
   objectScripts,
   selectedObjectId,
   activeZoneId,
@@ -214,12 +238,14 @@ export function ScriptPanel({
   groups,
   assets,
   onZoneScriptsChange,
+  onZoneDialoguesChange,
   onObjectScriptsChange,
   stateSchema,
   onStateSchemaChange,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDialogueId, setEditingDialogueId] = useState<string | null>(null);
 
   // Auto-switch to SELECTED tab when a trigger volume or object is selected
   useEffect(() => {
@@ -275,16 +301,17 @@ export function ScriptPanel({
     <div style={S.root}>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["level", "object", "state"] as TabId[]).map((t) => (
+        {(["level", "object", "dialogue", "state"] as TabId[]).map((t) => (
           <button
             key={t}
             style={S.tab(tab === t)}
             onClick={() => {
               setTab(t);
               setEditingId(null);
+              setEditingDialogueId(null);
             }}
           >
-            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : "STATE"}
+            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : "STATE"}
           </button>
         ))}
       </div>
@@ -303,12 +330,53 @@ export function ScriptPanel({
           "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
         {tab === "object" &&
           "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
+        {tab === "dialogue" &&
+          "Branching dialogue trees for this zone. A show_dialogue action plays one by id. Nodes show lines, then response options; options can be gated by conditions and run effects (set flags, adjust counters) when picked."}
         {tab === "state" &&
           "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
       </div>
 
       {tab === "state" ? (
         <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+      ) : tab === "dialogue" ? (
+        (() => {
+          const editingDialogue = editingDialogueId
+            ? (zoneDialogues.find((d) => d.id === editingDialogueId) ?? null)
+            : null;
+          return editingDialogue ? (
+            <DialogueEditor
+              dialogue={editingDialogue}
+              zoneObjects={zoneObjects}
+              zonePlatforms={zonePlatforms}
+              zoneStairs={zoneStairs}
+              zoneWalls={zoneWalls}
+              zoneFloors={zoneFloors}
+              zoneCheckpoints={zoneCheckpoints}
+              triggerVolumes={triggerVolumes}
+              groups={groups}
+              assets={assets}
+              zoneDialogues={zoneDialogues}
+              onBack={() => setEditingDialogueId(null)}
+              onChange={(d) =>
+                onZoneDialoguesChange(zoneDialogues.map((x) => (x.id === d.id ? d : x)))
+              }
+              onDelete={() => {
+                onZoneDialoguesChange(zoneDialogues.filter((x) => x.id !== editingDialogue.id));
+                setEditingDialogueId(null);
+              }}
+            />
+          ) : (
+            <DialogueList
+              dialogues={zoneDialogues}
+              onSelect={(id) => setEditingDialogueId(id)}
+              onAdd={() => {
+                const d = blankDialogue();
+                onZoneDialoguesChange([...zoneDialogues, d]);
+                setEditingDialogueId(d.id);
+              }}
+            />
+          );
+        })()
       ) : editing ? (
         <ScriptEditor
           script={editing}
@@ -321,6 +389,7 @@ export function ScriptPanel({
           zoneCheckpoints={zoneCheckpoints}
           groups={groups}
           assets={assets}
+          zoneDialogues={zoneDialogues}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -644,6 +713,7 @@ function ScriptEditor({
   zoneCheckpoints,
   groups,
   assets,
+  zoneDialogues,
   ownerIsEntity,
   selectedObjectId,
   onBack,
@@ -660,6 +730,7 @@ function ScriptEditor({
   zoneCheckpoints: CheckpointDef[];
   groups: GroupDef[];
   assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
   onBack: () => void;
@@ -678,7 +749,8 @@ function ScriptEditor({
     script.trigger.type === "on_player_enter" ||
     script.trigger.type === "on_player_exit" ||
     script.trigger.type === "on_interact" ||
-    script.trigger.type === "on_state_changed";
+    script.trigger.type === "on_state_changed" ||
+    script.trigger.type === "on_dialogue_end";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -741,16 +813,17 @@ function ScriptEditor({
             ))}
           </select>
 
-          {needsTarget && !ownerIsEntity && (
+          {needsTarget && (!ownerIsEntity || script.trigger.type === "on_dialogue_end") && (
             <TargetPicker
               triggerType={script.trigger.type}
               targetId={script.trigger.targetId ?? ""}
               triggerVolumes={triggerVolumes}
               zoneObjects={zoneObjects}
+              zoneDialogues={zoneDialogues}
               onChange={(id) => setTrigger({ targetId: id })}
             />
           )}
-          {needsTarget && ownerIsEntity && (
+          {needsTarget && ownerIsEntity && script.trigger.type !== "on_dialogue_end" && (
             <div
               style={{
                 color: "#555",
@@ -906,6 +979,7 @@ function ScriptEditor({
               triggerVolumes={triggerVolumes}
               groups={groups}
               assets={assets}
+              zoneDialogues={zoneDialogues}
               onChange={(na) =>
                 set(
                   "actions",
@@ -958,14 +1032,35 @@ function TargetPicker({
   targetId,
   triggerVolumes,
   zoneObjects,
+  zoneDialogues,
   onChange,
 }: {
   triggerType: TriggerType;
   targetId: string;
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
+  zoneDialogues: DialogueTreeDef[];
   onChange: (id: string) => void;
 }) {
+  if (triggerType === "on_dialogue_end") {
+    return (
+      <select
+        style={S.select}
+        value={targetId}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">— any dialogue —</option>
+        {zoneDialogues.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.label} ({d.id})
+          </option>
+        ))}
+        {targetId && !zoneDialogues.some((d) => d.id === targetId) && (
+          <option value={targetId}>{targetId} (custom)</option>
+        )}
+      </select>
+    );
+  }
   if (triggerType === "on_player_enter" || triggerType === "on_player_exit") {
     return (
       <select
@@ -1304,6 +1399,7 @@ function ActionRow({
   triggerVolumes,
   groups,
   assets,
+  zoneDialogues,
   onChange,
   onRemove,
 }: {
@@ -1317,6 +1413,7 @@ function ActionRow({
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -1367,6 +1464,7 @@ function ActionRow({
         triggerVolumes={triggerVolumes}
         groups={groups}
         assets={assets}
+        zoneDialogues={zoneDialogues}
         onChange={onChange}
       />
     </div>
@@ -1384,6 +1482,7 @@ function ActionFields({
   triggerVolumes,
   groups,
   assets,
+  zoneDialogues,
   onChange,
 }: {
   action: ScriptAction;
@@ -1396,6 +1495,7 @@ function ActionFields({
   triggerVolumes: TriggerVolume[];
   groups: GroupDef[];
   assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
   onChange: (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void {
@@ -1445,34 +1545,25 @@ function ActionFields({
     case "show_dialogue":
       return (
         <>
-          <input
-            style={{ ...S.field, marginBottom: 4 }}
-            placeholder="Speaker name"
-            value={action.dialogue?.speaker ?? ""}
-            onChange={(e) =>
-              set({
-                dialogue: {
-                  ...action.dialogue,
-                  speaker: e.target.value,
-                  lines: action.dialogue?.lines ?? [],
-                },
-              })
-            }
-          />
-          <textarea
-            style={{ ...S.field, height: 60, resize: "vertical" }}
-            placeholder="Lines (one per line)"
-            value={action.dialogue?.lines.join("\n") ?? ""}
-            onChange={(e) =>
-              set({
-                dialogue: {
-                  ...action.dialogue,
-                  speaker: action.dialogue?.speaker ?? "",
-                  lines: e.target.value.split("\n"),
-                },
-              })
-            }
-          />
+          <select
+            style={S.select}
+            value={action.dialogueId ?? ""}
+            onChange={(e) => set({ dialogueId: e.target.value || undefined })}
+          >
+            <option value="">— pick dialogue —</option>
+            {zoneDialogues.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.label} ({d.id})
+              </option>
+            ))}
+            {/* Preserve a hand-entered / cross-zone id that isn't in this zone */}
+            {action.dialogueId && !zoneDialogues.some((d) => d.id === action.dialogueId) && (
+              <option value={action.dialogueId}>{action.dialogueId} (custom)</option>
+            )}
+          </select>
+          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+            Manage dialogues in the DIALOGUE tab.
+          </div>
         </>
       );
 
@@ -1918,4 +2009,563 @@ function ActionFields({
     default:
       return null;
   }
+}
+
+// ── DialogueList (DIALOGUE tab) ───────────────────────────────────────────────
+
+function DialogueList({
+  dialogues,
+  onSelect,
+  onAdd,
+}: {
+  dialogues: DialogueTreeDef[];
+  onSelect: (id: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "6px 10px",
+          flexShrink: 0,
+        }}
+      >
+        <button style={S.btn(true)} onClick={onAdd}>
+          + New
+        </button>
+      </div>
+      <div style={S.scroll}>
+        {dialogues.length === 0 && (
+          <div
+            style={{
+              color: "#555",
+              fontSize: 11,
+              padding: "16px 12px",
+              textAlign: "center",
+            }}
+          >
+            No dialogues yet
+          </div>
+        )}
+        {dialogues.map((d) => (
+          <div key={d.id} style={{ ...S.row }} onClick={() => onSelect(d.id)}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={S.label}>{d.label}</div>
+              <div style={S.sub}>
+                {d.speaker || "(no speaker)"}
+                {` · ${d.nodes.length} node${d.nodes.length !== 1 ? "s" : ""}`}
+              </div>
+            </div>
+            <span style={{ color: "#444", marginLeft: 8, fontSize: 13 }}>
+              ›
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── DialogueEditor ────────────────────────────────────────────────────────────
+
+function DialogueEditor({
+  dialogue,
+  zoneObjects,
+  zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
+  zoneCheckpoints,
+  triggerVolumes,
+  groups,
+  assets,
+  zoneDialogues,
+  onBack,
+  onChange,
+  onDelete,
+}: {
+  dialogue: DialogueTreeDef;
+  zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
+  zoneCheckpoints: CheckpointDef[];
+  triggerVolumes: TriggerVolume[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
+  onBack: () => void;
+  onChange: (d: DialogueTreeDef) => void;
+  onDelete: () => void;
+}) {
+  function set<K extends keyof DialogueTreeDef>(key: K, val: DialogueTreeDef[K]): void {
+    onChange({ ...dialogue, [key]: val });
+  }
+
+  function updateNode(updated: DialogueNode): void {
+    set("nodes", dialogue.nodes.map((n) => (n.id === updated.id ? updated : n)));
+  }
+
+  function addNode(): void {
+    set("nodes", [...dialogue.nodes, { id: nextNodeId(dialogue.nodes), lines: [""], options: [] }]);
+  }
+
+  function deleteNode(id: string): void {
+    set("nodes", dialogue.nodes.filter((n) => n.id !== id));
+  }
+
+  // Light render-time validation — runtime degrades gracefully, so never block saves.
+  const nodeIds = new Set(dialogue.nodes.map((n) => n.id));
+  const reachable = new Set<string>([dialogue.startNode]);
+  for (const n of dialogue.nodes)
+    for (const o of n.options) if (o.next) reachable.add(o.next);
+  const unreachable = dialogue.nodes.filter((n) => !reachable.has(n.id)).map((n) => n.id);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 10px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          flexShrink: 0,
+        }}
+      >
+        <button style={{ ...S.btn(), padding: "3px 8px" }} onClick={onBack}>
+          ←
+        </button>
+        <span
+          style={{
+            color: "#c0c0c0",
+            fontSize: 12,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {dialogue.label || "Dialogue"}
+        </span>
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ padding: "8px 12px" }}>
+          <div style={S.sectionLabel as React.CSSProperties}>Label</div>
+          <input
+            style={S.field}
+            value={dialogue.label}
+            onChange={(e) => set("label", e.target.value)}
+          />
+        </div>
+        <div style={{ padding: "0 12px 8px", display: "flex", gap: 4 }}>
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="Speaker"
+            value={dialogue.speaker}
+            onChange={(e) => set("speaker", e.target.value)}
+          />
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="Portrait URL (optional)"
+            value={dialogue.portrait ?? ""}
+            onChange={(e) => set("portrait", e.target.value || undefined)}
+          />
+        </div>
+        <div style={{ padding: "0 12px 8px" }}>
+          <div style={S.sectionLabel as React.CSSProperties}>Start node</div>
+          <select
+            style={S.select}
+            value={dialogue.startNode}
+            onChange={(e) => set("startNode", e.target.value)}
+          >
+            {dialogue.nodes.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
+              </option>
+            ))}
+            {!nodeIds.has(dialogue.startNode) && (
+              <option value={dialogue.startNode}>{dialogue.startNode} (missing!)</option>
+            )}
+          </select>
+        </div>
+
+        <div style={S.divider} />
+
+        {/* Nodes */}
+        <div style={{ padding: "0 12px 8px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <span style={S.sectionLabel as React.CSSProperties}>Nodes</span>
+            <button style={{ ...S.btn(), fontSize: 10 }} onClick={addNode}>
+              + Add node
+            </button>
+          </div>
+          {dialogue.nodes.map((node) => (
+            <DialogueNodeCard
+              key={node.id}
+              node={node}
+              dialogue={dialogue}
+              isStart={node.id === dialogue.startNode}
+              zoneObjects={zoneObjects}
+              zonePlatforms={zonePlatforms}
+              zoneStairs={zoneStairs}
+              zoneWalls={zoneWalls}
+              zoneFloors={zoneFloors}
+              zoneCheckpoints={zoneCheckpoints}
+              triggerVolumes={triggerVolumes}
+              groups={groups}
+              assets={assets}
+              zoneDialogues={zoneDialogues}
+              onChange={updateNode}
+              onDelete={() => deleteNode(node.id)}
+            />
+          ))}
+        </div>
+
+        {unreachable.length > 0 && (
+          <div style={{ color: "#cc9944", fontSize: 10, padding: "0 12px 8px" }}>
+            ⚠ Unreachable node{unreachable.length !== 1 ? "s" : ""}: {unreachable.join(", ")}
+          </div>
+        )}
+
+        <div style={S.divider} />
+
+        <div style={{ display: "flex", gap: 8, padding: "8px 12px" }}>
+          <div style={{ flex: 1 }} />
+          <button
+            style={{ ...S.btn(), color: "#cc6666" }}
+            onClick={() => {
+              if (confirm("Delete this dialogue?")) onDelete();
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DialogueNodeCard ──────────────────────────────────────────────────────────
+
+function DialogueNodeCard({
+  node,
+  dialogue,
+  isStart,
+  zoneObjects,
+  zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
+  zoneCheckpoints,
+  triggerVolumes,
+  groups,
+  assets,
+  zoneDialogues,
+  onChange,
+  onDelete,
+}: {
+  node: DialogueNode;
+  dialogue: DialogueTreeDef;
+  isStart: boolean;
+  zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
+  zoneCheckpoints: CheckpointDef[];
+  triggerVolumes: TriggerVolume[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
+  onChange: (n: DialogueNode) => void;
+  onDelete: () => void;
+}) {
+  function set<K extends keyof DialogueNode>(key: K, val: DialogueNode[K]): void {
+    onChange({ ...node, [key]: val });
+  }
+
+  function addOption(): void {
+    set("options", [
+      ...node.options,
+      { id: `opt_${crypto.randomUUID().slice(0, 8)}`, text: "" },
+    ]);
+  }
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        borderRadius: 4,
+        padding: "6px 8px",
+        marginBottom: 6,
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
+        <span
+          style={{
+            color: "#80aaff",
+            fontSize: 10,
+            fontFamily: "monospace",
+            background: "rgba(128,170,255,0.12)",
+            borderRadius: 3,
+            padding: "2px 6px",
+          }}
+        >
+          {node.id}
+          {isStart ? " · start" : ""}
+        </span>
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Speaker (override)"
+          value={node.speaker ?? ""}
+          onChange={(e) => set("speaker", e.target.value || undefined)}
+        />
+        <button
+          style={{
+            ...S.btn(),
+            padding: "3px 6px",
+            color: isStart ? "#555" : "#cc6666",
+            cursor: isStart ? "not-allowed" : "pointer",
+          }}
+          disabled={isStart}
+          title={isStart ? "Start node — pick another start node first" : "Delete node"}
+          onClick={onDelete}
+        >
+          ×
+        </button>
+      </div>
+      <textarea
+        style={{ ...S.field, height: 48, resize: "vertical" }}
+        placeholder="Lines (one per line)"
+        value={node.lines.join("\n")}
+        onChange={(e) => set("lines", e.target.value.split("\n"))}
+      />
+
+      {/* Response options */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 4,
+        }}
+      >
+        <span style={{ color: "#606070", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+          Options
+        </span>
+        <button style={{ ...S.btn(), fontSize: 10 }} onClick={addOption}>
+          + Add
+        </button>
+      </div>
+      {node.options.length === 0 && (
+        <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+          (none — ends after last line)
+        </div>
+      )}
+      {node.options.map((opt, i) => (
+        <DialogueOptionRow
+          key={opt.id}
+          option={opt}
+          dialogue={dialogue}
+          zoneObjects={zoneObjects}
+          zonePlatforms={zonePlatforms}
+          zoneStairs={zoneStairs}
+          zoneWalls={zoneWalls}
+          zoneFloors={zoneFloors}
+          zoneCheckpoints={zoneCheckpoints}
+          triggerVolumes={triggerVolumes}
+          groups={groups}
+          assets={assets}
+          zoneDialogues={zoneDialogues}
+          onChange={(no) =>
+            set("options", node.options.map((x, j) => (j === i ? no : x)))
+          }
+          onRemove={() =>
+            set("options", node.options.filter((_, j) => j !== i))
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── DialogueOptionRow ─────────────────────────────────────────────────────────
+
+function DialogueOptionRow({
+  option,
+  dialogue,
+  zoneObjects,
+  zonePlatforms,
+  zoneStairs,
+  zoneWalls,
+  zoneFloors,
+  zoneCheckpoints,
+  triggerVolumes,
+  groups,
+  assets,
+  zoneDialogues,
+  onChange,
+  onRemove,
+}: {
+  option: DialogueOption;
+  dialogue: DialogueTreeDef;
+  zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
+  zoneCheckpoints: CheckpointDef[];
+  triggerVolumes: TriggerVolume[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
+  onChange: (o: DialogueOption) => void;
+  onRemove: () => void;
+}) {
+  function set(changes: Partial<DialogueOption>): void {
+    onChange({ ...option, ...changes });
+  }
+
+  const conditions = option.conditions ?? [];
+  const actions = option.actions ?? [];
+  const dangling = !!option.next && !dialogue.nodes.some((n) => n.id === option.next);
+
+  return (
+    <div
+      style={{
+        background: "rgba(0,0,0,0.25)",
+        borderRadius: 4,
+        padding: "6px 8px",
+        marginBottom: 4,
+        border: `1px solid ${dangling ? "rgba(204,102,102,0.5)" : "rgba(255,255,255,0.05)"}`,
+      }}
+    >
+      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Response text"
+          value={option.text}
+          onChange={(e) => set({ text: e.target.value })}
+        />
+        <button
+          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      </div>
+      <select
+        style={{ ...S.select, marginBottom: 4 }}
+        value={option.next ?? ""}
+        onChange={(e) => set({ next: e.target.value || undefined })}
+      >
+        <option value="">— end conversation —</option>
+        {dialogue.nodes.map((n) => (
+          <option key={n.id} value={n.id}>
+            → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
+          </option>
+        ))}
+        {dangling && (
+          <option value={option.next}>→ {option.next} (missing!)</option>
+        )}
+      </select>
+      {dangling && (
+        <div style={{ color: "#cc6666", fontSize: 10, marginBottom: 4 }}>
+          ⚠ next node "{option.next}" doesn't exist — plays as "end conversation"
+        </div>
+      )}
+
+      {/* Conditions (option hidden unless ALL pass) */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ color: "#606070", fontSize: 10 }}>Show if</span>
+        <button
+          style={{ ...S.btn(), fontSize: 10 }}
+          onClick={() =>
+            set({ conditions: [...conditions, { type: "has_state" } as ScriptCondition] })
+          }
+        >
+          + Add
+        </button>
+      </div>
+      {conditions.map((c, i) => (
+        <ConditionRow
+          key={i}
+          condition={c}
+          onChange={(nc) =>
+            set({ conditions: conditions.map((x, j) => (j === i ? nc : x)) })
+          }
+          onRemove={() => {
+            const next = conditions.filter((_, j) => j !== i);
+            set({ conditions: next.length ? next : undefined });
+          }}
+        />
+      ))}
+      {conditions.length === 0 && (
+        <div style={{ color: "#555", fontSize: 10, padding: "2px 0" }}>
+          (always shown)
+        </div>
+      )}
+
+      {/* Effects (run when picked) */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ color: "#606070", fontSize: 10 }}>On pick</span>
+        <button
+          style={{ ...S.btn(), fontSize: 10 }}
+          onClick={() =>
+            set({ actions: [...actions, { type: "set_state" } as ScriptAction] })
+          }
+        >
+          + Add
+        </button>
+      </div>
+      {actions.map((a, i) => (
+        <ActionRow
+          key={i}
+          action={a}
+          zoneObjects={zoneObjects}
+          zonePlatforms={zonePlatforms}
+          zoneStairs={zoneStairs}
+          zoneWalls={zoneWalls}
+          zoneFloors={zoneFloors}
+          zoneCheckpoints={zoneCheckpoints}
+          triggerVolumes={triggerVolumes}
+          groups={groups}
+          assets={assets}
+          zoneDialogues={zoneDialogues}
+          onChange={(na) =>
+            set({ actions: actions.map((x, j) => (j === i ? na : x)) })
+          }
+          onRemove={() => {
+            const next = actions.filter((_, j) => j !== i);
+            set({ actions: next.length ? next : undefined });
+          }}
+        />
+      ))}
+      {actions.length === 0 && (
+        <div style={{ color: "#555", fontSize: 10, padding: "2px 0" }}>
+          (no effects)
+        </div>
+      )}
+    </div>
+  );
 }

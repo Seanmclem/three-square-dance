@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -36,6 +36,7 @@ interface LeftPanelProps {
   activeZoneId:    string | null;
   // scripts panel
   zoneScripts:          ScriptDef[];
+  zoneDialogues:        DialogueTreeDef[];
   objectScripts:        ScriptDef[] | null;
   selectedObjectId:     string | null;
   triggerVolumes:       TriggerVolume[];
@@ -46,6 +47,7 @@ interface LeftPanelProps {
   zoneFloors:           FloorDef[];
   zoneCheckpoints:      CheckpointDef[];
   onZoneScriptsChange:  (scripts: ScriptDef[]) => void;
+  onZoneDialoguesChange:(dialogues: DialogueTreeDef[]) => void;
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
   stateSchema:          Record<string, StateSchema>;
   onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
@@ -61,9 +63,9 @@ export function LeftPanel({
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
-  zoneScripts, objectScripts, selectedObjectId,
+  zoneScripts, zoneDialogues, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
-  onZoneScriptsChange, onObjectScriptsChange,
+  onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
   decalTextures, selectedDecalId, onDecalSelect,
 }: LeftPanelProps) {
@@ -154,6 +156,7 @@ export function LeftPanel({
             {panelId === "scripts" && (
               <ScriptPanel
                 zoneScripts={zoneScripts}
+                zoneDialogues={zoneDialogues}
                 objectScripts={objectScripts}
                 selectedObjectId={selectedObjectId}
                 activeZoneId={activeZoneId}
@@ -167,6 +170,7 @@ export function LeftPanel({
                 groups={groups}
                 assets={assets}
                 onZoneScriptsChange={onZoneScriptsChange}
+                onZoneDialoguesChange={onZoneDialoguesChange}
                 onObjectScriptsChange={onObjectScriptsChange}
                 stateSchema={stateSchema}
                 onStateSchemaChange={onStateSchemaChange}

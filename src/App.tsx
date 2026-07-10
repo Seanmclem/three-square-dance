@@ -64,7 +64,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -77,7 +77,7 @@ type PendingEdit = {
 import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
-import { migrateWallNodes, pruneOrphanNodes, migrateUVs } from "@/world/WorldLoader";
+import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues } from "@/world/WorldLoader";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
@@ -160,9 +160,10 @@ export default function App() {
   const [previewMode,     setPreviewMode]      = useState<PreviewMode | null>(null);
   const previewModeRef = useRef<PreviewMode | null>(null);   // preview:stop needs the session's mode (save gating)
   const [, setPlayerSettingsRev]               = useState(0);
-  const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string } | null>(null);
+  const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
+  const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
@@ -496,6 +497,7 @@ export default function App() {
         setActiveZoneId(zoneId);
         const z = world.zones.get(zoneId);
         setZoneScripts(z?.scripts ?? []);
+        setZoneDialogues(z?.dialogues ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
         setCheckpoints(z?.checkpoints ?? []);
         scriptEngine.clearIndex();
@@ -509,6 +511,7 @@ export default function App() {
         setStateSchema(world.world?.stateSchema ?? {});
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
+        setZoneDialogues(z?.dialogues ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
         setCheckpoints(z?.checkpoints ?? []);
       }),
@@ -752,6 +755,7 @@ export default function App() {
       const file = json as SceneFile;
       migrateWallNodes(file.zones);
       migrateUVs(file);  // Phase 10.8: reset legacy tileScale to 1.0 (pre-world-space-UV scenes)
+      migrateDialogues(file);  // legacy inline show_dialogue lines[] → zone dialogue registry
       for (const zone of file.zones) pruneOrphanNodes(zone);  // reap orphaned polygon nodes from old saves
       await physicsWorld.init();
       for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
@@ -1769,6 +1773,16 @@ export default function App() {
     setIsDirty(true);
   };
 
+  const handleZoneDialoguesChange = (dialogues: DialogueTreeDef[]): void => {
+    const world = worldRef.current;
+    if (!activeZoneId || !world) return;
+    const zone = world.zones.get(activeZoneId);
+    if (!zone) return;
+    zone.dialogues = dialogues;
+    setZoneDialogues(dialogues);
+    setIsDirty(true);
+  };
+
   const handleStateSchemaChange = (schema: Record<string, StateSchema>): void => {
     const world = worldRef.current;
     if (!world?.world) return;
@@ -1881,6 +1895,7 @@ export default function App() {
         onDuplicateGroupMembers={handleDuplicateGroupMembers}
         activeZoneId={activeZoneId}
         zoneScripts={zoneScripts}
+        zoneDialogues={zoneDialogues}
         objectScripts={objectScripts}
         selectedObjectId={selectedObjectId}
         triggerVolumes={triggerVolumes}
@@ -1891,6 +1906,7 @@ export default function App() {
         zoneFloors={zoneFloors}
         zoneCheckpoints={checkpoints}
         onZoneScriptsChange={handleZoneScriptsChange}
+        onZoneDialoguesChange={handleZoneDialoguesChange}
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}
         onStateSchemaChange={handleStateSchemaChange}

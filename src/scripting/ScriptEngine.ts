@@ -2,9 +2,10 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   ZoneDef, WorldConfig, ScriptDef, ScriptAction, ScriptCondition,
-  TriggerType, Vec3, CompareOp,
+  TriggerType, Vec3, CompareOp, DialogueTreeDef,
 } from "@/types";
 import { gameState } from "./GameState";
+import { DialogueRunner, wrapLegacyDialogue } from "./DialogueRunner";
 
 function isVec3(v: unknown): v is Vec3 {
   return !!v && typeof v === "object"
@@ -35,10 +36,14 @@ export class ScriptEngine {
   // bound listeners so we can remove them on deactivate
   private _unsubscribers: (() => void)[] = [];
 
+  private readonly _runner: DialogueRunner;
+
   constructor(
     private readonly _bus:   EventBus,
     private readonly _state: WorldState,
-  ) {}
+  ) {
+    this._runner = new DialogueRunner(this._bus, this);
+  }
 
   // ─── Activation ───────────────────────────────────────────────────────────
 
@@ -61,11 +66,13 @@ export class ScriptEngine {
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
     sub("state:changed",         ({ key })       => this.fire("on_state_changed", key));
 
+    this._runner.attach();
     this._startTimers();
   }
 
   deactivate(): void {
     this._active = false;
+    this._runner.detach();
     for (const unsub of this._unsubscribers) unsub();
     this._unsubscribers = [];
     for (const t of this._timers) clearTimeout(t);
@@ -139,7 +146,7 @@ export class ScriptEngine {
   private _evalAndRun(s: ScriptDef): void {
     if (!s.enabled) return;
     if (this._firedOneShots.has(s.id)) return;
-    if (!this._checkConditions(s.conditions)) return;
+    if (!this.checkConditions(s.conditions)) return;
     const run = () => this._runActions(s);
     if (s.trigger.delay && s.trigger.delay > 0) {
       const t = setTimeout(run, s.trigger.delay * 1000);
@@ -167,7 +174,8 @@ export class ScriptEngine {
 
   // ─── Condition evaluation ─────────────────────────────────────────────────
 
-  private _checkConditions(conditions: ScriptCondition[]): boolean {
+  /** Public so DialogueRunner can filter option conditions with the same rules. */
+  checkConditions(conditions: ScriptCondition[]): boolean {
     for (const c of conditions) {
       switch (c.type) {
         case "has_state": {
@@ -193,7 +201,21 @@ export class ScriptEngine {
   // ─── Action dispatch ──────────────────────────────────────────────────────
 
   private _runActions(s: ScriptDef): void {
-    for (const action of s.actions) this._dispatch(action);
+    this.runActions(s.actions);
+  }
+
+  /** Public so DialogueRunner can dispatch a chosen option's effects. */
+  runActions(actions: ScriptAction[]): void {
+    for (const action of actions) this._dispatch(action);
+  }
+
+  /** Find a dialogue tree by id across every zone (tiny data; cross-zone-safe). */
+  findDialogue(id: string): DialogueTreeDef | undefined {
+    for (const z of this._state.zones.values()) {
+      const d = z.dialogues?.find(t => t.id === id);
+      if (d) return d;
+    }
+    return undefined;
   }
 
   private _dispatch(action: ScriptAction): void {
@@ -202,15 +224,13 @@ export class ScriptEngine {
         this._bus.emit("audio:play", { id: action.sound ?? "", position: action.position });
         break;
 
-      case "show_dialogue":
-        if (action.dialogue) {
-          this._bus.emit("dialogue:show", {
-            speaker:  action.dialogue.speaker,
-            lines:    action.dialogue.lines,
-            portrait: action.dialogue.portrait,
-          });
-        }
+      case "show_dialogue": {
+        const tree = action.dialogueId ? this.findDialogue(action.dialogueId) : undefined;
+        if (tree) this._runner.start(tree);
+        else if (action.dialogue) this._runner.start(wrapLegacyDialogue(action.dialogue)); // unmigrated inline data
+        else console.warn(`[ScriptEngine] show_dialogue: dialogue '${action.dialogueId ?? ""}' not found`);
         break;
+      }
 
       case "set_state":
         if (action.stateKey) gameState.set(action.stateKey, action.stateValue ?? null);

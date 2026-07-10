@@ -122,6 +122,28 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 > Trigger volumes are invisible at runtime — in the editor they show as a wireframe box so
 > you can see where to walk.
 
+### Scenario D — branching dialogue tree (Phase 30)
+
+1. Open **SCRIPTS** → **DIALOGUE** tab → **+ New**. Set a Label and Speaker. Node `n1`
+   is created for you — type its lines in the textarea (one per line).
+2. **+ Add node** to create `n2`. On `n1`, under **Options → + Add**, type a response
+   ("I'm new here."), set its next-node dropdown to `n2`, and under **On pick → + Add**
+   add a `set_state` effect (e.g. key `met_npc`, value `true`).
+3. Add a second option ("We've met — got my reward?") that **ends** the conversation
+   (next = "— end conversation —"), gate it under **Show if → + Add** with
+   `has_state met_npc`, and give it an On-pick `adjust_number` effect (e.g. `coins` +5) —
+   that's the "give item" pattern (items are just state counters).
+4. Place an object, mark it **Interactable**, and on its **SELECTED** tab add an
+   `on_interact` script with a `show_dialogue` action → pick your dialogue from the
+   dropdown.
+5. **▶ Preview**, press **E** on the object. **Expect:** lines advance with **E**; on the
+   last line the options appear — the gated option is hidden the first time. Pick
+   "I'm new here." → node 2 plays. Talk again: the gated option is now visible
+   (its flag was set); pick it and the dialogue ends. Arrow the highlight with the
+   d-pad/menu-nav on gamepad, click rows with the mouse, tap them on touch.
+6. Optional: a LEVEL script with trigger `on_dialogue_end` (target = your dialogue)
+   fires whenever that conversation closes — including if the player cancels out.
+
 ---
 
 ## Workflow: stamp a decal (sticker / crack / paint)
@@ -244,7 +266,9 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
    **RB** jump (A also works outside dialogue), **LB** interact, **Start** opens
    the **pause menu** (Resume / Exit — d-pad to highlight, A to pick; Start
    again also resumes). An open dialogue closes first.
-3. In a dialogue: **A** advances/closes. Movement is frozen while it's open.
+3. In a dialogue: **A** advances lines / picks the highlighted response option
+   (**d-pad** moves the highlight when options are shown). Movement is frozen
+   while it's open.
 4. Unplug mid-walk: the character stops immediately. Reconnect and press a
    button to resume.
 
@@ -257,7 +281,8 @@ active scheme switches to **whatever you touched last** — HUD prompts follow
 3. **Tap** (don't drag) to interact when the prompt shows. **JUMP** button
    bottom-right, **⚙** top-right opens the pause menu (Resume / Exit — tap a
    button, or tap the backdrop to resume). An open dialogue closes first.
-4. Tap the dialogue box itself to advance it.
+4. Tap the dialogue box itself to advance it; when response options appear,
+   tap an option row to pick it.
 
 On keyboard, **Enter** opens the same pause menu (Enter again = Resume);
 **Esc** still exits instantly.
