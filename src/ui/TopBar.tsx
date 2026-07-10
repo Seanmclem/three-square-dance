@@ -164,7 +164,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
           <Popover open={projMenuOpen} onClose={() => setProjMenuOpen(false)}>
             <button
               style={popBtn}
-              title="First pick where projects live — choose <repo>/public/games for instant ▶ Play — then name it"
+              title="Name the project and choose its home folder in one dialog"
               onClick={() => { setProjMenuOpen(false); onProjectNew?.(); }}
             >
               New Project…

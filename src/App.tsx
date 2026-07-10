@@ -81,6 +81,7 @@ import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } fro
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues } from "@/world/WorldLoader";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject, requestProjectPermission } from "@/project/ProjectStore";
+import { NewProjectModal } from "@/ui/NewProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 import { idbGet, idbSet } from "@/lib/fileHandleStore";
 
@@ -176,6 +177,7 @@ export default function App() {
   const [project, setProject] = useState<ProjectCtx | null>(null);
   const projectRef = useRef<ProjectCtx | null>(null);
   const [projectPending, setProjectPending] = useState<{ name: string; dir: FileSystemDirectoryHandle; sceneId: string } | null>(null);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
@@ -982,15 +984,15 @@ export default function App() {
     setProject(next);
   };
 
-  const handleProjectNew = useCallback(async (): Promise<void> => {
+  /** PROJ ▾ → New Project… opens the modal; name + folder are chosen there
+   *  (each native dialog gets its own click = its own user activation). */
+  const handleProjectNew = useCallback((): void => setNewProjectOpen(true), []);
+
+  const handleProjectCreate = useCallback(async (name: string, parent: FileSystemDirectoryHandle): Promise<void> => {
+    setNewProjectOpen(false);
     try {
-      // Picker FIRST: window.prompt() consumes the click's transient user
-      // activation, after which Chrome rejects showDirectoryPicker.
-      const parent = await window.showDirectoryPicker({ mode: "readwrite" });
-      const name = window.prompt(`Project name?\n\n(A folder for it will be created inside "${parent.name}".)`);
-      if (!name?.trim()) return;
       await closeProject();
-      const store = await ProjectStore.create(parent, name.trim());
+      const store = await ProjectStore.create(parent, name);
       // Adopt the current world as scene 1
       const world = worldRef.current!;
       const sceneId = uniqueSceneId(slugifyId(world.metadata?.name ?? "") || "scene_01", store.sceneIds);
@@ -998,10 +1000,8 @@ export default function App() {
       adoptProject(store, sceneId);
       setIsDirty(false);
     } catch (e: unknown) {
-      if ((e as DOMException).name !== 'AbortError') {
-        console.error('New project failed:', e);
-        window.alert(`New project failed: ${(e as Error).message}`);
-      }
+      console.error('New project failed:', e);
+      window.alert(`New project failed: ${(e as Error).message}`);
     }
   }, [closeProject, adoptProject]);
 
@@ -2246,7 +2246,7 @@ export default function App() {
           entryScene: project.store.entryScene,
         } : null}
         projectPendingName={projectPending?.name ?? null}
-        onProjectNew={() => void handleProjectNew()}
+        onProjectNew={handleProjectNew}
         onProjectOpen={() => void handleProjectOpen()}
         onProjectReopen={() => void handleProjectReopen()}
         onProjectClose={() => void handleProjectClose()}
@@ -2387,6 +2387,13 @@ export default function App() {
             busRef.current.emit("pause:closed", {});
             previewRef.current?.exit();
           }}
+        />
+      )}
+
+      {newProjectOpen && (
+        <NewProjectModal
+          onCancel={() => setNewProjectOpen(false)}
+          onConfirm={(name, dir) => void handleProjectCreate(name, dir)}
         />
       )}
 
