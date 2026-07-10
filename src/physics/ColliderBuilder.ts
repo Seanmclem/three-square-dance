@@ -2,7 +2,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import * as THREE from "three";
 import { physicsWorld } from "./PhysicsWorld";
 import { colliderWorldTransform } from "./attachedColliderMath";
-import { computeStairLayout, frameToWorld } from "@/builders/stairLayout";
+import { computeStairLayout, computeStairRamps, frameToWorld, STAIR_RAMP_THICK, STAIR_RAMP_LIFT } from "@/builders/stairLayout";
 import type { WallDef, Vec2, Vec3, PlatformDef, StairDef, ShapeDef, Opening, TriggerVolume, WorldObject, AttachedCollider } from "@/types";
 
 /** One oriented barrier-wall descriptor under a stair rail run (see registerStairRailings). */
@@ -153,6 +153,28 @@ export class ColliderBuilder {
           .setRotation({ x: 0, y: Math.sin(-angle / 2), z: 0, w: Math.cos(-angle / 2) });
         colliders.push(physicsWorld.createStaticCollider(desc));
       }
+    }
+
+    // Invisible climb ramp per flight — a thin inclined cuboid whose top face
+    // lies just above the step-nosing line, so the character glides up the
+    // stairs instead of bumping over each step box.
+    for (const rmp of computeStairRamps(layout)) {
+      const seg = new THREE.Vector3(rmp.b.x - rmp.a.x, rmp.b.y - rmp.a.y, rmp.b.z - rmp.a.z);
+      const len = seg.length();
+      if (len < 1e-6) continue;
+      const x = seg.divideScalar(len);
+      const z = new THREE.Vector3(-x.z, 0, x.x).normalize();
+      const y = new THREE.Vector3().crossVectors(z, x);
+      const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+      const off = STAIR_RAMP_LIFT - STAIR_RAMP_THICK / 2;   // center below the surface line
+      const desc = RAPIER.ColliderDesc.cuboid(len / 2, STAIR_RAMP_THICK / 2, stair.width / 2)
+        .setTranslation(
+          (rmp.a.x + rmp.b.x) / 2 + y.x * off,
+          (rmp.a.y + rmp.b.y) / 2 + y.y * off,
+          (rmp.a.z + rmp.b.z) / 2 + y.z * off,
+        )
+        .setRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+      colliders.push(physicsWorld.createStaticCollider(desc));
     }
 
     // One cuboid per landing slab, axis-aligned in the stairwell frame.

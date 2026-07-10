@@ -4,7 +4,7 @@ import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import type { StairRailBarrier } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import { computeStairLayout, computeRailPaths, frameToWorld, isPlainStair } from "@/builders/stairLayout";
+import { computeStairLayout, computeRailPaths, computeStairRamps, frameToWorld, isPlainStair, STAIR_RAMP_THICK, STAIR_RAMP_LIFT } from "@/builders/stairLayout";
 import type { LandingSpec } from "@/builders/stairLayout";
 import type { StairDef, StairUndersideMode, MeshUserData, Vec3 } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
@@ -739,6 +739,37 @@ export class StairBuilder {
           }
         }
       }
+    }
+
+    // ── Climb-ramp wireframes (TEMP, v4.23.18) ───────────────────────────────
+    // Editor-only visualization of the invisible climb-ramp colliders so their
+    // placement can be eyeballed; to be hidden once confirmed. Cyan.
+    for (const rmp of computeStairRamps(layout)) {
+      const seg = new THREE.Vector3(rmp.b.x - rmp.a.x, rmp.b.y - rmp.a.y, rmp.b.z - rmp.a.z);
+      const len = seg.length();
+      if (len < 1e-6) continue;
+      const x = seg.divideScalar(len);
+      const z = new THREE.Vector3(-x.z, 0, x.x).normalize();
+      const y = new THREE.Vector3().crossVectors(z, x);
+      const boxGeo   = new THREE.BoxGeometry(len, STAIR_RAMP_THICK, stair.width);
+      const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+      boxGeo.dispose();
+      const wire = new THREE.LineSegments(
+        edgesGeo,
+        new THREE.LineBasicMaterial({ color: 0x00ffcc, depthTest: false, transparent: true, opacity: 0.7 }),
+      );
+      const off = STAIR_RAMP_LIFT - STAIR_RAMP_THICK / 2;
+      wire.position.set(
+        (rmp.a.x + rmp.b.x) / 2 + y.x * off,
+        (rmp.a.y + rmp.b.y) / 2 + y.y * off,
+        (rmp.a.z + rmp.b.z) / 2 + y.z * off,
+      );
+      wire.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
+      wire.userData = {
+        editorId: stair.id, editorType: "stair", zoneId,
+        selectable: false, floorLevel: 0, _ownsMaterial: true, editorOnly: true,
+      } satisfies MeshUserData;
+      meshes.push(wire as unknown as THREE.Mesh);
     }
 
     // ── CSG cutter wireframe ─────────────────────────────────────────────────

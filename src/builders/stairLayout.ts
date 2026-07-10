@@ -130,6 +130,34 @@ export function computeStairLayout(stair: StairDef): StairLayout {
   return { flights, landings, frame, run, rise, numSteps, width, gap, off, landingDepth, flightsCount };
 }
 
+// ─── Climb ramps ─────────────────────────────────────────────────────────────
+//
+// Invisible inclined slabs over each flight so the character glides up the
+// stairs like a ramp instead of bumping over the per-step boxes (which stay,
+// for side/underside collision). The ramp's top surface lies STAIR_RAMP_LIFT
+// above the step-nosing line: it touches every step's front-top edge, starts
+// one tread-depth before the bottom step (meeting the floor), and stops one
+// tread short of the top (the last tread + landing are already flat).
+
+export const STAIR_RAMP_THICK = 0.12;   // slab thickness, sunk into the steps
+export const STAIR_RAMP_LIFT  = 0.01;   // top surface above the nosing line
+
+export interface StairRamp { a: Vec3; b: Vec3 }   // nosing-line ends (walking surface)
+
+export function computeStairRamps(layout: StairLayout): StairRamp[] {
+  const { flights, numSteps } = layout;
+  return flights.map((f) => {
+    const dx = f.end.x - f.start.x, dz = f.end.z - f.start.z;
+    const dH = Math.hypot(dx, dz) || 1;
+    const d  = dH / numSteps;                     // tread depth
+    const ux = dx / dH, uz = dz / dH;
+    return {
+      a: { x: f.start.x - ux * d, y: f.start.y, z: f.start.z - uz * d },
+      b: { x: f.end.x   - ux * d, y: f.end.y,   z: f.end.z   - uz * d },
+    };
+  });
+}
+
 // ─── Rail paths ───────────────────────────────────────────────────────────────
 //
 // With landings engaged, the entire railing is a small set of continuous
