@@ -558,7 +558,8 @@
         "Walk",
         "Walk_Gun",
         "Wave",
-        "Yes"
+        "Yes",
+        "Climb"
       ],
       "thumbnail": "/assets/models/character_thumb.png"
     },
