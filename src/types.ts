@@ -886,7 +886,7 @@ export interface ScriptAction {
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
   sound?:        string;
-  dialogue?:     DialogueDef;  // @deprecated — runtime fallback only; migrated to dialogueId
+  dialogue?:     DialogueDef;  // @deprecated — legacy data only; read by migrateDialogues, never at runtime
   dialogueId?:   string;       // show_dialogue: DialogueTreeDef id (zone registry)
   material?:     string;
   position?:     Vec3;

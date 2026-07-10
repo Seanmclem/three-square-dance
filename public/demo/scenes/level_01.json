@@ -162,19 +162,38 @@
               "trigger": { "type": "on_player_enter" },
               "conditions": [],
               "actions": [
-                {
-                  "type": "show_dialogue",
-                  "dialogue": {
-                    "speaker": "Runtime",
-                    "lines": [
-                      "Welcome to the standalone runtime shell.",
-                      "This level was loaded from a manifest URL."
-                    ]
-                  }
-                },
+                { "type": "show_dialogue", "dialogueId": "dlg_l1_welcome" },
                 { "type": "set_state", "stateKey": "visited_l1", "stateValue": 1 }
               ],
               "oneShot": true
+            }
+          ]
+        }
+      ],
+      "dialogues": [
+        {
+          "id": "dlg_l1_welcome",
+          "label": "Welcome",
+          "speaker": "Runtime",
+          "startNode": "n1",
+          "nodes": [
+            {
+              "id": "n1",
+              "lines": [
+                "Welcome to the standalone runtime shell.",
+                "This level was loaded from a manifest URL."
+              ],
+              "options": [
+                { "id": "o1", "text": "What's the purple box?", "next": "n2" },
+                { "id": "o2", "text": "Thanks, I'll explore." }
+              ]
+            },
+            {
+              "id": "n2",
+              "lines": [
+                "A portal — walk into it to load Level 2. Your game state travels with you."
+              ],
+              "options": []
             }
           ]
         }

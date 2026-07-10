@@ -1,21 +1,6 @@
 import type { EventBus } from "@/core/EventBus";
-import type { DialogueDef, DialogueTreeDef, DialogueOption } from "@/types";
+import type { DialogueTreeDef, DialogueOption } from "@/types";
 import type { ScriptEngine } from "./ScriptEngine";
-
-/**
- * Wrap a legacy inline { speaker, lines } dialogue into a single-node tree so
- * unmigrated data still plays. The empty id means "no on_dialogue_end target".
- */
-export function wrapLegacyDialogue(d: DialogueDef): DialogueTreeDef {
-  return {
-    id: "",
-    label: d.speaker || "Dialogue",
-    speaker: d.speaker,
-    ...(d.portrait ? { portrait: d.portrait } : {}),
-    startNode: "n1",
-    nodes: [{ id: "n1", lines: d.lines, options: [] }],
-  };
-}
 
 /**
  * Owns the walk through a DialogueTreeDef during preview/game. The overlay is a
@@ -100,6 +85,6 @@ export class DialogueRunner {
     if (!tree) return;
     this._tree = null;
     this._visible = [];
-    if (tree.id) this._engine.fire("on_dialogue_end", tree.id);
+    this._engine.fire("on_dialogue_end", tree.id);
   }
 }

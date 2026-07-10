@@ -24,8 +24,8 @@ scripts (App.tsx:424-427).
 | 4 | End option on node 2 → overlay closes, `dlg_done === true` (`on_dialogue_end` fired), `coins` untouched | PASS |
 | 5 | Re-interact → **both** options now visible (flag set); `menu:nav {dir:1}` moves highlight to B (`▸` marker) | PASS |
 | 6 | Confirm on B → `coins === 5` (give-item-as-counter), dialogue ends (no `next`) | PASS |
-| 7 | Legacy inline fallback: `__test.runAction({ type:"show_dialogue", dialogue:{ speaker, lines } })` plays linearly ("E to close", no options) | PASS |
-| 8 | `action:cancel` on the legacy dialogue → closes, does **not** fire `on_dialogue_end` (tree id `""`) | PASS |
+| 7 | Legacy inline fallback: `__test.runAction({ type:"show_dialogue", dialogue:{ speaker, lines } })` plays linearly ("E to close", no options) | PASS *(fallback removed in v4.24.1 — inline data is now migration-only; rows 7-8 are historical)* |
+| 8 | `action:cancel` on the legacy dialogue → closes, does **not** fire `on_dialogue_end` (tree id `""`) | PASS *(see row 7 note)* |
 | 9 | `action:cancel` mid-tree-dialogue → closes, **does** fire `on_dialogue_end`; pause menu did NOT open behind it (Phase 24b invariant) | PASS |
 | 10 | `__world.toJSON()` round-trips `zone.dialogues` (registry + 2 nodes) | PASS |
 | 11 | `migrateDialogues` on a synthetic legacy file (object script + world script with inline `dialogue`) → registry entries created (world's parked in zones[0]), actions rewritten to `dialogueId`, inline field deleted | PASS |

@@ -2,6 +2,11 @@
 
 > **Status: IMPLEMENTED** — shipped 2026-07-09 (v4.24.0). Verified in-browser
 > end-to-end; acceptance record in `test-plans/phase-30-dialogue-trees.md`.
+> **Follow-up (v4.24.1, 2026-07-10):** the runtime inline fallback
+> (`wrapLegacyDialogue` + `show_dialogue` reading `action.dialogue`) described
+> in §3 was removed — both load pipelines run `migrateDialogues`, so it was
+> dead code. The demo scenes were converted to the registry format (level_01's
+> greeter is now a branching tree). Authoring guide: `DIALOGUES.md`.
 
 Origin: user request — "better NPC interaction, most specifically dialogue:
 proper branching conversation system — multiple response options, conditional

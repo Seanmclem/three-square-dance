@@ -5,7 +5,7 @@ import type {
   TriggerType, Vec3, CompareOp, DialogueTreeDef,
 } from "@/types";
 import { gameState } from "./GameState";
-import { DialogueRunner, wrapLegacyDialogue } from "./DialogueRunner";
+import { DialogueRunner } from "./DialogueRunner";
 
 function isVec3(v: unknown): v is Vec3 {
   return !!v && typeof v === "object"
@@ -225,9 +225,10 @@ export class ScriptEngine {
         break;
 
       case "show_dialogue": {
+        // Legacy inline `action.dialogue` is migrated to a registry tree by
+        // migrateDialogues on load (both pipelines) — no runtime fallback.
         const tree = action.dialogueId ? this.findDialogue(action.dialogueId) : undefined;
         if (tree) this._runner.start(tree);
-        else if (action.dialogue) this._runner.start(wrapLegacyDialogue(action.dialogue)); // unmigrated inline data
         else console.warn(`[ScriptEngine] show_dialogue: dialogue '${action.dialogueId ?? ""}' not found`);
         break;
       }

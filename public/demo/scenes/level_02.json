@@ -91,15 +91,24 @@
             { "type": "compare_number", "stateKey": "visited_l1", "compareOp": ">=", "stateValue": 1 }
           ],
           "actions": [
-            {
-              "type": "show_dialogue",
-              "dialogue": {
-                "speaker": "Runtime",
-                "lines": ["Level 2. Your visit to Level 1 carried over — gameState survived the scene load."]
-              }
-            }
+            { "type": "show_dialogue", "dialogueId": "dlg_l2_carryover" }
           ],
           "oneShot": true
+        }
+      ],
+      "dialogues": [
+        {
+          "id": "dlg_l2_carryover",
+          "label": "State carried over",
+          "speaker": "Runtime",
+          "startNode": "n1",
+          "nodes": [
+            {
+              "id": "n1",
+              "lines": ["Level 2. Your visit to Level 1 carried over — gameState survived the scene load."],
+              "options": []
+            }
+          ]
         }
       ],
       "triggerVolumes": [
