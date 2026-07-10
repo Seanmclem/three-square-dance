@@ -43,6 +43,14 @@
         "min": 0,
         "max": 100
       }
+    },
+    "defaultSpawn": {
+      "position": {
+        "x": 6.4480399850121435,
+        "y": 0.14473653617037385,
+        "z": 8.92506898803649
+      },
+      "facingDeg": 0
     }
   },
   "terrain": null,
@@ -119,67 +127,47 @@
         }
       ],
       "walls": [],
-      "platforms": [
-        {
-          "id": "plat_8af769a3",
-          "position": {
-            "x": -6.151002142076543,
-            "y": 2.7363585444949097,
-            "z": -4.475922103907855
-          },
-          "size": {
-            "width": 5.9,
-            "depth": 3
-          },
-          "thickness": 0.3,
-          "material": "concrete_01",
-          "hasRailing": false,
-          "railingHeight": 1,
-          "floorLevel": 0
-        }
-      ],
+      "platforms": [],
       "stairs": [
         {
-          "id": "stair_25ad198c",
+          "id": "stair_7b88e70a",
           "start": {
-            "x": -4.5,
-            "y": 0.15403936331664703,
-            "z": 5
+            "x": 7.5,
+            "y": 0.14076765179447648,
+            "z": 3
           },
           "end": {
-            "x": -4.499999999999999,
-            "y": 3.0132717115221705,
-            "z": -3
+            "x": 7.131745622508879,
+            "y": 3.2997676517944763,
+            "z": -4.003324761387168
           },
           "width": 2.5,
           "style": "straight",
           "material": "concrete_01",
           "hasRailing": true,
+          "landing": {
+            "depth": 3
+          },
+          "numSteps": 14,
+          "flights": 2,
+          "railing": {
+            "topRail": true,
+            "balusters": true,
+            "balustersInner": true,
+            "balustersOuter": false,
+            "landingPerimeter": true,
+            "height": 0.9,
+            "stepInterval": 1,
+            "barThickness": 0.1,
+            "postThickness": 0.06,
+            "sideInset": 0.1,
+            "overhang": 0.15
+          },
           "underside": {
             "mode": "diagonal",
             "thickness": 0.25
-          }
-        },
-        {
-          "id": "stair_ae6bc166",
-          "start": {
-            "x": -7.962754506870307,
-            "y": 2.845709220242048,
-            "z": -2.975452314953662
           },
-          "end": {
-            "x": -7.962754506870307,
-            "y": 5.7049415684475715,
-            "z": 5.024547685046338
-          },
-          "width": 2.5,
-          "style": "straight",
-          "material": "concrete_01",
-          "hasRailing": true,
-          "underside": {
-            "mode": "diagonal",
-            "thickness": 0.25
-          }
+          "landingMaterial": "concrete_01"
         }
       ],
       "objects": []
