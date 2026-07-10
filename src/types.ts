@@ -200,6 +200,11 @@ export interface BusEvents {
   // Phase 24b — pause menu open/close (second menu-mode gate) + d-pad menu navigation
   "pause:show":            Record<string, never>;
   "pause:closed":          Record<string, never>;
+  // Phase 32 — inventory bag: toggle edge (manager → shells) + open/close gates
+  // (shells → ControlSchemeManager, third menu-mode client after dialogue/pause)
+  "bag:toggle":            Record<string, never>;
+  "bag:show":              Record<string, never>;
+  "bag:closed":            Record<string, never>;
   "menu:nav":              { dir: -1 | 1 };
   "gizmo:dragging":        { isDragging: boolean };
   // A ColliderEditor face handle is under the cursor — GizmoManager suspends
@@ -406,6 +411,7 @@ export interface PlayerSettings {
   // (play nothing); string = use that exact clip name.
   animClips?:          Partial<Record<LocomotionState, string | null>>;
   modelAssetId?:       string | null;
+  bagStyle?:           string;             // BagOverlay style-registry key (default "list")
 }
 
 export interface WorldConfig {
@@ -419,6 +425,7 @@ export interface WorldConfig {
   defaultSpawn?:   SpawnDef;
   scripts?:        ScriptDef[];
   stateSchema?:    Record<string, StateSchema>;   // authored gameplay-state keys (defaults + numeric clamp)
+  items?:          ItemDef[];                     // item registry — inventory counts live at gameState `inv.<id>`
 }
 
 export interface TerrainLayerMaterial {
@@ -813,6 +820,7 @@ export type TriggerType =
 export type ConditionType =
   | 'has_state'
   | 'compare_number'
+  | 'has_item'
   | 'npc_alive'
   | 'npc_dead';
 
@@ -838,7 +846,9 @@ export type ActionType =
   | 'load_scene'
   | 'start_mover'
   | 'stop_mover'
-  | 'toggle_mover';
+  | 'toggle_mover'
+  | 'give_item'
+  | 'take_item';
 
 // ─── Generic gameplay state ───────────────────────────────────────────────────
 
@@ -872,6 +882,21 @@ export interface ScriptCondition {
   stateKey?:  string;      // has_state / compare_number
   compareOp?: CompareOp;   // compare_number
   stateValue?: JsonValue;  // compare_number (compared as number)
+  itemId?:    string;      // has_item: ItemDef id (inventory key `inv.<id>`)
+  count?:     number;      // has_item: owned ≥ count (default 1)
+}
+
+// ─── Items / inventory (Phase 32) ────────────────────────────────────────────
+// Items are an identity layer over the generic gameState store: the count for
+// an item lives at key `inv.<id>`. give/take/has are thin wrappers over it, so
+// saves, on_state_changed, and STATE-tab defaults all apply unchanged.
+
+export interface ItemDef {
+  id:           string;   // itm_<uuid8> — inventory key is `inv.<id>`
+  label:        string;
+  icon?:        string;   // bare URL/path used as <img src> (portrait precedent)
+  description?: string;
+  stackSize?:   number;   // max count clamped on give; absent = unlimited
 }
 
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */
@@ -934,6 +959,8 @@ export interface ScriptAction {
   uiElementId?:  string;
   script?:       string;
   sceneId?:      string;      // load_scene: runtime-manifest scene key (not validated in the editor)
+  itemId?:       string;      // give_item / take_item: ItemDef id (inventory key `inv.<id>`)
+  count?:        number;      // give_item / take_item: amount (default 1)
 }
 
 export interface ScriptDef {

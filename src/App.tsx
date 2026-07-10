@@ -49,6 +49,7 @@ import { TopBar } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
+import { BagOverlay } from "@/ui/BagOverlay";
 import { DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
@@ -65,7 +66,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -157,6 +158,8 @@ export default function App() {
   const dialogueOpenRef = useRef(false);   // bus handlers need the current value, not a stale closure
   const [pauseOpen, setPauseOpen] = useState(false);
   const pauseOpenRef = useRef(false);
+  const [bagOpen, setBagOpen] = useState(false);
+  const bagOpenRef = useRef(false);
   const [isGame,          setIsGame]           = useState(false);
   const [previewMode,     setPreviewMode]      = useState<PreviewMode | null>(null);
   const previewModeRef = useRef<PreviewMode | null>(null);   // preview:stop needs the session's mode (save gating)
@@ -166,6 +169,7 @@ export default function App() {
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
+  const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
@@ -446,6 +450,8 @@ export default function App() {
         setPreviewMode(null);
         pauseOpenRef.current = false;
         setPauseOpen(false);
+        bagOpenRef.current = false;
+        setBagOpen(false);
         if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
         if (previewModeRef.current !== "occlusion") saveGame();
         previewModeRef.current = null;
@@ -459,6 +465,10 @@ export default function App() {
           dialogueOpenRef.current = false;
           setDialogueState(null);
           bus.emit("dialogue:closed", {});
+        } else if (bagOpenRef.current) {
+          bagOpenRef.current = false;
+          setBagOpen(false);
+          bus.emit("bag:closed", {});
         } else if (pauseOpenRef.current) {
           pauseOpenRef.current = false;
           setPauseOpen(false);
@@ -470,6 +480,17 @@ export default function App() {
         }
       }),
       bus.on("dialogue:show", payload => { dialogueOpenRef.current = true; setDialogueState(payload); }),
+      // Bag toggle (I/Tab, gamepad Y, touch 🎒). Ignored while a dialogue or the
+      // pause menu is up, and in occlusion mode (Tab switches vantage there).
+      bus.on("bag:toggle", () => {
+        if (dialogueOpenRef.current || pauseOpenRef.current) return;
+        if (previewModeRef.current === "occlusion") return;
+        if (!previewRef.current?.isActive) return;
+        const open = !bagOpenRef.current;
+        bagOpenRef.current = open;
+        setBagOpen(open);
+        bus.emit(open ? "bag:show" : "bag:closed", {});
+      }),
       bus.on("overlay:fade-in", payload => setFadeState(payload)),
       bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
@@ -515,6 +536,7 @@ export default function App() {
         setActiveZoneId(world.activeZoneId);
         setGroups([...world.groups]);
         setStateSchema(world.world?.stateSchema ?? {});
+        setWorldItems(world.world?.items ?? []);
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setZoneDialogues(z?.dialogues ?? []);
@@ -1798,6 +1820,15 @@ export default function App() {
     setIsDirty(true);
   };
 
+  const handleWorldItemsChange = (items: ItemDef[]): void => {
+    const world = worldRef.current;
+    if (!world?.world) return;
+    world.transaction("edit items", () => { world.world!.items = items; });
+    setWorldItems(items);
+    syncHistory();
+    setIsDirty(true);
+  };
+
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
@@ -1918,6 +1949,8 @@ export default function App() {
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}
         onStateSchemaChange={handleStateSchemaChange}
+        worldItems={worldItems}
+        onWorldItemsChange={handleWorldItemsChange}
         decalTextures={decalTextures}
         selectedDecalId={selectedDecalId}
         onDecalSelect={handleDecalSelect}
@@ -2066,6 +2099,18 @@ export default function App() {
             setPauseOpen(false);
             busRef.current.emit("pause:closed", {});
             previewRef.current?.exit();
+          }}
+        />
+      )}
+
+      {isPreview && bagOpen && worldRef.current && (
+        <BagOverlay
+          bus={busRef.current}
+          world={worldRef.current}
+          onClose={() => {
+            bagOpenRef.current = false;
+            setBagOpen(false);
+            busRef.current.emit("bag:closed", {});
           }}
         />
       )}

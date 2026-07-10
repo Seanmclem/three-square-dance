@@ -142,6 +142,18 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
       >
         ⚙
       </div>
+
+      {/* Inventory bag (bag toggle → App/Runtime toggles the bag overlay) */}
+      <div
+        onPointerDown={e => e.stopPropagation()}
+        onPointerUp={e => { e.stopPropagation(); shared.bagQueued = true; }}
+        style={{ ...btnBase,
+                 top: "calc(64px + env(safe-area-inset-top))",
+                 right: "calc(16px + env(safe-area-inset-right))",
+                 width: 40, height: 40, fontSize: 16 }}
+      >
+        🎒
+      </div>
     </div>
   );
 }

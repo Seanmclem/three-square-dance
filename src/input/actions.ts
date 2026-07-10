@@ -20,6 +20,7 @@ export interface ActionState {
   interactPressed: boolean;
   confirmPressed:  boolean;
   cancelPressed:   boolean;
+  bagPressed:      boolean;   // inventory-bag toggle (Phase 32)
   /** D-pad up/down edge, for future menu/choice UIs. */
   menuNav: -1 | 0 | 1;
 }
@@ -33,6 +34,7 @@ export function createActionState(): ActionState {
     interactPressed: false,
     confirmPressed:  false,
     cancelPressed:   false,
+    bagPressed:      false,
     menuNav: 0,
   };
 }
@@ -43,7 +45,7 @@ export function zeroActionState(s: ActionState): void {
   s.look.x = s.look.y = 0;
   s.zoomDelta = 0;
   s.jump = false;
-  s.interactPressed = s.confirmPressed = s.cancelPressed = false;
+  s.interactPressed = s.confirmPressed = s.cancelPressed = s.bagPressed = false;
   s.menuNav = 0;
 }
 

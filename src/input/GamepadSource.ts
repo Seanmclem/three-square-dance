@@ -74,6 +74,7 @@ export class GamepadSource implements InputSource {
     if (this._anyEdge(pad, b.buttons.interact)) state.interactPressed = true;
     if (this._anyEdge(pad, b.buttons.confirm))  state.confirmPressed  = true;
     if (this._anyEdge(pad, b.buttons.cancel))   state.cancelPressed   = true;
+    if (this._anyEdge(pad, b.buttons.bag))      state.bagPressed      = true;
     if (this._edge(pad, BTN_DPAD_UP))   state.menuNav = -1;
     if (this._edge(pad, BTN_DPAD_DOWN)) state.menuNav =  1;
     // Left stick also navigates menus (console convention). Edge on crossing

@@ -23,6 +23,7 @@ import type {
   DialogueTreeDef,
   DialogueNode,
   DialogueOption,
+  ItemDef,
 } from "@/types";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -129,6 +130,7 @@ const TRIGGER_TYPES: TriggerType[] = [
 const CONDITION_TYPES: ConditionType[] = [
   "has_state",
   "compare_number",
+  "has_item",
   "npc_alive",
   "npc_dead",
 ];
@@ -141,6 +143,7 @@ const ACTION_TYPES: ActionType[] = [
   "despawn_object",
   "fade_screen",
   "fire_event",
+  "give_item",
   "load_scene",
   "move_object",
   "open_door",
@@ -154,6 +157,7 @@ const ACTION_TYPES: ActionType[] = [
   "start_mover",
   "stop_mover",
   "store_position",
+  "take_item",
   "teleport_player",
   "toggle_mover",
 ];
@@ -191,6 +195,13 @@ function blankDialogue(): DialogueTreeDef {
   };
 }
 
+function blankItem(): ItemDef {
+  return {
+    id: `itm_${crypto.randomUUID().slice(0, 8)}`,
+    label: "New Item",
+  };
+}
+
 /** First free auto node id (n1, n2, …). */
 function nextNodeId(nodes: DialogueNode[]): string {
   let k = 1;
@@ -221,9 +232,11 @@ export interface ScriptPanelProps {
   onObjectScriptsChange: (objectId: string, scripts: ScriptDef[]) => void;
   stateSchema: Record<string, StateSchema>;
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
+  worldItems: ItemDef[];
+  onWorldItemsChange: (items: ItemDef[]) => void;
 }
 
-type TabId = "level" | "object" | "dialogue" | "state";
+type TabId = "level" | "object" | "dialogue" | "state" | "items";
 
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
@@ -248,6 +261,8 @@ export function ScriptPanel({
   onObjectScriptsChange,
   stateSchema,
   onStateSchemaChange,
+  worldItems,
+  onWorldItemsChange,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -307,7 +322,7 @@ export function ScriptPanel({
     <div style={S.root}>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["level", "object", "dialogue", "state"] as TabId[]).map((t) => (
+        {(["level", "object", "dialogue", "state", "items"] as TabId[]).map((t) => (
           <button
             key={t}
             style={S.tab(tab === t)}
@@ -317,7 +332,7 @@ export function ScriptPanel({
               setEditingDialogueId(null);
             }}
           >
-            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : "STATE"}
+            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : t === "state" ? "STATE" : "ITEMS"}
           </button>
         ))}
       </div>
@@ -340,10 +355,14 @@ export function ScriptPanel({
           "Branching dialogue trees for this zone. A show_dialogue action plays one by id. Nodes show lines, then response options; options can be gated by conditions and run effects (set flags, adjust counters) when picked."}
         {tab === "state" &&
           "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
+        {tab === "items" &&
+          "The world's item registry. An item's count lives at gameplay-state key inv.<id> — give_item / take_item actions and the has_item condition read and write it, and the in-game bag (I / Tab, gamepad Y) lists what the player holds."}
       </div>
 
       {tab === "state" ? (
         <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+      ) : tab === "items" ? (
+        <ItemsEditor items={worldItems} onChange={onWorldItemsChange} />
       ) : tab === "dialogue" ? (
         (() => {
           const editingDialogue = editingDialogueId
@@ -363,6 +382,7 @@ export function ScriptPanel({
               groups={groups}
               assets={assets}
               zoneDialogues={zoneDialogues}
+              worldItems={worldItems}
               onBack={() => setEditingDialogueId(null)}
               onChange={(d) =>
                 onZoneDialoguesChange(zoneDialogues.map((x) => (x.id === d.id ? d : x)))
@@ -398,6 +418,7 @@ export function ScriptPanel({
           groups={groups}
           assets={assets}
           zoneDialogues={zoneDialogues}
+          worldItems={worldItems}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -723,6 +744,7 @@ function ScriptEditor({
   groups,
   assets,
   zoneDialogues,
+  worldItems,
   ownerIsEntity,
   selectedObjectId,
   onBack,
@@ -741,6 +763,7 @@ function ScriptEditor({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  worldItems: ItemDef[];
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
   onBack: () => void;
@@ -931,6 +954,7 @@ function ScriptEditor({
             <ConditionRow
               key={i}
               condition={c}
+              worldItems={worldItems}
               onChange={(nc) =>
                 set(
                   "conditions",
@@ -991,6 +1015,7 @@ function ScriptEditor({
               groups={groups}
               assets={assets}
               zoneDialogues={zoneDialogues}
+              worldItems={worldItems}
               onChange={(na) =>
                 set(
                   "actions",
@@ -1326,10 +1351,12 @@ function PositionSourcePicker({
 
 function ConditionRow({
   condition,
+  worldItems,
   onChange,
   onRemove,
 }: {
   condition: ScriptCondition;
+  worldItems: ItemDef[];
   onChange: (c: ScriptCondition) => void;
   onRemove: () => void;
 }) {
@@ -1399,6 +1426,27 @@ function ConditionRow({
           />
         </>
       )}
+      {condition.type === "has_item" && (
+        <>
+          <ItemPicker
+            style={{ ...S.select, flex: 1 }}
+            itemId={condition.itemId ?? ""}
+            worldItems={worldItems}
+            onChange={(id) => onChange({ ...condition, itemId: id || undefined })}
+          />
+          <input
+            type="number"
+            min={1}
+            style={{ ...S.field, flex: "0 0 52px" }}
+            placeholder="≥ 1"
+            title="minimum count owned"
+            value={condition.count ?? ""}
+            onChange={(e) =>
+              onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })
+            }
+          />
+        </>
+      )}
       <button
         style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
         onClick={onRemove}
@@ -1406,6 +1454,40 @@ function ConditionRow({
         ×
       </button>
     </div>
+  );
+}
+
+// ── ItemPicker ────────────────────────────────────────────────────────────────
+// Dropdown over the world's item registry, preserving a hand-entered id that
+// isn't registered (the "(custom)" idiom shared with the dialogue picker).
+
+function ItemPicker({
+  itemId,
+  worldItems,
+  onChange,
+  style,
+}: {
+  itemId: string;
+  worldItems: ItemDef[];
+  onChange: (id: string) => void;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <select
+      style={style ?? S.select}
+      value={itemId}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">— pick item —</option>
+      {worldItems.map((it) => (
+        <option key={it.id} value={it.id}>
+          {it.label} ({it.id})
+        </option>
+      ))}
+      {itemId && !worldItems.some((it) => it.id === itemId) && (
+        <option value={itemId}>{itemId} (custom)</option>
+      )}
+    </select>
   );
 }
 
@@ -1424,6 +1506,7 @@ function ActionRow({
   groups,
   assets,
   zoneDialogues,
+  worldItems,
   onChange,
   onRemove,
 }: {
@@ -1439,6 +1522,7 @@ function ActionRow({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  worldItems: ItemDef[];
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -1491,6 +1575,7 @@ function ActionRow({
         groups={groups}
         assets={assets}
         zoneDialogues={zoneDialogues}
+        worldItems={worldItems}
         onChange={onChange}
       />
     </div>
@@ -1510,6 +1595,7 @@ function ActionFields({
   groups,
   assets,
   zoneDialogues,
+  worldItems,
   onChange,
 }: {
   action: ScriptAction;
@@ -1524,6 +1610,7 @@ function ActionFields({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  worldItems: ItemDef[];
   onChange: (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void {
@@ -1604,6 +1691,33 @@ function ActionFields({
           </select>
           <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
             Manage dialogues in the DIALOGUE tab.
+          </div>
+        </>
+      );
+
+    case "give_item":
+    case "take_item":
+      return (
+        <>
+          <div style={{ display: "flex", gap: 4 }}>
+            <ItemPicker
+              style={{ ...S.select, flex: 1 }}
+              itemId={action.itemId ?? ""}
+              worldItems={worldItems}
+              onChange={(id) => set({ itemId: id || undefined })}
+            />
+            <input
+              type="number"
+              min={1}
+              style={{ ...S.field, flex: "0 0 52px" }}
+              placeholder="1"
+              title="count"
+              value={action.count ?? ""}
+              onChange={(e) => set({ count: parseInt(e.target.value, 10) || undefined })}
+            />
+          </div>
+          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+            Manage items in the ITEMS tab.
           </div>
         </>
       );
@@ -2118,6 +2232,7 @@ function DialogueList({
 
 function DialogueEditor({
   dialogue,
+  worldItems,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2134,6 +2249,7 @@ function DialogueEditor({
   onDelete,
 }: {
   dialogue: DialogueTreeDef;
+  worldItems: ItemDef[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
   zoneShapes: ShapeDef[];
@@ -2264,6 +2380,7 @@ function DialogueEditor({
               key={node.id}
               node={node}
               dialogue={dialogue}
+              worldItems={worldItems}
               isStart={node.id === dialogue.startNode}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
@@ -2311,6 +2428,7 @@ function DialogueEditor({
 function DialogueNodeCard({
   node,
   dialogue,
+  worldItems,
   isStart,
   zoneObjects,
   zonePlatforms,
@@ -2328,6 +2446,7 @@ function DialogueNodeCard({
 }: {
   node: DialogueNode;
   dialogue: DialogueTreeDef;
+  worldItems: ItemDef[];
   isStart: boolean;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -2438,6 +2557,7 @@ function DialogueNodeCard({
           key={opt.id}
           option={opt}
           dialogue={dialogue}
+          worldItems={worldItems}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
           zoneShapes={zoneShapes}
@@ -2466,6 +2586,7 @@ function DialogueNodeCard({
 function DialogueOptionRow({
   option,
   dialogue,
+  worldItems,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2482,6 +2603,7 @@ function DialogueOptionRow({
 }: {
   option: DialogueOption;
   dialogue: DialogueTreeDef;
+  worldItems: ItemDef[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
   zoneShapes: ShapeDef[];
@@ -2565,6 +2687,7 @@ function DialogueOptionRow({
         <ConditionRow
           key={i}
           condition={c}
+          worldItems={worldItems}
           onChange={(nc) =>
             set({ conditions: conditions.map((x, j) => (j === i ? nc : x)) })
           }
@@ -2607,6 +2730,7 @@ function DialogueOptionRow({
           groups={groups}
           assets={assets}
           zoneDialogues={zoneDialogues}
+          worldItems={worldItems}
           onChange={(na) =>
             set({ actions: actions.map((x, j) => (j === i ? na : x)) })
           }
@@ -2621,6 +2745,149 @@ function DialogueOptionRow({
           (no effects)
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ItemsEditor (ITEMS tab) ───────────────────────────────────────────────────
+// Edits the world-level item registry (WorldConfig.items). Counts live at
+// gameplay-state key `inv.<id>`; the registry is identity only (label/icon/
+// description/stackSize), so deleting an item never touches player state.
+
+function ItemsEditor({
+  items,
+  onChange,
+}: {
+  items: ItemDef[];
+  onChange: (items: ItemDef[]) => void;
+}) {
+  function replace(id: string, next: ItemDef): void {
+    onChange(items.map((it) => (it.id === id ? next : it)));
+  }
+  function remove(id: string): void {
+    if (confirm("Delete this item? Scripts referencing it keep the raw id.")) {
+      onChange(items.filter((it) => it.id !== id));
+    }
+  }
+  function add(): void {
+    onChange([...items, blankItem()]);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          padding: "6px 10px",
+          flexShrink: 0,
+        }}
+      >
+        <button style={S.btn(true)} onClick={add}>
+          + New
+        </button>
+      </div>
+      <div style={S.scroll}>
+        {items.length === 0 && (
+          <div
+            style={{
+              color: "#555",
+              fontSize: 11,
+              padding: "16px 12px",
+              textAlign: "center",
+            }}
+          >
+            No items yet
+          </div>
+        )}
+        {items.map((it) => (
+          <ItemRow
+            key={it.id}
+            item={it}
+            onReplace={(next) => replace(it.id, next)}
+            onRemove={() => remove(it.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ItemRow({
+  item,
+  onReplace,
+  onRemove,
+}: {
+  item: ItemDef;
+  onReplace: (next: ItemDef) => void;
+  onRemove: () => void;
+}) {
+  function set<K extends keyof ItemDef>(key: K, val: ItemDef[K]): void {
+    onReplace({ ...item, [key]: val });
+  }
+
+  return (
+    <div
+      style={{
+        background: "rgba(255,255,255,0.03)",
+        borderRadius: 4,
+        padding: "6px 8px",
+        margin: "0 10px 6px",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+          marginBottom: 4,
+        }}
+      >
+        {item.icon ? (
+          <img src={item.icon} alt="" style={{ width: 24, height: 24, objectFit: "cover", borderRadius: 3, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: 24, height: 24, borderRadius: 3, flexShrink: 0, background: "rgba(255,255,255,0.08)" }} />
+        )}
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Label"
+          value={item.label}
+          onChange={(e) => set("label", e.target.value)}
+        />
+        <button
+          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Icon URL (optional)"
+          value={item.icon ?? ""}
+          onChange={(e) => set("icon", e.target.value || undefined)}
+        />
+        <input
+          type="number"
+          min={1}
+          style={{ ...S.field, flex: "0 0 72px" }}
+          placeholder="max ∞"
+          title="stack size (max count; blank = unlimited)"
+          value={item.stackSize ?? ""}
+          onChange={(e) => set("stackSize", parseInt(e.target.value, 10) || undefined)}
+        />
+      </div>
+      <input
+        style={{ ...S.field, marginBottom: 4 }}
+        placeholder="Description (shown in the bag)"
+        value={item.description ?? ""}
+        onChange={(e) => set("description", e.target.value || undefined)}
+      />
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>
+        {item.id} · state key inv.{item.id}
+      </div>
     </div>
   );
 }

@@ -13,12 +13,13 @@ export interface BindingsConfig {
     interact: string[];
     confirm:  string[];        // dialogue advance / menu activate (menu mode only)
     cancel:   string[];        // pause-menu toggle (Esc keeps its direct-exit path in App.tsx)
+    bag:      string[];        // inventory-bag toggle (Phase 32)
     menuNav:  { up: string[]; down: string[] };  // dialogue-option / menu highlight (menu mode only)
     lookSensitivity: number;   // rad per px of mouse movement
   };
   gamepad: {
     // standard-mapping button indices
-    buttons: Record<"jump" | "interact" | "confirm" | "cancel", number[]>;
+    buttons: Record<"jump" | "interact" | "confirm" | "cancel" | "bag", number[]>;
     lookRate: number;          // rad/s at full stick deflection
     deadzone: number;          // radial, 0..1
     invertLookY: boolean;
@@ -44,6 +45,7 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
     // Enter is BOTH confirm and cancel: in menu mode confirm wins (the manager
     // drops the simultaneous cancel), outside it cancel opens the pause menu.
     cancel:   ["Enter"],
+    bag:      ["KeyI", "Tab"],
     // Movement keys double as menu nav — harmless, since movement is zeroed
     // in menu mode and menuNav is ignored outside it.
     menuNav:  { up: ["ArrowUp", "KeyW"], down: ["ArrowDown", "KeyS"] },
@@ -55,6 +57,7 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
       interact: [4],           // LB
       confirm:  [0],           // A — face-button confirm for dialogue
       cancel:   [9],           // Start — exit preview / close dialogue
+      bag:      [3],           // Y — inventory-bag toggle
     },
     lookRate: 2.5,
     deadzone: 0.15,

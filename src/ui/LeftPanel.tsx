@@ -1,4 +1,4 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -52,6 +52,8 @@ interface LeftPanelProps {
   onObjectScriptsChange:(objectId: string, scripts: ScriptDef[]) => void;
   stateSchema:          Record<string, StateSchema>;
   onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
+  worldItems:           ItemDef[];
+  onWorldItemsChange:   (items: ItemDef[]) => void;
   // decals panel
   decalTextures:   DecalTexDef[];
   selectedDecalId: string | null;
@@ -68,6 +70,7 @@ export function LeftPanel({
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange,
+  worldItems, onWorldItemsChange,
   decalTextures, selectedDecalId, onDecalSelect,
 }: LeftPanelProps) {
   const open = panelId !== null;
@@ -176,6 +179,8 @@ export function LeftPanel({
                 onObjectScriptsChange={onObjectScriptsChange}
                 stateSchema={stateSchema}
                 onStateSchemaChange={onStateSchemaChange}
+                worldItems={worldItems}
+                onWorldItemsChange={onWorldItemsChange}
               />
             )}
           </div>

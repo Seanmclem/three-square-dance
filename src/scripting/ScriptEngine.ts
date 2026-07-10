@@ -6,6 +6,7 @@ import type {
 } from "@/types";
 import { gameState } from "./GameState";
 import { DialogueRunner } from "./DialogueRunner";
+import { invKey } from "./inventory";
 
 function isVec3(v: unknown): v is Vec3 {
   return !!v && typeof v === "object"
@@ -189,6 +190,11 @@ export class ScriptEngine {
           if (!compareNum(v, c.compareOp ?? "==", target)) return false;
           break;
         }
+        case "has_item": {
+          const owned = Number(gameState.get(invKey(c.itemId ?? "")) ?? 0);
+          if (owned < (c.count ?? 1)) return false;
+          break;
+        }
         case "npc_alive":
         case "npc_dead":
           // stub — NPC system Phase 13
@@ -325,6 +331,23 @@ export class ScriptEngine {
                  : action.type === "stop_mover"  ? "stop" : "toggle";
         for (const id of this._resolveTargets(action.targetId))
           this._bus.emit("mover:set", { targetId: id, op });
+        break;
+      }
+
+      // Phase 32 — items: counts live at gameState `inv.<itemId>`. Clamp inline
+      // (registry stackSize / floor 0) — gameState only clamps registered keys.
+      case "give_item":
+      case "take_item": {
+        if (!action.itemId) break;
+        const key   = invKey(action.itemId);
+        const item  = this._state.world?.items?.find(i => i.id === action.itemId);
+        if (!item) console.warn(`[ScriptEngine] ${action.type}: item '${action.itemId}' not in registry (operating on raw key)`);
+        const cur   = Number(gameState.get(key) ?? 0);
+        const count = action.count ?? 1;
+        const next  = action.type === "give_item"
+          ? Math.min(cur + count, item?.stackSize ?? Infinity)
+          : Math.max(cur - count, 0);
+        gameState.set(key, next);
         break;
       }
 

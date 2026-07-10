@@ -8,9 +8,9 @@ type Scheme = "kbm" | "gamepad" | "touch";
 // menu/exit hint — the overlay's ⚙ button is the affordance.
 const INTERACT_PREFIX: Record<Scheme, string> = { kbm: "[E]", gamepad: "[LB]", touch: "Tap ·" };
 const EXIT_HINT:       Record<Scheme, string | null> = {
-  kbm: "Enter · menu   Esc · exit",
-  gamepad: "Start · menu",
-  touch: null,
+  kbm: "I · bag   Enter · menu   Esc · exit",
+  gamepad: "Y · bag   Start · menu",
+  touch: null,   // the overlay's 🎒/⚙ buttons are the affordance
 };
 
 // mode is optional so the runtime shell (which also renders this HUD) needs no edit.

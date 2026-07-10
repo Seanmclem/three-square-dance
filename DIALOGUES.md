@@ -82,14 +82,17 @@ Under a node's **OPTIONS**, click **+ Add**:
 dropdown. Deleting a node is the **×** on its card — the start node can't be
 deleted (pick a different start node first).
 
-> **"Give / receive items":** there is no separate inventory system — items
-> are just state counters, by design. "Give the player a key" =
-> `set_state has_key = true`. "Charge 5 coins" = `adjust_number coins -5`.
-> "Only show this option if they can afford it" =
-> `compare_number coins >= 5`. These keys live in the same gameplay state as
-> everything else (see `GAMEPLAY_STATE.md`), persist across scene loads, and
-> are captured by save games automatically. Register keys you rely on in the
-> **STATE** tab to give them defaults and min/max clamps.
+> **"Give / receive items" (Phase 32):** define items in the **ITEMS** tab
+> (label, icon, description, stack size), then use the typed pieces with their
+> item-picker dropdowns: On pick → **`give_item`** ("hand over a key") or
+> **`take_item`** ("charge 5 coins"), Show if → **`has_item`** ("only if they
+> can afford it", count ≥ N). What the player holds shows up in the in-game
+> **bag** (I / Tab, gamepad Y, touch 🎒). Under the hood an item's count is
+> still just the gameplay-state key `inv.<itemId>` — the same store as
+> everything else (see `GAMEPLAY_STATE.md`), so it persists across scene loads
+> and save games automatically, and the raw `set_state`/`adjust_number`/
+> `compare_number` route still works for plain flags and counters. For a
+> starting inventory, register `inv.<itemId>` with a default in the STATE tab.
 
 ---
 

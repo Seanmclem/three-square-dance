@@ -15,6 +15,7 @@ export class TouchSource implements InputSource {
     jumpHeld: false,
     interactQueued: false,     // tap on the look region
     cancelQueued: false,       // ✕ button
+    bagQueued: false,          // 🎒 button (Phase 32)
     activity: false,           // any pointerdown on the overlay (scheme-switch signal)
   };
 
@@ -37,7 +38,7 @@ export class TouchSource implements InputSource {
     s.move.x = s.move.y = 0;
     s.lookPx.x = s.lookPx.y = 0;
     s.jumpHeld = false;
-    s.interactQueued = s.cancelQueued = s.activity = false;
+    s.interactQueued = s.cancelQueued = s.bagQueued = s.activity = false;
   }
 
   hadActivity(): boolean {
@@ -63,6 +64,10 @@ export class TouchSource implements InputSource {
     if (s.cancelQueued) {
       state.cancelPressed = true;
       s.cancelQueued = false;
+    }
+    if (s.bagQueued) {
+      state.bagPressed = true;
+      s.bagQueued = false;
     }
   }
 }

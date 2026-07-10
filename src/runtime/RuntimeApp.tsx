@@ -13,6 +13,7 @@ import { gameState } from "@/scripting/GameState";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { DialogueOverlay, type DialogueOverlayProps } from "@/ui/DialogueOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
+import { BagOverlay } from "@/ui/BagOverlay";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { FpsCounter } from "@/ui/FpsCounter";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
@@ -40,6 +41,8 @@ export default function RuntimeApp() {
   const sceneRef   = useRef<SceneManager | null>(null);
   const dialogueOpenRef = useRef(false);
   const pauseOpenRef    = useRef(false);
+  const bagOpenRef      = useRef(false);
+  const worldRef        = useRef<WorldState | null>(null);
   const manifestRef     = useRef<LoadedManifest | null>(null);
   const doSaveRef       = useRef<(() => void) | null>(null);
 
@@ -50,6 +53,7 @@ export default function RuntimeApp() {
   const [dialogueState, setDialogueState] = useState<DialogueOverlayProps["dialogue"]>(null);
   const [fadeState, setFadeState]   = useState<FadeRequest | null>(null);
   const [pauseOpen, setPauseOpen]   = useState(false);
+  const [bagOpen, setBagOpen]       = useState(false);
   const [zoneName, setZoneName]     = useState<string | undefined>(undefined);
   const [hasSave, setHasSave]       = useState(false);
 
@@ -68,6 +72,7 @@ export default function RuntimeApp() {
     assetManager.init(scene.renderer);
 
     const world        = new WorldState(bus);
+    worldRef.current   = world;
     const objectPlacer = new ObjectPlacer(bus);
     const movers       = new MoverSystem(bus);
     const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
@@ -126,6 +131,8 @@ export default function RuntimeApp() {
       bus.on("preview:stop", () => {
         pauseOpenRef.current = false;
         setPauseOpen(false);
+        bagOpenRef.current = false;
+        setBagOpen(false);
         dialogueOpenRef.current = false;
         setDialogueState(null);
         if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
@@ -145,6 +152,10 @@ export default function RuntimeApp() {
           dialogueOpenRef.current = false;
           setDialogueState(null);
           bus.emit("dialogue:closed", {});
+        } else if (bagOpenRef.current) {
+          bagOpenRef.current = false;
+          setBagOpen(false);
+          bus.emit("bag:closed", {});
         } else if (pauseOpenRef.current) {
           pauseOpenRef.current = false;
           setPauseOpen(false);
@@ -156,6 +167,15 @@ export default function RuntimeApp() {
         }
       }),
       bus.on("dialogue:show", payload => { dialogueOpenRef.current = true; setDialogueState(payload); }),
+      // Bag toggle (I/Tab, gamepad Y, touch 🎒) — ignored behind dialogue/pause.
+      bus.on("bag:toggle", () => {
+        if (dialogueOpenRef.current || pauseOpenRef.current) return;
+        if (!previewRef.current?.isActive) return;
+        const open = !bagOpenRef.current;
+        bagOpenRef.current = open;
+        setBagOpen(open);
+        bus.emit(open ? "bag:show" : "bag:closed", {});
+      }),
       bus.on("overlay:fade-in", payload => setFadeState(payload)),
     ];
 
@@ -318,6 +338,18 @@ export default function RuntimeApp() {
             busRef.current.emit("pause:closed", {});
             doSaveRef.current?.();      // fresh pose while still active
             previewRef.current?.exit(); // preview:stop handler routes to menu
+          }}
+        />
+      )}
+
+      {shell === "playing" && bagOpen && worldRef.current && (
+        <BagOverlay
+          bus={busRef.current}
+          world={worldRef.current}
+          onClose={() => {
+            bagOpenRef.current = false;
+            setBagOpen(false);
+            busRef.current.emit("bag:closed", {});
           }}
         />
       )}

@@ -300,6 +300,28 @@ the device (not in the world) and apply the next time you press Play.
 
 ---
 
+## Workflow: items & the inventory bag (Phase 32)
+
+1. Open **SCRIPTS** → **ITEMS** tab → **+ New**. Set a Label ("Gold Coin"), an
+   optional Icon URL and Description, and a Stack size (blank = unlimited).
+   The row's footer shows its id and state key (`inv.<id>`).
+2. **Make a pickup:** place an object, mark it **Interactable**, and on its
+   SELECTED tab add an `on_interact` script (check **One-shot**) with actions
+   `give_item` (pick the item, count) and `despawn_object` (target itself).
+3. **▶ Preview**, press **E** on the object — it vanishes and you have the item.
+4. Open the **bag**: **I** or **Tab** (gamepad **Y**, touch **🎒**). Expect the
+   item row with icon, name and ×count; arrows/W-S (or d-pad / stick flick)
+   move the highlight and show the highlighted item's description; the same
+   key, **E/Enter**, or Esc-less cancel closes it. Movement is frozen while
+   it's open, and the bag won't open while a dialogue or the pause menu is up.
+5. **Spend/gate:** in any script or dialogue option use `take_item` ("charge
+   5 coins") and the `has_item` condition ("Show if" they can afford it) —
+   both have item-picker dropdowns.
+6. Starting inventory: STATE tab → register `inv.<itemId>` with a numeric
+   default; New Game seeds it.
+
+---
+
 ## Workflow: play a world in the standalone runtime (Phase 25)
 
 The runtime shell plays worlds **without the editor** — it's a second page on

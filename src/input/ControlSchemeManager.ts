@@ -33,12 +33,13 @@ export class ControlSchemeManager {
   private readonly _sources: InputSource[];
   private _scheme: ControlScheme = "kbm";
   private _suppress = false;      // zone-transition fades freeze the player (InputManager idiom)
-  // Menu mode = dialogue OR pause menu open: movement/look/jump zeroed, confirm/cancel/menuNav live
+  // Menu mode = dialogue, pause menu, or bag open: movement/look/jump zeroed, confirm/cancel/menuNav live
   private _dialogueOpen = false;
   private _pauseOpen    = false;
+  private _bagOpen      = false;
   private _unsub: Array<() => void> = [];
 
-  private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen; }
+  private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen || this._bagOpen; }
 
   constructor(
     _dom: HTMLCanvasElement,      // canvas — reserved for future pointer-lock re-entry wiring
@@ -61,6 +62,8 @@ export class ControlSchemeManager {
       this._bus.on("dialogue:closed",  () => { this._dialogueOpen = false; }),
       this._bus.on("pause:show",       () => { this._pauseOpen = true; }),
       this._bus.on("pause:closed",     () => { this._pauseOpen = false; }),
+      this._bus.on("bag:show",         () => { this._bagOpen = true; }),
+      this._bus.on("bag:closed",       () => { this._bagOpen = false; }),
     );
     this._setScheme(this._guessScheme());
   }
@@ -126,11 +129,16 @@ export class ControlSchemeManager {
       if (this.state.menuNav !== 0) this._bus.emit("menu:nav", { dir: this.state.menuNav });
       const cancel = this.state.cancelPressed;
       const nav    = this.state.menuNav;
+      const bag    = this.state.bagPressed;   // the bag key must still close the bag
       zeroActionState(this.state);
       this.state.cancelPressed = cancel;
       this.state.menuNav = nav;
+      this.state.bagPressed = bag;
     }
     if (this.state.cancelPressed) this._bus.emit("action:cancel", {});
+    // Always emitted (open needs gameplay mode, close needs menu mode) — the
+    // shells decide whether to act (ignored during dialogue/pause/occlusion).
+    if (this.state.bagPressed) this._bus.emit("bag:toggle", {});
   }
 
   dispose(): void {

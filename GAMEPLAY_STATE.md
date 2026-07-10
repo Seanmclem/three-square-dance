@@ -186,14 +186,24 @@ The old `set_flag`/`clear_flag`/`give_item` + `flag_set`/`flag_not_set`/
 
 - `has_state` — `stateKey` present and truthy (not `undefined`/`null`/`false`).
 - `compare_number` — `Number(get(stateKey)) <op> Number(stateValue)`, `<op>` one of `>= <= > < == !=`.
+- `has_item` — owned count of `itemId` ≥ `count` (default 1). Sugar over the `inv.*` convention below (Phase 32).
 
 **Actions:**
 
 - `set_state` — `set(stateKey, stateValue)`
 - `adjust_number` — `adjust(stateKey, numberDelta)`
 - `delete_state` — `delete(stateKey)`
+- `give_item` / `take_item` — add/remove `count` of `itemId` at key `inv.<itemId>`; give clamps to the item's `stackSize`, take floors at 0 (Phase 32)
 - `store_position` — stores a `{x,y,z,facing}` pose into `stateKey` (see §5a)
 - `teleport_player` — moves the player to a position, optionally sets facing (see §5a)
+
+**Reserved key prefixes:** `__` = engine-internal (e.g. `__runtime_pose`);
+**`inv.`** = item counts (Phase 32) — the count for registry item `<id>`
+(`WorldConfig.items`) lives at `inv.<id>`. They're ordinary store keys (saved,
+`on_state_changed`-visible, STATE-tab-registrable for starting inventory /
+clamps); the item layer only adds identity (label/icon/stackSize) and the bag
+UI on top. Clamping for give/take is done inline in ScriptEngine from the
+registry's `stackSize`, not via the schema.
 
 `fire_event` fires `on_state_changed` (a manual signal). `run_script`'s sandbox
 ctx exposes `{ get, set, has, adjust }` over the store.
