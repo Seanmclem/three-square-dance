@@ -741,9 +741,9 @@ export class StairBuilder {
       }
     }
 
-    // ── Climb-ramp wireframes (TEMP, v4.23.18) ───────────────────────────────
-    // Editor-only visualization of the invisible climb-ramp colliders so their
-    // placement can be eyeballed; to be hidden once confirmed. Cyan.
+    // ── Climb-ramp wireframes ────────────────────────────────────────────────
+    // Editor-only visualization of the invisible climb-ramp colliders (cyan).
+    // Never renders in preview/play (`editorOnly`).
     for (const rmp of computeStairRamps(layout)) {
       const seg = new THREE.Vector3(rmp.b.x - rmp.a.x, rmp.b.y - rmp.a.y, rmp.b.z - rmp.a.z);
       const len = seg.length();
