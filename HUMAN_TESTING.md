@@ -324,10 +324,11 @@ the device (not in the world) and apply the next time you press Play.
 
 ## Workflow: author a multi-scene project (Phase 33)
 
-1. TopBar → **PROJ ▾ → New Project…** — name it, then in the folder picker
-   choose **`<repo>/public/games`** (that's what makes ▶ Play work instantly).
-   Your current world becomes scene 1; the TopBar now shows the project name,
-   a scene dropdown (★ = entry scene), **+**, **▶**, and **⋯**.
+1. TopBar → **PROJ ▾ → New Project…** — the folder picker opens **first**
+   (choose **`<repo>/public/games`**; that's what makes ▶ Play work
+   instantly), then name the project. Your current world becomes scene 1; the
+   TopBar now shows the project name, a scene dropdown (★ = entry scene),
+   **+**, **▶**, and **⋯**.
 2. **+** adds a scene (fresh world) and switches to it. Switching scenes via
    the dropdown **auto-saves the one you're leaving** — no prompt. Save
    (Ctrl+S) writes the current scene + `game.json` + `manifest.json` into the

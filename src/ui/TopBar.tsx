@@ -162,8 +162,14 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
             </button>
           )}
           <Popover open={projMenuOpen} onClose={() => setProjMenuOpen(false)}>
-            <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectNew?.(); }}>New Project…</button>
-            <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectOpen?.(); }}>Open Project…</button>
+            <button
+              style={popBtn}
+              title="First pick where projects live — choose <repo>/public/games for instant ▶ Play — then name it"
+              onClick={() => { setProjMenuOpen(false); onProjectNew?.(); }}
+            >
+              New Project…
+            </button>
+            <button style={popBtn} title="Pick a project folder (contains manifest.json)" onClick={() => { setProjMenuOpen(false); onProjectOpen?.(); }}>Open Project…</button>
           </Popover>
         </div>
       )}

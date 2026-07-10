@@ -983,10 +983,12 @@ export default function App() {
   };
 
   const handleProjectNew = useCallback(async (): Promise<void> => {
-    const name = window.prompt("Project name?\n\nNext, pick the folder projects live in — choose <repo>/public/games for instant ▶ Play in the runtime.");
-    if (!name?.trim()) return;
     try {
+      // Picker FIRST: window.prompt() consumes the click's transient user
+      // activation, after which Chrome rejects showDirectoryPicker.
       const parent = await window.showDirectoryPicker({ mode: "readwrite" });
+      const name = window.prompt(`Project name?\n\n(A folder for it will be created inside "${parent.name}".)`);
+      if (!name?.trim()) return;
       await closeProject();
       const store = await ProjectStore.create(parent, name.trim());
       // Adopt the current world as scene 1
@@ -996,7 +998,10 @@ export default function App() {
       adoptProject(store, sceneId);
       setIsDirty(false);
     } catch (e: unknown) {
-      if ((e as DOMException).name !== 'AbortError') console.error('New project failed:', e);
+      if ((e as DOMException).name !== 'AbortError') {
+        console.error('New project failed:', e);
+        window.alert(`New project failed: ${(e as Error).message}`);
+      }
     }
   }, [closeProject, adoptProject]);
 
@@ -1110,8 +1115,9 @@ export default function App() {
     const proj = projectRef.current;
     if (!proj) return;
     try {
-      await handleSave();
+      // Picker FIRST (fresh user activation), save after — same gesture rule as New Project.
       const target = await window.showDirectoryPicker({ mode: "readwrite" });
+      await handleSave();
       // Refuse to silently clobber a DIFFERENT game's published copy
       try {
         const existing = await target.getFileHandle("manifest.json");
