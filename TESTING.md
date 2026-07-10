@@ -436,6 +436,13 @@ user is working elsewhere, `document.hidden` stays true, rAF never fires, and re
 yanking Chrome to the front is rude. Instead, drive frames synchronously from
 `javascript_tool` (works regardless of visibility, and is deterministic — fixed dt):
 
+> ⚠️ **The un-versioned import below returned a DEAD duplicate module in an *editor* tab
+> too (2026-07-10, phase 31)** — `physicsWorld.initialized` was false and stepping it did
+> nothing (meshes animated, bodies froze). Don't trust `import('/src/...')` from the console:
+> get the HMR-stamped URL via `performance.getEntriesByType('resource')` (e.g.
+> `.../PhysicsWorld.ts?t=<stamp>`) and import THAT, then sanity-check
+> `physicsWorld.initialized === true` before stepping.
+
 ```js
 const { physicsWorld } = await import('/src/physics/PhysicsWorld.ts'); // Vite serves the
 const c = window.__preview._controller;                                // same module instance
