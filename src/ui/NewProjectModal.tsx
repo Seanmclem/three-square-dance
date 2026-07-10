@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { slugifyId } from "@/project/ProjectStore";
 
 interface NewProjectModalProps {
   onConfirm: (name: string, parentDir: FileSystemDirectoryHandle) => void;
@@ -86,9 +87,11 @@ export function NewProjectModal({ onConfirm, onCancel }: NewProjectModalProps) {
             </span>
           </div>
           <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5, marginTop: 6 }}>
-            The project folder is created inside your pick. Choose
-            <span style={{ color: "#8090a8" }}> &lt;repo&gt;/public/games </span>
-            for instant ▶ Play in the runtime shell (see PUBLISHING_GUIDE.md).
+            {name.trim()
+              ? <>A new folder <span style={{ color: "#8090a8" }}>{slugifyId(name.trim())}/</span> will be created inside the folder you choose{dir ? <> (<span style={{ color: "#8090a8" }}>{dir.name}/{slugifyId(name.trim())}/</span>)</> : null}.</>
+              : <>A new folder named after the project will be created inside the folder you choose.</>}
+            {" "}Pick <span style={{ color: "#8090a8" }}>&lt;repo&gt;/public/games</span> to
+            make ▶ Play work instantly (see PUBLISHING_GUIDE.md).
           </div>
           {error && (
             <div style={{ color: "#cc6666", fontSize: 10, marginTop: 6 }}>{error}</div>
