@@ -5,13 +5,13 @@ import type { WorldState } from "@/world/WorldState";
 import { resolveShapeParams } from "@/builders/ShapeBuilder";
 import type {
   IEditorModule, SelectedObjectPayload, SelectedRef,
-  PlatformDef, StairDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
+  PlatformDef, StairDef, LadderDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
 } from "@/types";
 import { isGameplayMode } from "@/types";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
-type GizmoType = "platform" | "stair" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
+type GizmoType = "platform" | "stair" | "ladder" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -185,7 +185,7 @@ export class GizmoManager implements IEditorModule {
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
         if (this._groupMode) return;  // group is translate-only — ignore T/R/S mode switches
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape")) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "ladder" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape")) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -232,7 +232,7 @@ export class GizmoManager implements IEditorModule {
     this._groupRefs = [];
 
     const type = payload.type as string;
-    if (!["platform", "stair", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal", "shape"].includes(type)) {
+    if (!["platform", "stair", "ladder", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal", "shape"].includes(type)) {
       this._detach(); return;
     }
 
@@ -272,6 +272,15 @@ export class GizmoManager implements IEditorModule {
         px = (stair.start.x + stair.end.x) / 2;
         pz = (stair.start.z + stair.end.z) / 2;
         py = Math.max(stair.start.y, stair.end.y) + 0.3;
+      }
+
+    } else if (type === "ladder") {
+      const ladder = this._getLadder();
+      if (ladder) {
+        px = ladder.position.x;
+        py = ladder.position.y + (ladder.height ?? 3) + 0.3;
+        pz = ladder.position.z;
+        rotY = THREE.MathUtils.degToRad(ladder.rotationY);
       }
 
     } else if (type === "wall") {
@@ -436,6 +445,10 @@ export class GizmoManager implements IEditorModule {
       case "stair": {
         const s = zone.stairs.find(x => x.id === ref.id);
         return s ? new THREE.Vector3((s.start.x + s.end.x) / 2, (s.start.y + s.end.y) / 2, (s.start.z + s.end.z) / 2) : null;
+      }
+      case "ladder": {
+        const l = zone.ladders?.find(x => x.id === ref.id);
+        return l ? new THREE.Vector3(l.position.x, l.position.y, l.position.z) : null;
       }
       case "trigger-volume": {
         const v = zone.triggerVolumes?.find(x => x.id === ref.id);
@@ -606,6 +619,14 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "ladder": {
+        const l = zone.ladders?.find(x => x.id === ref.id);
+        if (!l) break;
+        this._worldState.updateLadder(zoneId, ref.id, {
+          position: { x: l.position.x + delta.x, y: l.position.y + delta.y, z: l.position.z + delta.z },
+        });
+        break;
+      }
       case "object": {
         const o = zone.objects.find(x => x.id === ref.id);
         if (!o) break;
@@ -761,6 +782,13 @@ export class GizmoManager implements IEditorModule {
           (stair.start.z + stair.end.z) / 2,
         );
         this._pivot.rotation.set(0, 0, 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
+    } else if (type === "ladder") {
+      const ladder = this._getLadder();
+      if (ladder) {
+        this._pivot.position.set(ladder.position.x, ladder.position.y + (ladder.height ?? 3) + 0.3, ladder.position.z);
+        this._pivot.rotation.set(0, THREE.MathUtils.degToRad(ladder.rotationY), 0);
         this._pivotStart.copy(this._pivot.position);
       }
     } else if (type === "trigger-volume") {
@@ -937,6 +965,19 @@ export class GizmoManager implements IEditorModule {
         this._worldState.updateStair(this._selZoneId!, this._selId!, {
           start: { x: stair.start.x + delta.x, y: stair.start.y + delta.y, z: stair.start.z + delta.z },
           end:   { x: stair.end.x   + delta.x, y: stair.end.y   + delta.y, z: stair.end.z   + delta.z },
+        });
+        break;
+      }
+      case "ladder": {
+        if (delta.lengthSq() < 1e-6) break;
+        const ladder = this._getLadder();
+        if (!ladder) break;
+        this._worldState.updateLadder(this._selZoneId!, this._selId!, {
+          position: {
+            x: ladder.position.x + delta.x,
+            y: ladder.position.y + delta.y,
+            z: ladder.position.z + delta.z,
+          },
         });
         break;
       }
@@ -1193,6 +1234,14 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "ladder": {
+        if (Math.abs(deltaAngle) < 0.0001) { this._resetLiveRotate(); break; }
+        // Absolute yaw (degrees) — LadderBuilder applies it to mesh + colliders + sensors.
+        this._worldState.updateLadder(this._selZoneId!, this._selId!, {
+          rotationY: THREE.MathUtils.radToDeg(this._pivotYaw()),
+        });
+        break;
+      }
       case "shape": {
         // Full XYZ commit: read the tracked mesh's rotation after detach (like the
         // object case) so X/Z ring drags stick — _pivotYaw() alone would drop them.
@@ -1331,6 +1380,11 @@ export class GizmoManager implements IEditorModule {
   private _getStair(): StairDef | undefined {
     return this._worldState.zones.get(this._selZoneId ?? "")
       ?.stairs.find(s => s.id === this._selId);
+  }
+
+  private _getLadder(): LadderDef | undefined {
+    return this._worldState.zones.get(this._selZoneId ?? "")
+      ?.ladders?.find(l => l.id === this._selId);
   }
 
   private _getFloor(): FloorDef | undefined {

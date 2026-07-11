@@ -1292,6 +1292,7 @@ export default function App() {
           case "floor":          world.removeFloor(ref.zoneId, ref.id); break;
           case "platform":       world.removePlatform(ref.zoneId, ref.id); break;
           case "stair":          world.removeStair(ref.zoneId, ref.id); break;
+          case "ladder":         world.removeLadder(ref.zoneId, ref.id); break;
           case "object":         world.removeObject(ref.zoneId, ref.id); break;
           case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
           case "decal":          world.removeDecal(ref.zoneId, ref.id); break;

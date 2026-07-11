@@ -13,6 +13,7 @@ const COLLECTIONS: { type: EditorObjectType; key: keyof ZoneDef }[] = [
   { type: "wall",           key: "walls" },
   { type: "platform",       key: "platforms" },
   { type: "stair",          key: "stairs" },
+  { type: "ladder",         key: "ladders" },
   { type: "object",         key: "objects" },
   { type: "trigger-volume", key: "triggerVolumes" },
   { type: "shape",          key: "shapes" },
@@ -59,6 +60,7 @@ export function writeGroupIds(world: WorldState, ref: SelectedRef, groupIds: str
     case "wall":           world.updateWall(ref.zoneId, ref.id, { groupIds }); break;
     case "platform":       world.updatePlatform(ref.zoneId, ref.id, { groupIds }); break;
     case "stair":          world.updateStair(ref.zoneId, ref.id, { groupIds }); break;
+    case "ladder":         world.updateLadder(ref.zoneId, ref.id, { groupIds }); break;
     case "object":         world.updateObject(ref.zoneId, ref.id, { groupIds }); break;
     case "trigger-volume": world.updateTriggerVolume(ref.zoneId, ref.id, { groupIds }); break;
     case "shape":          world.updateShape(ref.zoneId, ref.id, { groupIds }); break;

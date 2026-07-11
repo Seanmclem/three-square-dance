@@ -1,11 +1,11 @@
 import type { WorldState } from "@/world/WorldState";
 import type {
   SelectedObjectPayload, SelectedRef, EditorObjectType,
-  WallDef, FloorDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
+  WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
 } from "@/types";
 
 /** Selection types that can be copied. (Openings/spawn/terrain are excluded.) */
-const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "object", "trigger-volume", "shape"]);
+const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "ladder", "object", "trigger-volume", "shape"]);
 
 /** One copied entity, tagged with its type so paste can route per-entity. */
 export interface ClipEntity {
@@ -35,6 +35,7 @@ function newId(type: EditorObjectType): string {
     case "wall":           return `wall_${uuid8()}`;
     case "platform":       return `plat_${uuid8()}`;
     case "stair":          return `stair_${uuid8()}`;
+    case "ladder":         return `ladder_${uuid8()}`;
     case "object":         return `obj_${uuid8()}`;
     case "trigger-volume": return `vol_${uuid8()}`;
     case "shape":          return `shape_${uuid8()}`;
@@ -78,6 +79,7 @@ function defsForRef(world: WorldState, ref: SelectedRef): ClipEntity[] {
     case "floor":          { const f = zone.floors.find(x => x.id === ref.id);    return f ? [{ type: ref.type, def: structuredClone(f) }] : []; }
     case "platform":       { const p = zone.platforms.find(x => x.id === ref.id); return p ? [{ type: ref.type, def: structuredClone(p) }] : []; }
     case "stair":          { const s = zone.stairs.find(x => x.id === ref.id);    return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
+    case "ladder":         { const l = zone.ladders?.find(x => x.id === ref.id);  return l ? [{ type: ref.type, def: structuredClone(l) }] : []; }
     case "object":         { const o = zone.objects.find(x => x.id === ref.id);   return o ? [{ type: ref.type, def: structuredClone(o) }] : []; }
     case "trigger-volume": { const v = zone.triggerVolumes?.find(x => x.id === ref.id); return v ? [{ type: ref.type, def: structuredClone(v) }] : []; }
     case "shape":          { const s = zone.shapes?.find(x => x.id === ref.id);         return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
@@ -179,6 +181,11 @@ export function pasteClipboard(
         case "stair": {
           const s = ent.def as StairDef;
           world.addStair(zoneId, { ...s, id, start: off3(s.start, dx, dz), end: off3(s.end, dx, dz) });
+          break;
+        }
+        case "ladder": {
+          const l = ent.def as LadderDef;
+          world.addLadder(zoneId, { ...l, id, position: off3(l.position, dx, dz) });
           break;
         }
         case "object": {
