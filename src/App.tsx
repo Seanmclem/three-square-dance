@@ -817,6 +817,15 @@ export default function App() {
     busRef.current.emit('quality:changed', { quality: q });
   };
 
+  /** Stamp the current editor viewpoint into metadata so explicit saves carry it.
+   *  Deliberately NOT called from the periodic autosave — a camera-only change must
+   *  not defeat the v4.14.1 "unchanged tab never writes" gate. */
+  const stampCameraPose = useCallback((): void => {
+    const cam  = sceneRef.current?.editorCamera;
+    const meta = worldRef.current?.metadata;
+    if (cam && meta) meta.editorCamera = cam.getPose();
+  }, []);
+
   const handleLoadFromJSON = useCallback(async (json: unknown): Promise<void> => {
     const world = worldRef.current;
     const zones = zonesRef.current;
@@ -836,6 +845,9 @@ export default function App() {
       setIsDirty(false);
       const activeId = world.activeZoneId;
       if (activeId) await zones.loadZone(activeId);
+      // Restore the scene's saved editor viewpoint (stamped on save; absent on old files)
+      const pose = file.metadata?.editorCamera;
+      if (pose) sceneRef.current?.editorCamera?.setPose(pose);
     } catch (e) {
       console.error('Failed to load scene:', e);
     }
@@ -847,6 +859,7 @@ export default function App() {
     const proj = projectRef.current;
     if (!proj) return;
     if (!opts?.skipSave) {
+      stampCameraPose();
       try { await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON()); } catch (e) { console.warn('Scene save on project close failed:', e); }
     }
     projectRef.current = null;
@@ -880,6 +893,7 @@ export default function App() {
   const handleSave = useCallback(async (): Promise<void> => {
     const world = worldRef.current;
     if (!world) return;
+    stampCameraPose();
     const json = JSON.stringify(world.toJSON(), null, 2);
     const name = world.toJSON().metadata?.name ?? 'world';
 
@@ -1000,6 +1014,7 @@ export default function App() {
         await handleLoadFromJSON(fresh);
       } else {
         // Adopt the current world as scene 1 (single-scene → project migration)
+        stampCameraPose();
         await store.addScene(sceneId, worldRef.current!.toJSON());
       }
       adoptProject(store, sceneId);
@@ -1047,6 +1062,7 @@ export default function App() {
     const proj = projectRef.current;
     if (!proj || target === proj.sceneId) return;
     try {
+      stampCameraPose();
       await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());  // write-through, no prompt
       const file = await proj.store.loadScene(target);
       await handleLoadFromJSON(file);
@@ -1068,6 +1084,7 @@ export default function App() {
     const name = window.prompt("New scene name?");
     if (!name?.trim()) return;
     try {
+      stampCameraPose();
       await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());
       const id = uniqueSceneId(slugifyId(name.trim()), proj.store.sceneIds);
       await proj.store.addScene(id, makeFreshScene(name.trim()));

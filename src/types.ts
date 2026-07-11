@@ -112,6 +112,15 @@ export type TransitionEffect = "fade" | "none";
 export interface Vec2 { x: number; z: number }
 export interface Vec3 { x: number; y: number; z: number }
 
+/** Editor orbit-camera pose, persisted per scene in SceneMetadata (Phase 33.x).
+ *  Editor-only convenience data — the runtime ignores it. */
+export interface EditorCameraPose {
+  focus:  Vec3;
+  radius: number;
+  phi:    number;
+  theta:  number;
+}
+
 export interface WallNode {
   id: string;
   x:  number;
@@ -374,6 +383,7 @@ export interface SceneMetadata {
   created:      string;
   lastModified: string;
   uvVersion?:   number;   // 1 = world-space ÷ UV convention (Phase 10.8); absent = legacy
+  editorCamera?: EditorCameraPose;  // last editor viewpoint — stamped on save, restored on load
 }
 
 export interface SpawnDef {

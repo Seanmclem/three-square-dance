@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
+import type { EditorCameraPose } from "@/types";
 
 interface MousePos { x: number; y: number }
 
@@ -64,6 +65,25 @@ export class EditorCamera {
       this.targetSpherical.radius = Math.min(this.targetSpherical.radius, 30);
     });
 
+    this._applyCamera();
+  }
+
+  /** Serializable orbit pose — persisted per scene in SceneMetadata (stamped on save). */
+  getPose(): EditorCameraPose {
+    return {
+      focus:  { x: this.targetFocus.x, y: this.targetFocus.y, z: this.targetFocus.z },
+      radius: this.targetSpherical.radius,
+      phi:    this.targetSpherical.phi,
+      theta:  this.targetSpherical.theta,
+    };
+  }
+
+  /** Restore a saved pose — sets current AND target so the view snaps, not lerps. */
+  setPose(pose: EditorCameraPose): void {
+    this.focus.set(pose.focus.x, pose.focus.y, pose.focus.z);
+    this.targetFocus.copy(this.focus);
+    this.spherical.set(pose.radius, pose.phi, pose.theta);
+    this.targetSpherical.set(pose.radius, pose.phi, pose.theta);
     this._applyCamera();
   }
 
