@@ -7917,6 +7917,15 @@ fixed dismount markers; the top-remount problem solved twice — auto-snap AND p
 - Editor-only climb-side indicator (v4.28.4): a green arrow on the +Z face at
   mid-height, tip pointing into the ladder; hidden in preview/game via the
   `editorOnly` sweep (`_setEditorOnlyVisible` now covers `ladderEntries` too).
+- **Invisible climbables** (v4.28.5, the Source-style "invisible ladder brush"):
+  `LadderDef.invisible` tags the body mesh `editorOnly` (rails render only while
+  editing — preview AND game hide them, unlike `hideInGame` which is game-only);
+  `LadderDef.noCollider` skips the solid slab (the dressed rock/vine wall supplies
+  its own collision — an extra invisible slab would snag the player). Both are
+  LADDER panel checkboxes. Recipe: ladder flush against the visible geometry,
+  both boxes checked; sensors/mount/ranges are unaffected. Wide surfaces: the
+  climb clamps to the ladder centerline, so tile several invisible ladders
+  side-by-side (lateral climb movement is deferred).
 
 ### Verified (2026-07-11, frame-stepped + real clicks)
 

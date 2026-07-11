@@ -3198,6 +3198,8 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
   const [dismStr, setDismStr] = useState(String(ladder?.topDismountOffset ?? 0.6));
   const [promptStr, setPromptStr] = useState(String(ladder?.promptRange ?? 1.8));
   const [grabStr, setGrabStr] = useState(String(ladder?.autoGrabRange ?? 0.7));
+  const [invis, setInvis] = useState(ladder?.invisible ?? false);
+  const [noCol, setNoCol] = useState(ladder?.noCollider ?? false);
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
@@ -3209,6 +3211,8 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     setDismStr(String(ladder?.topDismountOffset ?? 0.6));
     setPromptStr(String(ladder?.promptRange ?? 1.8));
     setGrabStr(String(ladder?.autoGrabRange ?? 0.7));
+    setInvis(ladder?.invisible ?? false);
+    setNoCol(ladder?.noCollider ?? false);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commitPos = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onObjectUpdate({ position: { ...(ladder?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>); };
@@ -3270,6 +3274,19 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
         Top-of-ladder ranges (metres onto the platform): PROMPT RANGE = where "Climb down"
         appears; AUTO-GRAB RANGE = where walking toward the ladder mounts (clamped to
         PROMPT RANGE). The green arrow marks the climbable side.
+      </div>
+      <label style={{ display: "flex", gap: 6, alignItems: "center", color: "#9090a0", fontSize: 10, cursor: "pointer" }}>
+        <input type="checkbox" checked={invis} onChange={e => { setInvis(e.target.checked); onObjectUpdate({ invisible: e.target.checked } as unknown as Partial<WorldObject>); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+        INVISIBLE IN GAME
+      </label>
+      <label style={{ display: "flex", gap: 6, alignItems: "center", color: "#9090a0", fontSize: 10, cursor: "pointer" }}>
+        <input type="checkbox" checked={noCol} onChange={e => { setNoCol(e.target.checked); onObjectUpdate({ noCollider: e.target.checked } as unknown as Partial<WorldObject>); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+        NO SOLID COLLIDER
+      </label>
+      <div style={{ color: "#505060", fontSize: 9, lineHeight: 1.5 }}>
+        For invisible climbables (rock walls, vines): place the ladder flush against the
+        visible geometry, check both boxes — the ladder supplies the climb volume, the
+        wall supplies the look and collision. Rails stay visible while editing.
       </div>
     </div>
   );

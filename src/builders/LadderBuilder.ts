@@ -99,6 +99,9 @@ export class LadderBuilder {
     mesh.userData = {
       editorId: def.id, editorType: "ladder", zoneId,
       selectable: true, floorLevel: def.floorLevel ?? 0, _ownsMaterial: !!ovr,
+      // invisible-climbable: rails render only while editing (preview/game hide via
+      // the same editorOnly sweep as the climb-side arrow)
+      ...(def.invisible ? { editorOnly: true } : {}),
     } satisfies MeshUserData;
 
     // ── Colliders (world frame: rotate local offsets by yaw) ─────────────────
@@ -111,9 +114,11 @@ export class LadderBuilder {
         .setRotation({ x: rotQ.x, y: rotQ.y, z: rotQ.z, w: rotQ.w });
     };
 
-    const solid = physicsWorld.createStaticCollider(
+    // noCollider: the dressed geometry (rock wall, vines) supplies its own collision —
+    // an extra invisible slab in front of it would snag the player.
+    const solids = def.noCollider ? [] : [physicsWorld.createStaticCollider(
       place(RAPIER.ColliderDesc.cuboid(p.width / 2, p.height / 2, SOLID_DEPTH / 2), 0, p.height / 2, 0),
-    );
+    )];
 
     // Climb-column sensor: the mountable face of the ladder.
     const colH = (p.height + SENSOR_BELOW + SENSOR_ABOVE) / 2;
@@ -151,6 +156,6 @@ export class LadderBuilder {
       selectable: false, floorLevel: def.floorLevel ?? 0, _ownsMaterial: true, editorOnly: true,
     } satisfies MeshUserData;
 
-    return { meshes: [mesh, arrow], colliders: [solid], sensors: [column, topZone] };
+    return { meshes: [mesh, arrow], colliders: solids, sensors: [column, topZone] };
   }
 }
