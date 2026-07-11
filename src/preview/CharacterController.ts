@@ -84,6 +84,10 @@ export class CharacterController {
   // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
   private _climbLadder: LadderDef | null = null;      // non-null = climbing
   private _interactLadder: LadderDef | null = null;   // top-zone "Climb down" prompt target
+  // Mounted from the top while still holding "forward toward the ladder": that held key
+  // means DESCEND until released once (otherwise W=up top-dismounts you right back off).
+  private _climbHoldInvert = false;
+  private _promptCooldown = 0;                        // s of "Climb down" prompt suppression after a climb exit
   private readonly _nearLadders = new Set<string>();  // sensor overlap (TriggerSystem events)
   private _climbCooldown = 0;                          // s until re-grab allowed
   private _offLadderExit:   (() => void) | null = null;
@@ -168,7 +172,7 @@ export class CharacterController {
       this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + actions.zoomDelta));
     }
     if (actions.interactPressed) {
-      if (this._interactLadder) this._mount(this._interactLadder);   // "Climb down" prompt
+      if (this._interactLadder) this._mount(this._interactLadder, true);   // "Climb down" prompt (top mount)
       else if (this._interactTargetId) this._bus.emit("character:interact", { objectId: this._interactTargetId });
     }
 
@@ -297,7 +301,8 @@ export class CharacterController {
     // Ladder-top "Climb down" prompt (Phase 34) — the explicit alternative to the
     // auto back-toward-the-ladder mount, so descending never needs a blind walk.
     this._interactLadder = null;
-    if (bestId === null && !this._climbLadder && this._nearLadders.size > 0) {
+    this._promptCooldown = Math.max(0, this._promptCooldown - dt);
+    if (bestId === null && !this._climbLadder && this._promptCooldown <= 0 && this._nearLadders.size > 0) {
       const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
       const feetY = pos.y - capsuleBottom;
       for (const id of this._nearLadders) {
@@ -345,21 +350,24 @@ export class CharacterController {
       // Climb side (+Z): mount by moving INTO the ladder (−f). Platform side (−Z):
       // only the top-remount zone mounts, by moving toward the ladder (+f).
       let mountDot: number;
+      let fromTop = false;
       if (localZ > 0.05) {
         mountDot = (moveDir.x * -fx + moveDir.z * -fz) / mLen;
       } else if (feetY > def.position.y + p.height - CLIMB_TOP_FRAC) {
         mountDot = (moveDir.x * fx + moveDir.z * fz) / mLen;
+        fromTop = true;
       } else {
         continue;
       }
       if (mountDot < CLIMB_MOUNT_DOT) continue;
-      this._mount(def);
+      this._mount(def, fromTop);
       return;
     }
   }
 
-  private _mount(def: LadderDef): void {
+  private _mount(def: LadderDef, fromTop = false): void {
     this._climbLadder = def;
+    this._climbHoldInvert = fromTop;   // held forward = descend until released (see field comment)
     this._velY = 0;
     // Face the ladder: camera yaw and avatar both look at the climb face.
     const yawRad = THREE.MathUtils.degToRad(def.rotationY);
@@ -379,6 +387,8 @@ export class CharacterController {
     this._climbLadder = null;
     this._velY = 0;
     if (withCooldown) this._climbCooldown = CLIMB_COOLDOWN;
+    this._climbHoldInvert = false;
+    this._promptCooldown = 1.5;   // don't flash "Climb down" while stepping off the top
     if (this._animPhase === "climb") {
       this._animPhase = "ground";   // resolves to idle/walk/air next frame
       if (this._currentAction) this._currentAction.timeScale = 1;
@@ -405,6 +415,10 @@ export class CharacterController {
 
     const pos = this._body.position;
     const climbSpeed = this._settings.climbSpeed ?? 2;
+    if (this._climbHoldInvert) {
+      if (moveY > 0.05) moveY = -moveY;        // still holding the walk-on key → descend
+      else this._climbHoldInvert = false;      // released once → normal W=up/S=down
+    }
     const vy = moveY * climbSpeed;                              // W = up, S = down
     const minY = def.position.y + capsuleBottom;                // feet at the ladder foot
     const maxY = def.position.y + p.height + capsuleBottom;     // feet at the top edge

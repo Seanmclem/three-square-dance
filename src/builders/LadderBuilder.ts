@@ -20,7 +20,7 @@ const SENSOR_SIDE_PAD  = 0.15;  // extra sensor width each side
 const SENSOR_DEPTH     = 0.9;   // how far the climb column reaches out from the ladder plane
 const SENSOR_BELOW     = 0.1;   // column reaches slightly below the foot
 const SENSOR_ABOVE     = 0.5;   // column reaches above the top rung
-const TOPZONE_DEPTH    = 1.1;   // top-lip zone: how far onto the platform (−Z) it reaches
+const TOPZONE_DEPTH    = 1.8;   // top-lip zone: how far onto the platform (−Z) it reaches
 const TOPZONE_HEIGHT   = 1.3;   // top-lip zone height above the ladder top
 
 /** Defaults/clamps for sparse defs (console-spawned, old saves). */
