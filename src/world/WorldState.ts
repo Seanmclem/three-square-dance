@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
-  ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, ShapeDef, WorldObject,
+  ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks,
   ItemDef, StateSchema,
 } from "@/types";
@@ -304,6 +304,34 @@ export class WorldState {
     this._bus.emit("stair:removed", { zoneId, id });
   }
 
+  // ── Ladder mutations (Phase 34) ──────────────────────────────────────────────
+
+  addLadder(zoneId: string, ladder: LadderDef): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.ladders) zone.ladders = [];
+    this._touch("ladder", zoneId, ladder.id);
+    zone.ladders.push(ladder);
+    this._bus.emit("ladder:added", { zoneId, ladder });
+  }
+
+  updateLadder(zoneId: string, id: string, changes: Partial<LadderDef>): void {
+    const zone   = this.zones.get(zoneId);
+    const ladder = zone?.ladders?.find(l => l.id === id);
+    if (!ladder) return;
+    this._touch("ladder", zoneId, id);
+    Object.assign(ladder, changes);
+    this._bus.emit("ladder:updated", { zoneId, id, changes });
+  }
+
+  removeLadder(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    this._touch("ladder", zoneId, id);
+    zone.ladders = (zone.ladders ?? []).filter(l => l.id !== id);
+    this._bus.emit("ladder:removed", { zoneId, id });
+  }
+
   // ── Shape mutations ──────────────────────────────────────────────────────────
 
   addShape(zoneId: string, shape: ShapeDef): void {
@@ -524,6 +552,11 @@ export class WorldState {
         else if (state === "removed") this._bus.emit("shape:removed", { zoneId: z, id });
         else                          this._bus.emit("shape:updated", { zoneId: z, id, changes: target as Partial<ShapeDef> });
         break;
+      case "ladder":
+        if (state === "added")        this._bus.emit("ladder:added", { zoneId: z, ladder: target as LadderDef });
+        else if (state === "removed") this._bus.emit("ladder:removed", { zoneId: z, id });
+        else                          this._bus.emit("ladder:updated", { zoneId: z, id, changes: target as Partial<LadderDef> });
+        break;
       case "object":
         if (state === "added")        this._bus.emit("object:added", { zoneId: z, object: target as WorldObject });
         else if (state === "removed") this._bus.emit("object:removed", { zoneId: z, id });
@@ -601,6 +634,7 @@ export class WorldState {
       case "node":          return zone.nodes;
       case "platform":      return zone.platforms;
       case "stair":         return zone.stairs;
+      case "ladder":        return (zone.ladders ??= []);
       case "shape":         return (zone.shapes ??= []);
       case "object":        return zone.objects;
       case "triggerVolume": return (zone.triggerVolumes ??= []);

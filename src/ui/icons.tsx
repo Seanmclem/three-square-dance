@@ -40,6 +40,16 @@ export const IconStair = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconLadder = ({ color }: IconProps) => (
+  <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+    <line x1="10" y1="4" x2="10" y2="24" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    <line x1="18" y1="4" x2="18" y2="24" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    <line x1="10" y1="8"  x2="18" y2="8"  stroke={color} strokeWidth="1.6"/>
+    <line x1="10" y1="13" x2="18" y2="13" stroke={color} strokeWidth="1.6"/>
+    <line x1="10" y1="18" x2="18" y2="18" stroke={color} strokeWidth="1.6"/>
+  </svg>
+);
+
 export const IconObject = ({ color }: IconProps) => (
   <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
     <rect x="7"    y="13" width="14"  height="3"  rx="0.5" fill={color} fillOpacity="0.8" stroke={color} strokeWidth="0.5"/>
@@ -189,6 +199,7 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   platform:         IconPlatform,
   "poly-platform":  IconPolyPlatform,
   stair:            IconStair,
+  ladder:           IconLadder,
   object:           IconObject,
   zone:             IconZone,
   spawnpoint:       IconSpawn,

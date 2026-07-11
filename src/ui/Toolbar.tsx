@@ -15,7 +15,7 @@ const TOOLS: ToolDef[] = [
   { id: "floor",           label: "Floor",    shortcut: "F", variants: [{ id: "floor", label: "▭ Rectangle" }, { id: "poly-floor", label: "⬠ Polygon" }] },
   { id: "wall",            label: "Wall",     shortcut: "W" },
   { id: "platform",        label: "Platform", shortcut: "L", variants: [{ id: "platform", label: "▭ Rectangle" }, { id: "poly-platform", label: "⬠ Polygon" }] },
-  { id: "stair",           label: "Stair",     shortcut: "T" },
+  { id: "stair",           label: "Stair",     shortcut: "T", variants: [{ id: "stair", label: "▤ Stair" }, { id: "ladder", label: "☰ Ladder" }] },
   { id: "shape-cylinder",  label: "Shape",    shortcut: "B", variants: [{ id: "shape-cylinder", label: "◍ Cylinder" }, { id: "shape-wedge", label: "◺ Wedge" }, { id: "shape-box", label: "▤ Box" }] },
   { id: "object",          label: "Object",   shortcut: "O" },
   { id: "zone",            label: "Groups",   shortcut: "Z" },

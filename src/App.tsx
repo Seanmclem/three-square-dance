@@ -17,6 +17,7 @@ import { WallTool } from "@/editor/WallTool";
 import { PlatformTool } from "@/editor/PlatformTool";
 import { PolygonPlatformTool } from "@/editor/PolygonPlatformTool";
 import { StairTool } from "@/editor/StairTool";
+import { LadderTool } from "@/editor/LadderTool";
 import { ShapeTool } from "@/editor/ShapeTool";
 import { ShapeResizer } from "@/editor/ShapeResizer";
 import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
@@ -66,7 +67,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -247,6 +248,7 @@ export default function App() {
     const platformTool       = new PlatformTool(scene.scene, world, bus, history);
     const polyPlatformTool   = new PolygonPlatformTool(scene.scene, world, bus, history);
     const stairTool          = new StairTool(scene.scene, world, bus, history);
+    const ladderTool         = new LadderTool(world, bus);
     const shapeTool          = new ShapeTool(scene.scene, world, bus, history);
     const shapeResizer       = new ShapeResizer(scene.scene, world, bus, scene.camera, canvas);
     const brushVertexEditor  = new BrushVertexEditor(scene.scene, world, bus, scene.camera, canvas);
@@ -305,6 +307,7 @@ export default function App() {
     platformTool.init();
     polyPlatformTool.init();
     stairTool.init();
+    ladderTool.init();
     shapeTool.init();
     shapeResizer.init();
     brushVertexEditor.init();
@@ -735,6 +738,7 @@ export default function App() {
       shapeResizer.dispose();
       shapeTool.dispose();
       stairTool.dispose();
+      ladderTool.dispose();
       polyPlatformTool.dispose();
       platformTool.dispose();
       wallTool.dispose();
@@ -1529,6 +1533,8 @@ export default function App() {
       world.removePlatform(zoneId, id);
     } else if (type === "stair") {
       world.removeStair(zoneId, id);
+    } else if (type === "ladder") {
+      world.removeLadder(zoneId, id);
     } else if (type === "object") {
       const obj = world.zones.get(zoneId)?.objects.find(o => o.id === id);
       if (obj?.scripts?.length) {
@@ -2035,6 +2041,13 @@ export default function App() {
       });
       syncHistory();
       setSelected(prev => prev ? { ...prev, data: { ...(prev.data as StairDef), ...stairChanges } } : null);
+    } else if (selected.type === "ladder") {
+      const ladderChanges = changes as unknown as Partial<LadderDef>;
+      worldRef.current?.transaction("update ladder", () => {
+        worldRef.current?.updateLadder(selected.zoneId, selected.id, ladderChanges);
+      });
+      syncHistory();
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as LadderDef), ...ladderChanges } } : null);
     } else if (selected.type === "trigger-volume") {
       const volChanges = changes as unknown as Partial<TriggerVolume>;
       worldRef.current?.transaction("update trigger volume", () => {

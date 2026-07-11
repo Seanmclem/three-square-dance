@@ -114,6 +114,15 @@ export class CharacterBody {
     this._body.setTranslation({ x: pos.x, y: pos.y, z: pos.z }, true);
   }
 
+  /**
+   * Climb-mode positioning (Phase 34): drive the kinematic body directly,
+   * bypassing the KCC — its snap-to-ground and slope logic fight a wall climb.
+   * The ladder line is kept clear of geometry by construction.
+   */
+  setClimbTranslation(pos: THREE.Vector3): void {
+    this._body.setNextKinematicTranslation({ x: pos.x, y: pos.y, z: pos.z });
+  }
+
   get position(): THREE.Vector3 {
     const t = this._body.translation();
     return new THREE.Vector3(t.x, t.y, t.z);

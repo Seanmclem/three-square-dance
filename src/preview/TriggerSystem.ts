@@ -12,6 +12,12 @@ export class TriggerSystem {
   private _insideVolumes = new Set<number>();
   private _scratchInside = new Set<number>();          // reused each frame (swapped, not re-allocated)
 
+  // ladder sensor tracking (Phase 34) — deduped by ladderId, since each ladder
+  // contributes two sensor colliders (climb column + top-lip zone)
+  private _ladderSensors = new Map<number, string>(); // colliderHandle → ladderId
+  private _insideLadders = new Set<string>();
+  private _scratchLadders = new Set<string>();
+
   constructor(
     private readonly _doorSensors: ReadonlyMap<number, string>,
     private readonly _bus: EventBus,
@@ -24,6 +30,11 @@ export class TriggerSystem {
     this._insideVolumes.clear();
   }
 
+  setLadderSensors(map: Map<number, string>): void {
+    this._ladderSensors = map;
+    this._insideLadders.clear();
+  }
+
   update(): void {
     if (!this._characterCollider) return;
 
@@ -31,6 +42,8 @@ export class TriggerSystem {
 
     const nowInside = this._scratchInside;
     nowInside.clear();
+    const nowLadders = this._scratchLadders;
+    nowLadders.clear();
 
     physicsWorld.world.intersectionPairsWith(this._characterCollider, (other) => {
       // door / zone transition sensors
@@ -44,6 +57,10 @@ export class TriggerSystem {
       if (this._volumeSensors.has(other.handle)) {
         nowInside.add(other.handle);
       }
+
+      // ladder sensors (either of the ladder's two boxes counts as "near")
+      const ladderId = this._ladderSensors.get(other.handle);
+      if (ladderId) nowLadders.add(ladderId);
     });
 
     // emit enter for newly-inside volumes
@@ -61,8 +78,18 @@ export class TriggerSystem {
       }
     }
 
+    // ladder enter/exit (same diff pattern, keyed by ladderId)
+    for (const id of nowLadders) {
+      if (!this._insideLadders.has(id)) this._bus.emit("ladder:zone-enter", { ladderId: id });
+    }
+    for (const id of this._insideLadders) {
+      if (!nowLadders.has(id)) this._bus.emit("ladder:zone-exit", { ladderId: id });
+    }
+
     // swap: next frame reuses the old set as scratch (no per-frame Set allocation)
     this._scratchInside = this._insideVolumes;
     this._insideVolumes = nowInside;
+    this._scratchLadders = this._insideLadders;
+    this._insideLadders = nowLadders;
   }
 }

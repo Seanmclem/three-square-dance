@@ -2,10 +2,11 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
-import type { PlayerSettings, LocomotionState } from "@/types";
+import type { PlayerSettings, LocomotionState, LadderDef } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import type { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { CharacterBody } from "./CharacterBody";
+import { resolveLadderParams } from "@/builders/LadderBuilder";
 import type { MoverSystem } from "@/world/MoverSystem";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
@@ -37,6 +38,14 @@ const INTERACT_REBUILD_SEC = 0.25; // how often to re-scan the scene for interac
 const MODEL_FORWARD_OFFSET = Math.PI;
 // The avatar is never an interact target — skip it from any raycast.
 const NO_RAYCAST: THREE.Object3D["raycast"] = () => {};
+
+// ── Ladder climbing (Phase 34) ────────────────────────────────────────────────
+const CLIMB_MOUNT_DOT   = 0.5;   // must move at least this much toward the ladder to mount
+const CLIMB_COOLDOWN    = 0.4;   // s after a jump-release before re-grab is allowed
+const CLIMB_SNAP_RATE   = 12;    // 1/s exp lerp of X/Z onto the ladder line while climbing
+const CLIMB_LINE_GAP    = 0.12;  // capsule surface ↔ ladder plane gap (line offset = gap + radius + slab/2)
+const CLIMB_TOP_FRAC    = 0.5;   // top-zone mount requires feet above top − this (m)
+const CLIMB_ANIM_REF    = 2;     // climb clip plays at 1× when climbing at this speed (m/s)
 
 // Reused scratch objects — the update() loop runs every frame, so it must not allocate
 // (per-frame garbage triggers GC pauses = micro-stutters). All temps below are set fresh
@@ -70,7 +79,17 @@ export class CharacterController {
   private _currentClip = "";
   private _currentAction:  THREE.AnimationAction | null = null;
   private _currentClipObj: THREE.AnimationClip  | null = null;
-  private _animPhase: "ground" | "jump" | "airidle" | "land" = "ground";
+  private _animPhase: "ground" | "jump" | "airidle" | "land" | "climb" = "ground";
+
+  // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
+  private _climbLadder: LadderDef | null = null;      // non-null = climbing
+  private _interactLadder: LadderDef | null = null;   // top-zone "Climb down" prompt target
+  private readonly _nearLadders = new Set<string>();  // sensor overlap (TriggerSystem events)
+  private _climbCooldown = 0;                          // s until re-grab allowed
+  private _offLadderExit:   (() => void) | null = null;
+  private _offLadderEnter:  (() => void) | null = null;
+  private _offLadderGone:   (() => void) | null = null;
+  private _offLadderMoved:  (() => void) | null = null;
   private _modelYaw   = 0;                       // smoothed avatar facing (third-person)
   private _desiredDist: number;                  // scroll-zoom target distance
   private _camY    = Number.NaN;                 // smoothed camera height; NaN = snap next frame
@@ -87,6 +106,7 @@ export class CharacterController {
     private readonly _bus: EventBus,
     private readonly _input: ControlSchemeManager,
     private readonly _movers: MoverSystem | null = null,
+    private readonly _ladderLookup: (id: string) => LadderDef | null = () => null,
   ) {
     this.camera = new THREE.PerspectiveCamera(
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
@@ -108,6 +128,7 @@ export class CharacterController {
     // the player doesn't inherit fall speed through the warp. Facing is left as-is for now
     // (teleport_player doesn't author a facing yet — always sends 0).
     this._offTeleport = this._bus.on("character:teleport", ({ position, facing }) => {
+      this._exitClimb();   // never carry the climb lock through a warp (soft-lock guard)
       this._body.teleport(new THREE.Vector3(position.x, position.y + capsuleBottom, position.z));
       this._velY = 0;
       this._camY = this._armDist = Number.NaN;   // snap camera smoothing across the warp
@@ -123,6 +144,17 @@ export class CharacterController {
       const p = this._body.position;
       gameState.set(key, { x: p.x, y: p.y - capsuleBottom, z: p.z, facing: THREE.MathUtils.radToDeg(this._yaw) });
     });
+    // Ladder proximity + lifecycle (Phase 34). A rebuilt/deleted ladder force-exits
+    // the climb — its colliders (and sensor handles) are gone.
+    this._offLadderEnter = this._bus.on("ladder:zone-enter", ({ ladderId }) => this._nearLadders.add(ladderId));
+    this._offLadderExit  = this._bus.on("ladder:zone-exit",  ({ ladderId }) => this._nearLadders.delete(ladderId));
+    this._offLadderGone  = this._bus.on("ladder:removed", ({ id }) => {
+      this._nearLadders.delete(id);
+      if (this._climbLadder?.id === id) this._exitClimb();
+    });
+    this._offLadderMoved = this._bus.on("ladder:updated", ({ id }) => {
+      if (this._climbLadder?.id === id) this._exitClimb();
+    });
     void this._loadModel();
   }
 
@@ -135,8 +167,9 @@ export class CharacterController {
     if (actions.zoomDelta !== 0) {
       this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + actions.zoomDelta));
     }
-    if (actions.interactPressed && this._interactTargetId) {
-      this._bus.emit("character:interact", { objectId: this._interactTargetId });
+    if (actions.interactPressed) {
+      if (this._interactLadder) this._mount(this._interactLadder);   // "Climb down" prompt
+      else if (this._interactTargetId) this._bus.emit("character:interact", { objectId: this._interactTargetId });
     }
 
     const speed = this._settings.moveSpeed;
@@ -148,38 +181,50 @@ export class CharacterController {
 
     const jumpHeld = actions.jump;
     if (!jumpHeld) this._jumpArmed = true;   // re-arm on release
-    if (this._body.isGrounded) {
-      if (jumpHeld && this._jumpArmed) {
-        this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
-        this._jumpArmed = false;
-      } else {
-        this._velY = 0;
-      }
+
+    // Ladder climbing (Phase 34) — mount check, then either the climb branch or
+    // the normal gravity/KCC path. Never both in one frame.
+    this._climbCooldown = Math.max(0, this._climbCooldown - dt);
+    if (!this._climbLadder && this._climbCooldown <= 0 && this._nearLadders.size > 0 && isMoving) {
+      this._tryMount(dir);
+    }
+
+    if (this._climbLadder) {
+      this._updateClimb(dt, jumpHeld, actions.move.y);
     } else {
-      this._velY -= 20 * dt;
-    }
-    dir.y = this._velY * dt;
-
-    // Moving geometry (Phase 31 / v4.25.1) — the whole block is gated on a mover
-    // actually running this frame, so a world without live movers pays nothing
-    // (no ground raycast, no contact scan).
-    if (this._movers?.anyRunning()) {
-      // Ride: standing on a mover's kinematic body adds its per-frame translation
-      // delta to the desired move, so the KCC still collision-resolves the
-      // combined motion. Translation only — spin doesn't rotate the player.
       if (this._body.isGrounded) {
-        const h = this._body.groundBodyHandle();
-        const carry = h !== null ? this._movers.carryDelta(h) : null;
-        if (carry) dir.add(carry);
+        if (jumpHeld && this._jumpArmed) {
+          this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
+          this._jumpArmed = false;
+        } else {
+          this._velY = 0;
+        }
+      } else {
+        this._velY -= 20 * dt;
       }
-      // Push: geometry that swept INTO the capsule since the last step shoves the
-      // player out along the contact normal (depenetration read from the step's
-      // contact manifolds). Routed through `dir` so walls still block the shove.
-      const push = this._body.moverPush(this._movers.isMoverBody);
-      if (push.lengthSq() > 0) dir.add(push);
-    }
+      dir.y = this._velY * dt;
 
-    this._body.move(dir);
+      // Moving geometry (Phase 31 / v4.25.1) — the whole block is gated on a mover
+      // actually running this frame, so a world without live movers pays nothing
+      // (no ground raycast, no contact scan).
+      if (this._movers?.anyRunning()) {
+        // Ride: standing on a mover's kinematic body adds its per-frame translation
+        // delta to the desired move, so the KCC still collision-resolves the
+        // combined motion. Translation only — spin doesn't rotate the player.
+        if (this._body.isGrounded) {
+          const h = this._body.groundBodyHandle();
+          const carry = h !== null ? this._movers.carryDelta(h) : null;
+          if (carry) dir.add(carry);
+        }
+        // Push: geometry that swept INTO the capsule since the last step shoves the
+        // player out along the contact normal (depenetration read from the step's
+        // contact manifolds). Routed through `dir` so walls still block the shove.
+        const push = this._body.moverPush(this._movers.isMoverBody);
+        if (push.lengthSq() > 0) dir.add(push);
+      }
+
+      this._body.move(dir);
+    }
     const pos = this._body.position;
 
     // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision.
@@ -246,6 +291,27 @@ export class CharacterController {
       if (forward.dot(to.divideScalar(d)) < INTERACT_MIN_DOT) continue;   // must be in front
       if (d < bestDist) { bestDist = d; bestId = e.id; bestLabel = e.label; }
     }
+
+    // Ladder-top "Climb down" prompt (Phase 34) — the explicit alternative to the
+    // auto back-toward-the-ladder mount, so descending never needs a blind walk.
+    this._interactLadder = null;
+    if (bestId === null && !this._climbLadder && this._nearLadders.size > 0) {
+      const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
+      const feetY = pos.y - capsuleBottom;
+      for (const id of this._nearLadders) {
+        const def = this._ladderLookup(id);
+        if (!def) continue;
+        const p = resolveLadderParams(def);
+        const yawRad = THREE.MathUtils.degToRad(def.rotationY);
+        const fx = Math.sin(yawRad), fz = Math.cos(yawRad);
+        const localZ = (pos.x - def.position.x) * fx + (pos.z - def.position.z) * fz;
+        if (localZ <= 0.05 && feetY > def.position.y + p.height - CLIMB_TOP_FRAC) {
+          this._interactLadder = def;
+          bestId = id; bestLabel = "Climb down";
+          break;
+        }
+      }
+    }
     if (bestId !== this._interactTargetId) {
       this._interactTargetId = bestId;
       this._bus.emit(
@@ -256,6 +322,120 @@ export class CharacterController {
   }
 
   get body(): CharacterBody { return this._body; }
+
+  // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
+
+  /** Mount if the player is moving toward a nearby ladder (survey: dot-product intent check). */
+  private _tryMount(moveDir: THREE.Vector3): void {
+    const mLen = Math.hypot(moveDir.x, moveDir.z);
+    if (mLen < 1e-6) return;
+    const pos = this._body.position;
+    const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
+    const feetY = pos.y - capsuleBottom;
+
+    for (const id of this._nearLadders) {
+      const def = this._ladderLookup(id);
+      if (!def) continue;
+      const p = resolveLadderParams(def);
+      const yawRad = THREE.MathUtils.degToRad(def.rotationY);
+      const fx = Math.sin(yawRad), fz = Math.cos(yawRad);   // climb-side normal (local +Z) in world
+      const localZ = (pos.x - def.position.x) * fx + (pos.z - def.position.z) * fz;
+      // Climb side (+Z): mount by moving INTO the ladder (−f). Platform side (−Z):
+      // only the top-remount zone mounts, by moving toward the ladder (+f).
+      let mountDot: number;
+      if (localZ > 0.05) {
+        mountDot = (moveDir.x * -fx + moveDir.z * -fz) / mLen;
+      } else if (feetY > def.position.y + p.height - CLIMB_TOP_FRAC) {
+        mountDot = (moveDir.x * fx + moveDir.z * fz) / mLen;
+      } else {
+        continue;
+      }
+      if (mountDot < CLIMB_MOUNT_DOT) continue;
+      this._mount(def);
+      return;
+    }
+  }
+
+  private _mount(def: LadderDef): void {
+    this._climbLadder = def;
+    this._velY = 0;
+    // Face the ladder: camera yaw and avatar both look at the climb face.
+    const yawRad = THREE.MathUtils.degToRad(def.rotationY);
+    this._yaw = yawRad;
+    this._modelYaw = yawRad;
+    this._play("climb", true);
+    this._animPhase = "climb";
+  }
+
+  /**
+   * Restore normal movement unconditionally — the single exit every path funnels
+   * through (jump release, dismounts, teleport, ladder rebuild/delete, dispose),
+   * so no transition can soft-lock the player.
+   */
+  private _exitClimb(withCooldown = false): void {
+    if (!this._climbLadder) return;
+    this._climbLadder = null;
+    this._velY = 0;
+    if (withCooldown) this._climbCooldown = CLIMB_COOLDOWN;
+    if (this._animPhase === "climb") {
+      this._animPhase = "ground";   // resolves to idle/walk/air next frame
+      if (this._currentAction) this._currentAction.timeScale = 1;
+    }
+  }
+
+  private _updateClimb(dt: number, jumpHeld: boolean, moveY: number): void {
+    const def = this._climbLadder!;
+    const p = resolveLadderParams(def);
+    const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
+
+    if (jumpHeld && this._jumpArmed) {     // jump = let go (remapped, not an actual jump)
+      this._jumpArmed = false;
+      this._exitClimb(true);
+      return;
+    }
+
+    const yawRad = THREE.MathUtils.degToRad(def.rotationY);
+    const fx = Math.sin(yawRad), fz = Math.cos(yawRad);
+    // Climb line: capsule center held just off the climb face.
+    const lineOff = 0.08 + this._body.capsuleRadius + CLIMB_LINE_GAP;
+    const lineX = def.position.x + fx * lineOff;
+    const lineZ = def.position.z + fz * lineOff;
+
+    const pos = this._body.position;
+    const climbSpeed = this._settings.climbSpeed ?? 2;
+    const vy = moveY * climbSpeed;                              // W = up, S = down
+    const minY = def.position.y + capsuleBottom;                // feet at the ladder foot
+    const maxY = def.position.y + p.height + capsuleBottom;     // feet at the top edge
+    let newY = pos.y + vy * dt;
+
+    // Top dismount: pushing up at the top bound steps onto a FIXED stand marker
+    // (never physics-derived), inward from the ladder top. Camera Y smoothing eats the step.
+    if (vy > 0 && newY >= maxY) {
+      this._exitClimb();
+      this._body.teleport(_tmpEye.set(
+        def.position.x - fx * p.topDismountOffset,
+        def.position.y + p.height + capsuleBottom,
+        def.position.z - fz * p.topDismountOffset,
+      ));
+      return;
+    }
+    if (newY > maxY) newY = maxY;
+    if (newY < minY) newY = minY;
+    // Bottom dismount: pushing down with feet at the foot → back to normal movement.
+    if (vy < 0 && newY <= minY) { this._exitClimb(); return; }
+
+    const k = Math.min(1, dt * CLIMB_SNAP_RATE);
+    this._body.setClimbTranslation(_tmpEye.set(
+      pos.x + (lineX - pos.x) * k,
+      newY,
+      pos.z + (lineZ - pos.z) * k,
+    ));
+
+    // Clip rate follows actual climb speed; holding still = hanging (paused clip).
+    if (this._currentClip === "climb" && this._currentAction) {
+      this._currentAction.timeScale = Math.abs(vy) / CLIMB_ANIM_REF;
+    }
+  }
 
   // Re-scan the scene for interactable objects (deduped by editorId; the root is visited first so
   // its world position ≈ the object). Called a few times/sec, not per frame.
@@ -378,6 +558,9 @@ export class CharacterController {
           this._animPhase = "ground";
         }
         break;
+      case "climb":                                       // exits via _exitClimb
+        this._play("climb", true);                        // no-op once playing; retries if the model loaded late
+        break;
     }
   }
 
@@ -396,8 +579,13 @@ export class CharacterController {
   }
 
   dispose(): void {
-    this._offTeleport?.(); this._offTeleport = null;
-    this._offSavePos?.();  this._offSavePos  = null;
+    this._exitClimb();
+    this._offTeleport?.();    this._offTeleport   = null;
+    this._offSavePos?.();     this._offSavePos    = null;
+    this._offLadderEnter?.(); this._offLadderEnter = null;
+    this._offLadderExit?.();  this._offLadderExit  = null;
+    this._offLadderGone?.();  this._offLadderGone  = null;
+    this._offLadderMoved?.(); this._offLadderMoved = null;
     if (this._modelRoot) this._scene.remove(this._modelRoot);
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);

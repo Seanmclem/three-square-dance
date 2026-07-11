@@ -1,6 +1,17 @@
 # Phase 34 — Ladders (climbable entity + climb movement mode)
 
-> **Status: PLANNED** — not started.
+> **Status: IMPLEMENTED** — shipped 2026-07-11 (v4.28.0). All 11 automated
+> scenarios + the real-click editor pass verified in-browser; acceptance record
+> in `test-plans/phase-34-ladders.md`. Notable deviations from plan:
+> - Top dismount is a **teleport to the fixed stand marker** (camera Y smoothing
+>   masks the step), not a 0.15s lerp — simpler, and indistinguishable in practice.
+> - `updateLadder` mid-climb force-exits but an instant remount of the rebuilt
+>   ladder is allowed (cooldown applies only to jump-release) — continuing the
+>   climb on the edited ladder is the desirable behavior.
+> - The climb anim phase **self-heals** (`_updateAnim` retries the `climb` intent)
+>   because a mount can beat the async avatar-model load.
+> - LadderTool is part of the Stair toolbar button's variant popover (▤/☰), not a
+>   standalone button.
 
 Origin: user request — build ladders, informed by a cross-engine survey of
 ladder mechanics (trigger-volume mounting, a locked climbing state, fixed

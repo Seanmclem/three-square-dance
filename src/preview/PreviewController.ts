@@ -87,12 +87,20 @@ export class PreviewController {
     const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, loadBindings());
     input.init();
 
-    const controller = new CharacterController(settings, this._scene.scene, this._bus, input, this._movers);
+    const controller = new CharacterController(settings, this._scene.scene, this._bus, input, this._movers,
+      (ladderId) => {
+        for (const zone of this._world.zones.values()) {
+          const l = zone.ladders?.find(l => l.id === ladderId);
+          if (l) return l;
+        }
+        return null;
+      });
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);
     triggers.setCharacterCollider(controller.body.collider);
     triggers.setVolumeSensors(this._zones.volumeSensorMap);
+    triggers.setLadderSensors(this._zones.ladderSensorMap);
 
     this._mode = mode;
     if (mode === "occlusion") {

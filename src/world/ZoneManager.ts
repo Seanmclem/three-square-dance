@@ -3,6 +3,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
+import { LadderBuilder } from "@/builders/LadderBuilder";
 import { ShapeBuilder } from "@/builders/ShapeBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
@@ -16,7 +17,7 @@ import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { MoverSystem } from "@/world/MoverSystem";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
 import { isGameplayMode } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -40,6 +41,13 @@ interface StairEntry {
   def:       StairDef;
 }
 
+interface LadderEntry {
+  meshes:    THREE.Mesh[];
+  colliders: RAPIER.Collider[];
+  sensors:   RAPIER.Collider[];
+  def:       LadderDef;
+}
+
 interface ShapeEntry {
   meshes:   THREE.Mesh[];   // [cap, side] — same transform, same editorId
   collider: RAPIER.Collider | null;
@@ -51,6 +59,7 @@ interface ZoneEntry {
   wallsGroup:     THREE.Group;
   platformsGroup: THREE.Group;
   stairsGroup:    THREE.Group;
+  laddersGroup:   THREE.Group;
   shapesGroup:    THREE.Group;
   objectsGroup:   THREE.Group;
   // keyed by floor.id
@@ -59,6 +68,7 @@ interface ZoneEntry {
   wallData:       Map<string, RunEntry>;
   platformEntries: Map<string, PlatformEntry>;
   stairEntries:    Map<string, StairEntry>;
+  ladderEntries:   Map<string, LadderEntry>;
   shapeEntries:    Map<string, ShapeEntry>;
   objectMeshes:    Map<string, THREE.Object3D>;
   // Attached colliders per placed object (explicit colliders[] or the implicit auto-box)
@@ -116,6 +126,7 @@ export class ZoneManager {
 
   // Trigger volume sensors
   private readonly _volumeSensors   = new Map<number, string>();           // handle → volumeId
+  private readonly _ladderSensors   = new Map<number, string>();           // handle → ladderId (climb column + top-lip zone)
   private readonly _volumeColliders = new Map<string, RAPIER.Collider[]>(); // zoneId → colliders
   private readonly _volumeMeshes    = new Map<string, THREE.LineSegments[]>(); // zoneId → wireframes
   private readonly _volumeFills     = new Map<string, THREE.Mesh[]>();      // zoneId → gradient fills
@@ -137,6 +148,7 @@ export class ZoneManager {
 
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
+  get ladderSensorMap(): Map<number, string>          { return this._ladderSensors; }
 
   // Pending wall rebuild requests — coalesced per microtask to avoid concurrent async races
   private readonly _pendingRebuild = new Map<string, Set<string>>();
@@ -294,6 +306,15 @@ export class ZoneManager {
       }),
       this._bus.on("shape:removed", ({ zoneId, id }) => {
         this._removeShape(zoneId, id);
+      }),
+      this._bus.on("ladder:added", ({ zoneId, ladder }) => {
+        void this._addLadder(zoneId, ladder);
+      }),
+      this._bus.on("ladder:updated", ({ zoneId, id }) => {
+        void this._rebuildLadder(zoneId, id);
+      }),
+      this._bus.on("ladder:removed", ({ zoneId, id }) => {
+        this._removeLadder(zoneId, id);
       }),
       this._bus.on("stair:added", ({ zoneId, stair }) => {
         void this._addStair(zoneId, stair);
@@ -494,14 +515,16 @@ export class ZoneManager {
     const wallsGroup     = new THREE.Group();
     const platformsGroup = new THREE.Group();
     const stairsGroup    = new THREE.Group();
+    const laddersGroup   = new THREE.Group();
     const shapesGroup    = new THREE.Group();
     const objectsGroup   = new THREE.Group();
-    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, shapesGroup, objectsGroup);
+    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup);
 
     const floorColliders  = new Map<string, RAPIER.Collider>();
     const wallData        = new Map<string, RunEntry>();
     const platformEntries = new Map<string, PlatformEntry>();
     const stairEntries    = new Map<string, StairEntry>();
+    const ladderEntries   = new Map<string, LadderEntry>();
     const shapeEntries    = new Map<string, ShapeEntry>();
     const objectMeshes    = new Map<string, THREE.Object3D>();
     const objectColliders = new Map<string, RAPIER.Collider[]>();
@@ -560,6 +583,14 @@ export class ZoneManager {
       stairEntries.set(stair.id, { group: stairGroup, meshes, colliders, def: stair });
     }
 
+    // ── Ladders ───────────────────────────────────────────────────────────
+    for (const ladder of zone.ladders ?? []) {
+      const { meshes, colliders, sensors } = await LadderBuilder.build(ladder, zoneId);
+      for (const m of meshes) laddersGroup.add(m);
+      ladderEntries.set(ladder.id, { meshes, colliders, sensors, def: ladder });
+      for (const s of sensors) this._ladderSensors.set(s.handle, ladder.id);
+    }
+
     // ── Shapes ────────────────────────────────────────────────────────────
     for (const shape of zone.shapes ?? []) {
       const { meshes, collider, moverBody } = await ShapeBuilder.build(shape, zoneId);
@@ -576,8 +607,8 @@ export class ZoneManager {
 
     this._scene.add(group);
     const zoneEntry: ZoneEntry = {
-      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, shapesGroup, objectsGroup,
-      floorColliders, wallData, platformEntries, stairEntries, shapeEntries, objectMeshes, objectColliders,
+      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup,
+      floorColliders, wallData, platformEntries, stairEntries, ladderEntries, shapeEntries, objectMeshes, objectColliders,
     };
     this._loadedZones.set(zoneId, zoneEntry);
     for (const obj of zone.objects) this._buildObjectColliders(zoneId, obj, zoneEntry);
@@ -631,6 +662,11 @@ export class ZoneManager {
 
     for (const se of entry.stairEntries.values()) {
       se.colliders.forEach(c => physicsWorld.removeCollider(c));
+    }
+
+    for (const le of entry.ladderEntries.values()) {
+      for (const s of le.sensors) this._ladderSensors.delete(s.handle);
+      [...le.colliders, ...le.sensors].forEach(c => physicsWorld.removeCollider(c));
     }
 
     for (const she of entry.shapeEntries.values()) {
@@ -1031,6 +1067,45 @@ export class ZoneManager {
         (m.material as THREE.Material).dispose();
     }
     entry.shapeEntries.delete(shapeId);
+  }
+
+  // ── Ladder helpers (Phase 34) ─────────────────────────────────────────────
+
+  private async _addLadder(zoneId: string, ladder: LadderDef): Promise<void> {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const { meshes, colliders, sensors } = await LadderBuilder.build(ladder, zoneId);
+    for (const m of meshes) entry.laddersGroup.add(m);
+    entry.ladderEntries.set(ladder.id, { meshes, colliders, sensors, def: ladder });
+    for (const s of sensors) this._ladderSensors.set(s.handle, ladder.id);
+    this._applyDimming();
+  }
+
+  private async _rebuildLadder(zoneId: string, ladderId: string): Promise<void> {
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return;
+    this._removeLadder(zoneId, ladderId);
+    const ladder = zone.ladders?.find(l => l.id === ladderId);
+    if (!ladder) return;
+    await this._addLadder(zoneId, ladder);
+  }
+
+  private _removeLadder(zoneId: string, ladderId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    const le = entry.ladderEntries.get(ladderId);
+    if (!le) return;
+    for (const s of le.sensors) this._ladderSensors.delete(s.handle);
+    [...le.colliders, ...le.sensors].forEach(c => physicsWorld.removeCollider(c));
+    for (const mesh of le.meshes) {
+      const orig = this._dimmedMeshes.get(mesh);
+      if (orig) { mesh.material = orig; this._dimmedMeshes.delete(mesh); }
+      entry.laddersGroup.remove(mesh);
+      mesh.geometry.dispose();
+      if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
+        (mesh.material as THREE.Material).dispose();
+    }
+    entry.ladderEntries.delete(ladderId);
   }
 
   // ── Stair helpers ─────────────────────────────────────────────────────────

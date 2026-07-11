@@ -94,7 +94,7 @@ export interface AssetManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box";
+export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -104,7 +104,7 @@ export type CameraMode = "fps" | "thirdperson";
 export type PreviewMode = "preview" | "game" | "occlusion";
 /** Gameplay semantics (defaultSpawn, hide editor furniture, gizmo/node-dot lockout) — everything but plain preview. */
 export const isGameplayMode = (m: PreviewMode): boolean => m !== "preview";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "ladder" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -180,6 +180,12 @@ export interface BusEvents {
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
   "stair:removed":         { zoneId: string; id: string };
   "stair:rebuilt":         { zoneId: string; stairId: string };
+  "ladder:added":          { zoneId: string; ladder: LadderDef };
+  "ladder:updated":        { zoneId: string; id: string; changes: Partial<LadderDef> };
+  "ladder:removed":        { zoneId: string; id: string };
+  // Player capsule entered/left a ladder's climb sensor (TriggerSystem, preview/game only).
+  "ladder:zone-enter":     { ladderId: string };
+  "ladder:zone-exit":      { ladderId: string };
   "floor:rebuilt":         { zoneId: string; floorId: string };
   "object:added":          { zoneId: string; object: WorldObject };
   "object:removed":        { zoneId: string; id: string };
@@ -334,7 +340,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | LadderDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
   // Sub-object selection (Phase 23, shapes only): which face/vertex/edge is selected
   // in the face/vertex/edge select modes. Clamped against the live mesh on every emit.
@@ -406,7 +412,7 @@ export interface CheckpointDef {
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
-export type LocomotionState = "idle" | "walk" | "jump" | "jump_idle" | "jump_land";
+export type LocomotionState = "idle" | "walk" | "jump" | "jump_idle" | "jump_land" | "climb";
 
 export interface PlayerSettings {
   cameraMode:          CameraMode;
@@ -416,6 +422,7 @@ export interface PlayerSettings {
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
+  climbSpeed?:         number;            // ladder climb speed m/s (default 2)
   characterScale?:     number;            // uniform scale of the 3rd-person avatar + collision (default 1)
   // Per-character clip overrides. Key absent/undefined = Auto (name match); null = None
   // (play nothing); string = use that exact clip name.
@@ -597,6 +604,27 @@ export interface StairDef {
   groupIds?:               string[];
 }
 
+// ─── Ladders (Phase 34) ──────────────────────────────────────────────────────
+
+// A vertical climbable: 2 rails + rungs, a thin solid collider, and an
+// auto-built climb sensor (width × height+lip × depth on the climb side, plus a
+// top-lip extension onto the platform for remount-from-top). The climb face
+// normal is local +Z rotated by rotationY — the player climbs on that side.
+export interface LadderDef {
+  id:        string;      // ladder_<uuid8>
+  label?:    string;
+  position:  Vec3;        // FOOT center, floor level
+  rotationY: number;      // degrees
+  height:    number;      // meters, foot → top rung
+  width:     number;      // default 0.7
+  rungSpacing: number;    // default 0.35
+  material:  string;
+  materialOverrides?: MaterialOverrides;
+  topDismountOffset?: number; // meters inward (−Z local) from the top onto the platform (default 0.6)
+  floorLevel?: number;
+  groupIds?: string[];
+}
+
 // ─── Parametric shape primitives (Phase 22) ─────────────────────────────────
 
 export type ShapeKind = "cylinder" | "wedge" | "box";
@@ -752,6 +780,7 @@ export interface ZoneDef {
   walls:           WallDef[];
   platforms:       PlatformDef[];
   stairs:          StairDef[];
+  ladders?:        LadderDef[];
   objects:         WorldObject[];
   scripts?:        ScriptDef[];
   triggerVolumes?: TriggerVolume[];

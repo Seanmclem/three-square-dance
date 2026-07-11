@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.25.1** — last updated 2026-07-10
+**Version 4.28.0** — last updated 2026-07-11
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -127,6 +127,7 @@
 - v4.27.3 — **New Project modal: SCENE 1 choice** (user feedback: created a project and "it's just the same level/scene" — the always-adopt-current-world behavior surprised when a fresh start was expected). The modal gains a segmented **SCENE 1** selector: **Current world** (default — the safe single-scene→project migration path, nothing can be lost) or **Blank scene** (fresh `scene_01` "Scene 1" via `makeFreshScene`, the New-button semantics, with an amber in-dialog warning that the currently edited world gets replaced). `onConfirm` gains `startBlank`; `handleProjectCreate` branches. Verified in-browser (OPFS-stubbed picker; the user's live project pointer was IDB-stashed and restored around the test): blank path produced `scene_01` + an empty "Scene 1" world; warning renders on selecting Blank.
 - v4.27.4 — **New Project modal: editable SCENE 1 ID** (user: "I don't remember naming it new-world" — the id was auto-slugified from the world's default `metadata.name` "New World", which is not editable anywhere in the UI, so the first scene's permanent id came from a name the user never chose). The modal gains a **SCENE 1 ID** field, prefilled from the current world's name slug (or `scene_01` when Blank is selected, while untouched) with a live `scenes/<slug>.json` preview and a note that renaming isn't supported yet; the confirm passes the sanitized id through (`onConfirm` gains `sceneId`; `handleProjectCreate` uses it for both modes). Create is gated on a non-empty slug.
 - v4.27.5 — **Per-scene editor camera persistence** (user report: loading a scene/project scene leaves the camera at the near-origin default). `SceneMetadata.editorCamera?: EditorCameraPose { focus, radius, phi, theta }` — editor-only convenience data, ignored by the runtime. `EditorCamera` gains `getPose()`/`setPose()` (set both current AND target orbit state → snap, not lerp; `_applyCamera()` immediately). **Stamped on every explicit save** (`stampCameraPose()` in App: handleSave, project scene switch/add/close, project create adopt path) and **restored at the end of `handleLoadFromJSON`** — which every load path funnels through (boot autosave restore, file Load, project open/scene switch/blank create), so one restore point covers them all. Deliberately NOT stamped by the periodic autosave tick: a camera-only change must not defeat the v4.14.1 "unchanged tab never writes" stale-tab gate (the autosave still carries whatever pose the last explicit save stamped). Old files without the field keep today's behavior. Verified in-browser on a real 2-scene project: moved the camera to a distinctive pose, switched scenes and back — pose snapped back exactly (focus/radius/phi/theta round-trip), stamp visible in metadata.
+- v4.28.0 — **Phase 34 — Ladders**: first-class `LadderDef` zone entity (rails+rungs `LadderBuilder`, thin solid collider, auto-built climb-column + top-lip **sensor pair** registered handle→ladderId in ZoneManager's `ladderSensorMap`); TriggerSystem emits deduped `ladder:zone-enter/exit`; CharacterController gains a **climb movement mode** (auto-mount on move-toward dot ≥ 0.5, KCC bypassed via `CharacterBody.setClimbTranslation`, X/Z lerped onto the climb line, W/S vertical at `PlayerSettings.climbSpeed`, jump-release + 0.4s re-grab cooldown, fixed-marker top dismount, top-zone auto-remount AND "Climb down" interact prompt, unconditional `_exitClimb()` wired to teleport/rebuild/delete/dispose — no soft locks); `LocomotionState` gains `"climb"` (plays the Climb clip at input-proportional `timeScale`, 0 = hanging); editor: Ladder variant under the Stair toolbar button, `LadderTool` click-place, LADDER PropertiesPanel geo/mat screens, undo via journal `"ladder"` kind. Plan: `plans/phase-34-ladders.md`; acceptance: `test-plans/phase-34-ladders.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -1233,6 +1234,11 @@ The in-memory mirror of the JSON. All tools write to WorldState; WorldState emit
 > scalars for exactly this reason. Emits `shape:added/updated/removed`; `"shape"` is a
 > `ChangeKind`, so undo/redo replay is generic. `removeShape` does NOT prune nodes
 > (shapes are not node-backed — cloned from the stair trio, not the platform trio).
+>
+> **v4.28.0 (Phase 34):** `addLadder` / `updateLadder` / `removeLadder` — the same
+> optional-array pattern (`zone.ladders ??= []`), `"ladder"` ChangeKind, emits
+> `ladder:added/updated/removed`. Serialization is wholesale (zones round-trip whole),
+> so no WorldLoader changes were needed.
 
 ```js
 class WorldState {
@@ -2338,6 +2344,13 @@ collider (`registerShape`). They are **never baked into vertices** — moving up
 > `register` overwrites. `object:updated` rebuilds colliders on `changes.mover` too, and
 > its shape-move fast path is skipped for mover shapes (`_movers.has(id)`) — their collider
 > is parented to the kinematic body.
+>
+> **v4.28.0 (Phase 34):** ladders join the entity lifecycle — `ladderEntries`
+> (meshes + solid collider + 2 sensors + def) in each ZoneEntry with its own
+> `laddersGroup`, `ladder:added/updated/removed` handlers mirroring the stair trio,
+> and `ladderSensorMap` (collider handle → ladderId, both sensor boxes) exposed for
+> `TriggerSystem.setLadderSensors`. Remove/rebuild/unload paths delete the handles
+> before freeing the colliders.
 
 ## MoverSystem.ts
 
@@ -2850,6 +2863,24 @@ rendered camera — which is why occlusion-test mode (Phase 28) works with **zer
 changes to this file**: its `camera` simply isn't handed to the renderer and
 becomes the "logic camera" (still written every frame, spring-arm included;
 visualized by PreviewController's CameraHelper).
+
+> **v4.28.0 (Phase 34 — ladders):** a second movement regime. `_nearLadders` tracks
+> `ladder:zone-enter/exit`; while not climbing, `_tryMount(dir)` mounts when moving
+> toward a near ladder (dot ≥ 0.5 against the climb-face normal; from the platform
+> side only within the top zone, feet above `top − 0.5`). While `_climbLadder` is set
+> the whole gravity/mover/KCC block is skipped: `_updateClimb` drives
+> `CharacterBody.setClimbTranslation` directly (X/Z exp-lerped onto the climb line at
+> 12/s, Y = `move.y × climbSpeed` clamped to [foot, top]); jump = let go (+0.4s
+> re-grab cooldown); pushing up at the top teleports to the **fixed stand marker**
+> (`topDismountOffset` inward — never physics-derived); pushing down at the foot
+> exits. Anim phase `"climb"` loops the `climb` intent with
+> `timeScale = |vy| / 2` (0 = hanging) and self-heals if the model loads after the
+> mount. `_exitClimb()` is the single unconditional exit — called by teleport,
+> `ladder:updated/removed`, and `dispose()`, so no path can soft-lock. The top zone
+> also surfaces a `"Climb down"` `character:interact-range` prompt whose
+> `interactPressed` mounts (`_interactLadder`), taking priority over object interacts
+> only when no object prompt is active. Constructor gains an optional
+> `_ladderLookup(id) → LadderDef|null` (PreviewController resolves via WorldState).
 
 ## PreviewController.ts
 
@@ -7048,6 +7079,9 @@ if (colliders.terrain)                         physicsWorld.removeCollider(colli
 > allocations**), accumulating depenetration along the manifold normal (flip-aware sign,
 > deepest `contactDist < 0`), clamped to `MAX_PUSH_PER_FRAME = 0.3`. Returns a reused
 > scratch vector.
+> **v4.28.0 (Phase 34):** `setClimbTranslation(pos)` — writes
+> `setNextKinematicTranslation` directly, bypassing the KCC (its snap-to-ground and
+> slope clamps fight a wall climb). Only CharacterController's climb mode calls it.
 
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -7111,6 +7145,15 @@ export class CharacterBody {
 ```
 
 ### TriggerSystem.ts
+
+> **Current shape (stale snippet below):** one `intersectionPairsWith` pass per frame
+> over the character collider serves three sensor families — door/zone-transition
+> sensors (`zone:enter`, 2s cooldown), trigger volumes (`setVolumeSensors`,
+> enter/exit diff by collider handle → `trigger:volume-enter/exit`), and
+> **ladders (v4.28.0)**: `setLadderSensors(map)` (handle → ladderId from
+> `ZoneManager.ladderSensorMap`), deduped by ladderId since each ladder has two
+> sensor boxes (climb column + top-lip zone), diffed the same set-swap
+> zero-allocation way → `ladder:zone-enter/exit`.
 
 ```ts
 import RAPIER from "@dimforge/rapier3d-compat";
@@ -7824,3 +7867,55 @@ shadow map.
 > - **Assets:** No hardcoded asset or material registries. Both are loaded dynamically from `public/assets/textures/manifest.json` and `public/assets/models/manifest.json` via `AssetManager.initMaterials()` and `AssetManager.initAssets()` on startup.
 > - **Scripting:** `ScriptEngine` is the only place scripts execute. No other module calls `new Function()` or `eval()`. Bus events are the only way scripts communicate with the rest of the engine.
 > - **Persistence:** Three separate stores — scene file (explicit save/load), game save (localStorage, auto), editor preferences (localStorage, on change). Never mix them."
+
+---
+
+## Ladders — Phase 34 (v4.28.0)
+
+First-class climbable entity + a locked climb movement mode. Full plan:
+`plans/phase-34-ladders.md`; acceptance record: `test-plans/phase-34-ladders.md`.
+Design follows the cross-engine survey (trigger volume + state flag, not physics;
+fixed dismount markers; the top-remount problem solved twice — auto-snap AND prompt).
+
+### Data & build
+
+- `LadderDef` (`src/types.ts`): foot `position`, `rotationY` (climb face = local +Z),
+  `height`, `width`, `rungSpacing`, `material`(+overrides), `topDismountOffset`,
+  `floorLevel`, `groupIds`. `ZoneDef.ladders?` optional array.
+- `src/builders/LadderBuilder.ts`: merged box geometry (2 rails + rungs every
+  `rungSpacing`), one mesh with `editorType: "ladder"`; `resolveLadderParams(def)`
+  clamps sparse defs. Colliders: one solid cuboid slab (0.16m deep) + **two sensors** —
+  climb column (0.9m off the climb face, full height + margins) and top-lip zone
+  (1.1m onto the platform side, 1.3m tall above the top) for remount-from-above.
+- ZoneManager: `ladderEntries` per zone, `laddersGroup`, stair-style add/rebuild/remove
+  handlers, `ladderSensorMap` (handle → ladderId).
+
+### Runtime
+
+- TriggerSystem: `setLadderSensors(map)`; same zero-allocation enter/exit diff as
+  volumes, deduped by ladderId → `ladder:zone-enter/exit`.
+- CharacterController climb mode: see the CharacterController.ts section (v4.28.0
+  callout) — mount intent (dot ≥ 0.5), KCC bypass via `CharacterBody.setClimbTranslation`,
+  W/S at `PlayerSettings.climbSpeed` (default 2), jump-release + 0.4s cooldown,
+  fixed-marker top dismount, top-zone auto-remount + "Climb down" interact prompt,
+  unconditional `_exitClimb()` (teleport/rebuild/delete/dispose) — no soft-lock paths.
+- `LocomotionState` gains `"climb"`: plays the `Climb` clip (authored into
+  character.gltf, see `.claude/skills/gltf-clip-authoring/`) at
+  `timeScale = |vy| / 2` — hanging still pauses the clip.
+
+### Editor
+
+- Toolbar: Stair button gains variants (▤ Stair / ☰ Ladder); `IconLadder` in icons.tsx.
+- `src/editor/LadderTool.ts`: single click places a default ladder (h 3, yaw 0) on the
+  clicked surface; height/facing edited in the panel (`tool:placed` → auto-select).
+- PropertiesPanel: LADDER geo screen (position/rotY/height/width/rung spacing/top
+  dismount offset) + single-material mat screen; player panel gains CLIMB SPEED and a
+  CLIMB (ladders) anim-override slot. Undo/redo generic via the `"ladder"` ChangeKind.
+
+### Verified (2026-07-11, frame-stepped + real clicks)
+
+Mount frame-11, line snap exact, clip timeScale 1↔0, hang drift 0, jump-release +
+cooldown gate, top dismount lands exactly on the fixed marker grounded, "Climb down"
+prompt + E-mount, top auto-remount, bottom dismount, teleport/rebuild force-exits,
+tool placement + panel edit + 2-level undo through the real UI. Solid collider blocks
+walk-through. No new console errors; typecheck clean.

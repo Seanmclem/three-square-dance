@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
@@ -56,6 +56,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   platform:         { desc: "Click and drag to define a freestanding platform.",        hint: "Click to place platform" },
   "poly-platform":  { desc: "Click to place vertices. Enter or click first dot to close.", hint: "Click to add first vertex" },
   stair:       { desc: "Click bottom point, then top point of staircase.",         hint: "Click bottom of stair" },
+  ladder:      { desc: "Click to place a ladder foot. Height and facing are edited in the panel.", hint: "Click to place ladder" },
   object:      { desc: "Choose an asset below, click to place.",                   hint: "Select an asset first" },
   zone:        { desc: "Draw a zone boundary to group rooms.",                     hint: "Click to define zone area" },
   spawnpoint:       { desc: "Click to place the player spawn point.",                   hint: "Click to set spawn location" },
@@ -177,6 +178,7 @@ const GEO_SUBTITLES: Partial<Record<string, string>> = {
   floor:    "POSITION · SIZE · VERTICES",
   platform: "POSITION · SIZE",
   stair:    "POINTS · STEPS",
+  ladder:   "TRANSFORM · RUNGS",
   object:   "TRANSFORM",
   opening:  "DIMENSIONS",
   shape:    "TRANSFORM · PARAMS",
@@ -187,6 +189,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   floor:    ["geo", "mat", "vert"],
   platform: ["geo", "mat"],
   stair:    ["geo", "mat"],
+  ladder:   ["geo", "mat"],
   object:   ["geo", "mat", "colliders"],
   opening:  ["geo"],
   shape:    ["geo", "mat"],
@@ -211,6 +214,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
   const floorData = type === "floor"    ? selected.data as FloorDef    : null;
   const platData  = type === "platform" ? selected.data as PlatformDef : null;
   const stairData = type === "stair"    ? selected.data as StairDef    : null;
+  const ladderData = type === "ladder"  ? selected.data as LadderDef   : null;
   const shapeData = type === "shape"    ? selected.data as ShapeDef    : null;
 
   switch (s) {
@@ -221,6 +225,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
         : `${(floorData.floorMesh.nodeIds ?? floorData.floorMesh.points ?? []).length} verts`;
       if (platData)  return `${platData.size.width}×${platData.size.depth}`;
       if (stairData) return `${effectiveSteps(stairData)} steps`;
+      if (ladderData) return `h ${ladderData.height} · ${Math.floor((ladderData.height - 0.05) / ladderData.rungSpacing)} rungs`;
       if (shapeData) {
         if (isBrush(shapeData)) return `brush · ${shapeData.mesh!.vertices.length} corners`;
         const p = resolveShapeParams(shapeData);
@@ -236,6 +241,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (floorData) { matId = floorData.floorMesh.material; overrides = floorData.materialOverrides; }
       if (platData)  { matId = platData.material;            overrides = platData.materialOverrides; }
       if (stairData) { matId = stairData.material;           overrides = stairData.materialOverrides; }
+      if (ladderData) { matId = ladderData.material;         overrides = ladderData.materialOverrides; }
       if (shapeData) { matId = shapeData.material;           overrides = shapeData.materialOverrides; }
       if (!matId) return "";
       const baseDef = materialList.find(m => m.id === matId);
@@ -288,6 +294,10 @@ function objectTypeLabel(selected: SelectedObjectPayload): string {
   if (type === "stair") {
     const d = selected.data as StairDef | null;
     return `STAIR · ${(d?.style ?? "").toUpperCase()}`;
+  }
+  if (type === "ladder") {
+    const d = selected.data as LadderDef | null;
+    return `LADDER · LEVEL ${d?.floorLevel ?? 0}`;
   }
   if (type === "opening") {
     const d = selected.data as Opening | null;
@@ -795,6 +805,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   if (selected.type === "floor")    return <FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />;
   if (selected.type === "platform") return <PlatformGeoView selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
+  if (selected.type === "ladder")   return <LadderGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} activeTool={activeTool} materialList={materialList} />;
@@ -3126,6 +3137,7 @@ function MatScreen({ selected, materialList, onObjectUpdate, onAddMaterial, qual
         {type === "floor"    && <FloorMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "platform" && <PlatformMatView selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "stair"    && <StairMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
+        {type === "ladder"   && <LadderMatView   selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} />}
         {type === "shape"    && <ShapeMatView    selected={selected} materialList={materialList} onObjectUpdate={onObjectUpdate} onAddMaterial={onAddMaterial} bus={bus} />}
       </div>
       <div style={{ padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.05)", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -3170,6 +3182,99 @@ function FloorMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
       currentMaterialId={floorData?.floorMesh.material ?? "concrete_01"}
       overrides={floorData?.materialOverrides}
       onMaterialChange={id => onObjectUpdate({ floorMesh: { ...floorData!.floorMesh, material: id }, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
+      onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+      onAddMaterial={onAddMaterial}
+    />
+  );
+}
+
+function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void }) {
+  const ladder = selected.data as LadderDef | null;
+  const [posStr,  setPosStr]  = useState({ x: String(ladder?.position.x ?? 0), y: String(ladder?.position.y ?? 0), z: String(ladder?.position.z ?? 0) });
+  const [rotYStr, setRotYStr] = useState(String(ladder?.rotationY ?? 0));
+  const [hStr,    setHStr]    = useState(String(ladder?.height ?? 3));
+  const [wStr,    setWStr]    = useState(String(ladder?.width ?? 0.7));
+  const [rungStr, setRungStr] = useState(String(ladder?.rungSpacing ?? 0.35));
+  const [dismStr, setDismStr] = useState(String(ladder?.topDismountOffset ?? 0.6));
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(ladder?.position.x ?? 0), y: String(ladder?.position.y ?? 0), z: String(ladder?.position.z ?? 0) });
+    setRotYStr(String(ladder?.rotationY ?? 0));
+    setHStr(String(ladder?.height ?? 3));
+    setWStr(String(ladder?.width ?? 0.7));
+    setRungStr(String(ladder?.rungSpacing ?? 0.35));
+    setDismStr(String(ladder?.topDismountOffset ?? 0.6));
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitPos = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onObjectUpdate({ position: { ...(ladder?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>); };
+  const commitNum = (field: keyof LadderDef, val: string, min: number) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= min) onObjectUpdate({ [field]: n } as unknown as Partial<WorldObject>); };
+
+  const numField = (label: string, val: string, setter: (v: string) => void, field: keyof LadderDef, min: number, step = 0.1) => (
+    <div>
+      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{label}</div>
+      <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+        <input type="number" step={step} value={val}
+          onChange={e => { setter(e.target.value); schedule(() => commitNum(field, e.target.value, min)); }}
+          onBlur={e => flush(() => commitNum(field, e.target.value, min))}
+          onKeyDown={e => { if (e.key === "Enter") flush(() => commitNum(field, (e.target as HTMLInputElement).value, min)); }}
+          style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div>
+        <div style={LABEL}>POSITION (foot)</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={LABEL}>ROTATION Y (deg) — climb side faces local +Z</div>
+        <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px", width: "fit-content" }}>
+          <span style={{ color: "#6bff8a", fontSize: 9 }}>Y</span>
+          <input type="number" step={15} value={rotYStr}
+            onChange={e => { setRotYStr(e.target.value); schedule(() => commitNum("rotationY", e.target.value, -Infinity)); }}
+            onBlur={e => flush(() => commitNum("rotationY", e.target.value, -Infinity))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitNum("rotationY", (e.target as HTMLInputElement).value, -Infinity)); }}
+            style={{ width: 70, minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+          />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+        {numField("HEIGHT", hStr, setHStr, "height", 0.5)}
+        {numField("WIDTH", wStr, setWStr, "width", 0.3)}
+        {numField("RUNG SPACING", rungStr, setRungStr, "rungSpacing", 0.15, 0.05)}
+        {numField("TOP DISMOUNT OFFSET", dismStr, setDismStr, "topDismountOffset", 0.2)}
+      </div>
+    </div>
+  );
+}
+
+function LadderMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
+  const ladder = selected.data as LadderDef | null;
+  return (
+    <MaterialSection
+      key={selected.id}
+      label="LADDER"
+      defaultExpanded={true}
+      materialList={materialList}
+      currentMaterialId={ladder?.material ?? "concrete_01"}
+      overrides={ladder?.materialOverrides}
+      onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
       onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
       onAddMaterial={onAddMaterial}
     />
@@ -4037,6 +4142,7 @@ function SpawnSettingsView({
     { slot: "jump",      label: "JUMP (takeoff)" },
     { slot: "jump_idle", label: "JUMP IDLE (in air)" },
     { slot: "jump_land", label: "JUMP LAND" },
+    { slot: "climb",     label: "CLIMB (ladders)" },
   ];
   const autoClip = (intent: string): string | undefined => {
     const lc = intent.toLowerCase();
@@ -4116,6 +4222,8 @@ function SpawnSettingsView({
 
       {numField("MOVE SPEED", "moveSpeed", 0.5)}
       {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
+      {numField("CLIMB SPEED", "climbSpeed", 0.5, 2,
+        "Vertical speed on ladders (metres/second). W climbs up, S climbs down, jump lets go.")}
       {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
       {settings.cameraMode === "thirdperson" && numField("CAMERA DISTANCE", "thirdPersonDistance", 0.5, undefined,
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
