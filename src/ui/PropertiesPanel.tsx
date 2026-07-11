@@ -965,7 +965,7 @@ function RectFloorFields({ floor, nodes, onFloorNodesUpdate }: {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
           {([["W", "w"], ["D", "d"]] as const).map(([lbl, dim]) => (
             <div key={dim}>
-              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+              <div style={{ ...LABEL, marginBottom: 2 }}>{lbl}</div>
               <input type="number" step={0.5} min={0.5} value={sizeStr[dim]}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                 onChange={e => { setSizeStr(p => ({ ...p, [dim]: e.target.value })); schedule(() => commitSize(dim, e.target.value)); }}
@@ -1202,7 +1202,7 @@ function MoverSection({ entityId, mover, onCommit }: {
   };
   const numField = (label: string, val: string, setter: (v: string) => void, field: "distance" | "duration" | "dwell" | "phase" | "speed", step: number, min?: number) => (
     <div>
-      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{label}</div>
+      <div style={{ ...LABEL, marginBottom: 2 }}>{label}</div>
       <input type="number" step={step} min={min} value={val} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
         onChange={e => { setter(e.target.value); schedule(() => commitNum(field, e.target.value)); }}
         onBlur={e => flush(() => commitNum(field, e.target.value))}
@@ -1221,7 +1221,7 @@ function MoverSection({ entityId, mover, onCommit }: {
         <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
-              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>KIND</div>
+              <div style={{ ...LABEL, marginBottom: 2 }}>KIND</div>
               <div style={{ display: "flex", gap: 4 }}>
                 {([["slide", "Slide"], ["spin", "Spin"]] as const).map(([k, lbl]) => (
                   <button key={k} disabled={k === cur.kind} onClick={() => commit({ kind: k })} style={MOVER_SEG_BTN(k === cur.kind)}>{lbl}</button>
@@ -1229,7 +1229,7 @@ function MoverSection({ entityId, mover, onCommit }: {
               </div>
             </div>
             <div>
-              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>AXIS (local)</div>
+              <div style={{ ...LABEL, marginBottom: 2 }}>AXIS (local)</div>
               <div style={{ display: "flex", gap: 4 }}>
                 {(["x", "y", "z"] as const).map(a => (
                   <button key={a} disabled={a === cur.axis} onClick={() => commit({ axis: a })} style={MOVER_SEG_BTN(a === cur.axis)}>{a.toUpperCase()}</button>
@@ -1245,7 +1245,7 @@ function MoverSection({ entityId, mover, onCommit }: {
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                 <div>
-                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>MODE</div>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>MODE</div>
                   <div style={{ display: "flex", gap: 4 }}>
                     {([["loop", "Loop"], ["once", "Once"]] as const).map(([m, lbl]) => (
                       <button key={m} disabled={m === cur.mode} onClick={() => commit({ mode: m })} style={MOVER_SEG_BTN(m === cur.mode)}>{lbl}</button>
@@ -1347,7 +1347,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
           {([["W","width",sizeStr.w,(v: string) => setSizeStr(p => ({ ...p, w: v })),"width"],
              ["D","depth", sizeStr.d,(v: string) => setSizeStr(p => ({ ...p, d: v })),"depth"]] as const).map(([lbl,,val,setter,dim]) => (
             <div key={dim}>
-              <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+              <div style={{ ...LABEL, marginBottom: 2 }}>{lbl}</div>
               <input type="number" step={0.5} min={0.5} value={val}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                 onChange={e => { setter(e.target.value); schedule(() => commitSize(dim as "width" | "depth", e.target.value)); }}
@@ -1375,7 +1375,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
         </label>
         {hasRail && (
           <div>
-            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAILING HEIGHT</div>
+            <div style={{ ...LABEL, marginBottom: 2 }}>RAILING HEIGHT</div>
             <input type="number" step={0.1} min={0.3} value={railH} style={{ ...NUM_INPUT, width: 90 }}
               onChange={e => { setRailH(e.target.value); schedule(() => commitRailH(e.target.value)); }}
               onBlur={e => flush(() => commitRailH(e.target.value))}
@@ -1559,7 +1559,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
             {fields.map(f => (
               <div key={f.key}>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{f.label}</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>{f.label}</div>
                 <input type="number" step={f.step} min={f.min} max={f.max} value={params[f.key] ?? ""}
                   style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { const v = e.target.value; setParams(p => ({ ...p, [f.key]: v })); schedule(() => commitParam(f, v)); }}
@@ -1695,7 +1695,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
                     <option value="__inherit__">(shape material)</option>
                     {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
-                  <span style={{ color: "#505060", fontSize: 9 }}>TILE</span>
+                  <span style={{ ...LABEL, marginBottom: 0 }}>TILE</span>
                   <input type="number" step={0.5} min={0.1} value={tileStr} placeholder="—"
                     style={{ ...NUM_INPUT, width: 52, padding: "2px 4px", fontSize: 10 }}
                     onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(i, e.target.value)); }}
@@ -1858,7 +1858,7 @@ function FaceMaterialRow({ index, face, materialList, isSel, onHover, onPick, ti
         <option value="__inherit__">(shape material)</option>
         {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
       </select>
-      <span style={{ color: "#505060", fontSize: 9 }}>TILE</span>
+      <span style={{ ...LABEL, marginBottom: 0 }}>TILE</span>
       <input type="number" step={0.5} min={0.1} value={tile} placeholder="—"
         style={{ ...NUM_INPUT, width: 48, padding: "2px 4px", fontSize: 10 }}
         onChange={e => { setTile(e.target.value); onTile(e.target.value, false); }}
@@ -2320,7 +2320,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
             </label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>HEIGHT</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>HEIGHT</div>
                 <input type="number" step={0.1} min={0.1} value={railHeight} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailHeight(e.target.value); schedule(() => commitRailHeight(e.target.value)); }}
                   onBlur={e => flush(() => commitRailHeight(e.target.value))}
@@ -2328,7 +2328,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>POST EVERY N STEPS</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>POST EVERY N STEPS</div>
                 <input type="number" step={1} min={1} value={railInterval} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailInterval(e.target.value); schedule(() => commitRailInterval(e.target.value)); }}
                   onBlur={e => flush(() => commitRailInterval(e.target.value))}
@@ -2336,7 +2336,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAIL THICKNESS</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>RAIL THICKNESS</div>
                 <input type="number" step={0.02} min={0.02} value={railBarT} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailBarT(e.target.value); schedule(() => commitRailBarT(e.target.value)); }}
                   onBlur={e => flush(() => commitRailBarT(e.target.value))}
@@ -2344,7 +2344,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>POST THICKNESS</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>POST THICKNESS</div>
                 <input type="number" step={0.02} min={0.02} value={railPostT} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailPostT(e.target.value); schedule(() => commitRailPostT(e.target.value)); }}
                   onBlur={e => flush(() => commitRailPostT(e.target.value))}
@@ -2352,7 +2352,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>SIDE INSET</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>SIDE INSET</div>
                 <input type="number" step={0.02} min={0} value={railSideInset} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailSideInset(e.target.value); schedule(() => commitRailSideInset(e.target.value)); }}
                   onBlur={e => flush(() => commitRailSideInset(e.target.value))}
@@ -2360,7 +2360,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 />
               </div>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>RAIL OVERHANG</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>RAIL OVERHANG</div>
                 <input type="number" step={0.05} min={0} value={railOverhang} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setRailOverhang(e.target.value); schedule(() => commitRailOverhang(e.target.value)); }}
                   onBlur={e => flush(() => commitRailOverhang(e.target.value))}
@@ -2395,7 +2395,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
         </div>
         {undersideMode === "diagonal" && (
           <div>
-            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>STRINGER THICKNESS</div>
+            <div style={{ ...LABEL, marginBottom: 2 }}>STRINGER THICKNESS</div>
             <input type="number" step={0.05} min={0.05} value={undersideThk} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
               onChange={e => { setUndersideThk(e.target.value); schedule(() => commitUndersideThk(e.target.value)); }}
               onBlur={e => flush(() => commitUndersideThk(e.target.value))}
@@ -2415,7 +2415,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>LANDING DEPTH</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>LANDING DEPTH</div>
                 <input type="number" step={0.5} min={0.5} value={landDepth} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setLandDepth(e.target.value); schedule(() => commitLandDepth(e.target.value)); }}
                   onBlur={e => flush(() => commitLandDepth(e.target.value))}
@@ -2424,7 +2424,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               </div>
               {(stair.flights ?? 1) <= 1 ? (
                 <div>
-                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>LANDING WIDTH</div>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>LANDING WIDTH</div>
                   <input type="number" step={0.5} min={0} value={landWidth} placeholder="auto" style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                     onChange={e => { setLandWidth(e.target.value); schedule(() => commitLandWidth(e.target.value)); }}
                     onBlur={e => flush(() => commitLandWidth(e.target.value))}
@@ -2433,7 +2433,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                 </div>
               ) : (
                 <div>
-                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>VOID GAP</div>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>VOID GAP</div>
                   <input type="number" step={0.1} min={0} value={gapStr} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                     onChange={e => { setGapStr(e.target.value); schedule(() => commitGap(e.target.value)); }}
                     onBlur={e => flush(() => commitGap(e.target.value))}
@@ -2444,7 +2444,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>FLIGHTS</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>FLIGHTS</div>
                 <input type="number" step={1} min={1} value={flightsStr} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                   onChange={e => { setFlightsStr(e.target.value); schedule(() => commitFlights(e.target.value)); }}
                   onBlur={e => flush(() => commitFlights(e.target.value))}
@@ -2453,7 +2453,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               </div>
               {(stair.flights ?? 1) > 1 && (
                 <div>
-                  <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>TURN</div>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>TURN</div>
                   <div style={{ display: "flex", gap: 4 }}>
                     {([["left","Left"],["right","Right"]] as const).map(([t, lbl]) => {
                       const isCurrent = t === turnDir;
@@ -2483,7 +2483,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
             )}
             {stair.hasRailing && (stair.flights ?? 1) > 1 && (
               <div>
-                <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>TOP LANDING RAILS</div>
+                <div style={{ ...LABEL, marginBottom: 2 }}>TOP LANDING RAILS</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px" }}>
                   {([["sideArrive", "Arrive side"], ["far", "Far"], ["sideExit", "Exit side"], ["close", "Stairwell"]] as const).map(([key, label]) => (
                     <label key={key} style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
@@ -2520,7 +2520,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
                 {([["W",cutW,setCutW,"width"],["D",cutD,setCutD,"depth"],["H",cutH,setCutH,"height"]] as const).map(([lbl,val,setter,field]) => (
                   <div key={field}>
-                    <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                    <div style={{ ...LABEL, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.1} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                       onChange={e => { setter(e.target.value); schedule(() => commitCutter(field, e.target.value)); }}
@@ -2569,7 +2569,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
                 {([["T+B",cutInnerH,setCutInnerH,"innerTileH"],["L+R",cutInnerV,setCutInnerV,"innerTileV"]] as const).map(([lbl,val,setter,field]) => (
                   <div key={field}>
-                    <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+                    <div style={{ ...LABEL, marginBottom: 2 }}>{lbl}</div>
                     <input type="number" step={0.25} min={0.1} value={val}
                       style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                       onChange={e => { setter(e.target.value); schedule(() => commitCutterInnerTile(field, e.target.value)); }}
@@ -3220,7 +3220,7 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
 
   const numField = (label: string, val: string, setter: (v: string) => void, field: keyof LadderDef, min: number, step = 0.1) => (
     <div>
-      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{label}</div>
+      <div style={{ ...LABEL, marginBottom: 2 }}>{label}</div>
       <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
         <input type="number" step={step} value={val}
           onChange={e => { setter(e.target.value); schedule(() => commitNum(field, e.target.value, min)); }}
@@ -3961,7 +3961,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
           {opening.type !== "passage" && (
             <label style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer" }}>
               <input type="checkbox" checked={opening.trim !== false} onChange={e => onUpdate({ trim: e.target.checked })} style={{ cursor: "pointer", accentColor: "#4d8cff" }} />
-              <span style={{ color: "#505060", fontSize: 9, userSelect: "none" }}>TRIM</span>
+              <span style={{ ...LABEL, marginBottom: 0, userSelect: "none" }}>TRIM</span>
             </label>
           )}
           {!hideDelete && (
@@ -3978,7 +3978,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
           ["ELEV",   elevStr,   setElevStr,   0,   "elevation"],
         ] as const).map(([lbl, val, setter, min, field]) => (
           <div key={field}>
-            <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>{lbl}</div>
+            <div style={{ ...LABEL, marginBottom: 2 }}>{lbl}</div>
             <input type="number" step={0.1} min={min} value={val}
               style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
               onChange={e => { setter(e.target.value); schedule(() => commitNum(e.target.value, min, field)); }}
@@ -3988,7 +3988,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
         ))}
 
         <div>
-          <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>INNER T+B</div>
+          <div style={{ ...LABEL, marginBottom: 2 }}>INNER T+B</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerHStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
             onChange={e => { setInnerHStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileH")); }}
@@ -3996,7 +3996,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
           />
         </div>
         <div>
-          <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>INNER L+R</div>
+          <div style={{ ...LABEL, marginBottom: 2 }}>INNER L+R</div>
           <input type="number" step={0.1} min={0.01} placeholder="auto" value={innerVStr}
             style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
             onChange={e => { setInnerVStr(e.target.value); schedule(() => commitInnerTile(e.target.value, "innerTileV")); }}
@@ -4007,7 +4007,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
 
       {(opening.type === "door" || opening.type === "arch") && (
         <div style={{ marginTop: 4 }}>
-          <div style={{ color: "#505060", fontSize: 9, marginBottom: 4 }}>ZONE LINK</div>
+          <div style={{ ...LABEL }}>ZONE LINK</div>
           {!zonePickerOpen ? (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ flex: 1, fontSize: 10, color: opening.linkedZoneId ? "#80aaff" : "#404050", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -4117,7 +4117,7 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
       </div>
 
       <div style={{ marginBottom: 4 }}>
-        <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>MATERIAL</div>
+        <div style={{ ...LABEL, marginBottom: 2 }}>MATERIAL</div>
         <select value={wall.material} onChange={e => onUpdate({ material: e.target.value, materialOverrides: undefined })}
           style={{ ...NUM_INPUT, padding: "2px 4px", cursor: "pointer" }}
         >
@@ -4127,7 +4127,7 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
       </div>
 
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <div style={{ color: "#505060", fontSize: 9, flexShrink: 0 }}>TILE</div>
+        <div style={{ ...LABEL, marginBottom: 0, flexShrink: 0 }}>TILE</div>
         <input type="number" step={0.1} min={0.1} placeholder="default" value={tileStr}
           style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
           onChange={e => { setTileStr(e.target.value); schedule(() => commitTile(e.target.value)); }}
