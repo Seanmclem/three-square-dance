@@ -45,6 +45,10 @@ const CLIMB_COOLDOWN    = 0.4;   // s after a jump-release before re-grab is all
 const CLIMB_SNAP_RATE   = 12;    // 1/s exp lerp of X/Z onto the ladder line while climbing
 const CLIMB_LINE_GAP    = 0.12;  // capsule surface ↔ ladder plane gap (line offset = gap + radius + slab/2)
 const CLIMB_TOP_FRAC    = 0.5;   // top-zone mount requires feet above top − this (m)
+// The top-lip sensor (1.8m onto the platform) is the PROMPT's range; auto-mount by
+// walking toward the ladder only arms this close to the lip — otherwise any approach
+// movement inside the sensor grabs you before the prompt is usable.
+const CLIMB_TOP_AUTO_DEPTH = 0.7;
 const CLIMB_ANIM_REF    = 1.2;   // climb clip plays at 1× at this speed (m/s) — default climbSpeed 2 → ~1.7×
 
 // Reused scratch objects — the update() loop runs every frame, so it must not allocate
@@ -353,7 +357,7 @@ export class CharacterController {
       let fromTop = false;
       if (localZ > 0.05) {
         mountDot = (moveDir.x * -fx + moveDir.z * -fz) / mLen;
-      } else if (feetY > def.position.y + p.height - CLIMB_TOP_FRAC) {
+      } else if (feetY > def.position.y + p.height - CLIMB_TOP_FRAC && localZ > -CLIMB_TOP_AUTO_DEPTH) {
         mountDot = (moveDir.x * fx + moveDir.z * fz) / mLen;
         fromTop = true;
       } else {
