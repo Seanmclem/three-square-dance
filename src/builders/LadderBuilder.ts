@@ -20,18 +20,24 @@ const SENSOR_SIDE_PAD  = 0.15;  // extra sensor width each side
 const SENSOR_DEPTH     = 0.9;   // how far the climb column reaches out from the ladder plane
 const SENSOR_BELOW     = 0.1;   // column reaches slightly below the foot
 const SENSOR_ABOVE     = 0.5;   // column reaches above the top rung
-const TOPZONE_DEPTH    = 1.8;   // top-lip zone: how far onto the platform (−Z) it reaches
 const TOPZONE_HEIGHT   = 1.3;   // top-lip zone height above the ladder top
 
 /** Defaults/clamps for sparse defs (console-spawned, old saves). */
-export function resolveLadderParams(def: LadderDef): { height: number; width: number; rungSpacing: number; topDismountOffset: number } {
+export function resolveLadderParams(def: LadderDef): {
+  height: number; width: number; rungSpacing: number; topDismountOffset: number;
+  promptRange: number; autoGrabRange: number;
+} {
   const num = (v: number | undefined, dflt: number, min: number, max = Infinity) =>
     Math.min(max, Math.max(min, v ?? dflt));
+  const promptRange = num(def.promptRange, 1.8, 0.3);
   return {
     height:            num(def.height,      3,   0.5),
     width:             num(def.width,       0.7, 0.3),
     rungSpacing:       num(def.rungSpacing, 0.35, 0.15),
     topDismountOffset: num(def.topDismountOffset, 0.6, 0.2),
+    promptRange,
+    // beyond the sensor the mount check never sees the ladder — clamp inside it
+    autoGrabRange:     num(def.autoGrabRange, 0.7, 0.1, promptRange),
   };
 }
 
@@ -119,13 +125,32 @@ export class LadderBuilder {
     );
     // Top-lip sensor: standing area on the platform behind the ladder top —
     // the remount-from-above zone (extends −Z, from just below the top edge up).
+    // Its depth IS the "Climb down" prompt's range; auto-mount uses the tighter
+    // per-ladder autoGrabRange gate in CharacterController.
     const topZone = physicsWorld.createSensorCollider(
       place(
-        RAPIER.ColliderDesc.cuboid(p.width / 2 + SENSOR_SIDE_PAD, TOPZONE_HEIGHT / 2, TOPZONE_DEPTH / 2),
-        0, p.height + TOPZONE_HEIGHT / 2 - 0.1, -(TOPZONE_DEPTH / 2),
+        RAPIER.ColliderDesc.cuboid(p.width / 2 + SENSOR_SIDE_PAD, TOPZONE_HEIGHT / 2, p.promptRange / 2),
+        0, p.height + TOPZONE_HEIGHT / 2 - 0.1, -(p.promptRange / 2),
       ),
     );
 
-    return { meshes: [mesh], colliders: [solid], sensors: [column, topZone] };
+    // Editor-only climb-side indicator: a green arrow at mid-height on the +Z
+    // face, tip pointing into the ladder ("mount from here"). Hidden in
+    // preview/game via the shared editorOnly sweep.
+    const arrowGeo = new THREE.ConeGeometry(0.11, 0.3, 10);
+    arrowGeo.rotateX(-Math.PI / 2);                       // +Y axis → −Z (tip toward the ladder)
+    arrowGeo.translate(0, p.height * 0.55, 0.45);
+    const arrow = new THREE.Mesh(
+      arrowGeo,
+      new THREE.MeshBasicMaterial({ color: 0x44ff88, transparent: true, opacity: 0.85 }),
+    );
+    arrow.position.copy(mesh.position);
+    arrow.rotation.y = mesh.rotation.y;
+    arrow.userData = {
+      editorId: def.id, editorType: "ladder", zoneId,
+      selectable: false, floorLevel: def.floorLevel ?? 0, _ownsMaterial: true, editorOnly: true,
+    } satisfies MeshUserData;
+
+    return { meshes: [mesh, arrow], colliders: [solid], sensors: [column, topZone] };
   }
 }

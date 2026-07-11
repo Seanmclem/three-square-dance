@@ -3196,6 +3196,8 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
   const [wStr,    setWStr]    = useState(String(ladder?.width ?? 0.7));
   const [rungStr, setRungStr] = useState(String(ladder?.rungSpacing ?? 0.35));
   const [dismStr, setDismStr] = useState(String(ladder?.topDismountOffset ?? 0.6));
+  const [promptStr, setPromptStr] = useState(String(ladder?.promptRange ?? 1.8));
+  const [grabStr, setGrabStr] = useState(String(ladder?.autoGrabRange ?? 0.7));
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
@@ -3205,6 +3207,8 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     setWStr(String(ladder?.width ?? 0.7));
     setRungStr(String(ladder?.rungSpacing ?? 0.35));
     setDismStr(String(ladder?.topDismountOffset ?? 0.6));
+    setPromptStr(String(ladder?.promptRange ?? 1.8));
+    setGrabStr(String(ladder?.autoGrabRange ?? 0.7));
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const commitPos = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onObjectUpdate({ position: { ...(ladder?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>); };
@@ -3259,6 +3263,13 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
         {numField("WIDTH", wStr, setWStr, "width", 0.3)}
         {numField("RUNG SPACING", rungStr, setRungStr, "rungSpacing", 0.15, 0.05)}
         {numField("TOP DISMOUNT OFFSET", dismStr, setDismStr, "topDismountOffset", 0.2)}
+        {numField("PROMPT RANGE", promptStr, setPromptStr, "promptRange", 0.3)}
+        {numField("AUTO-GRAB RANGE", grabStr, setGrabStr, "autoGrabRange", 0.1)}
+      </div>
+      <div style={{ color: "#505060", fontSize: 9, lineHeight: 1.5 }}>
+        Top-of-ladder ranges (metres onto the platform): PROMPT RANGE = where "Climb down"
+        appears; AUTO-GRAB RANGE = where walking toward the ladder mounts (clamped to
+        PROMPT RANGE). The green arrow marks the climbable side.
       </div>
     </div>
   );

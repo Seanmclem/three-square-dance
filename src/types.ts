@@ -621,6 +621,8 @@ export interface LadderDef {
   material:  string;
   materialOverrides?: MaterialOverrides;
   topDismountOffset?: number; // meters inward (−Z local) from the top onto the platform (default 0.6)
+  promptRange?:   number;     // how far onto the platform the top "Climb down" prompt reaches (default 1.8)
+  autoGrabRange?: number;     // how close to the lip walking-toward auto-mounts (default 0.7, clamped ≤ promptRange)
   floorLevel?: number;
   groupIds?: string[];
 }

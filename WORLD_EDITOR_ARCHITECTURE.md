@@ -7909,8 +7909,14 @@ fixed dismount markers; the top-remount problem solved twice — auto-snap AND p
 - `src/editor/LadderTool.ts`: single click places a default ladder (h 3, yaw 0) on the
   clicked surface; height/facing edited in the panel (`tool:placed` → auto-select).
 - PropertiesPanel: LADDER geo screen (position/rotY/height/width/rung spacing/top
-  dismount offset) + single-material mat screen; player panel gains CLIMB SPEED and a
-  CLIMB (ladders) anim-override slot. Undo/redo generic via the `"ladder"` ChangeKind.
+  dismount offset, plus per-ladder **PROMPT RANGE** and **AUTO-GRAB RANGE** — v4.28.4:
+  `LadderDef.promptRange` sizes the top-lip sensor = "Climb down" reach, default 1.8;
+  `autoGrabRange` gates the walk-toward top mount, default 0.7, clamped ≤ promptRange)
+  + single-material mat screen; player panel gains CLIMB SPEED and a CLIMB (ladders)
+  anim-override slot. Undo/redo generic via the `"ladder"` ChangeKind.
+- Editor-only climb-side indicator (v4.28.4): a green arrow on the +Z face at
+  mid-height, tip pointing into the ladder; hidden in preview/game via the
+  `editorOnly` sweep (`_setEditorOnlyVisible` now covers `ladderEntries` too).
 
 ### Verified (2026-07-11, frame-stepped + real clicks)
 

@@ -1482,6 +1482,12 @@ export class ZoneManager {
             mesh.visible = visible;
         }
       }
+      for (const [, le] of zone.ladderEntries) {
+        for (const mesh of le.meshes) {
+          if ((mesh.userData as { editorOnly?: boolean }).editorOnly)
+            mesh.visible = visible;
+        }
+      }
     }
   }
 
