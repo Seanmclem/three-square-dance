@@ -442,6 +442,15 @@ yanking Chrome to the front is rude. Instead, drive frames synchronously from
 > get the HMR-stamped URL via `performance.getEntriesByType('resource')` (e.g.
 > `.../PhysicsWorld.ts?t=<stamp>`) and import THAT, then sanity-check
 > `physicsWorld.initialized === true` before stepping.
+>
+> ⚠️ **The same split-brain bites USER-VISIBLE behavior in long-lived tabs.** A tab kept
+> open across pushed code changes accumulates Vite HMR patches; the live session can run a
+> MIXED old/new module graph. 2026-07-10: the user's player "slowly slid off" a moving
+> platform in their long-lived tab — unreproducible under any manual stepping, and a
+> per-frame recorder on a FRESH tab showed the carry exact to 0.0000 over 20m of platform
+> travel. The stale-HMR session was the entire bug. **When a user reports subtly-wrong
+> runtime behavior after code was pushed mid-session, have them reload the tab BEFORE
+> debugging.**
 
 ```js
 const { physicsWorld } = await import('/src/physics/PhysicsWorld.ts'); // Vite serves the
