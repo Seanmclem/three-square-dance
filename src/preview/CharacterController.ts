@@ -45,7 +45,7 @@ const CLIMB_COOLDOWN    = 0.4;   // s after a jump-release before re-grab is all
 const CLIMB_SNAP_RATE   = 12;    // 1/s exp lerp of X/Z onto the ladder line while climbing
 const CLIMB_LINE_GAP    = 0.12;  // capsule surface ↔ ladder plane gap (line offset = gap + radius + slab/2)
 const CLIMB_TOP_FRAC    = 0.5;   // top-zone mount requires feet above top − this (m)
-const CLIMB_ANIM_REF    = 2;     // climb clip plays at 1× when climbing at this speed (m/s)
+const CLIMB_ANIM_REF    = 1.2;   // climb clip plays at 1× at this speed (m/s) — default climbSpeed 2 → ~1.7×
 
 // Reused scratch objects — the update() loop runs every frame, so it must not allocate
 // (per-frame garbage triggers GC pauses = micro-stutters). All temps below are set fresh
@@ -261,7 +261,9 @@ export class CharacterController {
     if (this._modelRoot) {
       const feetY = pos.y - (this._body.capsuleHalfHeight + this._body.capsuleRadius);
       this._modelRoot.position.set(pos.x, feetY, pos.z);
-      if (isMoving) {
+      // While climbing the avatar stays chest-to-the-ladder — the movement-facing
+      // rule would spin it to face outward on the way down (input points away).
+      if (isMoving && !this._climbLadder) {
         const targetYaw = Math.atan2(-dir.x, -dir.z);
         let delta = targetYaw - this._modelYaw;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));   // wrap to [-π, π]
