@@ -433,12 +433,19 @@ export class CharacterController {
     const rx = Math.cos(yawRad), rz = -Math.sin(yawRad);   // ladder local +X in world
     const pos = this._body.position;
 
+    const climbSpeed = this._settings.climbSpeed ?? 2;
+
     // Lateral position: narrow ladders snap to the centerline; wide ones (rock
     // walls) keep the mount-point X and A/D shimmies, clamped inside the span.
+    // latSpeed is the APPLIED speed (0 when pinned at the edge) so the climb
+    // clip animates for sideways movement too.
+    let latSpeed = 0;
     if (p.width > CLIMB_FREE_X_WIDTH) {
-      this._climbLocalX += moveX * (this._settings.climbSpeed ?? 2) * dt;
+      const prevX = this._climbLocalX;
+      this._climbLocalX += moveX * climbSpeed * dt;
       const xMax = p.width / 2 - CLIMB_X_MARGIN;
       this._climbLocalX = Math.max(-xMax, Math.min(xMax, this._climbLocalX));
+      latSpeed = Math.abs(this._climbLocalX - prevX) / dt;
     }
     const localX = this._climbLocalX;
 
@@ -446,7 +453,6 @@ export class CharacterController {
     const lineOff = 0.08 + this._body.capsuleRadius + CLIMB_LINE_GAP;
     const lineX = def.position.x + fx * lineOff + rx * localX;
     const lineZ = def.position.z + fz * lineOff + rz * localX;
-    const climbSpeed = this._settings.climbSpeed ?? 2;
     if (this._climbHoldInvert) {
       if (moveY > 0.05) moveY = -moveY;        // still holding the walk-on key → descend
       else this._climbHoldInvert = false;      // released once → normal W=up/S=down
@@ -480,9 +486,10 @@ export class CharacterController {
       pos.z + (lineZ - pos.z) * k,
     ));
 
-    // Clip rate follows actual climb speed; holding still = hanging (paused clip).
+    // Clip rate follows actual movement speed (vertical, lateral, or diagonal);
+    // holding still = hanging (paused clip).
     if (this._currentClip === "climb" && this._currentAction) {
-      this._currentAction.timeScale = Math.abs(vy) / CLIMB_ANIM_REF;
+      this._currentAction.timeScale = Math.hypot(vy, latSpeed) / CLIMB_ANIM_REF;
     }
   }
 
