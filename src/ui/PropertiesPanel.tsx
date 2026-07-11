@@ -4253,6 +4253,8 @@ function SpawnSettingsView({
       {numField("CLIMB SPEED", "climbSpeed", 0.5, 2,
         "Vertical speed on ladders (metres/second). W climbs up, S climbs down, jump lets go.")}
       {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
+      {settings.cameraMode === "fps" && numField("FPS EYE HEIGHT", "fpsEyeHeight", 0.1, 1.7,
+        "Camera height above the character's feet (metres). Leave at the default to track Character Scale automatically (≈1.7 at scale 1). Camera only — does not change the collision size.")}
       {settings.cameraMode === "thirdperson" && numField("CAMERA DISTANCE", "thirdPersonDistance", 0.5, undefined,
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
       {settings.cameraMode === "thirdperson" && numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,

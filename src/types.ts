@@ -423,6 +423,9 @@ export interface PlayerSettings {
   thirdPersonHeight:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
   climbSpeed?:         number;            // ladder climb speed m/s (default 2)
+  // FPS camera height above the FEET (m). Absent = derived from the capsule
+  // (≈1.7 at characterScale 1), so it tracks Character Scale automatically.
+  fpsEyeHeight?:       number;
   characterScale?:     number;            // uniform scale of the 3rd-person avatar + collision (default 1)
   // Per-character clip overrides. Key absent/undefined = Auto (name match); null = None
   // (play nothing); string = use that exact clip name.

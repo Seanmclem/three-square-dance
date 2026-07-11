@@ -266,7 +266,11 @@ export class CharacterController {
       this.camera.position.copy(pivot).addScaledVector(back, this._armDist);
       this.camera.lookAt(pivot);
     } else {
-      const eyeY = this._camY + this._body.capsuleHalfHeight + this._body.capsuleRadius - 0.1;
+      // Eye height above the FEET: authored override, or derived from the capsule
+      // (capsule top − 0.1) so it tracks Character Scale when unset.
+      const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
+      const eyeAboveFeet = this._settings.fpsEyeHeight ?? (capsuleBottom * 2 - 0.1);
+      const eyeY = this._camY - capsuleBottom + eyeAboveFeet;
       this.camera.position.set(pos.x, eyeY, pos.z);
       this.camera.rotation.set(this._pitch, this._yaw, 0, "YXZ");
     }
