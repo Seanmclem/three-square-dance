@@ -49,6 +49,11 @@ const CLIMB_TOP_FRAC    = 0.5;   // top-zone mount requires feet above top − t
 // walking-toward auto-mount arms only within def.autoGrabRange of the lip — otherwise
 // any approach movement inside the sensor grabs you before the prompt is usable.
 const CLIMB_ANIM_REF    = 1.2;   // climb clip plays at 1× at this speed (m/s) — default climbSpeed 2 → ~1.7×
+// Ladders up to this width snap to the centerline (feels right on a normal ladder);
+// wider ones (rock walls, vine walls) keep the mount-point lateral position and
+// A/D shimmies sideways, clamped inside the span.
+const CLIMB_FREE_X_WIDTH = 1.2;
+const CLIMB_X_MARGIN     = 0.25; // lateral clamp inset from the ladder's edges
 
 // Reused scratch objects — the update() loop runs every frame, so it must not allocate
 // (per-frame garbage triggers GC pauses = micro-stutters). All temps below are set fresh
@@ -90,6 +95,8 @@ export class CharacterController {
   // Mounted from the top while still holding "forward toward the ladder": that held key
   // means DESCEND until released once (otherwise W=up top-dismounts you right back off).
   private _climbHoldInvert = false;
+  private _climbLocalX = 0;                           // lateral spot on a wide ladder (persistent — deriving from the
+                                                      // body each frame makes the snap-lerp eat 90% of the shimmy speed)
   private _promptCooldown = 0;                        // s of "Climb down" prompt suppression after a climb exit
   private readonly _nearLadders = new Set<string>();  // sensor overlap (TriggerSystem events)
   private _climbCooldown = 0;                          // s until re-grab allowed
@@ -197,7 +204,7 @@ export class CharacterController {
     }
 
     if (this._climbLadder) {
-      this._updateClimb(dt, jumpHeld, actions.move.y);
+      this._updateClimb(dt, jumpHeld, actions.move.y, actions.move.x);
     } else {
       if (this._body.isGrounded) {
         if (jumpHeld && this._jumpArmed) {
@@ -372,6 +379,18 @@ export class CharacterController {
     this._climbLadder = def;
     this._climbHoldInvert = fromTop;   // held forward = descend until released (see field comment)
     this._velY = 0;
+    // Wide ladders keep the grab-point lateral position; narrow ones center.
+    const p = resolveLadderParams(def);
+    if (p.width > CLIMB_FREE_X_WIDTH) {
+      const yawRad = THREE.MathUtils.degToRad(def.rotationY);
+      const rx = Math.cos(yawRad), rz = -Math.sin(yawRad);
+      const pos = this._body.position;
+      const xMax = p.width / 2 - CLIMB_X_MARGIN;
+      this._climbLocalX = Math.max(-xMax, Math.min(xMax,
+        (pos.x - def.position.x) * rx + (pos.z - def.position.z) * rz));
+    } else {
+      this._climbLocalX = 0;
+    }
     // Face the ladder: camera yaw and avatar both look at the climb face.
     const yawRad = THREE.MathUtils.degToRad(def.rotationY);
     this._yaw = yawRad;
@@ -398,7 +417,7 @@ export class CharacterController {
     }
   }
 
-  private _updateClimb(dt: number, jumpHeld: boolean, moveY: number): void {
+  private _updateClimb(dt: number, jumpHeld: boolean, moveY: number, moveX: number): void {
     const def = this._climbLadder!;
     const p = resolveLadderParams(def);
     const capsuleBottom = this._body.capsuleHalfHeight + this._body.capsuleRadius;
@@ -411,12 +430,22 @@ export class CharacterController {
 
     const yawRad = THREE.MathUtils.degToRad(def.rotationY);
     const fx = Math.sin(yawRad), fz = Math.cos(yawRad);
-    // Climb line: capsule center held just off the climb face.
-    const lineOff = 0.08 + this._body.capsuleRadius + CLIMB_LINE_GAP;
-    const lineX = def.position.x + fx * lineOff;
-    const lineZ = def.position.z + fz * lineOff;
-
+    const rx = Math.cos(yawRad), rz = -Math.sin(yawRad);   // ladder local +X in world
     const pos = this._body.position;
+
+    // Lateral position: narrow ladders snap to the centerline; wide ones (rock
+    // walls) keep the mount-point X and A/D shimmies, clamped inside the span.
+    if (p.width > CLIMB_FREE_X_WIDTH) {
+      this._climbLocalX += moveX * (this._settings.climbSpeed ?? 2) * dt;
+      const xMax = p.width / 2 - CLIMB_X_MARGIN;
+      this._climbLocalX = Math.max(-xMax, Math.min(xMax, this._climbLocalX));
+    }
+    const localX = this._climbLocalX;
+
+    // Climb line: capsule center held just off the climb face at the lateral spot.
+    const lineOff = 0.08 + this._body.capsuleRadius + CLIMB_LINE_GAP;
+    const lineX = def.position.x + fx * lineOff + rx * localX;
+    const lineZ = def.position.z + fz * lineOff + rz * localX;
     const climbSpeed = this._settings.climbSpeed ?? 2;
     if (this._climbHoldInvert) {
       if (moveY > 0.05) moveY = -moveY;        // still holding the walk-on key → descend
@@ -431,10 +460,11 @@ export class CharacterController {
     // (never physics-derived), inward from the ladder top. Camera Y smoothing eats the step.
     if (vy > 0 && newY >= maxY) {
       this._exitClimb();
+      // Stand marker keeps the lateral spot (matters on wide rock-wall ladders).
       this._body.teleport(_tmpEye.set(
-        def.position.x - fx * p.topDismountOffset,
+        def.position.x - fx * p.topDismountOffset + rx * localX,
         def.position.y + p.height + capsuleBottom,
-        def.position.z - fz * p.topDismountOffset,
+        def.position.z - fz * p.topDismountOffset + rz * localX,
       ));
       return;
     }

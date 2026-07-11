@@ -7923,9 +7923,14 @@ fixed dismount markers; the top-remount problem solved twice — auto-snap AND p
   `LadderDef.noCollider` skips the solid slab (the dressed rock/vine wall supplies
   its own collision — an extra invisible slab would snag the player). Both are
   LADDER panel checkboxes. Recipe: ladder flush against the visible geometry,
-  both boxes checked; sensors/mount/ranges are unaffected. Wide surfaces: the
-  climb clamps to the ladder centerline, so tile several invisible ladders
-  side-by-side (lateral climb movement is deferred).
+  both boxes checked; sensors/mount/ranges are unaffected.
+- **Width-aware lateral behavior** (v4.28.7): ladders ≤ `CLIMB_FREE_X_WIDTH`
+  (1.2m) snap to the centerline (normal-ladder feel); wider ones keep the
+  grab-point lateral position (`_climbLocalX`, persistent state — deriving it
+  from the body each frame makes the snap-lerp eat 90% of the shimmy speed)
+  and **A/D shimmies** at climbSpeed, clamped `±(width/2 − 0.25)`. The top
+  dismount marker preserves the lateral spot. One wide invisible ladder now
+  covers a whole rock face.
 
 ### Verified (2026-07-11, frame-stepped + real clicks)
 
