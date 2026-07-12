@@ -80,6 +80,23 @@ export function migrateDialogues(file: SceneFile): void {
     for (const s of file.world?.scripts ?? []) s.actions.forEach(a => intoZone(file.zones[0], a));
 }
 
+/**
+ * Phase 35: WorldConfig.ambientLight/sunLight existed since day one but were never
+ * applied — every scene rendered with SceneManager's hardcoded ambient 0.5 / sun 2.0.
+ * Old saves therefore carry the never-honored serialization defaults (1.2 / 3.0);
+ * applying those verbatim would visibly brighten every existing world. Rewrite
+ * exactly those untouched defaults to the values that match how the scene always
+ * looked. Hand-edited values are left alone. Mutates in place.
+ */
+export function migrateWorldLighting(file: SceneFile): void {
+  const w = file.world;
+  if (!w) return;
+  if (w.ambientLight?.color === "#aabbcc" && w.ambientLight.intensity === 1.2)
+    w.ambientLight.intensity = 0.5;
+  if (w.sunLight?.color === "#fff4e0" && w.sunLight.intensity === 3.0)
+    w.sunLight.intensity = 2.0;
+}
+
 /** Migrates a parsed scene JSON from old `start`/`end` wall format to node-based. */
 export function migrateWallNodes(zones: ZoneDef[]): void {
   for (const zone of zones) {

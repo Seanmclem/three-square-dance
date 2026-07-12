@@ -3,7 +3,7 @@ import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject,
-  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks,
+  SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks, LightDef,
   ItemDef, StateSchema,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
@@ -397,8 +397,8 @@ export class WorldState {
     if (!this.world) {
       this.world = {
         size: { width: 200, depth: 200 },
-        ambientLight: { color: "#aabbcc", intensity: 1.2 },
-        sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
+        ambientLight: { color: "#aabbcc", intensity: 0.5 },
+        sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
         playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
       };
@@ -461,6 +461,55 @@ export class WorldState {
     this._touch("checkpoint", zoneId, id);
     zone.checkpoints = (zone.checkpoints ?? []).filter(c => c.id !== id);
     this._bus.emit("checkpoint:removed", { zoneId, id });
+  }
+
+  // ── Light mutations ──────────────────────────────────────────────────────────
+
+  addLight(zoneId: string, light: LightDef): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.lights) zone.lights = [];
+    this._touch("light", zoneId, light.id);
+    zone.lights.push(light);
+    this._bus.emit("light:added", { zoneId, light });
+  }
+
+  updateLight(zoneId: string, id: string, changes: Partial<LightDef>): void {
+    const zone  = this.zones.get(zoneId);
+    const light = zone?.lights?.find(l => l.id === id);
+    if (!light) return;
+    this._touch("light", zoneId, id);
+    Object.assign(light, changes);
+    this._bus.emit("light:updated", { zoneId, id, changes });
+  }
+
+  removeLight(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    this._touch("light", zoneId, id);
+    zone.lights = (zone.lights ?? []).filter(l => l.id !== id);
+    this._bus.emit("light:removed", { zoneId, id });
+  }
+
+  /** World-level ambient/sun edit. Not journaled (matches playerSettings edits). */
+  updateWorldLighting(changes: { ambient?: Partial<WorldConfig["ambientLight"]>; sun?: Partial<WorldConfig["sunLight"]> }): void {
+    if (!this.world) {
+      // Fresh session with no loaded/saved world yet — seed the default config
+      // (same block setDefaultSpawn uses) so the edit has somewhere to live.
+      this.world = {
+        size: { width: 200, depth: 200 },
+        ambientLight: { color: "#aabbcc", intensity: 0.5 },
+        sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
+        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+      };
+    }
+    if (changes.ambient) this.world.ambientLight = { ...this.world.ambientLight, ...changes.ambient };
+    if (changes.sun)     this.world.sunLight     = { ...this.world.sunLight,     ...changes.sun };
+    this._bus.emit("world:lighting", {
+      ambient: { color: this.world.ambientLight.color, intensity: this.world.ambientLight.intensity },
+      sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
+    });
   }
 
   // ── Decal mutations ──────────────────────────────────────────────────────────
@@ -572,6 +621,11 @@ export class WorldState {
         else if (state === "removed") this._bus.emit("decal:removed", { zoneId: z, id });
         else                          this._bus.emit("decal:updated", { zoneId: z, id, changes: target as Partial<DecalDef> });
         break;
+      case "light":
+        if (state === "added")        this._bus.emit("light:added", { zoneId: z, light: target as LightDef });
+        else if (state === "removed") this._bus.emit("light:removed", { zoneId: z, id });
+        else                          this._bus.emit("light:updated", { zoneId: z, id, changes: target as Partial<LightDef> });
+        break;
       case "group":
         if (state === "added")        this._bus.emit("group:added", { group: target as GroupDef });
         else if (state === "removed") this._bus.emit("group:removed", { id });
@@ -640,6 +694,7 @@ export class WorldState {
       case "triggerVolume": return (zone.triggerVolumes ??= []);
       case "checkpoint":    return (zone.checkpoints ??= []);
       case "decal":         return (zone.decals ??= []);
+      case "light":         return (zone.lights ??= []);
       default:              return null;
     }
   }
@@ -660,7 +715,7 @@ export class WorldState {
   toJSON(): SceneFile {
     return {
       metadata:    { ...(this.metadata ?? { name: "Untitled", version: "1", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() }), uvVersion: 1 },  // Phase 10.8: every save is world-space-UV
-      world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 1.2 }, sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 }, stateSchema: DEFAULT_STATE_SCHEMA },
+      world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
       zones:       [...this.zones.values()],
       transitions: [...this.transitions.values()],
@@ -679,5 +734,9 @@ export class WorldState {
     this.groups       = file.groups ?? [];
     this.activeZoneId = file.zones[0]?.id ?? null;
     this._bus.emit("world:loaded", { metadata: file.metadata });
+    if (this.world) this._bus.emit("world:lighting", {
+      ambient: { color: this.world.ambientLight.color, intensity: this.world.ambientLight.intensity },
+      sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
+    });
   }
 }

@@ -31,6 +31,7 @@ import { GizmoManager } from "@/editor/GizmoManager";
 import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { CheckpointTool } from "@/editor/CheckpointTool";
+import { LightTool } from "@/editor/LightTool";
 import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { DecalTool } from "@/editor/DecalTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
@@ -67,7 +68,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -80,7 +81,7 @@ type PendingEdit = {
 import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
-import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues } from "@/world/WorldLoader";
+import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject, requestProjectPermission } from "@/project/ProjectStore";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -181,6 +182,12 @@ export default function App() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
+  // World-level ambient/sun (WorldConfig) — synced from the world:lighting bus event;
+  // seeded with the visual-parity defaults so the panel works before any load/save.
+  const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } }>({
+    ambient: { color: "#aabbcc", intensity: 0.5 },
+    sun:     { color: "#fff4e0", intensity: 2.0 },
+  });
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
@@ -262,6 +269,7 @@ export default function App() {
     const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
     const checkpointTool  = new CheckpointTool(scene.scene, world, bus);
+    const lightTool       = new LightTool(world, bus);
     const triggerVolumeTool = new TriggerVolumeTool(scene.scene, world, bus, history, scene.camera, canvas);
     const decalTool         = new DecalTool(scene.scene, world, bus, scene.camera, canvas);
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
@@ -321,6 +329,7 @@ export default function App() {
     zoneTool.init();
     spawnPointTool.init();
     checkpointTool.init();
+    lightTool.init();
     triggerVolumeTool.init();
     decalTool.init();
     triggerVolumeResizer.init();
@@ -669,6 +678,30 @@ export default function App() {
           });
         });
       }),
+      bus.on("light:updated", ({ id }) => {
+        // Refresh selected.data (gizmo moves emit light:updated; panel resyncs position).
+        setSelected(prev => {
+          if (prev?.type === "light" && prev.id === id) {
+            const l = world.zones.get(world.activeZoneId ?? "")?.lights?.find(l => l.id === id);
+            return l ? { ...prev, data: l, position: { ...l.position } } : prev;
+          }
+          return prev;
+        });
+      }),
+      bus.on("light:placed", ({ zoneId, id }) => {
+        // Place one, then break out of placement (mirrors the checkpoint flow).
+        queueMicrotask(() => {
+          setActiveTool("select");
+          bus.emit("tool:select", { tool: "select" });
+          const l = world.zones.get(zoneId)?.lights?.find(l => l.id === id);
+          if (l) bus.emit("object:selected", {
+            id, type: "light", zoneId,
+            position: l.position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 },
+            data: l,
+          });
+        });
+      }),
+      bus.on("world:lighting", ({ ambient, sun }) => setWorldLighting({ ambient, sun })),
       bus.on("spawn:placed", () => {
         // The initial spawn is singular; break out of placing mode after setting it.
         queueMicrotask(() => {
@@ -717,6 +750,7 @@ export default function App() {
       zonesRef.current    = null;
       unsub.forEach(u => u());
       checkpointTool.dispose();
+      lightTool.dispose();
       spawnPointTool.dispose();
       segmentHighlighter.dispose();
       wallSplitter.dispose();
@@ -839,6 +873,7 @@ export default function App() {
       migrateWallNodes(file.zones);
       migrateUVs(file);  // Phase 10.8: reset legacy tileScale to 1.0 (pre-world-space-UV scenes)
       migrateDialogues(file);  // legacy inline show_dialogue lines[] → zone dialogue registry
+      migrateWorldLighting(file);  // never-honored ambient/sun defaults → visual-parity values
       for (const zone of file.zones) pruneOrphanNodes(zone);  // reap orphaned polygon nodes from old saves
       await physicsWorld.init();
       for (const zoneId of [...world.zones.keys()]) zones.unloadZone(zoneId);
@@ -959,8 +994,8 @@ export default function App() {
     metadata: { name, version: "1.0", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() },
     world: {
       size: { width: 200, depth: 200 },
-      ambientLight: { color: "#aabbcc", intensity: 1.2 },
-      sunLight: { color: "#fff4e0", intensity: 3.0, position: { x: 30, y: 50, z: 20 } },
+      ambientLight: { color: "#aabbcc", intensity: 0.5 },
+      sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
       skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
       playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
       stateSchema: DEFAULT_STATE_SCHEMA,
@@ -1201,6 +1236,14 @@ export default function App() {
     setPlayerSettingsRev(v => v + 1);
   }, [syncHistory]);
 
+  const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    // Emits world:lighting → SceneManager applies it and the bus listener syncs panel state.
+    world.updateWorldLighting(changes);
+    setIsDirty(true);
+  }, []);
+
   const handleSpawnPositionChange = useCallback((pos: Vec3): void => {
     const world = worldRef.current;
     if (!world?.world?.defaultSpawn) return;
@@ -1297,6 +1340,7 @@ export default function App() {
           case "trigger-volume": world.removeTriggerVolume(ref.zoneId, ref.id); break;
           case "decal":          world.removeDecal(ref.zoneId, ref.id); break;
           case "shape":          world.removeShape(ref.zoneId, ref.id); break;
+          case "light":          world.removeLight(ref.zoneId, ref.id); break;
         }
       }
       for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
@@ -1554,6 +1598,8 @@ export default function App() {
       world.removeTriggerVolume(zoneId, id);
     } else if (type === "checkpoint") {
       world.removeCheckpoint(zoneId, id);
+    } else if (type === "light") {
+      world.removeLight(zoneId, id);
     } else if (type === "decal") {
       world.removeDecal(zoneId, id);
     } else if (type === "shape") {
@@ -2061,6 +2107,13 @@ export default function App() {
         worldRef.current?.updateCheckpoint(selected.zoneId, selected.id, cpChanges);
       });
       syncHistory();
+    } else if (selected.type === "light") {
+      const lightChanges = changes as unknown as Partial<LightDef>;
+      worldRef.current?.transaction("update light", () => {
+        worldRef.current?.updateLight(selected.zoneId, selected.id, lightChanges);
+      });
+      syncHistory();
+      setSelected(prev => prev ? { ...prev, data: { ...(prev.data as LightDef), ...lightChanges } } : null);
     } else if (selected.type === "decal") {
       const decChanges = changes as unknown as Partial<DecalDef>;
       worldRef.current?.transaction("update decal", () => {
@@ -2320,6 +2373,8 @@ export default function App() {
         assets={assets}
         onPlayerSettingsChange={handlePlayerSettingsChange}
         onSpawnPositionChange={handleSpawnPositionChange}
+        worldLighting={worldLighting}
+        onWorldLightingChange={handleWorldLightingChange}
         bus={busRef.current}
         onPreviewClip={(objectId, clipName) => objectPlacerRef.current?.previewClip(objectId, clipName)}
         onStopPreview={(objectId) => objectPlacerRef.current?.stopPreview(objectId)}

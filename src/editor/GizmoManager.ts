@@ -11,7 +11,7 @@ import { isGameplayMode } from "@/types";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
-type GizmoType = "platform" | "stair" | "ladder" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
+type GizmoType = "platform" | "stair" | "ladder" | "floor" | "wall" | "object" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape" | "light";
 
 export class GizmoManager implements IEditorModule {
   private readonly _scene:      THREE.Scene;
@@ -150,6 +150,13 @@ export class GizmoManager implements IEditorModule {
       }),
       // Checkpoint markers are rebuilt fresh by CheckpointTool on checkpoint:updated (both
       // listen). Defer a microtask so we re-track the new marker, mirroring spawn.
+      // Light markers are rebuilt fresh by ZoneManager on light:updated — retrack them.
+      this._bus.on("light:updated", ({ zoneId, id }) => {
+        if (this._selType !== "light" || this._selId !== id || this._selZoneId !== zoneId) return;
+        queueMicrotask(() => {
+          if (this._selType === "light" && this._selId === id) this._reattachMeshes();
+        });
+      }),
       this._bus.on("checkpoint:updated", ({ zoneId, id }) => {
         if (this._selType !== "checkpoint" || this._selId !== id || this._selZoneId !== zoneId) return;
         queueMicrotask(() => {
@@ -232,7 +239,7 @@ export class GizmoManager implements IEditorModule {
     this._groupRefs = [];
 
     const type = payload.type as string;
-    if (!["platform", "stair", "ladder", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal", "shape"].includes(type)) {
+    if (!["platform", "stair", "ladder", "floor", "wall", "object", "spawn", "trigger-volume", "checkpoint", "decal", "shape", "light"].includes(type)) {
       this._detach(); return;
     }
 
@@ -354,6 +361,7 @@ export class GizmoManager implements IEditorModule {
       const cp = this._worldState.zones.get(payload.zoneId)?.checkpoints?.find(c => c.id === payload.id);
       rotY = THREE.MathUtils.degToRad(cp?.facingDeg ?? 0);
     }
+    // "light": default pivot (marker position + 0.3), no yaw — aim is edited in the panel.
 
     this._pivot.position.set(px, py, pz);
     this._pivot.rotation.set(0, rotY, 0);
@@ -820,6 +828,13 @@ export class GizmoManager implements IEditorModule {
         this._pivot.rotation.set(0, THREE.MathUtils.degToRad(cp.facingDeg ?? 0), 0);
         this._pivotStart.copy(this._pivot.position);
       }
+    } else if (type === "light") {
+      const l = this._worldState.zones.get(this._selZoneId ?? "")?.lights?.find(l => l.id === this._selId);
+      if (l) {
+        this._pivot.position.set(l.position.x, l.position.y + 0.3, l.position.z);
+        this._pivot.rotation.set(0, 0, 0);
+        this._pivotStart.copy(this._pivot.position);
+      }
     }
     // For floor/wall: pivot Y is driven by the mesh; let SelectionManager re-emit handle it
 
@@ -1026,6 +1041,15 @@ export class GizmoManager implements IEditorModule {
         if (!cp) break;
         this._worldState.updateCheckpoint(this._selZoneId!, this._selId!, {
           position: { x: cp.position.x + delta.x, y: cp.position.y + delta.y, z: cp.position.z + delta.z },
+        });
+        break;
+      }
+      case "light": {
+        if (delta.lengthSq() < 1e-6) break;
+        const l = this._worldState.zones.get(this._selZoneId!)?.lights?.find(l => l.id === this._selId);
+        if (!l) break;
+        this._worldState.updateLight(this._selZoneId!, this._selId!, {
+          position: { x: l.position.x + delta.x, y: l.position.y + delta.y, z: l.position.z + delta.z },
         });
         break;
       }

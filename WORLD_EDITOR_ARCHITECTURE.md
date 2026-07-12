@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.28.0** — last updated 2026-07-11
+**Version 4.29.0** — last updated 2026-07-12
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -128,6 +128,7 @@
 - v4.27.4 — **New Project modal: editable SCENE 1 ID** (user: "I don't remember naming it new-world" — the id was auto-slugified from the world's default `metadata.name` "New World", which is not editable anywhere in the UI, so the first scene's permanent id came from a name the user never chose). The modal gains a **SCENE 1 ID** field, prefilled from the current world's name slug (or `scene_01` when Blank is selected, while untouched) with a live `scenes/<slug>.json` preview and a note that renaming isn't supported yet; the confirm passes the sanitized id through (`onConfirm` gains `sceneId`; `handleProjectCreate` uses it for both modes). Create is gated on a non-empty slug.
 - v4.27.5 — **Per-scene editor camera persistence** (user report: loading a scene/project scene leaves the camera at the near-origin default). `SceneMetadata.editorCamera?: EditorCameraPose { focus, radius, phi, theta }` — editor-only convenience data, ignored by the runtime. `EditorCamera` gains `getPose()`/`setPose()` (set both current AND target orbit state → snap, not lerp; `_applyCamera()` immediately). **Stamped on every explicit save** (`stampCameraPose()` in App: handleSave, project scene switch/add/close, project create adopt path) and **restored at the end of `handleLoadFromJSON`** — which every load path funnels through (boot autosave restore, file Load, project open/scene switch/blank create), so one restore point covers them all. Deliberately NOT stamped by the periodic autosave tick: a camera-only change must not defeat the v4.14.1 "unchanged tab never writes" stale-tab gate (the autosave still carries whatever pose the last explicit save stamped). Old files without the field keep today's behavior. Verified in-browser on a real 2-scene project: moved the camera to a distinctive pose, switched scenes and back — pose snapped back exactly (focus/radius/phi/theta round-trip), stamp visible in metadata.
 - v4.28.0 — **Phase 34 — Ladders**: first-class `LadderDef` zone entity (rails+rungs `LadderBuilder`, thin solid collider, auto-built climb-column + top-lip **sensor pair** registered handle→ladderId in ZoneManager's `ladderSensorMap`); TriggerSystem emits deduped `ladder:zone-enter/exit`; CharacterController gains a **climb movement mode** (auto-mount on move-toward dot ≥ 0.5, KCC bypassed via `CharacterBody.setClimbTranslation`, X/Z lerped onto the climb line, W/S vertical at `PlayerSettings.climbSpeed`, jump-release + 0.4s re-grab cooldown, fixed-marker top dismount, top-zone auto-remount AND "Climb down" interact prompt, unconditional `_exitClimb()` wired to teleport/rebuild/delete/dispose — no soft locks); `LocomotionState` gains `"climb"` (plays the Climb clip at input-proportional `timeScale`, 0 = hanging); editor: Ladder variant under the Stair toolbar button, `LadderTool` click-place, LADDER PropertiesPanel geo/mat screens, undo via journal `"ladder"` kind. Plan: `plans/phase-34-ladders.md`; acceptance: `test-plans/phase-34-ladders.md`.
+- v4.29.0 — **Phase 35 — Light controls**: placeable per-zone `LightDef` entities (point / spot / directional) built by ZoneManager as real THREE lights (editor + preview + game + runtime) with an editor pick-marker (`hideInGame`); Light toolbar button with three variants, `LightTool` click-place, LIGHT PropertiesPanel view (color, intensity, range, spot cone angle, pitch/yaw aim, CAST SHADOWS toggle, position, delete), gizmo translate, undo via journal `"light"` kind (added the missing `light` case to `_emitChange`). **World ambient/sun finally honored**: `WorldConfig.ambientLight`/`sunLight` were serialized since day one but never applied — SceneManager now applies them via a new `world:lighting` bus event (emitted by `loadFromJSON` + `updateWorldLighting`), editable in a WORLD LIGHT section under the Light tool; `migrateWorldLighting` rewrites the never-honored legacy defaults (1.2/3.0) to visual-parity values (0.5/2.0) so existing worlds look identical. Acceptance: `test-plans/phase-35-lights.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -1239,6 +1240,16 @@ The in-memory mirror of the JSON. All tools write to WorldState; WorldState emit
 > optional-array pattern (`zone.ladders ??= []`), `"ladder"` ChangeKind, emits
 > `ladder:added/updated/removed`. Serialization is wholesale (zones round-trip whole),
 > so no WorldLoader changes were needed.
+>
+> **v4.29.0 (Phase 35):** `addLight` / `updateLight` / `removeLight` — same pattern
+> (`zone.lights ??= []`, `"light"` ChangeKind, `light:added/updated/removed`), **plus
+> the `light` case in `_emitChange`** so undo/redo replays reach ZoneManager (a kind
+> without a case there silently skips the scene rebuild — checkpoints still have this
+> gap). Also `updateWorldLighting({ ambient?, sun? })`: mutates `world.ambientLight` /
+> `world.sunLight` (seeding the default WorldConfig when null — fresh sessions) and
+> emits **`world:lighting`**; `loadFromJSON` emits the same event after `world:loaded`
+> so SceneManager applies saved values on every load. NOT journaled (matches
+> playerSettings edits).
 
 ```js
 class WorldState {
@@ -1405,7 +1416,7 @@ Builders tag child meshes too — GLTF models have deep mesh hierarchies that ra
 
 When a click ray intersects multiple meshes, priority order (highest first):
 
-1. `opening` / `object` / `checkpoint` / `spawn` — props, markers, openings
+1. `opening` / `object` / `checkpoint` / `light` / `spawn` — props, markers, openings (light markers v4.29.0)
 2. `decal` — projected decal meshes (v4.7.0; **above** platform/wall/floor because a decal
    is coplanar with its surface — priority, not raycast distance, must break the tie)
 3. `shape` — parametric solids (v4.9.0; shapes typically sit ON platforms/floors, so they
@@ -1874,6 +1885,14 @@ class InputManager {
 ## SceneManager.ts
 
 Owns the renderer, scene, RAF loop, lighting/sky/grid setup, and camera selection.
+
+> **v4.29.0 (Phase 35):** the base lighting (`_ambientLight` field + `_sunLight`) is
+> no longer edit-proof — a ctor subscription to **`world:lighting`** applies
+> `WorldConfig.ambientLight`/`sunLight` color+intensity (both editor and runtime
+> SceneManagers, since WorldState emits it on load and on WORLD LIGHT panel edits).
+> Hardcoded defaults stay ambient `#aabbcc @ 0.5` / sun `#fff4e0 @ 2.0` — the values
+> `migrateWorldLighting` normalizes old saves to. The fill/rim directionals and the
+> sky-linked sun *position* remain hardcoded.
 `_loop()` each frame: `editorCamera?.update(dt)` (only when no preview camera),
 update callbacks (physics step, character, mixers), then
 `renderer.render(scene, _previewCamera ?? camera)`. `setPreviewCamera(cam)` is the
@@ -2351,6 +2370,21 @@ collider (`registerShape`). They are **never baked into vertices** — moving up
 > and `ladderSensorMap` (collider handle → ladderId, both sensor boxes) exposed for
 > `TriggerSystem.setLadderSensors`. Remove/rebuild/unload paths delete the handles
 > before freeing the colliders.
+>
+> **v4.29.0 (Phase 35):** lights join too — `lightEntries` (`{ light, marker }`) per
+> ZoneEntry in a `lightsGroup`, `light:added/updated/removed` handlers (update =
+> remove + rebuild). `_buildLight` makes the real THREE Point/Spot/DirectionalLight
+> (physical intensity, `range` → distance, spot `angleDeg` half-angle, penumbra 0.3
+> fixed; castShadow → 512² map, spot/point `shadow.camera.far = range || 50`,
+> directional ±20 ortho box) — so lights render in editor, preview, game AND the
+> runtime shell for free. Spot/directional aim from `pitchDeg`/`yawDeg` via
+> `lightAimDir()` (yaw 0 = -Z like facingDeg, pitch 90 = down); `light.target` is
+> added to lightsGroup. The pick **marker** (octahedron bulb + wire halo + aim
+> ArrowHelper for non-point) is tagged `editorType:"light"` + `hideInGame` (visible
+> in editor + preview, hidden in game). Light + target also carry the editorId
+> (selectable:false) so gizmo translate moves the actual light live during the drag.
+> `unloadZone` calls `light.dispose()` (shadow map); marker geometry/materials go
+> with the group traverse (`_ownsMaterial` on marker children).
 
 ## MoverSystem.ts
 
@@ -3074,6 +3108,12 @@ sensitivity + joystick radius + layout, reset-to-defaults.
 ---
 
 ## WorldSerializer.js / WorldLoader.ts
+
+> **Load-time migrations** (run in both pipelines — App `handleLoadFromJSON` and the
+> runtime's `SceneRouter`): `migrateWallNodes` (legacy start/end walls → node graph),
+> `migrateUVs` (pre-10.8 tileScale reset), `migrateDialogues` (inline dialogue →
+> zone registry), `migrateWorldLighting` (v4.29.0 — never-honored ambient/sun
+> defaults 1.2/3.0 → visual-parity 0.5/2.0), then `pruneOrphanNodes` per zone.
 
 ### Serializer
 
@@ -7939,3 +7979,77 @@ cooldown gate, top dismount lands exactly on the fixed marker grounded, "Climb d
 prompt + E-mount, top auto-remount, bottom dismount, teleport/rebuild force-exits,
 tool placement + panel edit + 2-level undo through the real UI. Solid collider blocks
 walk-through. No new console errors; typecheck clean.
+
+---
+
+## Light Controls — Phase 35 (v4.29.0)
+
+Placeable per-zone lights (point / spot / directional) plus honoring the world-level
+ambient/sun config that had been serialized-but-ignored since day one. Acceptance
+record: `test-plans/phase-35-lights.md`.
+
+### Data & build
+
+- `LightDef` (`src/types.ts`): `kind` (`"point" | "spot" | "directional"`), `position`,
+  `color` (hex string), `intensity` (physical/candela-ish for point/spot; sun-like
+  unit-less for directional), `range?` (point/spot distance, 0 = unlimited),
+  `angleDeg?` (spot cone half-angle), `pitchDeg?`/`yawDeg?` (spot/directional aim —
+  yaw 0° = -Z matching `facingDeg`, pitch 90° = straight down), `castShadow`,
+  `label?`. `ZoneDef.lights?` optional array; `"light"` is a `ChangeKind` **and** has
+  an `_emitChange` case (undo/redo replay — a kind missing there reverts data but
+  never rebuilds the scene; found live when the first undo test didn't touch the
+  THREE light).
+- ZoneManager owns rendering (NOT an editor tool, so preview/game/runtime shell all
+  get real lights): `lightEntries` + `lightsGroup` per zone, `_buildLight` /
+  `_removeLight`, `light:*` handlers. Marker (bulb + wire halo + aim arrow) is
+  `hideInGame`; the light + its `.target` carry the editorId (selectable:false) so
+  gizmo drags move them live. `unloadZone` disposes shadow maps.
+- Placement defaults (`LightTool`): point `#ffd9a0` @ 30 cd, range 15, +2.5m lift;
+  spot white @ 60, range 20, cone 30°, aimed straight down, +3m; directional white
+  @ 1.5, pitch 50°, +8m. Shadows default OFF (512² maps when enabled — they multiply,
+  see TESTING.md §7).
+
+### Editor
+
+- **Light** toolbar button (bulb icon, `IconLight`) with Point / Spot / Directional
+  variants → `ToolId`s `light-point` / `light-spot` / `light-directional`.
+  `LightTool` (`src/editor/LightTool.ts`) turns one click into `addLight` +
+  `light:placed`; App breaks out to Select + auto-selects (checkpoint flow).
+- `LightView` in PropertiesPanel: kind help, color swatch, INTENSITY, RANGE (M)
+  (point/spot), CONE ANGLE (spot), AIM PITCH/YAW (spot/directional), CAST SHADOWS
+  checkbox (+ perf warning when on), POSITION, Delete. Renameable (label header).
+- Selection: marker picking via `PRIORITY` (`light` after `checkpoint`);
+  `_getDataRecord` case. Gizmo: translate only (aim edits live in the panel);
+  `light:updated` → deferred `_reattachMeshes` (marker is rebuilt fresh).
+- Multi-select delete handles `light` refs; copy/paste excludes lights (same as
+  checkpoints/decals).
+
+### World ambient/sun (the "existing light")
+
+- `WorldConfig.ambientLight`/`sunLight` were never read by SceneManager — every scene
+  rendered hardcoded ambient 0.5 / sun 2.0 while old saves *stored* 1.2 / 3.0.
+  Now: WorldState emits **`world:lighting`** (on `loadFromJSON` and from
+  `updateWorldLighting`); SceneManager subscribes and applies color+intensity to its
+  ambient + sun (editor and runtime shell both, since SceneRouter loads through
+  `loadFromJSON`). Sun *position* stays sky-linked; fill/rim stay hardcoded.
+- **`migrateWorldLighting`** (WorldLoader, called in both load pipelines beside
+  `migrateUVs`): rewrites exactly the never-honored serialization defaults
+  (`#aabbcc`@1.2 / `#fff4e0`@3.0) to the visual-parity values (0.5 / 2.0) so
+  existing worlds render identically the first time the config is actually applied.
+  Hand-edited values pass through. Default literals in WorldState/App updated to
+  match.
+- UI: **WORLD LIGHT** section (ambient + sun color/intensity) renders under the
+  Light tool's ToolView; writes via `handleWorldLightingChange` →
+  `updateWorldLighting` (not journaled, matches playerSettings).
+
+### Verified (2026-07-12, real clicks + probes)
+
+Toolbar → Point variant → canvas click placed at surface+2.5y and auto-selected;
+warm glow pool visible in screenshot; INTENSITY input + CAST SHADOWS checkbox drove
+the THREE light (80 cd, shadow map 512², far = range); undo/redo after the
+`_emitChange` fix drives the scene light both ways; spot target exactly 5m below for
+pitch 90, directional target matches pitch 50 / yaw 90 vector; game mode hides all
+markers while lights stay lit; WORLD LIGHT ambient edit 0.5→1.0→0.5 applied to the
+scene AmbientLight through the real inputs; migration confirmed on the user's world
+(stored 1.2/3.0 → 0.5/2.0, look unchanged); lights persist through autosave reload.
+Only console entry: the known pointer-lock automation artifact. Typecheck clean.

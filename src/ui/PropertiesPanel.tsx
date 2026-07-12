@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
 } from "@/types";
@@ -65,6 +65,9 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   "shape-cylinder": { desc: "Click to set the center, move to set the radius, click to place.", hint: "Click to place cylinder center" },
   "shape-wedge":    { desc: "Click and drag a footprint. High edge faces away; rotate after placing.", hint: "Click to place wedge corner" },
   "shape-box":      { desc: "Click and drag a footprint. Taper/shear in the panel after placing.",     hint: "Click to place box corner" },
+  "light-point":       { desc: "Click to place a point light (glows in all directions).",              hint: "Click to place light" },
+  "light-spot":        { desc: "Click to place a spot light (cone, aims straight down; adjust aim in the panel).", hint: "Click to place light" },
+  "light-directional": { desc: "Click to place a directional light (parallel rays, like an extra sun).", hint: "Click to place light" },
 };
 
 
@@ -304,6 +307,10 @@ function objectTypeLabel(selected: SelectedObjectPayload): string {
     return `${(d?.type ?? "").toUpperCase()} OPENING`;
   }
   if (type === "trigger-volume") return "TRIGGER VOLUME";
+  if (type === "light") {
+    const d = selected.data as LightDef | null;
+    return `LIGHT · ${(d?.kind ?? "").toUpperCase()}`;
+  }
   if (type === "shape") {
     const d = selected.data as ShapeDef | null;
     const kind = d && isBrush(d) ? "brush" : (d?.kind ?? "shape");
@@ -341,6 +348,9 @@ interface PropertiesPanelProps {
   assets?:                  AssetDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
+  // World-level ambient/sun lighting (shown under the Light tool's ToolView).
+  worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
+  onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
   bus?:                     EventBus;
   onPreviewClip?:           (objectId: string, clipName: string) => void;
   onStopPreview?:           (objectId: string) => void;
@@ -365,6 +375,7 @@ export function PropertiesPanel({
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
+  worldLighting, onWorldLightingChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
 }: PropertiesPanelProps) {
@@ -404,7 +415,7 @@ export function PropertiesPanel({
   const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
-    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal", "shape"].includes(selected.type as string);
+    && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal", "shape", "light"].includes(selected.type as string);
   const startEdit  = (): void => { setLabelDraft(currentLabel); setEditingLabel(true); };
   const cancelEdit = (): void => { setLabelDraft(currentLabel); setEditingLabel(false); };
   const commitLabel = (): void => {
@@ -520,7 +531,8 @@ export function PropertiesPanel({
             position={selected.position} onPositionChange={onSpawnPositionChange}
           />
         ) : !selected ? (
-          <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)} />
+          <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
+            worldLighting={worldLighting} onWorldLightingChange={onWorldLightingChange} />
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
             selected={selected}
@@ -533,6 +545,8 @@ export function PropertiesPanel({
           />
         ) : selected.type === "checkpoint" ? (
           <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
+        ) : selected.type === "light" ? (
+          <LightView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
         ) : selected.type === "decal" ? (
           <DecalView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} decalTextures={decalTextures} />
         ) : isRoot ? (
@@ -4361,6 +4375,127 @@ function CheckpointView({ selected, onDelete, onObjectUpdate }: {
   );
 }
 
+// ── LightView ─────────────────────────────────────────────────────────────────
+
+const LIGHT_KIND_HELP: Record<string, string> = {
+  point:       "Glows in all directions from a point — lamps, torches, glow effects.",
+  spot:        "A cone of light aimed with pitch/yaw — spotlights, streetlamps.",
+  directional: "Parallel rays from a direction (position doesn't affect the light) — an extra sun/moon.",
+};
+
+function LightView({ selected, onDelete, onObjectUpdate }: {
+  selected:       SelectedObjectPayload;
+  onDelete?:      () => void;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const light = selected.data as LightDef | null;
+  const [posStr, setPosStr] = useState({ x: String(light?.position.x ?? 0), y: String(light?.position.y ?? 0), z: String(light?.position.z ?? 0) });
+  const [numStr, setNumStr] = useState({
+    intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
+    angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
+  });
+  const { schedule, flush } = useFieldDebounce(300);
+
+  useEffect(() => {
+    setPosStr({ x: String(light?.position.x ?? 0), y: String(light?.position.y ?? 0), z: String(light?.position.z ?? 0) });
+    setNumStr({
+      intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
+      angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
+    });
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Resync position when moved externally (gizmo drag refreshes selected.data).
+  useEffect(() => { setPosStr({ x: String(light?.position.x ?? 0), y: String(light?.position.y ?? 0), z: String(light?.position.z ?? 0) }); }, [light?.position.x, light?.position.y, light?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!light) return null;
+
+  const update     = (changes: Partial<LightDef>) => onObjectUpdate(changes as unknown as Partial<WorldObject>);
+  const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) update({ position: { ...light.position, [axis]: n } }); };
+  const commitNum  = (key: keyof LightDef, val: string, min = -Infinity) => { const n = parseFloat(val); if (Number.isFinite(n)) update({ [key]: Math.max(min, n) }); };
+
+  const numField = (label: string, stateKey: keyof typeof numStr, defKey: keyof LightDef, step: number, min = 0, suffix?: string) => (
+    <div>
+      <div style={LABEL}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input type="number" step={step} value={numStr[stateKey]} style={{ ...NUM_INPUT, width: 90 }}
+          onChange={e => { const v = e.target.value; setNumStr(p => ({ ...p, [stateKey]: v })); schedule(() => commitNum(defKey, v, min)); }}
+          onBlur={e => flush(() => commitNum(defKey, e.target.value, min))}
+          onKeyDown={e => { if (e.key === "Enter") flush(() => commitNum(defKey, (e.target as HTMLInputElement).value, min)); }}
+        />
+        {suffix && <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>{suffix}</span>}
+      </div>
+    </div>
+  );
+
+  const isPoint = light.kind === "point";
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
+        {LIGHT_KIND_HELP[light.kind]}
+      </div>
+
+      <div>
+        <div style={LABEL}>COLOR</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="color" value={light.color}
+            onChange={e => update({ color: e.target.value })}
+            style={{ width: 42, height: 26, padding: 0, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, background: "transparent", cursor: "pointer" }}
+          />
+          <span style={{ color: "#909090", fontSize: 11, fontFamily: "monospace" }}>{light.color}</span>
+        </div>
+      </div>
+
+      {numField("INTENSITY", "intensity", "intensity", isPoint || light.kind === "spot" ? 5 : 0.25)}
+      {light.kind !== "directional" && numField("RANGE (M)", "range", "range", 1, 0, "0 = unlimited")}
+      {light.kind === "spot" && numField("CONE ANGLE (°)", "angle", "angleDeg", 5, 1)}
+      {light.kind !== "point" && (
+        <div style={{ display: "flex", gap: 10 }}>
+          {numField("AIM PITCH (°)", "pitch", "pitchDeg", 5, -90)}
+          {numField("AIM YAW (°)", "yaw", "yawDeg", 15, -Infinity)}
+        </div>
+      )}
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <input type="checkbox" checked={light.castShadow}
+          onChange={e => update({ castShadow: e.target.checked })} />
+        <span style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>CAST SHADOWS</span>
+      </label>
+      {light.castShadow && (
+        <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+          Shadow-casting lights are expensive — keep to a few per zone (watch the FPS counter).
+        </div>
+      )}
+
+      <div>
+        <div style={LABEL}>POSITION</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([["x","#ff6b6b"],["y","#6bff8a"],["z","#6b8aff"]] as const).map(([axis, color]) => (
+            <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+              <input type="number" step={0.5} value={posStr[axis]}
+                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onBlur={e => flush(() => commitPos(axis, e.target.value))}
+                onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {onDelete && (
+        <button onClick={onDelete}
+          style={{ padding: "8px 0", background: "rgba(204,102,102,0.12)", border: "1px solid rgba(204,102,102,0.4)",
+                   borderRadius: 4, color: "#cc6666", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+          Delete Light
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── DecalView ─────────────────────────────────────────────────────────────────
 
 function DecalView({ selected, onDelete, onObjectUpdate, decalTextures }: {
@@ -4780,8 +4915,58 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
 
 // ── ToolView ──────────────────────────────────────────────────────────────────
 
-function ToolView({ activeTool, onShowCredits }: { activeTool: ToolId; onShowCredits?: () => void }) {
+// World-level ambient/sun controls — shown under the Light tool so the existing
+// scene lighting is manageable from the same place placed lights are authored.
+function WorldLightSection({ lighting, onChange }: {
+  lighting: { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
+  onChange: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+}) {
+  const [intStr, setIntStr] = useState({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity) });
+  const { schedule, flush } = useFieldDebounce(300);
+  useEffect(() => { setIntStr({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity) }); },
+    [lighting.ambient.intensity, lighting.sun.intensity]);
+
+  const row = (key: "ambient" | "sun", label: string) => {
+    const commit = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) onChange({ [key]: { intensity: n } }); };
+    return (
+      <div>
+        <div style={LABEL}>{label}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="color" value={lighting[key].color}
+            onChange={e => onChange({ [key]: { color: e.target.value } })}
+            style={{ width: 42, height: 26, padding: 0, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, background: "transparent", cursor: "pointer" }}
+          />
+          <input type="number" step={key === "ambient" ? 0.1 : 0.25} min={0} value={intStr[key]} style={{ ...NUM_INPUT, width: 70 }}
+            onChange={e => { const v = e.target.value; setIntStr(p => ({ ...p, [key]: v })); schedule(() => commit(v)); }}
+            onBlur={e => flush(() => commit(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commit((e.target as HTMLInputElement).value)); }}
+          />
+          <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ ...LABEL, marginBottom: 0 }}>WORLD LIGHT</div>
+      {row("ambient", "AMBIENT")}
+      {row("sun", "SUN")}
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        The world's base lighting — applies everywhere, saved with the scene.
+      </div>
+    </div>
+  );
+}
+
+function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingChange }: {
+  activeTool: ToolId;
+  onShowCredits?: () => void;
+  worldLighting?:         { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
+  onWorldLightingChange?: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+}) {
   const info = TOOL_INFO[activeTool];
+  const isLightTool = activeTool === "light-point" || activeTool === "light-spot" || activeTool === "light-directional";
   return (
     <>
       <div style={{ padding: "10px 16px 0", color: "#646464", fontSize: 11 }}>{info.desc}</div>
@@ -4790,6 +4975,9 @@ function ToolView({ activeTool, onShowCredits }: { activeTool: ToolId; onShowCre
           {info.hint}
         </div>
       </div>
+      {isLightTool && worldLighting && onWorldLightingChange && (
+        <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
+      )}
       {/* Home for global editor settings/links — grows over time; credits first. */}
       {activeTool === "select" && onShowCredits && (
         <div style={{ margin: "10px 16px 0", paddingTop: 2 }}>

@@ -94,7 +94,7 @@ export interface AssetManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box";
+export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box" | "light-point" | "light-spot" | "light-directional";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -104,7 +104,7 @@ export type CameraMode = "fps" | "thirdperson";
 export type PreviewMode = "preview" | "game" | "occlusion";
 /** Gameplay semantics (defaultSpawn, hide editor furniture, gizmo/node-dot lockout) — everything but plain preview. */
 export const isGameplayMode = (m: PreviewMode): boolean => m !== "preview";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "ladder" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "ladder" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape" | "light";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -300,6 +300,12 @@ export interface BusEvents {
   "checkpoint:updated":    { zoneId: string; id: string; changes: Partial<CheckpointDef> };
   "checkpoint:removed":    { zoneId: string; id: string };
   "checkpoint:placed":     { zoneId: string; id: string };
+  "light:added":           { zoneId: string; light: LightDef };
+  "light:updated":         { zoneId: string; id: string; changes: Partial<LightDef> };
+  "light:removed":         { zoneId: string; id: string };
+  "light:placed":          { zoneId: string; id: string };
+  // World-level ambient/sun changed (or loaded) — SceneManager applies it.
+  "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
   "spawn:mode":            { mode: "initial" | "checkpoint" };
   "spawn:placed":          Record<string, never>;
   "group:added":           { group: GroupDef };
@@ -340,7 +346,7 @@ export interface SelectedObjectPayload {
   position: Vec3;
   rotation: Euler3;
   scale: Scale3;
-  data: WallDef | FloorDef | PlatformDef | StairDef | LadderDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | null;
+  data: WallDef | FloorDef | PlatformDef | StairDef | LadderDef | WorldObject | Opening | TriggerVolume | CheckpointDef | DecalDef | ShapeDef | LightDef | null;
   runWalls?: WallDef[]; // populated for multi-wall runs; undefined for single-wall selections
   // Sub-object selection (Phase 23, shapes only): which face/vertex/edge is selected
   // in the face/vertex/edge select modes. Clamped against the live mesh on every emit.
@@ -409,6 +415,30 @@ export interface CheckpointDef {
   position:  Vec3;
   facingDeg: number;
   groupIds?: string[];
+}
+
+// ─── Placed lights (Phase 35) ─────────────────────────────────────────────────
+
+export type LightKind = "point" | "spot" | "directional";
+
+/**
+ * A placeable scene light (per zone). Built by ZoneManager as a real THREE light
+ * (so preview/game/runtime all get it) plus an editor-only marker for picking.
+ * Spot/directional aim via pitch/yaw (degrees): yaw 0° = -Z (matches facingDeg),
+ * pitch 90° = straight down.
+ */
+export interface LightDef {
+  id:         string;
+  label?:     string;
+  kind:       LightKind;
+  position:   Vec3;
+  color:      string;   // hex, e.g. "#ffddaa"
+  intensity:  number;   // candela-ish (physical units); directional in lux-like units
+  range?:     number;   // point/spot falloff distance; 0 = unlimited
+  angleDeg?:  number;   // spot cone half-angle (degrees)
+  pitchDeg?:  number;   // spot/directional aim (90 = straight down)
+  yawDeg?:    number;   // spot/directional aim (0 = -Z)
+  castShadow: boolean;
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
@@ -801,6 +831,7 @@ export interface ZoneDef {
   decals?:         DecalDef[];
   shapes?:         ShapeDef[];
   dialogues?:      DialogueTreeDef[];
+  lights?:         LightDef[];
 }
 
 export interface TransitionDef {

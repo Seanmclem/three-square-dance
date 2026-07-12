@@ -10,7 +10,7 @@ import type {
 
 // "decal" sits above platform/wall/floor: decals lie coplanar with those surfaces,
 // so priority (not raycast distance) must break the tie in the decal's favor.
-const PRIORITY: EditorObjectType[] = ["opening", "object", "checkpoint", "spawn", "decal", "shape", "platform", "wall", "floor"];
+const PRIORITY: EditorObjectType[] = ["opening", "object", "checkpoint", "light", "spawn", "decal", "shape", "platform", "wall", "floor"];
 
 const SELECT_EMISSIVE  = 0x3366ff;
 const SELECT_INTENSITY = 0.25;
@@ -589,6 +589,7 @@ export class SelectionManager implements IEditorModule {
       case "shape":    return zone.shapes?.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
       case "checkpoint": return zone.checkpoints?.find(c => c.id === editorId) ?? null;
+      case "light":    return zone.lights?.find(l => l.id === editorId) ?? null;
       case "decal":    return zone.decals?.find(d => d.id === editorId) ?? null;
       case "opening": {
         const wall = zone.walls.find(w => w.id === root.userData.wallId);

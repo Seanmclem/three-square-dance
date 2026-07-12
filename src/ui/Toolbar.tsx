@@ -22,6 +22,7 @@ const TOOLS: ToolDef[] = [
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
   { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
   { id: "decal",           label: "Decal",    shortcut: "K" },
+  { id: "light-point",     label: "Light",    shortcut: "G", variants: [{ id: "light-point", label: "◉ Point" }, { id: "light-spot", label: "◭ Spot" }, { id: "light-directional", label: "☀ Directional" }] },
 ];
 
 interface ToolbarProps {

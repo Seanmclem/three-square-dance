@@ -17,7 +17,7 @@ import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { MoverSystem } from "@/world/MoverSystem";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, DecalDef } from "@/types";
+import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, DecalDef, LightDef } from "@/types";
 import { isGameplayMode } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -53,6 +53,11 @@ interface ShapeEntry {
   collider: RAPIER.Collider | null;
 }
 
+interface LightEntry {
+  light:  THREE.PointLight | THREE.SpotLight | THREE.DirectionalLight;
+  marker: THREE.Group;      // editor pick proxy (hideInGame)
+}
+
 interface ZoneEntry {
   group:          THREE.Group;
   floorsGroup:    THREE.Group;
@@ -62,6 +67,7 @@ interface ZoneEntry {
   laddersGroup:   THREE.Group;
   shapesGroup:    THREE.Group;
   objectsGroup:   THREE.Group;
+  lightsGroup:    THREE.Group;
   // keyed by floor.id
   floorColliders: Map<string, RAPIER.Collider>;
   // Multiple wallIds can map to the same RunEntry (all walls in a merged run)
@@ -73,6 +79,15 @@ interface ZoneEntry {
   objectMeshes:    Map<string, THREE.Object3D>;
   // Attached colliders per placed object (explicit colliders[] or the implicit auto-box)
   objectColliders: Map<string, RAPIER.Collider[]>;
+  lightEntries:    Map<string, LightEntry>;
+}
+
+/** Spot/directional aim vector from pitch/yaw degrees (yaw 0 = -Z, pitch 90 = down). */
+function lightAimDir(def: LightDef): THREE.Vector3 {
+  const pitch = THREE.MathUtils.degToRad(def.pitchDeg ?? 90);
+  const yaw   = THREE.MathUtils.degToRad(def.yawDeg ?? 0);
+  const h     = Math.cos(pitch);
+  return new THREE.Vector3(-Math.sin(yaw) * h, -Math.sin(pitch), -Math.cos(yaw) * h);
 }
 
 
@@ -404,6 +419,19 @@ export class ZoneManager {
         // surface patches (restores the shared material when the last stain leaves).
         this._enqueueWallOp(() => this._rebuildDecal(zoneId, id));
       }),
+      this._bus.on("light:added", ({ zoneId, light }) => {
+        const entry = this._loadedZones.get(zoneId);
+        if (entry) this._buildLight(zoneId, light, entry);
+      }),
+      this._bus.on("light:updated", ({ zoneId, id }) => {
+        const entry = this._loadedZones.get(zoneId);
+        const def   = this._worldState.zones.get(zoneId)?.lights?.find(l => l.id === id);
+        if (entry && def) this._buildLight(zoneId, def, entry);   // removes the old entry first
+      }),
+      this._bus.on("light:removed", ({ zoneId, id }) => {
+        const entry = this._loadedZones.get(zoneId);
+        if (entry) this._removeLight(entry, id);
+      }),
       // Re-project decals whose footprint touches a rebuilt entity. Regens run
       // through _wallOpChain so they never observe a half-rebuilt run.
       this._bus.on("wall:rebuilt",     ({ zoneId, wallId })     => this._markDecalsDirty(zoneId, wallId)),
@@ -518,7 +546,8 @@ export class ZoneManager {
     const laddersGroup   = new THREE.Group();
     const shapesGroup    = new THREE.Group();
     const objectsGroup   = new THREE.Group();
-    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup);
+    const lightsGroup    = new THREE.Group();
+    group.add(floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup, lightsGroup);
 
     const floorColliders  = new Map<string, RAPIER.Collider>();
     const wallData        = new Map<string, RunEntry>();
@@ -528,6 +557,7 @@ export class ZoneManager {
     const shapeEntries    = new Map<string, ShapeEntry>();
     const objectMeshes    = new Map<string, THREE.Object3D>();
     const objectColliders = new Map<string, RAPIER.Collider[]>();
+    const lightEntries    = new Map<string, LightEntry>();
 
     // ── Floors ────────────────────────────────────────────────────────────
     const floorsByLevel = new Map<number, typeof zone.floors>();
@@ -607,9 +637,12 @@ export class ZoneManager {
 
     this._scene.add(group);
     const zoneEntry: ZoneEntry = {
-      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup,
-      floorColliders, wallData, platformEntries, stairEntries, ladderEntries, shapeEntries, objectMeshes, objectColliders,
+      group, floorsGroup, wallsGroup, platformsGroup, stairsGroup, laddersGroup, shapesGroup, objectsGroup, lightsGroup,
+      floorColliders, wallData, platformEntries, stairEntries, ladderEntries, shapeEntries, objectMeshes, objectColliders, lightEntries,
     };
+
+    // ── Lights ────────────────────────────────────────────────────────────
+    for (const light of zone.lights ?? []) this._buildLight(zoneId, light, zoneEntry);
     this._loadedZones.set(zoneId, zoneEntry);
     for (const obj of zone.objects) this._buildObjectColliders(zoneId, obj, zoneEntry);
 
@@ -672,6 +705,9 @@ export class ZoneManager {
     for (const she of entry.shapeEntries.values()) {
       if (she.collider) physicsWorld.removeCollider(she.collider);
     }
+
+    // Free light shadow-map resources; meshes/materials go with the group traverse below.
+    for (const le of entry.lightEntries.values()) le.light.dispose();
 
     for (const id of entry.objectMeshes.keys()) {
       this._objectPlacer.remove(id);
@@ -1760,6 +1796,103 @@ export class ZoneManager {
         }
       });
     }
+  }
+
+  // ── Lights (Phase 35) ─────────────────────────────────────────────────────
+  // Real THREE lights (rendered in editor, preview, game, runtime) + an editor
+  // marker for picking/gizmo, tagged hideInGame so game mode hides it.
+
+  private _buildLight(zoneId: string, def: LightDef, entry: ZoneEntry): void {
+    this._removeLight(entry, def.id);
+
+    const p = def.position;
+    let light: LightEntry["light"];
+    if (def.kind === "point") {
+      light = new THREE.PointLight(def.color, def.intensity, def.range ?? 0);
+    } else if (def.kind === "spot") {
+      light = new THREE.SpotLight(def.color, def.intensity, def.range ?? 0,
+        THREE.MathUtils.degToRad(def.angleDeg ?? 30), 0.3);
+    } else {
+      light = new THREE.DirectionalLight(def.color, def.intensity);
+    }
+    light.position.set(p.x, p.y, p.z);
+    // Tagged (selectable:false) so gizmo translate drags move the light live with
+    // the marker; the commit's light:updated rebuild lands on the same transform.
+    light.userData = { editorId: def.id, editorType: "light", zoneId, selectable: false };
+    light.castShadow = def.castShadow;
+    if (def.castShadow) {
+      light.shadow.mapSize.set(512, 512);   // modest — these can multiply (perf, TESTING.md §7)
+      light.shadow.bias = -0.001;
+      if (light instanceof THREE.DirectionalLight) {
+        const sc = light.shadow.camera;
+        sc.near = 0.5; sc.far = 100;
+        sc.left = -20; sc.right = 20; sc.top = 20; sc.bottom = -20;
+      } else {
+        light.shadow.camera.far = def.range || 50;
+      }
+    }
+    entry.lightsGroup.add(light);
+
+    if (light instanceof THREE.SpotLight || light instanceof THREE.DirectionalLight) {
+      const dir = lightAimDir(def);
+      light.target.position.set(p.x + dir.x * 5, p.y + dir.y * 5, p.z + dir.z * 5);
+      light.target.userData = { editorId: def.id, editorType: "light", zoneId, selectable: false };
+      entry.lightsGroup.add(light.target);
+    }
+
+    const marker = this._buildLightMarker(zoneId, def);
+    entry.lightsGroup.add(marker);
+    entry.lightEntries.set(def.id, { light, marker });
+  }
+
+  private _buildLightMarker(zoneId: string, def: LightDef): THREE.Group {
+    const marker = new THREE.Group();
+    marker.position.set(def.position.x, def.position.y, def.position.z);
+
+    const color = new THREE.Color(def.color);
+    const bulb = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.16),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    marker.add(bulb);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 12, 8),
+      new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.35 }),
+    );
+    marker.add(halo);
+    if (def.kind !== "point") {
+      marker.add(new THREE.ArrowHelper(lightAimDir(def), new THREE.Vector3(0, 0, 0), 1.1, color.getHex(), 0.3, 0.15));
+    }
+
+    marker.userData = { editorId: def.id, editorType: "light", zoneId, selectable: true, editorOnly: true, hideInGame: true };
+    marker.traverse(child => {
+      if (child === marker) return;
+      child.userData.editorId   = def.id;
+      child.userData.editorType = "light";
+      child.userData.zoneId     = zoneId;
+      child.userData.selectable = true;
+      child.userData.editorOnly = true;
+      child.userData._parentId  = def.id;
+      child.userData._ownsMaterial = true;   // marker owns its materials — dispose on unload
+    });
+    return marker;
+  }
+
+  private _removeLight(entry: ZoneEntry, id: string): void {
+    const le = entry.lightEntries.get(id);
+    if (!le) return;
+    le.light.dispose();
+    if ("target" in le.light && le.light.target.parent === entry.lightsGroup)
+      entry.lightsGroup.remove(le.light.target);
+    entry.lightsGroup.remove(le.light);
+    entry.lightsGroup.remove(le.marker);
+    le.marker.traverse(o => {
+      if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
+        o.geometry.dispose();
+        (o.material as THREE.Material).dispose();
+      }
+    });
+    entry.lightEntries.delete(id);
   }
 
   private _buildTriggerVolumes(zoneId: string, zone: ZoneDef, group: THREE.Group): void {

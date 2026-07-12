@@ -35,6 +35,8 @@ export class SceneManager {
   private _cullStats: { tested: number; hidden: number } | null = null;
 
   private readonly _sunLight:     THREE.DirectionalLight;
+  private readonly _ambientLight: THREE.AmbientLight;
+  private readonly _unsubLighting: () => void;
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
 
@@ -54,8 +56,17 @@ export class SceneManager {
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
     this.editorCamera = editor ? new EditorCamera(this.camera, canvas, bus) : null;
 
+    this._ambientLight = new THREE.AmbientLight(0xaabbcc, 0.5);
+    this.scene.add(this._ambientLight);
     this._sunLight  = this._setupLighting();
     this._setupSky();
+    // World-level ambient/sun config (WorldState emits on load and on panel edits).
+    this._unsubLighting = bus.on("world:lighting", ({ ambient, sun }) => {
+      this._ambientLight.color.set(ambient.color);
+      this._ambientLight.intensity = ambient.intensity;
+      this._sunLight.color.set(sun.color);
+      this._sunLight.intensity = sun.intensity;
+    });
     if (editor) this._setupGrid();   // grid helpers + demo ground are editor furniture
 
     if (editor) {
@@ -76,8 +87,6 @@ export class SceneManager {
   }
 
   private _setupLighting(): THREE.DirectionalLight {
-    this.scene.add(new THREE.AmbientLight(0xaabbcc, 0.5));
-
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
     sun.position.set(30, 50, 20);
     sun.castShadow = true;
@@ -253,6 +262,7 @@ export class SceneManager {
 
   dispose(): void {
     this._disposed = true;
+    this._unsubLighting();
     cancelAnimationFrame(this._raf);
     this.editorCamera?.dispose();
     window.removeEventListener("resize", this._onResize);

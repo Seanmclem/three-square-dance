@@ -188,6 +188,19 @@ export const IconSelectEdge = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconLight = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+    {/* bulb with rays */}
+    <circle cx="10" cy="9" r="4" stroke={color} strokeWidth="1.5" fill={color} fillOpacity="0.15"/>
+    <path d="M8.5 15.5 H11.5" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="10" y1="1.5"  x2="10"   y2="3.5"  stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+    <line x1="3.5" y1="9"   x2="1.5"  y2="9"    stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+    <line x1="18.5" y1="9"  x2="16.5" y2="9"    stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+    <line x1="4.8" y1="3.8" x2="6.2"  y2="5.2"  stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+    <line x1="15.2" y1="3.8" x2="13.8" y2="5.2" stroke={color} strokeWidth="1.3" strokeLinecap="round"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   "select-face":    IconSelectFace,
@@ -208,4 +221,7 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   "shape-cylinder": IconShapeCylinder,
   "shape-wedge":    IconShapeWedge,
   "shape-box":      IconShapeBox,
+  "light-point":       IconLight,
+  "light-spot":        IconLight,
+  "light-directional": IconLight,
 };
