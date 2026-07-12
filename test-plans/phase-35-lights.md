@@ -35,9 +35,11 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
-| 17 | List renders | nothing selected, any tool (v4.29.2) | LIGHTS IN THIS ZONE (n) whenever the zone has lights; row = color swatch + label/id + kind glyph (+ `☑︎sh` when shadow on); with zero lights the section (empty-state hint) appears only under the Light tool; WORLD LIGHT stays Light-tool-only |
-| 18 | Row click selects | click a row | tool switches to Select; that light selected (LightView + gizmo) — next canvas click does NOT place |
-| 19 | List is live | add/remove/edit lights | count and rows track `zone.lights` (light:added/updated/removed) and zone switches |
+| 17 | Lights category row | nothing selected, any tool (v4.29.3) | "Lights" CategoryRow with summary `sun + ambient · N placed` |
+| 18 | Nested page | press the row | drilldown page (← Back, "Lights" header, WORLD SUN · AMBIENT · PLACED subtitle): WORLD LIGHT (ambient + sun) on top, PLACED LIGHTS (n) below (swatch + label/id + kind glyph + `☑︎sh`); Back returns to the tool view |
+| 19 | Row click selects | click a placed-light row | tool switches to Select; that light selected (LightView + gizmo) — next canvas click does NOT place |
+| 20 | List is live | add/remove/edit lights | count and rows track `zone.lights` (light:added/updated/removed) and zone switches |
+| 21 | Tool switch resets | open Lights page, click another tool | panel shows the new tool's view (stack cleared) |
 
 ## Results (2026-07-12) — ALL PASS (real clicks + probes)
 
@@ -59,3 +61,7 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
   (LIGHTS IN THIS ZONE (1), demo light row with swatch + kind); row click selected
   the light (LIGHT · POINT view, Delete button present); count tracked add/remove
   live (1 → 2 → 1). Typecheck clean.
+- **v4.29.3 (nested page), 2026-07-12:** "Lights" CategoryRow on the default Select
+  view (`sun + ambient · 1 placed`); page shows ← Back + Lights header + WORLD LIGHT
+  above PLACED LIGHTS (1) (screenshot-verified); Back → tool view; reopen → row click
+  → LIGHT · POINT view. Console clean, typecheck clean.

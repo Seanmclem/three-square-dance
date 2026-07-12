@@ -159,11 +159,11 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
-  animations: "Animations", colliders: "Colliders",
+  animations: "Animations", colliders: "Colliders", lights: "Lights",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -174,6 +174,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   vert: "ELEVATION",
   animations: "CLIPS · AUTO-PLAY",
   colliders: "SHAPE · OFFSET · SENSOR",
+  lights: "WORLD SUN · AMBIENT · PLACED",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -277,6 +278,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (def?.colliders?.length) return `auto (${def.colliders.length} boxes)`;
       return def?.collidable ? "auto box" : "none";
     }
+    case "lights": return "";   // no-selection screen — never listed for a selected object
   }
 }
 
@@ -400,6 +402,12 @@ export function PropertiesPanel({
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [stack.length]);
 
+  // Tool switch with nothing selected: drop any open no-selection screen (Lights)
+  // so the panel shows the newly armed tool's own view.
+  useEffect(() => {
+    if (!selected) setStack([]);
+  }, [activeTool]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const push = (s: ScreenId) => setStack(prev => [...prev, s]);
   const pop  = ()            => setStack(prev => prev.slice(0, -1));
 
@@ -414,8 +422,8 @@ export function PropertiesPanel({
   // Committed label (if any). The root header shows it in place of the id;
   // the id then appears underneath so it's never lost.
   const currentLabel   = ((selected?.data as { label?: string } | null)?.label ?? "").trim();
-  const headerTitle    = !selected ? "" : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? (currentLabel || selected.id) : SCREEN_LABELS[currentScreen!];
-  const headerSubtitle = !selected ? "" : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
+  const headerTitle    = !selected ? (currentScreen ? SCREEN_LABELS[currentScreen] : "") : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? (currentLabel || selected.id) : SCREEN_LABELS[currentScreen!];
+  const headerSubtitle = !selected ? (currentScreen ? SCREEN_SUBTITLES[currentScreen] : "") : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
     && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal", "shape", "light"].includes(selected.type as string);
@@ -489,7 +497,7 @@ export function PropertiesPanel({
             </button>
           )}
         </div>
-        {selected && (
+        {(selected || currentScreen === "lights") && (
           <div style={{ padding: "0 16px 10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {canRename && editingLabel ? (
@@ -534,9 +542,17 @@ export function PropertiesPanel({
             position={selected.position} onPositionChange={onSpawnPositionChange}
           />
         ) : !selected ? (
-          <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
-            worldLighting={worldLighting} onWorldLightingChange={onWorldLightingChange}
-            zoneLights={zoneLights} onSelectLight={onSelectLight} />
+          currentScreen === "lights" ? (
+            <>
+              {worldLighting && onWorldLightingChange && (
+                <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
+              )}
+              <LightListSection lights={zoneLights} onSelect={onSelectLight} />
+            </>
+          ) : (
+            <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
+              lightCount={zoneLights.length} onOpenLights={() => push("lights")} />
+          )
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
             selected={selected}
@@ -4968,10 +4984,10 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   const KIND_GLYPH: Record<string, string> = { point: "◉", spot: "◭", directional: "☀" };
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ ...LABEL, marginBottom: 4 }}>LIGHTS IN THIS ZONE ({lights.length})</div>
+      <div style={{ ...LABEL, marginBottom: 4 }}>PLACED LIGHTS ({lights.length})</div>
       {lights.length === 0 && (
         <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
-          None yet — click in the scene to place one.
+          None yet — pick the Light tool and click in the scene to place one.
         </div>
       )}
       {lights.map(l => (
@@ -5001,16 +5017,13 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   );
 }
 
-function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingChange, zoneLights = [], onSelectLight }: {
+function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights }: {
   activeTool: ToolId;
   onShowCredits?: () => void;
-  worldLighting?:         { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
-  onWorldLightingChange?: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
-  zoneLights?:            LightDef[];
-  onSelectLight?:         (id: string) => void;
+  lightCount?:   number;
+  onOpenLights?: () => void;
 }) {
   const info = TOOL_INFO[activeTool];
-  const isLightTool = activeTool === "light-point" || activeTool === "light-spot" || activeTool === "light-directional";
   return (
     <>
       <div style={{ padding: "10px 16px 0", color: "#646464", fontSize: 11 }}>{info.desc}</div>
@@ -5019,11 +5032,13 @@ function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingCha
           {info.hint}
         </div>
       </div>
-      {/* Always listed while nothing is selected; the empty state only under the
-          Light tool (other tools shouldn't carry a permanent empty section). */}
-      {(isLightTool || zoneLights.length > 0) && <LightListSection lights={zoneLights} onSelect={onSelectLight} />}
-      {isLightTool && worldLighting && onWorldLightingChange && (
-        <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
+      {/* Scene lighting drilldown — world sun/ambient + this zone's placed lights. */}
+      {onOpenLights && (
+        <CategoryRow
+          label="Lights"
+          summary={`sun + ambient · ${lightCount} placed`}
+          onPress={onOpenLights}
+        />
       )}
       {/* Home for global editor settings/links — grows over time; credits first. */}
       {activeTool === "select" && onShowCredits && (
