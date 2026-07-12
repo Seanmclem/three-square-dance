@@ -55,6 +55,11 @@ const CLIMB_ANIM_REF    = 1.2;   // climb clip plays at 1× at this speed (m/s) 
 const CLIMB_FREE_X_WIDTH = 1.2;
 const CLIMB_X_MARGIN     = 0.25; // lateral clamp inset from the ladder's edges
 
+// ── Jump reliability (v4.28.14) ───────────────────────────────────────────────
+const JUMP_BUFFER_SEC = 0.15;  // a press is remembered this long (fires on landing)
+const COYOTE_SEC      = 0.12;  // recently-grounded still counts (ledge walk-offs, flag flicker)
+const GROUND_STICK    = 0.5;   // m/s downward bias while grounded — keeps computedGrounded stable
+
 /**
  * Character scale is per camera mode (Phase 34 follow-up): third-person uses
  * characterScale (avatar + capsule), FPS uses fpsCharacterScale (capsule/eye
@@ -83,6 +88,8 @@ export class CharacterController {
   private _velY    = 0;
   // Edge-triggered jump: must release the jump input before it fires again (no auto-bounce on landing).
   private _jumpArmed = true;
+  private _jumpBuffer = 0;   // s left on a buffered jump press
+  private _coyote = 0;       // s since last grounded that still counts as grounded
 
   private readonly _interactSeen = new Set<string>();   // dedupe interactables when rebuilding the cache
   private readonly _ray = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3()); // reused spring-arm ray
@@ -216,17 +223,29 @@ export class CharacterController {
     if (this._climbLadder) {
       this._updateClimb(dt, jumpHeld, actions.move.y, actions.move.x);
     } else {
-      if (this._body.isGrounded) {
-        if (jumpHeld && this._jumpArmed) {
-          this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
-          this._jumpArmed = false;
-        } else {
-          this._velY = 0;
-        }
+      // Jump reliability (v4.28.14). `computedGrounded()` is only true when the KCC
+      // move had a downward component, so plain walking flickers it false on most
+      // frames and a raw grounded-gated jump eats ~80% of presses. Three layers:
+      //  - press BUFFER: a tap is remembered briefly and fires on the next jumpable frame
+      //  - COYOTE grace: recently-grounded counts as grounded (also covers walking off a ledge)
+      //  - ground STICK below: while grounded, feed a small downward bias so the
+      //    flag stays true during horizontal movement (also stabilizes mover carry)
+      if (jumpHeld && this._jumpArmed) { this._jumpBuffer = JUMP_BUFFER_SEC; this._jumpArmed = false; }
+      this._jumpBuffer = Math.max(0, this._jumpBuffer - dt);
+      if (this._body.isGrounded) this._coyote = COYOTE_SEC;
+      else this._coyote = Math.max(0, this._coyote - dt);
+
+      if (this._jumpBuffer > 0 && this._coyote > 0) {
+        this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
+        this._jumpBuffer = 0;
+        this._coyote = 0;
+      } else if (this._body.isGrounded && this._velY <= 0) {
+        this._velY = 0;
       } else {
         this._velY -= 20 * dt;
       }
       dir.y = this._velY * dt;
+      if (this._body.isGrounded && this._velY === 0) dir.y = -GROUND_STICK * dt;
 
       // Moving geometry (Phase 31 / v4.25.1) — the whole block is gated on a mover
       // actually running this frame, so a world without live movers pays nothing
