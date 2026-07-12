@@ -4259,8 +4259,10 @@ function SpawnSettingsView({
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
       {settings.cameraMode === "thirdperson" && numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
         "Height of the camera's aim point above the player (metres). This is CAMERA framing, not the character's size. Higher = the camera sits higher and frames the head/above (character appears lower, seen more from above); lower = aims toward the feet. To resize the character itself, use Character Scale.")}
-      {numField("CHARACTER SCALE", "characterScale", 0.1, 1,
-        "Uniform size of the character — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Affects BOTH camera modes: the FPS eye height comes from the capsule, so a small scale puts the FPS camera near the floor. (Third-person: after scaling up you may want to raise Camera Height/Distance.)")}
+      {settings.cameraMode === "thirdperson" && numField("CHARACTER SCALE", "characterScale", 0.1, 1,
+        "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
+      {settings.cameraMode === "fps" && numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,
+        "FPS collision-capsule size (and default eye height). Independent of the third-person Character Scale — a small third-person avatar keeps a normal FPS viewpoint. Default 1.")}
       {settings.cameraMode === "thirdperson" && numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1)}
 
       <div>

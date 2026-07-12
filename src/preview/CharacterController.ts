@@ -55,6 +55,16 @@ const CLIMB_ANIM_REF    = 1.2;   // climb clip plays at 1× at this speed (m/s) 
 const CLIMB_FREE_X_WIDTH = 1.2;
 const CLIMB_X_MARGIN     = 0.25; // lateral clamp inset from the ladder's edges
 
+/**
+ * Character scale is per camera mode (Phase 34 follow-up): third-person uses
+ * characterScale (avatar + capsule), FPS uses fpsCharacterScale (capsule/eye
+ * height, default 1) — a small third-person avatar no longer shrinks the FPS
+ * viewpoint. Mode is a per-world author setting, so collision is stable in play.
+ */
+export function effectiveCharacterScale(s: PlayerSettings): number {
+  return s.cameraMode === "thirdperson" ? (s.characterScale ?? 1) : (s.fpsCharacterScale ?? 1);
+}
+
 // Reused scratch objects — the update() loop runs every frame, so it must not allocate
 // (per-frame garbage triggers GC pauses = micro-stutters). All temps below are set fresh
 // each use and never held across the yield back to the RAF loop.
@@ -126,7 +136,7 @@ export class CharacterController {
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
     );
 
-    this._body = new CharacterBody(_settings.characterScale ?? 1);
+    this._body = new CharacterBody(effectiveCharacterScale(_settings));
     this._desiredDist = _settings.thirdPersonDistance;
   }
 
@@ -525,7 +535,7 @@ export class CharacterController {
       this._modelAnimations = gltf.animations ?? [];
       this._modelRoot = root;
       this._mixer = new THREE.AnimationMixer(root);
-      root.scale.setScalar(this._settings.characterScale ?? 1);
+      root.scale.setScalar(effectiveCharacterScale(this._settings));
       this._scene.add(root);
       this._modelYaw = this._yaw;
       this._play("idle", true);

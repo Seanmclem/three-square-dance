@@ -423,6 +423,10 @@ export interface PlayerSettings {
   thirdPersonHeight:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
   climbSpeed?:         number;            // ladder climb speed m/s (default 2)
+  // Character scale is PER CAMERA MODE (mode is a per-world author choice, so
+  // collision never changes mid-game): characterScale applies in third-person
+  // (avatar + capsule), fpsCharacterScale in FPS (capsule/eye; default 1).
+  fpsCharacterScale?:  number;
   // FPS camera height above the FEET (m). Absent = derived from the capsule
   // (≈1.7 at characterScale 1), so it tracks Character Scale automatically.
   fpsEyeHeight?:       number;

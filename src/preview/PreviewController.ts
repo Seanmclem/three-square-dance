@@ -4,7 +4,7 @@ import type { WorldState } from "@/world/WorldState";
 import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
 import type { MoverSystem } from "@/world/MoverSystem";
-import { CharacterController } from "./CharacterController";
+import { CharacterController, effectiveCharacterScale } from "./CharacterController";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { loadBindings } from "@/input/bindings";
@@ -71,7 +71,7 @@ export class PreviewController {
     if (isGameplayMode(mode) && this._world.world?.defaultSpawn) {
       const s = this._world.world.defaultSpawn;
       // s.position is at foot/floor level; body origin is at capsule center (scaled)
-      const capsuleBottom = (0.6 + 0.3) * (settings.characterScale ?? 1); // (halfHeight + radius) * scale
+      const capsuleBottom = (0.6 + 0.3) * effectiveCharacterScale(settings); // (halfHeight + radius) * per-mode scale
       spawnPos = new THREE.Vector3(s.position.x, s.position.y + capsuleBottom, s.position.z);
       facingDeg = s.facingDeg;
     } else if (this._scene.editorCamera) {
