@@ -5019,7 +5019,9 @@ function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingCha
           {info.hint}
         </div>
       </div>
-      {isLightTool && <LightListSection lights={zoneLights} onSelect={onSelectLight} />}
+      {/* Always listed while nothing is selected; the empty state only under the
+          Light tool (other tools shouldn't carry a permanent empty section). */}
+      {(isLightTool || zoneLights.length > 0) && <LightListSection lights={zoneLights} onSelect={onSelectLight} />}
       {isLightTool && worldLighting && onWorldLightingChange && (
         <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
       )}

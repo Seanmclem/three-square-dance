@@ -35,7 +35,7 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 
 | # | Scenario | Steps | Expected |
 |---|---|---|---|
-| 17 | List renders | arm the Light tool | LIGHTS IN THIS ZONE (n) above WORLD LIGHT; row = color swatch + label/id + kind glyph (+ `☑︎sh` when shadow on); empty state when no lights |
+| 17 | List renders | nothing selected, any tool (v4.29.2) | LIGHTS IN THIS ZONE (n) whenever the zone has lights; row = color swatch + label/id + kind glyph (+ `☑︎sh` when shadow on); with zero lights the section (empty-state hint) appears only under the Light tool; WORLD LIGHT stays Light-tool-only |
 | 18 | Row click selects | click a row | tool switches to Select; that light selected (LightView + gizmo) — next canvas click does NOT place |
 | 19 | List is live | add/remove/edit lights | count and rows track `zone.lights` (light:added/updated/removed) and zone switches |
 
