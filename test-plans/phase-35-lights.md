@@ -31,6 +31,14 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 | 15 | Migration parity | load a pre-35 save (stored 1.2 / 3.0) | `migrateWorldLighting` rewrites to 0.5 / 2.0 — scene looks EXACTLY as before (those stored values were never applied); hand-edited values pass through untouched |
 | 16 | Fresh session | no autosave, edit WORLD LIGHT | default WorldConfig seeded by `updateWorldLighting`; edit applies + persists |
 
+## Lights list (v4.29.1)
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
+| 17 | List renders | arm the Light tool | LIGHTS IN THIS ZONE (n) above WORLD LIGHT; row = color swatch + label/id + kind glyph (+ `☑︎sh` when shadow on); empty state when no lights |
+| 18 | Row click selects | click a row | tool switches to Select; that light selected (LightView + gizmo) — next canvas click does NOT place |
+| 19 | List is live | add/remove/edit lights | count and rows track `zone.lights` (light:added/updated/removed) and zone switches |
+
 ## Results (2026-07-12) — ALL PASS (real clicks + probes)
 
 - Toolbar → Point → canvas click: placed at surface+2.5y, auto-selected, glow pool
@@ -47,3 +55,7 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 - User's world ("level-2") migration: stored 1.2/3.0 → 0.5/2.0, rendered look
   unchanged. Autosave reload rebuilt the light; demo light left in the world.
 - Console: only the known pointer-lock automation artifact. `npm run typecheck` clean.
+- **v4.29.1 (lights list), 2026-07-12:** list rendered via real toolbar clicks
+  (LIGHTS IN THIS ZONE (1), demo light row with swatch + kind); row click selected
+  the light (LIGHT · POINT view, Delete button present); count tracked add/remove
+  live (1 → 2 → 1). Typecheck clean.

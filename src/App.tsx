@@ -182,6 +182,7 @@ export default function App() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
+  const [zoneLights,      setZoneLights]       = useState<LightDef[]>([]);
   // World-level ambient/sun (WorldConfig) — synced from the world:lighting bus event;
   // seeded with the visual-parity defaults so the panel works before any load/save.
   const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } }>({
@@ -578,6 +579,7 @@ export default function App() {
         setZoneDialogues(z?.dialogues ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
         setCheckpoints(z?.checkpoints ?? []);
+        setZoneLights(z?.lights ?? []);
         scriptEngine.clearIndex();
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
         if (z) scriptEngine.loadZone(z);
@@ -596,6 +598,7 @@ export default function App() {
         setZoneDialogues(z?.dialogues ?? []);
         setTriggerVolumes(z?.triggerVolumes ?? []);
         setCheckpoints(z?.checkpoints ?? []);
+        setZoneLights(z?.lights ?? []);
       }),
       bus.on("triggervolume:added",   () => {
         const z = world.zones.get(world.activeZoneId ?? "");
@@ -678,11 +681,15 @@ export default function App() {
           });
         });
       }),
+      bus.on("light:added",   () => setZoneLights([...(world.zones.get(world.activeZoneId ?? "")?.lights ?? [])])),
+      bus.on("light:removed", () => setZoneLights([...(world.zones.get(world.activeZoneId ?? "")?.lights ?? [])])),
       bus.on("light:updated", ({ id }) => {
+        const z = world.zones.get(world.activeZoneId ?? "");
+        setZoneLights([...(z?.lights ?? [])]);
         // Refresh selected.data (gizmo moves emit light:updated; panel resyncs position).
         setSelected(prev => {
           if (prev?.type === "light" && prev.id === id) {
-            const l = world.zones.get(world.activeZoneId ?? "")?.lights?.find(l => l.id === id);
+            const l = z?.lights?.find(l => l.id === id);
             return l ? { ...prev, data: l, position: { ...l.position } } : prev;
           }
           return prev;
@@ -1235,6 +1242,21 @@ export default function App() {
     // for the spawn settings panel.
     setPlayerSettingsRev(v => v + 1);
   }, [syncHistory]);
+
+  const handleSelectLight = useCallback((id: string): void => {
+    const world = worldRef.current;
+    const zoneId = world?.activeZoneId;
+    const l = zoneId ? world?.zones.get(zoneId)?.lights?.find(l => l.id === id) : undefined;
+    if (!l || !zoneId) return;
+    // Leave the placement tool so the next canvas click doesn't drop another light.
+    setActiveTool("select");
+    busRef.current.emit("tool:select", { tool: "select" });
+    busRef.current.emit("object:selected", {
+      id, type: "light", zoneId,
+      position: l.position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 },
+      data: l,
+    });
+  }, []);
 
   const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }): void => {
     const world = worldRef.current;
@@ -2375,6 +2397,8 @@ export default function App() {
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
         onWorldLightingChange={handleWorldLightingChange}
+        zoneLights={zoneLights}
+        onSelectLight={handleSelectLight}
         bus={busRef.current}
         onPreviewClip={(objectId, clipName) => objectPlacerRef.current?.previewClip(objectId, clipName)}
         onStopPreview={(objectId) => objectPlacerRef.current?.stopPreview(objectId)}

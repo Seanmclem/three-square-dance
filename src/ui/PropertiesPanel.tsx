@@ -351,6 +351,9 @@ interface PropertiesPanelProps {
   // World-level ambient/sun lighting (shown under the Light tool's ToolView).
   worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
   onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+  // Active zone's placed lights + row-click selection (LIGHTS list under the Light tool).
+  zoneLights?:              LightDef[];
+  onSelectLight?:           (id: string) => void;
   bus?:                     EventBus;
   onPreviewClip?:           (objectId: string, clipName: string) => void;
   onStopPreview?:           (objectId: string) => void;
@@ -375,7 +378,7 @@ export function PropertiesPanel({
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
-  worldLighting, onWorldLightingChange,
+  worldLighting, onWorldLightingChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
 }: PropertiesPanelProps) {
@@ -532,7 +535,8 @@ export function PropertiesPanel({
           />
         ) : !selected ? (
           <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
-            worldLighting={worldLighting} onWorldLightingChange={onWorldLightingChange} />
+            worldLighting={worldLighting} onWorldLightingChange={onWorldLightingChange}
+            zoneLights={zoneLights} onSelectLight={onSelectLight} />
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
             selected={selected}
@@ -4959,11 +4963,51 @@ function WorldLightSection({ lighting, onChange }: {
   );
 }
 
-function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingChange }: {
+// One row per placed light in the active zone — click selects it in the viewport.
+function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?: (id: string) => void }) {
+  const KIND_GLYPH: Record<string, string> = { point: "◉", spot: "◭", directional: "☀" };
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ ...LABEL, marginBottom: 4 }}>LIGHTS IN THIS ZONE ({lights.length})</div>
+      {lights.length === 0 && (
+        <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+          None yet — click in the scene to place one.
+        </div>
+      )}
+      {lights.map(l => (
+        <button
+          key={l.id}
+          onClick={() => onSelect?.(l.id)}
+          title={l.id}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
+            padding: "6px 8px", borderRadius: 4, cursor: "pointer",
+            background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)",
+            color: "#c0c0c0", fontSize: 11, fontFamily: "monospace",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.4)"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
+        >
+          <span style={{ width: 10, height: 10, borderRadius: "50%", background: l.color, flexShrink: 0, boxShadow: `0 0 6px ${l.color}` }} />
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {l.label || l.id}
+          </span>
+          <span style={{ color: "#606070", fontSize: 10, flexShrink: 0 }}>
+            {KIND_GLYPH[l.kind]} {l.kind}{l.castShadow ? " · ☑︎sh" : ""}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingChange, zoneLights = [], onSelectLight }: {
   activeTool: ToolId;
   onShowCredits?: () => void;
   worldLighting?:         { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
   onWorldLightingChange?: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+  zoneLights?:            LightDef[];
+  onSelectLight?:         (id: string) => void;
 }) {
   const info = TOOL_INFO[activeTool];
   const isLightTool = activeTool === "light-point" || activeTool === "light-spot" || activeTool === "light-directional";
@@ -4975,6 +5019,7 @@ function ToolView({ activeTool, onShowCredits, worldLighting, onWorldLightingCha
           {info.hint}
         </div>
       </div>
+      {isLightTool && <LightListSection lights={zoneLights} onSelect={onSelectLight} />}
       {isLightTool && worldLighting && onWorldLightingChange && (
         <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
       )}
