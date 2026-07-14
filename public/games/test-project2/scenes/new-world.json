@@ -1,0 +1,392 @@
+{
+  "metadata": {
+    "name": "New World",
+    "version": "1.0",
+    "author": "",
+    "created": "2026-07-09T12:55:07.026Z",
+    "lastModified": "2026-07-09T12:55:07.026Z",
+    "uvVersion": 1,
+    "editorCamera": {
+      "focus": {
+        "x": 42,
+        "y": 5,
+        "z": -17
+      },
+      "radius": 33,
+      "phi": 0.9,
+      "theta": 2.2
+    }
+  },
+  "world": {
+    "size": {
+      "width": 200,
+      "depth": 200
+    },
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 0.5
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 2,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012,
+    "playerSettings": {
+      "cameraMode": "fps",
+      "moveSpeed": 6,
+      "jumpHeight": 1.2,
+      "fov": 75,
+      "thirdPersonDistance": 4,
+      "thirdPersonHeight": 2
+    },
+    "stateSchema": {
+      "health": {
+        "type": "number",
+        "default": 100,
+        "min": 0,
+        "max": 100
+      }
+    },
+    "defaultSpawn": {
+      "position": {
+        "x": 6.4480399850121435,
+        "y": 0.14473653617037385,
+        "z": 8.92506898803649
+      },
+      "facingDeg": 0
+    }
+  },
+  "terrain": null,
+  "zones": [
+    {
+      "id": "demo",
+      "name": "Demo Zone",
+      "type": "outdoor",
+      "bounds": {
+        "x": -250,
+        "z": -250,
+        "width": 500,
+        "depth": 500
+      },
+      "nodes": [
+        {
+          "id": "6338573b-44c4-4adc-83a6-ecabb70f5075",
+          "x": -21.5,
+          "z": -20
+        },
+        {
+          "id": "0c4aff35-6b5f-44bc-9d8b-27ce495e0534",
+          "x": 14.5,
+          "z": -20
+        },
+        {
+          "id": "7db001a0-422a-4b09-bcb1-b68883f779d8",
+          "x": 14.5,
+          "z": 13
+        },
+        {
+          "id": "6d477baf-1296-4f3f-b49d-6ecfaad28786",
+          "x": -21.5,
+          "z": 13
+        }
+      ],
+      "floors": [
+        {
+          "id": "63f85cee-5786-4b40-9283-a613caeff276",
+          "level": 0,
+          "elevation": 0.14076765179447648,
+          "ceilingHeight": null,
+          "floorMesh": {
+            "shape": "rect",
+            "points": [
+              {
+                "x": -21.5,
+                "z": -20
+              },
+              {
+                "x": 14.5,
+                "z": -20
+              },
+              {
+                "x": 14.5,
+                "z": 13
+              },
+              {
+                "x": -21.5,
+                "z": 13
+              }
+            ],
+            "nodeIds": [
+              "6338573b-44c4-4adc-83a6-ecabb70f5075",
+              "0c4aff35-6b5f-44bc-9d8b-27ce495e0534",
+              "7db001a0-422a-4b09-bcb1-b68883f779d8",
+              "6d477baf-1296-4f3f-b49d-6ecfaad28786"
+            ],
+            "material": "white_smooth_concrete"
+          },
+          "materialOverrides": {
+            "tileScale": 10
+          }
+        }
+      ],
+      "walls": [],
+      "platforms": [
+        {
+          "id": "plat_mover_lift",
+          "label": "Demo lift (rises)",
+          "position": {
+            "x": 0,
+            "y": 0.15,
+            "z": 6
+          },
+          "size": {
+            "width": 3,
+            "depth": 3
+          },
+          "thickness": 0.3,
+          "material": "concrete_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "mover": {
+            "enabled": true,
+            "kind": "slide",
+            "axis": "y",
+            "distance": 4,
+            "duration": 3,
+            "dwell": 0.5,
+            "mode": "loop",
+            "phase": 0,
+            "speed": 45,
+            "autoStart": true
+          }
+        },
+        {
+          "id": "plat_mover_ferry",
+          "label": "Demo ferry (slides)",
+          "position": {
+            "x": -6,
+            "y": 0.15,
+            "z": -3
+          },
+          "size": {
+            "width": 3,
+            "depth": 3
+          },
+          "thickness": 0.3,
+          "material": "concrete_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "mover": {
+            "enabled": true,
+            "kind": "slide",
+            "axis": "x",
+            "distance": 5,
+            "duration": 4,
+            "mode": "loop",
+            "autoStart": true
+          }
+        }
+      ],
+      "stairs": [
+        {
+          "id": "stair_7b88e70a",
+          "start": {
+            "x": 7.5,
+            "y": 0.14076765179447648,
+            "z": 3
+          },
+          "end": {
+            "x": 7.131745622508879,
+            "y": 3.2997676517944763,
+            "z": -4.003324761387168
+          },
+          "width": 2.5,
+          "style": "straight",
+          "material": "concrete_01",
+          "hasRailing": true,
+          "landing": {
+            "depth": 3
+          },
+          "numSteps": 14,
+          "flights": 2,
+          "railing": {
+            "topRail": true,
+            "balusters": true,
+            "balustersInner": true,
+            "balustersOuter": false,
+            "landingPerimeter": true,
+            "height": 0.9,
+            "stepInterval": 1,
+            "barThickness": 0.1,
+            "postThickness": 0.06,
+            "sideInset": 0.1,
+            "overhang": 0.15,
+            "topLanding": {
+              "sideArrive": true,
+              "far": true,
+              "sideExit": false,
+              "close": true
+            }
+          },
+          "underside": {
+            "mode": "diagonal",
+            "thickness": 0.25
+          },
+          "landingMaterial": "concrete_01"
+        }
+      ],
+      "objects": [
+        {
+          "id": "obj_106c1b33",
+          "assetId": "character",
+          "position": {
+            "x": -6.5,
+            "y": 0.14476765692234217,
+            "z": 1.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "autoPlayAnimation": "Idle"
+        }
+      ],
+      "shapes": [
+        {
+          "id": "shape_mover_spin",
+          "label": "Demo spinning wall",
+          "kind": "box",
+          "position": {
+            "x": -13,
+            "y": 0.2487522275055469,
+            "z": 6
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "material": "concrete_01",
+          "width": 4,
+          "depth": 0.35,
+          "height": 2.2,
+          "mover": {
+            "enabled": true,
+            "kind": "spin",
+            "axis": "y",
+            "speed": 60,
+            "autoStart": true
+          }
+        },
+        {
+          "id": "shape_mover_door",
+          "label": "Demo sliding door",
+          "kind": "box",
+          "position": {
+            "x": 2,
+            "y": 0.15,
+            "z": -8
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "material": "concrete_01",
+          "width": 2.4,
+          "depth": 0.3,
+          "height": 3,
+          "mover": {
+            "enabled": true,
+            "kind": "slide",
+            "axis": "y",
+            "distance": 2.7,
+            "duration": 0.4,
+            "dwell": 0,
+            "mode": "once",
+            "phase": 0,
+            "speed": 45,
+            "autoStart": false
+          }
+        }
+      ],
+      "triggerVolumes": [
+        {
+          "id": "tv_mover_door",
+          "label": "Door opener",
+          "position": {
+            "x": 2,
+            "y": 0.15,
+            "z": -8
+          },
+          "size": {
+            "x": 6,
+            "y": 2.5,
+            "z": 6
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_door_toggle",
+              "label": "Open door",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "toggle_mover",
+                  "targetId": "shape_mover_door"
+                }
+              ],
+              "oneShot": false
+            },
+            {
+              "id": "scr_28926df5",
+              "label": "Close Door",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_exit",
+                "delay": 2
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "toggle_mover",
+                  "targetId": "shape_mover_door"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "transitions": [],
+  "groups": []
+}

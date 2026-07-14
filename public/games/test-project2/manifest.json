@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "id": "test-project2",
+  "name": "test-project2",
+  "version": "1.0.0",
+  "entryScene": "new-world",
+  "scenes": {
+    "new-world": "scenes/new-world.json",
+    "level-2": "scenes/level-2.json"
+  },
+  "assetsBase": "/",
+  "game": "game.json"
+}

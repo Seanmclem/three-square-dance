@@ -65,6 +65,19 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Always Commit `public/games/**`
+
+**These are user content, and the editor can silently overwrite them.**
+
+Scene files under `public/games/` (`manifest.json`, `game.json`, `scenes/*.json`) are hand-built levels. The editor write-through-saves them via the File System Access API, which truncates on write — an overwritten scene is unrecoverable unless it is in git. This has already destroyed a level (a ladder-test `level-2.json` was overwritten with a blank demo world; no snapshot or backup existed).
+
+So, whenever work touches the editor's save/load, project, or scene paths — or any browser session that opens a project:
+
+- **Before** editing or testing: commit any dirty/untracked files under `public/games/` first, so there is a restore point. Never start a session with `?? public/games/...` in `git status`.
+- **After** the app writes to them: commit the resulting changes, so the new state is captured.
+
+Never add `public/games/` to `.gitignore`, and never delete or reset a scene file to "clean up" a working tree. If a scene file's diff looks like content vanished, stop and surface it — do not commit the deletion assuming it was intentional.
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
