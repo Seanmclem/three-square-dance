@@ -27,6 +27,10 @@ export function installTestHelpers({ bus, world, scriptEngine, preview, gameStat
   const zoneId = () => world.activeZoneId ?? "demo";
 
   const api = {
+    /** The live WorldState. `metadata === null` means "never loaded from a scene file"
+     *  (bare demo-zone fallback) — the condition the scene-overwrite guard keys off. */
+    world,
+
     // ── Preview / scripting ──────────────────────────────────────────────────
     /** Enter preview (no spawn needed — falls back to a floor point). */
     enterPreview: () => preview.enter("preview"),

@@ -430,8 +430,7 @@ export default function App() {
         }
       } catch { /* IDB or FSA not available */ }
 
-      // Project restore (Phase 33): permission still granted → adopt silently
-      // (the autosave above already restored the active scene — don't reload it);
+      // Project restore (Phase 33): permission still granted → adopt silently;
       // permission lost → pending banner, requestPermission needs a user gesture.
       try {
         const last = await restoreLastProject();
@@ -439,6 +438,19 @@ export default function App() {
           if (last.granted) {
             const store = await ProjectStore.open(last.dir);
             const sceneId = store.sceneIds.includes(last.sceneId) ? last.sceneId : store.entryScene;
+            // The autosave restore above stands in for the scene file only when it actually ran.
+            // When it didn't (expired >24h / corrupt / cleared), the world is the bare demo-zone
+            // fallback, and adopting the project over it would let the next write-through save
+            // flush that empty world onto the scene file. Load the scene from disk instead.
+            if (!restored) {
+              try {
+                restoringRef.current = true;
+                await handleLoadFromJSON(await store.loadScene(sceneId));
+                autosaveBaselineRef.current = JSON.stringify(world.toJSON());
+              } finally {
+                restoringRef.current = false;
+              }
+            }
             const ctx = { store, sceneId, rev: 0 };
             projectRef.current = ctx;
             setProject(ctx);
@@ -871,6 +883,18 @@ export default function App() {
     if (cam && meta) meta.editorCamera = cam.getPose();
   }, []);
 
+  /** Last line of defence for write-through saves onto an existing scene file.
+   *  A world loaded from a scene always carries that scene's metadata; a null metadata means
+   *  the world is the bare demo-zone fallback (WorldState.toJSON would fabricate an "Untitled"
+   *  shell). Overwriting a real scene with that truncates it to an empty world — the v4.29.x
+   *  data-loss bug. Refuse, and keep the file. Only guards overwrites: addScene creates a new
+   *  file, so adopting a metadata-less world into a brand-new scene stays allowed. */
+  const canOverwriteScene = useCallback((sceneId: string): boolean => {
+    if (worldRef.current?.metadata != null) return true;
+    console.warn(`[project] refusing to overwrite scene "${sceneId}" with an unloaded (empty) world`);
+    return false;
+  }, []);
+
   const handleLoadFromJSON = useCallback(async (json: unknown): Promise<void> => {
     const world = worldRef.current;
     const zones = zonesRef.current;
@@ -904,7 +928,7 @@ export default function App() {
   const closeProject = useCallback(async (opts?: { skipSave?: boolean }): Promise<void> => {
     const proj = projectRef.current;
     if (!proj) return;
-    if (!opts?.skipSave) {
+    if (!opts?.skipSave && canOverwriteScene(proj.sceneId)) {
       stampCameraPose();
       try { await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON()); } catch (e) { console.warn('Scene save on project close failed:', e); }
     }
@@ -915,7 +939,7 @@ export default function App() {
       worldRef.current.gameStateSchema = undefined;
     }
     void clearLastProject();
-  }, []);
+  }, [canOverwriteScene]);
 
   const handleLoad = useCallback((json: unknown): void => {
     void closeProject().then(() => handleLoadFromJSON(json));
@@ -947,6 +971,7 @@ export default function App() {
     // the single-file picker path below is skipped entirely.
     const proj = projectRef.current;
     if (proj) {
+      if (!canOverwriteScene(proj.sceneId)) return;
       try {
         await proj.store.saveScene(proj.sceneId, world.toJSON());
         await proj.store.writeGame();
@@ -1061,7 +1086,12 @@ export default function App() {
       } else {
         // Adopt the current world as scene 1 (single-scene → project migration)
         stampCameraPose();
-        await store.addScene(sceneId, worldRef.current!.toJSON());
+        const file = worldRef.current!.toJSON();
+        await store.addScene(sceneId, file);
+        // The world IS this scene now — take the metadata toJSON() just synthesized. A world
+        // built from the demo-zone fallback still has a null metadata, and leaving it null
+        // would make canOverwriteScene refuse every later save of the scene we just created.
+        worldRef.current!.metadata = file.metadata;
       }
       adoptProject(store, sceneId);
       setIsDirty(false);
@@ -1096,20 +1126,25 @@ export default function App() {
     try {
       const store = await ProjectStore.open(pending.dir);
       const sceneId = store.sceneIds.includes(pending.sceneId) ? pending.sceneId : store.entryScene;
-      // Do NOT reload the scene — the autosave already restored it (possibly fresher).
+      // Keep the autosave-restored world when there is one (it may be fresher than the file).
+      // A null metadata means no restore happened and this is the bare demo-zone fallback —
+      // adopting it would overwrite the scene file with an empty world on the next save.
+      if (worldRef.current?.metadata == null) await handleLoadFromJSON(await store.loadScene(sceneId));
       adoptProject(store, sceneId);
     } catch (e) {
       console.error('Reopen project failed:', e);
       setProjectPending(null);
     }
-  }, [projectPending, adoptProject]);
+  }, [projectPending, adoptProject, handleLoadFromJSON]);
 
   const handleProjectSceneSwitch = useCallback(async (target: string): Promise<void> => {
     const proj = projectRef.current;
     if (!proj || target === proj.sceneId) return;
     try {
-      stampCameraPose();
-      await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());  // write-through, no prompt
+      if (canOverwriteScene(proj.sceneId)) {
+        stampCameraPose();
+        await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());  // write-through, no prompt
+      }
       const file = await proj.store.loadScene(target);
       await handleLoadFromJSON(file);
       const world = worldRef.current!;
@@ -1130,8 +1165,10 @@ export default function App() {
     const name = window.prompt("New scene name?");
     if (!name?.trim()) return;
     try {
-      stampCameraPose();
-      await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());
+      if (canOverwriteScene(proj.sceneId)) {
+        stampCameraPose();
+        await proj.store.saveScene(proj.sceneId, worldRef.current!.toJSON());
+      }
       const id = uniqueSceneId(slugifyId(name.trim()), proj.store.sceneIds);
       await proj.store.addScene(id, makeFreshScene(name.trim()));
       await handleProjectSceneSwitch(id);
