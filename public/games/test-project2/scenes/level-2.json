@@ -63,7 +63,8 @@
         "z": 17.271931690951142
       },
       "facingDeg": 0
-    }
+    },
+    "envIntensity": 1
   },
   "terrain": null,
   "zones": [
@@ -548,8 +549,28 @@
           "pitchDeg": 50,
           "yawDeg": 0,
           "castShadow": false
+        },
+        {
+          "id": "light_demo_ss35",
+          "label": "Demo static-shadow spot (v4.29.6)",
+          "kind": "spot",
+          "position": {
+            "x": -4,
+            "y": 6,
+            "z": -10
+          },
+          "color": "#fff2cc",
+          "intensity": 120,
+          "range": 25,
+          "angleDeg": 40,
+          "pitchDeg": 70,
+          "yawDeg": 180,
+          "castShadow": true,
+          "staticShadow": true
         }
-      ]
+      ],
+      "shapes": [],
+      "scripts": []
     }
   ],
   "transitions": [],
