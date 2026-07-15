@@ -3880,8 +3880,11 @@ function MaterialSection({
                 <span style={{ color: ov ? "#c0c0c0" : "#7a7a7a", fontSize: 10, fontFamily: "monospace", flex: 1, fontStyle: ov ? "italic" : "normal" }}>
                   {mapLabel}{ov ? "*" : ""}
                 </span>
-                {key === "roughness" && !roughEnabled && (
+                {key === "roughness" && (
                   <input type="number" step={0.05} min={0} max={1} value={roughStr}
+                    title={roughEnabled
+                      ? "Multiplies the roughness texture (1 = texture as-is, lower = shinier overall)"
+                      : "Roughness: 0 = mirror-shiny, 1 = fully matte"}
                     onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
                     onBlur={e => flush(() => commitRough(e.target.value))}
                     style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
