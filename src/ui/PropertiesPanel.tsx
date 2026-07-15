@@ -3721,7 +3721,10 @@ function MaterialSection({
   const commitTile  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScale: n, tileScaleX: undefined, tileScaleY: undefined }); };
   const commitTileX = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScaleX: n }); };
   const commitTileY = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n <= 0) return; onOverridesChange({ ...overrides, tileScaleY: n }); };
-  const commitRough = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, roughnessVal: Math.max(0, Math.min(1, n)) }); };
+  // Cap 2 while the roughness texture is on: the scalar MULTIPLIES the texture's
+  // (sub-1) texels, so >1 is the only way to reach fully-matte on glossy-mapped
+  // materials. Plain (map-off) roughness is physically 0..1 — the shader clamps.
+  const commitRough = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, roughnessVal: Math.max(0, Math.min(effectiveEnabled("roughness") ? 2 : 1, n)) }); };
   const commitDisp  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n) || n < 0) return; onOverridesChange({ ...overrides, displacementScale: n }); };
   const commitOffX  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetX: n }); };
   const commitOffY  = (val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onOverridesChange({ ...overrides, offsetY: n }); };
@@ -3893,8 +3896,10 @@ function MaterialSection({
                         style={{ background: "none", border: "none", color: "#4a9eff", fontSize: 11, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
                       >↺</button>
                     )}
-                    <input type="number" step={0.05} min={0} max={1} value={roughStr}
-                      title={`0 = mirror-shiny · 1 = fully matte · this material's default: ${baseDef?.roughnessVal ?? 0.85}${roughEnabled ? " (scales the roughness texture)" : ""}`}
+                    <input type="number" step={0.05} min={0} max={roughEnabled ? 2 : 1} value={roughStr}
+                      title={roughEnabled
+                        ? `Scales the roughness texture — 0 = mirror · up to 2 for extra-matte (texture pixels are darker than 1, so >1 buys real headroom) · this material's default: ${baseDef?.roughnessVal ?? 0.85}`
+                        : `0 = mirror-shiny · 1 = fully matte · this material's default: ${baseDef?.roughnessVal ?? 0.85}`}
                       onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
                       onBlur={e => flush(() => commitRough(e.target.value))}
                       style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
