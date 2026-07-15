@@ -109,6 +109,12 @@ export class CharacterController {
   private _currentClipObj: THREE.AnimationClip  | null = null;
   private _animPhase: "ground" | "jump" | "airidle" | "land" | "climb" = "ground";
 
+  // ── Locomotion audio (Phase 36 follow-up) — footstep stride accumulator ──────
+  private _stepAccum = 0;    // metres of horizontal ground travel since the last footstep
+  private _stepPrevX = 0;
+  private _stepPrevZ = 0;
+  private _airTime   = 0;    // seconds airborne — a real fall vs grounded-flicker (land sound gate)
+
   // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
   private _climbLadder: LadderDef | null = null;      // non-null = climbing
   private _interactLadder: LadderDef | null = null;   // top-zone "Climb down" prompt target
@@ -153,6 +159,7 @@ export class CharacterController {
   init(spawnPos: THREE.Vector3, facingDeg: number): void {
     this._yaw = THREE.MathUtils.degToRad(facingDeg);
     this._body.init(spawnPos);
+    this._stepPrevX = spawnPos.x; this._stepPrevZ = spawnPos.z;   // seed footstep travel
     // Distance from the capsule CENTER (body origin) down to the feet. Stored positions
     // (checkpoints, saved poses, literal teleport coords) are all foot/floor level — where
     // a marker sits — so teleport adds this to land the FEET on the target, and save stores
@@ -243,6 +250,7 @@ export class CharacterController {
         this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
         this._jumpBuffer = 0;
         this._coyote = 0;
+        this._emitSound(this._settings.jumpSound);   // jump takeoff
       } else if (this._body.isGrounded && this._velY <= 0) {
         this._velY = 0;
       } else {
@@ -287,6 +295,30 @@ export class CharacterController {
       this._body.move(dir);
     }
     const pos = this._body.position;
+
+    // Land sound (Phase 36 follow-up) — physics-based so it works without an animated
+    // model. Gate on air TIME (> COYOTE) so brief grounded-flicker while walking on the
+    // ground-stick doesn't count as a landing.
+    if (this._body.isGrounded) {
+      if (this._airTime > COYOTE_SEC) this._emitSound(this._settings.landSound);
+      this._airTime = 0;
+    } else {
+      this._airTime += dt;
+    }
+
+    // Footsteps (Phase 36 follow-up) — emit every footstepDistance metres of ACTUAL
+    // horizontal travel while grounded and moving (so a treadmill/wall makes no steps).
+    if (this._settings.footstepSound && this._body.isGrounded && isMoving && !this._climbLadder) {
+      const dx = pos.x - this._stepPrevX, dz = pos.z - this._stepPrevZ;
+      this._stepAccum += Math.sqrt(dx * dx + dz * dz);
+      if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
+        this._stepAccum = 0;
+        this._emitSound(this._settings.footstepSound);
+      }
+    } else {
+      this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant
+    }
+    this._stepPrevX = pos.x; this._stepPrevZ = pos.z;
 
     // Camera — FPS or third-person orbit (yaw/pitch) with spring-arm collision.
     // Both modes derive their height from a smoothed body Y so stair steps don't judder.
@@ -673,6 +705,11 @@ export class CharacterController {
 
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
 
+  /** Fire a locomotion one-shot (jump/land/footstep) — a non-positional SFX-bus sound. */
+  private _emitSound(id?: string): void {
+    if (id) this._bus.emit("audio:play", { id });
+  }
+
   private _enterJump(): void {
     const s = this._jumpSpeed();
     if      (this._has("jump"))      { this._play("jump", false, s);     this._animPhase = "jump"; }
@@ -681,6 +718,7 @@ export class CharacterController {
   }
 
   private _enterLand(): void {
+    // Land SOUND is driven physics-side in update() (mixer-independent), not here.
     if (this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed()); this._animPhase = "land"; }
     else                        { this._animPhase = "ground"; }         // resolves to walk/idle next frame
   }

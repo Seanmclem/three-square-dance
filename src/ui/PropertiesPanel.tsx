@@ -562,7 +562,8 @@ export function PropertiesPanel({
             </>
           ) : currentScreen === "audio" ? (
             onWorldAudioChange
-              ? <AudioMixerSection audio={worldAudio} onChange={onWorldAudioChange} />
+              ? <AudioMixerSection audio={worldAudio} onChange={onWorldAudioChange}
+                    playerSettings={playerSettings} onPlayerSettingsChange={onPlayerSettingsChange} />
               : null
           ) : (
             <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
@@ -5095,9 +5096,11 @@ function WorldLightSection({ lighting, onChange }: {
 // saved with the scene, applied live via world:audio — mirrors WorldLightSection.
 const DEFAULT_AUDIO_MIX: AudioMix = { master: 1, music: 1, sfx: 1, ambient: 1 };
 
-function AudioMixerSection({ audio, onChange }: {
+function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsChange }: {
   audio?:   WorldAudio;
   onChange: (changes: Partial<WorldAudio>) => void;
+  playerSettings?:         PlayerSettings;
+  onPlayerSettingsChange?: (s: Partial<PlayerSettings>) => void;
 }) {
   const mix = { ...DEFAULT_AUDIO_MIX, ...audio?.mix };
 
@@ -5135,6 +5138,37 @@ function AudioMixerSection({ audio, onChange }: {
         bus in the pause menu. Trigger-volume scripts (play_music / play_sound) change
         audio per room.
       </div>
+
+      {playerSettings && onPlayerSettingsChange && (
+        <>
+          <div style={{ ...LABEL, marginBottom: 0, marginTop: 4 }}>CHARACTER SOUNDS</div>
+          <div>
+            <div style={LABEL}>FOOTSTEP</div>
+            <SoundPicker value={playerSettings.footstepSound} allowNone
+              onChange={id => onPlayerSettingsChange({ footstepSound: id || undefined })} />
+          </div>
+          <div>
+            <div style={LABEL}>JUMP</div>
+            <SoundPicker value={playerSettings.jumpSound} allowNone
+              onChange={id => onPlayerSettingsChange({ jumpSound: id || undefined })} />
+          </div>
+          <div>
+            <div style={LABEL}>LAND</div>
+            <SoundPicker value={playerSettings.landSound} allowNone
+              onChange={id => onPlayerSettingsChange({ landSound: id || undefined })} />
+          </div>
+          <div>
+            <div style={LABEL}>STRIDE LENGTH (m)</div>
+            <input type="number" min={0.3} step={0.1} style={{ ...NUM_INPUT, width: 80 }}
+              value={playerSettings.footstepDistance ?? ""} placeholder="1.8"
+              onChange={e => onPlayerSettingsChange({ footstepDistance: e.target.value === "" ? undefined : Number(e.target.value) })} />
+          </div>
+          <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+            The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
+            STRIDE LENGTH metres while walking on the ground.
+          </div>
+        </>
+      )}
     </div>
   );
 }

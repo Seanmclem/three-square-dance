@@ -226,7 +226,22 @@ Example (per-room music): **Trigger** tool → draw a trigger volume in a doorwa
 SELECTED → **+ New**, trigger `on_player_enter`, action `play_music` → pick a track. **▶
 Preview**, walk through → **Expect:** the music kicks in (or crossfades) as you cross.
 
-### F — Volume mixer & player sliders
+### F — Character sounds (footsteps / jump / land)
+
+The player character can make its own noise as it moves.
+
+1. Deselect everything → Properties **Audio** row → scroll to **CHARACTER SOUNDS**.
+2. Pick a **Footstep**, **Jump**, and/or **Land** sound (any of them; leave others blank).
+   Optionally set **Stride Length** (metres between footsteps; default 1.8).
+3. **▶ Preview** and walk / jump around.
+4. **Expect:** a footstep every ~stride-length of walking on the ground, a sound on jump
+   takeoff, and one on landing. Footsteps only fire while grounded and moving (none in the
+   air or standing still); the land sound fires after a real fall, not from walking bumps.
+
+> These play on the **SFX** bus and work even if the character has no animated model
+> (jump/land are driven by the physics, not the animation).
+
+### G — Volume mixer & player sliders
 
 - **Authored levels** (per scene): the four sliders on the **Audio** screen in step C.
   Move Music to ~50% → **Expect:** music is quieter, ambient unchanged.
@@ -235,7 +250,7 @@ Preview**, walk through → **Expect:** the music kicks in (or crossfades) as yo
   Drag them and **Expect:** the live sound changes immediately. These persist across
   sessions (saved to the browser) and multiply *on top of* the authored levels.
 
-### G — Play it in the standalone runtime
+### H — Play it in the standalone runtime
 
 Publish/play the level in the runtime shell (see the runtime workflow below) → **Expect:**
 the same music/ambient/positional audio and the pause-menu sliders all work there too.

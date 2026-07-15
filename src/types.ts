@@ -521,6 +521,12 @@ export interface PlayerSettings {
   animClips?:          Partial<Record<LocomotionState, string | null>>;
   modelAssetId?:       string | null;
   bagStyle?:           string;             // BagOverlay style-registry key (default "list")
+  // Character locomotion audio (Phase 36 follow-up) — SoundDef ids, played as SFX-bus
+  // one-shots by CharacterController at the matching moment. Absent = silent.
+  jumpSound?:          string;             // on jump takeoff
+  landSound?:          string;             // on landing
+  footstepSound?:      string;             // every footstepDistance metres while grounded + moving
+  footstepDistance?:   number;             // stride length in metres (default 1.8)
 }
 
 export interface WorldConfig {
