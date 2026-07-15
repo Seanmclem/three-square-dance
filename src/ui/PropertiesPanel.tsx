@@ -3881,14 +3881,25 @@ function MaterialSection({
                   {mapLabel}{ov ? "*" : ""}
                 </span>
                 {key === "roughness" && (
-                  <input type="number" step={0.05} min={0} max={1} value={roughStr}
-                    title={roughEnabled
-                      ? "Multiplies the roughness texture (1 = texture as-is, lower = shinier overall)"
-                      : "Roughness: 0 = mirror-shiny, 1 = fully matte"}
-                    onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
-                    onBlur={e => flush(() => commitRough(e.target.value))}
-                    style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
-                  />
+                  <>
+                    {overrides?.roughnessVal !== undefined && (
+                      <button
+                        title={`Reset to this material's default (${baseDef?.roughnessVal ?? 0.85})`}
+                        onClick={() => {
+                          const d = baseDef?.roughnessVal ?? 0.85;
+                          setRoughStr(String(d));
+                          onOverridesChange({ ...overrides, roughnessVal: undefined });
+                        }}
+                        style={{ background: "none", border: "none", color: "#4a9eff", fontSize: 11, cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+                      >↺</button>
+                    )}
+                    <input type="number" step={0.05} min={0} max={1} value={roughStr}
+                      title={`0 = mirror-shiny · 1 = fully matte · this material's default: ${baseDef?.roughnessVal ?? 0.85}${roughEnabled ? " (scales the roughness texture)" : ""}`}
+                      onChange={e => { setRoughStr(e.target.value); schedule(() => commitRough(e.target.value)); }}
+                      onBlur={e => flush(() => commitRough(e.target.value))}
+                      style={{ ...NUM_INPUT, width: 52, padding: "2px 5px", fontSize: 10 }}
+                    />
+                  </>
                 )}
                 {key === "displacement" && dispEnabled && (
                   <input type="number" step={0.005} min={0} value={dispStr}
