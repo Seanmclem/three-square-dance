@@ -570,7 +570,27 @@
         }
       ],
       "shapes": [],
-      "scripts": []
+      "scripts": [
+        {
+          "id": "script_flicker35",
+          "label": "Demo flicker — static-shadow spot blinks (0.4s)",
+          "zoneId": "demo",
+          "enabled": true,
+          "trigger": {
+            "type": "on_timer",
+            "repeat": true,
+            "interval": 0.4
+          },
+          "conditions": [],
+          "actions": [
+            {
+              "type": "toggle_light",
+              "targetId": "light_demo_ss35"
+            }
+          ],
+          "oneShot": false
+        }
+      ]
     }
   ],
   "transitions": [],

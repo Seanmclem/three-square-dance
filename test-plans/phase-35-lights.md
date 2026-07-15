@@ -43,6 +43,7 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 | 24 | Editor WYSIWYG | move/edit geometry via the normal editor path | `*:rebuilt` (and object add/remove) re-poke frozen maps — shadow follows editor edits |
 | 25 | light_off / light_on / toggle_light | author on a script (Lights optgroup in the target picker) or `__test.runAction` | intensity 0 ↔ authored value; off also freezes the shadow passes; light counts unchanged (no recompile hitch) |
 | 26 | Preview restore | turn lights off in preview, exit | all lights reset to their defs (intensity + shadow mode) |
+| 27 | Flicker (v4.29.7) | `on_timer` (repeat, ~0.4s) + `toggle_light` on a static-shadow light | intensity alternates every tick; `shadow.autoUpdate` stays false — ZERO shadow re-renders per blink (geometry pokes refresh off lights too); restored on exit. Hand-authored scripts MUST set `enabled: true` |
 
 ## Lights list (v4.29.1)
 

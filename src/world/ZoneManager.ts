@@ -1900,10 +1900,11 @@ export class ZoneManager {
       const turnOn = op === "on" || (op === "toggle" && le.light.intensity === 0);
       le.light.intensity = turnOn ? def.intensity : 0;
       if (le.light.castShadow) {
-        // Off: stop paying the per-frame shadow pass. On: resume (or re-render once
-        // for static shadows).
+        // Off: stop paying the per-frame shadow pass. On: resume. Static maps are
+        // NOT re-poked here — geometry pokes keep them fresh even while off (see
+        // _refreshStaticShadows), so a fast flicker costs zero shadow renders.
         le.light.shadow.autoUpdate = turnOn && !def.staticShadow;
-        if (turnOn) le.light.shadow.needsUpdate = true;
+        if (turnOn && !def.staticShadow) le.light.shadow.needsUpdate = true;
       }
     }
   }
@@ -1923,12 +1924,14 @@ export class ZoneManager {
     }
   }
 
-  /** Zone geometry rebuilt — frozen (static) shadow maps re-render once. */
+  /** Zone geometry rebuilt — frozen (static) shadow maps re-render once. Pokes
+   *  script-switched-off lights too (their map must be fresh when they flick back
+   *  on without a re-render — flickering lights stay zero-cost). */
   private _refreshStaticShadows(zoneId: string): void {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
     for (const le of entry.lightEntries.values()) {
-      if (le.light.castShadow && !le.light.shadow.autoUpdate && le.light.intensity > 0)
+      if (le.light.castShadow && !le.light.shadow.autoUpdate)
         le.light.shadow.needsUpdate = true;
     }
   }
