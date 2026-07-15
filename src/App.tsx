@@ -29,7 +29,6 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
-import { ZoneTool } from "@/editor/ZoneTool";
 import { SpawnPointTool } from "@/editor/SpawnPointTool";
 import { CheckpointTool } from "@/editor/CheckpointTool";
 import { LightTool } from "@/editor/LightTool";
@@ -280,7 +279,6 @@ export default function App() {
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
-    const zoneTool        = new ZoneTool(scene.scene, bus);
     const spawnPointTool  = new SpawnPointTool(scene.scene, world, bus);
     const checkpointTool  = new CheckpointTool(scene.scene, world, bus);
     const lightTool       = new LightTool(world, bus);
@@ -341,7 +339,6 @@ export default function App() {
     nodeDragger.init();
     openingDragger.init();
     gizmoManager.init();
-    zoneTool.init();
     spawnPointTool.init();
     checkpointTool.init();
     lightTool.init();
@@ -797,7 +794,6 @@ export default function App() {
       triggerVolumeTool.dispose();
       decalTool.dispose();
       scriptEngineRef.current = null;
-      zoneTool.dispose();
       gizmoManager.dispose();
       openingDragger.dispose();
       nodeDragger.dispose();
@@ -824,8 +820,8 @@ export default function App() {
   }, []);
 
   const handleToolSelect = (tool: ToolId): void => {
-    if (tool === "zone") {
-      // Z key = toggle groups panel
+    if (tool === "groups") {
+      // The "Groups" toolbar button just toggles the groups panel — it arms no tool.
       setLeftPanel(p => p === "groups" ? null : "groups");
       return;
     }

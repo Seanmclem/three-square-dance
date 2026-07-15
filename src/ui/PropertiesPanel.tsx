@@ -59,7 +59,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   stair:       { desc: "Click bottom point, then top point of staircase.",         hint: "Click bottom of stair" },
   ladder:      { desc: "Click to place a ladder foot. Height and facing are edited in the panel.", hint: "Click to place ladder" },
   object:      { desc: "Choose an asset below, click to place.",                   hint: "Select an asset first" },
-  zone:        { desc: "Draw a zone boundary to group rooms.",                     hint: "Click to define zone area" },
+  groups:      { desc: "Toggle the Groups panel to organize objects into groups.",  hint: "Groups are managed in the left panel" },
   spawnpoint:       { desc: "Click to place the player spawn point.",                   hint: "Click to set spawn location" },
   "trigger-volume": { desc: "Click and drag to place a trigger volume.",               hint: "Click to set volume start" },
   decal:            { desc: "Pick a decal, hover a surface, scroll = size, shift+scroll = rotate, click to stamp.", hint: "Select a decal texture in the Decals panel first" },

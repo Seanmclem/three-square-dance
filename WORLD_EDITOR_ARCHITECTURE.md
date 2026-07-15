@@ -1073,6 +1073,29 @@ SceneManager calls `update(dt)` on all registered modules each frame. Modules ne
 
 The canonical save/load format. All builders read exclusively from this structure — never from the Three.js scene.
 
+> ⚠️ **Zones & transitions are effectively single-zone now — read this before trusting the multi-zone examples below.**
+> The original design (shown in the JSON below with a `zones[]` array and a `transitions[]`
+> array of door/loading-zone links between zones) described a **multi-zone-per-scene** world
+> where the player walked between "rooms" via `TransitionDef`s. **That layer was removed and
+> superseded by the scene/level model (Phase 25 runtime shell + Phase 33 projects).** In the
+> shipped code:
+> - **Every scene has exactly one zone**, always created by `createDemoZone()` (`App.tsx`). There
+>   is **no working UI to create a second zone** — `ZoneTool` never activates (the `"zone"`
+>   ToolId toggles the Groups panel instead and never emits `tool:select`), and its
+>   `zonetool:awaiting-name` event has no handler. `ZonePanel` / `ZoneNamingDialog` are
+>   unmounted. (`ZoneTool` + those panels were **deleted** in the Phase 36 cleanup; this doc's
+>   `### ZoneTool.ts` section is retained only as history.)
+> - **There is no `TransitionManager`** (never built as a file). `TransitionDef` /
+>   `world.transitions` / openings' `linkedZoneId` survive as **vestigial data** in the schema
+>   (serialized as empty arrays, no runtime consumer) — kept for save-format stability, not
+>   because anything drives them. The `## TransitionManager.ts` and `### TransitionTool.ts`
+>   sections below describe code that does not exist.
+> - **Moving the player between areas** is done two ways: **across levels** via the `load_scene`
+>   action → runtime `SceneRouter` (a different scene `.json`), and **within a level** via
+>   trigger volumes + scripts. There are no sub-zones to move between.
+>
+> So read `zones[]` below as "always length 1" and `transitions[]` as "always empty".
+
 ```jsonc
 {
   "metadata": {
@@ -2557,6 +2580,11 @@ it left the wall patched after delete) — and via the dirty queue after target 
 
 ## TransitionManager.ts
 
+> ⚠️ **Does not exist.** No `TransitionManager` was ever built. Zone-to-zone transitions
+> were superseded by scene-to-scene routing (`src/runtime/SceneRouter.ts`, Phase 25/33).
+> `TransitionDef` / `world.transitions` remain as vestigial schema only. Section kept as
+> history. See the zones disclaimer under **Data Model**.
+
 ```js
 class TransitionManager {
   constructor(worldState, zoneManager, bus) { ... }
@@ -2740,6 +2768,12 @@ Rotation snap: 45° (disable with Alt key)
 
 ### ZoneTool.ts
 
+> ⚠️ **Deleted (Phase 36 cleanup).** This tool never activated in the shipped app — the
+> `"zone"` toolbar slot toggles the Groups panel and never emits `tool:select`, and
+> `zonetool:awaiting-name` had no handler. `src/editor/ZoneTool.ts`, `ZonePanel.tsx`, and
+> `ZoneNamingDialog.tsx` were removed. Section kept as history. See the zones disclaimer
+> under **Data Model**.
+
 ```
 States: IDLE → PLACING → NAMING → IDLE
 
@@ -2763,6 +2797,11 @@ Clicking inside an existing zone: set as active zone (no state change)
 ```
 
 ### TransitionTool.ts
+
+> ⚠️ **Does not exist.** No `TransitionTool` was built (the `transitiontool:*` events and
+> zone-destination linking below were never wired). The openings PropertiesPanel still has a
+> vestigial "link to zone" picker, but with only one zone it is meaningless. Section kept as
+> history. See the zones disclaimer under **Data Model**.
 
 ```
 Requires: a wall with a door opening already exists and is selected

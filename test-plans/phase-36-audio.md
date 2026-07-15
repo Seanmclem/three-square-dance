@@ -64,6 +64,17 @@ Setup: `assetManager.getSoundList()` → 3 sounds (music/ambient/sfx). Authored 
 
 - Metadata editing of existing sounds (only import + delete today; models/materials have
   an edit dialog).
-- Per-zone auto-crossfading ambience (scenes are single-zone here; per-room control uses
-  trigger-volume `play_music`/`play_sound` scripts).
 - Occlusion mode attaches the listener to the rendered vantage, not the logic camera.
+
+### Units of audio change (avoid the "zone" trap)
+
+There is **no working multi-zone / sub-room concept** in the current engine — every
+scene is a single zone, zone creation is dead code, and there is no zone-transition
+system (see the "zones" disclaimer in `WORLD_EDITOR_ARCHITECTURE.md`). So the real
+places audio changes are:
+
+- **Across levels** — the `load_scene` action routes to another scene via the runtime
+  `SceneRouter`; the new scene's `WorldConfig.audio` (ambient/music/mix) loads fresh.
+- **Within a level** — trigger volumes + scripts (`play_music` / `play_sound` /
+  `stop_music`) and per-object `sound` emitters. That's the whole toolkit; there are no
+  sub-zones to crossfade between.

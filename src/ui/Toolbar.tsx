@@ -18,7 +18,7 @@ const TOOLS: ToolDef[] = [
   { id: "stair",           label: "Stair",     shortcut: "T", variants: [{ id: "stair", label: "▤ Stair" }, { id: "ladder", label: "☰ Ladder" }] },
   { id: "shape-cylinder",  label: "Shape",    shortcut: "B", variants: [{ id: "shape-cylinder", label: "◍ Cylinder" }, { id: "shape-wedge", label: "◺ Wedge" }, { id: "shape-box", label: "▤ Box" }] },
   { id: "object",          label: "Object",   shortcut: "O" },
-  { id: "zone",            label: "Groups",   shortcut: "Z" },
+  { id: "groups",          label: "Groups",   shortcut: "Z" },
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
   { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
   { id: "decal",           label: "Decal",    shortcut: "K" },
@@ -79,7 +79,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         const menuOpen  = openMenu === tool.id;
         const active = activeTool === tool.id
           || activeVariantId !== undefined
-          || (tool.id === "zone"            && openPanel === "groups")
+          || (tool.id === "groups"          && openPanel === "groups")
           || (tool.id === "object"          && openPanel === "assets")
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
         const highlight = active || menuOpen;

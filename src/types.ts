@@ -117,7 +117,7 @@ export interface SoundManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "zone" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box" | "light-point" | "light-spot" | "light-directional";
+export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "groups" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box" | "light-point" | "light-spot" | "light-directional";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -292,9 +292,6 @@ export interface BusEvents {
   "assets:loaded":         { assets: AssetDef[] };
   "leftpanel:open":        { panelId: LeftPanelId };
   "leftpanel:close":       Record<string, never>;
-  "zonetool:awaiting-name": { bounds: Bounds };
-  "zonetool:name-confirmed": { name: string; type: ZoneType };
-  "zone:jump":             { zoneId: string };
   // Audio (Phase 36) — consumed by AudioSystem. `id` is a SoundDef id; a positional
   // one-shot passes `position`. `key` lets a looped emit be stopped later by audio:stop.
   "audio:play":            { id: string; position?: Vec3; volume?: number; loop?: boolean; key?: string };
@@ -924,6 +921,13 @@ export interface ZoneDef {
   lights?:         LightDef[];
 }
 
+/**
+ * @vestigial Zone-to-zone transitions. The multi-zone-per-scene concept was removed and
+ * superseded by scene-to-scene routing (`src/runtime/SceneRouter.ts`, Phase 25/33). No code
+ * creates or consumes these at runtime — `world.transitions` is always empty and serializes
+ * as `[]`. Retained only for save-format stability. Do not build new features on it; use
+ * `load_scene` (cross-level) or trigger volumes + scripts (within-level) instead.
+ */
 export interface TransitionDef {
   id:               string;
   fromZone:         string;

@@ -20,12 +20,18 @@ around it.
 - **Full importer + browser** — a real `public/assets/audio/manifest.json`,
   `AssetManager.initAudio()`, an FSA-based `AudioImporterModal`, and an `AudioBrowser`
   picker, exactly mirroring models/materials.
-- **Authored ambient/music live at scene level** (`WorldConfig.audio`). Every scene in
-  the project has exactly one zone, so "scene-level" *is* "zone-level" here — no
-  redundant per-zone fields. Per-room control is done the way the engine already does
-  everything else: **trigger-volume scripts** firing `play_music`/`play_sound`. Extra
-  authoring surfaces that genuinely add options are **per-object spatial emitters** and
-  **script/trigger-driven** sounds.
+- **Authored ambient/music live at scene level** (`WorldConfig.audio`). Per-room control
+  is done the way the engine already does everything else: **trigger-volume scripts**
+  firing `play_music`/`play_sound`. Extra authoring surfaces that genuinely add options
+  are **per-object spatial emitters** and **script/trigger-driven** sounds.
+
+  > **Correction (post-ship):** this doc originally justified the scene-level choice by
+  > saying "each scene has exactly one zone, so scene-level *is* zone-level." That framing
+  > wrongly implied a live multi-zone concept. In reality the multi-zone / sub-room layer
+  > was **removed** — zone creation is dead code and there is no zone-transition system
+  > (see the "zones" disclaimer in `WORLD_EDITOR_ARCHITECTURE.md`). Scene-level is simply
+  > *the* level of audio config; the only other units are cross-level `load_scene` and
+  > within-level trigger/script/object sounds. There was never a per-zone option to weigh.
 - **Authored mix + player sliders** — four gain buses (master/music/sfx/ambient).
   Authored defaults in `WorldConfig.audio.mix` (editable in an editor "Audio" tool
   screen cloned from the Lights screen); player-facing volume sliders in the PauseMenu

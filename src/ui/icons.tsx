@@ -59,7 +59,7 @@ export const IconObject = ({ color }: IconProps) => (
   </svg>
 );
 
-export const IconZone = ({ color }: IconProps) => (
+export const IconGroups = ({ color }: IconProps) => (
   <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
     <rect x="4" y="6" width="20" height="16" rx="2" stroke={color} strokeWidth="1.5" strokeDasharray="3.5,2.5"/>
     <circle cx="4"  cy="6"  r="2" fill={color}/>
@@ -222,7 +222,7 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   stair:            IconStair,
   ladder:           IconLadder,
   object:           IconObject,
-  zone:             IconZone,
+  groups:           IconGroups,
   spawnpoint:       IconSpawn,
   "trigger-volume": IconTriggerVolume,
   decal:            IconDecal,
