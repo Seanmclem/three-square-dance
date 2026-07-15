@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": 6.714722051596982,
+        "x": -2.6586733809588643,
         "y": 0,
-        "z": -15.198320325212771
+        "z": -20.62259608630179
       },
-      "radius": 34.95269135981797,
-      "phi": 1.1653981633974477,
-      "theta": -0.5246018366025518
+      "radius": 22.832649074494817,
+      "phi": 0.9703981633974492,
+      "theta": -0.15960183660255162
     }
   },
   "world": {
@@ -260,7 +260,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_ad6ce871",
@@ -272,7 +292,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_651c26af",
@@ -284,7 +324,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_9b1e4b63",
@@ -296,7 +356,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_8b045db3",
@@ -308,7 +388,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_5e73ee37",
@@ -320,7 +420,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_6bac871c",
@@ -332,7 +452,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_77bffbe9",
@@ -344,7 +484,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_7737c841",
@@ -356,7 +516,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_39463111",
@@ -368,7 +548,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_9e086724",
@@ -380,7 +580,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_c8d49fd2",
@@ -392,7 +612,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_04340a3c",
@@ -404,7 +644,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_2ccda0c8",
@@ -416,7 +676,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_482ea603",
@@ -428,7 +708,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_f181878e",
@@ -440,7 +740,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_ccdf01bc",
@@ -452,7 +772,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_d8e4b0f9",
@@ -464,7 +804,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_bdf16dac",
@@ -476,7 +836,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_32fa10bd",
@@ -488,7 +868,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         },
         {
           "id": "wall_e67bcc3c",
@@ -500,7 +900,27 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": true
+              },
+              "metalness": {
+                "enabled": false
+              },
+              "albedo": {
+                "enabled": true
+              },
+              "normal": {
+                "enabled": true
+              }
+            },
+            "roughnessVal": 2
+          }
         }
       ],
       "platforms": [],
@@ -534,7 +954,8 @@
           "color": "#ffd9a0",
           "intensity": 30,
           "range": 15,
-          "castShadow": false
+          "castShadow": false,
+          "staticShadow": false
         },
         {
           "id": "light_0eb16908",
