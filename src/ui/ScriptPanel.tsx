@@ -26,6 +26,7 @@ import type {
   DialogueOption,
   ItemDef,
 } from "@/types";
+import { SoundPicker } from "@/ui/SoundPicker";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ const ACTION_TYPES: ActionType[] = [
   "move_object",
   "open_door",
   "play_animation",
+  "play_music",
   "play_sound",
   "run_script",
   "set_state",
@@ -159,6 +161,8 @@ const ACTION_TYPES: ActionType[] = [
   "spawn_npc",
   "start_mover",
   "stop_mover",
+  "stop_music",
+  "stop_sound",
   "store_position",
   "take_item",
   "teleport_player",
@@ -1775,12 +1779,51 @@ function ActionFields({
 
     case "play_sound":
       return (
-        <input
-          style={S.field}
-          placeholder="Sound asset ID"
-          value={action.sound ?? ""}
-          onChange={(e) => set({ sound: e.target.value })}
-        />
+        <>
+          <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} />
+          <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
+            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3 }}>
+              <input type="checkbox" checked={action.loop ?? false} onChange={(e) => set({ loop: e.target.checked || undefined })} />
+              loop
+            </label>
+            <input type="number" min={0} max={1} step={0.1} style={{ ...S.field, flex: "0 0 64px" }}
+              placeholder="vol" title="volume 0..1"
+              value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+          </div>
+          <div style={{ color: "#606070", fontSize: 10, padding: "6px 0 2px" }}>Play at (optional — spatial):</div>
+          {targetPicker}
+        </>
+      );
+
+    case "stop_sound":
+      return (
+        <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+      );
+
+    case "play_music":
+      return (
+        <>
+          <SoundPicker value={action.music} onChange={(id) => set({ music: id })} />
+          <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
+            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3 }}>
+              <input type="checkbox" checked={action.loop ?? true} onChange={(e) => set({ loop: e.target.checked })} />
+              loop
+            </label>
+            <input type="number" min={0} max={1} step={0.1} style={{ ...S.field, flex: "0 0 64px" }}
+              placeholder="vol" title="volume 0..1"
+              value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            <input type="number" min={0} step={0.5} style={{ ...S.field, flex: "0 0 64px" }}
+              placeholder="fade s" title="crossfade seconds"
+              value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+          </div>
+        </>
+      );
+
+    case "stop_music":
+      return (
+        <input type="number" min={0} step={0.5} style={S.field}
+          placeholder="fade-out seconds (0 = instant)"
+          value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
       );
 
     case "set_state":

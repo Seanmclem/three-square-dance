@@ -69,7 +69,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -191,6 +191,8 @@ export default function App() {
     sun:     { color: "#fff4e0", intensity: 2.0 },
     envIntensity: 1,
   });
+  // Scene-level audio (WorldConfig.audio) — synced from the world:audio bus event (Phase 36).
+  const [worldAudio, setWorldAudio] = useState<WorldAudio | undefined>(undefined);
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
@@ -726,6 +728,7 @@ export default function App() {
         });
       }),
       bus.on("world:lighting", ({ ambient, sun, envIntensity }) => setWorldLighting({ ambient, sun, envIntensity: envIntensity ?? 1 })),
+      bus.on("world:audio", ({ audio }) => setWorldAudio(audio)),
       bus.on("spawn:placed", () => {
         // The initial spawn is singular; break out of placing mode after setting it.
         queueMicrotask(() => {
@@ -1306,6 +1309,14 @@ export default function App() {
     if (!world) return;
     // Emits world:lighting → SceneManager applies it and the bus listener syncs panel state.
     world.updateWorldLighting(changes);
+    setIsDirty(true);
+  }, []);
+
+  const handleWorldAudioChange = useCallback((changes: Partial<WorldAudio>): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    // Emits world:audio → AudioSystem reconciles live; the bus listener syncs panel state.
+    world.updateWorldAudio(changes);
     setIsDirty(true);
   }, []);
 
@@ -2441,6 +2452,8 @@ export default function App() {
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
         onWorldLightingChange={handleWorldLightingChange}
+        worldAudio={worldAudio}
+        onWorldAudioChange={handleWorldAudioChange}
         zoneLights={zoneLights}
         onSelectLight={handleSelectLight}
         bus={busRef.current}

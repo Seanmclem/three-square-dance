@@ -4,8 +4,9 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace,
+  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, ObjectSound, AudioMix,
 } from "@/types";
+import { SoundPicker } from "@/ui/SoundPicker";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
 import { facesFromCloud, splitFaceQuad, extrudeFace } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
@@ -159,11 +160,11 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
-  animations: "Animations", colliders: "Colliders", lights: "Lights",
+  animations: "Animations", colliders: "Colliders", lights: "Lights", sound: "Sound", audio: "Audio",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -175,6 +176,8 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   animations: "CLIPS · AUTO-PLAY",
   colliders: "SHAPE · OFFSET · SENSOR",
   lights: "WORLD SUN · AMBIENT · PLACED",
+  sound: "SPATIAL EMITTER",
+  audio: "MIXER · AMBIENT · MUSIC",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -194,7 +197,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   platform: ["geo", "mat"],
   stair:    ["geo", "mat"],
   ladder:   ["geo", "mat"],
-  object:   ["geo", "mat", "colliders"],
+  object:   ["geo", "mat", "colliders", "sound"],
   opening:  ["geo"],
   shape:    ["geo", "mat"],
 };
@@ -278,7 +281,13 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (def?.colliders?.length) return `auto (${def.colliders.length} boxes)`;
       return def?.collidable ? "auto box" : "none";
     }
-    case "lights": return "";   // no-selection screen — never listed for a selected object
+    case "sound": {
+      const snd = (selected.data as WorldObject | null)?.sound;
+      return snd?.soundId ? snd.soundId : "none";
+    }
+    case "lights":
+    case "audio":
+      return "";   // no-selection screens — never listed for a selected object
   }
 }
 
@@ -353,6 +362,8 @@ interface PropertiesPanelProps {
   // World-level ambient/sun/environment lighting (Lights drilldown page).
   worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
   onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;
+  worldAudio?:              WorldAudio;
+  onWorldAudioChange?:      (changes: Partial<WorldAudio>) => void;
   // Active zone's placed lights + row-click selection (LIGHTS list under the Light tool).
   zoneLights?:              LightDef[];
   onSelectLight?:           (id: string) => void;
@@ -380,7 +391,7 @@ export function PropertiesPanel({
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
-  worldLighting, onWorldLightingChange, zoneLights = [], onSelectLight,
+  worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
 }: PropertiesPanelProps) {
@@ -497,7 +508,7 @@ export function PropertiesPanel({
             </button>
           )}
         </div>
-        {(selected || currentScreen === "lights") && (
+        {(selected || currentScreen === "lights" || currentScreen === "audio") && (
           <div style={{ padding: "0 16px 10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {canRename && editingLabel ? (
@@ -549,9 +560,14 @@ export function PropertiesPanel({
               )}
               <LightListSection lights={zoneLights} onSelect={onSelectLight} />
             </>
+          ) : currentScreen === "audio" ? (
+            onWorldAudioChange
+              ? <AudioMixerSection audio={worldAudio} onChange={onWorldAudioChange} />
+              : null
           ) : (
             <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
-              lightCount={zoneLights.length} onOpenLights={() => push("lights")} />
+              lightCount={zoneLights.length} onOpenLights={() => push("lights")}
+              onOpenAudio={() => push("audio")} />
           )
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
@@ -632,6 +648,8 @@ export function PropertiesPanel({
             hullPointsFor={hullPointsFor}
             bus={bus}
           />
+        ) : currentScreen === "sound" ? (
+          <ObjectSoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : null}
       </div>
 
@@ -5073,6 +5091,98 @@ function WorldLightSection({ lighting, onChange }: {
   );
 }
 
+// Scene audio mixer + ambient/music tracks (Phase 36). Global (world-level),
+// saved with the scene, applied live via world:audio — mirrors WorldLightSection.
+const DEFAULT_AUDIO_MIX: AudioMix = { master: 1, music: 1, sfx: 1, ambient: 1 };
+
+function AudioMixerSection({ audio, onChange }: {
+  audio?:   WorldAudio;
+  onChange: (changes: Partial<WorldAudio>) => void;
+}) {
+  const mix = { ...DEFAULT_AUDIO_MIX, ...audio?.mix };
+
+  const slider = (key: keyof AudioMix, label: string) => (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
+        <span>{label}</span><span style={{ color: "#808090" }}>{Math.round(mix[key] * 100)}%</span>
+      </div>
+      <input type="range" min={0} max={1} step={0.01} value={mix[key]}
+        onChange={e => onChange({ mix: { ...mix, [key]: Number(e.target.value) } })}
+        style={{ width: "100%", accentColor: "#80aaff" }} />
+    </div>
+  );
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ ...LABEL, marginBottom: 0 }}>MIXER</div>
+      {slider("master", "MASTER")}
+      {slider("music", "MUSIC")}
+      {slider("sfx", "SFX")}
+      {slider("ambient", "AMBIENT")}
+
+      <div>
+        <div style={LABEL}>BACKGROUND MUSIC</div>
+        <SoundPicker value={audio?.music?.soundId} allowNone
+          onChange={id => onChange({ music: id ? { soundId: id, volume: audio?.music?.volume, loop: true } : undefined })} />
+      </div>
+      <div>
+        <div style={LABEL}>AMBIENT LOOP</div>
+        <SoundPicker value={audio?.ambient?.soundId} allowNone
+          onChange={id => onChange({ ambient: id ? { soundId: id, volume: audio?.ambient?.volume } : undefined })} />
+      </div>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        Authored per-scene defaults. These play on Preview/Play; players can lower each
+        bus in the pause menu. Trigger-volume scripts (play_music / play_sound) change
+        audio per room.
+      </div>
+    </div>
+  );
+}
+
+// Per-object spatial emitter (Phase 36) — a PositionalAudio that follows the mesh.
+function ObjectSoundScreen({ selected, onObjectUpdate }: {
+  selected: SelectedObjectPayload;
+  onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  const snd = (selected.data as WorldObject | null)?.sound;
+  const patch = (changes: Partial<ObjectSound>) =>
+    onObjectUpdate({ sound: { soundId: snd?.soundId ?? "", ...snd, ...changes } });
+
+  const numRow = (key: "volume" | "refDistance" | "maxDistance", label: string, def: number, step: number) => (
+    <div>
+      <div style={LABEL}>{label}</div>
+      <input type="number" min={0} step={step} style={{ ...NUM_INPUT, width: 90 }}
+        value={snd?.[key] ?? ""} placeholder={String(def)}
+        onChange={e => patch({ [key]: e.target.value === "" ? undefined : Number(e.target.value) })} />
+    </div>
+  );
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>SOUND</div>
+        <SoundPicker value={snd?.soundId} allowNone
+          onChange={id => onObjectUpdate({ sound: id ? { ...snd, soundId: id } : undefined })} />
+      </div>
+      {snd?.soundId && (
+        <>
+          <label style={{ color: "#a0a0a0", fontSize: 11, fontFamily: "monospace", display: "flex", alignItems: "center", gap: 6 }}>
+            <input type="checkbox" checked={snd.loop ?? true} onChange={e => patch({ loop: e.target.checked })} />
+            loop
+          </label>
+          {numRow("volume", "VOLUME (0..1)", 1, 0.1)}
+          {numRow("refDistance", "REF DISTANCE", 1, 0.5)}
+          {numRow("maxDistance", "MAX DISTANCE", 20, 1)}
+        </>
+      )}
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        Plays as a 3D positional loop in Preview/Play, attenuating between REF and MAX
+        distance. Leave empty for a silent object.
+      </div>
+    </div>
+  );
+}
+
 // One row per placed light in the active zone — click selects it in the viewport.
 function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?: (id: string) => void }) {
   const KIND_GLYPH: Record<string, string> = { point: "◉", spot: "◭", directional: "☀" };
@@ -5111,11 +5221,12 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   );
 }
 
-function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights }: {
+function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio }: {
   activeTool: ToolId;
   onShowCredits?: () => void;
   lightCount?:   number;
   onOpenLights?: () => void;
+  onOpenAudio?:  () => void;
 }) {
   const info = TOOL_INFO[activeTool];
   return (
@@ -5132,6 +5243,14 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights }: {
           label="Lights"
           summary={`sun + ambient · ${lightCount} placed`}
           onPress={onOpenLights}
+        />
+      )}
+      {/* Scene audio drilldown — mixer + ambient/music tracks (Phase 36). */}
+      {onOpenAudio && (
+        <CategoryRow
+          label="Audio"
+          summary="mixer · ambient · music"
+          onPress={onOpenAudio}
         />
       )}
       {/* Home for global editor settings/links — grows over time; credits first. */}
