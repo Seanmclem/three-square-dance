@@ -643,6 +643,7 @@ export interface PlatformDef {
   sideMaterialOverrides?: MaterialOverrides;
   groupIds?:              string[];
   mover?:                 MoverDef;
+  sound?:                 AttachedSound;   // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
 }
 
 export interface StairCutterDef {
@@ -820,6 +821,7 @@ export interface ShapeDef {
   shearX?: number;              // top-face offset in meters, default 0
   shearZ?: number;
   mover?:  MoverDef;
+  sound?:  AttachedSound;       // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
 }
 
 // ─── Movers — scripted geometry motion (Phase 31) ────────────────────────────
@@ -888,11 +890,15 @@ export interface WorldObject {
   // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
   colliders?: AttachedCollider[];
   mover?:     MoverDef;
-  sound?:     ObjectSound;   // attached spatial emitter — a PositionalAudio that follows the mesh (Phase 36)
+  sound?:     AttachedSound;   // attached spatial emitter — a PositionalAudio that follows the mesh, incl. movers (Phase 36)
 }
 
-/** Per-object positional audio emitter (Phase 36). Plays in preview/game only. */
-export interface ObjectSound {
+/**
+ * Attached positional audio emitter (Phase 36). Plays in preview/game only. Lives on the
+ * entity types that can move (`mover?`): WorldObject, PlatformDef, ShapeDef. The emitter
+ * is parented to the entity's mesh, so it follows movers automatically.
+ */
+export interface AttachedSound {
   soundId:      string;
   volume?:      number;   // 0..1 base gain (default 1)
   loop?:        boolean;  // default true for an ambient emitter

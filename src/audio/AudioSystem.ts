@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { SceneManager } from "@/core/SceneManager";
 import { assetManager } from "@/core/AssetManager";
-import type { AudioMix, SoundCategory, Vec3, WorldObject } from "@/types";
+import type { AudioMix, SoundCategory, Vec3, AttachedSound } from "@/types";
 
 /** Supertype of THREE.Audio<GainNode> and PositionalAudio (Audio<PannerNode>). */
 type AnyAudio = THREE.Audio<AudioNode>;
@@ -48,7 +48,7 @@ export class AudioSystem {
   private _ambient: AnyAudio | null = null;
   private _ambientId: string | null = null;
 
-  private readonly _emitters = new Map<string, THREE.PositionalAudio>();  // objectId → emitter
+  private readonly _emitters = new Map<string, THREE.PositionalAudio>();  // entityId → emitter
   private readonly _keyed    = new Map<string, AnyAudio>();             // keyed one-shots (audio:stop by key)
   private readonly _all      = new Set<AnyAudio>();                     // every live sound, for re-gain
   private readonly _fades:   Fade[] = [];
@@ -73,9 +73,16 @@ export class AudioSystem {
       _bus.on("music:stop",    (p) => this._stopMusic(p.fade)),
       _bus.on("world:audio",   () => this._reconcileAuthored()),
       _bus.on("audio:player-mix", ({ mix }) => this.setPlayerMix(mix)),
-      _bus.on("object:updated", ({ id, changes }) => { if (this._active && "sound" in changes) this._syncEmitter(id); }),
-      _bus.on("object:added",   ({ object }) => { if (this._active) this._syncEmitter(object.id); }),
-      _bus.on("object:removed", ({ id }) => this._removeEmitter(id)),
+      // Attached emitters live on the movable entity types: object / platform / shape.
+      _bus.on("object:updated",   ({ id, changes }) => { if (this._active && "sound" in changes) this._syncEmitter(id); }),
+      _bus.on("object:added",     ({ object }) => { if (this._active) this._syncEmitter(object.id); }),
+      _bus.on("object:removed",   ({ id }) => this._removeEmitter(id)),
+      _bus.on("platform:updated", ({ id, changes }) => { if (this._active && "sound" in changes) this._syncEmitter(id); }),
+      _bus.on("platform:added",   ({ platform }) => { if (this._active) this._syncEmitter(platform.id); }),
+      _bus.on("platform:removed", ({ id }) => this._removeEmitter(id)),
+      _bus.on("shape:updated",    ({ id, changes }) => { if (this._active && "sound" in changes) this._syncEmitter(id); }),
+      _bus.on("shape:added",      ({ shape }) => { if (this._active) this._syncEmitter(shape.id); }),
+      _bus.on("shape:removed",    ({ id }) => this._removeEmitter(id)),
     );
   }
 
@@ -103,9 +110,13 @@ export class AudioSystem {
     if (authored?.ambient?.soundId) this._playAmbient(authored.ambient.soundId, authored.ambient.volume);
     if (authored?.music?.soundId)   this._playMusic(authored.music.soundId, authored.music.volume, authored.music.loop ?? true);
 
-    // Attach positional emitters for every placed object that carries one.
-    for (const zone of this._world.zones.values())
-      for (const obj of zone.objects) if (obj.sound) this._syncEmitter(obj.id);
+    // Attach positional emitters for every placed entity that carries one
+    // (object / platform / shape — the movable types).
+    for (const zone of this._world.zones.values()) {
+      for (const o of zone.objects)          if (o.sound) this._syncEmitter(o.id);
+      for (const p of zone.platforms)        if (p.sound) this._syncEmitter(p.id);
+      for (const s of (zone.shapes ?? []))   if (s.sound) this._syncEmitter(s.id);
+    }
   }
 
   deactivate(): void {
@@ -241,26 +252,26 @@ export class AudioSystem {
 
   // ── Positional object emitters ───────────────────────────────────────────────
 
-  private _syncEmitter(objectId: string): void {
-    const obj = this._findObject(objectId);
-    if (!obj?.sound) { this._removeEmitter(objectId); return; }
-    this._removeEmitter(objectId);   // rebuild from scratch on any change
+  private _syncEmitter(entityId: string): void {
+    const ent = this._findEntity(entityId);
+    if (!ent?.sound) { this._removeEmitter(entityId); return; }
+    this._removeEmitter(entityId);   // rebuild from scratch on any change
 
-    const parent = this._findObjectMesh(objectId) ?? this._holderAt(obj.position);
-    const s = obj.sound;
+    const parent = this._findEntityMesh(entityId) ?? this._holderAt(ent.position);
+    const s = ent.sound;
     const def = assetManager.getSoundDef(s.soundId);
     void this._makeSound(s.soundId, true, catToBus(def?.category ?? "Ambient"),
       s.volume ?? def?.volume ?? 1, s.loop ?? true, parent, false, {
         ref: s.refDistance ?? 1, max: s.maxDistance ?? 20,
       }).then(emitter => {
-        if (emitter && emitter instanceof THREE.PositionalAudio) this._emitters.set(objectId, emitter);
+        if (emitter && emitter instanceof THREE.PositionalAudio) this._emitters.set(entityId, emitter);
       });
   }
 
-  private _removeEmitter(objectId: string): void {
-    const e = this._emitters.get(objectId);
+  private _removeEmitter(entityId: string): void {
+    const e = this._emitters.get(entityId);
     if (!e) return;
-    this._emitters.delete(objectId);
+    this._emitters.delete(entityId);
     this._finish(e);
   }
 
@@ -331,20 +342,26 @@ export class AudioSystem {
 
   // ── Scene lookups ────────────────────────────────────────────────────────────
 
-  private _findObject(id: string): WorldObject | undefined {
+  /** Find a sound-carrying entity (object / platform / shape) by id, with its rest position. */
+  private _findEntity(id: string): { position: Vec3; sound?: AttachedSound } | undefined {
     for (const zone of this._world.zones.values()) {
       const o = zone.objects.find(o => o.id === id);
       if (o) return o;
+      const p = zone.platforms.find(p => p.id === id);
+      if (p) return p;
+      const s = zone.shapes?.find(s => s.id === id);
+      if (s) return s;
     }
     return undefined;
   }
 
-  private _findObjectMesh(id: string): THREE.Object3D | null {
+  /** The entity's root mesh (any editorType) — parenting the emitter here makes it follow movers. */
+  private _findEntityMesh(id: string): THREE.Object3D | null {
     let found: THREE.Object3D | null = null;
     this._scene.scene.traverse(o => {
       if (found) return;
-      const ud = o.userData as { editorId?: string; editorType?: string; _parentId?: string };
-      if (ud.editorId === id && ud.editorType === "object" && !ud._parentId) found = o;
+      const ud = o.userData as { editorId?: string; _parentId?: string };
+      if (ud.editorId === id && !ud._parentId) found = o;
     });
     return found;
   }

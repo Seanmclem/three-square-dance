@@ -4,7 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, ObjectSound, AudioMix,
+  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
@@ -194,12 +194,12 @@ const GEO_SUBTITLES: Partial<Record<string, string>> = {
 const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   wall:     ["geo", "mat", "open", "seg"],
   floor:    ["geo", "mat", "vert"],
-  platform: ["geo", "mat"],
+  platform: ["geo", "mat", "sound"],
   stair:    ["geo", "mat"],
   ladder:   ["geo", "mat"],
   object:   ["geo", "mat", "colliders", "sound"],
   opening:  ["geo"],
-  shape:    ["geo", "mat"],
+  shape:    ["geo", "mat", "sound"],
 };
 
 // ── Summary helpers ───────────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       return def?.collidable ? "auto box" : "none";
     }
     case "sound": {
-      const snd = (selected.data as WorldObject | null)?.sound;
+      const snd = (selected.data as { sound?: { soundId?: string } } | null)?.sound;
       return snd?.soundId ? snd.soundId : "none";
     }
     case "lights":
@@ -649,7 +649,7 @@ export function PropertiesPanel({
             bus={bus}
           />
         ) : currentScreen === "sound" ? (
-          <ObjectSoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
+          <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : null}
       </div>
 
@@ -5139,14 +5139,16 @@ function AudioMixerSection({ audio, onChange }: {
   );
 }
 
-// Per-object spatial emitter (Phase 36) — a PositionalAudio that follows the mesh.
-function ObjectSoundScreen({ selected, onObjectUpdate }: {
+// Attached spatial emitter (Phase 36) — a PositionalAudio that follows the mesh. Lives on
+// object / platform / shape (the movable entity types); onObjectUpdate routes to the right
+// WorldState mutator by selected type, so this screen is type-agnostic.
+function EntitySoundScreen({ selected, onObjectUpdate }: {
   selected: SelectedObjectPayload;
   onObjectUpdate: (c: Partial<WorldObject>) => void;
 }) {
-  const snd = (selected.data as WorldObject | null)?.sound;
-  const patch = (changes: Partial<ObjectSound>) =>
-    onObjectUpdate({ sound: { soundId: snd?.soundId ?? "", ...snd, ...changes } });
+  const snd = (selected.data as { sound?: AttachedSound } | null)?.sound;
+  const patch = (changes: Partial<AttachedSound>) =>
+    onObjectUpdate({ sound: { soundId: snd?.soundId ?? "", ...snd, ...changes } } as Partial<WorldObject>);
 
   const numRow = (key: "volume" | "refDistance" | "maxDistance", label: string, def: number, step: number) => (
     <div>
@@ -5177,7 +5179,7 @@ function ObjectSoundScreen({ selected, onObjectUpdate }: {
       )}
       <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         Plays as a 3D positional loop in Preview/Play, attenuating between REF and MAX
-        distance. Leave empty for a silent object.
+        distance. Rides along if this is a moving platform/shape. Leave empty for silence.
       </div>
     </div>
   );

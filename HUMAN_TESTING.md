@@ -193,16 +193,23 @@ and a **volume mixer** (authored levels + player sliders).
 4. **Expect:** the music and ambient loop start playing and keep looping as you walk.
    Leave preview → they stop. (These are saved with the level, so they persist on reload.)
 
-### D — Positional sound on an object (spatial)
+### D — Positional sound on an object, platform, or shape (spatial)
 
-1. Place or select an **object** (a model). In its **Properties**, open the **Sound**
-   drilldown.
+Attached emitters live on the three **movable** entity types: **objects, platforms, and
+shapes**. (Static geometry — walls, floors, stairs — has no sound field; use a trigger
+volume + `play_sound` there.)
+
+1. Select an **object**, **platform**, or **shape**. In its **Properties**, open the
+   **Sound** drilldown.
 2. Pick a sound (choose a *spatial* one like `ambient_test`), leave **loop** on, and
    optionally set **Volume / Ref distance / Max distance** (how close you must be to hear
    it, and where it fades to silent).
-3. **▶ Preview** and **walk toward and away** from the object.
+3. **▶ Preview** and **walk toward and away** from it.
 4. **Expect:** the sound gets louder as you approach and fades with distance — it's coming
-   *from* the object. If the object is on a moving platform, the sound moves with it.
+   *from* the entity.
+5. **Moving things carry their sound.** Put a sound on a **moving platform** (or shape, or
+   a mover-enabled object) → **Expect:** the sound rides along as the platform slides/spins,
+   staying anchored to it. (Try it on the demo `Demo ferry` platform.)
 
 ### E — Trigger a sound from a script / event
 

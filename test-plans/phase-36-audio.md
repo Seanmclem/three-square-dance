@@ -46,6 +46,7 @@ Setup: `assetManager.getSoundList()` → 3 sounds (music/ambient/sfx). Authored 
 | 7 | `music:stop` | `_musicId` → null, track removed | ✅ |
 | 8 | Positional one-shot | `audio:play` with `position` creates a `PositionalAudio`; a non-loop one auto-cleans on end | ✅ |
 | 9 | Object emitter | `updateObject({ sound })` attaches a `PositionalAudio` **parented to the object mesh**, `refDistance`/`maxDistance` applied, gain = base·buses | ✅ |
+| 9b | Platform/shape emitter (v4.30.1) | `updatePlatform`/`updateShape` `{ sound }` attaches a `PositionalAudio` parented to the platform/shape mesh; **rides the mover** — demo ferry emitter world-pos tracks the slide (−5.369→−4.771 X) and stays locked to the mesh; **Sound** drilldown shows on both inspectors | ✅ |
 | 10 | Teardown | `exitPreview()` → `_active` false, `_all.size` 0, listener detached (no leaks across enter/exit) | ✅ |
 | 11 | Editor UI present | SOUNDS toolbar panel + Properties "Audio · mixer · ambient · music" row render | ✅ |
 
