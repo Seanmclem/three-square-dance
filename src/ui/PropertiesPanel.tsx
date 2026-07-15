@@ -4519,11 +4519,10 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
                 </div>
               ))}
             </div>
-            <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4, marginTop: 6 }}>
-              {light.flicker.style === "flame"
-                ? "Smooth random wobble (never fully off) — torches, fires. AMOUNT = wobble depth."
-                : "Hard on/off at random irregular intervals — faulty fixtures, neon. AMOUNT = how dark the off-blips are (1 = fully off)."}
-              {" Runs in preview/game only; pairs perfectly with STATIC SHADOWS."}
+            <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginTop: 6 }}>
+              AMOUNT: 0 to 1<br />
+              0 = flicker does nothing<br />
+              1 = flicker can take the light fully to black
             </div>
           </>
         )}
