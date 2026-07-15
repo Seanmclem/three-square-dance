@@ -58,6 +58,28 @@ player's own movement). Fixed with contact-manifold depenetration + a perf pass.
 | A7 | `preview:stop` reset + `running` re-seed still correct after stops/toggles; autosave byte-identical after the whole session (no world mutations) | ✅ |
 | A8 | Console clean (no mover/rapier errors) | ✅ |
 
+## v4.29.9 addendum — GROUND_STICK carry regression (2026-07-15)
+
+User report: standing on the horizontal ferry stutters + slowly slides off (FPS,
+noticed in runtime). Bisected to v4.28.14's GROUND_STICK: a downward bias into a
+MOVING kinematic ground makes the Rapier KCC inject the platform's motion into
+`computedMovement` (0×/2× oscillation; desired verified exact every frame).
+Fixed by suppressing the stick while riding a mover + caching the mover ground
+handle through the coyote window (walking flicker can't drop carry frames).
+
+| # | Check | Result |
+|---|---|---|
+| B1 | Standing ride, editor, 4s full-chain stepping: Σplayer 4.6318 vs Σplatform 4.6194 | ✅ |
+| B2 | Standing ride, runtime, full 8s ping-pong: net 0 vs 0, max relative excursion 2.6cm (one-frame lag) | ✅ |
+| B3 | W/S shuffle-walk on the moving ferry: 2cm drift over 208 frames, grounded 100% | ✅ |
+| B4 | Jump on the ferry: fires, lands back on the platform; jump on static floor unchanged (stick path intact) | ✅ |
+| B5 | Regression documented: pre-fix both shells showed dP = 0×/2× of dF (avg ~½–2×) | ✅ |
+
+Debugging traps for future sessions: `__test.enterGame()` before the runtime's
+real New Game creates a second co-located kinematic capsule (intercepts the
+carry ray → fake total carry failure); out-of-band KCC probes on moving ground
+are frame-phase-dependent — only trust in-chain measurements.
+
 ## Not covered / deferred
 
 - FPS-counter eyeball with many concurrent movers (hidden tab — no rAF); code

@@ -58,7 +58,7 @@ const CLIMB_X_MARGIN     = 0.25; // lateral clamp inset from the ladder's edges
 // ── Jump reliability (v4.28.14) ───────────────────────────────────────────────
 const JUMP_BUFFER_SEC = 0.15;  // a press is remembered this long (fires on landing)
 const COYOTE_SEC      = 0.12;  // recently-grounded still counts (ledge walk-offs, flag flicker)
-const GROUND_STICK    = 0.5;   // m/s downward bias while grounded — keeps computedGrounded stable
+const GROUND_STICK    = 0.5;   // m/s downward bias while grounded — keeps computedGrounded stable (SUPPRESSED on movers, see below)
 
 /**
  * Character scale is per camera mode (Phase 34 follow-up): third-person uses
@@ -90,6 +90,9 @@ export class CharacterController {
   private _jumpArmed = true;
   private _jumpBuffer = 0;   // s left on a buffered jump press
   private _coyote = 0;       // s since last grounded that still counts as grounded
+  // Mover body under the player (carry target) — cached across grounded-flicker
+  // frames via the coyote window (v4.29.9).
+  private _moverGroundHandle: number | null = null;
 
   private readonly _interactSeen = new Set<string>();   // dedupe interactables when rebuilding the cache
   private readonly _ray = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3()); // reused spring-arm ray
@@ -229,7 +232,8 @@ export class CharacterController {
       //  - press BUFFER: a tap is remembered briefly and fires on the next jumpable frame
       //  - COYOTE grace: recently-grounded counts as grounded (also covers walking off a ledge)
       //  - ground STICK below: while grounded, feed a small downward bias so the
-      //    flag stays true during horizontal movement (also stabilizes mover carry)
+      //    flag stays true during horizontal movement (STATIC ground only — on a
+      //    moving platform the stick corrupts the KCC solve, see the mover block)
       if (jumpHeld && this._jumpArmed) { this._jumpBuffer = JUMP_BUFFER_SEC; this._jumpArmed = false; }
       this._jumpBuffer = Math.max(0, this._jumpBuffer - dt);
       if (this._body.isGrounded) this._coyote = COYOTE_SEC;
@@ -245,26 +249,40 @@ export class CharacterController {
         this._velY -= 20 * dt;
       }
       dir.y = this._velY * dt;
-      if (this._body.isGrounded && this._velY === 0) dir.y = -GROUND_STICK * dt;
 
-      // Moving geometry (Phase 31 / v4.25.1) — the whole block is gated on a mover
-      // actually running this frame, so a world without live movers pays nothing
-      // (no ground raycast, no contact scan).
+      // Moving geometry (Phase 31 / v4.25.1 / v4.29.9) — gated on a mover actually
+      // running this frame, so a world without live movers pays nothing.
+      let onMover = false;
       if (this._movers?.anyRunning()) {
-        // Ride: standing on a mover's kinematic body adds its per-frame translation
-        // delta to the desired move, so the KCC still collision-resolves the
-        // combined motion. Translation only — spin doesn't rotate the player.
+        // Track which mover (if any) is under the player. Grounded frames refresh
+        // it; brief computedGrounded flicker while walking keeps the cached handle
+        // alive through the coyote window so the carry never drops a frame.
         if (this._body.isGrounded) {
           const h = this._body.groundBodyHandle();
-          const carry = h !== null ? this._movers.carryDelta(h) : null;
-          if (carry) dir.add(carry);
+          this._moverGroundHandle = h !== null && this._movers.carryDelta(h) ? h : null;
+        } else if (this._coyote <= 0) {
+          this._moverGroundHandle = null;
+        }
+        // Ride: add the mover's per-frame translation delta to the desired move —
+        // the KCC still collision-resolves the combined motion. Translation only.
+        if (this._moverGroundHandle !== null) {
+          const carry = this._movers.carryDelta(this._moverGroundHandle);
+          if (carry) { dir.add(carry); onMover = true; }
         }
         // Push: geometry that swept INTO the capsule since the last step shoves the
         // player out along the contact normal (depenetration read from the step's
         // contact manifolds). Routed through `dir` so walls still block the shove.
         const push = this._body.moverPush(this._movers.isMoverBody);
         if (push.lengthSq() > 0) dir.add(push);
+      } else {
+        this._moverGroundHandle = null;
       }
+
+      // Ground stick — NEVER while riding a mover: pressing the capsule into a
+      // MOVING kinematic ground makes the KCC inject the platform's own motion
+      // into its resolve (0×/2× oscillation = stutter + drift, v4.29.9). On a
+      // mover, grounded-flicker robustness comes from the coyote window instead.
+      if (this._body.isGrounded && this._velY === 0 && !onMover) dir.y = -GROUND_STICK * dt;
 
       this._body.move(dir);
     }
