@@ -241,6 +241,10 @@ The player character can make its own noise as it moves.
 > These play on the **SFX** bus and work even if the character has no animated model
 > (jump/land are driven by the physics, not the animation).
 
+**Swap footsteps by surface (wood → gravel):** add a trigger volume over the surface, then
+a `set_footstep` action on `on_player_enter` (pick the gravel sound) and another on
+`on_player_exit` (leave it **empty** to revert). Full reference: **`AUDIO.md`**.
+
 ### G — Volume mixer & player sliders
 
 - **Authored levels** (per scene): the four sliders on the **Audio** screen in step C.

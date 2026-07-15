@@ -48,6 +48,7 @@ Setup: `assetManager.getSoundList()` → 3 sounds (music/ambient/sfx). Authored 
 | 9 | Object emitter | `updateObject({ sound })` attaches a `PositionalAudio` **parented to the object mesh**, `refDistance`/`maxDistance` applied, gain = base·buses | ✅ |
 | 9b | Platform/shape emitter (v4.30.1) | `updatePlatform`/`updateShape` `{ sound }` attaches a `PositionalAudio` parented to the platform/shape mesh; **rides the mover** — demo ferry emitter world-pos tracks the slide (−5.369→−4.771 X) and stays locked to the mesh; **Sound** drilldown shows on both inspectors | ✅ |
 | 9c | Character locomotion audio (v4.30.2) | `PlayerSettings` footstep/jump/land sounds emit SFX-bus one-shots. Deterministic frame-stepping: **footsteps** 4 over 6.9 m (1.5 m stride); **0 false lands while walking** (air-time gate); **jump** + **land** each fire once per hop; both work with no animated model (physics-based land). CHARACTER SOUNDS section renders on the Audio screen | ✅ |
+| 9d | Runtime footstep swap (v4.30.3) | `set_footstep` action overrides the live footstep sound; empty reverts. Through the real dispatch (`__test.runAction`): default `blip_test`×4 → `set_footstep music_test` → `music_test`×4 → `set_footstep` (empty) → `blip_test`×4. `on_player_enter`/`exit` surface-zone pattern | ✅ |
 | 10 | Teardown | `exitPreview()` → `_active` false, `_all.size` 0, listener detached (no leaks across enter/exit) | ✅ |
 | 11 | Editor UI present | SOUNDS toolbar panel + Properties "Audio · mixer · ambient · music" row render | ✅ |
 

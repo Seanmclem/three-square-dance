@@ -257,6 +257,11 @@ export class ScriptEngine {
         this._bus.emit("music:stop", { fade: action.fadeSeconds });
         break;
 
+      case "set_footstep":
+        // Empty sound → revert to the authored default (CharacterController clears the override).
+        this._bus.emit("character:set-footstep", { sound: action.sound });
+        break;
+
       case "show_dialogue": {
         // Legacy inline `action.dialogue` is migrated to a registry tree by
         // migrateDialogues on load (both pipelines) — no runtime fallback.

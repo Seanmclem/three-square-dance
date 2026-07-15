@@ -114,6 +114,8 @@ export class CharacterController {
   private _stepPrevX = 0;
   private _stepPrevZ = 0;
   private _airTime   = 0;    // seconds airborne — a real fall vs grounded-flicker (land sound gate)
+  private _footstepOverride: string | null = null;   // runtime surface swap (set_footstep action); null = authored default
+  private _offFootstep: (() => void) | null = null;
 
   // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
   private _climbLadder: LadderDef | null = null;      // non-null = climbing
@@ -184,6 +186,10 @@ export class CharacterController {
     this._offSavePos = this._bus.on("character:save-position", ({ key }) => {
       const p = this._body.position;
       gameState.set(key, { x: p.x, y: p.y - capsuleBottom, z: p.z, facing: THREE.MathUtils.radToDeg(this._yaw) });
+    });
+    // Runtime footstep surface swap (set_footstep action). Empty = revert to authored default.
+    this._offFootstep = this._bus.on("character:set-footstep", ({ sound }) => {
+      this._footstepOverride = sound || null;
     });
     // Ladder proximity + lifecycle (Phase 34). A rebuilt/deleted ladder force-exits
     // the climb — its colliders (and sensor handles) are gone.
@@ -308,12 +314,14 @@ export class CharacterController {
 
     // Footsteps (Phase 36 follow-up) — emit every footstepDistance metres of ACTUAL
     // horizontal travel while grounded and moving (so a treadmill/wall makes no steps).
-    if (this._settings.footstepSound && this._body.isGrounded && isMoving && !this._climbLadder) {
+    // The override (set_footstep action) wins over the authored default — surface swaps.
+    const footstep = this._footstepOverride ?? this._settings.footstepSound;
+    if (footstep && this._body.isGrounded && isMoving && !this._climbLadder) {
       const dx = pos.x - this._stepPrevX, dz = pos.z - this._stepPrevZ;
       this._stepAccum += Math.sqrt(dx * dx + dz * dz);
       if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
         this._stepAccum = 0;
-        this._emitSound(this._settings.footstepSound);
+        this._emitSound(footstep);
       }
     } else {
       this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant
@@ -727,6 +735,7 @@ export class CharacterController {
     this._exitClimb();
     this._offTeleport?.();    this._offTeleport   = null;
     this._offSavePos?.();     this._offSavePos    = null;
+    this._offFootstep?.();    this._offFootstep   = null;
     this._offLadderEnter?.(); this._offLadderEnter = null;
     this._offLadderExit?.();  this._offLadderExit  = null;
     this._offLadderGone?.();  this._offLadderGone  = null;

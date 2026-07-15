@@ -298,6 +298,9 @@ export interface BusEvents {
   "audio:stop":            { id?: string; key?: string };   // no id/key ⇒ stop all one-shots
   "music:play":            { soundId: string; volume?: number; loop?: boolean; fade?: number };
   "music:stop":            { fade?: number };
+  // Override the live footstep sound (surface swap). Empty/absent = revert to the
+  // authored PlayerSettings.footstepSound. Runtime-only, resets when preview restarts.
+  "character:set-footstep": { sound?: string };
   // Authored scene mix / ambient / music changed (editor) — mirrors "world:lighting".
   "world:audio":           { audio: WorldAudio };
   // Player-preference mix from the PauseMenu sliders (multiplies over authored mix).
@@ -1018,6 +1021,7 @@ export type ActionType =
   | 'stop_sound'
   | 'play_music'
   | 'stop_music'
+  | 'set_footstep'
   | 'show_dialogue'
   | 'move_object'
   | 'play_animation'

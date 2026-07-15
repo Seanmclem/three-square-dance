@@ -159,6 +159,7 @@ const ACTION_TYPES: ActionType[] = [
   "show_dialogue",
   "show_ui",
   "spawn_npc",
+  "set_footstep",
   "start_mover",
   "stop_mover",
   "stop_music",
@@ -1824,6 +1825,17 @@ function ActionFields({
         <input type="number" min={0} step={0.5} style={S.field}
           placeholder="fade-out seconds (0 = instant)"
           value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+      );
+
+    case "set_footstep":
+      return (
+        <>
+          <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+            Overrides the player's walking sound (e.g. wood → gravel). Leave empty to revert
+            to the default. Pair on_player_enter / on_player_exit on a trigger volume.
+          </div>
+        </>
       );
 
     case "set_state":
