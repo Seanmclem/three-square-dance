@@ -314,6 +314,7 @@ export default function App() {
       g.__objectPlacer = objectPlacer; g.__history = history;
       g.__gameState = gameState;
       g.__movers = movers;
+      g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
