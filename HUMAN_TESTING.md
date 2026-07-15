@@ -150,6 +150,91 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 
 ---
 
+## Workflow: sound & music (Phase 36)
+
+Everything the audio system does: a sound library, scene-wide **ambient + background
+music**, **positional** sound attached to objects, sound triggered by **scripts/events**,
+and a **volume mixer** (authored levels + player sliders).
+
+> **Two things to know before you start:**
+> - **Audio only plays in Preview / Start Game**, never while editing (same as scripts).
+> - **Browsers block sound until you click.** Sound starts only after a real click — which
+>   is exactly what pressing **▶ Preview** is. If you set everything up but hear nothing,
+>   make sure you *clicked* Preview (audio can't auto-start on a page reload alone).
+> - **Three ready-made test sounds ship** so you can try this immediately without importing:
+>   `music_test` (a tone loop), `ambient_test` (soft wind), `blip_test` (a short beep).
+
+### A — Browse & preview the sound library
+
+1. Click the **SOUNDS** button (bottom-left toolbar, speaker icon). The panel lists the
+   sounds, tagged by category (Music / Ambient / SFX) with **loop / spatial** flags.
+2. Click the **▶** on any row to hear it right there in the editor (click again to stop).
+   **Expect:** the three test sounds play.
+
+### B — Import your own sound
+
+1. In the SOUNDS panel, click **+ Import Sound** → **Choose audio files…** and pick one or
+   more `.mp3` / `.wav` / `.ogg` files.
+2. Set each one's **Label**, **category**, and the **loop** / **spatial** checkboxes
+   (turn *loop* on for music/ambience; *spatial* on if you'll attach it to an object).
+3. Click **Grant assets/audio folder…** and select the project's
+   `public/assets/audio` folder, then **Import**.
+4. **Expect:** the file is copied in and the new sound appears in the list with a working
+   **▶** preview. (**Manage → Delete** removes sounds.)
+
+### C — Scene ambient loop + background music
+
+1. **Deselect everything** (click empty ground). In the **Properties** panel you'll see an
+   **Audio** row (next to **Lights**). Click it.
+2. On the **Audio** screen: pick a **Background Music** track and an **Ambient Loop** from
+   the dropdowns (each has a ▶ preview). The four **mixer sliders** (Master / Music / SFX /
+   Ambient) set the level saved *with the scene*.
+3. Click **▶ Preview** (**G**).
+4. **Expect:** the music and ambient loop start playing and keep looping as you walk.
+   Leave preview → they stop. (These are saved with the level, so they persist on reload.)
+
+### D — Positional sound on an object (spatial)
+
+1. Place or select an **object** (a model). In its **Properties**, open the **Sound**
+   drilldown.
+2. Pick a sound (choose a *spatial* one like `ambient_test`), leave **loop** on, and
+   optionally set **Volume / Ref distance / Max distance** (how close you must be to hear
+   it, and where it fades to silent).
+3. **▶ Preview** and **walk toward and away** from the object.
+4. **Expect:** the sound gets louder as you approach and fades with distance — it's coming
+   *from* the object. If the object is on a moving platform, the sound moves with it.
+
+### E — Trigger a sound from a script / event
+
+Same flow as **"author & run a script action"** above, but with the audio actions:
+
+- `play_sound` — a one-shot (e.g. a beep on interact). Set a **Target** object to make it
+  play **at that object's position** (spatial); leave the target empty for a flat one-shot.
+- `play_music` — start / swap the background music, with an optional **fade** (crossfade)
+  in seconds.
+- `stop_music` — stop the music (optional fade-out).
+- `stop_sound` — stop a specific looping sound.
+
+Example (per-room music): **Trigger** tool → draw a trigger volume in a doorway → SCRIPTS →
+SELECTED → **+ New**, trigger `on_player_enter`, action `play_music` → pick a track. **▶
+Preview**, walk through → **Expect:** the music kicks in (or crossfades) as you cross.
+
+### F — Volume mixer & player sliders
+
+- **Authored levels** (per scene): the four sliders on the **Audio** screen in step C.
+  Move Music to ~50% → **Expect:** music is quieter, ambient unchanged.
+- **Player levels** (a player's own preference): while in **Preview / Start Game**, press
+  **Enter** to open the **Pause** menu — it has **Master / Music / SFX / Ambient** sliders.
+  Drag them and **Expect:** the live sound changes immediately. These persist across
+  sessions (saved to the browser) and multiply *on top of* the authored levels.
+
+### G — Play it in the standalone runtime
+
+Publish/play the level in the runtime shell (see the runtime workflow below) → **Expect:**
+the same music/ambient/positional audio and the pause-menu sliders all work there too.
+
+---
+
 ## Workflow: stamp a decal (sticker / crack / paint)
 
 1. Click the **Decal** tool in the left toolbar (bottom of the strip). The **DECALS**
