@@ -8,6 +8,7 @@ import { ZoneManager } from "@/world/ZoneManager";
 import { MoverSystem } from "@/world/MoverSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { PreviewController } from "@/preview/PreviewController";
+import { AudioSystem } from "@/audio/AudioSystem";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { gameState } from "@/scripting/GameState";
 import { PreviewHUD } from "@/ui/PreviewHUD";
@@ -78,6 +79,7 @@ export default function RuntimeApp() {
     const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     const preview      = new PreviewController(bus, world, scene, zones, movers);
     previewRef.current = preview;
+    const audio        = new AudioSystem(bus, world, scene);
     const scriptEngine = new ScriptEngine(bus, world);
     gameState.attach(bus);
     zones.init();
@@ -88,6 +90,7 @@ export default function RuntimeApp() {
     scene.onUpdate(dt => objectPlacer.update(dt));
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
     scene.onUpdate(dt => zones.updateLights(dt));
+    scene.onUpdate(dt => audio.update(dt));
 
     // Runtime game save: pose is captured through the existing
     // character:save-position mechanism (foot-level, round-trips through
@@ -229,6 +232,7 @@ export default function RuntimeApp() {
         .catch(err => console.error("initMaterials failed:", err));
       assetManager.initAssets({ verifyFiles: false }).catch(err => console.error("initAssets failed:", err));
       assetManager.initDecals({ verifyFiles: false }).catch(err => console.error("initDecals failed:", err));
+      assetManager.initAudio({ verifyFiles: false }).catch(err => console.error("initAudio failed:", err));
 
       await Promise.all([physicsWorld.init(), materialsReady]);
       if (!active) return;
@@ -264,6 +268,7 @@ export default function RuntimeApp() {
       routerRef.current = null;
       doSaveRef.current = null;
       preview.exit();
+      audio.dispose();
       scene.dispose();
     };
   }, []);

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest } from "@/types";
 
 export type { MaterialDef };
 
@@ -14,8 +14,12 @@ export class AssetManager {
   private _materialRegistry: Record<string, MaterialDef> = {};
   private _assetRegistry:   Record<string, AssetDef>    = {};
   private _decalRegistry:   Record<string, DecalTexDef> = {};
+  private _soundRegistry:   Record<string, SoundDef>    = {};
+  private readonly _audioBufferCache = new Map<string, AudioBuffer>();
+  private _audioLoader: THREE.AudioLoader | null = null;
   private _missingAssetIds    = new Set<string>();
   private _missingMaterialIds = new Set<string>();
+  private _missingSoundIds    = new Set<string>();
   private _fallbackMat: THREE.MeshStandardMaterial | null = null;
   private _quality: QualityScale = 'high';
   private _baseUrl: string | null = null;
@@ -162,6 +166,67 @@ export class AssetManager {
 
   getDecalList(): DecalTexDef[] {
     return Object.values(this._decalRegistry);
+  }
+
+  // ─── Audio (Phase 36) — mirrors initAssets/initDecals ────────────────────────
+
+  /** Fetch audio/manifest.json, populate the sound registry, return the list. */
+  async initAudio(opts?: { verifyFiles?: boolean }): Promise<SoundDef[]> {
+    try {
+      const res = await fetch(this._resolve('/assets/audio/manifest.json'));
+      if (!res.ok) {
+        console.warn('AssetManager: no audio manifest found — sound picker will be empty');
+        this._soundRegistry = {};
+        return [];
+      }
+      const manifest: SoundManifest = await res.json();
+      // Hide entries whose files are missing on disk (gitignored / closed-source).
+      const checks = opts?.verifyFiles === false
+        ? manifest.sounds.map(() => true)
+        : await Promise.all(manifest.sounds.map(s => this._fileExists(s.path)));
+      const present = manifest.sounds.filter((_, i) => checks[i]);
+      this._missingSoundIds = new Set(manifest.sounds.filter((_, i) => !checks[i]).map(s => s.id));
+      if (this._missingSoundIds.size)
+        console.info(`AssetManager: ${this._missingSoundIds.size} sound(s) missing files, hidden:`, [...this._missingSoundIds]);
+      this._soundRegistry = Object.fromEntries(present.map(s => [s.id, s]));
+      return present;
+    } catch (err) {
+      console.warn('AssetManager: failed to load audio manifest', err);
+      this._soundRegistry = {};
+      return [];
+    }
+  }
+
+  getSoundDef(id: string): SoundDef | undefined { return this._soundRegistry[id]; }
+  getSoundList(): SoundDef[] { return Object.values(this._soundRegistry); }
+  isSoundMissing(id: string): boolean { return this._missingSoundIds.has(id); }
+
+  /** Merge a metadata patch into a registry sound entry (attribution merged one level deep). */
+  updateSound(id: string, patch: Partial<SoundDef>): void {
+    const def = this._soundRegistry[id];
+    if (!def) return;
+    this._soundRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
+  }
+
+  /** Drop sounds from the registry (and their decoded buffers) after a manifest delete. */
+  removeSounds(ids: string[]): void {
+    for (const id of ids) {
+      delete this._soundRegistry[id];
+      this._audioBufferCache.delete(id);
+    }
+  }
+
+  /** Decode a sound to a shared AudioBuffer (cached). Uses THREE's global AudioContext,
+   *  the same one THREE.AudioListener/Audio play through — so buffers are directly playable. */
+  async loadSound(id: string): Promise<AudioBuffer> {
+    const cached = this._audioBufferCache.get(id);
+    if (cached) return cached;
+    const def = this._soundRegistry[id];
+    if (!def) throw new Error(`AssetManager: unknown sound "${id}"`);
+    if (!this._audioLoader) this._audioLoader = new THREE.AudioLoader();
+    const buffer = await this._audioLoader.loadAsync(this._resolve(def.path));
+    this._audioBufferCache.set(id, buffer);
+    return buffer;
   }
 
   /** HEAD-check a static file's existence (used to hide manifest entries with missing files). */
@@ -413,6 +478,7 @@ export class AssetManager {
     this._textureCache.clear();
     this._materialCache.clear();
     this._gltfCache.clear();
+    this._audioBufferCache.clear();
   }
 }
 

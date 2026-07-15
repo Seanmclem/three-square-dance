@@ -51,7 +51,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | null;
 
 export interface GroupDef {
   id:   string;
@@ -90,6 +90,29 @@ export interface AssetDef {
 export interface AssetManifest {
   version: string;
   assets:  AssetDef[];
+}
+
+// ─── Audio asset types (Phase 36) ─────────────────────────────────────────────
+// Sound-library entries. Mirrors AssetDef/AssetManifest: one manifest at
+// public/assets/audio/manifest.json, loaded by AssetManager.initAudio().
+export type SoundCategory = 'Music' | 'Ambient' | 'SFX' | (string & {});
+
+export interface SoundDef {
+  id:           string;
+  label:        string;
+  category:     SoundCategory;   // also picks the mixer bus (Music/Ambient/SFX)
+  path:         string;
+  loop?:        boolean;         // default-loop hint (music/ambient); one-shots leave false
+  volume?:      number;          // 0..1 authored base gain (default 1)
+  spatial?:     boolean;         // true = suitable as a PositionalAudio emitter
+  tags:         string[];
+  dateAdded:    string;
+  attribution?: Attribution;
+}
+
+export interface SoundManifest {
+  version: string;
+  sounds:  SoundDef[];
 }
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
@@ -272,7 +295,17 @@ export interface BusEvents {
   "zonetool:awaiting-name": { bounds: Bounds };
   "zonetool:name-confirmed": { name: string; type: ZoneType };
   "zone:jump":             { zoneId: string };
-  "audio:play":            { id: string; position?: Vec3 };
+  // Audio (Phase 36) — consumed by AudioSystem. `id` is a SoundDef id; a positional
+  // one-shot passes `position`. `key` lets a looped emit be stopped later by audio:stop.
+  "audio:play":            { id: string; position?: Vec3; volume?: number; loop?: boolean; key?: string };
+  "audio:stop":            { id?: string; key?: string };   // no id/key ⇒ stop all one-shots
+  "music:play":            { soundId: string; volume?: number; loop?: boolean; fade?: number };
+  "music:stop":            { fade?: number };
+  // Authored scene mix / ambient / music changed (editor) — mirrors "world:lighting".
+  "world:audio":           { audio: WorldAudio };
+  // Player-preference mix from the PauseMenu sliders (multiplies over authored mix).
+  "audio:player-mix":      { mix: AudioMix };
+  "sounds:loaded":         { sounds: SoundDef[] };
   "dialogue:show":         { speaker: string; lines: string[]; portrait?: string;
                              // Branching trees: response options for the current node,
                              // pre-filtered by conditions. hasNext=false ⇒ selecting ends.
@@ -509,6 +542,24 @@ export interface WorldConfig {
   scripts?:        ScriptDef[];
   stateSchema?:    Record<string, StateSchema>;   // authored gameplay-state keys (defaults + numeric clamp)
   items?:          ItemDef[];                     // item registry — inventory counts live at gameState `inv.<id>`
+  audio?:          WorldAudio;                    // scene-level ambient/music + authored mix (Phase 36)
+}
+
+// ─── Audio (Phase 36) ─────────────────────────────────────────────────────────
+// Four gain buses. Authored defaults live per-scene in WorldConfig.audio.mix;
+// player-preference sliders (PauseMenu → localStorage) multiply over these.
+export interface AudioMix {
+  master:  number;   // 0..1
+  music:   number;
+  sfx:     number;
+  ambient: number;
+}
+
+/** Scene-level audio: a default ambient loop, a default music track, and the authored mix. */
+export interface WorldAudio {
+  music?:   { soundId: string; volume?: number; loop?: boolean };
+  ambient?: { soundId: string; volume?: number };
+  mix?:     AudioMix;
 }
 
 export interface TerrainLayerMaterial {
@@ -840,6 +891,16 @@ export interface WorldObject {
   // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
   colliders?: AttachedCollider[];
   mover?:     MoverDef;
+  sound?:     ObjectSound;   // attached spatial emitter — a PositionalAudio that follows the mesh (Phase 36)
+}
+
+/** Per-object positional audio emitter (Phase 36). Plays in preview/game only. */
+export interface ObjectSound {
+  soundId:      string;
+  volume?:      number;   // 0..1 base gain (default 1)
+  loop?:        boolean;  // default true for an ambient emitter
+  refDistance?: number;   // PositionalAudio reference distance (default 1)
+  maxDistance?: number;   // PositionalAudio max distance (default 20)
 }
 
 export interface ZoneDef {
@@ -938,6 +999,9 @@ export type ConditionType =
 
 export type ActionType =
   | 'play_sound'
+  | 'stop_sound'
+  | 'play_music'
+  | 'stop_music'
   | 'show_dialogue'
   | 'move_object'
   | 'play_animation'
@@ -1066,7 +1130,11 @@ export interface ScriptAction {
   animationLoop?: boolean;   // play_animation: loop the clip forever
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
-  sound?:        string;
+  sound?:        string;       // play_sound / stop_sound: SoundDef id
+  music?:        string;       // play_music: SoundDef id
+  volume?:       number;       // play_sound / play_music: 0..1 gain override
+  loop?:         boolean;      // play_sound / play_music: loop override
+  fadeSeconds?:  number;       // play_music / stop_music: crossfade / fade-out seconds
   dialogue?:     DialogueDef;  // @deprecated — legacy data only; read by migrateDialogues, never at runtime
   dialogueId?:   string;       // show_dialogue: DialogueTreeDef id (zone registry)
   material?:     string;

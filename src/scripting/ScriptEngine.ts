@@ -226,8 +226,35 @@ export class ScriptEngine {
 
   private _dispatch(action: ScriptAction): void {
     switch (action.type) {
-      case "play_sound":
-        this._bus.emit("audio:play", { id: action.sound ?? "", position: action.position });
+      case "play_sound": {
+        // Positional when targeting an entity/group — resolve each target's pose;
+        // otherwise a non-positional (or explicit-position) one-shot.
+        const ids = this._resolveTargets(action.targetId);
+        if (ids.length) {
+          for (const id of ids) {
+            const pose = this._resolveObjectPose(id);
+            this._bus.emit("audio:play", {
+              id: action.sound ?? "",
+              position: pose ? { x: pose.x, y: pose.y, z: pose.z } : action.position,
+              volume: action.volume, loop: action.loop,
+            });
+          }
+        } else {
+          this._bus.emit("audio:play", { id: action.sound ?? "", position: action.position, volume: action.volume, loop: action.loop });
+        }
+        break;
+      }
+
+      case "stop_sound":
+        this._bus.emit("audio:stop", { id: action.sound });
+        break;
+
+      case "play_music":
+        this._bus.emit("music:play", { soundId: action.music ?? action.sound ?? "", volume: action.volume, loop: action.loop, fade: action.fadeSeconds });
+        break;
+
+      case "stop_music":
+        this._bus.emit("music:stop", { fade: action.fadeSeconds });
         break;
 
       case "show_dialogue": {

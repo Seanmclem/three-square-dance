@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "sounds": [
+    {
+      "id": "music_test",
+      "label": "Test Music Loop",
+      "category": "Music",
+      "path": "/assets/audio/music_test.wav",
+      "loop": true,
+      "volume": 0.7,
+      "spatial": false,
+      "tags": ["test", "loop"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Synthesized fixture", "license": "CC0" }
+    },
+    {
+      "id": "ambient_test",
+      "label": "Test Ambient",
+      "category": "Ambient",
+      "path": "/assets/audio/ambient_test.wav",
+      "loop": true,
+      "volume": 0.6,
+      "spatial": true,
+      "tags": ["test", "loop", "ambience"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Synthesized fixture", "license": "CC0" }
+    },
+    {
+      "id": "blip_test",
+      "label": "Test Blip",
+      "category": "SFX",
+      "path": "/assets/audio/blip_test.wav",
+      "loop": false,
+      "volume": 0.8,
+      "spatial": true,
+      "tags": ["test", "sfx"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Synthesized fixture", "license": "CC0" }
+    }
+  ]
+}

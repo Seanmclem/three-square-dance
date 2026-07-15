@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { PreviewController } from "@/preview/PreviewController";
+import { AudioSystem } from "@/audio/AudioSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
@@ -249,6 +250,7 @@ export default function App() {
 
     const preview = new PreviewController(bus, world, scene, zones, movers);
     previewRef.current = preview;
+    const audio = new AudioSystem(bus, world, scene);
     const input     = new InputManager(canvas, scene.camera, bus, scene.scene);
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const floorTool    = new FloorTool(scene.scene, world, bus, history);
@@ -476,6 +478,7 @@ export default function App() {
     // Advance animated trigger-volume fills (no-op when none are animated)
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
     scene.onUpdate(dt => zones.updateLights(dt));
+    scene.onUpdate(dt => audio.update(dt));
 
     const bumpMembership = () => setMembershipRev(v => v + 1);
 
@@ -766,6 +769,7 @@ export default function App() {
       window.removeEventListener('beforeunload', writeAutosave);
       previewRef.current?.exit();
       previewRef.current  = null;
+      audio.dispose();
       sceneRef.current    = null;
       worldRef.current    = null;
       zonesRef.current    = null;

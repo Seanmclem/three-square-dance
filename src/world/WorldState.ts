@@ -514,6 +514,21 @@ export class WorldState {
     });
   }
 
+  /** Scene-level audio edit (ambient/music/mix). Not journaled (matches lighting/playerSettings). */
+  updateWorldAudio(changes: Partial<NonNullable<WorldConfig["audio"]>>): void {
+    if (!this.world) {
+      this.world = {
+        size: { width: 200, depth: 200 },
+        ambientLight: { color: "#aabbcc", intensity: 0.5 },
+        sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
+        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+      };
+    }
+    this.world.audio = { ...this.world.audio, ...changes };
+    this._bus.emit("world:audio", { audio: this.world.audio });
+  }
+
   // ── Decal mutations ──────────────────────────────────────────────────────────
 
   addDecal(zoneId: string, decal: DecalDef): void {
@@ -741,5 +756,6 @@ export class WorldState {
       sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
       envIntensity: this.world.envIntensity ?? 1,
     });
+    if (this.world?.audio) this._bus.emit("world:audio", { audio: this.world.audio });
   }
 }
