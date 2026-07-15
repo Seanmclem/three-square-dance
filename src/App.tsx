@@ -60,6 +60,7 @@ import { FpsCounter } from "@/ui/FpsCounter";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
+import { AudioImporterModal } from "@/ui/AudioImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
@@ -69,7 +70,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -140,6 +141,9 @@ export default function App() {
   >(null);
   const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [texturesDir,     setTexturesDir]      = useState<FileSystemDirectoryHandle | null>(null);
+  const [audioDir,        setAudioDir]         = useState<FileSystemDirectoryHandle | null>(null);
+  const [sounds,          setSounds]           = useState<SoundDef[]>([]);
+  const [audioImporterOpen, setAudioImporterOpen] = useState(false);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
   // Hint pill shown while a bake-related native picker is open (which dialog is which).
@@ -237,6 +241,10 @@ export default function App() {
     }).catch(err => console.error("initAssets failed:", err));
     assetManager.initDecals().then(defs => setDecalTextures(defs))
       .catch(err => console.error("initDecals failed:", err));
+    assetManager.initAudio().then(defs => {
+      setSounds(defs);
+      bus.emit("sounds:loaded", { sounds: defs });
+    }).catch(err => console.error("initAudio failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
     const objectPlacer = new ObjectPlacer(bus);
@@ -1717,6 +1725,44 @@ export default function App() {
     }).catch(err => console.error("assets reload failed:", err));
   };
 
+  const handleSoundsReload = (): void => {
+    assetManager.initAudio().then(defs => {
+      setSounds(defs);
+      busRef.current.emit("sounds:loaded", { sounds: defs });
+    }).catch(err => console.error("sounds reload failed:", err));
+  };
+
+  // Delete sounds: drop from the audio manifest + remove the file, then evict from the registry.
+  const handleDeleteSounds = async (ids: string[]): Promise<void> => {
+    if (!ids.length) return;
+    let dir = audioDir;
+    if (!dir) {
+      try {
+        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
+          .showDirectoryPicker({ mode: "readwrite" });
+        setAudioDir(dir);
+      } catch { return; }   // cancelled
+    }
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
+      const removed = data.sounds.filter(s => ids.includes(s.id));
+      data.sounds = data.sounds.filter(s => !ids.includes(s.id));
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+      for (const s of removed) {
+        const fname = s.path.split("/").pop();
+        if (fname) { try { await (dir as unknown as { removeEntry: (n: string) => Promise<void> }).removeEntry(fname); } catch { /* missing — ignore */ } }
+      }
+    } catch (err) {
+      console.error("sound delete failed:", err);
+      return;
+    }
+    assetManager.removeSounds(ids);
+    setSounds(prev => prev.filter(s => !ids.includes(s.id)));
+  };
+
   const handleAssetSelect = (id: string | null): void => {
     setSelectedAssetId(id);
     if (id) busRef.current.emit("asset:selected", { assetId: id });
@@ -2351,6 +2397,9 @@ export default function App() {
         onMaterialImport={openMaterialImporter}
         onDeleteMaterials={handleRequestMaterialDelete}
         onEditMaterials={handleRequestMaterialEdit}
+        sounds={sounds}
+        onSoundImport={() => setAudioImporterOpen(true)}
+        onDeleteSounds={handleDeleteSounds}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}
@@ -2622,6 +2671,15 @@ SquareDance
           onTextureDirSet={setTexturesDir}
           onComplete={() => { setMaterialImporterOpen(false); handleMaterialsReload(); }}
           onClose={() => setMaterialImporterOpen(false)}
+        />
+      )}
+
+      {audioImporterOpen && (
+        <AudioImporterModal
+          audioDir={audioDir}
+          onAudioDirSet={setAudioDir}
+          onComplete={() => { setAudioImporterOpen(false); handleSoundsReload(); }}
+          onClose={() => setAudioImporterOpen(false)}
         />
       )}
 

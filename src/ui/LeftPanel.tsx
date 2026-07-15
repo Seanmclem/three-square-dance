@@ -1,7 +1,8 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
+import { AudioBrowser } from "@/ui/AudioBrowser";
 import { DecalBrowser } from "@/ui/DecalBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
@@ -19,6 +20,9 @@ interface LeftPanelProps {
   onMaterialImport: () => void;
   onDeleteMaterials:(ids: string[]) => void;
   onEditMaterials:  (ids: string[]) => void;
+  sounds:           SoundDef[];
+  onSoundImport:    () => void;
+  onDeleteSounds:   (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   hiddenGroupIds:  Set<string>;
@@ -65,6 +69,7 @@ interface LeftPanelProps {
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
+  sounds, onSoundImport, onDeleteSounds,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
@@ -133,6 +138,13 @@ export function LeftPanel({
                 onImport={onMaterialImport}
                 onDeleteMaterials={onDeleteMaterials}
                 onEdit={onEditMaterials}
+              />
+            )}
+            {panelId === "audio" && (
+              <AudioBrowser
+                sounds={sounds}
+                onImport={onSoundImport}
+                onDeleteSounds={onDeleteSounds}
               />
             )}
             {panelId === "decals" && (

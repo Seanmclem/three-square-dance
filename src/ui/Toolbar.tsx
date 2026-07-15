@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial, IconAudio } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
@@ -213,6 +213,33 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             <span style={{ fontSize: 6, letterSpacing: 0.5, color: matActive ? "#80aaff" : "#7a7a7a",
                            opacity: 0.85, fontFamily: "monospace" }}>
               MATS
+            </span>
+          </button>
+        );
+      })()}
+
+      {/* Audio panel button */}
+      {(() => {
+        const audioActive = openPanel === "audio";
+        return (
+          <button
+            title="Sounds panel"
+            onClick={() => onPanelToggle(audioActive ? null : "audio")}
+            style={{
+              width: 48, height: 36, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: audioActive ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: audioActive ? "1px solid rgba(80,140,255,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!audioActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!audioActive) e.currentTarget.style.background = "transparent"; }}
+          >
+            <IconAudio color={audioActive ? "#80aaff" : "#7a7a7a"} />
+            <span style={{ fontSize: 6, letterSpacing: 0.5, color: audioActive ? "#80aaff" : "#7a7a7a",
+                           opacity: 0.85, fontFamily: "monospace" }}>
+              SOUNDS
             </span>
           </button>
         );
