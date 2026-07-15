@@ -5,11 +5,12 @@ interface AudioBrowserProps {
   sounds:         SoundDef[];
   onImport:       () => void;
   onDeleteSounds: (ids: string[]) => void;
+  onEdit:         (ids: string[]) => void;
 }
 
 const catOf = (s: SoundDef) => s.category ?? "SFX";
 
-export function AudioBrowser({ sounds, onImport, onDeleteSounds }: AudioBrowserProps) {
+export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: AudioBrowserProps) {
   const [search,  setSearch]  = useState("");
   const [cat,     setCat]     = useState<string>("All");
   const [manage,  setManage]  = useState(false);
@@ -85,6 +86,13 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds }: AudioBrowserP
           </>
         ) : (
           <>
+            <button onClick={() => { if (checked.size) onEdit([...checked]); }} disabled={checked.size === 0}
+              style={{ flex: 1, padding: "5px 0",
+                background: checked.size ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size ? "pointer" : "default",
+                color: checked.size ? "#80aaff" : "#555", fontSize: 10 }}>
+              Edit{checked.size ? ` (${checked.size})` : ""}</button>
             <button onClick={() => { if (checked.size) onDeleteSounds([...checked]); }} disabled={checked.size === 0}
               style={{ flex: 1, padding: "5px 0",
                 background: checked.size ? "rgba(200,60,60,0.15)" : "rgba(255,255,255,0.03)",

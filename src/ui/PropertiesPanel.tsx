@@ -4,7 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix,
+  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
@@ -357,6 +357,7 @@ interface PropertiesPanelProps {
   activeZoneId?:            string | null;
   playerSettings?:          PlayerSettings;
   assets?:                  AssetDef[];
+  sounds?:                  SoundDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
   // World-level ambient/sun/environment lighting (Lights drilldown page).
@@ -390,7 +391,7 @@ export function PropertiesPanel({
   onFloorNodesUpdate, getNodeLinks,
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
   onVolumeScriptsChange,
-  zones = [], groups = [], activeZoneId, playerSettings, assets = [], onPlayerSettingsChange, onSpawnPositionChange,
+  zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
@@ -655,7 +656,7 @@ export function PropertiesPanel({
       </div>
 
       {showCredits && (
-        <CreditsModal materials={materialList} assets={assets} onClose={() => setShowCredits(false)} />
+        <CreditsModal materials={materialList} assets={assets} sounds={sounds} onClose={() => setShowCredits(false)} />
       )}
     </div>
   );

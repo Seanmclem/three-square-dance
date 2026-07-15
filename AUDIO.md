@@ -21,10 +21,16 @@ Written for humans clicking through the UI; the engine-level details live in
   `AssetManager.initAudio()`. Three synthetic CC0 fixtures ship for testing: `music_test`,
   `ambient_test`, `blip_test`.
 - **SOUNDS panel** (bottom-left toolbar, speaker icon): browse, ▶-preview, and **Manage →
-  Delete**. **+ Import Sound** copies `.mp3` / `.wav` / `.ogg` files into `assets/audio`
-  and appends to the manifest.
+  Edit / Delete**. **+ Import Sound** copies `.mp3` / `.wav` / `.ogg` files into
+  `assets/audio` and appends to the manifest.
 - The category picks which **mixer bus** a sound feeds (`Music`→music, `Ambient`→ambient,
   else `sfx`), except scene music/ambient which are forced onto their named buses.
+- **Metadata & attribution.** On import you can fill an **ATTRIBUTION** block (author,
+  source / kit name + URL, patreon, license) — applied to every sound in the batch, same as
+  models/materials. **Manage → Edit** re-opens a dialog to rename, recategorize, or change
+  attribution on existing sounds (single or multi-select). Any sound with attribution is
+  listed automatically in the **Credits** modal (Properties panel → CREDITS), grouped by
+  author / pack with license badges and counts.
 
 ## 2. Scene ambient + background music
 

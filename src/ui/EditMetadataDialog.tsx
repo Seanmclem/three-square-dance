@@ -10,7 +10,7 @@ export interface EditPatch {
 
 interface EditMetadataDialogProps {
   items:           { id: string; label: string }[];
-  noun:            "model" | "material";
+  noun:            "model" | "material" | "sound";
   categoryOptions: string[];
   initial:         { label: string; category: string; attribution: Attribution };
   needsFolderGrant: boolean;

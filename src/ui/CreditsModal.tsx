@@ -1,4 +1,4 @@
-import type { AssetDef, MaterialDef } from "@/types";
+import type { AssetDef, MaterialDef, SoundDef } from "@/types";
 
 /**
  * Credits modal (opened from the PropertiesPanel empty state). Content is
@@ -10,6 +10,7 @@ import type { AssetDef, MaterialDef } from "@/types";
 interface CreditsModalProps {
   materials: MaterialDef[];
   assets:    AssetDef[];
+  sounds:    SoundDef[];
   onClose:   () => void;
 }
 
@@ -19,6 +20,7 @@ interface PackEntry {
   licenses:   Set<string>;
   materials:  string[];        // labels
   assets:     string[];
+  sounds:     string[];
 }
 
 interface AuthorEntry {
@@ -27,10 +29,10 @@ interface AuthorEntry {
   packs:      Map<string, PackEntry>;
 }
 
-function groupCredits(materials: MaterialDef[], assets: AssetDef[]): AuthorEntry[] {
+function groupCredits(materials: MaterialDef[], assets: AssetDef[], sounds: SoundDef[]): AuthorEntry[] {
   const authors = new Map<string, AuthorEntry>();
 
-  const add = (label: string, kind: "materials" | "assets", at: NonNullable<MaterialDef["attribution"]>) => {
+  const add = (label: string, kind: "materials" | "assets" | "sounds", at: NonNullable<MaterialDef["attribution"]>) => {
     const authorName = at.author?.trim() || "Unknown author";
     let author = authors.get(authorName);
     if (!author) { author = { author: authorName, packs: new Map() }; authors.set(authorName, author); }
@@ -38,7 +40,7 @@ function groupCredits(materials: MaterialDef[], assets: AssetDef[]): AuthorEntry
 
     const packName = at.sourceName?.trim() ?? "";
     let pack = author.packs.get(packName);
-    if (!pack) { pack = { sourceName: packName, licenses: new Set(), materials: [], assets: [] }; author.packs.set(packName, pack); }
+    if (!pack) { pack = { sourceName: packName, licenses: new Set(), materials: [], assets: [], sounds: [] }; author.packs.set(packName, pack); }
     if (at.sourceUrl && !pack.sourceUrl) pack.sourceUrl = at.sourceUrl;
     if (at.license) pack.licenses.add(at.license === "Other" ? (at.licenseOther?.trim() || "Other") : at.license);
     pack[kind].push(label);
@@ -46,19 +48,21 @@ function groupCredits(materials: MaterialDef[], assets: AssetDef[]): AuthorEntry
 
   for (const m of materials) if (m.attribution && (m.attribution.author || m.attribution.sourceName)) add(m.label, "materials", m.attribution);
   for (const a of assets)    if (a.attribution && (a.attribution.author || a.attribution.sourceName)) add(a.label, "assets", a.attribution);
+  for (const s of sounds)    if (s.attribution && (s.attribution.author || s.attribution.sourceName)) add(s.label, "sounds", s.attribution);
 
   return [...authors.values()].sort((x, y) => x.author.localeCompare(y.author));
 }
 
 const counts = (p: PackEntry): string =>
   [p.materials.length && `${p.materials.length} material${p.materials.length > 1 ? "s" : ""}`,
-   p.assets.length    && `${p.assets.length} asset${p.assets.length > 1 ? "s" : ""}`]
+   p.assets.length    && `${p.assets.length} asset${p.assets.length > 1 ? "s" : ""}`,
+   p.sounds.length    && `${p.sounds.length} sound${p.sounds.length > 1 ? "s" : ""}`]
     .filter(Boolean).join(" · ");
 
 const LINK: React.CSSProperties = { color: "#80aaff", textDecoration: "none" };
 
-export function CreditsModal({ materials, assets, onClose }: CreditsModalProps) {
-  const grouped = groupCredits(materials, assets);
+export function CreditsModal({ materials, assets, sounds, onClose }: CreditsModalProps) {
+  const grouped = groupCredits(materials, assets, sounds);
 
   return (
     <div
@@ -85,8 +89,8 @@ export function CreditsModal({ materials, assets, onClose }: CreditsModalProps) 
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
           {grouped.length === 0 && (
             <div style={{ color: "#646464", fontSize: 11 }}>
-              No attributed content yet — imported materials and assets with attribution
-              (author / pack) will be credited here automatically.
+              No attributed content yet — imported materials, assets, and sounds with
+              attribution (author / pack) will be credited here automatically.
             </div>
           )}
 

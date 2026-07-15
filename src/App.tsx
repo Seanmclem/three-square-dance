@@ -143,6 +143,7 @@ export default function App() {
   const [audioDir,        setAudioDir]         = useState<FileSystemDirectoryHandle | null>(null);
   const [sounds,          setSounds]           = useState<SoundDef[]>([]);
   const [audioImporterOpen, setAudioImporterOpen] = useState(false);
+  const [pendingSoundEdit, setPendingSoundEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
   // Hint pill shown while a bake-related native picker is open (which dialog is which).
@@ -1760,6 +1761,39 @@ export default function App() {
     setSounds(prev => prev.filter(s => !ids.includes(s.id)));
   };
 
+  // Open the sound metadata editor (label / category / attribution) for one or more sounds.
+  const handleRequestSoundEdit = (ids: string[]): void => {
+    const defs = ids.map(id => sounds.find(s => s.id === id)).filter(Boolean) as SoundDef[];
+    if (!defs.length) return;
+    const single = defs.length === 1;
+    setPendingSoundEdit({
+      ids, items: defs.map(d => ({ id: d.id, label: d.label })),
+      initial: {
+        label:       single ? defs[0]!.label : "",
+        category:    single ? (defs[0]!.category ?? "SFX") : commonOr(defs.map(d => d.category ?? "SFX")),
+        attribution: single ? (defs[0]!.attribution ?? {}) : {},
+      },
+    });
+  };
+
+  const handleConfirmSoundEdit = async (patch: EditPatch): Promise<void> => {
+    const pending = pendingSoundEdit;
+    setPendingSoundEdit(null);
+    if (!pending) return;
+    const dir = await ensureDir(audioDir, setAudioDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
+      data.sounds = data.sounds.map(s => pending.ids.includes(s.id) ? patchEntry(s, patch) : s);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("sound edit failed:", err); return; }
+    pending.ids.forEach(id => assetManager.updateSound(id, patch as Partial<SoundDef>));
+    setSounds(assetManager.getSoundList());
+  };
+
   const handleAssetSelect = (id: string | null): void => {
     setSelectedAssetId(id);
     if (id) busRef.current.emit("asset:selected", { assetId: id });
@@ -2397,6 +2431,7 @@ export default function App() {
         sounds={sounds}
         onSoundImport={() => setAudioImporterOpen(true)}
         onDeleteSounds={handleDeleteSounds}
+        onEditSounds={handleRequestSoundEdit}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}
@@ -2494,6 +2529,7 @@ export default function App() {
         activeZoneId={activeZoneId}
         playerSettings={worldRef.current?.world?.playerSettings}
         assets={assets}
+        sounds={sounds}
         onPlayerSettingsChange={handlePlayerSettingsChange}
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
@@ -2745,6 +2781,19 @@ SquareDance
           folderHint="public/assets/textures"
           onCancel={() => setPendingMaterialEdit(null)}
           onSave={patch => void handleConfirmMaterialEdit(patch)}
+        />
+      )}
+
+      {pendingSoundEdit && (
+        <EditMetadataDialog
+          items={pendingSoundEdit.items}
+          noun="sound"
+          categoryOptions={["Music", "Ambient", "SFX"]}
+          initial={pendingSoundEdit.initial}
+          needsFolderGrant={!audioDir}
+          folderHint="public/assets/audio"
+          onCancel={() => setPendingSoundEdit(null)}
+          onSave={patch => void handleConfirmSoundEdit(patch)}
         />
       )}
 

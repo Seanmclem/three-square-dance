@@ -23,6 +23,7 @@ interface LeftPanelProps {
   sounds:           SoundDef[];
   onSoundImport:    () => void;
   onDeleteSounds:   (ids: string[]) => void;
+  onEditSounds:     (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   hiddenGroupIds:  Set<string>;
@@ -69,7 +70,7 @@ interface LeftPanelProps {
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
-  sounds, onSoundImport, onDeleteSounds,
+  sounds, onSoundImport, onDeleteSounds, onEditSounds,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
@@ -145,6 +146,7 @@ export function LeftPanel({
                 sounds={sounds}
                 onImport={onSoundImport}
                 onDeleteSounds={onDeleteSounds}
+                onEdit={onEditSounds}
               />
             )}
             {panelId === "decals" && (

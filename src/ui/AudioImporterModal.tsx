@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { SoundDef, SoundCategory, SoundManifest } from "@/types";
+import type { SoundDef, SoundCategory, SoundManifest, Attribution } from "@/types";
+import { AttributionFields } from "@/ui/AttributionFields";
 
 interface Props {
   audioDir:      FileSystemDirectoryHandle | null;
@@ -58,6 +59,8 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
   const [progress, setProgress] = useState("");
   const [results,  setResults]  = useState<SoundDef[]>([]);
   const [error,    setError]    = useState<string | null>(null);
+  // Shared attribution applied to every sound in this import batch (mirrors ModelImporter).
+  const [attribution, setAttribution] = useState<Attribution>({});
 
   const update = (id: string, patch: Partial<SoundEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
@@ -117,6 +120,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
           id: base, label: e.label.trim() || base, category: e.category,
           path: `/assets/audio/${dest}`, loop: e.loop, spatial: e.spatial,
           tags: [], dateAdded: new Date().toISOString().slice(0, 10),
+          ...(Object.keys(attribution).length ? { attribution } : {}),
         };
         manifest.sounds = manifest.sounds.filter(s => s.id !== sound.id);
         manifest.sounds.push(sound);
@@ -178,6 +182,13 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
                   </div>
                 </div>
               ))}
+
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
+                <div style={{ color: "#909090", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>
+                  ATTRIBUTION (optional — applied to all, shown in Credits)
+                </div>
+                <AttributionFields value={attribution} onChange={setAttribution} />
+              </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
                 <button onClick={pickAudioDir} style={BTN(!audioDir)}>
