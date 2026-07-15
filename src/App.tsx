@@ -475,6 +475,7 @@ export default function App() {
     scene.onUpdate(dt => objectPlacer.update(dt));
     // Advance animated trigger-volume fills (no-op when none are animated)
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
+    scene.onUpdate(dt => zones.updateLights(dt));
 
     const bumpMembership = () => setMembershipRev(v => v + 1);
 

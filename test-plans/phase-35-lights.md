@@ -44,6 +44,7 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 | 25 | light_off / light_on / toggle_light | author on a script (Lights optgroup in the target picker) or `__test.runAction` | intensity 0 ↔ authored value; off also freezes the shadow passes; light counts unchanged (no recompile hitch) |
 | 26 | Preview restore | turn lights off in preview, exit | all lights reset to their defs (intensity + shadow mode) |
 | 27 | Flicker (v4.29.7) | `on_timer` (repeat, ~0.4s) + `toggle_light` on a static-shadow light | intensity alternates every tick; `shadow.autoUpdate` stays false — ZERO shadow re-renders per blink (geometry pokes refresh off lights too); restored on exit. Hand-authored scripts MUST set `enabled: true` |
+| 28 | Authored flicker (v4.29.8) | LightView FLICKER row: 🔥 Flame / ⚡ Electric + AMOUNT/SPEED | preview/game only (editor shows steady intensity). Flame: smooth wobble, never off. Electric: hard on/off, random irregular durations. Frozen static shadow stays frozen; `light_off` script pauses it; exit restores. Don't put a `toggle_light` timer script AND authored flicker on the same light |
 
 ## Lights list (v4.29.1)
 

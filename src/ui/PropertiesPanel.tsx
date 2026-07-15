@@ -4413,6 +4413,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
   const [numStr, setNumStr] = useState({
     intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
     angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
+    famount: String(light?.flicker?.amount ?? 0), fspeed: String(light?.flicker?.speed ?? 1),
   });
   const { schedule, flush } = useFieldDebounce(300);
 
@@ -4421,6 +4422,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
     setNumStr({
       intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
       angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
+      famount: String(light?.flicker?.amount ?? 0), fspeed: String(light?.flicker?.speed ?? 1),
     });
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resync position when moved externally (gizmo drag refreshes selected.data).
@@ -4476,6 +4478,56 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
           {numField("AIM YAW (°)", "yaw", "yawDeg", 15, -Infinity)}
         </div>
       )}
+
+      <div>
+        <div style={LABEL}>FLICKER</div>
+        <div style={{ display: "flex", gap: 4, marginBottom: light.flicker ? 8 : 0 }}>
+          {([["none", "None"], ["flame", "🔥 Flame"], ["electric", "⚡ Electric"]] as const).map(([style, label]) => {
+            const active = (light.flicker?.style ?? "none") === style;
+            return (
+              <button key={style}
+                onClick={() => update({
+                  flicker: style === "none" ? undefined : {
+                    style,
+                    // per-style defaults on first pick; keep values when switching styles
+                    amount: light.flicker?.amount ?? (style === "flame" ? 0.4 : 1),
+                    speed:  light.flicker?.speed ?? 1,
+                  },
+                })}
+                style={{ flex: 1, padding: "6px 0", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "monospace",
+                         border: active ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.1)",
+                         background: active ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.9)",
+                         color: active ? "#cfe0ff" : "#909090" }}>
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {light.flicker && (
+          <>
+            <div style={{ display: "flex", gap: 10 }}>
+              {([["AMOUNT", "famount", "amount", 0.05, 0, 1], ["SPEED", "fspeed", "speed", 0.25, 0.1, 20]] as const).map(([label, sk, dk, step, min, max]) => (
+                <div key={sk}>
+                  <div style={LABEL}>{label}</div>
+                  <input type="number" step={step} min={min} max={max} value={numStr[sk]} style={{ ...NUM_INPUT, width: 70 }}
+                    onChange={e => {
+                      const v = e.target.value; setNumStr(p => ({ ...p, [sk]: v }));
+                      schedule(() => { const n = parseFloat(v); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); });
+                    }}
+                    onBlur={e => flush(() => { const n = parseFloat(e.target.value); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); })}
+                  />
+                </div>
+              ))}
+            </div>
+            <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4, marginTop: 6 }}>
+              {light.flicker.style === "flame"
+                ? "Smooth random wobble (never fully off) — torches, fires. AMOUNT = wobble depth."
+                : "Hard on/off at random irregular intervals — faulty fixtures, neon. AMOUNT = how dark the off-blips are (1 = fully off)."}
+              {" Runs in preview/game only; pairs perfectly with STATIC SHADOWS."}
+            </div>
+          </>
+        )}
+      </div>
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
         <input type="checkbox" checked={light.castShadow}

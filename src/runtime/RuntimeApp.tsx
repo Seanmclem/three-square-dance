@@ -87,6 +87,7 @@ export default function RuntimeApp() {
     scene.onUpdate(dt => physicsWorld.step(dt));
     scene.onUpdate(dt => objectPlacer.update(dt));
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
+    scene.onUpdate(dt => zones.updateLights(dt));
 
     // Runtime game save: pose is captured through the existing
     // character:save-position mechanism (foot-level, round-trips through

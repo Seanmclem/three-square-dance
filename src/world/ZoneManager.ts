@@ -56,6 +56,12 @@ interface ShapeEntry {
 interface LightEntry {
   light:  THREE.PointLight | THREE.SpotLight | THREE.DirectionalLight;
   marker: THREE.Group;      // editor pick proxy (hideInGame)
+  def:    LightDef;         // authored def (flicker params, base intensity)
+  // Runtime flicker/scripting state (reset by _restoreLightStates)
+  scriptOff:   boolean;     // light_off'd by a script — flicker paused, stays dark
+  flickerT:    number;      // elapsed flicker clock (s)
+  electricOn:  boolean;     // electric style: current on/off phase
+  electricNext: number;     // electric style: clock time of the next flip
 }
 
 interface ZoneEntry {
@@ -193,6 +199,9 @@ export class ZoneManager {
 
   // Editor-only group visibility — group ids the user has hidden via the Groups panel
   private readonly _hiddenGroups = new Set<string>();
+
+  // Authored light flicker runs only between preview:start/stop (mover precedent)
+  private _flickerActive = false;
 
   // Floor dimming state
   private _activeLevel = 0;
@@ -450,11 +459,13 @@ export class ZoneManager {
         this._applyGroupVisibility();
       }),
       this._bus.on("preview:start", ({ mode }) => {
+        this._flickerActive = true;
         this._setEditorOnlyVisible(false);
         this._setHiddenWallGhostsVisible(false);
         if (isGameplayMode(mode)) this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
+        this._flickerActive = false;
         this._restoreDespawned();
         this._restoreLightStates();
         this._setEditorOnlyVisible(true);
@@ -1854,7 +1865,10 @@ export class ZoneManager {
 
     const marker = this._buildLightMarker(zoneId, def);
     entry.lightsGroup.add(marker);
-    entry.lightEntries.set(def.id, { light, marker });
+    entry.lightEntries.set(def.id, {
+      light, marker, def,
+      scriptOff: false, flickerT: 0, electricOn: true, electricNext: 0,
+    });
   }
 
   private _buildLightMarker(zoneId: string, def: LightDef): THREE.Group {
@@ -1897,7 +1911,8 @@ export class ZoneManager {
       if (!le) continue;
       const def = this._worldState.zones.get(zoneId)?.lights?.find(l => l.id === targetId);
       if (!def) continue;
-      const turnOn = op === "on" || (op === "toggle" && le.light.intensity === 0);
+      const turnOn = op === "on" || (op === "toggle" && (le.scriptOff || le.light.intensity === 0));
+      le.scriptOff = !turnOn;   // pauses/resumes authored flicker too
       le.light.intensity = turnOn ? def.intensity : 0;
       if (le.light.castShadow) {
         // Off: stop paying the per-frame shadow pass. On: resume. Static maps are
@@ -1909,16 +1924,51 @@ export class ZoneManager {
     }
   }
 
-  /** preview:stop — reset every light to its authored def (undoes light:set). */
+  /** preview:stop — reset every light to its authored def (undoes light:set + flicker). */
   private _restoreLightStates(): void {
     for (const [zoneId, entry] of this._loadedZones) {
       for (const [id, le] of entry.lightEntries) {
         const def = this._worldState.zones.get(zoneId)?.lights?.find(l => l.id === id);
         if (!def) continue;
+        le.scriptOff = false;
+        le.flickerT = 0; le.electricOn = true; le.electricNext = 0;
         le.light.intensity = def.intensity;
         if (le.light.castShadow) {
           le.light.shadow.autoUpdate = !def.staticShadow;
           le.light.shadow.needsUpdate = true;
+        }
+      }
+    }
+  }
+
+  // ── Authored flicker (Phase 35.2) ─────────────────────────────────────────
+  // Per-frame from App/RuntimeApp's scene.onUpdate. Intensity-only (shader-stable,
+  // frozen static shadows untouched). Runs only while preview/game is active —
+  // mover precedent; the editor shows the steady authored intensity. Zero
+  // allocations: state lives on the LightEntry.
+
+  updateLights(dt: number): void {
+    if (!this._flickerActive) return;
+    for (const [, entry] of this._loadedZones) {
+      for (const [, le] of entry.lightEntries) {
+        const fl = le.def.flicker;
+        if (!fl || le.scriptOff) continue;
+        le.flickerT += dt;
+        const t = le.flickerT * (fl.speed || 1);
+        if (fl.style === "flame") {
+          // Layered incommensurate sines → smooth organic wobble in [0, 1]
+          const n = 0.5 + 0.275 * Math.sin(t * 6.3) + 0.15 * Math.sin(t * 17.1) + 0.075 * Math.sin(t * 31.7);
+          le.light.intensity = le.def.intensity * (1 - fl.amount * n);
+        } else {
+          // electric: hard on/off phases with random irregular durations
+          if (le.flickerT >= le.electricNext) {
+            le.electricOn = !le.electricOn;
+            const dur = le.electricOn
+              ? 0.3 + Math.random() * 1.2     // lit stretches
+              : 0.04 + Math.random() * 0.3;   // dark blips
+            le.electricNext = le.flickerT + dur / (fl.speed || 1);
+          }
+          le.light.intensity = le.electricOn ? le.def.intensity : le.def.intensity * (1 - fl.amount);
         }
       }
     }

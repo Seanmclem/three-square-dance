@@ -566,31 +566,35 @@
           "pitchDeg": 70,
           "yawDeg": 180,
           "castShadow": true,
-          "staticShadow": true
+          "staticShadow": true,
+          "flicker": {
+            "style": "electric",
+            "amount": 1,
+            "speed": 1
+          }
+        },
+        {
+          "id": "light_demo_flame35",
+          "label": "Demo flame torch (v4.29.8)",
+          "kind": "point",
+          "position": {
+            "x": -9,
+            "y": 2,
+            "z": -14
+          },
+          "color": "#ff9a3c",
+          "intensity": 50,
+          "range": 12,
+          "castShadow": false,
+          "flicker": {
+            "style": "flame",
+            "amount": 0.4,
+            "speed": 1
+          }
         }
       ],
       "shapes": [],
-      "scripts": [
-        {
-          "id": "script_flicker35",
-          "label": "Demo flicker — static-shadow spot blinks (0.4s)",
-          "zoneId": "demo",
-          "enabled": true,
-          "trigger": {
-            "type": "on_timer",
-            "repeat": true,
-            "interval": 0.4
-          },
-          "conditions": [],
-          "actions": [
-            {
-              "type": "toggle_light",
-              "targetId": "light_demo_ss35"
-            }
-          ],
-          "oneShot": false
-        }
-      ]
+      "scripts": []
     }
   ],
   "transitions": [],

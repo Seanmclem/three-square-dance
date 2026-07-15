@@ -426,6 +426,21 @@ export interface CheckpointDef {
 
 export type LightKind = "point" | "spot" | "directional";
 
+export type LightFlickerStyle = "flame" | "electric";
+
+/**
+ * Authored flicker (Phase 35.2) — runs only while preview/game is active (mover
+ * precedent), driven per-frame by ZoneManager.updateLights via the light's
+ * INTENSITY only (no shader recompiles; frozen static shadows stay frozen).
+ * flame: smooth layered-sine wobble, never fully off. electric: hard on/off at
+ * random irregular intervals.
+ */
+export interface LightFlickerDef {
+  style:  LightFlickerStyle;
+  amount: number;   // 0..1 — flame: wobble depth; electric: how dark "off" is (1 = fully off)
+  speed:  number;   // rate multiplier (default 1)
+}
+
 /**
  * A placeable scene light (per zone). Built by ZoneManager as a real THREE light
  * (so preview/game/runtime all get it) plus an editor-only marker for picking.
@@ -448,6 +463,7 @@ export interface LightDef {
   // saving for lights over static geometry; moving objects won't update this shadow.
   // ZoneManager re-renders it when zone geometry rebuilds.
   staticShadow?: boolean;
+  flicker?:      LightFlickerDef;
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
