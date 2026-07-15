@@ -4504,27 +4504,26 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
           })}
         </div>
         {light.flicker && (
-          <>
-            <div style={{ display: "flex", gap: 10 }}>
-              {([["AMOUNT", "famount", "amount", 0.05, 0, 1], ["SPEED", "fspeed", "speed", 0.25, 0.1, 20]] as const).map(([label, sk, dk, step, min, max]) => (
-                <div key={sk}>
-                  <div style={LABEL}>{label}</div>
-                  <input type="number" step={step} min={min} max={max} value={numStr[sk]} style={{ ...NUM_INPUT, width: 70 }}
-                    onChange={e => {
-                      const v = e.target.value; setNumStr(p => ({ ...p, [sk]: v }));
-                      schedule(() => { const n = parseFloat(v); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); });
-                    }}
-                    onBlur={e => flush(() => { const n = parseFloat(e.target.value); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); })}
-                  />
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {([
+              ["AMOUNT", "famount", "amount", 0.05, 0, 1, ["0 to 1", "0 = flicker does nothing", "1 = flicker can take the light fully to black"]],
+              ["SPEED", "fspeed", "speed", 0.25, 0.1, 20, ["1 = neutral", "0.5 = half as fast", "2 = twice as fast"]],
+            ] as const).map(([label, sk, dk, step, min, max, hints]) => (
+              <div key={sk}>
+                <div style={LABEL}>{label}</div>
+                <input type="number" step={step} min={min} max={max} value={numStr[sk]} style={{ ...NUM_INPUT, width: 70 }}
+                  onChange={e => {
+                    const v = e.target.value; setNumStr(p => ({ ...p, [sk]: v }));
+                    schedule(() => { const n = parseFloat(v); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); });
+                  }}
+                  onBlur={e => flush(() => { const n = parseFloat(e.target.value); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); })}
+                />
+                <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginTop: 4 }}>
+                  {hints.map(h => <div key={h}>{h}</div>)}
                 </div>
-              ))}
-            </div>
-            <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginTop: 6 }}>
-              AMOUNT: 0 to 1<br />
-              0 = flicker does nothing<br />
-              1 = flicker can take the light fully to black
-            </div>
-          </>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
