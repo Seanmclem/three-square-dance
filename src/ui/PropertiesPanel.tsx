@@ -350,9 +350,9 @@ interface PropertiesPanelProps {
   assets?:                  AssetDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
-  // World-level ambient/sun lighting (shown under the Light tool's ToolView).
-  worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
-  onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+  // World-level ambient/sun/environment lighting (Lights drilldown page).
+  worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
+  onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;
   // Active zone's placed lights + row-click selection (LIGHTS list under the Light tool).
   zoneLights?:              LightDef[];
   onSelectLight?:           (id: string) => void;
@@ -4938,13 +4938,14 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
 // World-level ambient/sun controls — shown under the Light tool so the existing
 // scene lighting is manageable from the same place placed lights are authored.
 function WorldLightSection({ lighting, onChange }: {
-  lighting: { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
-  onChange: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }) => void;
+  lighting: { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
+  onChange: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;
 }) {
-  const [intStr, setIntStr] = useState({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity) });
+  const envVal = lighting.envIntensity ?? 1;
+  const [intStr, setIntStr] = useState({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity), env: String(envVal) });
   const { schedule, flush } = useFieldDebounce(300);
-  useEffect(() => { setIntStr({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity) }); },
-    [lighting.ambient.intensity, lighting.sun.intensity]);
+  useEffect(() => { setIntStr({ ambient: String(lighting.ambient.intensity), sun: String(lighting.sun.intensity), env: String(envVal) }); },
+    [lighting.ambient.intensity, lighting.sun.intensity, envVal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const row = (key: "ambient" | "sun", label: string) => {
     const commit = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) onChange({ [key]: { intensity: n } }); };
@@ -4967,13 +4968,28 @@ function WorldLightSection({ lighting, onChange }: {
     );
   };
 
+  const commitEnv = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) onChange({ envIntensity: n }); };
+
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
       <div style={{ ...LABEL, marginBottom: 0 }}>WORLD LIGHT</div>
       {row("ambient", "AMBIENT")}
       {row("sun", "SUN")}
+      <div>
+        <div style={LABEL}>ENVIRONMENT</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input type="number" step={0.1} min={0} value={intStr.env} style={{ ...NUM_INPUT, width: 70 }}
+            onChange={e => { const v = e.target.value; setIntStr(p => ({ ...p, env: v })); schedule(() => commitEnv(v)); }}
+            onBlur={e => flush(() => commitEnv(e.target.value))}
+            onKeyDown={e => { if (e.key === "Enter") flush(() => commitEnv((e.target as HTMLInputElement).value)); }}
+          />
+          <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
+        </div>
+      </div>
       <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
-        The world's base lighting — applies everywhere, saved with the scene.
+        The world's base lighting, saved with the scene. Fill/rim lights follow SUN;
+        ENVIRONMENT is the reflected sky/image light. Set all three to 0 for a scene
+        lit only by placed lights.
       </div>
     </div>
   );

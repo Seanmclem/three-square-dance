@@ -304,8 +304,9 @@ export interface BusEvents {
   "light:updated":         { zoneId: string; id: string; changes: Partial<LightDef> };
   "light:removed":         { zoneId: string; id: string };
   "light:placed":          { zoneId: string; id: string };
-  // World-level ambient/sun changed (or loaded) — SceneManager applies it.
-  "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } };
+  // World-level ambient/sun/environment changed (or loaded) — SceneManager applies it
+  // (fill/rim directionals scale with sun intensity; envIntensity drives scene.environmentIntensity).
+  "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
   "spawn:mode":            { mode: "initial" | "checkpoint" };
   "spawn:placed":          Record<string, never>;
   "group:added":           { group: GroupDef };
@@ -472,6 +473,10 @@ export interface WorldConfig {
   size:            { width: number; depth: number };
   ambientLight:    { color: string; intensity: number };
   sunLight:        { color: string; intensity: number; position: Vec3 };
+  // Image-based-lighting (scene.environment) multiplier; absent = 1. At 0, standard
+  // materials get no environment light — combined with ambient/sun 0 the scene goes
+  // truly dark (fill/rim scale with sun automatically).
+  envIntensity?:   number;
   skybox:          string;
   fogColor:        string;
   fogDensity:      number;

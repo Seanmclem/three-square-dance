@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.29.0** — last updated 2026-07-12
+**Version 4.29.5** — last updated 2026-07-15
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -128,6 +128,7 @@
 - v4.27.4 — **New Project modal: editable SCENE 1 ID** (user: "I don't remember naming it new-world" — the id was auto-slugified from the world's default `metadata.name` "New World", which is not editable anywhere in the UI, so the first scene's permanent id came from a name the user never chose). The modal gains a **SCENE 1 ID** field, prefilled from the current world's name slug (or `scene_01` when Blank is selected, while untouched) with a live `scenes/<slug>.json` preview and a note that renaming isn't supported yet; the confirm passes the sanitized id through (`onConfirm` gains `sceneId`; `handleProjectCreate` uses it for both modes). Create is gated on a non-empty slug.
 - v4.27.5 — **Per-scene editor camera persistence** (user report: loading a scene/project scene leaves the camera at the near-origin default). `SceneMetadata.editorCamera?: EditorCameraPose { focus, radius, phi, theta }` — editor-only convenience data, ignored by the runtime. `EditorCamera` gains `getPose()`/`setPose()` (set both current AND target orbit state → snap, not lerp; `_applyCamera()` immediately). **Stamped on every explicit save** (`stampCameraPose()` in App: handleSave, project scene switch/add/close, project create adopt path) and **restored at the end of `handleLoadFromJSON`** — which every load path funnels through (boot autosave restore, file Load, project open/scene switch/blank create), so one restore point covers them all. Deliberately NOT stamped by the periodic autosave tick: a camera-only change must not defeat the v4.14.1 "unchanged tab never writes" stale-tab gate (the autosave still carries whatever pose the last explicit save stamped). Old files without the field keep today's behavior. Verified in-browser on a real 2-scene project: moved the camera to a distinctive pose, switched scenes and back — pose snapped back exactly (focus/radius/phi/theta round-trip), stamp visible in metadata.
 - v4.28.0 — **Phase 34 — Ladders**: first-class `LadderDef` zone entity (rails+rungs `LadderBuilder`, thin solid collider, auto-built climb-column + top-lip **sensor pair** registered handle→ladderId in ZoneManager's `ladderSensorMap`); TriggerSystem emits deduped `ladder:zone-enter/exit`; CharacterController gains a **climb movement mode** (auto-mount on move-toward dot ≥ 0.5, KCC bypassed via `CharacterBody.setClimbTranslation`, X/Z lerped onto the climb line, W/S vertical at `PlayerSettings.climbSpeed`, jump-release + 0.4s re-grab cooldown, fixed-marker top dismount, top-zone auto-remount AND "Climb down" interact prompt, unconditional `_exitClimb()` wired to teleport/rebuild/delete/dispose — no soft locks); `LocomotionState` gains `"climb"` (plays the Climb clip at input-proportional `timeScale`, 0 = hanging); editor: Ladder variant under the Stair toolbar button, `LadderTool` click-place, LADDER PropertiesPanel geo/mat screens, undo via journal `"ladder"` kind. Plan: `plans/phase-34-ladders.md`; acceptance: `test-plans/phase-34-ladders.md`.
+- v4.29.5 — **True darkness: fill/rim follow the sun + ENVIRONMENT intensity control.** The two hardcoded fill/rim directionals now scale with sun intensity (0.3×/0.15× — identical look at the default sun 2.0), and new `WorldConfig.envIntensity?` (absent = 1) drives `scene.environmentIntensity` (the IBL term), carried on `world:lighting` and edited via a new ENVIRONMENT row in WORLD LIGHT. Ambient 0 + sun 0 + environment 0 = a truly dark scene lit only by placed lights (pixel-verified [32,42,50]→[5,8,9]; placed point light lights its pool in the dark). No migration needed (absent field = previous behavior).
 - v4.29.4 — **Scene-file data loss on project restore (fix).** User report: a project scene ("a level full of ladder tests") was found blank. Forensics: the file was a byte-exact `WorldState.toJSON()` of a world with **null metadata** (the `"Untitled"` / `version "1"` shell, `moveSpeed: 5` — the WorldState fallback, not `makeFreshScene`'s `moveSpeed: 6`). Cause: boot restores the world from the `worldeditor_autosave` localStorage key, but **drops it when older than 24h** and falls back to `zones.loadZone(DEMO_ZONE_ID)` — which sets no metadata. Project restore then adopted the last project at its saved `sceneId` **without reloading the scene**, on the v4.27.0 assumption that "the autosave already restored the active scene". That assumption is only true when the restore actually ran; it ignored the `restored` flag the same function had already computed. So after >24h away, the editor sat on an empty demo world pointing at a real scene id, and the **next write-through save flushed the empty world onto the scene file** (FSA `createWritable` truncates → unrecoverable; the file was untracked in git). Two fixes: (1) both adopt paths now load the scene from disk when the autosave did not restore — boot keys off `!restored` (and re-baselines the autosave gate), `handleProjectReopen` keys off `world.metadata == null`; (2) **`canOverwriteScene(sceneId)`** guards every write-through `saveScene` (handleSave, closeProject, scene switch, scene add) — a null metadata means "never loaded from a scene file", so the overwrite is refused with a console warning and the file is kept. Only overwrites are guarded: `addScene` creates a new file, so the "New Project → adopt current world" path still works (it now also adopts the synthesized metadata onto the world, so later saves of that scene aren't refused). `window.__test.world` exposed for automation. Process: **`public/games/**` is now committed** and CLAUDE.md §5 requires committing scene files before/after editor writes — an untracked scene file has no recovery path. Verified in-browser against the real `test-project2` (permission still granted in IDB): with the autosave cleared, boot loaded `new-world` from disk (4 nodes / 1 floor / 2 platforms / 1 stairs / 1 object / 2 shapes) instead of the demo zone, a real Cmd+S write-through left the file byte-identical, and forcing `metadata = null` made the same save refuse (`[project] refusing to overwrite scene "new-world" with an unloaded (empty) world`) with the file untouched. The lost level was **not recoverable** (untracked; no Time Machine destination, no data APFS snapshot).
 - v4.29.3 — **Lights as a nested panel page.** The nothing-selected panel now shows a "Lights" CategoryRow (every tool; summary `sun + ambient · N placed`) that drills into a `"lights"` screen — the first no-selection screen on the drilldown stack — containing WORLD LIGHT (sun + ambient, moved out of the Light-tool ToolView) above PLACED LIGHTS. Row click still selects; tool switch with nothing selected resets the stack.
 - v4.29.2 — **Lights list always visible.** LIGHTS IN THIS ZONE now renders in the nothing-selected ToolView under every tool whenever the zone has lights (empty state stays Light-tool-only, WORLD LIGHT stays Light-tool-only).
@@ -1249,11 +1250,12 @@ The in-memory mirror of the JSON. All tools write to WorldState; WorldState emit
 > (`zone.lights ??= []`, `"light"` ChangeKind, `light:added/updated/removed`), **plus
 > the `light` case in `_emitChange`** so undo/redo replays reach ZoneManager (a kind
 > without a case there silently skips the scene rebuild — checkpoints still have this
-> gap). Also `updateWorldLighting({ ambient?, sun? })`: mutates `world.ambientLight` /
-> `world.sunLight` (seeding the default WorldConfig when null — fresh sessions) and
-> emits **`world:lighting`**; `loadFromJSON` emits the same event after `world:loaded`
-> so SceneManager applies saved values on every load. NOT journaled (matches
-> playerSettings edits).
+> gap). Also `updateWorldLighting({ ambient?, sun?, envIntensity? })`: mutates
+> `world.ambientLight` / `world.sunLight` / `world.envIntensity` (seeding the default
+> WorldConfig when null — fresh sessions) and emits **`world:lighting`** (payload
+> includes `envIntensity ?? 1` since v4.29.5); `loadFromJSON` emits the same event
+> after `world:loaded` so SceneManager applies saved values on every load. NOT
+> journaled (matches playerSettings edits).
 
 ```js
 class WorldState {
@@ -1895,8 +1897,16 @@ Owns the renderer, scene, RAF loop, lighting/sky/grid setup, and camera selectio
 > `WorldConfig.ambientLight`/`sunLight` color+intensity (both editor and runtime
 > SceneManagers, since WorldState emits it on load and on WORLD LIGHT panel edits).
 > Hardcoded defaults stay ambient `#aabbcc @ 0.5` / sun `#fff4e0 @ 2.0` — the values
-> `migrateWorldLighting` normalizes old saves to. The fill/rim directionals and the
-> sky-linked sun *position* remain hardcoded.
+> `migrateWorldLighting` normalizes old saves to. The sky-linked sun *position*
+> remains hardcoded.
+>
+> **v4.29.5:** true-darkness support. The fill/rim directionals (now `_fillLight`/
+> `_rimLight` fields) **scale with sun intensity** in the `world:lighting` handler
+> (baseline ratios 0.3× and 0.15× of sun — exactly 0.6/0.3 at the default sun 2.0),
+> and `scene.environmentIntensity` is driven by the event's `envIntensity` (the IBL
+> term from the PMREM RoomEnvironment). Ambient 0 + sun 0 + environment 0 = a truly
+> dark scene lit only by placed lights (verified: center-floor pixel [32,42,50] →
+> [5,8,9]).
 `_loop()` each frame: `editorCamera?.update(dt)` (only when no preview camera),
 update callbacks (physics step, character, mixers), then
 `renderer.render(scene, _previewCamera ?? camera)`. `setPreviewCamera(cam)` is the
@@ -8045,6 +8055,10 @@ record: `test-plans/phase-35-lights.md`.
 - UI: **WORLD LIGHT** section (ambient + sun color/intensity) renders under the
   Light tool's ToolView; writes via `handleWorldLightingChange` →
   `updateWorldLighting` (not journaled, matches playerSettings).
+- **v4.29.5 — true darkness**: fill/rim scale with sun intensity (0.3×/0.15×,
+  parity at sun 2.0) and `WorldConfig.envIntensity?` (absent = 1) drives
+  `scene.environmentIntensity` via the same `world:lighting` event — a third
+  ENVIRONMENT row in WORLD LIGHT. All three at 0 = scene lit only by placed lights.
 
 ### Lights list (v4.29.1, always-visible v4.29.2, nested page v4.29.3)
 

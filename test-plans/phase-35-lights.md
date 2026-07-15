@@ -30,6 +30,9 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 | 14 | WORLD LIGHT edits | Light tool armed, edit AMBIENT/SUN color + intensity | scene AmbientLight + sun DirectionalLight follow live; saved in `world.ambientLight/sunLight`; NOT undoable (matches player settings) |
 | 15 | Migration parity | load a pre-35 save (stored 1.2 / 3.0) | `migrateWorldLighting` rewrites to 0.5 / 2.0 — scene looks EXACTLY as before (those stored values were never applied); hand-edited values pass through untouched |
 | 16 | Fresh session | no autosave, edit WORLD LIGHT | default WorldConfig seeded by `updateWorldLighting`; edit applies + persists |
+| 16b | Fill/rim follow sun (v4.29.5) | set SUN intensity | fill = 0.3×sun, rim = 0.15×sun (0.6/0.3 at default sun 2.0 — unchanged look) |
+| 16c | ENVIRONMENT row (v4.29.5) | edit ENVIRONMENT intensity | `scene.environmentIntensity` follows; saved as `WorldConfig.envIntensity` (absent = 1, no migration) |
+| 16d | True darkness (v4.29.5) | ambient 0 + sun 0 + environment 0 | scene renders black except placed lights (and sky/fog); a placed point light lights its pool |
 
 ## Lights list (v4.29.1)
 
@@ -65,3 +68,9 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
   view (`sun + ambient · 1 placed`); page shows ← Back + Lights header + WORLD LIGHT
   above PLACED LIGHTS (1) (screenshot-verified); Back → tool view; reopen → row click
   → LIGHT · POINT view. Console clean, typecheck clean.
+- **v4.29.5 (true darkness), 2026-07-15:** on load fill/rim = 0.6/0.3 at sun 2
+  (parity). All-zero via `updateWorldLighting`: dirs [0,0,0], env 0, center-floor
+  pixel [32,42,50]→[5,8,9]; temp point light in the dark scene showed a clear glow
+  pool (screenshot). ENVIRONMENT input through the real panel: 1→0.4→1, scene +
+  config tracked each step. Original values restored pixel-exact; project scene
+  files untouched (git clean). Console clean, typecheck clean.

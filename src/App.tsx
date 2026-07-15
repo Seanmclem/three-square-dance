@@ -185,9 +185,10 @@ export default function App() {
   const [zoneLights,      setZoneLights]       = useState<LightDef[]>([]);
   // World-level ambient/sun (WorldConfig) — synced from the world:lighting bus event;
   // seeded with the visual-parity defaults so the panel works before any load/save.
-  const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number } }>({
+  const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity: number }>({
     ambient: { color: "#aabbcc", intensity: 0.5 },
     sun:     { color: "#fff4e0", intensity: 2.0 },
+    envIntensity: 1,
   });
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
@@ -720,7 +721,7 @@ export default function App() {
           });
         });
       }),
-      bus.on("world:lighting", ({ ambient, sun }) => setWorldLighting({ ambient, sun })),
+      bus.on("world:lighting", ({ ambient, sun, envIntensity }) => setWorldLighting({ ambient, sun, envIntensity: envIntensity ?? 1 })),
       bus.on("spawn:placed", () => {
         // The initial spawn is singular; break out of placing mode after setting it.
         queueMicrotask(() => {
@@ -1295,7 +1296,7 @@ export default function App() {
     });
   }, []);
 
-  const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }> }): void => {
+  const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }): void => {
     const world = worldRef.current;
     if (!world) return;
     // Emits world:lighting → SceneManager applies it and the bus listener syncs panel state.

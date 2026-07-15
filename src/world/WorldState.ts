@@ -491,8 +491,8 @@ export class WorldState {
     this._bus.emit("light:removed", { zoneId, id });
   }
 
-  /** World-level ambient/sun edit. Not journaled (matches playerSettings edits). */
-  updateWorldLighting(changes: { ambient?: Partial<WorldConfig["ambientLight"]>; sun?: Partial<WorldConfig["sunLight"]> }): void {
+  /** World-level ambient/sun/environment edit. Not journaled (matches playerSettings edits). */
+  updateWorldLighting(changes: { ambient?: Partial<WorldConfig["ambientLight"]>; sun?: Partial<WorldConfig["sunLight"]>; envIntensity?: number }): void {
     if (!this.world) {
       // Fresh session with no loaded/saved world yet — seed the default config
       // (same block setDefaultSpawn uses) so the edit has somewhere to live.
@@ -506,9 +506,11 @@ export class WorldState {
     }
     if (changes.ambient) this.world.ambientLight = { ...this.world.ambientLight, ...changes.ambient };
     if (changes.sun)     this.world.sunLight     = { ...this.world.sunLight,     ...changes.sun };
+    if (changes.envIntensity !== undefined) this.world.envIntensity = changes.envIntensity;
     this._bus.emit("world:lighting", {
       ambient: { color: this.world.ambientLight.color, intensity: this.world.ambientLight.intensity },
       sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
+      envIntensity: this.world.envIntensity ?? 1,
     });
   }
 
@@ -737,6 +739,7 @@ export class WorldState {
     if (this.world) this._bus.emit("world:lighting", {
       ambient: { color: this.world.ambientLight.color, intensity: this.world.ambientLight.intensity },
       sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
+      envIntensity: this.world.envIntensity ?? 1,
     });
   }
 }

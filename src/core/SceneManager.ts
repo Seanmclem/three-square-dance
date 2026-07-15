@@ -36,6 +36,8 @@ export class SceneManager {
 
   private readonly _sunLight:     THREE.DirectionalLight;
   private readonly _ambientLight: THREE.AmbientLight;
+  private _fillLight!: THREE.DirectionalLight;   // assigned in _setupLighting
+  private _rimLight!:  THREE.DirectionalLight;
   private readonly _unsubLighting: () => void;
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
@@ -60,12 +62,18 @@ export class SceneManager {
     this.scene.add(this._ambientLight);
     this._sunLight  = this._setupLighting();
     this._setupSky();
-    // World-level ambient/sun config (WorldState emits on load and on panel edits).
-    this._unsubLighting = bus.on("world:lighting", ({ ambient, sun }) => {
+    // World-level ambient/sun/environment config (WorldState emits on load and on
+    // panel edits). The hardcoded fill/rim directionals scale with the sun (baseline
+    // ratios 0.6/2.0 and 0.3/2.0) so SUN 0 means genuinely no directional light, and
+    // envIntensity drives the IBL term — all three at 0 = a truly dark scene.
+    this._unsubLighting = bus.on("world:lighting", ({ ambient, sun, envIntensity }) => {
       this._ambientLight.color.set(ambient.color);
       this._ambientLight.intensity = ambient.intensity;
       this._sunLight.color.set(sun.color);
       this._sunLight.intensity = sun.intensity;
+      this._fillLight.intensity = sun.intensity * 0.3;
+      this._rimLight.intensity  = sun.intensity * 0.15;
+      this.scene.environmentIntensity = envIntensity ?? 1;
     });
     if (editor) this._setupGrid();   // grid helpers + demo ground are editor furniture
 
@@ -100,10 +108,12 @@ export class SceneManager {
     const fill = new THREE.DirectionalLight(0x6688cc, 0.6);
     fill.position.set(-20, 10, -20);
     this.scene.add(fill);
+    this._fillLight = fill;
 
     const rim = new THREE.DirectionalLight(0xffeedd, 0.3);
     rim.position.set(0, 5, -30);
     this.scene.add(rim);
+    this._rimLight = rim;
 
     return sun;
   }
