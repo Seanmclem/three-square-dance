@@ -343,10 +343,12 @@ export class ZoneManager {
         if (oldDef?.csgCutter) void this._rebuildOverlapping(zoneId, oldDef);
       }),
       this._bus.on("object:added", ({ zoneId, object }) => {
-        void this._addObject(zoneId, object);
+        // Re-render frozen shadows after the (async) mesh actually lands in the scene.
+        void this._addObject(zoneId, object).then(() => this._refreshStaticShadows(zoneId));
       }),
       this._bus.on("object:removed", ({ zoneId, id }) => {
         this._removeObject(zoneId, id);
+        this._refreshStaticShadows(zoneId);
       }),
       // Script-driven despawn_object for NON-object entities (platforms, stairs, walls,
       // floors, trigger volumes). Objects are handled by ObjectPlacer; a group target is
@@ -432,13 +434,16 @@ export class ZoneManager {
         const entry = this._loadedZones.get(zoneId);
         if (entry) this._removeLight(entry, id);
       }),
+      // light_on/light_off/toggle_light script actions — runtime-only, via intensity
+      // (light counts never change → no shader recompiles). Reset on preview:stop.
+      this._bus.on("light:set", ({ targetId, op }) => this._setLightOp(targetId, op)),
       // Re-project decals whose footprint touches a rebuilt entity. Regens run
       // through _wallOpChain so they never observe a half-rebuilt run.
-      this._bus.on("wall:rebuilt",     ({ zoneId, wallId })     => this._markDecalsDirty(zoneId, wallId)),
-      this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => this._markDecalsDirty(zoneId, floorId)),
-      this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._markDecalsDirty(zoneId, platformId)),
-      this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => this._markDecalsDirty(zoneId, stairId)),
-      this._bus.on("shape:rebuilt",    ({ zoneId, shapeId })    => this._markDecalsDirty(zoneId, shapeId)),
+      this._bus.on("wall:rebuilt",     ({ zoneId, wallId })     => { this._markDecalsDirty(zoneId, wallId);     this._refreshStaticShadows(zoneId); }),
+      this._bus.on("floor:rebuilt",    ({ zoneId, floorId })    => { this._markDecalsDirty(zoneId, floorId);    this._refreshStaticShadows(zoneId); }),
+      this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => { this._markDecalsDirty(zoneId, platformId); this._refreshStaticShadows(zoneId); }),
+      this._bus.on("stair:rebuilt",    ({ zoneId, stairId })    => { this._markDecalsDirty(zoneId, stairId);    this._refreshStaticShadows(zoneId); }),
+      this._bus.on("shape:rebuilt",    ({ zoneId, shapeId })    => { this._markDecalsDirty(zoneId, shapeId);    this._refreshStaticShadows(zoneId); }),
       this._bus.on("group:visibility", ({ groupId, visible }) => {
         if (visible) this._hiddenGroups.delete(groupId);
         else this._hiddenGroups.add(groupId);
@@ -451,6 +456,7 @@ export class ZoneManager {
       }),
       this._bus.on("preview:stop",  () => {
         this._restoreDespawned();
+        this._restoreLightStates();
         this._setEditorOnlyVisible(true);
         this._setHiddenWallGhostsVisible(true);
         this._setHideInGameVisible(true);
@@ -1830,6 +1836,12 @@ export class ZoneManager {
       } else {
         light.shadow.camera.far = def.range || 50;
       }
+      if (def.staticShadow) {
+        // Render the map once, then freeze — _refreshStaticShadows re-pokes it
+        // when zone geometry rebuilds. Movers won't update a frozen shadow.
+        light.shadow.autoUpdate = false;
+        light.shadow.needsUpdate = true;
+      }
     }
     entry.lightsGroup.add(light);
 
@@ -1876,6 +1888,49 @@ export class ZoneManager {
       child.userData._ownsMaterial = true;   // marker owns its materials — dispose on unload
     });
     return marker;
+  }
+
+  /** light:set — on/off/toggle via intensity + frozen shadow updates (never WorldState). */
+  private _setLightOp(targetId: string, op: "on" | "off" | "toggle"): void {
+    for (const [zoneId, entry] of this._loadedZones) {
+      const le = entry.lightEntries.get(targetId);
+      if (!le) continue;
+      const def = this._worldState.zones.get(zoneId)?.lights?.find(l => l.id === targetId);
+      if (!def) continue;
+      const turnOn = op === "on" || (op === "toggle" && le.light.intensity === 0);
+      le.light.intensity = turnOn ? def.intensity : 0;
+      if (le.light.castShadow) {
+        // Off: stop paying the per-frame shadow pass. On: resume (or re-render once
+        // for static shadows).
+        le.light.shadow.autoUpdate = turnOn && !def.staticShadow;
+        if (turnOn) le.light.shadow.needsUpdate = true;
+      }
+    }
+  }
+
+  /** preview:stop — reset every light to its authored def (undoes light:set). */
+  private _restoreLightStates(): void {
+    for (const [zoneId, entry] of this._loadedZones) {
+      for (const [id, le] of entry.lightEntries) {
+        const def = this._worldState.zones.get(zoneId)?.lights?.find(l => l.id === id);
+        if (!def) continue;
+        le.light.intensity = def.intensity;
+        if (le.light.castShadow) {
+          le.light.shadow.autoUpdate = !def.staticShadow;
+          le.light.shadow.needsUpdate = true;
+        }
+      }
+    }
+  }
+
+  /** Zone geometry rebuilt — frozen (static) shadow maps re-render once. */
+  private _refreshStaticShadows(zoneId: string): void {
+    const entry = this._loadedZones.get(zoneId);
+    if (!entry) return;
+    for (const le of entry.lightEntries.values()) {
+      if (le.light.castShadow && !le.light.shadow.autoUpdate && le.light.intensity > 0)
+        le.light.shadow.needsUpdate = true;
+    }
   }
 
   private _removeLight(entry: ZoneEntry, id: string): void {

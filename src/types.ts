@@ -304,6 +304,10 @@ export interface BusEvents {
   "light:updated":         { zoneId: string; id: string; changes: Partial<LightDef> };
   "light:removed":         { zoneId: string; id: string };
   "light:placed":          { zoneId: string; id: string };
+  // light_on/light_off/toggle_light script actions → ZoneManager (targetId already
+  // group-expanded). Runtime-only: drives intensity (never WorldState), so light
+  // counts stay fixed — no shader recompiles; reset on preview:stop.
+  "light:set":             { targetId: string; op: "on" | "off" | "toggle" };
   // World-level ambient/sun/environment changed (or loaded) — SceneManager applies it
   // (fill/rim directionals scale with sun intensity; envIntensity drives scene.environmentIntensity).
   "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
@@ -440,6 +444,10 @@ export interface LightDef {
   pitchDeg?:  number;   // spot/directional aim (90 = straight down)
   yawDeg?:    number;   // spot/directional aim (0 = -Z)
   castShadow: boolean;
+  // Render the shadow map ONCE and freeze it (shadow.autoUpdate = false) — big per-frame
+  // saving for lights over static geometry; moving objects won't update this shadow.
+  // ZoneManager re-renders it when zone geometry rebuilds.
+  staticShadow?: boolean;
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
@@ -935,6 +943,9 @@ export type ActionType =
   | 'start_mover'
   | 'stop_mover'
   | 'toggle_mover'
+  | 'light_on'
+  | 'light_off'
+  | 'toggle_light'
   | 'give_item'
   | 'take_item';
 

@@ -334,6 +334,18 @@ export class ScriptEngine {
         break;
       }
 
+      // Placed-light switching. ZoneManager is the only listener — drives intensity
+      // only (light counts never change → no shader recompile); reset on preview:stop.
+      case "light_on":
+      case "light_off":
+      case "toggle_light": {
+        const op = action.type === "light_on" ? "on"
+                 : action.type === "light_off" ? "off" : "toggle";
+        for (const id of this._resolveTargets(action.targetId))
+          this._bus.emit("light:set", { targetId: id, op });
+        break;
+      }
+
       // Phase 32 — items: counts live at gameState `inv.<itemId>`. Clamp inline
       // (registry stackSize / floor 0) — gameState only clamps registered keys.
       case "give_item":

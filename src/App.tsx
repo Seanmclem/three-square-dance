@@ -2358,6 +2358,7 @@ export default function App() {
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
         zoneShapes={zoneShapes}
+        zoneLights={zoneLights}
         zoneStairs={zoneStairs}
         zoneWalls={zoneWalls}
         zoneFloors={zoneFloors}

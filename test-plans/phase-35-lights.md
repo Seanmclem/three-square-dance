@@ -34,6 +34,16 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
 | 16c | ENVIRONMENT row (v4.29.5) | edit ENVIRONMENT intensity | `scene.environmentIntensity` follows; saved as `WorldConfig.envIntensity` (absent = 1, no migration) |
 | 16d | True darkness (v4.29.5) | ambient 0 + sun 0 + environment 0 | scene renders black except placed lights (and sky/fog); a placed point light lights its pool |
 
+## Static shadows + script actions (v4.29.6)
+
+| # | Scenario | Steps | Expected |
+|---|---|---|---|
+| 22 | STATIC SHADOWS toggle | CAST SHADOWS on → check STATIC SHADOWS | `shadow.autoUpdate` false, one-shot `needsUpdate` render; hint explains the moving-object caveat; uncheck → live shadow again |
+| 23 | Frozen-ness | move a caster mesh directly (mover-style) | shadow stays at the old spot; `needsUpdate = true` refreshes once |
+| 24 | Editor WYSIWYG | move/edit geometry via the normal editor path | `*:rebuilt` (and object add/remove) re-poke frozen maps — shadow follows editor edits |
+| 25 | light_off / light_on / toggle_light | author on a script (Lights optgroup in the target picker) or `__test.runAction` | intensity 0 ↔ authored value; off also freezes the shadow passes; light counts unchanged (no recompile hitch) |
+| 26 | Preview restore | turn lights off in preview, exit | all lights reset to their defs (intensity + shadow mode) |
+
 ## Lights list (v4.29.1)
 
 | # | Scenario | Steps | Expected |
@@ -74,3 +84,13 @@ warm `#ffd9a0` @ 60 cd, range 15 — visible glow pool on the concrete floor.
   pool (screenshot). ENVIRONMENT input through the real panel: 1→0.4→1, scene +
   config tracked each step. Original values restored pixel-exact; project scene
   files untouched (git clean). Console clean, typecheck clean.
+- **v4.29.6 (static shadows + actions), 2026-07-15, in the user's level-2:** static
+  spot built frozen (`autoUpdate` false, one-shot `needsUpdate` consumed after one
+  render). Pixel-proofed in a darkened world: box shadow band 15 vs lit 50–63; box
+  mesh moved mover-style → frozen shadow stayed (15); `needsUpdate` → refreshed
+  (59); editor `updateShape` move → `shape:rebuilt` poke refreshed automatically.
+  STATIC SHADOWS checkbox via real click flipped def + rebuilt light live. Actions
+  via real dispatch: off/on/toggle drove intensity 0↔80 with `autoUpdate` managed;
+  preview-exit restored. ScriptPanel: light_off/light_on/toggle_light in the type
+  dropdown, Lights optgroup listed all 4 zone lights; test script deleted after.
+  World lighting + scene restored exactly (project files git-clean). Console clean.

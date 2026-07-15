@@ -4483,9 +4483,18 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
         <span style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>CAST SHADOWS</span>
       </label>
       {light.castShadow && (
-        <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
-          Shadow-casting lights are expensive — keep to a few per zone (watch the FPS counter).
-        </div>
+        <>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginLeft: 22 }}>
+            <input type="checkbox" checked={light.staticShadow ?? false}
+              onChange={e => update({ staticShadow: e.target.checked })} />
+            <span style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>STATIC SHADOWS</span>
+          </label>
+          <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+            {light.staticShadow
+              ? "Shadow renders once (near-free per frame). Editing geometry refreshes it, but MOVING objects/platforms won't update this light's shadow."
+              : "Shadow re-renders every frame — expensive, keep to a few per zone (watch the FPS counter). Turn on STATIC SHADOWS if nothing moves under this light."}
+          </div>
+        </>
       )}
 
       <div>
