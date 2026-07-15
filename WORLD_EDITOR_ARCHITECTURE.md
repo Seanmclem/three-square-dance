@@ -138,6 +138,7 @@
 - v4.29.2 — **Lights list always visible.** LIGHTS IN THIS ZONE now renders in the nothing-selected ToolView under every tool whenever the zone has lights (empty state stays Light-tool-only, WORLD LIGHT stays Light-tool-only).
 - v4.29.1 — **Lights list.** LIGHTS IN THIS ZONE section under the Light tool (above WORLD LIGHT): a row per placed light (color swatch, label/id, kind, shadow tag); clicking a row switches to Select and selects that light (panel + gizmo). App `zoneLights` state synced from `light:*` events like `checkpoints`.
 - v4.29.0 — **Phase 35 — Light controls**: placeable per-zone `LightDef` entities (point / spot / directional) built by ZoneManager as real THREE lights (editor + preview + game + runtime) with an editor pick-marker (`hideInGame`); Light toolbar button with three variants, `LightTool` click-place, LIGHT PropertiesPanel view (color, intensity, range, spot cone angle, pitch/yaw aim, CAST SHADOWS toggle, position, delete), gizmo translate, undo via journal `"light"` kind (added the missing `light` case to `_emitChange`). **World ambient/sun finally honored**: `WorldConfig.ambientLight`/`sunLight` were serialized since day one but never applied — SceneManager now applies them via a new `world:lighting` bus event (emitted by `loadFromJSON` + `updateWorldLighting`), editable in a WORLD LIGHT section under the Light tool; `migrateWorldLighting` rewrites the never-honored legacy defaults (1.2/3.0) to visual-parity values (0.5/2.0) so existing worlds look identical. Acceptance: `test-plans/phase-35-lights.md`.
+- v4.30.0 — **Phase 36 — Audio System**: sound-asset manifest, ambient/background music, positional/spatial audio, and a 4-bus mixer — the missing consumer for the long-stubbed `play_sound`/`audio:play`. **Manifest** mirrors models/materials: `public/assets/audio/manifest.json` (`SoundManifest { version, sounds: SoundDef[] }`; `SoundDef { id, label, category('Music'|'Ambient'|'SFX'), path, loop?, volume?, spatial?, tags, dateAdded, attribution? }`), loaded by `AssetManager.initAudio()` (+ `getSoundList`/`getSoundDef`/`updateSound`/`removeSounds`/`loadSound` → cached `AudioBuffer` via `THREE.AudioLoader`, `_resolve` base-url like the other loaders). **New `src/audio/AudioSystem.ts`** is the consumer, constructed in BOTH roots (App + RuntimeApp) and self-managing on the bus like MoverSystem — a `THREE.AudioListener` attaches to `SceneManager.activeRenderCamera` on `preview:start` and detaches on `preview:stop` (sound plays only in preview/game). It handles `audio:play`(one-shot; positional when `position` given) / `audio:stop` / `music:play` / `music:stop` / `world:audio` / `audio:player-mix`, and `object:added/updated/removed` for **object-attached `PositionalAudio` emitters parented to the mesh** (follow movers). **Mixer**: four gain buses (master/music/sfx/ambient); effective per-sound gain = base × authoredMix[bus] × playerMix[bus], master via `listener.setMasterVolume`; a sound's bus is derived from its `SoundDef.category`. Authored defaults live per-scene in `WorldConfig.audio { music?, ambient?, mix? }` (`WorldState.updateWorldAudio` → `world:audio`, serialized wholesale with `world`, non-journaled like lighting); player prefs are PauseMenu sliders persisted to `localStorage.audio_mix` → `audio:player-mix`. **Data model** (additive, no migration): `WorldConfig.audio`, `WorldObject.sound { soundId, volume?, loop?, refDistance?, maxDistance? }`. **Scripting**: `ActionType` += `stop_sound`/`play_music`/`stop_music` (kept `play_sound`, now positional via `_resolveTargets`/`_resolveObjectPose`); `ScriptAction` += `music?`/`volume?`/`loop?`/`fadeSeconds?`. **Editor UI**: SOUNDS toolbar panel (`AudioBrowser` list+preview+manage, `AudioImporterModal` FSA import → dedupe-splice manifest), reusable `SoundPicker`, PropertiesPanel **Audio** mixer tool-screen (cloned from the Lights screen) and an object **Sound** drilldown. **Gotcha**: `THREE.Audio.setVolume` uses `setTargetAtTime`, frozen while the `AudioContext` is suspended (autoplay policy) — gains converge only after a real user gesture resumes it (the Play button). Verified in-browser end-to-end. Plan: `plans/phase-36-audio.md`; acceptance: `test-plans/phase-36-audio.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -966,6 +967,8 @@ world-editor/
 │   ├── scripting/
 │   │   ├── ScriptEngine.ts         ← Runtime: trigger index, condition eval, action dispatch
 │   │   └── GameState.ts            ← Generic runtime state store (see GAMEPLAY_STATE.md; replaced GameStateManager)
+│   ├── audio/                      ← Phase 36 — audio system
+│   │   └── AudioSystem.ts          ← AudioListener + music/ambient/positional playback + 4-bus mixer (both roots)
 │   ├── input/                      ← preview-mode input (Phase 24; editor input = core/InputManager)
 │   │   ├── actions.ts              ← ActionState struct + InputSource interface
 │   │   ├── bindings.ts             ← BindingsConfig, defaults, localStorage load/save
@@ -1104,6 +1107,11 @@ The canonical save/load format. All builders read exclusively from this structur
       "position": { "x": 0, "y": 0, "z": 0 },
       "zoneId": "zone_001",
       "facing": 0
+    },
+    "audio": {
+      "music":   { "soundId": "theme_01", "volume": 0.7, "loop": true },
+      "ambient": { "soundId": "wind_loop", "volume": 0.5 },
+      "mix":     { "master": 1, "music": 1, "sfx": 1, "ambient": 1 }
     }
   },
   "terrain": {
@@ -1211,7 +1219,8 @@ The canonical save/load format. All builders read exclusively from this structur
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
-          }
+          },
+          "sound": { "soundId": "campfire_loop", "volume": 0.8, "loop": true, "refDistance": 2, "maxDistance": 15 }
         }
       ]
     }
@@ -2817,6 +2826,12 @@ remote origin. `initMaterials` / `initAssets` / `initDecals` also take
 `opts?: { verifyFiles?: boolean }` — the runtime passes `false` because
 cross-origin HEAD checks 405 on some static hosts, and a false negative hides
 every asset (magenta world).
+
+**Audio (Phase 36):** `initAudio(opts?)` fetches `/assets/audio/manifest.json` into a
+`_soundRegistry` (same missing-file HEAD-filter pattern), with `getSoundDef` /
+`getSoundList` / `updateSound` / `removeSounds` / `isSoundMissing` accessors and
+`loadSound(id)` → cached `AudioBuffer` via `THREE.AudioLoader` (base-url resolved like the
+other loaders). Consumed by `src/audio/AudioSystem.ts`.
 
 ```js
 class AssetManager {
@@ -5792,7 +5807,10 @@ Key behaviours:
 
 | Action | Implementation |
 |---|---|
-| `play_sound` | `bus.emit('audio:play', { id, position })` |
+| `play_sound` | `bus.emit('audio:play', { id, position?, volume?, loop? })` → AudioSystem (Phase 36). Positional when the action has a target (`_resolveTargets` + `_resolveObjectPose` supply the position); otherwise a non-positional one-shot |
+| `stop_sound` | `bus.emit('audio:stop', { id })` — stop live one-shots of that sound id (Phase 36) |
+| `play_music` | `bus.emit('music:play', { soundId, volume?, loop?, fade? })` — AudioSystem swaps the current music track, optional crossfade (Phase 36) |
+| `stop_music` | `bus.emit('music:stop', { fade? })` — AudioSystem fades out / stops music (Phase 36) |
 | `show_dialogue` | resolves `action.dialogueId` via `findDialogue()` → `DialogueRunner.start(tree)`; the runner emits `dialogue:show` per node with condition-filtered `options[]` (Phase 30; legacy inline `action.dialogue` is handled by `migrateDialogues` on load — no runtime fallback since v4.24.1) |
 | `move_object` | Find mesh by editorId, tween to target position |
 | `play_animation` | Find mixer by editorId, play named clip |
@@ -5839,8 +5857,15 @@ src/
 "character:interact":       { objectId: string };
 "character:interact-range": { objectId: string; label: string } | null;
 
-// Phase 10.5
-"audio:play":               { id: string; position?: Vec3 };
+// Phase 10.5 (consumer shipped Phase 36 — see the audio events below)
+"audio:play":               { id: string; position?: Vec3; volume?: number; loop?: boolean; key?: string };
+// Phase 36 — Audio System (consumed by src/audio/AudioSystem.ts)
+"audio:stop":               { id?: string; key?: string };
+"music:play":               { soundId: string; volume?: number; loop?: boolean; fade?: number };
+"music:stop":               { fade?: number };
+"world:audio":              { audio: WorldAudio };        // authored scene mix/ambient/music (editor) — mirrors world:lighting
+"audio:player-mix":         { mix: AudioMix };            // PauseMenu player sliders (multiplies over authored)
+"sounds:loaded":            { sounds: SoundDef[] };
 "dialogue:show":            { speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] };  // options added Phase 30
 "dialogue:choose":          { index: number };   // Phase 30 — overlay → DialogueRunner option pick
 "object:despawn":           { id: string };
@@ -5861,7 +5886,7 @@ Actions and triggers that are registered but not yet implemented, and where they
 | `play_animation` | console.warn | Phase 10.9 (wire to the Phase 10.7 mixer/clip system) |
 | `change_material` | console.warn | Phase 10.9 (needs `WorldObject.material` + runtime mesh swap — see note below) |
 | `fade_screen` | bus event fires, no visual | Phase 10.9 (`<FadeOverlay>` component listening to `overlay:fade-in`) |
-| `play_sound` | bus event only, no audio | Phase 12 (Audio system — sound asset manifest, positional audio) |
+| `play_sound` | **implemented** | Phase 36 — shipped (AudioSystem consumes `audio:play`; sound manifest + positional audio) |
 | `open_door` / `close_door` | console.warn | Phase 13 (NPC + door animation system) |
 | `spawn_npc` | console.warn | Phase 13 (NPC system) |
 | `on_health_zero` | never fires | Phase 13 (NPC/enemy health system) |
@@ -6874,7 +6899,7 @@ src/types.ts                  ← bus event selection:set
 - **Item system** — **shipped Phase 32 (v4.26.0)** as an identity layer over gameState (`ItemDef` registry in `WorldConfig.items`, counts at `inv.<id>`, `give_item`/`take_item`/`has_item` with editor pickers, view-only bag overlay with swappable styles, stackable via `stackSize`, item icons). Still future: item *use*/consume/equip effects, pickup-object convenience property, loot tables.
 - **Dialogue system** — **shipped Phase 30 (v4.24.0)**: branching dialogue trees (`DialogueTreeDef` zone registry + DialogueRunner), conversation UI with response options, DIALOGUE-tab editor. See `DIALOGUES.md`.
 - **Quest system** — quest definitions, objectives, completion conditions, quest log UI.
-- **Audio system** — sound asset manifest, positional audio, ambient loops, music tracks, audio mixer.
+- **Audio system** — **shipped Phase 36 (v4.30.0)**: sound-asset manifest (`public/assets/audio/manifest.json` + `AssetManager.initAudio`), `src/audio/AudioSystem.ts` (`THREE.AudioListener` on the player camera, `preview:start`/`stop` lifecycle), ambient loops + background music (`WorldConfig.audio`), positional/spatial audio (`WorldObject.sound` emitters + positional `play_sound`), and a 4-bus mixer (authored `WorldConfig.audio.mix` + player PauseMenu sliders). Actions `play_sound`/`stop_sound`/`play_music`/`stop_music`. Still future: reverb/audio zones, ducking, occlusion-aware attenuation.
 - **Navmesh** — walkable surface generation from Rapier floor colliders, NPC pathfinding via Recast/Detour.
 - **Export** — export as self-contained playable HTML (bakes textures as base64, bundles scripts).
 - **Multiplayer** — out of scope for now, noted for future.
