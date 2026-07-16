@@ -3425,23 +3425,25 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onMaterialChange={id => onObjectUpdate({ riserMaterial: id, riserMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
         onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
+        extraTilingControls={
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
+              <span>TEXTURE VARIATION</span>
+              <span style={{ color: "#808090" }}>{Math.round(riserJitter * 100)}%</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.01} value={riserJitter}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setRiserJitter(v);
+                schedule(() => commitJitter(v));
+              }}
+              onPointerUp={() => flush(() => commitJitter(riserJitter))}
+              style={{ width: "100%", accentColor: "#80aaff" }}
+            />
+          </div>
+        }
       />
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
-          <span>TEXTURE VARIATION</span>
-          <span style={{ color: "#808090" }}>{Math.round(riserJitter * 100)}%</span>
-        </div>
-        <input
-          type="range" min={0} max={1} step={0.01} value={riserJitter}
-          onChange={e => {
-            const v = Number(e.target.value);
-            setRiserJitter(v);
-            schedule(() => commitJitter(v));
-          }}
-          onPointerUp={() => flush(() => commitJitter(riserJitter))}
-          style={{ width: "100%", accentColor: "#80aaff" }}
-        />
-      </div>
       {stair?.landing && (
         <MaterialSection
           key={selected.id + ":landing"}
@@ -3679,6 +3681,7 @@ function VertScreen({ selected, onObjectUpdate }: {
 function MaterialSection({
   label = "MATERIAL", defaultExpanded = true,
   materialList, currentMaterialId, overrides, onMaterialChange, onOverridesChange, onAddMaterial,
+  extraTilingControls,
 }: {
   label?:            string;
   defaultExpanded?:  boolean;
@@ -3688,6 +3691,7 @@ function MaterialSection({
   onMaterialChange:  (id: string) => void;
   onOverridesChange: (ov: MaterialOverrides) => void;
   onAddMaterial:     () => void;
+  extraTilingControls?: React.ReactNode;   // rendered with the TILE/OFFSET cluster (e.g. riser TEXTURE VARIATION)
 }) {
   const baseDef = materialList.find(m => m.id === currentMaterialId);
   const isColorMode = !!overrides?.color;
@@ -3911,6 +3915,8 @@ function MaterialSection({
           style={{ ...NUM_INPUT, padding: "3px 6px", fontSize: 10 }}
         />
       </div>
+
+      {extraTilingControls}
 
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 8 }}>
         <div style={{ ...LABEL, marginBottom: 6 }}>MAPS</div>
