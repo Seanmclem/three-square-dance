@@ -326,8 +326,14 @@ export class StairBuilder {
         const gy = (c[2]-a[2])*(b[0]-a[0]) - (c[0]-a[0])*(b[2]-a[2]);
         const gz = (c[0]-a[0])*(b[1]-a[1]) - (c[1]-a[1])*(b[0]-a[0]);
         const flip = gx*n[0] + gy*n[1] + gz*n[2] < 0;
-        const [B, D] = flip ? [d, b] : [b, d];
-        pushQuad(landAcc, ...a, ...B, ...c, ...D, ...n, uScl, vScl);
+        if (flip) {
+          // Reversed winding (a, d, c, b) with each corner keeping its own UV,
+          // so mirrored frames don't transpose the U/V tiling axes.
+          pushQuadUV(landAcc, ...a, ...d, ...c, ...b, ...n,
+                     0, 0,  0, vScl,  uScl, vScl,  uScl, 0);
+        } else {
+          pushQuad(landAcc, ...a, ...b, ...c, ...d, ...n, uScl, vScl);
+        }
       };
 
       const du = l.uMax - l.uMin, dv = l.vMax - l.vMin, dh = l.topY - l.bottomY;
