@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest } from "@/types";
 
 export type { MaterialDef };
 
@@ -17,9 +17,13 @@ export class AssetManager {
   private _soundRegistry:   Record<string, SoundDef>    = {};
   private readonly _audioBufferCache = new Map<string, AudioBuffer>();
   private _audioLoader: THREE.AudioLoader | null = null;
+  private _skyboxRegistry:  Record<string, SkyboxDef>   = {};
+  private readonly _skyboxTextureCache = new Map<string, THREE.Texture>();
+  private _rgbeLoader: { loadAsync: (url: string) => Promise<THREE.DataTexture> } | null = null;
   private _missingAssetIds    = new Set<string>();
   private _missingMaterialIds = new Set<string>();
   private _missingSoundIds    = new Set<string>();
+  private _missingSkyboxIds   = new Set<string>();
   private _fallbackMat: THREE.MeshStandardMaterial | null = null;
   private _quality: QualityScale = 'high';
   private _baseUrl: string | null = null;
@@ -227,6 +231,82 @@ export class AssetManager {
     const buffer = await this._audioLoader.loadAsync(this._resolve(def.path));
     this._audioBufferCache.set(id, buffer);
     return buffer;
+  }
+
+  // ─── Skyboxes (Phase 37) ─────────────────────────────────────────────────────
+
+  /** Fetch manifest.json, populate the skybox registry, return the list. */
+  async initSkyboxes(opts?: { verifyFiles?: boolean }): Promise<SkyboxDef[]> {
+    try {
+      const res = await fetch(this._resolve('/assets/skyboxes/manifest.json'));
+      if (!res.ok) {
+        console.warn('AssetManager: no skybox manifest found — skybox picker will be empty');
+        this._skyboxRegistry = {};
+        return [];
+      }
+      const manifest: SkyboxManifest = await res.json();
+      const checks = opts?.verifyFiles === false
+        ? manifest.skyboxes.map(() => true)
+        : await Promise.all(manifest.skyboxes.map(s => this._fileExists(s.path)));
+      const present = manifest.skyboxes.filter((_, i) => checks[i]);
+      this._missingSkyboxIds = new Set(manifest.skyboxes.filter((_, i) => !checks[i]).map(s => s.id));
+      if (this._missingSkyboxIds.size)
+        console.info(`AssetManager: ${this._missingSkyboxIds.size} skybox(es) missing files, hidden:`, [...this._missingSkyboxIds]);
+      this._skyboxRegistry = Object.fromEntries(present.map(s => [s.id, s]));
+      return present;
+    } catch (err) {
+      console.warn('AssetManager: failed to load skybox manifest', err);
+      this._skyboxRegistry = {};
+      return [];
+    }
+  }
+
+  getSkyboxDef(id: string): SkyboxDef | undefined { return this._skyboxRegistry[id]; }
+  getSkyboxList(): SkyboxDef[] { return Object.values(this._skyboxRegistry); }
+  isSkyboxMissing(id: string): boolean { return this._missingSkyboxIds.has(id); }
+
+  /** Merge a metadata patch into a registry skybox entry (attribution merged one level deep). */
+  updateSkybox(id: string, patch: Partial<SkyboxDef>): void {
+    const def = this._skyboxRegistry[id];
+    if (!def) return;
+    this._skyboxRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
+  }
+
+  /** Drop skyboxes from the registry (and their textures) after a manifest delete. */
+  removeSkyboxes(ids: string[]): void {
+    for (const id of ids) {
+      delete this._skyboxRegistry[id];
+      const tex = this._skyboxTextureCache.get(id);
+      if (tex) { tex.dispose(); this._skyboxTextureCache.delete(id); }
+    }
+  }
+
+  /**
+   * Load a skybox as an equirectangular texture (cached). LDR (jpg/png) goes through
+   * the shared TextureLoader; HDR (.hdr) lazily constructs an RGBELoader. The returned
+   * texture is tagged EquirectangularReflectionMapping so it works as both
+   * scene.background and a PMREMGenerator.fromEquirectangular source.
+   */
+  async loadSkybox(id: string): Promise<THREE.Texture> {
+    const cached = this._skyboxTextureCache.get(id);
+    if (cached) return cached;
+    const def = this._skyboxRegistry[id];
+    if (!def) throw new Error(`AssetManager: unknown skybox "${id}"`);
+    let tex: THREE.Texture;
+    if (def.format === 'hdr') {
+      if (!this._rgbeLoader) {
+        // RGBELoader defaults to HalfFloatType output — good for PMREM + background.
+        const { RGBELoader } = await import('three/addons/loaders/RGBELoader.js');
+        this._rgbeLoader = new RGBELoader();
+      }
+      tex = await this._rgbeLoader.loadAsync(this._resolve(def.path));
+    } else {
+      tex = await this._textureLoader.loadAsync(this._resolve(def.path));
+      tex.colorSpace = THREE.SRGBColorSpace;
+    }
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    this._skyboxTextureCache.set(id, tex);
+    return tex;
   }
 
   /** HEAD-check a static file's existence (used to hide manifest entries with missing files). */
@@ -479,6 +559,11 @@ export class AssetManager {
     this._materialCache.clear();
     this._gltfCache.clear();
     this._audioBufferCache.clear();
+    // Skybox textures are quality-independent background images, so (unlike material
+    // textures) they are NOT cleared in setQuality — that would invalidate the live
+    // scene.background/environment. They are only released on full dispose.
+    this._skyboxTextureCache.forEach(t => t.dispose());
+    this._skyboxTextureCache.clear();
   }
 }
 

@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.29.9** — last updated 2026-07-15
+**Version 4.31.0** — last updated 2026-07-15
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -143,6 +143,7 @@
 - v4.30.2 — **Phase 36 follow-up — character locomotion audio (footsteps / jump / land).** `PlayerSettings` gains `jumpSound` / `landSound` / `footstepSound` (SoundDef ids) + `footstepDistance` (stride, default 1.8 m). `CharacterController` emits them as non-positional SFX-bus `audio:play` one-shots: **jump** at takeoff (in the physics jump block), **footsteps** every `footstepDistance` metres of *actual* horizontal travel while grounded + moving, **land** on the airborne→grounded transition. Land is **physics-based** (gated on air-time > `COYOTE_SEC` so ground-stick flicker while walking never false-triggers it) — deliberately NOT in the anim state machine, so it works even with no animated model (`_updateAnim` early-returns without a mixer). Edited in a **CHARACTER SOUNDS** section on the Audio tool-screen (backed by `playerSettings` / `onPlayerSettingsChange`). Verified with deterministic frame-stepping: 4 footsteps over 6.9 m (1.5 m stride) with **zero** false lands while walking; jump + land each fire exactly once per hop; both mixer-independent. No combat/death hooks — there is no player health/damage system (`on_health_zero` remains an unfired stub).
 - v4.30.3 — **Phase 36 follow-up — runtime footstep swap + `AUDIO.md`.** New `set_footstep` script action → `character:set-footstep { sound? }`; `CharacterController` holds a `_footstepOverride` (override ?? authored default; empty reverts). Canonical use: `on_player_enter`/`on_player_exit` on a surface trigger volume (wood → gravel → wood). Verified through the real dispatch with deterministic stepping: default `blip_test`×4 → override `music_test`×4 → cleared `blip_test`×4. New consolidated feature doc **`AUDIO.md`** (library / ambient+music / positional emitters / character sounds / actions / mixer) — includes a **"Not built: combat/death"** section documenting that there is no player health/damage system (`on_health_zero` is an unfired stub) and how to script hit/death *reactions* out of existing pieces (`health` state + `on_state_changed` + `compare_number` + `play_animation`/`play_sound`).
 - v4.30.4 — **Phase 36 follow-up — sound metadata editing + attribution + credits.** Sounds reach parity with models/materials: the `AudioImporterModal` gains an **`AttributionFields`** block (shared per batch, written into each `SoundDef.attribution`); the AudioBrowser Manage mode gains an **Edit** button → the shared `EditMetadataDialog` (`noun` union += `"sound"`) for rename / recategorize / attribution (single + multi-select), wired via `handleRequestSoundEdit` / `handleConfirmSoundEdit` (read-modify-write `audio/manifest.json` + `assetManager.updateSound`, mirroring the material edit flow). **`CreditsModal`** takes a `sounds` prop and groups them alongside materials/assets (author → pack, license badges, `N sounds` count); `PropertiesPanel` threads `sounds` through. Verified in-browser: Credits shows "Synthesized fixture · CC0 · 3 sounds"; `updateSound` merges label/category/attribution; the EDIT SOUND dialog renders LABEL/CATEGORY/AUTHOR/LICENSE.
+- v4.31.0 — **Phase 37 — Skyboxes (selectable/importable image backgrounds).** Made the long-dead `WorldConfig.skybox` field real: it now discriminates `"sky"` (the built-in procedural `three/addons/objects/Sky.js`, default) from a **SkyboxDef id** (an equirectangular image that becomes `scene.background` **and** `scene.environment`). **Manifest** mirrors audio/decals: `public/assets/skyboxes/manifest.json` (`SkyboxManifest { version, skyboxes: SkyboxDef[] }`; `SkyboxDef { id, label, category, path, format:'ldr'|'hdr', thumbnail?, tags, dateAdded, attribution? }`), loaded by **`AssetManager.initSkyboxes()`** (+ `getSkyboxList`/`getSkyboxDef`/`updateSkybox`/`removeSkyboxes`, and **`loadSkybox(id)`** → cached equirect `THREE.Texture`: LDR via the shared `TextureLoader` (`SRGBColorSpace`), HDR via a lazily-imported **`RGBELoader`**; both tagged `EquirectangularReflectionMapping`. Skybox textures are quality-independent so — unlike material textures — they're NOT cleared in `setQuality`, only on `dispose`). **Application** lives in `SceneManager` (see its section): a `world:sky` ctor subscription + `_applySkybox` that toggles the procedural `Sky` mesh vs an image background, regenerates the PMREM env map from the image (old one disposed), and guards stale async loads with `_skyReqToken`; `environmentIntensity` still multiplies the active env map. Because both roots build a `SceneManager` and `WorldState.loadFromJSON` re-emits `world:sky`, it works in editor **and** runtime with one implementation (RuntimeApp awaits `initSkyboxes` alongside `initMaterials` so the registry is ready before the scene's `world:sky` fires; the editor does the same before its scene load — otherwise a saved image skybox would fail to load cold and fall back to procedural). **Data/bus** (additive, no migration): `WorldState.updateWorldSky(skybox)` (non-journaled, like lighting/audio), events `world:sky { skybox }` + `skyboxes:loaded { skyboxes }`. **Editor UI**: SKYBOX toolbar panel (`IconSkybox`) → **`SkyboxBrowser`** (thumbnail grid — a leading "Procedural Sky" tile + one per SkyboxDef, active tile highlighted; Import + Manage/Edit/Delete, mirroring `AudioBrowser`) and **`SkyboxImporterModal`** (FSA import of `.jpg/.png/.hdr` → dedupe-splice `manifest.json`, cloned from `AudioImporterModal`); metadata edit via the shared `EditMetadataDialog` (`noun` += `"skybox"`). Ships **3 procedural starter equirects** (`clear_day`/`sunset`/`night_sky`, generated with a zero-dep PNG encoder). Deliberately **not** wired: `fogColor`/`fogDensity` (still dead, hardcoded sky-blue fog) and 6-face cubemaps. Verified in-browser end-to-end (real toolbar/tile clicks): sunset applies live (bg=Texture @ EquirectReflection, env regenerated, Sky mesh hidden) + persists to `toJSON`, renders in preview/game mode, revert to Procedural Sky restores bg=null + Sky visible + RoomEnvironment; zero console errors. Plan: `plans/phase-37-skyboxes.md`; acceptance: `test-plans/phase-37-skyboxes.md`.
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -330,7 +331,11 @@ export interface PlayerSettings {
   thirdPersonHeight:    number;
 }
 
-// ⏳ Phase 7 — not yet implemented
+// ⚠️ NEVER IMPLEMENTED as written. The procedural Sky's turbidity/rayleigh/sun-angle
+// stay hardcoded in SceneManager._setupSky(). Phase 37 (v4.31.0) instead shipped
+// *selectable image skyboxes*: WorldConfig.skybox is a real value now — "sky" = the
+// procedural sky, any other string = a SkyboxDef id (see below). This SkyConfig
+// scrubbing interface was never built and is kept only as a historical marker.
 export interface SkyConfig {
   turbidity:        number;
   rayleigh:         number;
@@ -338,6 +343,20 @@ export interface SkyConfig {
   mieDirectionalG:  number;
   sunElevation:     number;
   sunAzimuth:       number;
+}
+
+// Phase 37 (v4.31.0) — selectable/importable skybox library. Manifest at
+// public/assets/skyboxes/manifest.json, loaded by AssetManager.initSkyboxes().
+export interface SkyboxDef {
+  id:        string;
+  label:     string;
+  category:  string;                // 'Day' | 'Sunset' | 'Night' | 'Space' | 'Studio' | 'Other'
+  path:      string;                // equirectangular image (/assets/skyboxes/*.jpg|png|hdr)
+  format:    'ldr' | 'hdr';         // ldr = TextureLoader; hdr = RGBELoader (lazy import)
+  thumbnail?: string;
+  tags:      string[];
+  dateAdded: string;
+  attribution?: Attribution;
 }
 
 // ⏳ Phase 9 — not yet implemented
@@ -351,7 +370,7 @@ export interface WorldConfig {
   size:           { width: number; depth: number };
   ambientLight:   { color: string; intensity: number };
   sunLight:       { color: string; intensity: number; position: Vec3 };
-  skybox:         string;        // sky material id — sky: SkyConfig planned ⏳ Phase 7
+  skybox:         string;        // Phase 37: "sky" = procedural, else a SkyboxDef id (image bg + IBL)
   fogColor:       string;
   fogDensity:     number;
   playerSettings: PlayerSettings;
@@ -1947,6 +1966,16 @@ Owns the renderer, scene, RAF loop, lighting/sky/grid setup, and camera selectio
 > term from the PMREM RoomEnvironment). Ambient 0 + sun 0 + environment 0 = a truly
 > dark scene lit only by placed lights (verified: center-floor pixel [32,42,50] →
 > [5,8,9]).
+>
+> **v4.31.0 (Phase 37):** skybox selection. The ctor also subscribes to **`world:sky`**
+> (`{ skybox }`, emitted by `WorldState.updateWorldSky` on edit and by `loadFromJSON` on
+> load). `_applySkybox(id)`: `"sky"` shows the procedural `Sky` mesh, `scene.background =
+> null`, and restores the RoomEnvironment env map; any other id `assetManager.loadSkybox`s
+> an equirectangular image → hides the `Sky` mesh, sets `scene.background = tex`, and
+> `scene.environment = PMREMGenerator.fromEquirectangular(tex)` (regenerated, old one
+> disposed). A `_skyReqToken` guards against a slow load clobbering a newer selection;
+> `environmentIntensity` (from `world:lighting`) still multiplies whichever env map is
+> active. Both roots get it (App + RuntimeApp share SceneManager).
 `_loop()` each frame: `editorCamera?.update(dt)` (only when no preview camera),
 update callbacks (physics step, character, mixers), then
 `renderer.render(scene, _previewCamera ?? camera)`. `setPreviewCamera(cam)` is the
@@ -3453,6 +3482,13 @@ export const csgSubtract = (meshA, meshB) => {
 
 ### Phase 3 — Physics Foundation + Sky + Floor Tool
 Rapier goes in here, not later. Every subsequent builder depends on it.
+
+> **Reality vs the spec below:** the procedural sky shipped hardcoded (no `WorldConfig.sky`
+> scrubbing UI was ever built), `scene.environment` comes from `RoomEnvironment` (not the
+> sky), and `scene.fog` is a hardcoded `FogExp2(0x87ceeb, 0.006)` — `fogColor`/`fogDensity`
+> remain dead fields. **Phase 37 (v4.31.0)** made `WorldConfig.skybox` real instead: an
+> image-skybox layer on top of the procedural sky (see the v4.31.0 changelog entry and
+> `SkyboxDef`). The `sky: {...}` block below was never added to `WorldConfig`.
 
 **Sky setup (SceneManager addition):**
 - Import `Sky` from `three/addons/objects/Sky.js`

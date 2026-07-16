@@ -1,8 +1,9 @@
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
 import { AudioBrowser } from "@/ui/AudioBrowser";
+import { SkyboxBrowser } from "@/ui/SkyboxBrowser";
 import { DecalBrowser } from "@/ui/DecalBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
@@ -24,6 +25,12 @@ interface LeftPanelProps {
   onSoundImport:    () => void;
   onDeleteSounds:   (ids: string[]) => void;
   onEditSounds:     (ids: string[]) => void;
+  skyboxes:         SkyboxDef[];
+  selectedSkybox:   string;
+  onSkyboxSelect:   (id: string) => void;
+  onSkyboxImport:   () => void;
+  onDeleteSkyboxes: (ids: string[]) => void;
+  onEditSkyboxes:   (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   hiddenGroupIds:  Set<string>;
@@ -71,6 +78,7 @@ export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onDeleteSounds, onEditSounds,
+  skyboxes, selectedSkybox, onSkyboxSelect, onSkyboxImport, onDeleteSkyboxes, onEditSkyboxes,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
@@ -147,6 +155,16 @@ export function LeftPanel({
                 onImport={onSoundImport}
                 onDeleteSounds={onDeleteSounds}
                 onEdit={onEditSounds}
+              />
+            )}
+            {panelId === "skybox" && (
+              <SkyboxBrowser
+                skyboxes={skyboxes}
+                selectedId={selectedSkybox}
+                onSelect={onSkyboxSelect}
+                onImport={onSkyboxImport}
+                onDeleteSkyboxes={onDeleteSkyboxes}
+                onEdit={onEditSkyboxes}
               />
             )}
             {panelId === "decals" && (

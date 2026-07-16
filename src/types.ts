@@ -51,7 +51,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | null;
 
 export interface GroupDef {
   id:   string;
@@ -113,6 +113,30 @@ export interface SoundDef {
 export interface SoundManifest {
   version: string;
   sounds:  SoundDef[];
+}
+
+// ─── Skybox asset types (Phase 37) ────────────────────────────────────────────
+// Equirectangular background/environment images. Mirrors SoundDef/SoundManifest:
+// one manifest at public/assets/skyboxes/manifest.json, loaded by
+// AssetManager.initSkyboxes(). The special WorldConfig.skybox value "sky" selects
+// the built-in procedural Sky instead of any of these.
+export type SkyboxCategory = 'Day' | 'Sunset' | 'Night' | 'Space' | 'Studio' | 'Other' | (string & {});
+
+export interface SkyboxDef {
+  id:           string;
+  label:        string;
+  category:     SkyboxCategory;
+  path:         string;          // /assets/skyboxes/<file>.(jpg|png|hdr) — equirectangular
+  format:       'ldr' | 'hdr';   // ldr = TextureLoader (jpg/png); hdr = RGBELoader
+  thumbnail?:   string;
+  tags:         string[];
+  dateAdded:    string;
+  attribution?: Attribution;
+}
+
+export interface SkyboxManifest {
+  version:  string;
+  skyboxes: SkyboxDef[];
 }
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
@@ -306,6 +330,10 @@ export interface BusEvents {
   // Player-preference mix from the PauseMenu sliders (multiplies over authored mix).
   "audio:player-mix":      { mix: AudioMix };
   "sounds:loaded":         { sounds: SoundDef[] };
+  // Skybox (Phase 37) — `skybox` is a SkyboxDef id, or "sky" for the procedural sky.
+  // Consumed by SceneManager (swaps scene.background + environment). Mirrors "world:lighting".
+  "world:sky":             { skybox: string };
+  "skyboxes:loaded":       { skyboxes: SkyboxDef[] };
   "dialogue:show":         { speaker: string; lines: string[]; portrait?: string;
                              // Branching trees: response options for the current node,
                              // pre-filtered by conditions. hasNext=false ⇒ selecting ends.

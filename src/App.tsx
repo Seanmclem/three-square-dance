@@ -60,6 +60,7 @@ import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { AudioImporterModal } from "@/ui/AudioImporterModal";
+import { SkyboxImporterModal } from "@/ui/SkyboxImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
@@ -69,7 +70,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -144,6 +145,10 @@ export default function App() {
   const [sounds,          setSounds]           = useState<SoundDef[]>([]);
   const [audioImporterOpen, setAudioImporterOpen] = useState(false);
   const [pendingSoundEdit, setPendingSoundEdit] = useState<PendingEdit | null>(null);
+  const [skyboxDir,       setSkyboxDir]        = useState<FileSystemDirectoryHandle | null>(null);
+  const [skyboxes,        setSkyboxes]         = useState<SkyboxDef[]>([]);
+  const [skyboxImporterOpen, setSkyboxImporterOpen] = useState(false);
+  const [pendingSkyboxEdit, setPendingSkyboxEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
   // Hint pill shown while a bake-related native picker is open (which dialog is which).
@@ -197,6 +202,9 @@ export default function App() {
   });
   // Scene-level audio (WorldConfig.audio) — synced from the world:audio bus event (Phase 36).
   const [worldAudio, setWorldAudio] = useState<WorldAudio | undefined>(undefined);
+  // Selected skybox (WorldConfig.skybox) — synced from the world:sky bus event (Phase 37).
+  // "sky" = built-in procedural sky.
+  const [worldSkybox, setWorldSkybox] = useState<string>("sky");
   const [deletePrompt,    setDeletePrompt]     = useState<{ type: "volume" | "object"; id: string; zoneId: string; scripts: ScriptDef[] } | null>(null);
   const fileHandleRef  = useRef<FileSystemFileHandle | null>(null);
   const restoringRef   = useRef(false);
@@ -245,6 +253,13 @@ export default function App() {
       setSounds(defs);
       bus.emit("sounds:loaded", { sounds: defs });
     }).catch(err => console.error("initAudio failed:", err));
+    // Awaited before the scene load (below) so the registry is ready when the loaded
+    // scene's world:sky fires — otherwise a saved image skybox would fail to _applySkybox
+    // on cold load and silently fall back to the procedural sky.
+    const skyboxesReady = assetManager.initSkyboxes().then(defs => {
+      setSkyboxes(defs);
+      bus.emit("skyboxes:loaded", { skyboxes: defs });
+    }).catch(err => console.error("initSkyboxes failed:", err));
     const world     = new WorldState(bus);
     worldRef.current = world;
     const objectPlacer = new ObjectPlacer(bus);
@@ -404,7 +419,7 @@ export default function App() {
       // Wait for physics (WASM) and material registry together. physicsWorld.init() wins the
       // race against initMaterials() on fast hardware, leaving _materialRegistry empty when
       // WallBuilder.build first calls getMaterial() — walls render gray. Awaiting both fixes it.
-      await Promise.all([physicsWorld.init(), materialsReady]);
+      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady]);
       if (!active) return; // StrictMode first mount: cleanup already fired, bail out
 
       const savedJson = localStorage.getItem('worldeditor_autosave');
@@ -736,6 +751,7 @@ export default function App() {
       }),
       bus.on("world:lighting", ({ ambient, sun, envIntensity }) => setWorldLighting({ ambient, sun, envIntensity: envIntensity ?? 1 })),
       bus.on("world:audio", ({ audio }) => setWorldAudio(audio)),
+      bus.on("world:sky", ({ skybox }) => setWorldSkybox(skybox)),
       bus.on("spawn:placed", () => {
         // The initial spawn is singular; break out of placing mode after setting it.
         queueMicrotask(() => {
@@ -1326,6 +1342,14 @@ export default function App() {
     setIsDirty(true);
   }, []);
 
+  const handleWorldSkyChange = useCallback((skybox: string): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    // Emits world:sky → SceneManager swaps background/environment; bus listener syncs panel.
+    world.updateWorldSky(skybox);
+    setIsDirty(true);
+  }, []);
+
   const handleSpawnPositionChange = useCallback((pos: Vec3): void => {
     const world = worldRef.current;
     if (!world?.world?.defaultSpawn) return;
@@ -1792,6 +1816,79 @@ export default function App() {
     } catch (err) { console.error("sound edit failed:", err); return; }
     pending.ids.forEach(id => assetManager.updateSound(id, patch as Partial<SoundDef>));
     setSounds(assetManager.getSoundList());
+  };
+
+  const handleSkyboxesReload = (): void => {
+    assetManager.initSkyboxes().then(defs => {
+      setSkyboxes(defs);
+      busRef.current.emit("skyboxes:loaded", { skyboxes: defs });
+    }).catch(err => console.error("skyboxes reload failed:", err));
+  };
+
+  // Delete skyboxes: drop from the manifest + remove the image, then evict from the registry.
+  const handleDeleteSkyboxes = async (ids: string[]): Promise<void> => {
+    if (!ids.length) return;
+    let dir = skyboxDir;
+    if (!dir) {
+      try {
+        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
+          .showDirectoryPicker({ mode: "readwrite" });
+        setSkyboxDir(dir);
+      } catch { return; }   // cancelled
+    }
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as SkyboxManifest;
+      const removed = data.skyboxes.filter(s => ids.includes(s.id));
+      data.skyboxes = data.skyboxes.filter(s => !ids.includes(s.id));
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+      for (const s of removed) {
+        const fname = s.path.split("/").pop();
+        if (fname) { try { await (dir as unknown as { removeEntry: (n: string) => Promise<void> }).removeEntry(fname); } catch { /* missing — ignore */ } }
+      }
+    } catch (err) {
+      console.error("skybox delete failed:", err);
+      return;
+    }
+    assetManager.removeSkyboxes(ids);
+    setSkyboxes(prev => prev.filter(s => !ids.includes(s.id)));
+    // If the deleted skybox was active, fall back to the procedural sky.
+    if (ids.includes(worldSkybox)) handleWorldSkyChange("sky");
+  };
+
+  // Open the skybox metadata editor (label / category / attribution) for one or more skyboxes.
+  const handleRequestSkyboxEdit = (ids: string[]): void => {
+    const defs = ids.map(id => skyboxes.find(s => s.id === id)).filter(Boolean) as SkyboxDef[];
+    if (!defs.length) return;
+    const single = defs.length === 1;
+    setPendingSkyboxEdit({
+      ids, items: defs.map(d => ({ id: d.id, label: d.label })),
+      initial: {
+        label:       single ? defs[0]!.label : "",
+        category:    single ? (defs[0]!.category ?? "Day") : commonOr(defs.map(d => d.category ?? "Day")),
+        attribution: single ? (defs[0]!.attribution ?? {}) : {},
+      },
+    });
+  };
+
+  const handleConfirmSkyboxEdit = async (patch: EditPatch): Promise<void> => {
+    const pending = pendingSkyboxEdit;
+    setPendingSkyboxEdit(null);
+    if (!pending) return;
+    const dir = await ensureDir(skyboxDir, setSkyboxDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as SkyboxManifest;
+      data.skyboxes = data.skyboxes.map(s => pending.ids.includes(s.id) ? patchEntry(s, patch) : s);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("skybox edit failed:", err); return; }
+    pending.ids.forEach(id => assetManager.updateSkybox(id, patch as Partial<SkyboxDef>));
+    setSkyboxes(assetManager.getSkyboxList());
   };
 
   const handleAssetSelect = (id: string | null): void => {
@@ -2432,6 +2529,12 @@ export default function App() {
         onSoundImport={() => setAudioImporterOpen(true)}
         onDeleteSounds={handleDeleteSounds}
         onEditSounds={handleRequestSoundEdit}
+        skyboxes={skyboxes}
+        selectedSkybox={worldSkybox}
+        onSkyboxSelect={handleWorldSkyChange}
+        onSkyboxImport={() => setSkyboxImporterOpen(true)}
+        onDeleteSkyboxes={handleDeleteSkyboxes}
+        onEditSkyboxes={handleRequestSkyboxEdit}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}
@@ -2716,6 +2819,15 @@ SquareDance
         />
       )}
 
+      {skyboxImporterOpen && (
+        <SkyboxImporterModal
+          skyboxDir={skyboxDir}
+          onSkyboxDirSet={setSkyboxDir}
+          onComplete={() => { setSkyboxImporterOpen(false); handleSkyboxesReload(); }}
+          onClose={() => setSkyboxImporterOpen(false)}
+        />
+      )}
+
       {pendingMaterialDelete && (
         <DeleteAssetDialog
           labels={pendingMaterialDelete.labels}
@@ -2794,6 +2906,19 @@ SquareDance
           folderHint="public/assets/audio"
           onCancel={() => setPendingSoundEdit(null)}
           onSave={patch => void handleConfirmSoundEdit(patch)}
+        />
+      )}
+
+      {pendingSkyboxEdit && (
+        <EditMetadataDialog
+          items={pendingSkyboxEdit.items}
+          noun="skybox"
+          categoryOptions={["Day", "Sunset", "Night", "Space", "Studio", "Other"]}
+          initial={pendingSkyboxEdit.initial}
+          needsFolderGrant={!skyboxDir}
+          folderHint="public/assets/skyboxes"
+          onCancel={() => setPendingSkyboxEdit(null)}
+          onSave={patch => void handleConfirmSkyboxEdit(patch)}
         />
       )}
 

@@ -529,6 +529,22 @@ export class WorldState {
     this._bus.emit("world:audio", { audio: this.world.audio });
   }
 
+  /** Scene-level skybox selection ("sky" = procedural, else a SkyboxDef id). Not journaled
+   *  (matches lighting/audio/playerSettings). Applied live via world:sky in SceneManager. */
+  updateWorldSky(skybox: string): void {
+    if (!this.world) {
+      this.world = {
+        size: { width: 200, depth: 200 },
+        ambientLight: { color: "#aabbcc", intensity: 0.5 },
+        sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
+        skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
+        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+      };
+    }
+    this.world.skybox = skybox;
+    this._bus.emit("world:sky", { skybox });
+  }
+
   // ── Decal mutations ──────────────────────────────────────────────────────────
 
   addDecal(zoneId: string, decal: DecalDef): void {
@@ -757,5 +773,6 @@ export class WorldState {
       envIntensity: this.world.envIntensity ?? 1,
     });
     if (this.world?.audio) this._bus.emit("world:audio", { audio: this.world.audio });
+    this._bus.emit("world:sky", { skybox: this.world?.skybox ?? "sky" });
   }
 }

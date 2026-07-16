@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial, IconAudio } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconTriggerVolume, IconMaterial, IconAudio, IconSkybox } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
@@ -240,6 +240,33 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             <span style={{ fontSize: 6, letterSpacing: 0.5, color: audioActive ? "#80aaff" : "#7a7a7a",
                            opacity: 0.85, fontFamily: "monospace" }}>
               SOUNDS
+            </span>
+          </button>
+        );
+      })()}
+
+      {/* Skybox panel button */}
+      {(() => {
+        const skyActive = openPanel === "skybox";
+        return (
+          <button
+            title="Skybox panel"
+            onClick={() => onPanelToggle(skyActive ? null : "skybox")}
+            style={{
+              width: 48, height: 36, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: skyActive ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: skyActive ? "1px solid rgba(80,140,255,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!skyActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!skyActive) e.currentTarget.style.background = "transparent"; }}
+          >
+            <IconSkybox color={skyActive ? "#80aaff" : "#7a7a7a"} />
+            <span style={{ fontSize: 6, letterSpacing: 0.5, color: skyActive ? "#80aaff" : "#7a7a7a",
+                           opacity: 0.85, fontFamily: "monospace" }}>
+              SKYBOX
             </span>
           </button>
         );

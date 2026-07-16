@@ -233,8 +233,12 @@ export default function RuntimeApp() {
       assetManager.initAssets({ verifyFiles: false }).catch(err => console.error("initAssets failed:", err));
       assetManager.initDecals({ verifyFiles: false }).catch(err => console.error("initDecals failed:", err));
       assetManager.initAudio({ verifyFiles: false }).catch(err => console.error("initAudio failed:", err));
+      // Awaited below so the skybox registry is populated before the scene's world:sky
+      // fires (SceneManager._applySkybox needs the SkyboxDef to load its image).
+      const skyboxesReady = assetManager.initSkyboxes({ verifyFiles: false })
+        .catch(err => console.error("initSkyboxes failed:", err));
 
-      await Promise.all([physicsWorld.init(), materialsReady]);
+      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady]);
       if (!active) return;
 
       if (loaded) {

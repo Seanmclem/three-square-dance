@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "skyboxes": [
+    {
+      "id": "clear_day",
+      "label": "Clear Day",
+      "category": "Day",
+      "path": "/assets/skyboxes/clear_day.png",
+      "format": "ldr",
+      "thumbnail": "/assets/skyboxes/clear_day_thumb.png",
+      "tags": ["sky", "blue", "day", "outdoor"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Procedural fixture", "license": "CC0" }
+    },
+    {
+      "id": "sunset",
+      "label": "Sunset",
+      "category": "Sunset",
+      "path": "/assets/skyboxes/sunset.png",
+      "format": "ldr",
+      "thumbnail": "/assets/skyboxes/sunset_thumb.png",
+      "tags": ["sky", "sunset", "orange", "dusk"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Procedural fixture", "license": "CC0" }
+    },
+    {
+      "id": "night_sky",
+      "label": "Night Sky",
+      "category": "Night",
+      "path": "/assets/skyboxes/night_sky.png",
+      "format": "ldr",
+      "thumbnail": "/assets/skyboxes/night_sky_thumb.png",
+      "tags": ["sky", "night", "stars", "dark"],
+      "dateAdded": "2026-07-15",
+      "attribution": { "author": "Procedural fixture", "license": "CC0" }
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { Sky } from "three/addons/objects/Sky.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { ViewHelper } from "three/addons/helpers/ViewHelper.js";
 import { EditorCamera } from "@/editor/EditorCamera";
+import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { MeshUserData } from "@/types";
 
@@ -42,6 +43,15 @@ export class SceneManager {
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
 
+  // Skybox (Phase 37). The procedural Sky mesh + its RoomEnvironment env map are the
+  // "sky" default; an image skybox hides the mesh, sets scene.background, and swaps in
+  // a PMREM env map generated from the image. _skyReqToken guards stale async loads.
+  private _sky!:          Sky;
+  private _roomEnvMap:    THREE.Texture | null = null;   // RoomEnvironment PMREM (procedural)
+  private _skyboxEnvMap:  THREE.Texture | null = null;   // generated from an image skybox
+  private _skyReqToken    = 0;
+  private readonly _unsubSky: () => void;
+
   constructor(canvas: HTMLCanvasElement, bus: EventBus, opts?: { mode?: "editor" | "game" }) {
     const editor = (opts?.mode ?? "editor") === "editor";
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -75,6 +85,8 @@ export class SceneManager {
       this._rimLight.intensity  = sun.intensity * 0.15;
       this.scene.environmentIntensity = envIntensity ?? 1;
     });
+    // Skybox selection (WorldState emits on load and on panel edits). "sky" = procedural.
+    this._unsubSky = bus.on("world:sky", ({ skybox }) => this._applySkybox(skybox));
     if (editor) this._setupGrid();   // grid helpers + demo ground are editor furniture
 
     if (editor) {
@@ -119,7 +131,7 @@ export class SceneManager {
   }
 
   private _setupSky(): void {
-    const sky = new Sky();
+    const sky = this._sky = new Sky();
     sky.scale.setScalar(450000);
     this.scene.add(sky);
 
@@ -142,12 +154,45 @@ export class SceneManager {
 
     // Generate env map for reflections
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    const envMap = pmrem.fromScene(new RoomEnvironment()).texture;
-    this.scene.environment = envMap;
+    this._roomEnvMap = pmrem.fromScene(new RoomEnvironment()).texture;
+    this.scene.environment = this._roomEnvMap;
     pmrem.dispose();
 
     // Atmospheric fog derived from sky
     this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.006);
+  }
+
+  /**
+   * Phase 37 — apply the selected skybox. "sky" (the default) is the procedural Sky
+   * mesh + RoomEnvironment IBL; any other id is a SkyboxDef loaded as an equirectangular
+   * image that becomes scene.background and (via PMREM) scene.environment. Async loads
+   * are guarded by a request token so a fast re-selection can't be clobbered by a slow
+   * earlier load. environmentIntensity (driven by world:lighting) still multiplies the
+   * active env map, so ENVIRONMENT works the same for procedural and image skyboxes.
+   */
+  private _applySkybox(skyboxId: string): void {
+    const token = ++this._skyReqToken;
+    if (!skyboxId || skyboxId === "sky") {
+      this._sky.visible = true;
+      this.scene.background = null;
+      this.scene.environment = this._roomEnvMap;
+      if (this._skyboxEnvMap) { this._skyboxEnvMap.dispose(); this._skyboxEnvMap = null; }
+      return;
+    }
+    assetManager.loadSkybox(skyboxId).then(tex => {
+      if (token !== this._skyReqToken || this._disposed) return;   // superseded / torn down
+      this._sky.visible = false;
+      this.scene.background = tex;
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      const env = pmrem.fromEquirectangular(tex).texture;
+      pmrem.dispose();
+      if (this._skyboxEnvMap) this._skyboxEnvMap.dispose();
+      this._skyboxEnvMap = env;
+      this.scene.environment = env;
+    }).catch(err => {
+      console.warn(`SceneManager: failed to load skybox "${skyboxId}", using procedural sky`, err);
+      if (token === this._skyReqToken) this._applySkybox("sky");
+    });
   }
 
   private _setupGrid(): void {
@@ -273,6 +318,8 @@ export class SceneManager {
   dispose(): void {
     this._disposed = true;
     this._unsubLighting();
+    this._unsubSky();
+    this._skyboxEnvMap?.dispose();
     cancelAnimationFrame(this._raf);
     this.editorCamera?.dispose();
     window.removeEventListener("resize", this._onResize);
