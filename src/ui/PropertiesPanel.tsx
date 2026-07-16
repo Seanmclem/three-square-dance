@@ -1254,9 +1254,11 @@ function MoverSection({ entityId, mover, onCommit }: {
     const n = parseFloat(val);
     if (Number.isFinite(n)) commit({ [field]: n });
   };
-  const numField = (label: string, val: string, setter: (v: string) => void, field: "distance" | "duration" | "dwell" | "phase" | "speed", step: number, min?: number) => (
+  const numField = (label: string, val: string, setter: (v: string) => void, field: "distance" | "duration" | "dwell" | "phase" | "speed", step: number, min?: number, help?: string) => (
     <div>
-      <div style={{ ...LABEL, marginBottom: 2 }}>{label}</div>
+      <div style={{ ...LABEL, marginBottom: 2, display: "flex", alignItems: "center", gap: 4 }}>
+        {label}{help && <HelpTooltip text={help} />}
+      </div>
       <input type="number" step={step} min={min} value={val} style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
         onChange={e => { setter(e.target.value); schedule(() => commitNum(field, e.target.value)); }}
         onBlur={e => flush(() => commitNum(field, e.target.value))}
@@ -1310,7 +1312,8 @@ function MoverSection({ entityId, mover, onCommit }: {
               </div>
               {cur.mode === "loop" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {numField("PHASE (0–1)", phaseStr, setPhaseStr, "phase", 0.1, 0)}
+                  {numField("PHASE (0–1)", phaseStr, setPhaseStr, "phase", 0.1, 0,
+                    "Where in the loop this platform starts. 0 = beginning of the cycle, 0.5 = half a cycle behind (starts at the far end). Use it to desync identical movers — e.g. one platform up while another is down. Loop mode only.")}
                 </div>
               )}
             </>
