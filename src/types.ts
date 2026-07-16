@@ -678,6 +678,8 @@ export interface PlatformDef {
   materialOverrides?:     MaterialOverrides;
   sideMaterial?:          string;
   sideMaterialOverrides?: MaterialOverrides;
+  bottomMaterial?:          string;             // bottom cap; falls back to `material` (Phase 38 ceilings)
+  bottomMaterialOverrides?: MaterialOverrides;
   groupIds?:              string[];
   mover?:                 MoverDef;
   sound?:                 AttachedSound;   // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)

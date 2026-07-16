@@ -350,6 +350,7 @@ interface PropertiesPanelProps {
   onQualityChange:          (q: QualityScale) => void;
   onCopyRunToFloor?:        (targetLevel: number) => void;
   onFillRunWithFloor?:      () => void;
+  onAddCeilingToRun?:       () => void;
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
   zones?:                   ZoneDef[];
@@ -389,7 +390,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onFloorNodesUpdate, getNodeLinks,
-  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onDelete,
+  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
@@ -610,6 +611,7 @@ export function PropertiesPanel({
               selected={selected}
               onCopyRunToFloor={onCopyRunToFloor}
               onFillRunWithFloor={onFillRunWithFloor}
+              onAddCeilingToRun={onAddCeilingToRun}
               onDelete={onDelete}
               onBake={onBake}
             />
@@ -684,12 +686,13 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onDelete, onBake }: {
+function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onDelete, onBake }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
   onCopyRunToFloor?:  (level: number) => void;
   onFillRunWithFloor?: () => void;
+  onAddCeilingToRun?: () => void;
   onDelete?:          () => void;
   onBake?:            (refs: SelectedRef[]) => void;
 }) {
@@ -719,6 +722,17 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
                 color: "#6bc88a", fontSize: 11, fontFamily: "monospace",
               }}
             >Fill closed loop with floor</button>
+          )}
+
+          {onAddCeilingToRun && (
+            <button
+              onClick={onAddCeilingToRun}
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(60,180,100,0.1)", border: "1px solid rgba(60,180,100,0.35)",
+                color: "#6bc88a", fontSize: 11, fontFamily: "monospace",
+              }}
+            >Add ceiling (cap closed loop)</button>
           )}
 
           {onCopyRunToFloor && (
@@ -3372,13 +3386,24 @@ function PlatformMatView({ selected, materialList, onObjectUpdate, onAddMaterial
     <>
       <MaterialSection
         key={selected.id + ":top"}
-        label="TOP / BOTTOM"
+        label="TOP"
         defaultExpanded={false}
         materialList={materialList}
         currentMaterialId={plat?.material ?? "concrete_01"}
         overrides={plat?.materialOverrides}
         onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
         onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
+        onAddMaterial={onAddMaterial}
+      />
+      <MaterialSection
+        key={selected.id + ":bottom"}
+        label="BOTTOM"
+        defaultExpanded={false}
+        materialList={materialList}
+        currentMaterialId={plat?.bottomMaterial ?? plat?.material ?? "concrete_01"}
+        overrides={plat?.bottomMaterialOverrides}
+        onMaterialChange={id => onObjectUpdate({ bottomMaterial: id, bottomMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
+        onOverridesChange={ov => onObjectUpdate({ bottomMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
       />
       <MaterialSection

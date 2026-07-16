@@ -57,17 +57,23 @@ function makeGeo(pos: number[], nrm: number[], uv: number[], idx: number[]): THR
   return geo;
 }
 
+// Which cap faces to emit — "top"/"bottom" used when the bottom cap splits into
+// its own mesh for a separate bottomMaterial (Phase 38 ceilings).
+type CapFaces = "both" | "top" | "bottom";
+
 // ── Rect slab ─────────────────────────────────────────────────────────────────
 
-function buildSlabCapGeo(w: number, h: number, d: number, ts: number): THREE.BufferGeometry {
+function buildSlabCapGeo(w: number, h: number, d: number, ts: number, faces: CapFaces = "both"): THREE.BufferGeometry {
   const hw = w/2, hh = h/2, hd = d/2;
   const pos: number[] = [], nrm: number[] = [], uv: number[] = [], idx: number[] = [];
   let vi = 0;
   const f = (...a: Parameters<typeof pushFace>) => { pushFace(...a); vi += 4; };
   // +Y top
-  f(pos,nrm,uv,idx,vi,  -hw, hh,-hd,  hw, hh,-hd,  hw, hh, hd,  -hw, hh, hd,  0,1,0, w/ts,d/ts);
+  if (faces !== "bottom")
+    f(pos,nrm,uv,idx,vi,  -hw, hh,-hd,  hw, hh,-hd,  hw, hh, hd,  -hw, hh, hd,  0,1,0, w/ts,d/ts);
   // -Y bottom
-  f(pos,nrm,uv,idx,vi,  -hw,-hh, hd,  hw,-hh, hd,  hw,-hh,-hd,  -hw,-hh,-hd,  0,-1,0, w/ts,d/ts);
+  if (faces !== "top")
+    f(pos,nrm,uv,idx,vi,  -hw,-hh, hd,  hw,-hh, hd,  hw,-hh,-hd,  -hw,-hh,-hd,  0,-1,0, w/ts,d/ts);
   return makeGeo(pos, nrm, uv, idx);
 }
 
@@ -89,7 +95,7 @@ function buildSlabSideGeo(w: number, h: number, d: number, ts: number): THREE.Bu
 
 // ── Polygon slab ──────────────────────────────────────────────────────────────
 
-function buildPolygonCapGeo(points: Vec2[], cx: number, cz: number, thickness: number, tileScale: number): THREE.BufferGeometry {
+function buildPolygonCapGeo(points: Vec2[], cx: number, cz: number, thickness: number, tileScale: number, faces: CapFaces = "both"): THREE.BufferGeometry {
   // Signed area in world XZ: positive = CW from above (Z goes away from viewer in top-down).
   // ShapeGeometry needs a CCW shape in XY to produce front-face normals in +Z → after
   // rotateX(-π/2) those become +Y (visible from above).  The shape uses y = -(worldZ - cz),
@@ -137,6 +143,9 @@ function buildPolygonCapGeo(points: Vec2[], cx: number, cz: number, thickness: n
     for (let i = 0; i < p.count; i++) u.setXY(i, p.getX(i) / tileScale, p.getZ(i) / tileScale);
     u.needsUpdate = true;
   }
+
+  if (faces === "top")    { botGeo.dispose(); return topGeo; }
+  if (faces === "bottom") { topGeo.dispose(); return botGeo; }
 
   // Merge top + bottom into one geometry
   const posT = topGeo.attributes["position"] as THREE.BufferAttribute;
@@ -252,6 +261,22 @@ export class PlatformBuilder {
               .catch(() => assetManager.getDefaultMaterial(0x667788)))
       : mat;
 
+    // Bottom cap splits into its own mesh only when a separate bottom material /
+    // overrides is set — otherwise the merged top+bottom cap path is unchanged.
+    const botOvr   = platform.bottomMaterialOverrides;
+    const botMatId = platform.bottomMaterial;
+    const splitBottom = botMatId !== undefined || botOvr !== undefined;
+    const botBaseDef  = botMatId ? assetManager.getMaterialDef(botMatId) : baseDef;
+    const botTileScale = botOvr?.tileScale ?? botBaseDef?.tileScale ?? tileScale;
+
+    const botMat: THREE.Material = !splitBottom
+      ? mat
+      : (botOvr
+          ? await assetManager.getMaterialWithOverrides(botMatId ?? platform.material, botOvr)
+              .catch(() => assetManager.getDefaultMaterial(0x667788))
+          : await assetManager.getMaterial(botMatId!)
+              .catch(() => assetManager.getDefaultMaterial(0x667788)));
+
     const { position: p, size, thickness } = platform;
     const floorLevel = platform.floorLevel ?? 0;
     const meshes: THREE.Mesh[] = [];
@@ -259,26 +284,30 @@ export class PlatformBuilder {
     const isPolygon = !!(platform.points && platform.points.length >= 3);
 
     let capGeo  = isPolygon
-      ? buildPolygonCapGeo(platform.points!, p.x, p.z, thickness, tileScale)
-      : buildSlabCapGeo(size.width, thickness, size.depth, tileScale);
+      ? buildPolygonCapGeo(platform.points!, p.x, p.z, thickness, tileScale, splitBottom ? "top" : "both")
+      : buildSlabCapGeo(size.width, thickness, size.depth, tileScale, splitBottom ? "top" : "both");
+    let bottomGeo = !splitBottom ? null : isPolygon
+      ? buildPolygonCapGeo(platform.points!, p.x, p.z, thickness, botTileScale, "bottom")
+      : buildSlabCapGeo(size.width, thickness, size.depth, botTileScale, "bottom");
     const sideGeo = isPolygon
       ? buildPolygonSideGeo(platform.points!, p.x, p.z, thickness, sideTileScale)
       : buildSlabSideGeo(size.width, thickness, size.depth, sideTileScale);
 
-    // UV offset (Phase 10.8); sides fall back to cap overrides when no separate side material
+    // UV offset (Phase 10.8); sides/bottom fall back to cap overrides when no separate material
     const sOffX = sideOvr?.offsetX ?? ovr?.offsetX ?? 0;
     const sOffY = sideOvr?.offsetY ?? ovr?.offsetY ?? 0;
     applyUVOffset(capGeo,  ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
+    if (bottomGeo) applyUVOffset(bottomGeo, botOvr?.offsetX ?? ovr?.offsetX ?? 0, botOvr?.offsetY ?? ovr?.offsetY ?? 0);
     applyUVOffset(sideGeo, sOffX, sOffY);
 
     const slabY = p.y + thickness / 2;
 
     // Apply CSG cuts — translate cap geo to world space, cut, result stays in world space
     let capInWorldSpace = false;
-    if (cuts.length > 0) {
-      const worldCapGeo = capGeo.clone();
-      worldCapGeo.translate(p.x, slabY, p.z);
-      let workMesh: THREE.Mesh = new THREE.Mesh(worldCapGeo, new THREE.MeshBasicMaterial());
+    const cutWorldGeo = (geo: THREE.BufferGeometry): THREE.BufferGeometry => {
+      const worldGeo = geo.clone();
+      worldGeo.translate(p.x, slabY, p.z);
+      let workMesh: THREE.Mesh = new THREE.Mesh(worldGeo, new THREE.MeshBasicMaterial());
       workMesh.updateMatrixWorld();
       let prevIsOriginal = true;
       for (const cut of cuts) {
@@ -288,9 +317,14 @@ export class PlatformBuilder {
         if (!prevIsOriginal) prev.geometry.dispose();
         prevIsOriginal = false;
       }
-      worldCapGeo.dispose();
-      capGeo = workMesh.geometry;
-      capGeo.setAttribute('uv2', capGeo.attributes['uv']?.clone() ?? capGeo.attributes['position'].clone());
+      worldGeo.dispose();
+      const result = workMesh.geometry;
+      result.setAttribute('uv2', result.attributes['uv']?.clone() ?? result.attributes['position'].clone());
+      return result;
+    };
+    if (cuts.length > 0) {
+      capGeo = cutWorldGeo(capGeo);
+      if (bottomGeo) bottomGeo = cutWorldGeo(bottomGeo);
       capInWorldSpace = true;
     }
 
@@ -308,6 +342,23 @@ export class PlatformBuilder {
       _hasCsgCuts:   capInWorldSpace || undefined,
     } satisfies MeshUserData;
     meshes.push(capMesh);
+
+    if (bottomGeo) {
+      const bottomMesh = new THREE.Mesh(bottomGeo, botMat);
+      bottomMesh.position.copy(capMesh.position);
+      bottomMesh.receiveShadow = true;
+      bottomMesh.castShadow    = true;
+      bottomMesh.userData = {
+        editorId:      platform.id,
+        editorType:    "platform",
+        zoneId,
+        selectable:    true,           // ceilings are clicked from below
+        floorLevel,
+        _ownsMaterial: !!botOvr,
+        _hasCsgCuts:   capInWorldSpace || undefined,
+      } satisfies MeshUserData;
+      meshes.push(bottomMesh);
+    }
 
     const sideMesh = new THREE.Mesh(sideGeo, sideMat);
     sideMesh.position.set(p.x, slabY, p.z);

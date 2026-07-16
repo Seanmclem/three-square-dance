@@ -1655,6 +1655,46 @@ export default function App() {
     syncHistory();
   };
 
+  const handleAddCeilingToRun = (): void => {
+    const world = worldRef.current;
+    if (!selected || selected.type !== "wall" || !world) return;
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    if (walls.length < 3) return;
+    const nodeIds = resolveRunNodeIds(walls);
+    if (!nodeIds || nodeIds[0] !== nodeIds[nodeIds.length - 1]) return;
+    const zone = world.zones.get(selected.zoneId);
+    if (!zone) return;
+    const wallData = selected.data as WallDef;
+    const coreNodeIds = nodeIds.slice(0, -1);
+    const points = coreNodeIds.map(id => {
+      const n = zone.nodes.find(nn => nn.id === id);
+      return n ? { x: n.x, z: n.z } : { x: 0, z: 0 };
+    });
+    const xs = points.map(pt => pt.x);
+    const zs = points.map(pt => pt.z);
+    const cx = points.reduce((s, pt) => s + pt.x, 0) / points.length;
+    const cz = points.reduce((s, pt) => s + pt.z, 0) / points.length;
+    // Slab bottom flush with the wall top — the lid sits ON the walls
+    // (PlatformBuilder places the slab from position.y up to y + thickness).
+    const elevY = (wallData?.elevation ?? 0) + (wallData?.height ?? 3.0);
+    worldRef.current?.transaction("add ceiling", () => {
+      world.addPlatform(selected.zoneId, {
+        id:            `plat_${crypto.randomUUID().slice(0, 8)}`,
+        position:      { x: cx, y: elevY, z: cz },
+        size:          { width: Math.max(Math.max(...xs) - Math.min(...xs), 0.5),
+                         depth: Math.max(Math.max(...zs) - Math.min(...zs), 0.5) },
+        thickness:     0.2,
+        material:      "concrete_01",
+        hasRailing:    false,
+        railingHeight: 1.0,
+        floorLevel:    wallData?.floor ?? 0,
+        points,
+        nodeIds:       coreNodeIds,
+      });
+    });
+    syncHistory();
+  };
+
   const isWallRunClosed = (): boolean => {
     if (!selected || selected.type !== "wall") return false;
     const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
@@ -1979,7 +2019,7 @@ export default function App() {
         const hits = [
           ...zone.walls.map(w => w.material),
           ...zone.floors.map(f => f.floorMesh.material),
-          ...zone.platforms.flatMap(p => [p.material, p.sideMaterial]),
+          ...zone.platforms.flatMap(p => [p.material, p.sideMaterial, p.bottomMaterial]),
           ...zone.stairs.flatMap(s => [s.material, s.riserMaterial, s.landingMaterial, s.railingMaterial]),
         ].filter(m => m && idSet.has(m));
         if (hits.length) { count += hits.length; zones.add(zone.name); }
@@ -2620,6 +2660,7 @@ export default function App() {
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}
         onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
+        onAddCeilingToRun={isWallRunClosed() ? handleAddCeilingToRun : undefined}
         onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
         multiSelected={multiSelected}
         onCopy={handleCopy}
