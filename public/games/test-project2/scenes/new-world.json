@@ -61,7 +61,8 @@
         "z": 8.92506898803649
       },
       "facingDeg": 0
-    }
+    },
+    "audio": {}
   },
   "terrain": null,
   "zones": [
@@ -199,12 +200,12 @@
           "id": "stair_7b88e70a",
           "start": {
             "x": 7.5,
-            "y": 0.14076765179447648,
+            "y": 0.13366802335988126,
             "z": 3
           },
           "end": {
             "x": 7.131745622508879,
-            "y": 3.2997676517944763,
+            "y": 3.292668023359881,
             "z": -4.003324761387168
           },
           "width": 2.5,
@@ -239,7 +240,8 @@
             "mode": "diagonal",
             "thickness": 0.25
           },
-          "landingMaterial": "concrete_01"
+          "landingMaterial": "concrete_01",
+          "riserUvJitter": 0.57
         }
       ],
       "objects": [
@@ -360,6 +362,11 @@
                 {
                   "type": "toggle_mover",
                   "targetId": "shape_mover_door"
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "blip_test",
+                  "targetId": "obj_106c1b33"
                 }
               ],
               "oneShot": false
