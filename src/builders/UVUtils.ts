@@ -50,6 +50,27 @@ export function applyProjectedUVs(
 }
 
 /**
+ * Deterministic [0,1) from a string key + integer lanes (FNV-1a + avalanche).
+ * Builders must never use Math.random — editor and runtime rebuild geometry
+ * independently and must produce identical UVs.
+ */
+export function hash01(key: string, ...lanes: number[]): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  for (const n of lanes) {
+    h ^= (n + 0x9e3779b9) >>> 0;
+    h = Math.imul(h, 16777619);
+  }
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
  * Shift all UV coordinates by (offsetX, offsetY). Offsets are in repeat units —
  * 0.5 is half a texture tile, values wrap (1.1 ≡ 0.1), negatives work.
  * All maps share UV channel 0, so one offset shifts every map in sync.

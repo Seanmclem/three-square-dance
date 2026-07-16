@@ -3395,6 +3395,13 @@ function PlatformMatView({ selected, materialList, onObjectUpdate, onAddMaterial
 
 function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }: { selected: SelectedObjectPayload; materialList: MaterialDef[]; onObjectUpdate: (c: Partial<WorldObject>) => void; onAddMaterial: () => void }) {
   const stair = selected.data as StairDef | null;
+  const { schedule, flush } = useFieldDebounce(300);
+  const [riserJitter, setRiserJitter] = useState(stair?.riserUvJitter ?? 0);
+  useEffect(() => {
+    setRiserJitter((selected.data as StairDef | null)?.riserUvJitter ?? 0);
+  }, [selected.id]);
+  const commitJitter = (v: number) =>
+    onObjectUpdate({ riserUvJitter: v } as unknown as Partial<WorldObject>);
   return (
     <>
       <MaterialSection
@@ -3419,6 +3426,22 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onOverridesChange={ov => onObjectUpdate({ riserMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
       />
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
+          <span>TEXTURE VARIATION</span>
+          <span style={{ color: "#808090" }}>{Math.round(riserJitter * 100)}%</span>
+        </div>
+        <input
+          type="range" min={0} max={1} step={0.01} value={riserJitter}
+          onChange={e => {
+            const v = Number(e.target.value);
+            setRiserJitter(v);
+            schedule(() => commitJitter(v));
+          }}
+          onPointerUp={() => flush(() => commitJitter(riserJitter))}
+          style={{ width: "100%", accentColor: "#80aaff" }}
+        />
+      </div>
       {stair?.landing && (
         <MaterialSection
           key={selected.id + ":landing"}

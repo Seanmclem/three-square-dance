@@ -3,7 +3,7 @@ import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import type { StairRailBarrier } from "@/physics/ColliderBuilder";
 import { assetManager } from "@/core/AssetManager";
-import { applyUVOffset } from "@/builders/UVUtils";
+import { applyUVOffset, hash01 } from "@/builders/UVUtils";
 import { computeStairLayout, computeRailPaths, computeStairRamps, frameToWorld, isPlainStair, STAIR_RAMP_THICK, STAIR_RAMP_LIFT } from "@/builders/stairLayout";
 import type { LandingSpec } from "@/builders/stairLayout";
 import type { StairDef, StairUndersideMode, MeshUserData, Vec3 } from "@/types";
@@ -159,7 +159,7 @@ export class StairBuilder {
 
     // ── One flight of steps (the pre-Phase-29 per-step loop, verbatim, with
     // the flight's own start/end in place of the def's) ─────────────────────
-    const emitFlight = (fStart: Vec3, fEnd: Vec3, mode: StairUndersideMode): void => {
+    const emitFlight = (fStart: Vec3, fEnd: Vec3, mode: StairUndersideMode, flightIdx: number): void => {
     const fdx         = fEnd.x - fStart.x;
     const fdz         = fEnd.z - fStart.z;
     const fAngle      = Math.atan2(fdz, fdx);
@@ -298,9 +298,14 @@ export class StairBuilder {
       }
 
       // ── Riser face (-X) ─────────────────────────────────────────────────────
-      pushQuad(riser,
+      // Per-step deterministic UV offset (riserUvJitter 0–1) so each riser shows
+      // a different window of the texture instead of the identical crop.
+      const j  = stair.riserUvJitter ?? 0;
+      const oU = hash01(stair.id, flightIdx, i, 0) * j;
+      const oV = hash01(stair.id, flightIdx, i, 1) * j;
+      pushQuadUV(riser,
         pTFL_x,pTFL_y,pTFL_z, pTFR_x,pTFR_y,pTFR_z, pBFR_x,pBFR_y,pBFR_z, pBFL_x,pBFL_y,pBFL_z,
-        ...nRiser, rWw, rWh);
+        ...nRiser, oU,oV, rWw + oU,oV, rWw + oU,rWh + oV, oU,rWh + oV);
     }
     };  // end emitFlight
 
@@ -361,7 +366,7 @@ export class StairBuilder {
     for (let k = 0; k < layout.flights.length; k++) {
       const effMode: StairUndersideMode =
         undersideMode === "closed" && k > 0 ? "diagonal" : undersideMode;
-      emitFlight(layout.flights[k].start, layout.flights[k].end, effMode);
+      emitFlight(layout.flights[k].start, layout.flights[k].end, effMode, k);
     }
     for (const l of layout.landings) emitLanding(l);
 

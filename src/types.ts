@@ -748,6 +748,7 @@ export interface StairDef {
   materialOverrides?:      MaterialOverrides;
   riserMaterial?:          string;
   riserMaterialOverrides?: MaterialOverrides;
+  riserUvJitter?:          number;              // 0–1: per-step random UV offset on riser faces; absent → 0 (uniform)
   landingMaterial?:          string;            // landing slabs; absent → body material
   landingMaterialOverrides?: MaterialOverrides;
   railingMaterial?:          string;            // rails/posts; absent → built-in metal grey
