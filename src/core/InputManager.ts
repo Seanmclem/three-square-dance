@@ -23,6 +23,7 @@ export class InputManager implements IEditorModule {
   private readonly _groundPlane  = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly _hit          = new THREE.Vector3();
   private _suppress = false;
+  private _activeFloorLevel = 0;
   private _unsub: Array<() => void> = [];
   private _mouseDownScreenPos: { x: number; y: number } | null = null;
   private readonly _DRAG_THRESHOLD = 5; // pixels — moves beyond this are drags, not clicks
@@ -68,6 +69,7 @@ export class InputManager implements IEditorModule {
     this._unsub.push(
       this._bus.on("overlay:fade-in",  () => { this._suppress = true; }),
       this._bus.on("overlay:fade-out", () => { this._suppress = false; }),
+      this._bus.on("floor:select",     ({ level }) => { this._activeFloorLevel = level; }),
     );
   }
 
@@ -109,7 +111,15 @@ export class InputManager implements IEditorModule {
 
     const hit = this._raycaster
       .intersectObjects(this._scene.children, true)
-      .find(h => h.object.userData.selectable && !h.object.userData.ghostPick && SURFACE_TYPES.has(h.object.userData.editorType));
+      .find(h => {
+        const ud = h.object.userData;
+        if (!ud.selectable || ud.ghostPick || !SURFACE_TYPES.has(ud.editorType)) return false;
+        // Inactive-level geometry is dimmed to a see-through ghost — it must not catch
+        // surface placement (e.g. an overhead level-1 floor or wall top grabbing a
+        // ground-level stair start inside a room stack while editing floor G).
+        if (ud.floorLevel !== undefined && ud.floorLevel !== this._activeFloorLevel) return false;
+        return true;
+      });
     const surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;
 
     return { worldPos, surfacePos };

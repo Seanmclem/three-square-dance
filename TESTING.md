@@ -314,6 +314,18 @@ the user's tab had written. Rules:
 4. If contamination reached the user's live tab, tell them: their open tab holds the junk
    in memory and will write it back on close/reload — they need to delete the stray
    entities in their tab (or reload and delete after).
+5. **The periodic autosave tick pollutes mid-test even without a reload** (2026-07-17): a
+   60s tick fired while a test cutter drag was in progress and persisted the half-test
+   state. So at session end, don't assume the snapshot-restore left things clean — READ
+   the final autosave and check the actual field values (the user's entities at their
+   original values, no test ids). If it's wrong, write the cleaned in-memory world:
+   `delete localStorage.setItem` (un-neuter), verify `__world.toJSON()` is correct, then
+   `setItem('worldeditor_autosave', JSON.stringify(...))` + fresh `_ts`, then re-neuter.
+6. **Don't delete backups until the restore is VERIFIED.** The localStorage backup key
+   vanished mid-session once (cause unknown — possibly same-origin activity from the
+   user's tab), and the restore snippet had already `removeEntry`'d the OPFS copy before
+   discovering that. Sequence must be: restore → verify content → only then delete the
+   backup copies.
 
 ---
 

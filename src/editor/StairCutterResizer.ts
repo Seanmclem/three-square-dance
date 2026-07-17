@@ -265,18 +265,22 @@ export class StairCutterResizer implements IEditorModule {
       } };
     } else {
       // Resize along the (rotated) face normal, opposite face pinned.
+      // FACE_LOCAL already encodes the face's outward direction in `n` (e.g. "-x" → −x̂),
+      // so measurements along n need no extra face sign: the dragged face sits at
+      // center + n·(size/2) and the pinned opposite face at center − n·(size/2).
       const [lx, ly, lz] = FACE_LOCAL[h];
       const n = new THREE.Vector3(lx, ly, lz).applyEuler(o.euler).normalize();
       const dim = FACE_DIM[h];
       const sOrig = o.cutter[dim];
-      const faceSign = h[0] === "+" ? 1 : -1;
-      const fixed = origCenter.clone().addScaledVector(n, -faceSign * sOrig / 2); // pinned opposite face
+      const fixed = origCenter.clone().addScaledVector(n, -sOrig / 2); // pinned opposite face
       const closest = this._closestPointOnAxis(ray, origCenter, n);
       if (!closest) return;
-      const proj = closest.clone().sub(fixed).dot(n);
-      let newSize = faceSign * proj;
+      // Handles rest GAP outside their face — subtract it so the face lands under the
+      // mouse minus that resting offset (otherwise every grab grows the box by GAP).
+      const proj = closest.clone().sub(fixed).dot(n) - GAP;
+      let newSize = proj;
       newSize = Math.max(MIN, this._altDown ? newSize : snap(newSize));
-      const newCenter = fixed.clone().addScaledVector(n, faceSign * newSize / 2);
+      const newCenter = fixed.clone().addScaledVector(n, newSize / 2);
       cutter = {
         ...o.cutter,
         [dim]: newSize,

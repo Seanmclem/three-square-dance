@@ -65,8 +65,8 @@ export class StairTool implements IEditorModule {
         if (button !== 0) { this._reset(); return; }
         this._onLeftClick(worldPos, surfacePos);
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._active) this._onMouseMove(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        if (this._active) this._onMouseMove(surfacePos ?? worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (this._active && code === "Escape") this._reset();
@@ -89,13 +89,16 @@ export class StairTool implements IEditorModule {
   }
 
   private _onLeftClick(worldPos: Vec3, surfacePos: Vec3 | null): void {
-    const sx = snap(worldPos.x);
-    const sz = snap(worldPos.z);
+    // Base the stair on the surface actually under the cursor (ShapeTool precedent).
+    // Use the surface hit's own XZ too — worldPos is the y=0 ground-plane intersection,
+    // which sits at a DIFFERENT spot along a tilted view ray than the elevated surface
+    // the user clicked. The level heuristic is only the void-click fallback — a
+    // zone-wide max over floors at the active level breaks as soon as any floor is
+    // dragged off its level plane.
+    const sx = snap(surfacePos?.x ?? worldPos.x);
+    const sz = snap(surfacePos?.z ?? worldPos.z);
 
     if (this._state === "IDLE") {
-      // Base the stair on the surface actually under the cursor (ShapeTool precedent).
-      // The level heuristic is only a fallback — a zone-wide max over floors at the
-      // active level breaks as soon as any floor is dragged off its level plane.
       const sy = surfacePos?.y ?? this._getElevationForLevel(this._activeLevel);
       this._startPos = { x: sx, y: sy, z: sz };
 
