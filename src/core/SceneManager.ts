@@ -11,6 +11,15 @@ type UpdateCallback = (dt: number) => void;
 
 const DEMO_ZONE = "demo";
 
+// Sun shadow frustum: a small box that FOLLOWS the view (editor focus / ahead of the
+// player) instead of a large static one — fewer meters per shadow texel = sharper
+// shadows, with full-world coverage because the box re-centers every frame. The box
+// position is snapped to whole shadow-map texels so edges don't shimmer as it moves.
+const SHADOW_HALF     = 25;     // ortho half-extent (meters); was a static ±40
+const SHADOW_MAP_SIZE = 1024;   // 1024² halves shadow-map fill vs 2048² (perf)
+const SHADOW_AHEAD    = 15;     // preview/game: center this far along the view direction
+const UP = new THREE.Vector3(0, 1, 0);
+
 export class SceneManager {
   public readonly scene:        THREE.Scene;
   public readonly camera:       THREE.PerspectiveCamera;
@@ -43,6 +52,17 @@ export class SceneManager {
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
 
+  // Follow-the-camera sun shadow frustum. The light's world direction is fixed after
+  // _setupSky, so the shadow camera's basis is captured once (lazily, on the first
+  // loop tick) and each frame just re-centers position+target — all scratch
+  // preallocated (no allocations in the RAF path, TESTING.md §7).
+  private readonly _shadowFollow = {
+    ready: false,
+    offset: new THREE.Vector3(),   // sun.position − target (fixed light offset)
+    x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3(),   // shadow-cam basis
+    center: new THREE.Vector3(), fwd: new THREE.Vector3(),
+  };
+
   // Skybox (Phase 37). The procedural Sky mesh + its RoomEnvironment env map are the
   // "sky" default; an image skybox hides the mesh, sets scene.background, and swaps in
   // a PMREM env map generated from the image. _skyReqToken guards stale async loads.
@@ -57,8 +77,7 @@ export class SceneManager {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
-    // PCF (not PCFSoft) — cheaper per-pixel shadow sampling. See TESTING.md §7 (perf).
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.5;
     this.renderer.autoClear = false; // ViewHelper needs manual clear control
@@ -110,12 +129,20 @@ export class SceneManager {
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
     sun.position.set(30, 50, 20);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);   // 1024² halves shadow-map fill vs 2048² (perf)
+    sun.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     const sc = sun.shadow.camera as THREE.OrthographicCamera;
-    sc.near = 0.5; sc.far = 200;
-    sc.left = -40; sc.right = 40; sc.top = 40; sc.bottom = -40;
-    sun.shadow.bias = -0.001;
+    // near/far bracket the follow box (light sits 50m from the box center, box ±25m,
+    // ~10m content-height slack). A tight depth range matters: shadow.bias is in
+    // normalized [near,far] units, so range 200 made -0.001 ≈ 20cm of world depth —
+    // enough to light-leak a bright band into every floor/wall crease.
+    sc.near = 10; sc.far = 100;
+    sc.left = -SHADOW_HALF; sc.right = SHADOW_HALF; sc.top = SHADOW_HALF; sc.bottom = -SHADOW_HALF;
+    // Acne control via normalBias (offsets the sample along the surface normal — no
+    // depth detachment, so creases stay dark); keep only a hair of depth bias.
+    sun.shadow.bias = -0.0001;
+    sun.shadow.normalBias = 0.03;
     this.scene.add(sun);
+    this.scene.add(sun.target);   // target must be in the scene for its matrix to update
 
     const fill = new THREE.DirectionalLight(0x6688cc, 0.6);
     fill.position.set(-20, 10, -20);
@@ -293,11 +320,47 @@ export class SceneManager {
     this._cullHidden.length = 0;
   }
 
+  /**
+   * Re-center the sun's shadow box on where the view actually is: the editor
+   * camera's focus point, or SHADOW_AHEAD meters along the preview camera's view
+   * direction. Moving sun.position and sun.target by the same delta translates the
+   * ortho frustum without changing the light direction. The center is snapped to
+   * whole shadow-map texels in the shadow camera's basis (lookAt with up=(0,1,0),
+   * captured once — the direction never changes after _setupSky) so shadow edges
+   * don't crawl/shimmer as the camera pans.
+   */
+  private _updateSunShadow(): void {
+    const s = this._shadowFollow;
+    const sun = this._sunLight;
+    if (!s.ready) {
+      s.offset.copy(sun.position);              // target starts at the origin
+      s.z.copy(s.offset).normalize();           // shadow cam looks down −z (toward target)
+      s.x.crossVectors(UP, s.z).normalize();
+      s.y.crossVectors(s.z, s.x);
+      s.ready = true;
+    }
+    if (this.editorCamera && !this._previewCamera) {
+      s.center.copy(this.editorCamera.focus);
+    } else {
+      const cam = this._previewCamera ?? this.camera;
+      cam.getWorldDirection(s.fwd);
+      s.center.copy(cam.position).addScaledVector(s.fwd, SHADOW_AHEAD);
+    }
+    const texel = (SHADOW_HALF * 2) / SHADOW_MAP_SIZE;
+    const lx = Math.round(s.center.dot(s.x) / texel) * texel;
+    const ly = Math.round(s.center.dot(s.y) / texel) * texel;
+    const lz = s.center.dot(s.z);
+    s.center.set(0, 0, 0).addScaledVector(s.x, lx).addScaledVector(s.y, ly).addScaledVector(s.z, lz);
+    sun.target.position.copy(s.center);
+    sun.position.copy(s.center).add(s.offset);
+  }
+
   private _loop(): void {
     if (this._disposed) return;
     const dt = this._clock.getDelta();
     if (!this._previewCamera) this.editorCamera?.update(dt);
     this._updateCallbacks.forEach(cb => cb(dt));
+    this._updateSunShadow();
     this._applyCullOverride();                 // no-op unless the occlusion cull view is on
     this.renderer.clear();
     this.renderer.render(this.scene, this._previewCamera ?? this.camera);
