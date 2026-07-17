@@ -157,6 +157,7 @@ export class StairTool implements IEditorModule {
       material:   this._material,
       hasRailing: this._hasRailing,
       riserUvJitter: 0.5,
+      treadUvJitter: 0.5,
     };
 
     this._world.transaction("add stair", () => {

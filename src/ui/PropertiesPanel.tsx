@@ -3460,11 +3460,15 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
   const stair = selected.data as StairDef | null;
   const { schedule, flush } = useFieldDebounce(300);
   const [riserJitter, setRiserJitter] = useState(stair?.riserUvJitter ?? 0);
+  const [treadJitter, setTreadJitter] = useState(stair?.treadUvJitter ?? 0);
   useEffect(() => {
     setRiserJitter((selected.data as StairDef | null)?.riserUvJitter ?? 0);
+    setTreadJitter((selected.data as StairDef | null)?.treadUvJitter ?? 0);
   }, [selected.id]);
   const commitJitter = (v: number) =>
     onObjectUpdate({ riserUvJitter: v } as unknown as Partial<WorldObject>);
+  const commitTreadJitter = (v: number) =>
+    onObjectUpdate({ treadUvJitter: v } as unknown as Partial<WorldObject>);
   return (
     <>
       <MaterialSection
@@ -3477,6 +3481,24 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
         onMaterialChange={id => onObjectUpdate({ material: id, materialOverrides: undefined } as unknown as Partial<WorldObject>)}
         onOverridesChange={ov => onObjectUpdate({ materialOverrides: ov } as unknown as Partial<WorldObject>)}
         onAddMaterial={onAddMaterial}
+        extraTilingControls={
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
+              <span>TEXTURE VARIATION</span>
+              <span style={{ color: "#808090" }}>{Math.round(treadJitter * 100)}%</span>
+            </div>
+            <input
+              type="range" min={0} max={1} step={0.01} value={treadJitter}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setTreadJitter(v);
+                schedule(() => commitTreadJitter(v));
+              }}
+              onPointerUp={() => flush(() => commitTreadJitter(treadJitter))}
+              style={{ width: "100%", accentColor: "#80aaff" }}
+            />
+          </div>
+        }
       />
       <MaterialSection
         key={selected.id + ":risers"}

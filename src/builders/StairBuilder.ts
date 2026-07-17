@@ -219,10 +219,15 @@ export class StairBuilder {
       const rWw = stair.width / riserTs, rWh = stepRise / riserTs;
 
       // ── Body faces ──────────────────────────────────────────────────────────
-      // +Y top
-      pushQuad(body,
+      // +Y top (tread). Per-step deterministic UV offset (treadUvJitter 0–1) so each
+      // step-top shows a different window of the texture — same idea as the riser
+      // jitter below, distinct hash lanes (2,3) so treads and risers don't shift alike.
+      const jT  = stair.treadUvJitter ?? 0;
+      const tU  = hash01(stair.id, flightIdx, i, 2) * jT;
+      const tV  = hash01(stair.id, flightIdx, i, 3) * jT;
+      pushQuadUV(body,
         pTFL_x,pTFL_y,pTFL_z, pTBL_x,pTBL_y,pTBL_z, pTBR_x,pTBR_y,pTBR_z, pTFR_x,pTFR_y,pTFR_z,
-        ...nTop, wd, ww);
+        ...nTop, tU,tV, wd+tU,tV, wd+tU,ww+tV, tU,ww+tV);
       // ── Underside / sides / caps (mode-gated) ─────────────────────────────────
       if (undersideMode === "open") {
         // -Y bottom
