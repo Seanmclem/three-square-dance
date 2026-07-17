@@ -4,7 +4,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, StairDef, StairCutterDef, Vec3, ScreenPos } from "@/types";
 
-const GRID = 0.5;
+const GRID = 0.1;   // drag snap — matches the panel's 0.1 field step (Alt = free)
 const MIN  = 0.1;   // smallest allowed cut-box dimension (matches panel step/min)
 const HANDLE = 0.22;
 const GAP  = 0.3;   // push face handles this far OUTSIDE each face — clear of the box body
