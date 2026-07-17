@@ -8,7 +8,7 @@ import type {
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, extrudeFace } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -50,7 +50,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   select:      { desc: "Click any object to select it. Use gizmos to transform.",  hint: "Nothing selected" },
   "select-face":   { desc: "Face mode: click a brush face to select it (other objects select normally). 1-4 switch modes.", hint: "Click a brush face" },
   "select-vertex": { desc: "Vertex mode: click a brush corner sphere to select it. 1-4 switch modes.", hint: "Click a brush corner" },
-  "select-edge":   { desc: "Edge mode: click a brush face near an edge to select that edge (other objects select normally). 1-4 switch modes.", hint: "Click near a brush edge" },
+  "select-edge":   { desc: "Edge mode: click a brush face near an edge to select that edge (other objects select normally). Split the selected edge from the panel. 1-4 switch modes.", hint: "Click near a brush edge" },
   floor:       { desc: "Click and drag to paint a rectangular floor region.",      hint: "Click to place floor origin" },
   "poly-floor": { desc: "Click to place vertices. Enter or click first dot to close.", hint: "Click to add first vertex" },
   wall:        { desc: "Click to set wall start, click again to set end.",         hint: "Click to place wall start" },
@@ -1621,6 +1621,9 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
   if (faceBrush && activeTool === "select-vertex") {
     return <VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} />;
   }
+  if (faceBrush && activeTool === "select-edge") {
+    return <EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} />;
+  }
 
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1720,6 +1723,14 @@ const SHAPE_ACTION_BTN: React.CSSProperties = {
   border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
   color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", cursor: "pointer",
 };
+
+// Topology-op buttons (shared by ShapeFaceOps + EdgesList).
+const OP_BTN: React.CSSProperties = {
+  flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
+  border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
+  color: "#c0c0c0", cursor: "pointer",
+};
+const OP_BTN_OFF: React.CSSProperties = { ...OP_BTN, color: "#505060", cursor: "default" };
 
 // ── Brush FACES list (face mode, Phase 23) ────────────────────────────────────
 // Rows hover-highlight the face in the canvas (shape:face-hover) and click-select
@@ -1838,13 +1849,8 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
   };
   const split = (pair: 0 | 1) => run(splitFaceQuad(shape.mesh!, faceIndex, pair));
   const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, 0.25));
-
-  const OP_BTN: React.CSSProperties = {
-    flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
-    border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
-    color: "#c0c0c0", cursor: "pointer",
-  };
-  const OP_BTN_OFF: React.CSSProperties = { ...OP_BTN, color: "#505060", cursor: "default" };
+  const recess  = () => run(extrudeFace(shape.mesh!, faceIndex, -0.25));
+  const inset   = () => run(insetFace(shape.mesh!, faceIndex, 0.25));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1857,8 +1863,18 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
           onClick={() => split(pair0IsH ? 1 : 0)} title="Split between the vertical-ish edge pair">
           SPLIT │
         </button>
-        <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m along its normal">
+        <button style={OP_BTN} onClick={inset}
+          title="Inset this face 0.25m — border ring + inner face, ready to extrude or recess">
+          INSET
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m outward along its normal">
           EXTRUDE
+        </button>
+        <button style={OP_BTN} onClick={recess}
+          title="Extrude this face 0.25m inward — carve a recess (inset first for a window/pit)">
+          RECESS
         </button>
       </div>
       {!isQuad && (
@@ -2013,6 +2029,63 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ── Brush EDGES view (edge mode, Phase 39) ───────────────────────────────────
+// Edges have no stored identity (an edge IS its vertex-index pair, from
+// selected.edgeVerts), so this is a single card for the current selection, not a
+// list. SPLIT EDGE commits through the same run/onObjectUpdate idiom as
+// ShapeFaceOps, then re-emits shape:sub-select with the surviving sub-edge —
+// without that the SelectionManager liveness clamp drops the selection (the old
+// pair is no longer traversed once the midpoint is spliced in).
+
+function EdgesList({ selected, shape, bus, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; bus?: EventBus;
+  onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  const verts = shape.mesh!.vertices;
+  const edge = selected.edgeVerts ?? null;
+  const a = edge ? verts[edge[0]] : undefined;
+  const b = edge ? verts[edge[1]] : undefined;
+
+  const doSplit = () => {
+    if (!edge) return;
+    const r = splitEdge(shape.mesh!, edge);
+    if (!r) return;   // validateMesh aborted — warning already logged
+    onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
+    bus?.emit("shape:sub-select", {
+      zoneId: selected.zoneId, shapeId: selected.id,
+      faceIndex: null, vertexIndex: null,
+      edge: [Math.min(edge[0], r.mid), Math.max(edge[0], r.mid)] as [number, number],
+    });
+  };
+
+  return (
+    <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={LABEL}>EDGE — click a brush face near an edge</div>
+      {!edge || !a || !b ? (
+        <div style={{ color: "#505060", fontSize: 10, lineHeight: 1.5 }}>
+          Click near a brush edge in the canvas to select it.
+        </div>
+      ) : (
+        <div style={{ border: "1px solid rgba(80,160,255,0.5)", borderRadius: 5, background: "rgba(80,160,255,0.06)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace" }}>
+            EDGE V{edge[0] + 1} – V{edge[1] + 1}
+          </span>
+          <div style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>
+            ({a.x}, {a.y}, {a.z}) → ({b.x}, {b.y}, {b.z})
+          </div>
+          <button style={OP_BTN} onClick={doSplit}
+            title="Insert a vertex at this edge's midpoint (both adjacent faces gain a corner)">
+            SPLIT EDGE
+          </button>
+        </div>
+      )}
+      <div style={{ color: "#404050", fontSize: 9, lineHeight: 1.4 }}>
+        Drag the gizmo to move the edge. Press 1/2/3 for object/face/vertex modes.
+      </div>
     </div>
   );
 }

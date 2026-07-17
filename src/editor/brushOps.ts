@@ -19,6 +19,9 @@ const EPS_PLANE = 1e-4;   // coplanarity distance (meters)
 
 export interface BrushMeshData { vertices: Vec3[]; faces: BrushFace[] }
 
+/** `splitEdge` result: the new mesh plus the midpoint's vertex index (for re-selection). */
+export interface SplitEdgeResult { mesh: BrushMeshData; mid: number }
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
 /** Outward face normal via Newell's method (robust for non-planar/n-gon loops). */
@@ -249,6 +252,28 @@ const cloneFaces = (faces: BrushFace[]): BrushFace[] =>
   faces.map(f => ({ ...f, verts: [...f.verts], materialOverrides: f.materialOverrides ? structuredClone(f.materialOverrides) : undefined }));
 
 /**
+ * Splice vertex `mid` into every face loop traversing undirected edge (p,q), right
+ * after the matched endpoint (T-junction prevention). Loops already containing `mid`
+ * are skipped. Mutates `faces` — call on cloned faces. Returns the splice count.
+ */
+function spliceMidpoint(faces: BrushFace[], mid: number, p: number, q: number): number {
+  let count = 0;
+  for (const f of faces) {
+    const loop = f.verts;
+    if (loop.includes(mid)) continue;
+    for (let k = 0; k < loop.length; k++) {
+      const s = loop[k]!, t = loop[(k + 1) % loop.length]!;
+      if ((s === p && t === q) || (s === q && t === p)) {
+        loop.splice(k + 1, 0, mid);
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+/**
  * Split a QUAD face between the midpoints of an opposite edge pair.
  * pair 0 cuts edges (v0,v1)/(v2,v3); pair 1 cuts (v1,v2)/(v3,v0). The selected
  * faceIdx stays on child A. CRITICAL: any other face traversing a split edge gets
@@ -280,21 +305,10 @@ export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1
   faces[faceIdx] = { ...faces[faceIdx]!, verts: childA };
   faces.push({ ...src, verts: childB, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
 
-  // T-junction propagation into every other face sharing a split edge.
-  for (let fi = 0; fi < faces.length; fi++) {
-    if (fi === faceIdx || fi === faces.length - 1) continue;
-    const loop = faces[fi]!.verts;
-    for (const [m, [p, q]] of [[i1, e1], [i2, e2]] as Array<[number, [number, number]]>) {
-      if (loop.includes(m)) continue;
-      for (let k = 0; k < loop.length; k++) {
-        const s = loop[k]!, t = loop[(k + 1) % loop.length]!;
-        if ((s === p && t === q) || (s === q && t === p)) {
-          loop.splice(k + 1, 0, m);
-          break;
-        }
-      }
-    }
-  }
+  // T-junction propagation into every other face sharing a split edge (the two
+  // children already contain the midpoints, so spliceMidpoint's guard skips them).
+  spliceMidpoint(faces, i1, e1[0], e1[1]);
+  spliceMidpoint(faces, i2, e2[0], e2[1]);
 
   const out = { vertices, faces };
   const err = validateMesh(out);
@@ -303,14 +317,97 @@ export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1
 }
 
 /**
- * Extrude a face along its outward normal by `dist` (> 0 only in v1). The loop's
- * vertices are DUPLICATED (never reused — neighbors keep the original ring), the
- * face is retargeted to the new ring (faceIdx stays on the moved cap), and a side
- * quad [p, q, q', p'] per edge seals the band. Sides inherit the cap's material.
+ * Inset a face: replace it with a border ring of quads (uniform width `margin`) and
+ * a new inner face. Each corner moves inward along its angle bisector with miter
+ * length margin/sin(θ/2), so the perpendicular distance from the inner loop to every
+ * original edge is exactly `margin` (uniform border even at non-90° corners — a
+ * centroid scale would not give this on elongated faces). The inner face takes over
+ * faces[faceIdx] (keeps material/overrides, stays selected — ready to EXTRUDE or
+ * RECESS); border quads inherit the parent material. Outer-ring vertices are
+ * untouched, so no T-junction propagation is needed.
+ * Guards reject margins too large for the face (collapsed/inverted inner loop) and
+ * degenerate corners. Residual v1 risk: a strongly concave face can produce a
+ * self-intersecting inner loop that still passes the area guard — validateMesh
+ * catches many such cases; the rest the user undoes.
+ */
+export function insetFace(mesh: ShapeBrushMesh, faceIdx: number, margin = 0.25): BrushMeshData | null {
+  const src = mesh.faces?.[faceIdx];
+  if (!src || src.verts.length < 3 || !(margin > 0)) return null;
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const loop = src.verts;
+  const L = loop.length;
+  const n = newellNormal(vertices, loop);
+  if (n.lengthSq() < 0.5) { console.warn("brushOps.insetFace: degenerate normal"); return null; }
+
+  const inner: number[] = [];
+  const V = (i: number): THREE.Vector3 => {
+    const v = vertices[loop[(i + L) % L]!]!;
+    return new THREE.Vector3(v.x, v.y, v.z);
+  };
+  for (let i = 0; i < L; i++) {
+    const prev = V(i - 1), cur = V(i), next = V(i + 1);
+    // Edge directions projected into the face plane (Newell handles mild non-planarity).
+    const dPrev = cur.clone().sub(prev); dPrev.addScaledVector(n, -dPrev.dot(n));
+    const dNext = next.clone().sub(cur); dNext.addScaledVector(n, -dNext.dot(n));
+    if (dPrev.lengthSq() < 1e-12 || dNext.lengthSq() < 1e-12) { console.warn("brushOps.insetFace: zero-length edge"); return null; }
+    dPrev.normalize(); dNext.normalize();
+    // In-plane inward edge normals (loop is CCW about n, so n × d points into the face).
+    const mPrev = new THREE.Vector3().crossVectors(n, dPrev);
+    const mNext = new THREE.Vector3().crossVectors(n, dNext);
+    const b = mPrev.clone().add(mNext);
+    if (b.lengthSq() < 1e-12) { console.warn("brushOps.insetFace: spike corner (edges reverse)"); return null; }
+    b.normalize();
+    const denom = b.dot(mNext);   // = sin(θ/2) for interior angle θ; miter blows up as θ → 0
+    if (denom < 0.05) { console.warn("brushOps.insetFace: near-degenerate corner"); return null; }
+    const p = cur.addScaledVector(b, margin / denom);
+    // Never addOrReuse here: welding an inner vertex onto the outer ring would corrupt topology.
+    vertices.push({ x: +p.x.toFixed(4), y: +p.y.toFixed(4), z: +p.z.toFixed(4) });
+    inner.push(vertices.length - 1);
+  }
+
+  // Margin-too-large guards: collapsed inner edge, or inner loop inverted/degenerate
+  // (raw = unnormalized Newell vector of the inner loop; ‖raw‖ = 2×area).
+  const raw = new THREE.Vector3();
+  for (let i = 0; i < L; i++) {
+    const a = vertices[inner[i]!]!, c = vertices[inner[(i + 1) % L]!]!;
+    const dx = a.x - c.x, dy = a.y - c.y, dz = a.z - c.z;
+    if (dx * dx + dy * dy + dz * dz < 1e-6) { console.warn("brushOps.insetFace: inner loop collapsed (margin too large)"); return null; }
+    raw.x += (a.y - c.y) * (a.z + c.z);
+    raw.y += (a.z - c.z) * (a.x + c.x);
+    raw.z += (a.x - c.x) * (a.y + c.y);
+  }
+  if (raw.lengthSq() < 1e-12 || raw.dot(n) <= 0) { console.warn("brushOps.insetFace: inner loop inverted (margin too large)"); return null; }
+
+  const faces = cloneFaces(mesh.faces!);
+  faces[faceIdx] = { ...faces[faceIdx]!, verts: inner };
+  for (let i = 0; i < L; i++) {
+    faces.push({
+      // Border quad [p, q, qInner, pInner]: supplies p→q (pairs the untouched
+      // neighbor's q→p) and qInner→pInner (pairs the inner face's pInner→qInner).
+      verts: [loop[i]!, loop[(i + 1) % L]!, inner[(i + 1) % L]!, inner[i]!],
+      material: src.material,
+      materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
+    });
+  }
+
+  const out = { vertices, faces };
+  const err = validateMesh(out);
+  if (err) { console.warn(`brushOps.insetFace: aborted (${err})`); return null; }
+  return out;
+}
+
+/**
+ * Extrude a face along its outward normal by `dist` — positive = outward bump,
+ * negative = inward recess/carve. The loop's vertices are DUPLICATED (never reused —
+ * neighbors keep the original ring), the face is retargeted to the new ring (faceIdx
+ * stays on the moved cap), and a side quad [p, q, q', p'] per edge seals the band.
+ * Sides inherit the cap's material. A recess deeper than the solid is caught by
+ * validateMesh's volume check when gross; a shallow punch-through of a large solid
+ * can still validate (net volume positive) — the user undoes those.
  */
 export function extrudeFace(mesh: ShapeBrushMesh, faceIdx: number, dist = 0.25): BrushMeshData | null {
   const src = mesh.faces?.[faceIdx];
-  if (!src || dist <= 0) return null;
+  if (!src || dist === 0 || !Number.isFinite(dist)) return null;
   const vertices = mesh.vertices.map(v => ({ ...v }));
   const n = newellNormal(vertices, src.verts);
   if (n.lengthSq() < 0.5) { console.warn("brushOps.extrudeFace: degenerate normal"); return null; }
@@ -327,7 +424,11 @@ export function extrudeFace(mesh: ShapeBrushMesh, faceIdx: number, dist = 0.25):
     const p = src.verts[i]!, q = src.verts[(i + 1) % src.verts.length]!;
     const pd = dup[i]!, qd = dup[(i + 1) % dup.length]!;
     faces.push({
-      verts: [p, q, qd, pd],   // CCW from outside the band (loop is CCW about +n)
+      // Sign-agnostic winding — do NOT flip for negative dist: by directed-edge
+      // pairing the band must supply p→q (the neighbor still has q→p) and qd→pd
+      // (the moved cap has pd→qd), whichever way the dup ring moved; the quad's
+      // geometric normal flips automatically with the sign of dist.
+      verts: [p, q, qd, pd],
       material: src.material,
       materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
     });
@@ -337,4 +438,30 @@ export function extrudeFace(mesh: ShapeBrushMesh, faceIdx: number, dist = 0.25):
   const err = validateMesh(out);
   if (err) { console.warn(`brushOps.extrudeFace: aborted (${err})`); return null; }
   return out;
+}
+
+/**
+ * Insert a vertex at the midpoint of an edge: both faces traversing (a,b) gain the
+ * midpoint in their loop (e.g. two quads become pentagons). Works on any polygon
+ * faces — the generalization of splitFaceQuad's edge cut. Returns the new mesh plus
+ * the midpoint's vertex index so the caller can re-select a surviving sub-edge (the
+ * original (a,b) pair is no longer traversed after the split, so a stored edge
+ * selection on it goes stale).
+ */
+export function splitEdge(mesh: ShapeBrushMesh, edge: [number, number]): SplitEdgeResult | null {
+  const [a, b] = edge;
+  if (!mesh.faces?.length || a === b) return null;
+  if (a < 0 || b < 0 || a >= mesh.vertices.length || b >= mesh.vertices.length) return null;
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const va = vertices[a]!, vb = vertices[b]!;
+  const mid = addOrReuse(vertices, { x: (va.x + vb.x) / 2, y: (va.y + vb.y) / 2, z: (va.z + vb.z) / 2 });
+  const faces = cloneFaces(mesh.faces);
+  // Exactly the two adjacent faces must take the splice (manifold invariant); also
+  // catches addOrReuse welding onto a vertex already inside one of those loops.
+  const count = spliceMidpoint(faces, mid, a, b);
+  if (count !== 2) { console.warn(`brushOps.splitEdge: edge traversed ${count}× (expected 2)`); return null; }
+  const out = { vertices, faces };
+  const err = validateMesh(out);
+  if (err) { console.warn(`brushOps.splitEdge: aborted (${err})`); return null; }
+  return { mesh: out, mid };
 }
