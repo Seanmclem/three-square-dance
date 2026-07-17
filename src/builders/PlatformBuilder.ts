@@ -280,6 +280,9 @@ export class PlatformBuilder {
     const { position: p, size, thickness } = platform;
     const floorLevel = platform.floorLevel ?? 0;
     const meshes: THREE.Mesh[] = [];
+    // Slab meshes only (cap/bottom/sides/inner faces — no railings): the source for the
+    // exact trimesh collider when CSG cuts punch holes in the slab.
+    const physMeshes: THREE.Mesh[] = [];
 
     const isPolygon = !!(platform.points && platform.points.length >= 3);
 
@@ -342,6 +345,7 @@ export class PlatformBuilder {
       _hasCsgCuts:   capInWorldSpace || undefined,
     } satisfies MeshUserData;
     meshes.push(capMesh);
+    physMeshes.push(capMesh);
 
     if (bottomGeo) {
       const bottomMesh = new THREE.Mesh(bottomGeo, botMat);
@@ -358,6 +362,7 @@ export class PlatformBuilder {
         _hasCsgCuts:   capInWorldSpace || undefined,
       } satisfies MeshUserData;
       meshes.push(bottomMesh);
+      physMeshes.push(bottomMesh);
     }
 
     const sideMesh = new THREE.Mesh(sideGeo, sideMat);
@@ -373,6 +378,7 @@ export class PlatformBuilder {
       _ownsMaterial: !!(sideMatId && sideOvr),
     } satisfies MeshUserData;
     meshes.push(sideMesh);
+    physMeshes.push(sideMesh);
 
     // ── Inner faces for CSG holes ─────────────────────────────────────────────
     if (capInWorldSpace) {
@@ -397,6 +403,7 @@ export class PlatformBuilder {
           _ownsMaterial: true,
         } satisfies MeshUserData;
         meshes.push(innerMesh);
+        physMeshes.push(innerMesh);
       }
     }
 
@@ -465,6 +472,13 @@ export class PlatformBuilder {
       );
       const collider = ColliderBuilder.registerPlatform(platform, true, moverBody);
       return { meshes, collider, moverBody };
+    }
+    // CSG-cut slabs get an exact trimesh so the visual hole is a physical hole —
+    // the AABB cuboid would seal it and block the character (box fallback on failure).
+    if (capInWorldSpace) {
+      const tri = ColliderBuilder.trimeshData(physMeshes);
+      const trimesh = ColliderBuilder.registerCutTrimesh(platform.id, tri.vertices, tri.indices);
+      if (trimesh) return { meshes, collider: trimesh };
     }
     const collider = ColliderBuilder.registerPlatform(platform, !capInWorldSpace);
     return { meshes, collider };

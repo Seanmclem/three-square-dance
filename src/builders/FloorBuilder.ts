@@ -121,6 +121,13 @@ export class FloorBuilder {
       _ownsMaterial: !!ovr,
     } satisfies MeshUserData;
 
+    // CSG-cut floors get an exact trimesh so the stair opening is a physical hole —
+    // the AABB cuboid would seal it (box fallback on failure). Geometry is world-space.
+    if (cutterMeshes.length > 0) {
+      const tri = ColliderBuilder.trimeshData([mesh]);
+      const trimesh = ColliderBuilder.registerCutTrimesh(floor.id, tri.vertices, tri.indices);
+      if (trimesh) return { mesh, collider: trimesh };
+    }
     const collider = ColliderBuilder.registerFloor(colliderBounds, floor.elevation);
 
     return { mesh, collider };

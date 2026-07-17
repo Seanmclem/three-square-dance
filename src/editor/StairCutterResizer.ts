@@ -171,6 +171,7 @@ export class StairCutterResizer implements IEditorModule {
       (m.material as THREE.Material).dispose();
     }
     this._handles.length = 0;
+    if (this._hovered !== null) this._bus.emit("collider:handle-hover", { hovering: false });
     this._hovered = null;
   }
 
@@ -228,6 +229,9 @@ export class StairCutterResizer implements IEditorModule {
       mat.opacity = on ? 1.0 : 0.6;
       m.scale.setScalar(on ? 1.4 : 1.0);
     }
+    // Suspend the stair's TransformControls while a handle is hot, so the handle wins
+    // the pick instead of the drag falling through to the gizmo (ColliderEditor idiom).
+    this._bus.emit("collider:handle-hover", { hovering: h !== null });
   }
 
   // ── Dragging ──────────────────────────────────────────────────────────────

@@ -56,6 +56,41 @@ export class ColliderBuilder {
     });
   }
 
+  /** World-space triangle soup from built meshes (each mesh's local transform applied). */
+  static trimeshData(meshes: THREE.Mesh[]): { vertices: Float32Array; indices: Uint32Array } {
+    const verts: number[] = [], idx: number[] = [];
+    const v = new THREE.Vector3();
+    for (const mesh of meshes) {
+      mesh.updateMatrix();
+      const pos = mesh.geometry.attributes["position"] as THREE.BufferAttribute;
+      const base = verts.length / 3;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrix);
+        verts.push(v.x, v.y, v.z);
+      }
+      const gi = mesh.geometry.index;
+      if (gi) { for (let i = 0; i < gi.count; i++) idx.push(base + gi.getX(i)); }
+      else    { for (let i = 0; i < pos.count; i++) idx.push(base + i); }
+    }
+    return { vertices: new Float32Array(verts), indices: new Uint32Array(idx) };
+  }
+
+  /**
+   * Exact world-space trimesh for CSG-cut floor/platform geometry, so the visual
+   * hole is a physical hole (the AABB cuboid used for uncut slabs would seal it).
+   * FIX_INTERNAL_EDGES per registerShapeTrimesh. Null on degenerate input —
+   * callers fall back to the box collider.
+   */
+  static registerCutTrimesh(id: string, vertices: Float32Array, indices: Uint32Array): RAPIER.Collider | null {
+    try {
+      const desc = RAPIER.ColliderDesc.trimesh(vertices, indices, RAPIER.TriMeshFlags.FIX_INTERNAL_EDGES);
+      return physicsWorld.createStaticCollider(desc);
+    } catch {
+      console.warn(`ColliderBuilder: cut trimesh failed for "${id}" — falling back to box collider`);
+      return null;
+    }
+  }
+
   static registerPlatform(platform: PlatformDef, applyRotation = true, body?: RAPIER.RigidBody): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(
       platform.size.width / 2,
