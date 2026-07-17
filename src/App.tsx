@@ -266,6 +266,7 @@ export default function App() {
     objectPlacerRef.current = objectPlacer;
     const movers    = new MoverSystem(bus);
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
+    zones.enableEditorGhosts();   // see-through editorGhost ceilings (editor shell only)
     zonesRef.current = zones;
     const history   = new HistoryManager(world, syncHistory);
     historyRef.current = history;
@@ -1653,6 +1654,7 @@ export default function App() {
       });
     });
     syncHistory();
+    setSelected(s => (s ? { ...s } : s));   // recompute loop-fill button gating
   };
 
   const handleAddCeilingToRun = (): void => {
@@ -1693,6 +1695,7 @@ export default function App() {
       });
     });
     syncHistory();
+    setSelected(s => (s ? { ...s } : s));   // recompute loop-fill button gating
   };
 
   const isWallRunClosed = (): boolean => {
@@ -1701,6 +1704,48 @@ export default function App() {
     if (walls.length < 3) return false;
     const nodeIds = resolveRunNodeIds(walls);
     return nodeIds !== null && nodeIds.length > 1 && nodeIds[0] === nodeIds[nodeIds.length - 1];
+  };
+
+  // Loop-fill detection: the selected closed run's core node ids (loop order, no
+  // duplicate closer), or null when the selection isn't a closed wall loop.
+  const getRunLoopNodeIds = (): string[] | null => {
+    if (!selected || selected.type !== "wall") return null;
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    if (walls.length < 3) return null;
+    const nodeIds = resolveRunNodeIds(walls);
+    if (!nodeIds || nodeIds.length < 2 || nodeIds[0] !== nodeIds[nodeIds.length - 1]) return null;
+    return nodeIds.slice(0, -1);
+  };
+
+  const sameNodeSet = (a: string[] | null | undefined, b: string[]): boolean =>
+    !!a && a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
+
+  /** The ceiling platform capping the selected run's loop (matched by node set), if any. */
+  const findRunCeiling = (): PlatformDef | null => {
+    const core = getRunLoopNodeIds();
+    if (!core || !selected) return null;
+    const zone = worldRef.current?.zones.get(selected.zoneId);
+    return zone?.platforms.find(p => sameNodeSet(p.nodeIds, core)) ?? null;
+  };
+
+  /** Whether the selected run's loop already has a fill floor at the run's level. */
+  const runHasFloorFill = (): boolean => {
+    const core = getRunLoopNodeIds();
+    if (!core || !selected) return false;
+    const zone = worldRef.current?.zones.get(selected.zoneId);
+    const level = (selected.data as WallDef | null)?.floor ?? 0;
+    return !!zone?.floors.some(f => f.level === level && sameNodeSet(f.floorMesh.nodeIds, core));
+  };
+
+  const handleToggleCeilingGhost = (): void => {
+    const world = worldRef.current;
+    const ceiling = findRunCeiling();
+    if (!world || !selected || !ceiling) return;
+    world.transaction("toggle ceiling ghost", () => {
+      world.updatePlatform(selected.zoneId, ceiling.id, { editorGhost: !ceiling.editorGhost });
+    });
+    syncHistory();
+    setSelected(s => (s ? { ...s } : s));   // refresh the Hide/Show ceiling label
   };
 
   const handleDelete = useCallback((): void => {
@@ -2659,8 +2704,10 @@ export default function App() {
         onImportMaterial={openMaterialImporter}
         onQualityChange={handleQualityChange}
         onCopyRunToFloor={handleCopyRunToFloor}
-        onFillRunWithFloor={isWallRunClosed() ? handleFillRunWithFloor : undefined}
-        onAddCeilingToRun={isWallRunClosed() ? handleAddCeilingToRun : undefined}
+        onFillRunWithFloor={isWallRunClosed() && !runHasFloorFill() ? handleFillRunWithFloor : undefined}
+        onAddCeilingToRun={isWallRunClosed() && !findRunCeiling() ? handleAddCeilingToRun : undefined}
+        onToggleCeilingGhost={findRunCeiling() ? handleToggleCeilingGhost : undefined}
+        runCeilingGhosted={!!findRunCeiling()?.editorGhost}
         onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
         multiSelected={multiSelected}
         onCopy={handleCopy}

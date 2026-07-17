@@ -208,6 +208,13 @@ export class ZoneManager {
   private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
   private readonly _dimMaterials = new Set<THREE.Material>();
 
+  // Editor-ghosted platforms (PlatformDef.editorGhost — see-through ceilings, Phase 38).
+  // Never active in the runtime shell: only the editor calls enableEditorGhosts().
+  private _editorGhosts = false;
+  private _ghostsSolid  = false;   // preview/game running → ghosts render solid
+  private readonly _ghostedMeshes = new Map<THREE.Mesh, THREE.Material>();
+  private readonly _ghostMaterials = new Set<THREE.Material>();
+
   constructor(
     private readonly _scene:        THREE.Scene,
     private readonly _worldState:   WorldState,
@@ -462,6 +469,8 @@ export class ZoneManager {
         this._flickerActive = true;
         this._setEditorOnlyVisible(false);
         this._setHiddenWallGhostsVisible(false);
+        this._ghostsSolid = true;
+        this._applyGhosts();
         if (isGameplayMode(mode)) this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
@@ -470,6 +479,8 @@ export class ZoneManager {
         this._restoreLightStates();
         this._setEditorOnlyVisible(true);
         this._setHiddenWallGhostsVisible(true);
+        this._ghostsSolid = false;
+        this._applyGhosts();
         this._setHideInGameVisible(true);
       }),
       this._bus.on("history:restore", () => {
@@ -1046,6 +1057,13 @@ export class ZoneManager {
     for (const mesh of pe.meshes) {
       const orig = this._dimmedMeshes.get(mesh);
       if (orig) { mesh.material = orig; this._dimmedMeshes.delete(mesh); }
+      const ghostOrig = this._ghostedMeshes.get(mesh);
+      if (ghostOrig) {
+        this._ghostMaterials.delete(mesh.material as THREE.Material);
+        (mesh.material as THREE.Material).dispose();
+        mesh.material = ghostOrig;
+        this._ghostedMeshes.delete(mesh);
+      }
       entry.platformsGroup.remove(mesh);
       mesh.geometry.dispose();
       if ((mesh.userData as { _ownsMaterial?: boolean })._ownsMaterial)
@@ -1581,6 +1599,8 @@ export class ZoneManager {
 
         // Don't re-dim something that's already a dim clone
         if (this._dimMaterials.has(child.material as THREE.Material)) return;
+        // Editor-ghosted meshes are already translucent — leave them to _applyGhosts
+        if (this._ghostedMeshes.has(child)) return;
 
         const origMat = child.material as THREE.Material;
         const dimMat  = origMat.clone() as THREE.MeshStandardMaterial;
@@ -1591,6 +1611,57 @@ export class ZoneManager {
         this._dimmedMeshes.set(child, origMat);
         child.material = dimMat;
       });
+    }
+
+    // Ghosting shares the dimming lifecycle: every build path ends here, so
+    // chaining keeps ghosts applied after any platform/zone rebuild.
+    this._applyGhosts();
+  }
+
+  // ── Editor-ghosted ceilings (Phase 38) ────────────────────────────────────
+
+  /** Editor shell only — the runtime never calls this, so editorGhost platforms
+   *  render solid there. */
+  enableEditorGhosts(): void {
+    this._editorGhosts = true;
+    this._applyGhosts();
+  }
+
+  private _applyGhosts(): void {
+    // Restore all previously ghosted meshes first
+    for (const [mesh, origMat] of this._ghostedMeshes) {
+      mesh.material = origMat;
+      delete (mesh.userData as { ghostPick?: boolean }).ghostPick;
+    }
+    this._ghostedMeshes.clear();
+    for (const m of this._ghostMaterials) m.dispose();
+    this._ghostMaterials.clear();
+
+    if (!this._editorGhosts || this._ghostsSolid) return;
+
+    for (const [zoneId, entry] of this._loadedZones) {
+      const zone = this._worldState.zones.get(zoneId);
+      if (!zone) continue;
+      for (const platform of zone.platforms) {
+        if (!platform.editorGhost) continue;
+        const pe = entry.platformEntries.get(platform.id);
+        if (!pe) continue;
+        for (const mesh of pe.meshes) {
+          // Dimmed meshes are already translucent; don't double-swap
+          if (this._dimmedMeshes.has(mesh)) continue;
+          const origMat  = mesh.material as THREE.Material;
+          const ghostMat = origMat.clone() as THREE.MeshStandardMaterial;
+          ghostMat.transparent = true;
+          ghostMat.opacity     = 0.15;
+          ghostMat.depthWrite  = false;
+          this._ghostMaterials.add(ghostMat);
+          this._ghostedMeshes.set(mesh, origMat);
+          mesh.material = ghostMat;
+          // Click-through: SelectionManager picks ghostPick meshes only when
+          // nothing solid is under the cursor (hidden-wall rule)
+          (mesh.userData as { ghostPick?: boolean }).ghostPick = true;
+        }
+      }
     }
   }
 

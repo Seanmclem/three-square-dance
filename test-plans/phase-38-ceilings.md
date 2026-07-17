@@ -44,6 +44,23 @@ entity type.
 | 12 | Material screen (real click) | Sections TOP, BOTTOM, SIDES; old "TOP / BOTTOM" label gone | ✅ |
 | 13 | Cleanup | Test platforms/walls/nodes removed; zone back to baseline (0 platforms, 25 walls) | ✅ |
 
+## Follow-up checks — v4.32.1 ghost ceilings + button gating (verified 2026-07-16, real clicks)
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 14 | Closed run, no fills | Actions shows BOTH "Fill closed loop with floor" and "Add ceiling" | ✅ |
+| 15 | Click "Add ceiling" | Button disappears immediately, replaced by "Hide ceiling (ghost)"; Fill remains | ✅ |
+| 16 | Reload (autosave round-trip) | Ceiling + gating state persist: Add still hidden, Hide shown | ✅ |
+| 17 | Click "Hide ceiling (ghost)" | Both ceiling meshes → opacity 0.15, `ghostPick: true`; label flips to "Show ceiling (un-ghost)" | ✅ |
+| 18 | Click through the ghost lid from above | Selects the object inside the room (`test_chair`), not the ceiling | ✅ |
+| 19 | Enter preview with ghosted ceiling | Meshes solid (opacity 1, no ghostPick) | ✅ |
+| 20 | Exit preview | Re-ghosted (0.15 + ghostPick); `editorGhost` persisted in the def | ✅ |
+| 21 | Click "Show ceiling (un-ghost)" | Solid again, ghostPick cleared, label back to "Hide ceiling (ghost)" | ✅ |
+| 22 | Click "Fill closed loop with floor" | Floor created; Fill button disappears immediately | ✅ |
+
+Note: clicking at the room's center while the wall run is selected hits the run's
+transform gizmo (pivot = run centroid) — deselect first when testing click-through there.
+
 ## Not covered this pass (manual follow-ups if suspicious)
 
 - CSG stair-cut through a bottom-textured platform (helper is shared with the proven

@@ -680,6 +680,9 @@ export interface PlatformDef {
   sideMaterialOverrides?: MaterialOverrides;
   bottomMaterial?:          string;             // bottom cap; falls back to `material` (Phase 38 ceilings)
   bottomMaterialOverrides?: MaterialOverrides;
+  // Editor-only see-through: renders as a translucent click-through ghost in the editor
+  // (so rooms under a ceiling stay editable) but is fully solid in preview/game.
+  editorGhost?:           boolean;
   groupIds?:              string[];
   mover?:                 MoverDef;
   sound?:                 AttachedSound;   // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)

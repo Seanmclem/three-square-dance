@@ -58,6 +58,29 @@ elevation/height, so reading them off `selected.data` is safe.
   `onAddCeilingToRun={isWallRunClosed() ? ... : undefined}`; material-delete usage scan
   counts `p.bottomMaterial`.
 
+## Follow-up (v4.32.1): ghost ceilings + loop-fill button gating
+
+A capped room was un-editable from outside (the lid occluded view and clicks), and the
+fill/ceiling buttons could stack duplicates. Shipped (user-approved design):
+
+- **`PlatformDef.editorGhost?: boolean`** — the platform renders as a translucent (0.15)
+  **click-through** ghost in the editor but is solid in preview/game/runtime.
+  Implementation: `ZoneManager._applyGhosts()`, an editor-only material-swap pass mirroring
+  `_applyDimming` (chained from its tail; disjoint mesh sets via skip-guards); sets
+  `userData.ghostPick` so the existing hidden-wall pick rule provides click-through while
+  the ghost stays selectable on empty space. `enableEditorGhosts()` is called only by
+  App.tsx (runtime never ghosts); `preview:start/stop` toggle `_ghostsSolid`.
+- **Toggles**: wall-run Actions button "Hide ceiling (ghost)" / "Show ceiling (un-ghost)"
+  (shown when a node-set-matched ceiling exists) + a GHOST IN EDITOR checkbox on the
+  platform Geometry screen (covers hand-placed ceilings).
+- **Gating**: "Fill closed loop with floor" hides when a floor with the run's exact node
+  set exists at the run's level; "Add ceiling" hides when a matching platform exists
+  (replaced by the ghost toggle). Detection: `getRunLoopNodeIds()` + order-insensitive
+  node-set compare (App.tsx). Deleting the fill/ceiling brings the button back.
+- **Gotcha fixed**: the mutating handlers must bump `setSelected(s => ({...s}))` — 
+  `syncHistory()` alone doesn't re-render App when `canUndo` was already true, leaving the
+  buttons stale until the next selection change.
+
 ## Accepted edge cases (documented, not fixed)
 
 - Collider stays the AABB cuboid → a ceiling over a concave loop has invisible collision
@@ -67,7 +90,11 @@ elevation/height, so reading them off `selected.data` is safe.
 - BOTTOM section can't be reset to "follow top" once set (parity with SIDES).
 - Deleting the wall run deletes its nodes; the ceiling falls back to cached `points` and
   keeps its last shape (parity with node-backed floors from "Fill closed loop with floor").
-- Double-clicking "Add ceiling" stacks two ceilings (parity with the fill-floor button).
+- A ghosted ceiling over a fully-floored room can be hard to click directly (something
+  solid is always behind it) — un-ghost it from the wall run, or use the platform panel
+  checkbox after selecting it from an angle with sky behind.
+- A dimmed (inactive-level) ceiling is left to the dimming system rather than ghosted —
+  visually identical opacity; picking follows the level rules.
 
 ## Verification
 

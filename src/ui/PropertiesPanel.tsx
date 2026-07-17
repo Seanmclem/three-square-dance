@@ -351,6 +351,8 @@ interface PropertiesPanelProps {
   onCopyRunToFloor?:        (targetLevel: number) => void;
   onFillRunWithFloor?:      () => void;
   onAddCeilingToRun?:       () => void;
+  onToggleCeilingGhost?:    () => void;
+  runCeilingGhosted?:       boolean;
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
   zones?:                   ZoneDef[];
@@ -390,7 +392,8 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onFloorNodesUpdate, getNodeLinks,
-  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onDelete,
+  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun,
+  onToggleCeilingGhost, runCeilingGhosted, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
@@ -612,6 +615,8 @@ export function PropertiesPanel({
               onCopyRunToFloor={onCopyRunToFloor}
               onFillRunWithFloor={onFillRunWithFloor}
               onAddCeilingToRun={onAddCeilingToRun}
+              onToggleCeilingGhost={onToggleCeilingGhost}
+              runCeilingGhosted={runCeilingGhosted}
               onDelete={onDelete}
               onBake={onBake}
             />
@@ -686,13 +691,15 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onDelete, onBake }: {
+function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onDelete, onBake }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
   onCopyRunToFloor?:  (level: number) => void;
   onFillRunWithFloor?: () => void;
   onAddCeilingToRun?: () => void;
+  onToggleCeilingGhost?: () => void;
+  runCeilingGhosted?: boolean;
   onDelete?:          () => void;
   onBake?:            (refs: SelectedRef[]) => void;
 }) {
@@ -733,6 +740,20 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
                 color: "#6bc88a", fontSize: 11, fontFamily: "monospace",
               }}
             >Add ceiling (cap closed loop)</button>
+          )}
+
+          {onToggleCeilingGhost && (
+            <button
+              onClick={onToggleCeilingGhost}
+              title={runCeilingGhosted
+                ? "Ceiling is ghosted (see-through, click-through in the editor; solid in game)"
+                : "Ghost the ceiling so you can see and click into the room; stays solid in game"}
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(60,180,100,0.1)", border: "1px solid rgba(60,180,100,0.35)",
+                color: "#6bc88a", fontSize: 11, fontFamily: "monospace",
+              }}
+            >{runCeilingGhosted ? "Show ceiling (un-ghost)" : "Hide ceiling (ghost)"}</button>
           )}
 
           {onCopyRunToFloor && (
@@ -1356,6 +1377,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   const [railH,    setRailH]    = useState(String(plat?.railingHeight ?? 1.0));
   const [hasRail,  setHasRail]  = useState(plat?.hasRailing ?? false);
   const [floorLvl, setFloorLvl] = useState(plat?.floorLevel ?? 0);
+  const [ghost,    setGhost]    = useState(plat?.editorGhost ?? false);
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
@@ -1366,6 +1388,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
     setRailH(String(plat?.railingHeight ?? 1.0));
     setHasRail(plat?.hasRailing ?? false);
     setFloorLvl(plat?.floorLevel ?? 0);
+    setGhost(plat?.editorGhost ?? false);
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setRotYStr(String(plat?.rotation?.y ?? 0)); }, [plat?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1376,6 +1399,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   const commitThick = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ thickness: n } as unknown as Partial<WorldObject>); };
   const commitRailH = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n > 0) onObjectUpdate({ railingHeight: n } as unknown as Partial<WorldObject>); };
   const toggleRail  = (checked: boolean) => { setHasRail(checked); onObjectUpdate({ hasRailing: checked } as unknown as Partial<WorldObject>); };
+  const toggleGhost = (checked: boolean) => { setGhost(checked); onObjectUpdate({ editorGhost: checked } as unknown as Partial<WorldObject>); };
 
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1462,6 +1486,17 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
           setFloorLvl(n);
           onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
         }} />
+      </div>
+
+      {/* Editor ghost (Phase 38 — see-through ceilings) */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={ghost} onChange={e => toggleGhost(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>GHOST IN EDITOR</span>
+        </label>
+        <span style={{ color: "#505060", fontSize: 9, paddingLeft: 21 }}>
+          See-through & click-through while editing (for ceilings) — solid in preview / game
+        </span>
       </div>
 
       {/* Motion (Phase 31) — polygon platforms bake world-space geometry and can't animate */}
