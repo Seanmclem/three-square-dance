@@ -125,6 +125,7 @@ export class NodeDragger {
 
   private _altDown = false;
   private _gizmoActive = false; // a TransformControls gizmo drag is in progress — mute node picking
+  private _handleHot   = false; // another editor's face/collider handle is hovered — it owns the pick
   private _gameMode = false;   // in Play (game) mode, helpers stay hidden — don't rebuild them
   private _lastRawPos: Vec2 = { x: 0, z: 0 };
   private readonly _unsubs: Array<() => void> = [];
@@ -148,12 +149,19 @@ export class NodeDragger {
         }
       }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (!isSelectMode(this._activeTool) || this._gizmoActive) return;
+        if (!isSelectMode(this._activeTool) || this._gizmoActive || this._handleHot) return;
         this._onMouseMove(worldPos.x, worldPos.z);
       }),
       this._bus.on("input:mousedown", ({ button }) => {
-        if (!isSelectMode(this._activeTool) || button !== 0 || this._gizmoActive) return;
+        if (!isSelectMode(this._activeTool) || button !== 0 || this._gizmoActive || this._handleHot) return;
         this._onMouseDown();
+      }),
+      // A face/collider/cut-box handle (StairCutterResizer, ShapeResizer, ColliderEditor,
+      // BrushVertexEditor) is hovered — it owns the pick, so don't hover/grab a node or
+      // edge underneath it. Clear our hover so a node dot + a cut-box handle aren't both lit.
+      this._bus.on("collider:handle-hover", ({ hovering }) => {
+        this._handleHot = hovering;
+        if (hovering && this._state !== "DRAG") this._clearHover();
       }),
       // A gizmo drag (TransformControls) shares the canvas; without this, pressing on a
       // gizmo ring over a node dot behind it would also grab the node. Mute picking while
@@ -765,6 +773,36 @@ export class NodeDragger {
       size:     { width: w, depth: d },
     });
     this._repositionRectPlatform(this._dragRectPlatId, cx, cz, w, d, o.theta);
+  }
+
+  /** Reset hover highlights without destroying the dots/lines (used when a face/collider
+   *  handle takes over the pick — a subsequent mousemove re-detects hover normally). */
+  private _clearHover(): void {
+    if (this._hoveredRectCorner) {
+      const c = this._rectCorners.get(this._hoveredRectCorner);
+      if (c) this._styleDot(c.dot, "idle");
+      this._hoveredRectCorner = null;
+    }
+    if (this._hoveredRectEdge) {
+      const e = this._rectEdges.get(this._hoveredRectEdge);
+      if (e) this._setEdgeStyle(e.line, false);
+      this._hoveredRectEdge = null;
+    }
+    if (this._hoveredNodeId) {
+      const dot = this._nodeDots.get(this._hoveredNodeId);
+      if (dot) {
+        (dot.material as THREE.MeshBasicMaterial).color.setHex(0x6699bb);
+        (dot.material as THREE.MeshBasicMaterial).opacity = 0.48;
+        dot.scale.setScalar(1);
+      }
+      this._hoveredNodeId = null;
+    }
+    if (this._hoveredEdgeKey) {
+      const e = this._edgeEntries.get(this._hoveredEdgeKey);
+      if (e) this._setEdgeStyle(e.line, false);
+      this._hoveredEdgeKey = null;
+    }
+    document.body.style.cursor = "";
   }
 
   private _hide(): void {
