@@ -1543,24 +1543,13 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
   const fields = SHAPE_PARAM_FIELDS[shape?.kind ?? "box"];
   const resolved = shape ? resolveShapeParams(shape) : null;
   const [resizeOn, setResizeOn] = useState(false);
-  const [addArmed, setAddArmed] = useState(false);
 
-  // Resize handles + add-corner arming are per-selection editor state.
+  // Resize handles are per-selection editor state.
   useEffect(() => {
     setResizeOn(false);
-    setAddArmed(false);
   }, [selected.id]);
-  // Clear the armed cursor / handles when this screen unmounts.
-  useEffect(() => () => {
-    bus?.emit("shape:add-corner", { armed: false });
-  }, [bus]);
 
   const toggleResize = (on: boolean) => { setResizeOn(on); bus?.emit("shape:resize-toggle", { enabled: on }); };
-  const armAddCorner = () => {
-    const next = !addArmed;
-    setAddArmed(next);
-    bus?.emit("shape:add-corner", { armed: next });
-  };
   const convertToBrush = () => {
     if (!shape) return;
     const pts = ShapeBuilder.localHullPoints(shape);
@@ -1700,13 +1689,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
             <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", marginBottom: 6 }}>
               {shape.mesh!.vertices.length} corners
             </div>
-            <button
-              style={{ ...SHAPE_ACTION_BTN, ...(addArmed ? { background: "rgba(80,140,255,0.25)", color: "#80aaff" } : {}) }}
-              onClick={armAddCorner}
-            >
-              {addArmed ? "Click the brush to add… (Esc)" : "+ Add corner"}
-            </button>
-            <button style={{ ...SHAPE_ACTION_BTN, marginTop: 6 }} onClick={revertToParams}>Revert to {shape.kind} params</button>
+            <button style={SHAPE_ACTION_BTN} onClick={revertToParams}>Revert to {shape.kind} params</button>
             <div style={{ color: "#404050", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
               Drag a corner sphere to reshape (Alt = no snap). Right-click a corner to
               delete it. The solid always stays convex.

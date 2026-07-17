@@ -21,10 +21,8 @@ const snap = (v: number): number => Math.round(v / SNAP) * SNAP;
  *  - drag a handle → move that corner (camera-facing plane, snapped to 0.25 local,
  *    Alt = free); live hull rebuild through updateShape inside one drag transaction.
  *  - right-click a handle → delete the corner (min 4 kept).
- *  - "shape:add-corner" (Geometry panel) arms insertion: the next click on the brush
- *    surface adds a corner at the hit point — it starts ON the hull (no visual
- *    change) and becomes a real corner the moment it's dragged outward. Convexity is
- *    guaranteed by construction: geometry + collider are always the hull of the cloud.
+ *    Convexity is guaranteed by construction: geometry + collider are always the
+ *    hull of the cloud.
  * NodeDragger/TriggerVolumeResizer idioms: raycasts only its own handles,
  * gizmo:dragging mute both ways, Escape cancels.
  */
@@ -35,7 +33,6 @@ export class BrushVertexEditor implements IEditorModule {
   private _previewing = false;
   private _gizmoActive = false;
   private _altDown = false;
-  private _addArmed = false;
 
   private _handles: THREE.Mesh[] = [];
   private _hovered: number | null = null;
@@ -100,19 +97,14 @@ export class BrushVertexEditor implements IEditorModule {
         this._selectedId = payload.type === "shape" ? payload.id : null;
         this._zoneId = payload.zoneId;
         this._selectedVertex = payload.type === "shape" ? (payload.vertexIndex ?? null) : null;
-        this._addArmed = false;
         this._sync();
       }),
-      this._bus.on("object:deselected", () => { this._selectedId = null; this._addArmed = false; this._sync(); }),
+      this._bus.on("object:deselected", () => { this._selectedId = null; this._sync(); }),
       this._bus.on("shape:removed", ({ id }) => {
         if (id === this._selectedId) { this._selectedId = null; this._sync(); }
       }),
       this._bus.on("shape:updated", ({ id }) => {
         if (id === this._selectedId && this._state !== "DRAG" && !this._tcDragging) this._sync();
-      }),
-      this._bus.on("shape:add-corner", ({ armed }) => {
-        this._addArmed = armed;
-        document.body.style.cursor = armed ? "crosshair" : "";
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
@@ -126,7 +118,6 @@ export class BrushVertexEditor implements IEditorModule {
       }),
       this._bus.on("input:mousedown", ({ button, screenPos }) => {
         if (button !== 0 || !this._shouldShow() || this._gizmoActive) return;
-        if (this._addArmed) { this._onAddCorner(screenPos); return; }
         this._onMouseDown(screenPos);
       }),
       this._bus.on("input:mouseup", ({ button }) => {
@@ -141,7 +132,6 @@ export class BrushVertexEditor implements IEditorModule {
         if (code === "Escape") {
           if (this._state === "DRAG") this._cancelDrag();
           if (this._tcDragging) this._cancelTcDrag();
-          if (this._addArmed) { this._addArmed = false; document.body.style.cursor = ""; }
         }
       }),
       this._bus.on("input:keyup", ({ code }) => {
@@ -379,39 +369,7 @@ export class BrushVertexEditor implements IEditorModule {
     this._sync();
   }
 
-  // ── Add / delete corners ────────────────────────────────────────────────────
-
-  /** Armed click: raycast the brush's own meshes, insert a corner at the hit point. */
-  private _onAddCorner(screenPos: ScreenPos): void {
-    const shape = this._selectedShape();
-    if (!shape || !this._zoneId || !this._selectedId) return;
-    // Face-brushes: a loose corner has no face loop to live in — split/extrude are
-    // the topology tools there (Phase 23 v1 restriction).
-    if ((shape.mesh?.faces?.length ?? 0) > 0) { this._addArmed = false; document.body.style.cursor = ""; return; }
-    this._setRayFrom(screenPos);
-    const targets: THREE.Mesh[] = [];
-    this._scene.traverse(o => {
-      if (o instanceof THREE.Mesh && o.userData["editorId"] === this._selectedId) targets.push(o);
-    });
-    const hit = this._raycaster.intersectObjects(targets, false)[0];
-    if (!hit) return;   // stay armed until a face is actually clicked (Escape cancels)
-    const inv = this._shapeMatrix(shape).invert();
-    const local = hit.point.clone().applyMatrix4(inv);
-    const v: Vec3 = this._altDown
-      ? { x: local.x, y: local.y, z: local.z }
-      : { x: snap(local.x), y: snap(local.y), z: snap(local.z) };
-    this._world.transaction("add brush corner", () => {
-      this._world.updateShape(this._zoneId!, this._selectedId!, {
-        mesh: { ...shape.mesh!, vertices: [...shape.mesh!.vertices, v] },
-      });
-    });
-    this._addArmed = false;
-    document.body.style.cursor = "";
-    // Swallow the click that follows this mousedown so SelectionManager doesn't re-pick.
-    this._bus.emit("gizmo:dragging", { isDragging: true });
-    this._bus.emit("gizmo:dragging", { isDragging: false });
-    this._sync();
-  }
+  // ── Delete corners ──────────────────────────────────────────────────────────
 
   /** Right-click a handle: remove that corner (keep at least MIN_VERTS). */
   private _onDeleteCorner(screenPos: ScreenPos): void {

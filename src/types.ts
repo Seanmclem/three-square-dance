@@ -220,8 +220,6 @@ export interface BusEvents {
   "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
-  // Geometry-panel "add corner" arm → BrushVertexEditor (next click on the brush inserts a vertex).
-  "shape:add-corner":      { armed: boolean };
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
