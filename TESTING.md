@@ -294,6 +294,27 @@ localStorage.setItem = () => {};
 Then call `tabs_close_mcp`. The tab's `beforeunload` fires but `setItem` is now a no-op,
 so the user's level remains exactly as it was before the test session.
 
+**⚠️ Mid-session reloads leak test entities to the USER'S session (2026-07-16).** Reloading
+a test tab (e.g. to pick up an HMR-heavy code change) fires `beforeunload`, which writes the
+tab's test entities into the shared autosave. If the user reloads THEIR tab during that
+window — likely, since sessions often tell them to reload for new code — their session
+ingests the junk and re-writes it on every later unload, re-contaminating the autosave even
+after this session restores its snapshot. It happened exactly that way: a test room +
+`plat_*` ceiling rode into the user's world; the snapshot-restore at session end then put
+the contaminated value *back* because the start-of-session snapshot itself was taken after
+the user's tab had written. Rules:
+1. **Delete all test entities BEFORE any reload of the test tab**, not just at session end.
+2. At session end, don't blindly restore the start snapshot — **verify it first**: the
+   autosave string must contain no test ids. If it's contaminated, instead purge the test
+   entities from the tab's in-memory world and write `JSON.stringify(__world.toJSON())`
+   as the autosave (un-neuter `setItem` with `delete localStorage.setItem` if needed).
+3. Grep for **all** ids you created, not just `test_*` — entities made by clicking real
+   UI buttons get production ids (`plat_xxxxxxxx`, `crypto.randomUUID()` floors). Track
+   them as you create them.
+4. If contamination reached the user's live tab, tell them: their open tab holds the junk
+   in memory and will write it back on close/reload — they need to delete the stray
+   entities in their tab (or reload and delete after).
+
 ---
 
 ### Other lessons
