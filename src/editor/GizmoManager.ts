@@ -1118,6 +1118,16 @@ export class GizmoManager implements IEditorModule {
               });
             }
           }
+          // Same for node-backed platforms (ceilings capping the run — Phase 38)
+          for (const plat of zone.platforms) {
+            const pIds = plat.nodeIds;
+            if (!pIds?.length) continue;
+            if (pIds.every(id => movedNodes.has(id))) {
+              this._worldState.updatePlatform(this._selZoneId!, plat.id, {
+                position: { ...plat.position, y: plat.position.y + delta.y },
+              });
+            }
+          }
         }
         break;
       }

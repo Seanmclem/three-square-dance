@@ -61,6 +61,12 @@ entity type.
 Note: clicking at the room's center while the wall run is selected hits the run's
 transform gizmo (pivot = run centroid) — deselect first when testing click-through there.
 
+## Follow-up — ceilings follow vertical run moves (v4.32.2, verified 2026-07-16)
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 23 | Real gizmo Y-drag on a closed run with fill floor + ceiling | Wall `elevation`, floor `elevation`, and ceiling `position.y` all shift by the identical delta (measured +1.693 on all three); room + lid move as one unit | ✅ |
+
 ## Not covered this pass (manual follow-ups if suspicious)
 
 - CSG stair-cut through a bottom-textured platform (helper is shared with the proven

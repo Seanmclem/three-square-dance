@@ -81,6 +81,15 @@ fill/ceiling buttons could stack duplicates. Shipped (user-approved design):
   `syncHistory()` alone doesn't re-render App when `canUndo` was already true, leaving the
   buttons stale until the next selection change.
 
+## Follow-up (v4.32.2): ceilings follow vertical wall-run moves
+
+GizmoManager's wall Y-move commit elevated walls and node-matched **floors** but had no
+platform equivalent — a ceiling followed the run horizontally (node-derived polygon) but
+stayed at its old height on a vertical move. Fixed by mirroring the floor loop: node-backed
+platforms whose `nodeIds` are entirely within the moved node set get
+`position.y += delta.y` (`GizmoManager.ts`, wall case). Verified with a real gizmo drag —
+wall/floor/ceiling all moved by the identical delta.
+
 ## Accepted edge cases (documented, not fixed)
 
 - Collider stays the AABB cuboid → a ceiling over a concave loop has invisible collision
