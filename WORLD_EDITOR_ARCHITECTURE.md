@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.32.2** — last updated 2026-07-16
+**Version 4.32.3** — last updated 2026-07-16
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -150,6 +150,7 @@
 - v4.32.0 — **Phase 38 — Ceilings (platform bottom material + "Add ceiling" on closed wall runs).** A ceiling is deliberately **not a new entity** — it's a **thin node-backed polygon platform**, which already had a bottom cap visible from below, perimeter sides with `sideMaterial`, thickness, node-following points, and a collider. **Part A — `PlatformDef.bottomMaterial?` / `bottomMaterialOverrides?`** (additive, no migration): the bottom cap splits into its own `THREE.Mesh` **only when one of them is set** — otherwise the merged top+bottom cap path is byte-for-byte unchanged (same mesh count / draw calls / single CSG pass), so existing worlds have zero regression surface. `PlatformBuilder`: new `CapFaces = "both"|"top"|"bottom"` param on `buildSlabCapGeo` (gates the ±Y quads) and `buildPolygonCapGeo` (early-returns one cap before the merge); the CSG cut loop was extracted into a `cutWorldGeo` helper applied to both caps; the bottom mesh is `selectable: true` (ceilings are clicked from below); overrides-only (`bottomMaterialOverrides` without `bottomMaterial`) falls back to the top material id — deliberately better than the sides quirk where overrides-only is ignored. PropertiesPanel platform material view: "TOP / BOTTOM" renamed **"TOP"**, new **"BOTTOM"** `MaterialSection` (value falls back to `material`) wired like SIDES. Material-delete usage scan counts `p.bottomMaterial`. **Part B — "Add ceiling (cap closed loop)"** button in the wall-run Actions accordion beside "Fill closed loop with floor", gated by the same `isWallRunClosed()`. `handleAddCeilingToRun` (App.tsx) mirrors `handleFillRunWithFloor` but commits a polygon `PlatformDef` with `PolygonPlatformTool._commit`'s exact field set, **reusing the run's node IDs** (no duplication — ZoneManager's node-move rebuild keeps the lid glued to wall edits) at `position.y = wall.elevation + wall.height` (slab bottom flush with the wall top — the lid sits ON the walls; runs merge only with uniform elevation/height so reading `selected.data` is safe), `thickness 0.2`, `material "concrete_01"`, `bottomMaterial` unset. Accepted parity edge cases: AABB collider over concave loops, underside-only selection tint, BOTTOM not resettable to follow-top (like SIDES), node loss on run delete falls back to cached `points`, double-click stacks two lids. Plan: `plans/phase-38-ceilings.md`; acceptance: `test-plans/phase-38-ceilings.md`.
 - v4.32.1 — **Phase 38 follow-up — ghost ceilings + loop-fill button gating.** (a) **`PlatformDef.editorGhost?: boolean`** (persisted): the platform renders as a translucent (0.15) **click-through** ghost in the editor — so a capped room stays viewable/editable from outside — but is fully solid in preview/game and in the runtime shell. Implemented as an editor-only material-swap pass `ZoneManager._applyGhosts()` (mirrors `_applyDimming`; chained from its tail so every build path reapplies it; guards make ghost/dim mesh sets disjoint): swaps in a transparent clone + sets `userData.ghostPick`, so the existing hidden-wall pick rule (`SelectionManager._cast`: ghosts picked only when nothing solid is under the cursor) provides the click-through. Gated by `enableEditorGhosts()`, called **only** by the editor shell (App.tsx) — the runtime never ghosts; `preview:start/stop` set `_ghostsSolid` and re-run the pass, so ghosts are solid while playing. Colliders are untouched (physics only runs in preview, where ghosts are solid anyway). Toggled from the wall-run Actions button ("Hide ceiling (ghost)" / "Show ceiling (un-ghost)", shown when a node-matched ceiling exists) and a **GHOST IN EDITOR** checkbox on the platform Geometry screen (covers hand-placed ceilings). (b) **Gating**: "Fill closed loop with floor" hides when a floor with the run's exact node set exists at the run's level; "Add ceiling" hides when a platform with that node set exists (replaced by the ghost toggle) — no more double-stacked lids/floors. Detection = `getRunLoopNodeIds()` + order-insensitive node-set compare in App.tsx. The three mutating handlers bump `setSelected(s => ({...s}))` after committing because `syncHistory()` alone doesn't re-render when canUndo was already true — without it the buttons went stale until the next selection change (caught in browser verification).
 - v4.32.2 — **Ceilings follow vertical wall-run moves.** `GizmoManager`'s wall-case Y-move commit bumped each wall's `elevation` and elevated **floors** whose `nodeIds` were entirely within the moved node set — but had no platform equivalent, so a ceiling followed the run horizontally (nodes are X/Z-only; the polygon re-derives) but was left behind vertically. Added the mirrored loop: node-backed **platforms** whose `nodeIds` ⊆ moved set get `position.y += delta.y` via `updatePlatform`. Verified with a real gizmo Y-drag: wall elevation, fill-floor elevation, and ceiling `position.y` all moved by the identical delta (+1.693), room + lid traveling as one unit.
+- v4.32.3 — **StairTool bases the stair on the clicked surface.** User-reported: stairs placed "high, like floor 2" on any floor over any surface. Root cause: `StairTool._getElevationForLevel` took **`Math.max` over every floor at the active level zone-wide**, and the user's level-2 scene had a level-0 floor gizmo-dragged to elevation 8.43 — so every ground-floor stair started at 8.43 regardless of where it was drawn. Fix: the start click now uses **`surfacePos.y`** (InputManager's real raycast against buildable geometry, ghostPick excluded — the ShapeTool precedent; the original StairTool spec in this doc even called for surface snapping, but the implementation never did it), keeping the level heuristic only as the fallback for clicks over the void. Verified in the user's actual level-2 world with the rogue floor present: ground stair starts at 0.004 (floor surface), room-stack stair at 3.004 (level-1 fill floor — the ghosted lid correctly lets placement fall through). End-Y logic unchanged (auto-rise to next level else stepped).
 - v3.9.3 — **Phase 10.6 status clarified:** the engine-routing half (index-based `fire()` + `on_timer` timers) is already shipped in `ScriptEngine.ts`; the unbuilt remainder (`EntityRegistry` capability discovery + `ActionDispatcher` handler registry) is deferred to **Phase 13**, where it first has consumers (NPCs/enemies). 10.6 adds no functional capability over what's already shipped/planned — only decoupling + capability-aware UI. Added a status banner and struck the already-solved problems (O(n) lookup, timer polling).
 - v4.1 — **Generic gameplay-state store implemented** (`src/scripting/GameState.ts`). Replaced the boolean-only flag system + string-set `GameStateManager` inventory with one `Map<string, JsonValue>` store (registered-schema defaults + numeric clamp; ad-hoc keys). Removed script types `set_flag`/`clear_flag`/`give_item`/`flag_set`/`flag_not_set`/`player_has_item`/`on_flag_set`/`on_flag_cleared`; added `set_state`/`adjust_number`/`delete_state`/`has_state`/`compare_number`/`on_state_changed`. Added a `worldeditor_gamesave` localStorage game save (state snapshot + fired one-shots). **Full reference: `GAMEPLAY_STATE.md`** — the stale `GameSave`/flag/`GameStateManager` descriptions in this file are superseded by it.
 
@@ -2748,27 +2749,30 @@ Status label shows current Y elevation during PLACING
 
 ### StairTool.ts
 
+> **v4.32.3 — synced to the actual implementation.** The original spec below said the
+> cursor "snaps to nearest floor surface hit", but the shipped tool derived the start Y
+> from the LEVEL instead — `max(elevation)` over ALL floors at the active level — which
+> broke zone-wide as soon as any floor was gizmo-dragged off its level plane (a stray
+> level-0 floor at y 8.43 made every ground-floor stair start at 8.43). Now the start Y
+> uses the click's **`surfacePos.y`** (real raycast against buildable geometry, ghostPick
+> excluded — ShapeTool precedent), with the level heuristic only as the void-click fallback.
+
 ```
-States: IDLE → SET_BOTTOM → SET_TOP → IDLE
+States: IDLE → PLACING → IDLE
 
-SET_BOTTOM:
-  Raycast against floor meshes + platform meshes + ground (not walls)
-  Cursor snaps to nearest floor surface hit
-  On input:click: record bottomPoint, enter SET_TOP
+IDLE, on input:click:
+  startY = surfacePos?.y                       // the surface actually under the cursor
+           ?? max(floors at activeLevel).elevation ?? activeLevel * 3.0   // void fallback
+  record startPos (XZ snapped 0.5), show start dot + preview line, enter PLACING
 
-SET_TOP:
-  Show preview line from bottomPoint to mouse
-  Cursor still snaps to floor surfaces
-  Show angle label and height label
-  Scroll wheel adjusts stair width (0.8m–4.0m, default 1.5m)
-
-  On input:click:
-    if topPoint.y <= bottomPoint.y: flash error "Top point must be higher", stay in SET_TOP
-    stairDef = { id: uuid(), start: bottomPoint, end: topPoint, width, style, material, hasRailing: true }
-    worldState.addStair(zoneId, stairDef)
-    Return to IDLE
-
-  On input:keydown Escape: return to IDLE
+PLACING:
+  Preview line startPos → mouse; end Y via _computeEndY:
+    targetY = elevation of activeLevel+1 (same floor lookup)
+    endY = targetY > startY ? targetY          // auto-rise to the next level's plane
+                            : startY + numSteps * STEP_H   // stepped rise
+  On input:click: commit StairDef { start, end, width, style: "straight", ... } via
+    history.record("add stair"); return to IDLE
+  Escape / tool switch: reset
 ```
 
 ### ShapeTool.ts (v4.9.0)

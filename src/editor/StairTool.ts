@@ -60,10 +60,10 @@ export class StairTool implements IEditorModule {
         if (!this._active) this._reset();
       }),
       this._bus.on("floor:select",  ({ level }) => { this._activeLevel = level; }),
-      this._bus.on("input:click",   ({ worldPos, button }) => {
+      this._bus.on("input:click",   ({ worldPos, surfacePos, button }) => {
         if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
-        this._onLeftClick(worldPos);
+        this._onLeftClick(worldPos, surfacePos);
       }),
       this._bus.on("input:mousemove", ({ worldPos }) => {
         if (this._active) this._onMouseMove(worldPos);
@@ -88,12 +88,15 @@ export class StairTool implements IEditorModule {
     return level * 3.0;
   }
 
-  private _onLeftClick(worldPos: Vec3): void {
+  private _onLeftClick(worldPos: Vec3, surfacePos: Vec3 | null): void {
     const sx = snap(worldPos.x);
     const sz = snap(worldPos.z);
 
     if (this._state === "IDLE") {
-      const sy = this._getElevationForLevel(this._activeLevel);
+      // Base the stair on the surface actually under the cursor (ShapeTool precedent).
+      // The level heuristic is only a fallback — a zone-wide max over floors at the
+      // active level breaks as soon as any floor is dragged off its level plane.
+      const sy = surfacePos?.y ?? this._getElevationForLevel(this._activeLevel);
       this._startPos = { x: sx, y: sy, z: sz };
 
       this._startDot = makeStartDot();
