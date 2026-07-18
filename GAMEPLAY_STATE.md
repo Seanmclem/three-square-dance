@@ -205,6 +205,15 @@ clamps); the item layer only adds identity (label/icon/stackSize) and the bag
 UI on top. Clamping for give/take is done inline in ScriptEngine from the
 registry's `stackSize`, not via the schema.
 
+**Schema scopes (projects, Phase 33+):** values are ALWAYS one global pool —
+only the schema has scopes. With a project open, the STATE tab gains a
+**GAME / THIS SCENE** toggle: GAME edits the shared `game.json` schema
+(defaults + clamps for every scene, persisted on Save, outside the scene's
+undo journal), THIS SCENE edits the scene's own `stateSchema` (which overrides
+GAME entries for the same key while that scene is loaded). At play/scene entry
+the two spread game-under-scene into one `configureSchema` call; the classic
+`DEFAULT_STATE_SCHEMA` applies only when neither exists.
+
 `fire_event` fires `on_state_changed` (a manual signal). `run_script`'s sandbox
 ctx exposes `{ get, set, has, adjust }` over the store.
 

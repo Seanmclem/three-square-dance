@@ -188,6 +188,8 @@ export default function App() {
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
+  // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
+  const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
   interface ProjectCtx { store: ProjectStore; sceneId: string; rev: number }
   const [project, setProject] = useState<ProjectCtx | null>(null);
@@ -490,6 +492,7 @@ export default function App() {
             world.gameItems       = store.game.items;
             world.gameStateSchema = store.game.stateSchema;
             setWorldItems(store.game.items ?? []);
+            setGameSchema(store.game.stateSchema ?? {});
           } else {
             setProjectPending({ name: last.name, dir: last.dir, sceneId: last.sceneId });
           }
@@ -1036,6 +1039,7 @@ export default function App() {
       worldRef.current.gameItems = undefined;
       worldRef.current.gameStateSchema = undefined;
     }
+    setGameSchema({});
     void clearLastProject();
   }, [canOverwriteScene]);
 
@@ -1156,6 +1160,7 @@ export default function App() {
       worldRef.current.gameStateSchema = store.game.stateSchema;
     }
     setWorldItems(store.game.items ?? []);
+    setGameSchema(store.game.stateSchema ?? {});
     void persistLastProject(store.dir, store.name, sceneId);
   }, []);
 
@@ -2569,6 +2574,21 @@ export default function App() {
     setIsDirty(true);
   };
 
+  /** STATE tab GAME scope (project open) — edits game.json's shared schema.
+   *  Empty schema normalizes to undefined so the merge fallback semantics and
+   *  the serialized game.json stay clean. Persisted on Save (writeGame); like
+   *  the game item registry, it sits outside the scene's undo journal. */
+  const handleGameSchemaChange = (schema: Record<string, StateSchema>): void => {
+    const proj = projectRef.current;
+    const world = worldRef.current;
+    if (!proj || !world) return;
+    const normalized = Object.keys(schema).length ? schema : undefined;
+    proj.store.game.stateSchema = normalized;
+    world.gameStateSchema = normalized;
+    setGameSchema(schema);
+    setIsDirty(true);
+  };
+
   const handleWorldItemsChange = (items: ItemDef[]): void => {
     const world = worldRef.current;
     if (!world?.world) return;
@@ -2719,6 +2739,8 @@ export default function App() {
         onObjectScriptsChange={handleObjectScriptsChange}
         stateSchema={stateSchema}
         onStateSchemaChange={handleStateSchemaChange}
+        gameStateSchema={project ? gameSchema : undefined}
+        onGameStateSchemaChange={project ? handleGameSchemaChange : undefined}
         worldItems={worldItems}
         onWorldItemsChange={handleWorldItemsChange}
         projectSceneIds={project ? project.store.sceneIds : undefined}

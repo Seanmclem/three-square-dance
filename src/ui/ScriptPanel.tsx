@@ -242,6 +242,8 @@ export interface ScriptPanelProps {
   onObjectScriptsChange: (objectId: string, scripts: ScriptDef[]) => void;
   stateSchema: Record<string, StateSchema>;
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
+  gameStateSchema?: Record<string, StateSchema>;
+  onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
   worldItems: ItemDef[];
   onWorldItemsChange: (items: ItemDef[]) => void;
   projectSceneIds?: string[];
@@ -273,6 +275,8 @@ export function ScriptPanel({
   onObjectScriptsChange,
   stateSchema,
   onStateSchemaChange,
+  gameStateSchema,
+  onGameStateSchemaChange,
   worldItems,
   onWorldItemsChange,
   projectSceneIds,
@@ -280,6 +284,9 @@ export function ScriptPanel({
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingDialogueId, setEditingDialogueId] = useState<string | null>(null);
+  // STATE tab scope (project open only): GAME = shared game.json schema, SCENE = this scene's.
+  const [stateScope, setStateScope] = useState<"game" | "scene">("game");
+  const hasGameScope = gameStateSchema !== undefined && !!onGameStateSchemaChange;
 
   // Auto-switch to SELECTED tab when a trigger volume or object is selected
   useEffect(() => {
@@ -366,14 +373,43 @@ export function ScriptPanel({
           "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
         {tab === "dialogue" &&
           "Branching dialogue trees for this zone. A show_dialogue action plays one by id. Nodes show lines, then response options; options can be gated by conditions and run effects (set flags, adjust counters) when picked."}
-        {tab === "state" &&
+        {tab === "state" && !hasGameScope &&
           "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
+        {tab === "state" && hasGameScope && (stateScope === "game"
+          ? "GAME scope: shared defaults + clamps for every scene in the project (game.json). A scene's own entry for the same key overrides these. Saved with the project on Save."
+          : "SCENE scope: this scene's own keys — they override the project's GAME entries for the same key while this scene is loaded.")}
         {tab === "items" &&
           "The world's item registry. An item's count lives at gameplay-state key inv.<id> — give_item / take_item actions and the has_item condition read and write it, and the in-game bag (I / Tab, gamepad Y) lists what the player holds."}
       </div>
 
       {tab === "state" ? (
-        <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+        <>
+          {hasGameScope && (
+            <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexShrink: 0 }}>
+              {(["game", "scene"] as const).map((sc) => (
+                <button
+                  key={sc}
+                  onClick={() => setStateScope(sc)}
+                  style={{
+                    flex: 1, padding: "5px 0", borderRadius: 4, cursor: "pointer",
+                    fontFamily: "monospace", fontSize: 10, letterSpacing: 1,
+                    border: "none",
+                    background: stateScope === sc ? "rgba(80,140,255,0.2)" : "rgba(46,46,46,0.9)",
+                    color: stateScope === sc ? "#80aaff" : "#646464",
+                    outline: stateScope === sc ? "1px solid rgba(80,140,255,0.33)" : "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  {sc === "game" ? "GAME" : "THIS SCENE"}
+                </button>
+              ))}
+            </div>
+          )}
+          {hasGameScope && stateScope === "game" ? (
+            <SchemaEditor schema={gameStateSchema} onChange={onGameStateSchemaChange} />
+          ) : (
+            <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+          )}
+        </>
       ) : tab === "items" ? (
         <ItemsEditor items={worldItems} onChange={onWorldItemsChange} />
       ) : tab === "dialogue" ? (
