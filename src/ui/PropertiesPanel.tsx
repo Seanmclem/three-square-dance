@@ -584,6 +584,7 @@ export function PropertiesPanel({
             groupsOpen={groupsOpen}
             onToggleGroups={() => setGroupsOpen(v => !v)}
             onObjectUpdate={onObjectUpdate}
+            bus={bus}
           />
         ) : selected.type === "checkpoint" ? (
           <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
@@ -4960,7 +4961,12 @@ function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter
   };
 }
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate }: {
+// MOVE/RESIZE for trigger volumes is one-or-the-other (overlapping face handles and
+// gizmo arrows fight for the pick). Sticky for the session so a resize pass over
+// several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
+let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
+
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
@@ -4968,8 +4974,21 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
   groupsOpen:       boolean;
   onToggleGroups:   () => void;
   onObjectUpdate:   (changes: Partial<WorldObject>) => void;
+  bus?:             EventBus;
 }) {
   const vol = selected.data as TriggerVolume | null;
+  const [editMode, setEditModeState] = useState<"move" | "resize">(TRIGGER_EDIT_MODE);
+  const setEditMode = (m: "move" | "resize") => { TRIGGER_EDIT_MODE = m; setEditModeState(m); };
+  // Broadcast the mode to the resizer + move gizmo on selection and on toggle;
+  // clear both when the view unmounts (deselect / different entity type).
+  useEffect(() => {
+    bus?.emit("trigger:resize-toggle", { enabled: editMode === "resize" });
+    bus?.emit("gizmo:suspend", { source: "trigger-edit-mode", suspended: editMode === "resize" });
+  }, [editMode, selected.id, bus]);
+  useEffect(() => () => {
+    bus?.emit("trigger:resize-toggle", { enabled: false });
+    bus?.emit("gizmo:suspend", { source: "trigger-edit-mode", suspended: false });
+  }, [bus]);
   const [posStr,  setPosStr]  = useState({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
   const [sizeStr, setSizeStr] = useState({ x: String(vol?.size.x ?? 1),     y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
   const { schedule, flush } = useFieldDebounce(300);
@@ -5017,6 +5036,23 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
       <div>
         <div style={LABEL}>LABEL</div>
         <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>{vol.label}</div>
+      </div>
+      <div>
+        <div style={LABEL}>EDIT MODE</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {(["move", "resize"] as const).map(m => (
+            <button key={m} onClick={() => setEditMode(m)}
+              title={m === "move" ? "Show the move/rotate gizmo (hides resize handles)" : "Show the face resize handles (hides the move gizmo)"}
+              style={{
+                flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
+                border: "1px solid " + (editMode === m ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
+                background: editMode === m ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+                color: editMode === m ? "#80aaff" : "#c0c0c0", cursor: "pointer",
+              }}>
+              {m === "move" ? "MOVE" : "RESIZE"}
+            </button>
+          ))}
+        </div>
       </div>
       <div>
         <div style={LABEL}>POSITION</div>

@@ -38,6 +38,7 @@ export class TriggerVolumeResizer implements IEditorModule {
   private _previewing   = false;
   private _gizmoActive  = false;   // an external TransformControls drag is in progress
   private _altDown      = false;
+  private _enabled      = false;   // panel MOVE/RESIZE toggle (RESIZE broadcasts true)
 
   private _handles:  THREE.Mesh[] = [];
   private _hovered:  Face | null = null;
@@ -81,6 +82,7 @@ export class TriggerVolumeResizer implements IEditorModule {
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
+      this._bus.on("trigger:resize-toggle", ({ enabled }) => { this._enabled = enabled; this._sync(); }),
 
       this._bus.on("gizmo:dragging", ({ isDragging }) => {
         this._gizmoActive = isDragging && this._state !== "DRAG";
@@ -118,7 +120,7 @@ export class TriggerVolumeResizer implements IEditorModule {
   // ── Visibility ────────────────────────────────────────────────────────────
 
   private _shouldShow(): boolean {
-    return isSelectMode(this._activeTool) && this._selectedId !== null && !this._previewing;
+    return this._enabled && isSelectMode(this._activeTool) && this._selectedId !== null && !this._previewing;
   }
 
   private _selectedVolume(): TriggerVolume | undefined {

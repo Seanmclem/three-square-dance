@@ -348,6 +348,8 @@ export interface BusEvents {
   "triggervolume:hover":   { zoneId: string; id: string | null };
   "triggervolume:select":  { zoneId: string; id: string | null };
   "triggervolume:placed":  { vol: TriggerVolume };
+  // Panel MOVE/RESIZE toggle → TriggerVolumeResizer (resize handles shown only when enabled).
+  "trigger:resize-toggle": { enabled: boolean };
   "decal:added":           { zoneId: string; decal: DecalDef };
   "decal:updated":         { zoneId: string; id: string; changes: Partial<DecalDef> };
   "decal:removed":         { zoneId: string; id: string };
