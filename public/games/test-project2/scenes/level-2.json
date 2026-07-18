@@ -2246,7 +2246,27 @@
             "y": 2.5,
             "z": 2.3000000000000003
           },
-          "zoneId": "demo"
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "scr_loadnew1",
+              "label": "On Enter",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter",
+                "targetId": "vol_94a6e2c6"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "load_scene",
+                  "sceneId": "new-world"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
         }
       ]
     }
