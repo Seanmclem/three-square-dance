@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -43.73236914468886,
+        "x": -27.715196438705366,
         "y": 0,
-        "z": -35.965643759586605
+        "z": -37.41752374907967
       },
       "radius": 22.882649074494818,
       "phi": 1.2803981633974453,
@@ -2238,15 +2238,43 @@
           "label": "Trigger Volume",
           "position": {
             "x": -41.69718739490719,
-            "y": 0,
-            "z": -22.4
+            "y": 0.2,
+            "z": -22.15
           },
           "size": {
             "x": 1.8,
-            "y": 2.5,
-            "z": 2.3000000000000003
+            "y": 2.4,
+            "z": 2.2
           },
-          "zoneId": "demo"
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "scr_cb4c1ede",
+              "label": "Level end",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "load_scene",
+                  "sceneId": "new-world"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "visual": {
+            "enabled": true,
+            "style": "gradient",
+            "color": "#5a3d8f",
+            "fadeDir": "up",
+            "opacity": 0.8,
+            "fadeHeight": 1,
+            "animate": false
+          }
         }
       ]
     }
