@@ -325,10 +325,15 @@ export class SelectionManager implements IEditorModule {
       hits.push({ distance: b.distance, point: b.point, object: b.root } as THREE.Intersection);
     }
     hits.sort((a, b) => a.distance - b.distance);
-    // Hidden-wall ghosts never occlude real geometry: pick them only when nothing
-    // solid is under the cursor (so a dollhouse-hidden wall stays click-through,
-    // but a fully hidden run is still selectable on empty space).
-    const solid = hits.filter(h => !h.object.userData.ghostPick);
+    // Hidden-wall ghosts and dimmed off-level geometry never occlude the active
+    // level: pick them only when nothing active-level is under the cursor (so a
+    // dollhouse-hidden wall or a level-1 wall stays click-through while editing
+    // floor G, but both remain selectable on empty space).
+    const solid = hits.filter(h => {
+      const ud = h.object.userData;
+      if (ud.ghostPick) return false;
+      return ud.floorLevel === undefined || ud.floorLevel === this._activeFloorLevel;
+    });
     return solid.length > 0 ? solid : hits;
   }
 
