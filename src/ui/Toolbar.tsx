@@ -68,7 +68,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
       background: "rgba(28,28,28,0.95)",
       borderRight: "1px solid rgba(255,255,255,0.08)",
       display: "flex", flexDirection: "column", alignItems: "center",
-      paddingTop: 56, gap: 2, zIndex: 10,
+      paddingTop: 40, gap: 2, zIndex: 10,
     }}>
 
       {TOOLS.map(tool => {
