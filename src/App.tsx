@@ -177,6 +177,10 @@ export default function App() {
   const [isGame,          setIsGame]           = useState(false);
   const [previewMode,     setPreviewMode]      = useState<PreviewMode | null>(null);
   const previewModeRef = useRef<PreviewMode | null>(null);   // preview:stop needs the session's mode (save gating)
+  // load_scene fired during preview (project mode): mid-route teardown flag + the scene
+  // the user launched preview from, restored on preview exit (non-destructive round-trip).
+  const routingRef = useRef(false);
+  const routeReturnSceneRef = useRef<string | null>(null);
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
@@ -534,11 +538,19 @@ export default function App() {
         // Continue only when the launch explicitly asked to resume (Continue). New Game
         // and Preview always start fresh — no silent auto-continue. loadGame must run after
         // activate() (which clears fired one-shots) so a resumed save's progress survives.
-        if (resume && loadGame()) { /* resumed */ } else { gameState.reset(); }
+        // A mid-route re-entry (load_scene in preview) must NOT reset game state —
+        // cross-scene persistence is the point, mirroring SceneRouter.
+        if (resume && loadGame()) { /* resumed */ } else if (!routingRef.current) { gameState.reset(); }
         // Occlusion-test runs are debug sessions — never let them clobber the Continue save.
         if (mode !== "occlusion") gameAutosaveTimer = setInterval(saveGame, 30_000);
       }),
       bus.on("preview:stop",  () => {
+        // Clear the autosave timer first so a mid-route re-entry (below) starts a fresh
+        // one instead of leaking a second interval each hop.
+        if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
+        // Mid-route teardown (load_scene fired in preview): stay in preview at the React
+        // level, just deactivate the old scene's engine — preview:start re-activates the new one.
+        if (routingRef.current) { scriptEngine.deactivate(); return; }
         setIsPreview(false);
         setIsGame(false);
         setPreviewMode(null);
@@ -546,10 +558,64 @@ export default function App() {
         setPauseOpen(false);
         bagOpenRef.current = false;
         setBagOpen(false);
-        if (gameAutosaveTimer) { clearInterval(gameAutosaveTimer); gameAutosaveTimer = null; }
         if (previewModeRef.current !== "occlusion") saveGame();
         previewModeRef.current = null;
         scriptEngine.deactivate();
+        // If preview routed us into another scene, return to the one we launched from —
+        // non-destructively (nothing was saved to disk during preview).
+        const back = routeReturnSceneRef.current;
+        routeReturnSceneRef.current = null;
+        if (back && back !== projectRef.current?.sceneId) {
+          void (async () => {
+            const proj = projectRef.current;
+            if (!proj) return;
+            try {
+              const file = await proj.store.loadScene(back);
+              await handleLoadFromJSON(file);
+              worldRef.current!.gameItems       = proj.store.game.items;
+              worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
+              const next = { ...proj, sceneId: back };
+              projectRef.current = next; setProject(next);
+              void persistLastProject(proj.store.dir, proj.store.name, back);
+            } catch (e) { console.error("[preview] restore editing scene failed:", e); }
+          })();
+        }
+      }),
+      // load_scene during editor PREVIEW (project mode only): route to another of the
+      // project's scenes the way the runtime shell does, but non-destructively. Outside
+      // preview, or with no project open, this stays the deliberate no-op (runtime parity).
+      bus.on("scene:load-request", ({ sceneId }) => {
+        const proj = projectRef.current;
+        if (!proj || !preview.isActive || preview.mode === "occlusion") return;
+        if (routingRef.current) return;                        // a portal can fire twice before teardown
+        if (!proj.store.sceneIds.includes(sceneId)) {
+          console.warn(`[preview] load_scene: unknown scene "${sceneId}" — staying put`);
+          return;
+        }
+        if (sceneId === proj.sceneId) return;                  // already here
+        const mode = preview.mode ?? "preview";
+        void (async () => {
+          routingRef.current = true;
+          routeReturnSceneRef.current ??= proj.sceneId;        // remember the origin (first hop only)
+          try {
+            const fired = scriptEngine.getFiredOneShots();     // survive the hop (don't re-fire cross-scene one-shots)
+            preview.exit();                                    // remove character (fires the guarded preview:stop)
+            const file = await proj.store.loadScene(sceneId);
+            await handleLoadFromJSON(file);                    // teardown zones + rebuild world/physics (no save)
+            const world = worldRef.current!;
+            world.gameItems       = proj.store.game.items;
+            world.gameStateSchema = proj.store.game.stateSchema;
+            // Keep proj.sceneId in lockstep with the loaded world so any save targets the right file.
+            const next = { ...projectRef.current!, sceneId };
+            projectRef.current = next; setProject(next);
+            preview.enter(mode);                               // respawn at the new scene's defaultSpawn (fires preview:start → re-index + activate)
+            scriptEngine.restoreFiredOneShots(fired);          // after activate(), which clears the set
+          } catch (e) {
+            console.error(`[preview] load_scene "${sceneId}" failed:`, e);
+          } finally {
+            routingRef.current = false;
+          }
+        })();
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
       // Gamepad Start / kbm Enter / touch ⚙ → close the dialogue if one is
