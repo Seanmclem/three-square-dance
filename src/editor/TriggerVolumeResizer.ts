@@ -4,7 +4,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, TriggerVolume, Vec3, ScreenPos } from "@/types";
 
-const GRID = 0.5;
+const GRID = 0.1;   // drag snap — matches StairCutterResizer's fine grid (Alt = free)
 const MIN  = 0.5;   // smallest allowed size along any axis
 const HANDLE = 0.24;
 const GAP  = 0.35;  // push face handles this far OUTSIDE each face — clear of the
