@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -27.715196438705366,
+        "x": -36.450744215096954,
         "y": 0,
-        "z": -37.41752374907967
+        "z": -33.19851866202769
       },
       "radius": 22.882649074494818,
       "phi": 1.2803981633974453,
@@ -2267,7 +2267,7 @@
             }
           ],
           "visual": {
-            "enabled": true,
+            "enabled": false,
             "style": "gradient",
             "color": "#5a3d8f",
             "fadeDir": "up",

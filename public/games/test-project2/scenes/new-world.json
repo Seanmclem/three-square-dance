@@ -12,7 +12,7 @@
         "y": 5,
         "z": -5.146143612889168
       },
-      "radius": 33,
+      "radius": 24.169048340618616,
       "phi": 0.9,
       "theta": 2.2
     }
@@ -385,6 +385,49 @@
                 {
                   "type": "toggle_mover",
                   "targetId": "shape_mover_door"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
+        },
+        {
+          "id": "vol_2fcb3f7b",
+          "label": "Trigger Volume",
+          "position": {
+            "x": 11.75,
+            "y": 0,
+            "z": 7.05
+          },
+          "size": {
+            "x": 3,
+            "y": 2.5,
+            "z": 3.4000000000000004
+          },
+          "zoneId": "demo",
+          "visual": {
+            "enabled": true,
+            "style": "gradient",
+            "color": "#5a3d8f",
+            "fadeDir": "up",
+            "opacity": 0.55,
+            "fadeHeight": 1,
+            "animate": false
+          },
+          "scripts": [
+            {
+              "id": "scr_7048a8ae",
+              "label": "Next Level",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "load_scene",
+                  "sceneId": "level-2"
                 }
               ],
               "oneShot": false
