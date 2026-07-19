@@ -428,8 +428,8 @@ the device (not in the world) and apply the next time you press Play.
 5. **Spend/gate:** in any script or dialogue option use `take_item` ("charge
    5 coins") and the `has_item` condition ("Show if" they can afford it) —
    both have item-picker dropdowns.
-6. Starting inventory: STATE tab → register `inv.<itemId>` with a numeric
-   default; New Game seeds it.
+6. Starting inventory: set the item's **Starting count** field (ITEMS tab);
+   New Game grants it automatically.
 
 ---
 
