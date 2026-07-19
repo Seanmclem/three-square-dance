@@ -125,7 +125,7 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 ### Scenario D — branching dialogue tree (Phase 30)
 
 > Full authoring guide (conditions, effects, items-as-counters, JSON format):
-> **`DIALOGUES.md`**.
+> **`DIALOGUES_GUIDE.md`**.
 
 1. Open **SCRIPTS** → **DIALOGUE** tab → **+ New**. Set a Label and Speaker. Node `n1`
    is created for you — type its lines in the textarea (one per line).

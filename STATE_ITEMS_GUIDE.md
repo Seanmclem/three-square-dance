@@ -3,7 +3,7 @@
 This guide explains the three related-but-different systems behind the
 SCRIPTS panel's **STATE** and **ITEMS** tabs: what each one is *for*, how they
 differ, and step-by-step recipes. If dialogue is what you're after, see
-`DIALOGUES.md`; this guide is about the data those dialogues (and scripts,
+`DIALOGUES_GUIDE.md`; this guide is about the data those dialogues (and scripts,
 portals, and the bag) read and write.
 
 **Where everything in this guide lives:** left edge toolbar → **SCRIPTS**
@@ -152,11 +152,67 @@ registry adds:
 With a project open, items are **game-wide** (stored in `game.json`) — define
 "Gold Coin" once, use it from every scene.
 
-**The player's view** — the in-game **bag** (press `I` or `Tab`, gamepad `Y`,
-touch 🎒) lists what's owned, with counts and the highlighted item's
-description:
+### The bag (the player's inventory view)
+
+The in-game **bag** lists what's owned, with counts and the highlighted
+item's description:
 
 ![The in-game bag](docs/images/bag.png)
+
+**Opening and closing** — press `I` or `Tab` (keyboard), `Y` (gamepad), or
+the 🎒 button (touch). The same key closes it, as do E/Enter (confirm) and
+the cancel button. While it's open, movement freezes — it's a menu, like the
+pause screen. The toggle is deliberately ignored while a dialogue or the
+pause menu is up (close those first).
+
+**What it shows, exactly:**
+
+- Every item the player owns **at least one** of — zero-count items don't
+  clutter the list. Arrow keys / d-pad move the highlight; the highlighted
+  item's description appears at the bottom.
+- Counts update **live**: a script that gives or takes items while the bag is
+  open changes the row on the spot.
+- If the player somehow holds something that's *not in the registry* (say you
+  deleted the item definition after they picked one up), the bag falls back
+  to a dimmed technical name rather than hiding it — inventory is never
+  silently lost.
+
+**What it doesn't do (yet):** the bag is **view-only** — there's no
+"use"/equip/drop from inside it. Consuming an item is authored through
+scripts and dialogue (`take_item` on "Drink the potion"), which keeps *what
+items do* fully in your hands. A use-from-bag system is a possible future
+phase.
+
+### How the numbers behave
+
+Worth knowing precisely, because shops and puzzles depend on it:
+
+- **`give_item` clamps at Stack size.** Give ×99 to someone holding 3 of a
+  max-5 item and they end at 5 — no overflow, no error. Blank stack size =
+  unlimited.
+- **`take_item` floors at 0.** Taking more than the player has just empties
+  them — it never goes negative and never *fails*. If a purchase must be
+  refusable, gate the option with `has_item ≥ price` first; the take is then
+  guaranteed to succeed.
+- **Counts survive everything but New Game**: scene changes (`load_scene`),
+  save/Continue in the runtime, full browser restarts. New Game wipes and
+  re-grants each item's **Starting count**.
+- **Duplicates are impossible by construction** — an item is one counter, so
+  giving the "same" item twice just increments it. If you want two visually
+  identical-but-distinct keys (brass vs. iron), make two items.
+
+### A complete inventory loop (worth building once)
+
+Ten minutes, touches every piece: **1)** ITEMS tab → create *Gold Coin*
+(stack 99, Starting count 5) and *Rusty Key* (stack 1). **2)** Place a coin
+pickup: interactable object, `on_interact` (One-shot) → `give_item Gold Coin
+×3` + `despawn_object` itself. **3)** Give an NPC a shop dialogue: "Buy the
+key — 5 coins" gated `has_item Gold Coin ≥ 5`, effects `take_item ×5` +
+`give_item Rusty Key`; a second option "You look broke…" gated `< 5`.
+**4)** Gate a door: trigger volume, `on_player_enter` + condition `has_item
+Rusty Key` → `load_scene` (or open a door). **5)** ▶ Preview with the STATE
+tab open — watch `🎒 Gold Coin` tick 5 → 8 → 3 in LIVE VALUES as you pick up
+and spend. That loop is the skeleton of most item-driven game design.
 
 ### Item recipes
 
@@ -204,7 +260,7 @@ in **GAME** scope, level-specific exceptions in **THIS SCENE**.
 
 ## Related reading
 
-- `DIALOGUES.md` — using conditions/effects from conversation options
+- `DIALOGUES_GUIDE.md` — using conditions/effects from conversation options
 - `GAMEPLAY_STATE.md` — the technical reference for the state store
 - `HUMAN_TESTING.md` — click-by-click walkthroughs (items & bag, projects)
 - `PUBLISHING_GUIDE.md` — projects, `game.json`, and shipping your game

@@ -57,6 +57,11 @@ Two rules cover most of the behavior:
 4. Type the NPC's lines into the node's textarea — **one line per row**; the
    player presses E (or A / tap) to step through them.
 
+Here's the whole editor with a one-node dialogue staged — label and speaker
+up top, the start-node picker, then the node card with its lines and options:
+
+![The DIALOGUE tab editor — tree fields, node card, and an option's full anatomy](docs/images/dialogue-editor.png)
+
 ### Adding responses
 
 Under a node's **OPTIONS**, click **+ Add**:
@@ -82,17 +87,15 @@ Under a node's **OPTIONS**, click **+ Add**:
 dropdown. Deleting a node is the **×** on its card — the start node can't be
 deleted (pick a different start node first).
 
-> **"Give / receive items" (Phase 32):** define items in the **ITEMS** tab
-> (label, icon, description, stack size), then use the typed pieces with their
-> item-picker dropdowns: On pick → **`give_item`** ("hand over a key") or
-> **`take_item`** ("charge 5 coins"), Show if → **`has_item`** ("only if they
-> can afford it", count ≥ N). What the player holds shows up in the in-game
-> **bag** (I / Tab, gamepad Y, touch 🎒). Under the hood an item's count is
-> still just the gameplay-state key `inv.<itemId>` — the same store as
-> everything else (see `GAMEPLAY_STATE.md`), so it persists across scene loads
-> and save games automatically, and the raw `set_state`/`adjust_number`/
-> `compare_number` route still works for plain flags and counters. For a
-> starting inventory, register `inv.<itemId>` with a default in the STATE tab.
+> **"Give / receive items":** define items in the **ITEMS** tab (label, icon,
+> description, stack size, starting count), then use the typed pieces with
+> their item-picker dropdowns: On pick → **`give_item`** ("hand over a key")
+> or **`take_item`** ("charge 5 coins"), Show if → **`has_item`** with its
+> comparison dropdown ("can afford it" = `≥ 5`, "looks broke" = `< 5`). What
+> the player holds shows up in the in-game **bag** (I / Tab, gamepad Y,
+> touch 🎒), and items persist across scene loads and save games like any
+> other state. For everything about items, state, and schemas — including a
+> full shop recipe — see **`STATE_ITEMS_GUIDE.md`**.
 
 ---
 
@@ -124,9 +127,12 @@ ending). Target it at a specific dialogue from the dropdown, or leave it as
 
 ## Playing it
 
-Enter preview/game (▶) and interact:
+Enter preview/game (▶) and interact. On the last line, the options appear —
+the highlighted row has the `▸` marker and the footer flips to "E to choose":
 
-- **E / A / tap** advances lines; on the last line the response options appear.
+![The in-game dialogue box — last line, two options, first highlighted](docs/images/dialogue-ingame.png)
+
+- **E / A / tap** advances lines until the options show.
 - **Arrow keys or W/S** (keyboard), **d-pad or a left-stick flick** (gamepad)
   move the highlight; **E / A** picks. Mouse click or
   tap picks a row directly.
