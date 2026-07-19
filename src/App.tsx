@@ -274,6 +274,7 @@ export default function App() {
     const movers    = new MoverSystem(bus);
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     zones.enableEditorGhosts();   // see-through editorGhost ceilings (editor shell only)
+    zones.enableLevelDimming();   // translucent non-active floor levels (editor shell only)
     zonesRef.current = zones;
     const history   = new HistoryManager(world, syncHistory);
     historyRef.current = history;

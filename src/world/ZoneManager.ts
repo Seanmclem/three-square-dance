@@ -203,8 +203,12 @@ export class ZoneManager {
   // Authored light flicker runs only between preview:start/stop (mover precedent)
   private _flickerActive = false;
 
-  // Floor dimming state
+  // Floor dimming state (non-active levels rendered translucent). Editor-only:
+  // never active in the runtime shell (only the editor calls enableLevelDimming),
+  // and suspended while preview/game is running.
   private _activeLevel = 0;
+  private _levelDimming = false;
+  private _dimSuspended = false;
   private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
   private readonly _dimMaterials = new Set<THREE.Material>();
 
@@ -470,7 +474,8 @@ export class ZoneManager {
         this._setEditorOnlyVisible(false);
         this._setHiddenWallGhostsVisible(false);
         this._ghostsSolid = true;
-        this._applyGhosts();
+        this._dimSuspended = true;
+        this._applyDimming();
         if (isGameplayMode(mode)) this._setHideInGameVisible(false);
       }),
       this._bus.on("preview:stop",  () => {
@@ -480,7 +485,8 @@ export class ZoneManager {
         this._setEditorOnlyVisible(true);
         this._setHiddenWallGhostsVisible(true);
         this._ghostsSolid = false;
-        this._applyGhosts();
+        this._dimSuspended = false;
+        this._applyDimming();
         this._setHideInGameVisible(true);
       }),
       this._bus.on("history:restore", () => {
@@ -1590,6 +1596,11 @@ export class ZoneManager {
     this._dimmedMeshes.clear();
     this._pruneDimMaterials();
 
+    if (!this._levelDimming || this._dimSuspended) {
+      this._applyGhosts();
+      return;
+    }
+
     for (const [, zoneEntry] of this._loadedZones) {
       zoneEntry.group.traverse(child => {
         if (!(child instanceof THREE.Mesh)) return;
@@ -1616,6 +1627,13 @@ export class ZoneManager {
     // Ghosting shares the dimming lifecycle: every build path ends here, so
     // chaining keeps ghosts applied after any platform/zone rebuild.
     this._applyGhosts();
+  }
+
+  /** Editor shell only — the runtime never calls this, so every level renders
+   *  solid there regardless of `_activeLevel`. */
+  enableLevelDimming(): void {
+    this._levelDimming = true;
+    this._applyDimming();
   }
 
   // ── Editor-ghosted ceilings (Phase 38) ────────────────────────────────────
