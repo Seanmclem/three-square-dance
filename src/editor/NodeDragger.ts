@@ -596,10 +596,15 @@ export class NodeDragger {
         if (!nodeY.has(id) || nodeY.get(id)! < y) nodeY.set(id, y);
       }
     }
+    // A platform's top anchors only the nodes nothing else claimed. A node-backed
+    // ceiling shares its corners with the wall run below it, and overwriting the
+    // wall's anchor hoisted that run's corner dots (and its edge lines) up to roof
+    // height — under the ceiling and any dimmed floor above, which reads as "the
+    // handles vanished". Lowest anchor wins, so run corners stay grabbable.
     for (const platform of zone.platforms) {
       if (!platform.nodeIds?.length) continue;
       const y = platform.position.y + platform.thickness + 0.06;
-      for (const id of platform.nodeIds) nodeY.set(id, y);
+      for (const id of platform.nodeIds) if (!nodeY.has(id)) nodeY.set(id, y);
     }
 
     for (const node of zone.nodes) {
@@ -652,7 +657,7 @@ export class NodeDragger {
           ((platform.rotation?.y ?? 0) * Math.PI) / 180);
         continue;
       }
-      const edgeY = platform.position.y + platform.thickness + 0.04;
+      const platformEdgeY = platform.position.y + platform.thickness + 0.04;
 
       for (let i = 0; i < ids.length; i++) {
         const id1 = ids[i]!;
@@ -662,6 +667,13 @@ export class NodeDragger {
         if (!n1 || !n2) continue;
         const key = `${id1}::${id2}`;
         if (this._edgeEntries.has(key)) continue;
+
+        // Follow the dots (above): a ceiling's edges sit at the wall run's anchor,
+        // not on the roof, whenever these corners belong to something lower.
+        const dy1 = this._nodeDotY.get(id1), dy2 = this._nodeDotY.get(id2);
+        const edgeY = dy1 !== undefined && dy2 !== undefined
+          ? Math.min(dy1, dy2) - 0.08          // dot sits +0.12 over its surface; edges ride +0.04
+          : platformEdgeY;
 
         const line = makeEdgeLine(n1.x, n1.z, n2.x, n2.z, edgeY);
         this._scene.add(line);
