@@ -63,7 +63,7 @@ const S = {
     cursor: "pointer",
   } as const,
   label: { color: "#c0c0c0", fontSize: 12 } as const,
-  sub: { color: "#606070", fontSize: 10, marginTop: 2 } as const,
+  sub: { color: "#8b94a8", fontSize: 11, marginTop: 2 } as const,
   badge: (enabled: boolean): React.CSSProperties => ({
     width: 8,
     height: 8,
@@ -103,7 +103,7 @@ const S = {
     outline: "none",
   } as const,
   sectionLabel: {
-    color: "#606070",
+    color: "#8b94a8",
     fontSize: 10,
     letterSpacing: 1,
     padding: "8px 12px 4px",
@@ -338,8 +338,24 @@ export function ScriptPanel({
     ? (currentScripts.find((s) => s.id === editingId) ?? null)
     : null;
 
+  // Shared suggestions for every state-key input in the panel (type-or-pick):
+  // registered keys from both schema scopes, plus each item's counter shown by
+  // its label — so nobody has to remember the inv.<id> convention.
+  const knownStateKeys = [...new Set([
+    ...Object.keys(gameStateSchema ?? {}),
+    ...Object.keys(stateSchema),
+  ])];
+
   return (
     <div style={S.root}>
+      <datalist id="wb-state-keys">
+        {knownStateKeys.map((k) => (
+          <option key={k} value={k} />
+        ))}
+        {worldItems.map((it) => (
+          <option key={it.id} value={`inv.${it.id}`} label={`${it.label} — item count`} />
+        ))}
+      </datalist>
       {/* Tabs */}
       <div style={S.tabs}>
         {(["level", "object", "dialogue", "state", "items"] as TabId[]).map((t) => (
@@ -360,11 +376,10 @@ export function ScriptPanel({
       {/* Per-tab description */}
       <div
         style={{
-          color: "#555",
-          fontSize: 10,
-          fontStyle: "italic",
-          padding: "5px 10px 0",
-          lineHeight: 1.4,
+          color: "#a8b2c8",
+          fontSize: 11.5,
+          padding: "6px 10px 0",
+          lineHeight: 1.45,
         }}
       >
         {tab === "level" &&
@@ -379,7 +394,7 @@ export function ScriptPanel({
           ? "GAME scope: shared defaults + clamps for every scene in the project (game.json). A scene's own entry for the same key overrides these. Saved with the project on Save."
           : "SCENE scope: this scene's own keys — they override the project's GAME entries for the same key while this scene is loaded.")}
         {tab === "items" &&
-          "The world's item registry. An item's count lives at gameplay-state key inv.<id> — give_item / take_item actions and the has_item condition read and write it, and the in-game bag (I / Tab, gamepad Y) lists what the player holds."}
+          "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds."}
       </div>
 
       {tab === "state" ? (
@@ -481,7 +496,7 @@ export function ScriptPanel({
       ) : tab === "object" && !selectedObjectId ? (
         <div
           style={{
-            color: "#555",
+            color: "#98a2b8",
             fontSize: 11,
             fontStyle: "italic",
             textAlign: "center",
@@ -559,7 +574,7 @@ function SchemaEditor({
         {entries.length === 0 && (
           <div
             style={{
-              color: "#555",
+              color: "#98a2b8",
               fontSize: 11,
               padding: "16px 12px",
               textAlign: "center",
@@ -743,7 +758,7 @@ function ScriptList({
         {scripts.length === 0 && (
           <div
             style={{
-              color: "#555",
+              color: "#98a2b8",
               fontSize: 11,
               padding: "16px 12px",
               textAlign: "center",
@@ -916,7 +931,7 @@ function ScriptEditor({
           {needsTarget && ownerIsEntity && script.trigger.type !== "on_dialogue_end" && (
             <div
               style={{
-                color: "#555",
+                color: "#98a2b8",
                 fontSize: 10,
                 fontStyle: "italic",
                 padding: "4px 0",
@@ -1027,7 +1042,7 @@ function ScriptEditor({
             />
           ))}
           {script.conditions.length === 0 && (
-            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+            <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
               (none)
             </div>
           )}
@@ -1090,7 +1105,7 @@ function ScriptEditor({
             />
           ))}
           {script.actions.length === 0 && (
-            <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+            <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
               (none)
             </div>
           )}
@@ -1191,6 +1206,7 @@ function TargetPicker({
   // on_state_changed: the target is the state key to watch
   return (
     <input
+      list="wb-state-keys"
       style={S.field}
       placeholder={
         triggerType === "on_state_changed"
@@ -1433,7 +1449,7 @@ function ConditionRow({
 }) {
   return (
     <div
-      style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}
+      style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "center" }}
     >
       <select
         style={{ ...S.select, flex: "0 0 120px" }}
@@ -1451,7 +1467,7 @@ function ConditionRow({
       {condition.type === "has_state" && (
         <input
           style={{ ...S.field, flex: 1 }}
-          placeholder="state key"
+          list="wb-state-keys" placeholder="state key"
           value={condition.stateKey ?? ""}
           onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
         />
@@ -1460,7 +1476,7 @@ function ConditionRow({
         <>
           <input
             style={{ ...S.field, flex: 1 }}
-            placeholder="state key"
+            list="wb-state-keys" placeholder="state key"
             value={condition.stateKey ?? ""}
             onChange={(e) =>
               onChange({ ...condition, stateKey: e.target.value })
@@ -1499,18 +1515,34 @@ function ConditionRow({
       )}
       {condition.type === "has_item" && (
         <>
+          {/* four controls don't fit one 280px row — item picker gets line 2 */}
+          <div style={{ flexBasis: "100%", height: 0 }} />
           <ItemPicker
             style={{ ...S.select, flex: 1 }}
             itemId={condition.itemId ?? ""}
             worldItems={worldItems}
             onChange={(id) => onChange({ ...condition, itemId: id || undefined })}
           />
+          <select
+            style={{ ...S.select, flex: "0 0 56px" }}
+            title="owned count comparison (default: at least)"
+            value={condition.compareOp ?? ">="}
+            onChange={(e) =>
+              onChange({ ...condition, compareOp: e.target.value as CompareOp })
+            }
+          >
+            {COMPARE_OPS.map((op) => (
+              <option key={op} value={op}>
+                {op}
+              </option>
+            ))}
+          </select>
           <input
             type="number"
-            min={1}
+            min={0}
             style={{ ...S.field, flex: "0 0 52px" }}
-            placeholder="≥ 1"
-            title="minimum count owned"
+            placeholder="1"
+            title="count to compare the owned amount against"
             value={condition.count ?? ""}
             onChange={(e) =>
               onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })
@@ -1552,7 +1584,7 @@ function ItemPicker({
       <option value="">— pick item —</option>
       {worldItems.map((it) => (
         <option key={it.id} value={it.id}>
-          {it.label} ({it.id})
+          {it.label}
         </option>
       ))}
       {itemId && !worldItems.some((it) => it.id === itemId) && (
@@ -1781,7 +1813,7 @@ function ActionFields({
               <option value={action.dialogueId}>{action.dialogueId} (custom)</option>
             )}
           </select>
-          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Manage dialogues in the DIALOGUE tab.
           </div>
         </>
@@ -1808,7 +1840,7 @@ function ActionFields({
               onChange={(e) => set({ count: parseInt(e.target.value, 10) || undefined })}
             />
           </div>
-          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Manage items in the ITEMS tab.
           </div>
         </>
@@ -1827,7 +1859,7 @@ function ActionFields({
               placeholder="vol" title="volume 0..1"
               value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
           </div>
-          <div style={{ color: "#606070", fontSize: 10, padding: "6px 0 2px" }}>Play at (optional — spatial):</div>
+          <div style={{ color: "#8b94a8", fontSize: 11, padding: "6px 0 2px" }}>Play at (optional — spatial):</div>
           {targetPicker}
         </>
       );
@@ -1867,7 +1899,7 @@ function ActionFields({
       return (
         <>
           <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
-          <div style={{ color: "#555", fontSize: 10, fontStyle: "italic", padding: "4px 0 0" }}>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Overrides the player's walking sound (e.g. wood → gravel). Leave empty to revert
             to the default. Pair on_player_enter / on_player_exit on a trigger volume.
           </div>
@@ -1879,7 +1911,7 @@ function ActionFields({
         <div style={{ display: "flex", gap: 4 }}>
           <input
             style={{ ...S.field, flex: 1 }}
-            placeholder="State key"
+            list="wb-state-keys" placeholder="State key"
             value={action.stateKey ?? ""}
             onChange={(e) => set({ stateKey: e.target.value })}
           />
@@ -1899,7 +1931,7 @@ function ActionFields({
         <div style={{ display: "flex", gap: 4 }}>
           <input
             style={{ ...S.field, flex: 1 }}
-            placeholder="State key (e.g. health)"
+            list="wb-state-keys" placeholder="State key (e.g. health)"
             value={action.stateKey ?? ""}
             onChange={(e) => set({ stateKey: e.target.value })}
           />
@@ -1919,7 +1951,7 @@ function ActionFields({
       return (
         <input
           style={S.field}
-          placeholder="State key"
+          list="wb-state-keys" placeholder="State key"
           value={action.stateKey ?? ""}
           onChange={(e) => set({ stateKey: e.target.value })}
         />
@@ -1931,7 +1963,7 @@ function ActionFields({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <input
             style={S.field}
-            placeholder="State key (e.g. checkpoint)"
+            list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
             value={action.stateKey ?? ""}
             onChange={(e) => set({ stateKey: e.target.value })}
           />
@@ -2222,7 +2254,7 @@ function ActionFields({
           {fromKey ? (
             <input
               style={S.field}
-              placeholder="State key (e.g. checkpoint)"
+              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
               value={action.positionKey ?? ""}
               onChange={(e) => set({ positionKey: e.target.value })}
             />
@@ -2370,7 +2402,7 @@ function DialogueList({
         {dialogues.length === 0 && (
           <div
             style={{
-              color: "#555",
+              color: "#98a2b8",
               fontSize: 11,
               padding: "16px 12px",
               textAlign: "center",
@@ -2720,7 +2752,7 @@ function DialogueNodeCard({
           marginTop: 4,
         }}
       >
-        <span style={{ color: "#606070", fontSize: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+        <span style={{ color: "#8b94a8", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>
           Options
         </span>
         <button style={{ ...S.btn(), fontSize: 10 }} onClick={addOption}>
@@ -2728,7 +2760,7 @@ function DialogueNodeCard({
         </button>
       </div>
       {node.options.length === 0 && (
-        <div style={{ color: "#555", fontSize: 10, padding: "4px 0" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
           (none — ends after last line)
         </div>
       )}
@@ -2859,7 +2891,7 @@ function DialogueOptionRow({
 
       {/* Conditions (option hidden unless ALL pass) */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#606070", fontSize: 10 }}>Show if</span>
+        <span style={{ color: "#8b94a8", fontSize: 11 }}>Show if</span>
         <button
           style={{ ...S.btn(), fontSize: 10 }}
           onClick={() =>
@@ -2884,14 +2916,14 @@ function DialogueOptionRow({
         />
       ))}
       {conditions.length === 0 && (
-        <div style={{ color: "#555", fontSize: 10, padding: "2px 0" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
           (always shown)
         </div>
       )}
 
       {/* Effects (run when picked) */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#606070", fontSize: 10 }}>On pick</span>
+        <span style={{ color: "#8b94a8", fontSize: 11 }}>On pick</span>
         <button
           style={{ ...S.btn(), fontSize: 10 }}
           onClick={() =>
@@ -2929,7 +2961,7 @@ function DialogueOptionRow({
         />
       ))}
       {actions.length === 0 && (
-        <div style={{ color: "#555", fontSize: 10, padding: "2px 0" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
           (no effects)
         </div>
       )}
@@ -2979,7 +3011,7 @@ function ItemsEditor({
         {items.length === 0 && (
           <div
             style={{
-              color: "#555",
+              color: "#98a2b8",
               fontSize: 11,
               padding: "16px 12px",
               textAlign: "center",
@@ -3073,9 +3105,19 @@ function ItemRow({
         value={item.description ?? ""}
         onChange={(e) => set("description", e.target.value || undefined)}
       />
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>
-        {item.id} · state key inv.{item.id}
-      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 6, color: "#8b94a8", fontSize: 11 }}>
+        Starting count
+        <input
+          type="number"
+          min={0}
+          style={{ ...S.field, width: 64 }}
+          placeholder="0"
+          title="How many the player holds at the start of a New Game"
+          value={item.startCount ?? ""}
+          onChange={(e) => set("startCount", parseInt(e.target.value, 10) || undefined)}
+        />
+        <span style={{ color: "#6a7488", fontSize: 10 }}>on New Game</span>
+      </label>
     </div>
   );
 }

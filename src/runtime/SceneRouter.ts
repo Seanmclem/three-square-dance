@@ -5,6 +5,7 @@ import type { PreviewController } from "@/preview/PreviewController";
 import type { ScriptEngine } from "@/scripting/ScriptEngine";
 import type { SceneFile, WorldConfig } from "@/types";
 import { gameState, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
+import { seedStartingInventory } from "@/scripting/inventory";
 import { migrateWallNodes, migrateUVs, migrateDialogues, pruneOrphanNodes, migrateWorldLighting } from "@/world/WorldLoader";
 import type { LoadedManifest } from "./manifest";
 
@@ -127,6 +128,10 @@ export class SceneRouter {
         ...(gameSchema ?? {}),
         ...(sceneSchema ?? (gameSchema ? {} : DEFAULT_STATE_SCHEMA)),
       });
+
+      // Starting inventory (items' startCount) — New Game only; scene→scene
+      // transitions must never re-grant items.
+      if (opts?.newGame) seedStartingInventory(world);
 
       scriptEngine.activate();
       if (opts?.restore) scriptEngine.restoreFiredOneShots(opts.restore.firedOneShots);

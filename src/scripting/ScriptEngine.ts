@@ -191,8 +191,10 @@ export class ScriptEngine {
           break;
         }
         case "has_item": {
+          // owned <op> count — op defaults to ">=" ("has at least N"), so
+          // pre-existing conditions keep their exact semantics.
           const owned = Number(gameState.get(invKey(c.itemId ?? "")) ?? 0);
-          if (owned < (c.count ?? 1)) return false;
+          if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
           break;
         }
         case "npc_alive":

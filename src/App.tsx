@@ -84,6 +84,7 @@ import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
+import { seedStartingInventory } from "@/scripting/inventory";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject, requestProjectPermission } from "@/project/ProjectStore";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -543,7 +544,10 @@ export default function App() {
         // activate() (which clears fired one-shots) so a resumed save's progress survives.
         // A mid-route re-entry (load_scene in preview) must NOT reset game state —
         // cross-scene persistence is the point, mirroring SceneRouter.
-        if (resume && loadGame()) { /* resumed */ } else if (!routingRef.current) { gameState.reset(); }
+        if (resume && loadGame()) { /* resumed */ } else if (!routingRef.current) {
+          gameState.reset();
+          seedStartingInventory(world);   // items' Starting count → inventory (New Game only)
+        }
         // Occlusion-test runs are debug sessions — never let them clobber the Continue save.
         if (mode !== "occlusion") gameAutosaveTimer = setInterval(saveGame, 30_000);
       }),

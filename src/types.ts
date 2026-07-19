@@ -1114,10 +1114,10 @@ export interface ScriptCondition {
   type:       ConditionType;
   npcId?:     string;
   stateKey?:  string;      // has_state / compare_number
-  compareOp?: CompareOp;   // compare_number
+  compareOp?: CompareOp;   // compare_number / has_item (has_item default ">=")
   stateValue?: JsonValue;  // compare_number (compared as number)
   itemId?:    string;      // has_item: ItemDef id (inventory key `inv.<id>`)
-  count?:     number;      // has_item: owned ≥ count (default 1)
+  count?:     number;      // has_item: owned <compareOp> count (defaults: ">=" 1)
 }
 
 // ─── Items / inventory (Phase 32) ────────────────────────────────────────────
@@ -1131,6 +1131,7 @@ export interface ItemDef {
   icon?:        string;   // bare URL/path used as <img src> (portrait precedent)
   description?: string;
   stackSize?:   number;   // max count clamped on give; absent = unlimited
+  startCount?:  number;   // seeded into the player's inventory on New Game (default 0)
 }
 
 /**

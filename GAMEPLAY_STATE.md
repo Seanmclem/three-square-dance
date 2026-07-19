@@ -186,7 +186,7 @@ The old `set_flag`/`clear_flag`/`give_item` + `flag_set`/`flag_not_set`/
 
 - `has_state` — `stateKey` present and truthy (not `undefined`/`null`/`false`).
 - `compare_number` — `Number(get(stateKey)) <op> Number(stateValue)`, `<op>` one of `>= <= > < == !=`.
-- `has_item` — owned count of `itemId` ≥ `count` (default 1). Sugar over the `inv.*` convention below (Phase 32).
+- `has_item` — owned count of `itemId` `<compareOp>` `count` (defaults `>=` 1, so "has at least one"; `<`/`==`/etc. enable "fewer than N" and "has none" checks). Sugar over the `inv.*` convention below (Phase 32; comparisons v4.33.5).
 
 **Actions:**
 

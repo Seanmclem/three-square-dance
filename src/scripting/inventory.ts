@@ -36,6 +36,18 @@ export function itemRegistry(world: WorldState): ItemDef[] {
 }
 
 /**
+ * Seed starting inventory from the registry's `startCount` fields. Call ONLY
+ * right after a New Game reset (values are wiped there, so a plain set is
+ * correct; never call on scene transitions — that would re-grant items).
+ */
+export function seedStartingInventory(world: WorldState): void {
+  for (const item of itemRegistry(world)) {
+    if (!item.startCount || item.startCount <= 0) continue;
+    gameState.set(invKey(item.id), Math.min(item.startCount, item.stackSize ?? Infinity));
+  }
+}
+
+/**
  * Everything the player currently holds (count > 0), joined against the
  * world's item registry. Pure read — the bag UI's only data source.
  */
