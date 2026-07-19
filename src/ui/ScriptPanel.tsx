@@ -2938,7 +2938,7 @@ function DialogueOptionRow({
       ))}
       {conditions.length === 0 && (
         <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
-          (always shown)
+          (no conditions — option is always shown)
         </div>
       )}
 
@@ -2983,7 +2983,7 @@ function DialogueOptionRow({
       ))}
       {actions.length === 0 && (
         <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
-          (no effects)
+          (nothing happens yet — add effects that run when picked)
         </div>
       )}
     </div>
