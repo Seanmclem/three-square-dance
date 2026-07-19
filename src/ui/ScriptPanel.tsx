@@ -2602,6 +2602,11 @@ function DialogueEditor({
               + Add node
             </button>
           </div>
+          <div style={{ color: "#8b94a8", fontSize: 11, lineHeight: 1.4, padding: "0 0 6px" }}>
+            A node is one "screen" of the conversation: its lines play in
+            order, then its response options appear. Options jump to other
+            nodes — that's how conversations branch.
+          </div>
           {dialogue.nodes.map((node) => (
             <DialogueNodeCard
               key={node.id}
@@ -2725,6 +2730,9 @@ function DialogueNodeCard({
         }}
       >
         <span
+          title={isStart
+            ? "This node's id — the conversation starts here; response options elsewhere can jump to it"
+            : "This node's id — response options jump to nodes by these ids"}
           style={{
             color: "#80aaff",
             fontSize: 10,
@@ -2739,7 +2747,7 @@ function DialogueNodeCard({
         </span>
         <input
           style={{ ...S.field, flex: 1 }}
-          placeholder="Speaker (override)"
+          placeholder="Speaker for this node (optional)" title="Overrides the dialogue's Speaker while this node is on screen"
           value={node.speaker ?? ""}
           onChange={(e) => set("speaker", e.target.value || undefined)}
         />
@@ -2773,8 +2781,11 @@ function DialogueNodeCard({
           marginTop: 4,
         }}
       >
-        <span style={{ color: "#8b94a8", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>
-          Options
+        <span
+          title="What the player can say when this node's lines finish"
+          style={{ color: "#8b94a8", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}
+        >
+          Response options
         </span>
         <button style={{ ...S.btn(), fontSize: 10 }} onClick={addOption}>
           + Add
@@ -2782,7 +2793,7 @@ function DialogueNodeCard({
       </div>
       {node.options.length === 0 && (
         <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
-          (none — ends after last line)
+          (no responses — the conversation ends after this node's last line)
         </div>
       )}
       {node.options.map((opt, i) => (
@@ -2890,6 +2901,7 @@ function DialogueOptionRow({
         </button>
       </div>
       <select
+        title="Where this response leads — another node, or end the conversation"
         style={{ ...S.select, marginBottom: 4 }}
         value={option.next ?? ""}
         onChange={(e) => set({ next: e.target.value || undefined })}

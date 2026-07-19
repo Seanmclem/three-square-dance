@@ -28,8 +28,17 @@ Three building blocks:
 | Thing | What it is |
 |---|---|
 | **Node** | One "screen" of the conversation: the NPC's lines (shown one at a time, confirm to advance), followed by the player's response options. |
-| **Option** | One player response. It can be **gated** (hidden unless conditions pass), can **do things** when picked (set flags, adjust counters, any script action), and either **jumps to another node** or **ends** the conversation. |
+| **Response option** | One player response. It can be **gated** (hidden unless its "Show if" conditions pass), can **do things** when picked (its "On pick" effects — set flags, give items, any script action), and either **jumps to another node** or **ends** the conversation. |
 | **Tree** | The whole conversation: a label (for you), a speaker name (shown in-game), a start node, and its nodes. Each tree gets an id like `dlg_a1b2c3d4` that scripts reference. |
+
+> **Why "node"?** Because a conversation is a flowchart (a *graph*, in math
+> terms), and the standard name for a point in a graph is a node — the
+> response options are the arrows between them. Every branching-dialogue tool
+> uses some flavor of this word (Twine calls them passages, Ink calls them
+> knots, Yarn calls them nodes too). Practically, just read "node" as **"one
+> screen of talk"**. Their ids (`n1`, `n2`, …) are auto-numbered and only
+> matter as jump targets — the next-node dropdown shows each node's first
+> line next to its id so you rarely think about the numbers.
 
 Two rules cover most of the behavior:
 
@@ -55,7 +64,11 @@ Two rules cover most of the behavior:
    - **Start node** — which node plays first (usually `n1`; you rarely change
      this).
 4. Type the NPC's lines into the node's textarea — **one line per row**; the
-   player presses E (or A / tap) to step through them.
+   player presses E (or A / tap) to step through them. The node card's other
+   pieces: the blue **`n1 · start`** badge is the node's id (jump target —
+   hover it for a reminder), and **"Speaker for this node"** optionally
+   replaces the dialogue's Speaker while that node is on screen (for a second
+   character butting into the conversation).
 
 Here's the whole editor with a one-node dialogue staged — label and speaker
 up top, the start-node picker, then the node card with its lines and options:
@@ -64,17 +77,20 @@ up top, the start-node picker, then the node card with its lines and options:
 
 ### Adding responses
 
-Under a node's **OPTIONS**, click **+ Add**:
+Under a node's **RESPONSE OPTIONS**, click **+ Add**:
 
 - **Response text** — what the player sees, e.g. `Who are you?`
 - **Next-node dropdown** — where picking it leads:
   - a node (`→ n2 — Welcome, stranger.`), or
   - **— end conversation —** to close the dialogue.
-- **Show if** (+ Add) — conditions; the option is *hidden* unless **all** pass:
+- **Show if** (+ Add) — conditions; the option is *hidden* unless **all**
+  pass. With none added, the row reads *"(no conditions — option is always
+  shown)"* — that's the default, not a warning:
   - `has_state <key>` — the flag/key is set (and not false/null).
   - `compare_number <key> <op> <value>` — numeric check, e.g. `coins >= 5`.
-- **On pick** (+ Add) — effects that run the moment the player picks it. Any
-  script action works; the ones you'll use most:
+- **On pick** (+ Add) — effects that run the moment the player picks it
+  (empty rows say so: *"nothing happens yet — add effects that run when
+  picked"*). Any script action works; the ones you'll use most:
   - `set_state` — set a flag: key `met_guard`, value `true`.
   - `adjust_number` — add/subtract a counter: key `coins`, delta `-5`.
   - but also `play_sound`, `teleport_player`, `despawn_object`,

@@ -100,7 +100,7 @@ export function LeftPanel({
       left: 64,
       top: 48,
       bottom: 0,
-      width: open ? 280 : 0,
+      width: open ? 320 : 0,
       overflow: "hidden",
       transition: "width 0.2s ease",
       background: "rgba(28,28,28,0.97)",
