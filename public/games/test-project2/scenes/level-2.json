@@ -1330,7 +1330,7 @@
           "id": "obj_27f4a0e2",
           "assetId": "character",
           "position": {
-            "x": -34.16075151516859,
+            "x": -34.0064248679077,
             "y": 3.203150852697326,
             "z": -36.721040927866696
           },
@@ -2223,20 +2223,7 @@
           }
         }
       ],
-      "scripts": [
-        {
-          "id": "scr_e50e0b8f",
-          "label": "New Script",
-          "zoneId": "demo",
-          "enabled": true,
-          "trigger": {
-            "type": "on_game_start"
-          },
-          "conditions": [],
-          "actions": [],
-          "oneShot": false
-        }
-      ],
+      "scripts": [],
       "triggerVolumes": [
         {
           "id": "vol_94a6e2c6",
@@ -2305,6 +2292,10 @@
                   "id": "opt_8b003ec5",
                   "text": "This response is nice",
                   "next": "n3"
+                },
+                {
+                  "id": "opt_bbb8386c",
+                  "text": "Bye"
                 }
               ]
             },
