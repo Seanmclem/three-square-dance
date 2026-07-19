@@ -2745,6 +2745,7 @@ export default function App() {
         onStateSchemaChange={handleStateSchemaChange}
         gameStateSchema={project ? gameSchema : undefined}
         onGameStateSchemaChange={project ? handleGameSchemaChange : undefined}
+        isPreviewing={isPreview}
         worldItems={worldItems}
         onWorldItemsChange={handleWorldItemsChange}
         projectSceneIds={project ? project.store.sceneIds : undefined}

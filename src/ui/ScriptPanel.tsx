@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
   ScriptTrigger,
@@ -244,6 +245,8 @@ export interface ScriptPanelProps {
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
   gameStateSchema?: Record<string, StateSchema>;
   onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
+  /** True while editor preview/game is running — enables the live-values pane. */
+  isPreviewing?: boolean;
   worldItems: ItemDef[];
   onWorldItemsChange: (items: ItemDef[]) => void;
   projectSceneIds?: string[];
@@ -277,6 +280,7 @@ export function ScriptPanel({
   onStateSchemaChange,
   gameStateSchema,
   onGameStateSchemaChange,
+  isPreviewing,
   worldItems,
   onWorldItemsChange,
   projectSceneIds,
@@ -287,6 +291,15 @@ export function ScriptPanel({
   // STATE tab scope (project open only): GAME = shared game.json schema, SCENE = this scene's.
   const [stateScope, setStateScope] = useState<"game" | "scene">("game");
   const hasGameScope = gameStateSchema !== undefined && !!onGameStateSchemaChange;
+
+  // Live-values pane: refresh twice a second while a play session is running
+  // and the STATE tab is visible (a watch pane, not a per-frame HUD).
+  const [, setLiveRev] = useState(0);
+  useEffect(() => {
+    if (!isPreviewing || tab !== "state") return;
+    const id = setInterval(() => setLiveRev((r) => r + 1), 500);
+    return () => clearInterval(id);
+  }, [isPreviewing, tab]);
 
   // Auto-switch to SELECTED tab when a trigger volume or object is selected
   useEffect(() => {
@@ -399,6 +412,9 @@ export function ScriptPanel({
 
       {tab === "state" ? (
         <>
+          {isPreviewing && (
+            <LiveValues worldItems={worldItems} />
+          )}
           {hasGameScope && (
             <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexShrink: 0 }}>
               {(["game", "scene"] as const).map((sc) => (
@@ -580,7 +596,9 @@ function SchemaEditor({
               textAlign: "center",
             }}
           >
-            No state keys yet
+            Nothing registered yet — scripts can use any key without registering
+            it. Add a key here only to give it a New Game starting value or,
+            for numbers, min/max limits.
           </div>
         )}
         {entries.map(([key, sch]) => (
@@ -764,7 +782,8 @@ function ScriptList({
               textAlign: "center",
             }}
           >
-            No scripts yet
+            No scripts yet — hit + New. A script is a trigger (when it fires:
+            interact, enter a volume, game start…) plus actions (what happens).
           </div>
         )}
         {scripts.map((s) => (
@@ -2408,7 +2427,9 @@ function DialogueList({
               textAlign: "center",
             }}
           >
-            No dialogues yet
+            No dialogues yet — + New starts a conversation tree: nodes of lines
+            the NPC says, with response options that can branch, check
+            conditions, and run effects. Play one with a show_dialogue action.
           </div>
         )}
         {dialogues.map((d) => (
@@ -3017,7 +3038,9 @@ function ItemsEditor({
               textAlign: "center",
             }}
           >
-            No items yet
+            No items yet — items are things the player collects, sees in their
+            bag (I / Tab in game), and spends. + New creates one; scripts then
+            give, take, and check them by name.
           </div>
         )}
         {items.map((it) => (
@@ -3118,6 +3141,51 @@ function ItemRow({
         />
         <span style={{ color: "#6a7488", fontSize: 10 }}>on New Game</span>
       </label>
+    </div>
+  );
+}
+
+// ── LiveValues (STATE tab, while playing) ─────────────────────────────────────
+// Read-only watch pane over the live gameState store: every current key and
+// its value, refreshed by the panel's tick while a preview/game session runs.
+// Item counters are shown by their item label; engine-internal __keys hidden.
+
+function LiveValues({ worldItems }: { worldItems: ItemDef[] }) {
+  const snapshot = gameState.snapshot();
+  const rows = Object.entries(snapshot)
+    .filter(([k]) => !k.startsWith("__"))
+    .map(([k, v]) => {
+      const item = k.startsWith("inv.") ? worldItems.find((it) => `inv.${it.id}` === k) : undefined;
+      return { key: k, display: item ? `🎒 ${item.label}` : k, value: v, isItem: !!item };
+    })
+    .sort((a, b) => Number(a.isItem) - Number(b.isItem) || a.display.localeCompare(b.display));
+
+  return (
+    <div style={{
+      margin: "8px 10px 0", padding: "8px 10px", flexShrink: 0,
+      background: "rgba(80,200,120,0.06)", border: "1px solid rgba(80,200,120,0.25)",
+      borderRadius: 6, maxHeight: 180, overflowY: "auto",
+    }}>
+      <div style={{ color: "#50c878", fontSize: 10, letterSpacing: 1, marginBottom: 6, fontFamily: "monospace" }}>
+        ● LIVE VALUES — playing now
+      </div>
+      {rows.length === 0 && (
+        <div style={{ color: "#98a2b8", fontSize: 11 }}>
+          Nothing set yet — values appear here the moment a script or pickup
+          writes one.
+        </div>
+      )}
+      {rows.map((r) => (
+        <div key={r.key} style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "1px 0" }}>
+          <span style={{ color: "#a8b2c8", fontSize: 11, fontFamily: "monospace",
+                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {r.display}
+          </span>
+          <span style={{ color: "#c8d8ff", fontSize: 11, fontFamily: "monospace", flexShrink: 0 }}>
+            {JSON.stringify(r.value)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

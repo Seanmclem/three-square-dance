@@ -72,12 +72,33 @@ session.
 > action. Press Play: the second object does nothing until you've poked the
 > first one three times. That's the whole state system in miniature.
 
+### Watching values live (the debug view)
+
+While a **▶ Preview** session is running, the STATE tab grows a green
+**LIVE VALUES** pane — every current value, updating as you play. Flags,
+counters, and item counts (shown by their item label with a 🎒) all appear
+the moment something writes them:
+
+![LIVE VALUES — the STATE tab while a preview is running](docs/images/live-values.png)
+
+This is the answer to "why isn't my condition firing?" — walk up to the
+thing, trigger it, and watch whether the value actually changed. Notes:
+
+- It's **read-only** — a watch pane, not an editor. Values still change only
+  through scripts, dialogue, and pickups.
+- It appears in **Preview** (the editor panels stay visible there). **Start
+  Game** hides all editor UI for an immersive test, so use Preview when you
+  want to watch the numbers.
+- Keys starting with `__` (engine internals) are hidden.
+
 ---
 
 ## Layer 2 — Schema (the STATE tab)
 
-The STATE tab does **not** show the live values. It's the *rulebook*: which
-keys get a starting value on New Game, and what range numbers are allowed in.
+The STATE tab's rows are the *rulebook*, not the live values: which keys get
+a starting value on New Game, and what range numbers are allowed in. (Live
+values show up in this tab's green pane only while you're playing — see
+"Watching values live" above.)
 
 A schema entry = key name + type + **default** + (numbers) **min / max**:
 

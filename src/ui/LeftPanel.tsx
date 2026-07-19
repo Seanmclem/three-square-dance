@@ -67,6 +67,7 @@ interface LeftPanelProps {
   onStateSchemaChange:  (schema: Record<string, StateSchema>) => void;
   gameStateSchema?:     Record<string, StateSchema>;
   onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
+  isPreviewing?:        boolean;
   worldItems:           ItemDef[];
   projectSceneIds?:     string[];
   onWorldItemsChange:   (items: ItemDef[]) => void;
@@ -87,7 +88,7 @@ export function LeftPanel({
   zoneScripts, zoneDialogues, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneLights, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
-  stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange,
+  stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing,
   worldItems, onWorldItemsChange, projectSceneIds,
   decalTextures, selectedDecalId, onDecalSelect,
 }: LeftPanelProps) {
@@ -218,6 +219,7 @@ export function LeftPanel({
                 onStateSchemaChange={onStateSchemaChange}
                 gameStateSchema={gameStateSchema}
                 onGameStateSchemaChange={onGameStateSchemaChange}
+                isPreviewing={isPreviewing}
                 worldItems={worldItems}
                 projectSceneIds={projectSceneIds}
                 onWorldItemsChange={onWorldItemsChange}
