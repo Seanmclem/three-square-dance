@@ -222,6 +222,21 @@ Measured in "New Game" mode, dev build, 120Hz Retina MacBook, DPR capped at 2:
 |---|---|---|---|---|---|
 | `subway1.json` (6 walls, 2 floors, 2 stairs+railings, 1 platform) | 14–15 | 250–850 | 8.6ms | 12ms | FPS mode, zero dropped frames incl. look-around sweeps |
 | `Obby1.json` (4 platforms, 2 trigger volumes, animated warp box, skinned avatar) | ~15 | ~1k | 8.7ms | 12ms | third person; GC bursts only (see §7) |
+| `test-project2/level-2.json` (41 walls incl. a two-storey stack, 2 floors, 2 platforms, 1 stair, 2 NPCs) — measured 2026-07-19 | 29–32 | ~4k | 8.4ms | 17.9ms | first person, walking; 2177-frame sample. Median sits on the 120Hz vsync floor, so the scene is not GPU-bound; the p99 includes automation/CDP hitches |
+
+**Flat wall normals (v4.33.14) — measured cost.** `WallBuilder` unshares wall vertices
+(`toNonIndexed`) to get true per-face normals. What that does and doesn't cost:
+
+- **Triangles: unchanged. Draw calls: unchanged.** Only the vertex count rises — same
+  triangles, just unshared. In the level above, walls went ~290 → 1440 verts, i.e. **5.3%**
+  of the scene's 27.3k verts (~+4% scene-wide). Unmeasurable against the vsync floor.
+- **Build cost is editor-only** (walls build once at scene load). Timed per run:
+  `toNonIndexed` + `computeVertexNormals` adds **~0.1ms** to a 22-point run (0.4ms total)
+  and ~0.2ms to a synthetic 200-point run — versus **2.6ms** for a single CSG'd door
+  opening in the same run. Normals are not the term that matters in a rebuild.
+- **Scaling caveat:** cost is linear in wall count, so a level with 10× the walls carries
+  ~+11.5k verts. Still small, but if wall geometry ever dominates a scene, the cheaper fix
+  is to emit per-face vertices directly in the builder instead of converting after.
 
 The FpsCounter (top-left) now shows **draw calls · triangles** alongside FPS/worst-ms — compare
 any future level against these; draw calls are the number that compounds with level size (§5).
