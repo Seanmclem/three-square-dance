@@ -2900,22 +2900,25 @@ function DialogueOptionRow({
           ×
         </button>
       </div>
-      <select
-        title="Where this response leads — another page node, or end the conversation"
-        style={{ ...S.select, marginBottom: 4 }}
-        value={option.next ?? ""}
-        onChange={(e) => set({ next: e.target.value || undefined })}
-      >
-        <option value="">— end conversation —</option>
-        {dialogue.nodes.map((n) => (
-          <option key={n.id} value={n.id}>
-            → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
-          </option>
-        ))}
-        {dangling && (
-          <option value={option.next}>→ {option.next} (missing!)</option>
-        )}
-      </select>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <span style={{ color: "#8b94a8", fontSize: 11, flexShrink: 0 }}>Leads to</span>
+        <select
+          title="The page node this response jumps to — leave the default to end the conversation"
+          style={{ ...S.select, flex: 1 }}
+          value={option.next ?? ""}
+          onChange={(e) => set({ next: e.target.value || undefined })}
+        >
+          <option value="">— end conversation (default) —</option>
+          {dialogue.nodes.map((n) => (
+            <option key={n.id} value={n.id}>
+              → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
+            </option>
+          ))}
+          {dangling && (
+            <option value={option.next}>→ {option.next} (missing!)</option>
+          )}
+        </select>
+      </div>
       {dangling && (
         <div style={{ color: "#cc6666", fontSize: 10, marginBottom: 4 }}>
           ⚠ next node "{option.next}" doesn't exist — plays as "end conversation"

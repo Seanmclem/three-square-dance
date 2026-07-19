@@ -37,7 +37,7 @@ Three building blocks:
 > uses some flavor of this word (Twine calls them passages, Ink calls them
 > knots, Yarn calls them nodes too). Practically, just read "node" as **"one
 > screen of talk"**. Their ids (`n1`, `n2`, …) are auto-numbered and only
-> matter as jump targets — the next-node dropdown shows each node's first
+> matter as jump targets — the "Leads to" dropdown shows each node's first
 > line next to its id so you rarely think about the numbers.
 
 Two rules cover most of the behavior:
@@ -53,7 +53,7 @@ Two rules cover most of the behavior:
 
 The editor doesn't draw the flowchart — it shows the tree as a **vertical
 stack of page-node cards**, and the branching lives in each response option's
-**next-node dropdown**. Two options on the same card pointing at different
+**"Leads to" dropdown**. Two options on the same card pointing at different
 targets *is* the fork. Here's the conversation from the chart above, compact:
 
 ```
@@ -73,8 +73,8 @@ continuous view of the PAGE NODES section, two node cards:
 Reading the image against the chart:
 
 - **n1's card** holds the NPC's two lines and both response options. The two
-  next-node dropdowns are the chart's two arrows: `→ n2 — Welcome, stranger.`
-  is the left arrow, `— end conversation —` is the right one.
+  "Leads to" dropdowns are the chart's two arrows: `→ n2 — Welcome, stranger.`
+  is the left arrow, `— end conversation (default) —` is the right one.
 - The second option's **Show if** row (`has_state · met_npc`) is the chart's
   "only shown if met_npc is set", and its **On pick** row (`adjust_number ·
   coins · 5`) is "gives 5 coins".
@@ -105,8 +105,9 @@ Reading the image against the chart:
    replaces the dialogue's Speaker while that node is on screen (for a second
    character butting into the conversation).
 
-Here's the whole editor with a one-node dialogue staged — label and speaker
-up top, the start-node picker, then the node card with its lines and options:
+Here's the editor with the Guard-intro example staged — label and speaker
+up top, the start page-node picker, then the first node card with its lines
+and a complete response option (its "Leads to" target, Show if, and On pick):
 
 ![The DIALOGUE tab editor — tree fields, node card, and an option's full anatomy](docs/images/dialogue-editor.png)
 
@@ -115,9 +116,9 @@ up top, the start-node picker, then the node card with its lines and options:
 Under a node's **RESPONSE OPTIONS**, click **+ Add**:
 
 - **Response text** — what the player sees, e.g. `Who are you?`
-- **Next-node dropdown** — where picking it leads:
-  - a node (`→ n2 — Welcome, stranger.`), or
-  - **— end conversation —** to close the dialogue.
+- **Leads to** — where picking it takes the conversation. A new option leads
+  nowhere yet, so it reads **— end conversation (default) —**; point it at a
+  page node (`→ n2 — Welcome, stranger.`) to continue instead of ending.
 - **Show if** (+ Add) — conditions; the option is *hidden* unless **all**
   pass. With none added, the row reads *"(no conditions — option is always
   shown)"* — that's the default, not a warning:
@@ -144,10 +145,10 @@ recipe for an actual branch is:
 1. **+ Add page node** — an empty `n2` card appears below `n1`. Type its
    lines (what the NPC says on that branch).
 2. On `n1`, **+ Add** a response option and type its text ("I'm new here.").
-3. Open that option's **next-node dropdown** and pick **`→ n2 — …`**. That
+3. Open that option's **Leads to** dropdown and pick **`→ n2 — …`**. That
    dropdown selection *is* the branch — there's no separate "connect" step.
-4. **+ Add** a second option on `n1` and leave its dropdown on
-   **— end conversation —** (or point it at a different node).
+4. **+ Add** a second option on `n1` and leave its Leads to dropdown on
+   **— end conversation (default) —** (or point it at a different node).
 5. That's a fork: two options, two destinations. Repeat from step 1 to fan
    out further (a third option → `n3`, an option on `n2` → `n4`, …).
 
@@ -226,7 +227,7 @@ are runtime-only and reset when you leave preview.
 The editor warns but never blocks saving — the runtime degrades gracefully:
 
 - **Red option border + "next node doesn't exist"** — the option points at a
-  deleted node. In-game it just ends the conversation. Fix via the next-node
+  deleted node. In-game it just ends the conversation. Fix via the Leads to
   dropdown (the broken id shows as `(missing!)`).
 - **"⚠ Unreachable nodes: …"** — nodes nothing points to. They're harmless
   dead weight; either wire an option to them or delete them.
