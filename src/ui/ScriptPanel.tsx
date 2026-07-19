@@ -400,7 +400,7 @@ export function ScriptPanel({
         {tab === "object" &&
           "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
         {tab === "dialogue" &&
-          "Branching dialogue trees for this zone. A show_dialogue action plays one by id. Nodes show lines, then response options; options can be gated by conditions and run effects (set flags, adjust counters) when picked."}
+          "Branching conversations for this zone. Any script can play one with a show_dialogue action — picked by name. Each page node shows its lines, then its response options; options can be gated by conditions and run effects when picked."}
         {tab === "state" && !hasGameScope &&
           "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
         {tab === "state" && hasGameScope && (stateScope === "game"
@@ -1181,7 +1181,7 @@ function TargetPicker({
         <option value="">— any dialogue —</option>
         {zoneDialogues.map((d) => (
           <option key={d.id} value={d.id}>
-            {d.label} ({d.id})
+            {d.label}
           </option>
         ))}
         {targetId && !zoneDialogues.some((d) => d.id === targetId) && (
@@ -1824,7 +1824,7 @@ function ActionFields({
             <option value="">— pick dialogue —</option>
             {zoneDialogues.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.label} ({d.id})
+                {d.label}
               </option>
             ))}
             {/* Preserve a hand-entered / cross-zone id that isn't in this zone */}
@@ -2438,7 +2438,7 @@ function DialogueList({
               <div style={S.label}>{d.label}</div>
               <div style={S.sub}>
                 {d.speaker || "(no speaker)"}
-                {` · ${d.nodes.length} node${d.nodes.length !== 1 ? "s" : ""}`}
+                {` · ${d.nodes.length} page node${d.nodes.length !== 1 ? "s" : ""}`}
               </div>
             </div>
             <span style={{ color: "#444", marginLeft: 8, fontSize: 13 }}>
@@ -2569,7 +2569,7 @@ function DialogueEditor({
           />
         </div>
         <div style={{ padding: "0 12px 8px" }}>
-          <div style={S.sectionLabel as React.CSSProperties}>Start node</div>
+          <div style={S.sectionLabel as React.CSSProperties}>Start page-node</div>
           <select
             style={S.select}
             value={dialogue.startNode}
@@ -2597,15 +2597,15 @@ function DialogueEditor({
               alignItems: "center",
             }}
           >
-            <span style={S.sectionLabel as React.CSSProperties}>Nodes</span>
+            <span style={S.sectionLabel as React.CSSProperties}>Page nodes</span>
             <button style={{ ...S.btn(), fontSize: 10 }} onClick={addNode}>
-              + Add node
+              + Add page node
             </button>
           </div>
           <div style={{ color: "#8b94a8", fontSize: 11, lineHeight: 1.4, padding: "0 0 6px" }}>
-            A node is one "screen" of the conversation: its lines play in
+            A page node is one "page" of the conversation: its lines play in
             order, then its response options appear. Options jump to other
-            nodes — that's how conversations branch.
+            page nodes — that's how conversations branch.
           </div>
           {dialogue.nodes.map((node) => (
             <DialogueNodeCard
@@ -2635,7 +2635,7 @@ function DialogueEditor({
 
         {unreachable.length > 0 && (
           <div style={{ color: "#cc9944", fontSize: 10, padding: "0 12px 8px" }}>
-            ⚠ Unreachable node{unreachable.length !== 1 ? "s" : ""}: {unreachable.join(", ")}
+            ⚠ Unreachable page node{unreachable.length !== 1 ? "s" : ""}: {unreachable.join(", ")}
           </div>
         )}
 
@@ -2731,8 +2731,8 @@ function DialogueNodeCard({
       >
         <span
           title={isStart
-            ? "This node's id — the conversation starts here; response options elsewhere can jump to it"
-            : "This node's id — response options jump to nodes by these ids"}
+            ? "This page node's id — the conversation starts here; response options elsewhere can jump to it"
+            : "This page node's id — response options jump to page nodes by these ids"}
           style={{
             color: "#80aaff",
             fontSize: 10,
@@ -2759,7 +2759,7 @@ function DialogueNodeCard({
             cursor: isStart ? "not-allowed" : "pointer",
           }}
           disabled={isStart}
-          title={isStart ? "Start node — pick another start node first" : "Delete node"}
+          title={isStart ? "This is the start page-node — pick a different start page-node first" : "Delete this page node"}
           onClick={onDelete}
         >
           ×
@@ -2793,7 +2793,7 @@ function DialogueNodeCard({
       </div>
       {node.options.length === 0 && (
         <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
-          (no responses — the conversation ends after this node's last line)
+          (no responses — the conversation ends after this page's last line)
         </div>
       )}
       {node.options.map((opt, i) => (
@@ -2901,7 +2901,7 @@ function DialogueOptionRow({
         </button>
       </div>
       <select
-        title="Where this response leads — another node, or end the conversation"
+        title="Where this response leads — another page node, or end the conversation"
         style={{ ...S.select, marginBottom: 4 }}
         value={option.next ?? ""}
         onChange={(e) => set({ next: e.target.value || undefined })}

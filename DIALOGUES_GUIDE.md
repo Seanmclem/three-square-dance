@@ -27,13 +27,13 @@ Three building blocks:
 
 | Thing | What it is |
 |---|---|
-| **Node** | One "screen" of the conversation: the NPC's lines (shown one at a time, confirm to advance), followed by the player's response options. |
+| **Page node** | One "page" of the conversation: the NPC's lines (shown one at a time, confirm to advance), followed by the player's response options. |
 | **Response option** | One player response. It can be **gated** (hidden unless its "Show if" conditions pass), can **do things** when picked (its "On pick" effects — set flags, give items, any script action), and either **jumps to another node** or **ends** the conversation. |
 | **Tree** | The whole conversation: a label (for you), a speaker name (shown in-game), a start node, and its nodes. Each tree gets an id like `dlg_a1b2c3d4` that scripts reference. |
 
-> **Why "node"?** Because a conversation is a flowchart (a *graph*, in math
-> terms), and the standard name for a point in a graph is a node — the
-> response options are the arrows between them. Every branching-dialogue tool
+> **Why "node"?** (Labeled **PAGE NODES** in the editor.) A conversation is
+> a flowchart (a *graph*, in math terms), and the standard name for a point
+> in a graph is a node — the response options are the arrows between them. Every branching-dialogue tool
 > uses some flavor of this word (Twine calls them passages, Ink calls them
 > knots, Yarn calls them nodes too). Practically, just read "node" as **"one
 > screen of talk"**. Their ids (`n1`, `n2`, …) are auto-numbered and only
@@ -55,14 +55,14 @@ Two rules cover most of the behavior:
 
 1. Open the **SCRIPTS** panel (bottom-left toolbar) and switch to the
    **DIALOGUE** tab.
-2. Click **+ New**. You get a fresh tree with one node (`n1`) already set as
-   the start node.
+2. Click **+ New**. You get a fresh tree with one page node (`n1`) already
+   set as the start page-node.
 3. Fill in the top fields:
    - **Label** — your name for it ("Guard intro"). Only shown in the editor.
    - **Speaker** — the name displayed above the dialogue text in-game.
    - **Portrait URL** — optional image shown beside the text.
-   - **Start node** — which node plays first (usually `n1`; you rarely change
-     this).
+   - **Start page-node** — which page node plays first (usually `n1`; you
+     rarely change this).
 4. Type the NPC's lines into the node's textarea — **one line per row**; the
    player presses E (or A / tap) to step through them. The node card's other
    pieces: the blue **`n1 · start`** badge is the node's id (jump target —
@@ -97,11 +97,11 @@ Under a node's **RESPONSE OPTIONS**, click **+ Add**:
     `fade_screen`, `load_scene`, even `show_dialogue` (hands off to another
     tree).
 
-### Adding more nodes
+### Adding more page nodes
 
-**+ Add node** creates `n2`, `n3`, … Point options at them via the next-node
-dropdown. Deleting a node is the **×** on its card — the start node can't be
-deleted (pick a different start node first).
+**+ Add page node** creates `n2`, `n3`, … Point options at them via the
+next-node dropdown. Deleting one is the **×** on its card — the start
+page-node can't be deleted (pick a different start page-node first).
 
 > **"Give / receive items":** define items in the **ITEMS** tab (label, icon,
 > description, stack size, starting count), then use the typed pieces with
