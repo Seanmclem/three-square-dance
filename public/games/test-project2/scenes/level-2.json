@@ -13,8 +13,8 @@
         "z": -33.19851866202769
       },
       "radius": 22.882649074494818,
-      "phi": 1.2803981633974453,
-      "theta": 0.09039816339744819
+      "phi": 1.0103981633974461,
+      "theta": 0.8403981633974483
     }
   },
   "world": {
@@ -1325,62 +1325,6 @@
             "triggerEventId": null
           },
           "groupIds": []
-        },
-        {
-          "id": "obj_ed46fc13",
-          "assetId": "character",
-          "position": {
-            "x": -32.5,
-            "y": 3.200000047683716,
-            "z": -35
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "autoPlayAnimation": "Run"
-        },
-        {
-          "id": "obj_573374b4",
-          "assetId": "character",
-          "position": {
-            "x": -28,
-            "y": 0.004999999888241291,
-            "z": -27
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "autoPlayAnimation": "HitReact"
         }
       ],
       "lights": [
