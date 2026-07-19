@@ -49,6 +49,41 @@ Two rules cover most of the behavior:
    that sets a flag can unlock a different option later in the *same*
    conversation, or change what the NPC offers next time you talk to them.
 
+### What that looks like in the editor
+
+The editor doesn't draw the flowchart — it shows the tree as a **vertical
+stack of page-node cards**, and the branching lives in each response option's
+**next-node dropdown**. Two options on the same card pointing at different
+targets *is* the fork. Here's the conversation from the chart above, compact:
+
+```
+        n1  "Halt! Who goes there?"
+       ┌────┴───────────────────────────┐
+  "I'm new here."             "We've met — got my reward?"
+   → goes to n2                (gated; gives 5 coins) → ends
+       │
+        n2  "Welcome, stranger."  → ends
+```
+
+…and here is that exact conversation authored in the DIALOGUE tab — one
+continuous view of the PAGE NODES section, two node cards:
+
+![The branching example in the editor — n1's two options point at different targets; n2 sits below](docs/images/dialogue-branching.png)
+
+Reading the image against the chart:
+
+- **n1's card** holds the NPC's two lines and both response options. The two
+  next-node dropdowns are the chart's two arrows: `→ n2 — Welcome, stranger.`
+  is the left arrow, `— end conversation —` is the right one.
+- The second option's **Show if** row (`has_state · met_npc`) is the chart's
+  "only shown if met_npc is set", and its **On pick** row (`adjust_number ·
+  coins · 5`) is "gives 5 coins".
+- **n2's card** underneath is the chart's n2 box — no response options, so
+  the conversation just ends after its line.
+- The cards' top-to-bottom order is only storage order. The *shape* of the
+  conversation — what branches where — is entirely in where each option's
+  dropdown points.
+
 ---
 
 ## Creating a dialogue
@@ -97,11 +132,35 @@ Under a node's **RESPONSE OPTIONS**, click **+ Add**:
     `fade_screen`, `load_scene`, even `show_dialogue` (hands off to another
     tree).
 
-### Adding more page nodes
+### Adding more page nodes — making it branch
 
-**+ Add page node** creates `n2`, `n3`, … Point options at them via the
-next-node dropdown. Deleting one is the **×** on its card — the start
-page-node can't be deleted (pick a different start page-node first).
+**+ Add page node** creates `n2`, `n3`, … Deleting one is the **×** on its
+card — the start page-node can't be deleted (pick a different start
+page-node first).
+
+A new page node does nothing until an option points at it, so the full
+recipe for an actual branch is:
+
+1. **+ Add page node** — an empty `n2` card appears below `n1`. Type its
+   lines (what the NPC says on that branch).
+2. On `n1`, **+ Add** a response option and type its text ("I'm new here.").
+3. Open that option's **next-node dropdown** and pick **`→ n2 — …`**. That
+   dropdown selection *is* the branch — there's no separate "connect" step.
+4. **+ Add** a second option on `n1` and leave its dropdown on
+   **— end conversation —** (or point it at a different node).
+5. That's a fork: two options, two destinations. Repeat from step 1 to fan
+   out further (a third option → `n3`, an option on `n2` → `n4`, …).
+
+What you just built:
+
+```
+        n1 ── option A ──→ n2
+          └── option B ──→ (end)
+```
+
+…which is exactly the layout in the [branching screenshot](#what-that-looks-like-in-the-editor)
+up in the mental-model section: the fork never appears as lines on screen,
+only as two dropdowns with different targets.
 
 > **"Give / receive items":** define items in the **ITEMS** tab (label, icon,
 > description, stack size, starting count), then use the typed pieces with

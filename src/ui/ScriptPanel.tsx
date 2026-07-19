@@ -573,7 +573,7 @@ function SchemaEditor({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div
         style={{
           display: "flex",
@@ -759,7 +759,7 @@ function ScriptList({
   onAdd: () => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div
         style={{
           display: "flex",
@@ -877,7 +877,7 @@ function ScriptEditor({
     script.trigger.type === "on_dialogue_end";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Header */}
       <div
         style={{
@@ -2404,7 +2404,7 @@ function DialogueList({
   onAdd: () => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div
         style={{
           display: "flex",
@@ -2516,7 +2516,7 @@ function DialogueEditor({
   const unreachable = dialogue.nodes.filter((n) => !reachable.has(n.id)).map((n) => n.id);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Header */}
       <div
         style={{
@@ -3027,7 +3027,7 @@ function ItemsEditor({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div
         style={{
           display: "flex",
