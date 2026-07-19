@@ -40,6 +40,24 @@ function createArchCutterGeo(width: number, height: number, thickness: number): 
   return geo;
 }
 
+/** Replaces an indexed wall strip with an unshared copy carrying true per-face
+ *  normals. The strip shares each polyline point's 4 vertices between the side
+ *  faces AND the top/bottom/cap faces, so `computeVertexNormals()` on the
+ *  indexed form averages a side face's normal with the caps' — tilting the
+ *  bottom row down (n.y ≈ −0.1) and the top row up (n.y ≈ +0.1) and smearing a
+ *  fake vertical shading gradient over every wall. It also rounds the shading
+ *  across mitered corners. The gradient is invisible on a lone wall but breaks
+ *  hard where two floors' runs stack (the lower run's top row meets the upper
+ *  run's bottom row), which reads as a lit seam across the facade.
+ *  Costs ~6× the vertices — walls are a handful of meshes, and draw calls are
+ *  unchanged. */
+function withFlatNormals(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const flat = geo.toNonIndexed();
+  flat.computeVertexNormals();
+  geo.dispose();
+  return flat;
+}
+
 // Builds the 4 inward-facing faces of a passage/opening tunnel as explicit geometry.
 // Geometry is centered at origin in opening-local space (width × height × thickness).
 // includeLintel: false for arch openings (arch curve replaces the top face).
@@ -283,12 +301,12 @@ export class WallBuilder {
       4,5,7, 4,7,6,  // end cap
     ];
 
-    const baseGeo = new THREE.BufferGeometry();
-    baseGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-    baseGeo.setAttribute('uv',  new THREE.Float32BufferAttribute(uvArr, 2));
-    baseGeo.setAttribute('uv2', new THREE.Float32BufferAttribute([...uvArr], 2));
-    baseGeo.setIndex(idxArr);
-    baseGeo.computeVertexNormals();
+    const indexedGeo = new THREE.BufferGeometry();
+    indexedGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    indexedGeo.setAttribute('uv',  new THREE.Float32BufferAttribute(uvArr, 2));
+    indexedGeo.setAttribute('uv2', new THREE.Float32BufferAttribute([...uvArr], 2));
+    indexedGeo.setIndex(idxArr);
+    const baseGeo = withFlatNormals(indexedGeo);
     applyUVOffset(baseGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);  // offset before CSG so cut UVs inherit it
 
     // CSG: subtract openings. Cutters positioned in world space (matching buildRun).
@@ -581,12 +599,12 @@ export class WallBuilder {
       if (nextBoundary) capEnd(out, j);
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr,  2));
-    geo.setAttribute('uv2',      new THREE.Float32BufferAttribute(uvArr.slice(), 2));
-    geo.setIndex(idxArr);
-    geo.computeVertexNormals();
+    const indexedGeo = new THREE.BufferGeometry();
+    indexedGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    indexedGeo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr,  2));
+    indexedGeo.setAttribute('uv2',      new THREE.Float32BufferAttribute(uvArr.slice(), 2));
+    indexedGeo.setIndex(idxArr);
+    const geo = withFlatNormals(indexedGeo);
     applyUVOffset(geo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);  // offset before CSG so cut UVs inherit it
 
     // --- Opening processing: CSG cuts + trim/trigger meshes for any wall in the run ---
