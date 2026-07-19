@@ -1213,7 +1213,7 @@
             "41154cf0-902c-4fd7-973d-cde160f6e97b",
             "df573b6d-ddeb-4919-9e03-1c77d765c7ff"
           ],
-          "editorGhost": true
+          "editorGhost": false
         },
         {
           "id": "plat_4a9d2370",
@@ -1325,6 +1325,54 @@
             "triggerEventId": null
           },
           "groupIds": []
+        },
+        {
+          "id": "obj_27f4a0e2",
+          "assetId": "character",
+          "position": {
+            "x": -34.16075151516859,
+            "y": 3.203150852697326,
+            "z": -36.721040927866696
+          },
+          "rotation": {
+            "x": 0,
+            "y": 56.558625421374884,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": true,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null,
+            "interactLabel": "Talk"
+          },
+          "autoPlayAnimation": "Idle",
+          "scripts": [
+            {
+              "id": "scr_f172fd31",
+              "label": "Begin conversation",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_interact"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "show_dialogue",
+                  "dialogueId": "dlg_036e1297"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
         }
       ],
       "lights": [
@@ -2175,7 +2223,20 @@
           }
         }
       ],
-      "scripts": [],
+      "scripts": [
+        {
+          "id": "scr_e50e0b8f",
+          "label": "New Script",
+          "zoneId": "demo",
+          "enabled": true,
+          "trigger": {
+            "type": "on_game_start"
+          },
+          "conditions": [],
+          "actions": [],
+          "oneShot": false
+        }
+      ],
       "triggerVolumes": [
         {
           "id": "vol_94a6e2c6",
@@ -2219,6 +2280,49 @@
             "fadeHeight": 1,
             "animate": false
           }
+        }
+      ],
+      "dialogues": [
+        {
+          "id": "dlg_036e1297",
+          "label": "Blue Bunny Talk",
+          "speaker": "",
+          "startNode": "n1",
+          "nodes": [
+            {
+              "id": "n1",
+              "lines": [
+                "Hey there! Welcome to this world.",
+                "How did you get in here?"
+              ],
+              "options": [
+                {
+                  "id": "opt_ce4297ab",
+                  "text": "This is the response bitch",
+                  "next": "n2"
+                },
+                {
+                  "id": "opt_8b003ec5",
+                  "text": "This response is nice",
+                  "next": "n3"
+                }
+              ]
+            },
+            {
+              "id": "n2",
+              "lines": [
+                "Well, that's rude :("
+              ],
+              "options": []
+            },
+            {
+              "id": "n3",
+              "lines": [
+                "Well, that's nice!"
+              ],
+              "options": []
+            }
+          ]
         }
       ]
     }
