@@ -152,11 +152,55 @@ export class WorldState {
   updateNode(zoneId: string, nodeId: string, pos: { x: number; z: number }): void {
     const zone = this.zones.get(zoneId);
     const node = zone?.nodes.find(n => n.id === nodeId);
-    if (!node) return;
+    if (!node || !zone) return;
     this._touch("node", zoneId, nodeId);
     node.x = pos.x;
     node.z = pos.z;
     this._bus.emit("node:updated", { zoneId, nodeId, pos });
+
+    this.propagateNodeLink(zoneId, nodeId);
+  }
+
+  /** Linked corners (copy-to-floor): pushes a node's position onto every
+   *  link-mate, so dragging one floor's corner moves the stacked floors. Each
+   *  mate emits its own `node:updated` so its walls rebuild through the normal
+   *  path (a mate lives on another floor — the dragged node's rebuild won't
+   *  cover it). Public because callers that mutate `zone.nodes` directly
+   *  (NodeDragger's rect-corner sync) must still propagate. */
+  propagateNodeLink(zoneId: string, nodeId: string): void {
+    const zone = this.zones.get(zoneId);
+    const node = zone?.nodes.find(n => n.id === nodeId);
+    if (!zone || !node?.linkId) return;
+    const pos = { x: node.x, z: node.z };
+    for (const mate of zone.nodes) {
+      if (mate.id === nodeId || mate.linkId !== node.linkId) continue;
+      if (mate.x === pos.x && mate.z === pos.z) continue;   // already in sync — no redundant rebuild
+      this._touch("node", zoneId, mate.id);
+      mate.x = pos.x;
+      mate.z = pos.z;
+      this._bus.emit("node:updated", { zoneId, nodeId: mate.id, pos });
+    }
+  }
+
+  /** Joins a node to a cross-floor link group (data-only, like unlinkNodes). */
+  setNodeLink(zoneId: string, nodeId: string, linkId: string): void {
+    const node = this.zones.get(zoneId)?.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+    this._touch("node", zoneId, nodeId);
+    node.linkId = linkId;
+  }
+
+  /** Drops the cross-floor corner link on the given nodes (data-only — no
+   *  geometry changes, so no rebuild events). */
+  unlinkNodes(zoneId: string, nodeIds: string[]): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    for (const id of nodeIds) {
+      const node = zone.nodes.find(n => n.id === id);
+      if (!node?.linkId) continue;
+      this._touch("node", zoneId, id);
+      delete node.linkId;
+    }
   }
 
   removeNode(zoneId: string, nodeId: string): void {

@@ -1682,7 +1682,12 @@ export default function App() {
         if (nodeMap.has(oldId)) continue;
         const oldNode = zone.nodes.find(n => n.id === oldId);
         if (!oldNode) continue;
-        const newNode = { id: crypto.randomUUID(), x: oldNode.x, z: oldNode.z };
+        // Link the copy to its source so dragging either corner moves both
+        // floors. The source adopts a linkId on its first copy (existing nodes
+        // have none), and later copies of the same run join that same group.
+        const linkId = oldNode.linkId ?? crypto.randomUUID();
+        if (!oldNode.linkId) world.setNodeLink(selected.zoneId, oldId, linkId);
+        const newNode = { id: crypto.randomUUID(), x: oldNode.x, z: oldNode.z, linkId };
         world.addNode(selected.zoneId, newNode);
         nodeMap.set(oldId, newNode.id);
       }
@@ -1811,6 +1816,49 @@ export default function App() {
     const zone = worldRef.current?.zones.get(selected.zoneId);
     const level = (selected.data as WallDef | null)?.floor ?? 0;
     return !!zone?.floors.some(f => f.level === level && sameNodeSet(f.floorMesh.nodeIds, core));
+  };
+
+  /** The selected run's own nodes (deduped), for the cross-floor corner link. */
+  const getRunNodeIds = (): string[] => {
+    if (!selected || selected.type !== "wall") return [];
+    const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
+    return [...new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]))];
+  };
+
+  /** Floor levels this run's corners are linked to, excluding its own — drives the
+   *  "Corners linked to: G, 1" readout. A link-mate's level comes from the walls
+   *  that reference it (a node carries no level of its own). */
+  const getRunLinkedFloors = (): number[] => {
+    const world = worldRef.current;
+    if (!world || !selected || selected.type !== "wall") return [];
+    const zone = world.zones.get(selected.zoneId);
+    if (!zone) return [];
+    const ownIds  = new Set(getRunNodeIds());
+    const linkIds = new Set(
+      [...ownIds].map(id => zone.nodes.find(n => n.id === id)?.linkId).filter((l): l is string => !!l),
+    );
+    if (linkIds.size === 0) return [];
+    const ownLevel = (selected.data as WallDef | null)?.floor ?? 0;
+    const levels = new Set<number>();
+    for (const node of zone.nodes) {
+      if (ownIds.has(node.id) || !node.linkId || !linkIds.has(node.linkId)) continue;
+      for (const w of zone.walls) {
+        if (w.startNodeId !== node.id && w.endNodeId !== node.id) continue;
+        if ((w.floor ?? 0) !== ownLevel) levels.add(w.floor ?? 0);
+      }
+    }
+    return [...levels].sort((a, b) => a - b);
+  };
+
+  const handleUnlinkRunCorners = (): void => {
+    const world = worldRef.current;
+    const nodeIds = getRunNodeIds();
+    if (!world || !selected || nodeIds.length === 0) return;
+    world.transaction("unlink run corners", () => {
+      world.unlinkNodes(selected.zoneId, nodeIds);
+    });
+    syncHistory();
+    setSelected(s => (s ? { ...s } : s));   // drop the "Corners linked to" readout
   };
 
   const handleToggleCeilingGhost = (): void => {
@@ -2802,6 +2850,8 @@ export default function App() {
         onAddCeilingToRun={isWallRunClosed() && !findRunCeiling() ? handleAddCeilingToRun : undefined}
         onToggleCeilingGhost={findRunCeiling() ? handleToggleCeilingGhost : undefined}
         runCeilingGhosted={!!findRunCeiling()?.editorGhost}
+        onUnlinkRunCorners={selected?.type === "wall" ? handleUnlinkRunCorners : undefined}
+        runLinkedFloors={selected?.type === "wall" ? getRunLinkedFloors() : undefined}
         onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
         multiSelected={multiSelected}
         onCopy={handleCopy}

@@ -269,8 +269,11 @@ export class WallBuilder {
       sl.x, 0, sl.z,  sl.x, H, sl.z,  sr.x, 0, sr.z,  sr.x, H, sr.z,
       el.x, 0, el.z,  el.x, H, el.z,  er.x, 0, er.z,  er.x, H, er.z,
     ];
-    const uE = totalLen / tileX, vT = H / tileY;
-    const uvArr = [0,0,0,vT,0,0,0,vT, uE,0,uE,vT,uE,0,uE,vT];
+    // V is world-space like U: a wall at elevation E starts its texture where a
+    // wall below it left off, so stacked runs (copy-to-floor) tile continuously.
+    const uE = totalLen / tileX;
+    const vB = (wall.elevation ?? 0) / tileY, vT = vB + H / tileY;
+    const uvArr = [0,vB,0,vT,0,vB,0,vT, uE,vB,uE,vT,uE,vB,uE,vT];
     const idxArr = [
       0,1,5, 0,5,4,  // left face
       2,6,7, 2,7,3,  // right face
@@ -508,7 +511,10 @@ export class WallBuilder {
     // Build indexed BufferGeometry.
     // Per polyline point: 4 vertices — LB(4i), LT(4i+1), RB(4i+2), RT(4i+3)
     // Face winding verified for correct outward normals (CCW from outside).
-    const vTop   = H / tileY;
+    // V is world-space like U (see the single-wall path): starting at the run's
+    // elevation makes a copy-to-floor stack tile continuously across the seam.
+    const vBot   = runElevation / tileY;
+    const vTop   = vBot + H / tileY;
     const posArr: number[] = [];
     const uvArr:  number[] = [];
     const idxArr: number[] = [];
@@ -517,7 +523,7 @@ export class WallBuilder {
       const l = lefts[i]!, r = rights[i]!;
       const u = cumDist[i]! / tileX;
       posArr.push(l.x, 0, l.z,  l.x, H, l.z,  r.x, 0, r.z,  r.x, H, r.z);
-      uvArr.push( u,   0, u,   vTop,  u,  0, u, vTop);
+      uvArr.push( u,   vBot, u,   vTop,  u,  vBot, u, vTop);
     }
 
     // Closed loops: the wrap-around segment (pts[N-1]→pts[0]) would interpolate
@@ -530,7 +536,7 @@ export class WallBuilder {
       const uTotal     = (cumDist[N - 1]! + wrapLen) / tileX;
       const l = lefts[0]!, r = rights[0]!;
       posArr.push(l.x, 0, l.z,  l.x, H, l.z,  r.x, 0, r.z,  r.x, H, r.z);
-      uvArr.push(uTotal, 0, uTotal, vTop, uTotal, 0, uTotal, vTop);
+      uvArr.push(uTotal, vBot, uTotal, vTop, uTotal, vBot, uTotal, vTop);
     }
 
     // Closed loops have N segments (last wraps back to 0); open runs have N-1.

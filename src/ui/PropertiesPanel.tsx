@@ -353,6 +353,8 @@ interface PropertiesPanelProps {
   onAddCeilingToRun?:       () => void;
   onToggleCeilingGhost?:    () => void;
   runCeilingGhosted?:       boolean;
+  onUnlinkRunCorners?:      () => void;
+  runLinkedFloors?:         number[];
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
   zones?:                   ZoneDef[];
@@ -393,7 +395,7 @@ export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onFloorNodesUpdate, getNodeLinks,
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun,
-  onToggleCeilingGhost, runCeilingGhosted, onDelete,
+  onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete,
   onVolumeScriptsChange,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
@@ -618,6 +620,8 @@ export function PropertiesPanel({
               onAddCeilingToRun={onAddCeilingToRun}
               onToggleCeilingGhost={onToggleCeilingGhost}
               runCeilingGhosted={runCeilingGhosted}
+              onUnlinkRunCorners={onUnlinkRunCorners}
+              runLinkedFloors={runLinkedFloors}
               onDelete={onDelete}
               onBake={onBake}
             />
@@ -692,7 +696,7 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onDelete, onBake }: {
+function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
@@ -701,6 +705,8 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
   onAddCeilingToRun?: () => void;
   onToggleCeilingGhost?: () => void;
   runCeilingGhosted?: boolean;
+  onUnlinkRunCorners?: () => void;
+  runLinkedFloors?:   number[];
   onDelete?:          () => void;
   onBake?:            (refs: SelectedRef[]) => void;
 }) {
@@ -755,6 +761,23 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
                 color: "#6bc88a", fontSize: 11, fontFamily: "monospace",
               }}
             >{runCeilingGhosted ? "Show ceiling (un-ghost)" : "Hide ceiling (ghost)"}</button>
+          )}
+
+          {onUnlinkRunCorners && runLinkedFloors && runLinkedFloors.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontFamily: "monospace", color: "#98a2b8", marginBottom: 6 }}>
+                ⛓ Corners linked to: {runLinkedFloors.map(l => (l === 0 ? "G" : String(l))).join(", ")}
+              </div>
+              <button
+                onClick={onUnlinkRunCorners}
+                title="Stop this run's corners from following the other floors' — each floor moves on its own afterward. The other floors stay linked to each other."
+                style={{
+                  width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                  background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                  color: "#80aaff", fontSize: 11, fontFamily: "monospace",
+                }}
+              >Unlink corners from other floors</button>
+            </div>
           )}
 
           {onCopyRunToFloor && (

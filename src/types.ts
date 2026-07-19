@@ -172,6 +172,12 @@ export interface WallNode {
   id: string;
   x:  number;
   z:  number;
+  /** Cross-floor corner link (copy-to-floor). Nodes sharing a linkId keep the
+   *  same x/z — WorldState.updateNode propagates a move to every link-mate.
+   *  Absent = unlinked. Nodes can't be *shared* between floors outright: a
+   *  shared node would read as degree-4 in groupWallRuns' canMerge and shatter
+   *  both runs' merged geometry. */
+  linkId?: string;
 }
 export interface ScreenPos { x: number; y: number }
 export interface Euler3 { x: number; y: number; z: number }

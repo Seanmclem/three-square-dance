@@ -560,6 +560,7 @@ export class NodeDragger {
       const dot = this._nodeDots.get(sameXId);
       if (dot) dot.position.set(nx, this._dotY(sameXId), sameXNode.z);
       this._updateEdgeLinesForNode(sameXId, nx, sameXNode.z);
+      this._world.propagateNodeLink(this._activeZoneId!, sameXId);  // direct mutation skips updateNode
     }
 
     if (sameZNode) {
@@ -567,6 +568,7 @@ export class NodeDragger {
       const dot = this._nodeDots.get(sameZId);
       if (dot) dot.position.set(sameZNode.x, this._dotY(sameZId), nz);
       this._updateEdgeLinesForNode(sameZId, sameZNode.x, nz);
+      this._world.propagateNodeLink(this._activeZoneId!, sameZId);
     }
   }
 
