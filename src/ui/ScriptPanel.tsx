@@ -2861,6 +2861,9 @@ function DialogueNodeCard({
   // Accordion state for the response wells, lifted here so each nested
   // subtree can render right after its well while "+ Add" stays reachable.
   const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+  // The per-page speaker override stays hidden behind ✎ unless set — as a
+  // bare header input it kept catching dialogue lines typed into it.
+  const [speakerEdit, setSpeakerEdit] = useState(false);
   // The default open state is evaluated ONCE per option id and then frozen —
   // deriving it live would slam an option shut the moment "empty" stops
   // being true (i.e. on the first character typed into it).
@@ -2884,7 +2887,7 @@ function DialogueNodeCard({
       style={{
         background: "rgba(255,255,255,0.04)",
         borderRadius: 6,
-        padding: depth > 0 ? "8px 4px 8px 8px" : "8px 8px",
+        padding: depth > 0 ? "10px 6px 10px 12px" : "8px 8px",
         marginBottom: depth > 0 ? 0 : 8,
         border: "1px solid rgba(255,255,255,0.05)",
         borderLeft: depth > 0 ? `2px solid ${NEST_RAILS[(depth - 1) % 3]}` : "1px solid rgba(255,255,255,0.05)",
@@ -2914,12 +2917,34 @@ function DialogueNodeCard({
           {node.id}
           {isStart ? " · start" : ""}
         </span>
-        <input
-          style={{ ...S.field, flex: 1 }}
-          placeholder="Speaker override…" title="Overrides the dialogue's Speaker while this node is on screen"
-          value={node.speaker ?? ""}
-          onChange={(e) => set("speaker", e.target.value || undefined)}
-        />
+        <span
+          title={
+            node.speaker
+              ? `"${node.speaker}" speaks this page (overrides the dialogue's Speaker) — ✎ to change`
+              : "Who speaks this page's lines (the dialogue's Speaker) — ✎ to override for this page only"
+          }
+          style={{
+            flex: 1,
+            minWidth: 0,
+            color: "#dde3f0",
+            fontSize: 10,
+            fontWeight: 600,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {node.speaker || dialogue.speaker || "NPC"} says
+        </span>
+        <button
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 11, padding: "2px 4px", flexShrink: 0 }}
+          title="Change who speaks on this page only (overrides the dialogue's Speaker)"
+          onClick={() => setSpeakerEdit((v) => !v)}
+        >
+          ✎
+        </button>
         <button
           style={{
             ...S.btn(),
@@ -2934,9 +2959,18 @@ function DialogueNodeCard({
           ×
         </button>
       </div>
+      {(speakerEdit || !!node.speaker) && (
+        <input
+          style={{ ...S.field, marginBottom: 4 }}
+          placeholder={`Speaker for this page only (blank = ${dialogue.speaker || "the dialogue's Speaker"})`}
+          title="Overrides the dialogue's Speaker while this page is on screen"
+          value={node.speaker ?? ""}
+          onChange={(e) => set("speaker", e.target.value || undefined)}
+        />
+      )}
       <textarea
         style={{ ...S.field, height: 56, resize: "vertical" }}
-        placeholder="Lines (one per line)"
+        placeholder={`What ${node.speaker || dialogue.speaker || "the NPC"} says — one line per row`}
         value={node.lines.join("\n")}
         onChange={(e) => set("lines", e.target.value.split("\n"))}
       />
@@ -2951,10 +2985,10 @@ function DialogueNodeCard({
         }}
       >
         <span
-          title="What the player can say when this node's lines finish"
-          style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}
+          title="What the player can say when this page's lines finish"
+          style={{ color: "#7f8ba0", fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}
         >
-          Responses
+          Player responses
         </span>
         <button
           style={{ background: "none", border: "none", cursor: "pointer", color: "#80aaff", fontSize: 11, padding: "1px 3px" }}
@@ -3005,8 +3039,8 @@ function DialogueNodeCard({
           {open && nested?.kind === "hosted" && (
             <div
               style={{
-                margin: depth + 1 > 1 ? "2px -5px 8px -14px" : "2px 0 8px 0",
-                paddingLeft: 8,
+                margin: depth + 1 > 1 ? "6px -7px 10px -22px" : "6px 0 10px 0",
+                paddingLeft: 12,
               }}
             >
               {nested.el}
@@ -3139,7 +3173,7 @@ function DialogueOptionRow({
             fontFamily: "monospace",
             padding: "4px 4px",
           }}
-          placeholder="Response text"
+          placeholder="Player response…"
           title="What the player can say — edit right here"
           value={option.text}
           onChange={(e) => set({ text: e.target.value })}

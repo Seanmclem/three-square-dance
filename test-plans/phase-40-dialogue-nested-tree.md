@@ -56,3 +56,12 @@ protocol: autosave snapshot → OPFS stash → in-memory staging only, never Sav
 - Accordion open/closed state is component-local — it resets when you leave
   the dialogue editor or the option is re-hosted elsewhere.
 - Node cards themselves don't collapse (only responses do).
+
+## v4.34.5 additions (browser-verified 2026-07-20)
+
+| # | Check | How | Result |
+|---|---|---|---|
+| 14 | Speaker label | Open a node card | Header reads `n1 · start` **GUARD SAYS** (effective speaker, uppercase, near-white); textarea placeholder "What Guard says — one line per row" |
+| 15 | Override behind ✎ | Click ✎ → type "Captain" → clear → toggle off | Input appears only on demand (or when an override exists); label live-updates CAPTAIN SAYS ↔ GUARD SAYS; no bare header input to mistype into |
+| 16 | PLAYER RESPONSES | Inspect section header + response placeholder | "PLAYER RESPONSES" + "Player response…" — NPC/player halves both labeled |
+| 17 | Rail air | Measure n1→n2 | +21px at level 1 (12px gutter + card padding 12 inside the rail); deeper levels still ~+4px (breakout −22) |

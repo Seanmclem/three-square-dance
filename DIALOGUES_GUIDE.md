@@ -72,7 +72,8 @@ card nested inside the response that leads to it:
 
 Reading the image against the chart:
 
-- **n1's card** holds the NPC's two lines and both response options.
+- **n1's card** opens with **GUARD SAYS** — every page names its speaker —
+  then the NPC's two lines, then the **PLAYER RESPONSES**.
 - The first response is **expanded** (▾): its editable text (right in the
   header), its Show if / On pick groups, then its **THEN** row at the very
   bottom (`→ n2`) — and directly under that, **n2's whole card nested inside
@@ -111,11 +112,12 @@ Reading the image against the chart:
    - **Start page-node** — which page node plays first (usually `n1`; you
      rarely change this).
 4. Type the NPC's lines into the node's textarea — **one line per row**; the
-   player presses E (or A / tap) to step through them. The node card's other
-   pieces: the blue **`n1 · start`** badge is the node's id (jump target —
-   hover it for a reminder), and **"Speaker for this node"** optionally
-   replaces the dialogue's Speaker while that node is on screen (for a second
-   character butting into the conversation).
+   player presses E (or A / tap) to step through them. The card header tells
+   you whose words these are: the blue **`n1 · start`** badge is the node's
+   id (jump target — hover it for a reminder), and **"GUARD SAYS"** names the
+   speaker. The little **✎** beside it overrides the speaker *for that page
+   only* (a second character butting into the conversation) — it stays out
+   of the way until you ask for it.
 
 Here's the editor with the Guard-intro example staged — label and speaker
 up top, the start page-node picker, then the first node card with an
@@ -125,7 +127,7 @@ expanded response nesting the page it leads to:
 
 ### Adding responses
 
-Under a node's **RESPONSES**, click **+ Add**. Each response is an
+Under a node's **PLAYER RESPONSES**, click **+ Add**. Each response is an
 accordion row: the header holds its **editable text** (type right there), a
 route tag (`→ n2` / `⏹ ends` / `↩ n1`), and ×; the caret (▸/▾) collapses it
 to just that header. A fresh response starts expanded, showing:

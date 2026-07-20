@@ -169,7 +169,10 @@ sputter — every failure mode below was hit and diagnosed in practice.
 
 1. **Reuse the running dev server — do NOT start a second one.**
    The port is pinned to **7373** in `vite.config.ts` (`server.port`, `strictPort`).
-   Check first: `lsof -ti:7373`. If the app is already up, use it. With `strictPort`,
+   Check first: `lsof -nP -iTCP:7373 -sTCP:LISTEN` — the `-sTCP:LISTEN` filter matters:
+   bare `lsof -ti:7373` also lists Chrome's network process holding CLIENT sockets to a
+   dead server, which reads as "server up" when it isn't (bit a session on 2026-07-20).
+   If the app is already up, use it. With `strictPort`,
    a second `npm run dev` while 7373 is taken **fails loudly** (rather than silently
    bumping to 7374) — so just reuse the running one.
 2. **Reuse the existing World Editor tab; navigate once.** Get tabs with
@@ -461,8 +464,11 @@ from brick) the camera pulls to its MIN_DIST and ends up *inside* the avatar, so
 avatar shots in open space.
 
 **Dev server may be DOWN.** The golden path says "reuse the running server," but it can
-stop between/among sessions. Check `lsof -ti:7373`; if down, start `npm run dev` in the
-background (Bash `run_in_background`) before navigating.
+stop between/among sessions. Check `lsof -nP -iTCP:7373 -sTCP:LISTEN`; if down, start it
+**detached** — `nohup npm run dev >> /tmp/three-world-builder-dev.log 2>&1 < /dev/null &`
+— NOT via Bash `run_in_background`: that creates a session-owned task the harness can
+reap, which killed the server mid-day on 2026-07-20 (the user just saw "localhost died
+again"). A nohup'd server survives the Claude session; its log is the /tmp path above.
 
 **Hidden tab (rAF frozen)? Manually step the runtime — no visibility needed.** When the
 user is working elsewhere, `document.hidden` stays true, rAF never fires, and repeatedly
