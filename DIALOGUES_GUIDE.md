@@ -51,10 +51,10 @@ Two rules cover most of the behavior:
 
 ### What that looks like in the editor
 
-The editor doesn't draw the flowchart — it shows the tree as a **vertical
-stack of page-node cards**, and the branching lives in each response option's
-**"Leads to" dropdown**. Two options on the same card pointing at different
-targets *is* the fork. Here's the conversation from the chart above, compact:
+The editor renders the tree as **actual nesting**: each response option is a
+small accordion, and the page node it leads to sits **inside** it. Branch by
+branch, the layout *is* the flowchart, rotated vertical. Here's the
+conversation from the chart above, compact:
 
 ```
         n1  "Halt! Who goes there?"
@@ -65,24 +65,36 @@ targets *is* the fork. Here's the conversation from the chart above, compact:
         n2  "Welcome, stranger."  → ends
 ```
 
-…and here is that exact conversation authored in the DIALOGUE tab — one
-continuous view of the PAGE NODES section, two node cards:
+…and here is that exact conversation authored in the DIALOGUE tab — n2's
+card nested inside the response that leads to it:
 
-![The branching example in the editor — n1's two options point at different targets; n2 sits below](docs/images/dialogue-branching.png)
+![The branching example in the editor — n2 nests inside the response that leads to it; the second response is a collapsed "ends" accordion](docs/images/dialogue-branching.png)
 
 Reading the image against the chart:
 
-- **n1's card** holds the NPC's two lines and both response options. The two
-  "Leads to" dropdowns are the chart's two arrows: `→ n2 — Welcome, stranger.`
-  is the left arrow, `— end conversation (default) —` is the right one.
-- The second option's **Show if** row (`has_state · met_npc`) is the chart's
-  "only shown if met_npc is set", and its **On pick** row (`adjust_number ·
-  coins · 5`) is "gives 5 coins".
-- **n2's card** underneath is the chart's n2 box — no response options, so
-  the conversation just ends after its line.
-- The cards' top-to-bottom order is only storage order. The *shape* of the
-  conversation — what branches where — is entirely in where each option's
-  dropdown points.
+- **n1's card** holds the NPC's two lines and both response options.
+- The first response is **expanded** (▾): its editable text (right in the
+  header), its **Leads to** dropdown (`→ n2`) — and directly under that,
+  **n2's whole card nested inside it**, marked by the colored left rail.
+  That containment is the chart's left arrow.
+- The **`▸ Show if / On pick`** line between them is a tucked-away sub-row:
+  conditions that gate the response and effects that run when it's picked
+  live behind it, summarized as counts (`· 0 cond · 1 effect`) so they
+  don't push the destination away from its Leads to. Expand it only when
+  you're editing gates/effects.
+- The second response reads `⏹ ends` in its route tag (the chart's right
+  arrow) — its `· 1 cond · 1 effect` summary is the chart's "only shown
+  if met_npc / gives 5 coins". Collapse any response with its caret to a
+  single header line.
+- Because a conversation can loop or share a destination, a page node's full
+  card appears only **once** — under the *first* response that leads to it.
+  Any other response that points there shows a **`↩ continues at n2`** chip
+  (click it to jump to the card).
+- Nesting indents **once** — deeper cards stay at that same width (the rail
+  colors mark depth instead), so long conversation chains never squeeze the
+  fields off the panel.
+- Need more room anyway? **Drag the panel's right edge** — the whole left
+  panel is resizable (280–600px) and remembers its width.
 
 ---
 
@@ -106,19 +118,24 @@ Reading the image against the chart:
    character butting into the conversation).
 
 Here's the editor with the Guard-intro example staged — label and speaker
-up top, the start page-node picker, then the first node card with its lines
-and a complete response option (its "Leads to" target, Show if, and On pick):
+up top, the start page-node picker, then the first node card with an
+expanded response nesting the page it leads to:
 
 ![The DIALOGUE tab editor — tree fields, node card, and an option's full anatomy](docs/images/dialogue-editor.png)
 
 ### Adding responses
 
-Under a node's **RESPONSE OPTIONS**, click **+ Add**:
+Under a node's **RESPONSES**, click **+ Add**. Each response is an
+accordion row: the header holds its **editable text** (type right there), a
+route tag (`→ n2` / `⏹ ends` / `↩ n1`), and ×; the caret (▸/▾) collapses it
+to just that header. A fresh response starts expanded, showing:
 
-- **Response text** — what the player sees, e.g. `Who are you?`
 - **Leads to** — where picking it takes the conversation. A new option leads
-  nowhere yet, so it reads **— end conversation (default) —**; point it at a
-  page node (`→ n2 — Welcome, stranger.`) to continue instead of ending.
+  nowhere yet, so it reads **— end conversation (default) —**. Point it at an
+  existing page node (`→ n2 — Welcome, stranger.`), or pick
+  **＋ new page node…** to create the next page and nest it right there.
+- **▸ Show if / On pick** — a compact sub-row summarizing this response's
+  conditions and effects (`· 1 cond · 2 effects`, or `· none`). Click it to expand both editors:
 - **Show if** (+ Add) — conditions; the option is *hidden* unless **all**
   pass. With none added, the row reads *"(no conditions — option is always
   shown)"* — that's the default, not a warning:
@@ -135,22 +152,17 @@ Under a node's **RESPONSE OPTIONS**, click **+ Add**:
 
 ### Adding more page nodes — making it branch
 
-**+ Add page node** creates `n2`, `n3`, … Deleting one is the **×** on its
-card — the start page-node can't be deleted (pick a different start
-page-node first).
+The fastest way to branch never leaves the response you're writing:
 
-A new page node does nothing until an option points at it, so the full
-recipe for an actual branch is:
-
-1. **+ Add page node** — an empty `n2` card appears below `n1`. Type its
-   lines (what the NPC says on that branch).
-2. On `n1`, **+ Add** a response option and type its text ("I'm new here.").
-3. Open that option's **Leads to** dropdown and pick **`→ n2 — …`**. That
-   dropdown selection *is* the branch — there's no separate "connect" step.
-4. **+ Add** a second option on `n1` and leave its Leads to dropdown on
-   **— end conversation (default) —** (or point it at a different node).
-5. That's a fork: two options, two destinations. Repeat from step 1 to fan
-   out further (a third option → `n3`, an option on `n2` → `n4`, …).
+1. On `n1`, **+ Add** a response option and type its text ("I'm new here.").
+2. In its **Leads to** dropdown, pick **＋ new page node…** — a fresh `n2`
+   is created, wired to this response, and its card opens **nested inside
+   it**. No separate "connect" step.
+3. Type `n2`'s lines right there in the nested card, add ITS responses the
+   same way, and keep going — the conversation grows downward exactly the
+   way it will play.
+4. **+ Add** a second option on `n1` and leave it on
+   **— end conversation (default) —** (or point it at any existing node).
 
 What you just built:
 
@@ -159,9 +171,19 @@ What you just built:
           └── option B ──→ (end)
 ```
 
-…which is exactly the layout in the [branching screenshot](#what-that-looks-like-in-the-editor)
-up in the mental-model section: the fork never appears as lines on screen,
-only as two dropdowns with different targets.
+…which is exactly the nested layout in the
+[branching screenshot](#what-that-looks-like-in-the-editor) up in the
+mental-model section — option A physically contains n2.
+
+Odds and ends:
+
+- The top-level **+ Add page node** button still exists — it creates an
+  *unwired* node, which lands in the **Unreachable page nodes** section at
+  the bottom until some response's Leads to points at it.
+- Deleting a page node is the **×** on its card — the start page-node can't
+  be deleted (pick a different start page-node first).
+- Loops are fine: point a deep response back at `n1` and it renders as a
+  `↩ continues at n1` chip rather than nesting forever.
 
 > **"Give / receive items":** define items in the **ITEMS** tab (label, icon,
 > description, stack size, starting count), then use the typed pieces with
@@ -229,8 +251,10 @@ The editor warns but never blocks saving — the runtime degrades gracefully:
 - **Red option border + "next node doesn't exist"** — the option points at a
   deleted node. In-game it just ends the conversation. Fix via the Leads to
   dropdown (the broken id shows as `(missing!)`).
-- **"⚠ Unreachable nodes: …"** — nodes nothing points to. They're harmless
-  dead weight; either wire an option to them or delete them.
+- **Unreachable page nodes section** — nodes nothing points to render in
+  their own labeled section at the bottom of the tree. They're harmless
+  dead weight; wire a response's Leads to at them (they'll move up into the
+  tree) or delete them.
 - **All of a node's options gated off** — if every option's conditions fail,
   the node behaves like it has no options: the dialogue ends after its lines.
   Deliberately useful ("nothing more to say until you find the key"), but

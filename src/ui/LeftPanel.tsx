@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
@@ -94,15 +95,40 @@ export function LeftPanel({
 }: LeftPanelProps) {
   const open = panelId !== null;
 
+  // Resizable width — drag the right edge. Persisted across sessions.
+  const [width, setWidth] = useState<number>(() =>
+    Math.min(600, Math.max(280, Number(localStorage.getItem("wb_leftpanel_w")) || 320)),
+  );
+  const [resizing, setResizing] = useState(false);
+
+  function onResizeDown(e: React.PointerEvent<HTMLDivElement>): void {
+    e.preventDefault();
+    (e.target as HTMLDivElement).setPointerCapture(e.pointerId);
+    setResizing(true);
+  }
+  function onResizeMove(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!resizing) return;
+    setWidth(Math.min(600, Math.max(280, e.clientX - 64)));
+  }
+  function onResizeUp(e: React.PointerEvent<HTMLDivElement>): void {
+    if (!resizing) return;
+    (e.target as HTMLDivElement).releasePointerCapture(e.pointerId);
+    setResizing(false);
+    setWidth((w) => {
+      localStorage.setItem("wb_leftpanel_w", String(w));
+      return w;
+    });
+  }
+
   return (
     <div style={{
       position: "absolute",
       left: 64,
       top: 48,
       bottom: 0,
-      width: open ? 320 : 0,
+      width: open ? width : 0,
       overflow: "hidden",
-      transition: "width 0.2s ease",
+      transition: resizing ? "none" : "width 0.2s ease",
       background: "rgba(28,28,28,0.97)",
       borderRight: open ? "1px solid rgba(255,255,255,0.08)" : "none",
       zIndex: 9,
@@ -226,6 +252,26 @@ export function LeftPanel({
               />
             )}
           </div>
+
+          {/* Drag the right edge to resize the panel */}
+          <div
+            title="Drag to resize the panel"
+            onPointerDown={onResizeDown}
+            onPointerMove={onResizeMove}
+            onPointerUp={onResizeUp}
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 6,
+              cursor: "col-resize",
+              zIndex: 10,
+              background: resizing ? "rgba(128,170,255,0.25)" : "transparent",
+            }}
+            onPointerEnter={(e) => { if (!resizing) (e.target as HTMLDivElement).style.background = "rgba(128,170,255,0.12)"; }}
+            onPointerLeave={(e) => { if (!resizing) (e.target as HTMLDivElement).style.background = "transparent"; }}
+          />
         </>
       )}
     </div>

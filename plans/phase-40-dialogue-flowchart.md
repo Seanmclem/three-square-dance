@@ -1,5 +1,10 @@
 # Phase 40 — Dialogue Flowchart View (visual branching editor)
 
+> **SUPERSEDED (2026-07-19, before implementation):** the user decided a whole
+> chart view wasn't needed — the card stack itself should feel nested instead.
+> See **`plans/phase-40-dialogue-nested-tree.md`** for what actually shipped.
+> Kept for the design record; nothing below was built.
+
 ## Context / problem
 
 The DIALOGUE tab edits a branching tree, but the editor shows a **vertical

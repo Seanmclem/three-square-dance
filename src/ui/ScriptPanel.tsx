@@ -2510,10 +2510,122 @@ function DialogueEditor({
 
   // Light render-time validation — runtime degrades gracefully, so never block saves.
   const nodeIds = new Set(dialogue.nodes.map((n) => n.id));
-  const reachable = new Set<string>([dialogue.startNode]);
-  for (const n of dialogue.nodes)
-    for (const o of n.options) if (o.next) reachable.add(o.next);
-  const unreachable = dialogue.nodes.filter((n) => !reachable.has(n.id)).map((n) => n.id);
+  const byId = new Map(dialogue.nodes.map((n) => [n.id, n]));
+
+  // Nested-tree layout (pure precompute, StrictMode-safe): depth-first from the
+  // start page-node, each option "hosts" the full card of the node it leads to —
+  // but a node is hosted only once (first encounter). Later references render as
+  // jump chips. Orphan roots (nothing leads to them) walk their own subtrees so
+  // wired chains under an unreachable node still nest.
+  const hosted = new Map<string, string>(); // option.id -> node id it hosts
+  const seen = new Set<string>();
+  function walk(id: string): void {
+    const n = byId.get(id);
+    if (!n) return;
+    for (const o of n.options) {
+      if (o.next && byId.has(o.next) && !seen.has(o.next)) {
+        seen.add(o.next);
+        hosted.set(o.id, o.next);
+        walk(o.next);
+      }
+    }
+  }
+  if (byId.has(dialogue.startNode)) seen.add(dialogue.startNode);
+  walk(dialogue.startNode);
+  const orphanRoots: string[] = [];
+  for (const n of dialogue.nodes) {
+    if (!seen.has(n.id)) {
+      seen.add(n.id);
+      orphanRoots.push(n.id);
+      walk(n.id);
+    }
+  }
+
+  function createNodeForOption(hostNodeId: string, optionId: string): void {
+    const newId = nextNodeId(dialogue.nodes);
+    onChange({
+      ...dialogue,
+      nodes: dialogue.nodes
+        .map((n) =>
+          n.id !== hostNodeId
+            ? n
+            : { ...n, options: n.options.map((o) => (o.id === optionId ? { ...o, next: newId } : o)) },
+        )
+        .concat({ id: newId, lines: [""], options: [] }),
+    });
+  }
+
+  function jumpToNode(id: string): void {
+    const el = document.getElementById(`wb-dlgnode-${id}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    el?.animate(
+      [
+        { boxShadow: "0 0 0 2px rgba(128,170,255,0.9)" },
+        { boxShadow: "0 0 0 2px rgba(128,170,255,0)" },
+      ],
+      { duration: 1400 },
+    );
+  }
+
+  function renderNodeById(nodeId: string, depth: number): React.ReactNode {
+    const node = byId.get(nodeId);
+    if (!node) return null;
+    return (
+      <DialogueNodeCard
+        key={node.id}
+        node={node}
+        depth={depth}
+        dialogue={dialogue}
+        worldItems={worldItems}
+        projectSceneIds={projectSceneIds}
+        isStart={node.id === dialogue.startNode}
+        zoneObjects={zoneObjects}
+        zonePlatforms={zonePlatforms}
+        zoneShapes={zoneShapes}
+        zoneLights={zoneLights}
+        zoneStairs={zoneStairs}
+        zoneWalls={zoneWalls}
+        zoneFloors={zoneFloors}
+        zoneCheckpoints={zoneCheckpoints}
+        triggerVolumes={triggerVolumes}
+        groups={groups}
+        assets={assets}
+        zoneDialogues={zoneDialogues}
+        renderNested={renderNested}
+        onCreateNext={(optionId) => createNodeForOption(node.id, optionId)}
+        onChange={updateNode}
+        onDelete={() => deleteNode(node.id)}
+      />
+    );
+  }
+
+  function renderNested(opt: DialogueOption, childDepth: number): NestedRender | null {
+    if (!opt.next || !byId.has(opt.next)) return null; // ends / dangling — row handles both
+    const hostedId = hosted.get(opt.id);
+    if (hostedId === opt.next) {
+      return { kind: "hosted", el: renderNodeById(hostedId, childDepth) };
+    }
+    const targetId = opt.next;
+    return {
+      kind: "jump",
+      el: (
+        <button
+          style={{
+            ...S.btn(),
+            fontSize: 10,
+            color: "#80aaff",
+            marginTop: 4,
+            width: "100%",
+            textAlign: "left",
+          }}
+          title="This page node's full card is nested under the first response that leads to it — click to jump there"
+          onClick={() => jumpToNode(targetId)}
+        >
+          ↩ continues at {targetId} — {(byId.get(targetId)?.lines[0] ?? "").slice(0, 24)} (click to view)
+        </button>
+      ),
+    };
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -2598,44 +2710,38 @@ function DialogueEditor({
             }}
           >
             <span style={S.sectionLabel as React.CSSProperties}>Page nodes</span>
-            <button style={{ ...S.btn(), fontSize: 10 }} onClick={addNode}>
+            <button
+              style={{ ...S.btn(), fontSize: 10 }}
+              title="Adds an unwired page node (it lands in the Unreachable section until a response leads to it). Tip: '+ new page node…' inside a response's Leads to creates and wires one in place."
+              onClick={addNode}
+            >
               + Add page node
             </button>
           </div>
           <div style={{ color: "#8b94a8", fontSize: 11, lineHeight: 1.4, padding: "0 0 6px" }}>
             A page node is one "page" of the conversation: its lines play in
-            order, then its response options appear. Options jump to other
-            page nodes — that's how conversations branch.
+            order, then its response options appear. Each response nests the
+            page node it leads to right inside it — that's the branching,
+            shown as actual nesting.
           </div>
-          {dialogue.nodes.map((node) => (
-            <DialogueNodeCard
-              key={node.id}
-              node={node}
-              dialogue={dialogue}
-              worldItems={worldItems}
-              projectSceneIds={projectSceneIds}
-              isStart={node.id === dialogue.startNode}
-              zoneObjects={zoneObjects}
-              zonePlatforms={zonePlatforms}
-              zoneShapes={zoneShapes}
-              zoneLights={zoneLights}
-              zoneStairs={zoneStairs}
-              zoneWalls={zoneWalls}
-              zoneFloors={zoneFloors}
-              zoneCheckpoints={zoneCheckpoints}
-              triggerVolumes={triggerVolumes}
-              groups={groups}
-              assets={assets}
-              zoneDialogues={zoneDialogues}
-              onChange={updateNode}
-              onDelete={() => deleteNode(node.id)}
-            />
-          ))}
+          {byId.has(dialogue.startNode) ? (
+            renderNodeById(dialogue.startNode, 0)
+          ) : (
+            <div style={{ color: "#cc6666", fontSize: 11, padding: "4px 0" }}>
+              ⚠ Start page-node "{dialogue.startNode}" doesn't exist — pick one above.
+            </div>
+          )}
         </div>
 
-        {unreachable.length > 0 && (
-          <div style={{ color: "#cc9944", fontSize: 10, padding: "0 12px 8px" }}>
-            ⚠ Unreachable page node{unreachable.length !== 1 ? "s" : ""}: {unreachable.join(", ")}
+        {orphanRoots.length > 0 && (
+          <div style={{ padding: "0 12px 8px" }}>
+            <div
+              title="Nothing leads to these page nodes — wire one up via any response's Leads to dropdown, or delete it"
+              style={{ color: "#cc9944", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", padding: "4px 0 6px" }}
+            >
+              ⚠ Unreachable page nodes (nothing leads here)
+            </div>
+            {orphanRoots.map((id) => renderNodeById(id, 0))}
           </div>
         )}
 
@@ -2659,8 +2765,21 @@ function DialogueEditor({
 
 // ── DialogueNodeCard ──────────────────────────────────────────────────────────
 
+/** What a response option nests under it: the target node's full card, or a
+ *  jump chip when that node is already rendered elsewhere (2nd parent / loop). */
+type NestedRender = { kind: "hosted" | "jump"; el: React.ReactNode };
+
+// Depth rails — cycle 3 muted hues so adjacent nesting levels stay readable
+// even after the indent stops growing (see NEST_BREAKOUT).
+const NEST_RAILS = [
+  "rgba(128,170,255,0.4)",
+  "rgba(170,128,255,0.4)",
+  "rgba(96,192,160,0.4)",
+];
+
 function DialogueNodeCard({
   node,
+  depth,
   dialogue,
   worldItems,
   projectSceneIds,
@@ -2677,10 +2796,13 @@ function DialogueNodeCard({
   groups,
   assets,
   zoneDialogues,
+  renderNested,
+  onCreateNext,
   onChange,
   onDelete,
 }: {
   node: DialogueNode;
+  depth: number;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
   projectSceneIds?: string[];
@@ -2697,6 +2819,8 @@ function DialogueNodeCard({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  renderNested: (opt: DialogueOption, childDepth: number) => NestedRender | null;
+  onCreateNext: (optionId: string) => void;
   onChange: (n: DialogueNode) => void;
   onDelete: () => void;
 }) {
@@ -2713,12 +2837,14 @@ function DialogueNodeCard({
 
   return (
     <div
+      id={`wb-dlgnode-${node.id}`}
       style={{
-        background: "rgba(255,255,255,0.03)",
-        borderRadius: 4,
-        padding: "6px 8px",
-        marginBottom: 6,
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.04)",
+        borderRadius: 6,
+        padding: depth > 0 ? "8px 4px 8px 8px" : "8px 8px",
+        marginBottom: depth > 0 ? 0 : 8,
+        border: "1px solid rgba(255,255,255,0.05)",
+        borderLeft: depth > 0 ? `2px solid ${NEST_RAILS[(depth - 1) % 3]}` : "1px solid rgba(255,255,255,0.05)",
       }}
     >
       <div
@@ -2747,7 +2873,7 @@ function DialogueNodeCard({
         </span>
         <input
           style={{ ...S.field, flex: 1 }}
-          placeholder="Speaker for this node (optional)" title="Overrides the dialogue's Speaker while this node is on screen"
+          placeholder="Speaker override…" title="Overrides the dialogue's Speaker while this node is on screen"
           value={node.speaker ?? ""}
           onChange={(e) => set("speaker", e.target.value || undefined)}
         />
@@ -2778,16 +2904,20 @@ function DialogueNodeCard({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginTop: 4,
+          margin: "8px 0 5px",
         }}
       >
         <span
           title="What the player can say when this node's lines finish"
-          style={{ color: "#8b94a8", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}
+          style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}
         >
-          Response options
+          Responses
         </span>
-        <button style={{ ...S.btn(), fontSize: 10 }} onClick={addOption}>
+        <button
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#80aaff", fontSize: 10, padding: "1px 3px" }}
+          title="Add a response the player can pick"
+          onClick={addOption}
+        >
           + Add
         </button>
       </div>
@@ -2800,6 +2930,8 @@ function DialogueNodeCard({
         <DialogueOptionRow
           key={opt.id}
           option={opt}
+          depth={depth}
+          nested={renderNested(opt, depth + 1)}
           dialogue={dialogue}
           worldItems={worldItems}
           projectSceneIds={projectSceneIds}
@@ -2815,6 +2947,7 @@ function DialogueNodeCard({
           groups={groups}
           assets={assets}
           zoneDialogues={zoneDialogues}
+          onCreateNext={() => onCreateNext(opt.id)}
           onChange={(no) =>
             set("options", node.options.map((x, j) => (j === i ? no : x)))
           }
@@ -2831,6 +2964,8 @@ function DialogueNodeCard({
 
 function DialogueOptionRow({
   option,
+  depth,
+  nested,
   dialogue,
   worldItems,
   projectSceneIds,
@@ -2846,10 +2981,13 @@ function DialogueOptionRow({
   groups,
   assets,
   zoneDialogues,
+  onCreateNext,
   onChange,
   onRemove,
 }: {
   option: DialogueOption;
+  depth: number;
+  nested: NestedRender | null;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
   projectSceneIds?: string[];
@@ -2865,9 +3003,22 @@ function DialogueOptionRow({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  onCreateNext: () => void;
   onChange: (o: DialogueOption) => void;
   onRemove: () => void;
 }) {
+  // Accordion: options that nest a page node start open near the top of the
+  // tree; deeper hosted options and plain "ends" options start collapsed.
+  // Untouched (empty) options start open so a fresh "+ Add" is ready to type.
+  const [open, setOpen] = useState<boolean>(
+    () =>
+      (nested?.kind === "hosted" && depth < 2) ||
+      (!option.text && !option.next && !option.conditions?.length && !option.actions?.length),
+  );
+  // Show if / On pick live behind their own compact sub-row so the nested
+  // destination card sits directly under "Leads to".
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   function set(changes: Partial<DialogueOption>): void {
     onChange({ ...option, ...changes });
   }
@@ -2876,55 +3027,173 @@ function DialogueOptionRow({
   const actions = option.actions ?? [];
   const dangling = !!option.next && !dialogue.nodes.some((n) => n.id === option.next);
 
+  const routeTag = dangling
+    ? `⚠ ${option.next}`
+    : option.next
+      ? nested?.kind === "jump"
+        ? `↩ ${option.next}`
+        : `→ ${option.next}`
+      : "⏹ ends";
+  const chipStyle: React.CSSProperties = {
+    flexShrink: 0,
+    fontSize: 9,
+    fontFamily: "monospace",
+    padding: "1px 7px",
+    borderRadius: 999,
+    background: dangling
+      ? "rgba(204,102,102,0.15)"
+      : option.next
+        ? "rgba(128,170,255,0.14)"
+        : "rgba(255,255,255,0.06)",
+    color: dangling ? "#e08585" : option.next ? "#8fb3ff" : "#98a2b8",
+  };
+
   return (
+    <>
     <div
       style={{
-        background: "rgba(0,0,0,0.25)",
+        background: "rgba(0,0,0,0.28)",
         borderRadius: 4,
-        padding: "6px 8px",
-        marginBottom: 4,
-        border: `1px solid ${dangling ? "rgba(204,102,102,0.5)" : "rgba(255,255,255,0.05)"}`,
+        padding: "3px 6px 3px 4px",
+        marginBottom: nested && open ? 0 : 6,
+        border: dangling ? "1px solid rgba(204,102,102,0.5)" : "1px solid transparent",
       }}
     >
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+      {/* Accordion header */}
+      <div style={{ display: "flex", gap: 5, alignItems: "center", minHeight: 24 }}>
+        <button
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#8b94a8",
+            fontSize: 10,
+            padding: "2px 2px",
+            flexShrink: 0,
+          }}
+          title={open ? "Collapse this response" : "Expand this response"}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? "▾" : "▸"}
+        </button>
         <input
-          style={{ ...S.field, flex: 1 }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: "none",
+            border: "none",
+            outline: "none",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            color: "#c0c0c0",
+            fontSize: 11,
+            fontFamily: "monospace",
+            padding: "2px 2px",
+          }}
           placeholder="Response text"
+          title="What the player can say — edit right here"
           value={option.text}
           onChange={(e) => set({ text: e.target.value })}
         />
+        <span
+          style={chipStyle}
+          title={
+            dangling
+              ? `The target page node "${option.next}" was deleted — in-game this response just ends the conversation`
+              : option.next
+                ? nested?.kind === "jump"
+                  ? `Continues at ${option.next} — its card is nested under the first response that leads to it`
+                  : `Continues at ${option.next} — nested below`
+                : "Picking this response ends the conversation"
+          }
+        >
+          {routeTag}
+        </span>
         <button
-          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#8a5a5a",
+            fontSize: 12,
+            padding: "0 3px",
+            flexShrink: 0,
+            lineHeight: 1,
+          }}
+          title="Delete this response option"
           onClick={onRemove}
         >
           ×
         </button>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <span style={{ color: "#8b94a8", fontSize: 11, flexShrink: 0 }}>Leads to</span>
-        <select
-          title="The page node this response jumps to — leave the default to end the conversation"
-          style={{ ...S.select, flex: 1 }}
-          value={option.next ?? ""}
-          onChange={(e) => set({ next: e.target.value || undefined })}
-        >
-          <option value="">— end conversation (default) —</option>
-          {dialogue.nodes.map((n) => (
-            <option key={n.id} value={n.id}>
-              → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
-            </option>
-          ))}
+
+      {open && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "5px 2px 5px 17px" }}>
+            <span style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>Leads to</span>
+            <select
+              title="The page node this response jumps to — leave the default to end the conversation"
+              style={{ ...S.select, flex: 1 }}
+              value={option.next ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__new__") {
+                  setOpen(true);
+                  onCreateNext();
+                  return;
+                }
+                if (v) setOpen(true);
+                set({ next: v || undefined });
+              }}
+            >
+              <option value="">— end conversation (default) —</option>
+              {dialogue.nodes.map((n) => (
+                <option key={n.id} value={n.id}>
+                  → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
+                </option>
+              ))}
+              {dangling && (
+                <option value={option.next}>→ {option.next} (missing!)</option>
+              )}
+              <option value="__new__">＋ new page node…</option>
+            </select>
+          </div>
           {dangling && (
-            <option value={option.next}>→ {option.next} (missing!)</option>
+            <div style={{ color: "#cc6666", fontSize: 10, marginBottom: 4 }}>
+              ⚠ next node "{option.next}" doesn't exist — plays as "end conversation"
+            </div>
           )}
-        </select>
-      </div>
-      {dangling && (
-        <div style={{ color: "#cc6666", fontSize: 10, marginBottom: 4 }}>
-          ⚠ next node "{option.next}" doesn't exist — plays as "end conversation"
-        </div>
+
+          {/* Compact sub-row: conditions & effects stay tucked away so the
+              nested destination card sits right under "Leads to". Single
+              line — never wraps. */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              margin: "0 2px 3px 3px",
+              cursor: "pointer",
+              color: "#8b94a8",
+              fontSize: 10.5,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+            title="Conditions that gate this response (Show if) and effects that run when it's picked (On pick)"
+            onClick={() => setDetailsOpen(!detailsOpen)}
+          >
+            <span style={{ fontSize: 10, flexShrink: 0 }}>{detailsOpen ? "▾" : "▸"}</span>
+            <span style={{ flexShrink: 0 }}>Show if / On pick</span>
+            <span style={{ color: "#6b7488", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis" }}>
+              {conditions.length === 0 && actions.length === 0
+                ? "· none"
+                : `· ${conditions.length} cond · ${actions.length} effect${actions.length === 1 ? "" : "s"}`}
+            </span>
+          </div>
+        </>
       )}
 
+      {open && detailsOpen && (
+      <>
       {/* Conditions (option hidden unless ALL pass) */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ color: "#8b94a8", fontSize: 11 }}>Show if</span>
@@ -3001,7 +3270,28 @@ function DialogueOptionRow({
           (nothing happens yet — add effects that run when picked)
         </div>
       )}
+      </>
+      )}
+
+      {/* Jump chip lives in the well (it's a field-sized control) */}
+      {open && nested?.kind === "jump" && nested.el}
     </div>
+
+    {/* The page node this response leads to renders as a SIBLING below the
+        well — rail-connected, not box-in-box. The gutter is constant: only
+        level 1 shows an inset; deeper levels pull back the host card's
+        per-level padding so chains never squeeze the fields. */}
+    {open && nested?.kind === "hosted" && (
+      <div
+        style={{
+          margin: depth + 1 > 1 ? "2px -5px 6px -18px" : "2px 0 6px 0",
+          paddingLeft: 8,
+        }}
+      >
+        {nested.el}
+      </div>
+    )}
+    </>
   );
 }
 
