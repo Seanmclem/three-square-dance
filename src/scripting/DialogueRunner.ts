@@ -13,6 +13,9 @@ import type { ScriptEngine } from "./ScriptEngine";
 export class DialogueRunner {
   private _tree: DialogueTreeDef | null = null;
   private _visible: DialogueOption[] = [];
+  // Option ids picked earlier in THIS conversation run — looping back to a node
+  // re-shows them de-emphasized (still selectable). Reset per conversation.
+  private _picked = new Set<string>();
   private _unsubscribers: (() => void)[] = [];
 
   constructor(
@@ -36,10 +39,12 @@ export class DialogueRunner {
     this._unsubscribers = [];
     this._tree = null;
     this._visible = [];
+    this._picked.clear();
   }
 
   start(tree: DialogueTreeDef): void {
     this._tree = tree;
+    this._picked.clear();
     this._showNode(tree.startNode);
   }
 
@@ -64,6 +69,7 @@ export class DialogueRunner {
       options: this._visible.map(o => ({
         text:    o.text,
         hasNext: !!o.next && tree.nodes.some(n => n.id === o.next),
+        picked:  this._picked.has(o.id),
       })),
     });
   }
@@ -72,6 +78,7 @@ export class DialogueRunner {
     const tree = this._tree;
     const opt  = this._visible[index];
     if (!tree || !opt) return;
+    this._picked.add(opt.id);
     this._engine.runActions(opt.actions ?? []);
     // An effect may itself show_dialogue → runner restarted on a new tree; don't
     // step the old one. Otherwise advance if the next node exists; a missing/absent
@@ -85,6 +92,7 @@ export class DialogueRunner {
     if (!tree) return;
     this._tree = null;
     this._visible = [];
+    this._picked.clear();
     this._engine.fire("on_dialogue_end", tree.id);
   }
 }

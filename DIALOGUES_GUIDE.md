@@ -234,6 +234,10 @@ the highlighted row has the `▸` marker and the footer flips to "E to choose":
 - **Arrow keys or W/S** (keyboard), **d-pad or a left-stick flick** (gamepad)
   move the highlight; **E / A** picks. Mouse click or
   tap picks a row directly.
+- **Looping back re-marks the menu:** if the conversation returns to a page
+  you've already answered, responses you picked earlier in *this*
+  conversation show dimmed with a ✓ — still selectable, just visibly
+  exhausted. The marks reset when the dialogue closes.
 - Movement is frozen while a dialogue is open; **Enter / Start / ✕** closes it
   (that's the "cancel" that still fires `on_dialogue_end`).
 

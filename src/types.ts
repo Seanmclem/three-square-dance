@@ -341,7 +341,9 @@ export interface BusEvents {
   "dialogue:show":         { speaker: string; lines: string[]; portrait?: string;
                              // Branching trees: response options for the current node,
                              // pre-filtered by conditions. hasNext=false ⇒ selecting ends.
-                             options?: { text: string; hasNext: boolean }[] };
+                             // picked=true ⇒ already chosen earlier in THIS conversation
+                             // (loops) — overlays de-emphasize but still allow it.
+                             options?: { text: string; hasNext: boolean; picked?: boolean }[] };
   // Overlay → DialogueRunner: player picked options[index] of the shown node
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string };

@@ -5,14 +5,14 @@ interface DialogueState {
   speaker:     string;
   lines:       string[];
   portrait?:   string;
-  options?:    { text: string; hasNext: boolean }[];
+  options?:    { text: string; hasNext: boolean; picked?: boolean }[];
   lineIndex:   number;
   optionIndex: number;
 }
 
 export interface DialogueOverlayProps {
   dialogue: { speaker: string; lines: string[]; portrait?: string;
-              options?: { text: string; hasNext: boolean }[] } | null;
+              options?: { text: string; hasNext: boolean; picked?: boolean }[] } | null;
   bus:      EventBus;
   onClose:  () => void;
 }
@@ -121,6 +121,9 @@ export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps
           <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
             {options.map((opt, i) => {
               const active = i === state.optionIndex;
+              // Already picked earlier in this conversation (looped back here):
+              // de-emphasized but still selectable.
+              const picked = !!opt.picked;
               return (
                 <div
                   key={i}
@@ -131,12 +134,13 @@ export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps
                     borderRadius: 6,
                     cursor: "pointer",
                     fontSize: 13,
-                    color: active ? "#fff" : "#9ab",
+                    color: active ? "#fff" : picked ? "#5a6474" : "#9ab",
                     background: active ? "rgba(128,170,255,0.18)" : "transparent",
                     border: `1px solid ${active ? "rgba(128,170,255,0.5)" : "transparent"}`,
+                    opacity: picked && !active ? 0.75 : 1,
                   }}
                 >
-                  {active ? "▸ " : "  "}{opt.text || "…"}
+                  {active ? "▸ " : "  "}{opt.text || "…"}{picked ? "  ✓" : ""}
                 </div>
               );
             })}

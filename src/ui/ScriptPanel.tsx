@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
@@ -28,6 +28,7 @@ import type {
   ItemDef,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
+import { HelpTooltip } from "@/ui/HelpTooltip";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ const S = {
     background: "none",
     border: "none",
     cursor: "pointer",
-    color: active ? "#c0c0e0" : "#606070",
+    color: active ? "#dde3f0" : "#8b94a8",
     fontSize: 11,
     fontFamily: "monospace",
     borderBottom: active ? "2px solid #80aaff" : "2px solid transparent",
@@ -359,6 +360,22 @@ export function ScriptPanel({
     ...Object.keys(stateSchema),
   ])];
 
+  // Per-tab description — shown on demand via a (?) in each view's header row.
+  const tabHelp =
+    tab === "level"
+      ? "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."
+      : tab === "object"
+        ? "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."
+        : tab === "dialogue"
+          ? "Branching conversations for this zone. Any script can play one with a show_dialogue action — picked by name. Each page node shows its lines, then its response options; options can be gated by conditions and run effects when picked."
+          : tab === "state"
+            ? !hasGameScope
+              ? "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."
+              : stateScope === "game"
+                ? "GAME scope: shared defaults + clamps for every scene in the project (game.json). A scene's own entry for the same key overrides these. Saved with the project on Save."
+                : "SCENE scope: this scene's own keys — they override the project's GAME entries for the same key while this scene is loaded."
+            : "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds.";
+
   return (
     <div style={S.root}>
       <datalist id="wb-state-keys">
@@ -384,30 +401,6 @@ export function ScriptPanel({
             {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : t === "state" ? "STATE" : "ITEMS"}
           </button>
         ))}
-      </div>
-
-      {/* Per-tab description */}
-      <div
-        style={{
-          color: "#a8b2c8",
-          fontSize: 11.5,
-          padding: "6px 10px 0",
-          lineHeight: 1.45,
-        }}
-      >
-        {tab === "level" &&
-          "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."}
-        {tab === "object" &&
-          "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."}
-        {tab === "dialogue" &&
-          "Branching conversations for this zone. Any script can play one with a show_dialogue action — picked by name. Each page node shows its lines, then its response options; options can be gated by conditions and run effects when picked."}
-        {tab === "state" && !hasGameScope &&
-          "Gameplay-state keys for this level. A registered key seeds its default on New Game and (numbers) clamps to min/max. Unregistered keys still work in scripts — registering just adds a default + clamp."}
-        {tab === "state" && hasGameScope && (stateScope === "game"
-          ? "GAME scope: shared defaults + clamps for every scene in the project (game.json). A scene's own entry for the same key overrides these. Saved with the project on Save."
-          : "SCENE scope: this scene's own keys — they override the project's GAME entries for the same key while this scene is loaded.")}
-        {tab === "items" &&
-          "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds."}
       </div>
 
       {tab === "state" ? (
@@ -436,13 +429,13 @@ export function ScriptPanel({
             </div>
           )}
           {hasGameScope && stateScope === "game" ? (
-            <SchemaEditor schema={gameStateSchema} onChange={onGameStateSchemaChange} />
+            <SchemaEditor schema={gameStateSchema} help={tabHelp} onChange={onGameStateSchemaChange} />
           ) : (
-            <SchemaEditor schema={stateSchema} onChange={onStateSchemaChange} />
+            <SchemaEditor schema={stateSchema} help={tabHelp} onChange={onStateSchemaChange} />
           )}
         </>
       ) : tab === "items" ? (
-        <ItemsEditor items={worldItems} onChange={onWorldItemsChange} />
+        <ItemsEditor items={worldItems} help={tabHelp} onChange={onWorldItemsChange} />
       ) : tab === "dialogue" ? (
         (() => {
           const editingDialogue = editingDialogueId
@@ -451,6 +444,7 @@ export function ScriptPanel({
           return editingDialogue ? (
             <DialogueEditor
               dialogue={editingDialogue}
+              help={tabHelp}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
               zoneShapes={zoneShapes}
@@ -477,6 +471,7 @@ export function ScriptPanel({
           ) : (
             <DialogueList
               dialogues={zoneDialogues}
+              help={tabHelp}
               onSelect={(id) => setEditingDialogueId(id)}
               onAdd={() => {
                 const d = blankDialogue();
@@ -489,6 +484,7 @@ export function ScriptPanel({
       ) : editing ? (
         <ScriptEditor
           script={editing}
+          help={tabHelp}
           triggerVolumes={triggerVolumes}
           zoneObjects={zoneObjects}
           zonePlatforms={zonePlatforms}
@@ -527,6 +523,7 @@ export function ScriptPanel({
       ) : (
         <ScriptList
           scripts={currentScripts}
+          help={tabHelp}
           onSelect={(id) => setEditingId(id)}
           onToggle={(id) => toggleEnabled(id)}
           onAdd={addScript}
@@ -542,9 +539,11 @@ export function ScriptPanel({
 
 function SchemaEditor({
   schema,
+  help,
   onChange,
 }: {
   schema: Record<string, StateSchema>;
+  help?: string;
   onChange: (s: Record<string, StateSchema>) => void;
 }) {
   const entries = Object.entries(schema);
@@ -578,10 +577,13 @@ function SchemaEditor({
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 10,
           padding: "6px 10px",
           flexShrink: 0,
         }}
       >
+        {help && <HelpTooltip side="below" align="right" text={help} />}
         <button style={S.btn(true)} onClick={add}>
           + Add key
         </button>
@@ -749,11 +751,13 @@ function SchemaKeyRow({
 
 function ScriptList({
   scripts,
+  help,
   onSelect,
   onToggle,
   onAdd,
 }: {
   scripts: ScriptDef[];
+  help?: string;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onAdd: () => void;
@@ -764,10 +768,13 @@ function ScriptList({
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 10,
           padding: "6px 10px",
           flexShrink: 0,
         }}
       >
+        {help && <HelpTooltip side="below" align="right" text={help} />}
         <button style={S.btn(true)} onClick={onAdd}>
           + New
         </button>
@@ -836,6 +843,7 @@ function ScriptEditor({
   projectSceneIds,
   ownerIsEntity,
   selectedObjectId,
+  help,
   onBack,
   onChange,
   onDelete,
@@ -857,6 +865,7 @@ function ScriptEditor({
   projectSceneIds?: string[];
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
+  help?: string;
   onBack: () => void;
   onChange: (s: ScriptDef) => void;
   onDelete: () => void;
@@ -904,6 +913,7 @@ function ScriptEditor({
         >
           {script.label || "Script"}
         </span>
+        {help && <HelpTooltip side="below" align="right" text={help} />}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
@@ -2396,10 +2406,12 @@ function ActionFields({
 
 function DialogueList({
   dialogues,
+  help,
   onSelect,
   onAdd,
 }: {
   dialogues: DialogueTreeDef[];
+  help?: string;
   onSelect: (id: string) => void;
   onAdd: () => void;
 }) {
@@ -2409,10 +2421,13 @@ function DialogueList({
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 10,
           padding: "6px 10px",
           flexShrink: 0,
         }}
       >
+        {help && <HelpTooltip side="below" align="right" text={help} />}
         <button style={S.btn(true)} onClick={onAdd}>
           + New
         </button>
@@ -2469,6 +2484,7 @@ function DialogueEditor({
   groups,
   assets,
   zoneDialogues,
+  help,
   onBack,
   onChange,
   onDelete,
@@ -2488,6 +2504,7 @@ function DialogueEditor({
   groups: GroupDef[];
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
+  help?: string;
   onBack: () => void;
   onChange: (d: DialogueTreeDef) => void;
   onDelete: () => void;
@@ -2655,6 +2672,7 @@ function DialogueEditor({
         >
           {dialogue.label || "Dialogue"}
         </span>
+        {help && <HelpTooltip side="below" align="right" text={help} />}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
@@ -2829,11 +2847,36 @@ function DialogueNodeCard({
   }
 
   function addOption(): void {
-    set("options", [
-      ...node.options,
-      { id: `opt_${crypto.randomUUID().slice(0, 8)}`, text: "" },
-    ]);
+    const id = `opt_${crypto.randomUUID().slice(0, 8)}`;
+    set("options", [...node.options, { id, text: "" }]);
+    // Take the author straight to the new response (it belongs at the end of
+    // the list, which can sit below a long nested subtree).
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`wb-dlgopt-${id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.querySelector("input")?.focus();
+    });
   }
+
+  // Accordion state for the response wells, lifted here so each nested
+  // subtree can render right after its well while "+ Add" stays reachable.
+  const [openIds, setOpenIds] = useState<Record<string, boolean>>({});
+  // The default open state is evaluated ONCE per option id and then frozen —
+  // deriving it live would slam an option shut the moment "empty" stops
+  // being true (i.e. on the first character typed into it).
+  const seedOpen = useRef<Record<string, boolean>>({});
+  const optionMeta = node.options.map((opt) => {
+    const nested = renderNested(opt, depth + 1);
+    if (!(opt.id in seedOpen.current)) {
+      // Hosted options open near the top of the tree; untouched (empty)
+      // options open so a fresh "+ Add" is ready to type.
+      seedOpen.current[opt.id] =
+        (nested?.kind === "hosted" && depth < 2) ||
+        (!opt.text && !opt.next && !opt.conditions?.length && !opt.actions?.length);
+    }
+    const open = openIds[opt.id] ?? seedOpen.current[opt.id];
+    return { opt, nested, open };
+  });
 
   return (
     <div
@@ -2926,35 +2969,50 @@ function DialogueNodeCard({
           (no responses — the conversation ends after this page's last line)
         </div>
       )}
-      {node.options.map((opt, i) => (
-        <DialogueOptionRow
-          key={opt.id}
-          option={opt}
-          depth={depth}
-          nested={renderNested(opt, depth + 1)}
-          dialogue={dialogue}
-          worldItems={worldItems}
-          projectSceneIds={projectSceneIds}
-          zoneObjects={zoneObjects}
-          zonePlatforms={zonePlatforms}
-          zoneShapes={zoneShapes}
-          zoneLights={zoneLights}
-          zoneStairs={zoneStairs}
-          zoneWalls={zoneWalls}
-          zoneFloors={zoneFloors}
-          zoneCheckpoints={zoneCheckpoints}
-          triggerVolumes={triggerVolumes}
-          groups={groups}
-          assets={assets}
-          zoneDialogues={zoneDialogues}
-          onCreateNext={() => onCreateNext(opt.id)}
-          onChange={(no) =>
-            set("options", node.options.map((x, j) => (j === i ? no : x)))
-          }
-          onRemove={() =>
-            set("options", node.options.filter((_, j) => j !== i))
-          }
-        />
+      {optionMeta.map(({ opt, nested, open }, i) => (
+        <Fragment key={opt.id}>
+          <DialogueOptionRow
+            option={opt}
+            depth={depth}
+            nested={nested}
+            open={open}
+            onToggleOpen={(v) => setOpenIds((m) => ({ ...m, [opt.id]: v }))}
+            dialogue={dialogue}
+            worldItems={worldItems}
+            projectSceneIds={projectSceneIds}
+            zoneObjects={zoneObjects}
+            zonePlatforms={zonePlatforms}
+            zoneShapes={zoneShapes}
+            zoneLights={zoneLights}
+            zoneStairs={zoneStairs}
+            zoneWalls={zoneWalls}
+            zoneFloors={zoneFloors}
+            zoneCheckpoints={zoneCheckpoints}
+            triggerVolumes={triggerVolumes}
+            groups={groups}
+            assets={assets}
+            zoneDialogues={zoneDialogues}
+            onCreateNext={() => onCreateNext(opt.id)}
+            onChange={(no) =>
+              set("options", node.options.map((x, j) => (j === i ? no : x)))
+            }
+            onRemove={() =>
+              set("options", node.options.filter((_, j) => j !== i))
+            }
+          />
+          {/* The page this response leads to, directly below it — a slight
+              per-level inset; rail hues carry the rest of the depth signal. */}
+          {open && nested?.kind === "hosted" && (
+            <div
+              style={{
+                margin: depth + 1 > 1 ? "2px -5px 8px -14px" : "2px 0 8px 0",
+                paddingLeft: 8,
+              }}
+            >
+              {nested.el}
+            </div>
+          )}
+        </Fragment>
       ))}
     </div>
   );
@@ -2966,6 +3024,8 @@ function DialogueOptionRow({
   option,
   depth,
   nested,
+  open,
+  onToggleOpen,
   dialogue,
   worldItems,
   projectSceneIds,
@@ -2988,6 +3048,8 @@ function DialogueOptionRow({
   option: DialogueOption;
   depth: number;
   nested: NestedRender | null;
+  open: boolean;
+  onToggleOpen: (open: boolean) => void;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
   projectSceneIds?: string[];
@@ -3007,15 +3069,6 @@ function DialogueOptionRow({
   onChange: (o: DialogueOption) => void;
   onRemove: () => void;
 }) {
-  // Accordion: options that nest a page node start open near the top of the
-  // tree; deeper hosted options and plain "ends" options start collapsed.
-  // Untouched (empty) options start open so a fresh "+ Add" is ready to type.
-  const [open, setOpen] = useState<boolean>(
-    () =>
-      (nested?.kind === "hosted" && depth < 2) ||
-      (!option.text && !option.next && !option.conditions?.length && !option.actions?.length),
-  );
-
   function set(changes: Partial<DialogueOption>): void {
     onChange({ ...option, ...changes });
   }
@@ -3046,13 +3099,13 @@ function DialogueOptionRow({
   };
 
   return (
-    <>
     <div
+      id={`wb-dlgopt-${option.id}`}
       style={{
         background: "rgba(0,0,0,0.28)",
         borderRadius: 4,
         padding: "4px 8px 8px",
-        marginBottom: nested && open ? 0 : 8,
+        marginBottom: nested?.kind === "hosted" && open ? 0 : 8,
         border: dangling ? "1px solid rgba(204,102,102,0.5)" : "1px solid transparent",
       }}
     >
@@ -3069,7 +3122,7 @@ function DialogueOptionRow({
             flexShrink: 0,
           }}
           title={open ? "Collapse this response" : "Expand this response"}
-          onClick={() => setOpen(!open)}
+          onClick={() => onToggleOpen(!open)}
         >
           {open ? "▾" : "▸"}
         </button>
@@ -3238,7 +3291,7 @@ function DialogueOptionRow({
             }}
             title="Create the next page of the conversation, nested right below this response"
             onClick={() => {
-              setOpen(true);
+              onToggleOpen(true);
               onCreateNext();
             }}
           >
@@ -3252,11 +3305,11 @@ function DialogueOptionRow({
           onChange={(e) => {
             const v = e.target.value;
             if (v === "__new__") {
-              setOpen(true);
+              onToggleOpen(true);
               onCreateNext();
               return;
             }
-            if (v) setOpen(true);
+            if (v) onToggleOpen(true);
             set({ next: v || undefined });
           }}
         >
@@ -3283,22 +3336,6 @@ function DialogueOptionRow({
       {/* Jump chip lives in the well (it's a field-sized control) */}
       {open && nested?.kind === "jump" && nested.el}
     </div>
-
-    {/* The page node this response leads to renders as a SIBLING below the
-        well — rail-connected, not box-in-box. The gutter is constant: only
-        level 1 shows an inset; deeper levels pull back the host card's
-        per-level padding so chains never squeeze the fields. */}
-    {open && nested?.kind === "hosted" && (
-      <div
-        style={{
-          margin: depth + 1 > 1 ? "4px -5px 8px -18px" : "4px 0 8px 0",
-          paddingLeft: 8,
-        }}
-      >
-        {nested.el}
-      </div>
-    )}
-    </>
   );
 }
 
@@ -3309,9 +3346,11 @@ function DialogueOptionRow({
 
 function ItemsEditor({
   items,
+  help,
   onChange,
 }: {
   items: ItemDef[];
+  help?: string;
   onChange: (items: ItemDef[]) => void;
 }) {
   function replace(id: string, next: ItemDef): void {
@@ -3332,10 +3371,13 @@ function ItemsEditor({
         style={{
           display: "flex",
           justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 10,
           padding: "6px 10px",
           flexShrink: 0,
         }}
       >
+        {help && <HelpTooltip side="below" align="right" text={help} />}
         <button style={S.btn(true)} onClick={add}>
           + New
         </button>
