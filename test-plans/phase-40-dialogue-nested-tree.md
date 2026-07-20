@@ -22,7 +22,9 @@ protocol: autosave snapshot → OPFS stash → in-memory staging only, never Sav
 | 7d | No-wrap details row | Inspect `▸ Show if / On pick · …` | Single flex line, `nowrap` + ellipsis — cannot wrap at any panel width |
 | 8 | Accordion collapse | Click ▾ on n1's hosted option | Option body AND nested subtree (n2 card) removed from DOM; ▸ re-expand restores it |
 | 9 | Fresh option UX | + Add a response | Starts expanded, header text input ready to type (single input — no duplicate text row) |
-| 9b | Labeled groups (v4.34.1 mockup layout) | Expand a response | LEADS TO → hairline → **Show if** (`+ Add condition`) → **On pick** (`+ Add effect`); empty groups read *Always shown* / *No effects*; the response caret is the only toggle |
+| 9b | Labeled groups (v4.34.1 mockup layout) | Expand a response | **Show if** (`+ Add condition`) → **On pick** (`+ Add effect`); empty groups read *Always shown* / *No effects*; the response caret is the only toggle |
+| 9d | THEN row at the bottom (v4.34.2) | Expand a response with no destination | Hairline → `THEN [＋ Next page] [— ends the conversation — ▾]`; clicking ＋ Next page creates+wires+nests the next node in one click and the button disappears (destination set); dropdown remains for loops/relinks |
+| 9e | Design scale (v4.34.2) | Inspect styles | Spacing on 4px increments, whole-number type scale (10/11/12); S.field/S.select at 12px panel-wide |
 | 9c | Sibling state isolation | Add an option, edit its text | Other options' open/closed state and the nested n2 card unaffected (an early automation artifact suggested otherwise; not reproducible with clean sequencing — two repro attempts) |
 | 10 | Unreachable section | Top-level "+ Add page node" | n6 renders flat under "⚠ Unreachable page nodes (nothing leads here)", outside the tree |
 | 11 | Scroll integrity | scrollTop → max on a tall tree | Editor's last button (Delete) fully visible — v4.33.10 fix intact |

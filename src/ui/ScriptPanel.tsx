@@ -85,22 +85,22 @@ const S = {
   field: {
     width: "100%",
     background: "rgba(46,46,46,0.9)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "1px solid rgba(255,255,255,0.1)",
     borderRadius: 4,
-    color: "#c0c0c0",
-    fontSize: 11,
-    padding: "4px 8px",
+    color: "#d4d8e2",
+    fontSize: 12,
+    padding: "6px 8px",
     fontFamily: "monospace",
     outline: "none",
   } as const,
   select: {
     width: "100%",
     background: "rgba(46,46,46,0.9)",
-    border: "1px solid rgba(255,255,255,0.08)",
+    border: "1px solid rgba(255,255,255,0.1)",
     borderRadius: 4,
-    color: "#c0c0c0",
-    fontSize: 11,
-    padding: "4px 6px",
+    color: "#d4d8e2",
+    fontSize: 12,
+    padding: "6px 6px",
     outline: "none",
   } as const,
   sectionLabel: {
@@ -2865,7 +2865,7 @@ function DialogueNodeCard({
             fontFamily: "monospace",
             background: "rgba(128,170,255,0.12)",
             borderRadius: 3,
-            padding: "2px 6px",
+            padding: "2px 8px",
           }}
         >
           {node.id}
@@ -2892,7 +2892,7 @@ function DialogueNodeCard({
         </button>
       </div>
       <textarea
-        style={{ ...S.field, height: 48, resize: "vertical" }}
+        style={{ ...S.field, height: 56, resize: "vertical" }}
         placeholder="Lines (one per line)"
         value={node.lines.join("\n")}
         onChange={(e) => set("lines", e.target.value.split("\n"))}
@@ -2904,7 +2904,7 @@ function DialogueNodeCard({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          margin: "8px 0 5px",
+          margin: "8px 0 4px",
         }}
       >
         <span
@@ -2914,7 +2914,7 @@ function DialogueNodeCard({
           Responses
         </span>
         <button
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#80aaff", fontSize: 10, padding: "1px 3px" }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#80aaff", fontSize: 11, padding: "1px 3px" }}
           title="Add a response the player can pick"
           onClick={addOption}
         >
@@ -2922,7 +2922,7 @@ function DialogueNodeCard({
         </button>
       </div>
       {node.options.length === 0 && (
-        <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 4px 8px" }}>
           (no responses — the conversation ends after this page's last line)
         </div>
       )}
@@ -3033,9 +3033,9 @@ function DialogueOptionRow({
       : "⏹ ends";
   const chipStyle: React.CSSProperties = {
     flexShrink: 0,
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "monospace",
-    padding: "1px 7px",
+    padding: "2px 8px",
     borderRadius: 999,
     background: dangling
       ? "rgba(204,102,102,0.15)"
@@ -3051,13 +3051,13 @@ function DialogueOptionRow({
       style={{
         background: "rgba(0,0,0,0.28)",
         borderRadius: 4,
-        padding: "3px 6px 3px 4px",
-        marginBottom: nested && open ? 0 : 6,
+        padding: "4px 8px 8px",
+        marginBottom: nested && open ? 0 : 8,
         border: dangling ? "1px solid rgba(204,102,102,0.5)" : "1px solid transparent",
       }}
     >
       {/* Accordion header */}
-      <div style={{ display: "flex", gap: 5, alignItems: "center", minHeight: 24 }}>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", minHeight: 28 }}>
         <button
           style={{
             background: "none",
@@ -3080,11 +3080,11 @@ function DialogueOptionRow({
             background: "none",
             border: "none",
             outline: "none",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            color: "#c0c0c0",
-            fontSize: 11,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            color: "#d4d8e2",
+            fontSize: 12,
             fontFamily: "monospace",
-            padding: "2px 2px",
+            padding: "4px 4px",
           }}
           placeholder="Response text"
           title="What the player can say — edit right here"
@@ -3125,54 +3125,16 @@ function DialogueOptionRow({
 
       {open && (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "5px 2px 5px 17px" }}>
-            <span style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>Leads to</span>
-            <select
-              title="The page node this response jumps to — leave the default to end the conversation"
-              style={{ ...S.select, flex: 1 }}
-              value={option.next ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "__new__") {
-                  setOpen(true);
-                  onCreateNext();
-                  return;
-                }
-                if (v) setOpen(true);
-                set({ next: v || undefined });
-              }}
-            >
-              <option value="">— end conversation (default) —</option>
-              {dialogue.nodes.map((n) => (
-                <option key={n.id} value={n.id}>
-                  → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
-                </option>
-              ))}
-              {dangling && (
-                <option value={option.next}>→ {option.next} (missing!)</option>
-              )}
-              <option value="__new__">＋ new page node…</option>
-            </select>
-          </div>
-          {dangling && (
-            <div style={{ color: "#cc6666", fontSize: 10, marginBottom: 4 }}>
-              ⚠ next node "{option.next}" doesn't exist — plays as "end conversation"
-            </div>
-          )}
-
-          {/* Hairline between routing and the condition/effect groups */}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "7px 2px" }} />
-
       {/* Conditions (option hidden unless ALL pass) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 2px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 4px 4px" }}>
         <span
           title="This response is hidden unless ALL of these pass"
-          style={{ color: "#b6bfd0", fontSize: 11, fontWeight: 600 }}
+          style={{ color: "#b6bfd0", fontSize: 12, fontWeight: 600 }}
         >
           Show if
         </span>
         <button
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 10, padding: "1px 2px" }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 11, padding: "2px 4px" }}
           onClick={() =>
             set({ conditions: [...conditions, { type: "has_state" } as ScriptCondition] })
           }
@@ -3195,21 +3157,21 @@ function DialogueOptionRow({
         />
       ))}
       {conditions.length === 0 && (
-        <div style={{ color: "#6b7488", fontSize: 11, padding: "3px 2px 5px" }}>
+        <div style={{ color: "#6b7488", fontSize: 11, padding: "4px 4px 8px" }}>
           Always shown
         </div>
       )}
 
       {/* Effects (run when picked) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "4px 2px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "8px 4px 4px" }}>
         <span
           title="Effects that run the moment the player picks this response"
-          style={{ color: "#b6bfd0", fontSize: 11, fontWeight: 600 }}
+          style={{ color: "#b6bfd0", fontSize: 12, fontWeight: 600 }}
         >
           On pick
         </span>
         <button
-          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 10, padding: "1px 2px" }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 11, padding: "2px 4px" }}
           onClick={() =>
             set({ actions: [...actions, { type: "set_state" } as ScriptAction] })
           }
@@ -3245,8 +3207,74 @@ function DialogueOptionRow({
         />
       ))}
       {actions.length === 0 && (
-        <div style={{ color: "#6b7488", fontSize: 11, padding: "3px 2px 4px" }}>
+        <div style={{ color: "#6b7488", fontSize: 11, padding: "4px 4px 8px" }}>
           No effects
+        </div>
+      )}
+
+      {/* Routing lives at the BOTTOM of the response, so the nested page
+          follows it directly. One click creates the next page; the dropdown
+          is only for ending or linking back to an earlier page (loops). */}
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 4px 4px" }}>
+        <span
+          style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}
+          title="What happens after this response"
+        >
+          Then
+        </span>
+        {!option.next && (
+          <button
+            style={{
+              background: "rgba(128,170,255,0.12)",
+              border: "1px solid rgba(128,170,255,0.25)",
+              borderRadius: 4,
+              cursor: "pointer",
+              color: "#8fb3ff",
+              fontSize: 12,
+              padding: "4px 12px",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            title="Create the next page of the conversation, nested right below this response"
+            onClick={() => {
+              setOpen(true);
+              onCreateNext();
+            }}
+          >
+            ＋ Next page
+          </button>
+        )}
+        <select
+          title="Where this response goes — a fresh next page, an existing page (loop back), or end the conversation"
+          style={{ ...S.select, flex: 1, minWidth: 0 }}
+          value={option.next ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "__new__") {
+              setOpen(true);
+              onCreateNext();
+              return;
+            }
+            if (v) setOpen(true);
+            set({ next: v || undefined });
+          }}
+        >
+          <option value="">— ends the conversation —</option>
+          {dialogue.nodes.map((n) => (
+            <option key={n.id} value={n.id}>
+              → {n.id} — {(n.lines[0] ?? "").slice(0, 30)}
+            </option>
+          ))}
+          {dangling && (
+            <option value={option.next}>→ {option.next} (missing!)</option>
+          )}
+          <option value="__new__">＋ new page…</option>
+        </select>
+      </div>
+      {dangling && (
+        <div style={{ color: "#cc6666", fontSize: 11, margin: "0 4px 8px" }}>
+          ⚠ next page "{option.next}" doesn't exist — plays as "end conversation"
         </div>
       )}
       </>
@@ -3263,7 +3291,7 @@ function DialogueOptionRow({
     {open && nested?.kind === "hosted" && (
       <div
         style={{
-          margin: depth + 1 > 1 ? "2px -5px 6px -18px" : "2px 0 6px 0",
+          margin: depth + 1 > 1 ? "4px -5px 8px -18px" : "4px 0 8px 0",
           paddingLeft: 8,
         }}
       >

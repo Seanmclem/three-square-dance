@@ -37,7 +37,7 @@ Three building blocks:
 > uses some flavor of this word (Twine calls them passages, Ink calls them
 > knots, Yarn calls them nodes too). Practically, just read "node" as **"one
 > screen of talk"**. Their ids (`n1`, `n2`, …) are auto-numbered and only
-> matter as jump targets — the "Leads to" dropdown shows each node's first
+> matter as jump targets — the "Then" dropdown shows each node's first
 > line next to its id so you rarely think about the numbers.
 
 Two rules cover most of the behavior:
@@ -74,9 +74,10 @@ Reading the image against the chart:
 
 - **n1's card** holds the NPC's two lines and both response options.
 - The first response is **expanded** (▾): its editable text (right in the
-  header), its **Leads to** dropdown (`→ n2`) — and directly under that,
-  **n2's whole card nested inside it**, marked by the colored left rail.
-  That containment is the chart's left arrow.
+  header), its Show if / On pick groups, then its **THEN** row at the very
+  bottom (`→ n2`) — and directly under that, **n2's whole card nested inside
+  it**, marked by the colored left rail. Routing sits last on purpose: the
+  destination page physically follows the row that points at it.
 - Below a hairline sit the response's two labeled groups: **Show if**
   (conditions that gate it — `+ Add condition`) and **On pick** (effects
   that run when picked — `+ Add effect`). Empty groups stay quiet: just
@@ -129,10 +130,6 @@ accordion row: the header holds its **editable text** (type right there), a
 route tag (`→ n2` / `⏹ ends` / `↩ n1`), and ×; the caret (▸/▾) collapses it
 to just that header. A fresh response starts expanded, showing:
 
-- **Leads to** — where picking it takes the conversation. A new option leads
-  nowhere yet, so it reads **— end conversation (default) —**. Point it at an
-  existing page node (`→ n2 — Welcome, stranger.`), or pick
-  **＋ new page node…** to create the next page and nest it right there.
 - **Show if** (`+ Add condition`) — conditions; the response is *hidden*
   unless **all** pass. With none added the group just reads *Always shown* —
   that's the default, not a warning:
@@ -146,15 +143,21 @@ to just that header. A fresh response starts expanded, showing:
   - but also `play_sound`, `teleport_player`, `despawn_object`,
     `fade_screen`, `load_scene`, even `show_dialogue` (hands off to another
     tree).
+- **Then** (bottom row) — what happens after this response. A new response
+  ends the conversation, so the row shows a **＋ Next page** button (one
+  click: creates the next page and nests it right below) next to a dropdown
+  reading **— ends the conversation —**. The dropdown is for the rarer moves:
+  pointing at an existing page (loop back to `n1`, share a destination) or
+  going back to ending.
 
 ### Adding more page nodes — making it branch
 
 The fastest way to branch never leaves the response you're writing:
 
 1. On `n1`, **+ Add** a response option and type its text ("I'm new here.").
-2. In its **Leads to** dropdown, pick **＋ new page node…** — a fresh `n2`
-   is created, wired to this response, and its card opens **nested inside
-   it**. No separate "connect" step.
+2. Hit **＋ Next page** in its bottom THEN row — a fresh `n2` is created,
+   wired to this response, and its card opens **nested right below it**. No
+   separate "connect" step.
 3. Type `n2`'s lines right there in the nested card, add ITS responses the
    same way, and keep going — the conversation grows downward exactly the
    way it will play.
@@ -176,7 +179,7 @@ Odds and ends:
 
 - The top-level **+ Add page node** button still exists — it creates an
   *unwired* node, which lands in the **Unreachable page nodes** section at
-  the bottom until some response's Leads to points at it.
+  the bottom until some response's Then row points at it.
 - Deleting a page node is the **×** on its card — the start page-node can't
   be deleted (pick a different start page-node first).
 - Loops are fine: point a deep response back at `n1` and it renders as a
@@ -246,11 +249,11 @@ are runtime-only and reset when you leave preview.
 The editor warns but never blocks saving — the runtime degrades gracefully:
 
 - **Red option border + "next node doesn't exist"** — the option points at a
-  deleted node. In-game it just ends the conversation. Fix via the Leads to
+  deleted node. In-game it just ends the conversation. Fix via the Then
   dropdown (the broken id shows as `(missing!)`).
 - **Unreachable page nodes section** — nodes nothing points to render in
   their own labeled section at the bottom of the tree. They're harmless
-  dead weight; wire a response's Leads to at them (they'll move up into the
+  dead weight; point a response's Then dropdown at them (they'll move up into the
   tree) or delete them.
 - **All of a node's options gated off** — if every option's conditions fail,
   the node behaves like it has no options: the dialogue ends after its lines.
