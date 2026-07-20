@@ -22,7 +22,7 @@ protocol: autosave snapshot → OPFS stash → in-memory staging only, never Sav
 | 7d | No-wrap details row | Inspect `▸ Show if / On pick · …` | Single flex line, `nowrap` + ellipsis — cannot wrap at any panel width |
 | 8 | Accordion collapse | Click ▾ on n1's hosted option | Option body AND nested subtree (n2 card) removed from DOM; ▸ re-expand restores it |
 | 9 | Fresh option UX | + Add a response | Starts expanded, header text input ready to type (single input — no duplicate text row) |
-| 9b | Details sub-row | Toggle `▸ Show if / On pick` | Collapsed by default with count summary ("(0 conditions · 1 effect)" / "(none — always shown, no effects)"); expanding shows the full Show if + On pick editors; nested card sits directly under Leads to either way |
+| 9b | Labeled groups (v4.34.1 mockup layout) | Expand a response | LEADS TO → hairline → **Show if** (`+ Add condition`) → **On pick** (`+ Add effect`); empty groups read *Always shown* / *No effects*; the response caret is the only toggle |
 | 9c | Sibling state isolation | Add an option, edit its text | Other options' open/closed state and the nested n2 card unaffected (an early automation artifact suggested otherwise; not reproducible with clean sequencing — two repro attempts) |
 | 10 | Unreachable section | Top-level "+ Add page node" | n6 renders flat under "⚠ Unreachable page nodes (nothing leads here)", outside the tree |
 | 11 | Scroll integrity | scrollTop → max on a tall tree | Editor's last button (Delete) fully visible — v4.33.10 fix intact |

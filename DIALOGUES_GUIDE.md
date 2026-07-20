@@ -77,15 +77,14 @@ Reading the image against the chart:
   header), its **Leads to** dropdown (`→ n2`) — and directly under that,
   **n2's whole card nested inside it**, marked by the colored left rail.
   That containment is the chart's left arrow.
-- The **`▸ Show if / On pick`** line between them is a tucked-away sub-row:
-  conditions that gate the response and effects that run when it's picked
-  live behind it, summarized as counts (`· 0 cond · 1 effect`) so they
-  don't push the destination away from its Leads to. Expand it only when
-  you're editing gates/effects.
+- Below a hairline sit the response's two labeled groups: **Show if**
+  (conditions that gate it — `+ Add condition`) and **On pick** (effects
+  that run when picked — `+ Add effect`). Empty groups stay quiet: just
+  *Always shown* / *No effects*.
 - The second response reads `⏹ ends` in its route tag (the chart's right
-  arrow) — its `· 1 cond · 1 effect` summary is the chart's "only shown
-  if met_npc / gives 5 coins". Collapse any response with its caret to a
-  single header line.
+  arrow) — its `has_state met_npc` condition and `adjust_number coins +5`
+  effect are the chart's "only shown if met_npc / gives 5 coins". Collapse
+  any response with its caret to a single header line.
 - Because a conversation can loop or share a destination, a page node's full
   card appears only **once** — under the *first* response that leads to it.
   Any other response that points there shows a **`↩ continues at n2`** chip
@@ -134,16 +133,14 @@ to just that header. A fresh response starts expanded, showing:
   nowhere yet, so it reads **— end conversation (default) —**. Point it at an
   existing page node (`→ n2 — Welcome, stranger.`), or pick
   **＋ new page node…** to create the next page and nest it right there.
-- **▸ Show if / On pick** — a compact sub-row summarizing this response's
-  conditions and effects (`· 1 cond · 2 effects`, or `· none`). Click it to expand both editors:
-- **Show if** (+ Add) — conditions; the option is *hidden* unless **all**
-  pass. With none added, the row reads *"(no conditions — option is always
-  shown)"* — that's the default, not a warning:
+- **Show if** (`+ Add condition`) — conditions; the response is *hidden*
+  unless **all** pass. With none added the group just reads *Always shown* —
+  that's the default, not a warning:
   - `has_state <key>` — the flag/key is set (and not false/null).
   - `compare_number <key> <op> <value>` — numeric check, e.g. `coins >= 5`.
-- **On pick** (+ Add) — effects that run the moment the player picks it
-  (empty rows say so: *"nothing happens yet — add effects that run when
-  picked"*). Any script action works; the ones you'll use most:
+- **On pick** (`+ Add effect`) — effects that run the moment the player picks
+  it (empty group reads *No effects*). Any script action works; the ones
+  you'll use most:
   - `set_state` — set a flag: key `met_guard`, value `true`.
   - `adjust_number` — add/subtract a counter: key `coins`, delta `-5`.
   - but also `play_sound`, `teleport_player`, `despawn_object`,

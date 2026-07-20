@@ -3015,9 +3015,6 @@ function DialogueOptionRow({
       (nested?.kind === "hosted" && depth < 2) ||
       (!option.text && !option.next && !option.conditions?.length && !option.actions?.length),
   );
-  // Show if / On pick live behind their own compact sub-row so the nested
-  // destination card sits directly under "Leads to".
-  const [detailsOpen, setDetailsOpen] = useState(false);
 
   function set(changes: Partial<DialogueOption>): void {
     onChange({ ...option, ...changes });
@@ -3163,47 +3160,24 @@ function DialogueOptionRow({
             </div>
           )}
 
-          {/* Compact sub-row: conditions & effects stay tucked away so the
-              nested destination card sits right under "Leads to". Single
-              line — never wraps. */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              margin: "0 2px 3px 3px",
-              cursor: "pointer",
-              color: "#8b94a8",
-              fontSize: 10.5,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-            }}
-            title="Conditions that gate this response (Show if) and effects that run when it's picked (On pick)"
-            onClick={() => setDetailsOpen(!detailsOpen)}
-          >
-            <span style={{ fontSize: 10, flexShrink: 0 }}>{detailsOpen ? "▾" : "▸"}</span>
-            <span style={{ flexShrink: 0 }}>Show if / On pick</span>
-            <span style={{ color: "#6b7488", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis" }}>
-              {conditions.length === 0 && actions.length === 0
-                ? "· none"
-                : `· ${conditions.length} cond · ${actions.length} effect${actions.length === 1 ? "" : "s"}`}
-            </span>
-          </div>
-        </>
-      )}
+          {/* Hairline between routing and the condition/effect groups */}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "7px 2px" }} />
 
-      {open && detailsOpen && (
-      <>
       {/* Conditions (option hidden unless ALL pass) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#8b94a8", fontSize: 11 }}>Show if</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 2px" }}>
+        <span
+          title="This response is hidden unless ALL of these pass"
+          style={{ color: "#b6bfd0", fontSize: 11, fontWeight: 600 }}
+        >
+          Show if
+        </span>
         <button
-          style={{ ...S.btn(), fontSize: 10 }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 10, padding: "1px 2px" }}
           onClick={() =>
             set({ conditions: [...conditions, { type: "has_state" } as ScriptCondition] })
           }
         >
-          + Add
+          + Add condition
         </button>
       </div>
       {conditions.map((c, i) => (
@@ -3221,21 +3195,26 @@ function DialogueOptionRow({
         />
       ))}
       {conditions.length === 0 && (
-        <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
-          (no conditions — option is always shown)
+        <div style={{ color: "#6b7488", fontSize: 11, padding: "3px 2px 5px" }}>
+          Always shown
         </div>
       )}
 
       {/* Effects (run when picked) */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ color: "#8b94a8", fontSize: 11 }}>On pick</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "4px 2px 0" }}>
+        <span
+          title="Effects that run the moment the player picks this response"
+          style={{ color: "#b6bfd0", fontSize: 11, fontWeight: 600 }}
+        >
+          On pick
+        </span>
         <button
-          style={{ ...S.btn(), fontSize: 10 }}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#8b94a8", fontSize: 10, padding: "1px 2px" }}
           onClick={() =>
             set({ actions: [...actions, { type: "set_state" } as ScriptAction] })
           }
         >
-          + Add
+          + Add effect
         </button>
       </div>
       {actions.map((a, i) => (
@@ -3266,8 +3245,8 @@ function DialogueOptionRow({
         />
       ))}
       {actions.length === 0 && (
-        <div style={{ color: "#98a2b8", fontSize: 11, padding: "2px 0" }}>
-          (nothing happens yet — add effects that run when picked)
+        <div style={{ color: "#6b7488", fontSize: 11, padding: "3px 2px 4px" }}>
+          No effects
         </div>
       )}
       </>
