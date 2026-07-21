@@ -259,10 +259,15 @@ export function DialogueFlowchart({
         const tp = posOf(t);
         const x2 = tp.x + BOX_W / 2;
         const y2 = tp.y - 6;
+        // Control-point reach scales with distance; loop-backs (target above
+        // the source port) get a much wider sweep so the curve arcs around
+        // instead of hairpinning at the port and slicing across boxes.
+        const dist = Math.hypot(x2 - x1, y2 - y1);
+        const k = y2 < y1 ? Math.min(280, 80 + dist * 0.5) : Math.min(160, 40 + dist * 0.25);
         edges.push({
           key: `${n.id}-${o.id}`,
           color: "rgba(128,170,255,0.75)",
-          d: `M ${x1} ${y1} C ${x1 + 60} ${y1}, ${x2} ${y2 - 60}, ${x2} ${y2}`,
+          d: `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2} ${y2 - k}, ${x2} ${y2}`,
         });
       } else if (o.next) {
         edges.push({
