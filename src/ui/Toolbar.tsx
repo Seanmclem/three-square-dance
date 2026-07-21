@@ -207,8 +207,6 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         );
       })}
 
-      <div style={{ flex: 1 }} />
-
       {/* ASSETS group button — flyout with Models / Materials / Decals / Sounds / Skybox */}
       {(() => {
         const activeEntry = ASSET_ENTRIES.find(e => assetEntryActive(e, activeTool, openPanel));
@@ -226,7 +224,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               setOpenMenu(menuOpen ? null : "assets-menu");
             }}
             style={{
-              width: 48, height: 36, border: "none", cursor: "pointer",
+              width: 48, height: 48, border: "none", cursor: "pointer",
               borderRadius: 8, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center", gap: 2,
               background: highlight ? "rgba(80,140,255,0.2)" : "transparent",
@@ -237,8 +235,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = "transparent"; }}
           >
             <ButtonIcon color={color} />
-            <span style={{ fontSize: 6, letterSpacing: 0.5, color, opacity: 0.85, fontFamily: "monospace" }}>
-              ASSETS
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+                           textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
+              Assets
             </span>
           </button>
           {menuOpen && (
@@ -291,7 +290,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             title="Scripts &amp; Triggers panel (S)"
             onClick={() => onPanelToggle(scriptsActive ? null : "scripts")}
             style={{
-              width: 48, height: 36, border: "none", cursor: "pointer",
+              width: 48, height: 48, border: "none", cursor: "pointer",
               borderRadius: 8, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center", gap: 2,
               background: scriptsActive ? "rgba(255,170,0,0.2)" : "transparent",
@@ -302,13 +301,16 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseLeave={e => { if (!scriptsActive) e.currentTarget.style.background = "transparent"; }}
           >
             <IconTriggerVolume color={scriptsActive ? "#ffaa00" : "#7a7a7a"} />
-            <span style={{ fontSize: 6, letterSpacing: 0.5, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
-                           opacity: 0.85, fontFamily: "monospace" }}>
-              SCRIPTS
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
+                           opacity: 0.7, fontFamily: "monospace", textAlign: "center",
+                           lineHeight: 1.1, maxWidth: 46 }}>
+              Scripts
             </span>
           </button>
         );
       })()}
+
+      <div style={{ flex: 1 }} />
 
       <div style={{ width: 40, height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 4 }} />
 

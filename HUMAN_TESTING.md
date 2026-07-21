@@ -16,7 +16,7 @@ npm run dev          # then open the printed http://localhost:5173/
 - **Select** something: Select tool (V), click it. The right-hand **Properties** panel
   shows its `label · id` in the header. Rename with the ✎ pencil to give it a memorable
   label/id.
-- **Left panels** (bottom-left buttons): **ASSETS** — a flyout menu with **Models /
+- **Left panels** (below the tools in the left bar): **Assets** — a flyout menu with **Models /
   Materials / Decals / Sounds / Skybox** (Models and Decals also arm their placement
   tools) — and **SCRIPTS** (scripting). The Groups panel opens via the Groups tool.
 - **Play**: the green **▶ Preview** button bottom-left (hotkey **G**), or its dropdown
@@ -49,7 +49,7 @@ Use this to test `despawn_object`, `move_object`, `change_material`, `play_anima
 1. **Note the target's id.** Select the object you want the script to affect; read its
    `id` from the Properties header (rename it for clarity if you like). For a **group**
    target, create the group in the Groups panel first and use the group's name/id.
-2. **Open SCRIPTS** (bottom-left) and pick **where the script lives** (this is *not* the
+2. **Open Scripts** (left bar, below Assets) and pick **where the script lives** (this is *not* the
    trigger — that's the next step):
    - **LEVEL** — the script belongs to the level. Use for `on_game_start`, `on_timer`,
      or anything not tied to one entity.
@@ -167,7 +167,7 @@ and a **volume mixer** (authored levels + player sliders).
 
 ### A — Browse & preview the sound library
 
-1. Click **ASSETS** (bottom-left toolbar) → **Sounds**. The panel lists the
+1. Click **Assets** (left bar, below the tools) → **Sounds**. The panel lists the
    sounds, tagged by category (Music / Ambient / SFX) with **loop / spatial** flags.
 2. Click the **▶** on any row to hear it right there in the editor (click again to stop).
    **Expect:** the three test sounds play.
@@ -264,7 +264,7 @@ the same music/ambient/positional audio and the pause-menu sliders all work ther
 
 ## Workflow: stamp a decal (sticker / crack / paint)
 
-1. Click **ASSETS** (bottom-left toolbar) → **Decals**. The **DECALS**
+1. Click **Assets** (left bar, below the tools) → **Decals**. The **DECALS**
    panel opens with a grid of decal textures (Overlay kind; Surface is a later phase).
 2. Click a texture tile — it highlights, and the tool is armed.
 3. Hover any wall, floor, platform, or stair: a translucent **ghost** of the decal sticks
