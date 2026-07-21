@@ -3022,8 +3022,8 @@ function DialogueNodeCard({
           (no responses — the conversation ends after this page's last line)
         </div>
       )}
-      {optionMeta.map(({ opt, nested, open }, i) => (
-        <Fragment key={opt.id}>
+      {optionMeta.map(({ opt, nested, open }, i) => {
+        const row = (
           <DialogueOptionRow
             option={opt}
             depth={depth}
@@ -3053,20 +3053,51 @@ function DialogueNodeCard({
               set("options", node.options.filter((_, j) => j !== i))
             }
           />
-          {/* The page this response leads to, directly below it — a slight
-              per-level inset; rail hues carry the rest of the depth signal. */}
-          {open && nested?.kind === "hosted" && (
-            <div
-              style={{
-                margin: depth + 1 > 1 ? "6px 0 10px -16px" : "6px 0 10px 0",
-                paddingLeft: 12,
-              }}
-            >
-              {nested.el}
-            </div>
-          )}
-        </Fragment>
-      ))}
+        );
+        // Deep levels break the child card out to the LEFT of its response
+        // well (anti-runaway-indent), which loses the visual relation — the
+        // child's rail extends up along the well so one continuous colored
+        // line ties response → page. First level keeps its plain inset; it
+        // already reads as nested.
+        const deepHosted = open && nested?.kind === "hosted" && depth + 1 > 1;
+        const hue = NEST_RAILS[depth % 3];
+        return (
+          <Fragment key={opt.id}>
+            {deepHosted ? (
+              <div style={{ borderLeft: `2px solid ${hue}`, marginLeft: -4, paddingLeft: 2 }}>
+                {row}
+              </div>
+            ) : (
+              row
+            )}
+            {/* The page this response leads to, directly below it — a slight
+                per-level inset; rail hues carry the rest of the depth signal. */}
+            {open && nested?.kind === "hosted" && (
+              <div
+                style={{
+                  position: "relative",
+                  margin: depth + 1 > 1 ? "6px 0 10px -16px" : "6px 0 10px 0",
+                  paddingLeft: 12,
+                }}
+              >
+                {deepHosted && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 12,
+                      top: -7,
+                      width: 2,
+                      height: 9,
+                      background: hue,
+                    }}
+                  />
+                )}
+                {nested.el}
+              </div>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
