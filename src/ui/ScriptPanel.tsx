@@ -3058,7 +3058,7 @@ function DialogueNodeCard({
           {open && nested?.kind === "hosted" && (
             <div
               style={{
-                margin: depth + 1 > 1 ? "6px -7px 10px -22px" : "6px 0 10px 0",
+                margin: depth + 1 > 1 ? "6px -7px 10px -16px" : "6px 0 10px 0",
                 paddingLeft: 12,
               }}
             >
