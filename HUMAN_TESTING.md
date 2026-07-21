@@ -16,8 +16,9 @@ npm run dev          # then open the printed http://localhost:5173/
 - **Select** something: Select tool (V), click it. The right-hand **Properties** panel
   shows its `label · id` in the header. Rename with the ✎ pencil to give it a memorable
   label/id.
-- **Left panels** (bottom-left buttons): **MATS** (materials), **SCRIPTS** (scripting),
-  and the asset/groups panels. The Groups panel also opens when you pick the groups tool.
+- **Left panels** (bottom-left buttons): **ASSETS** — a flyout menu with **Models /
+  Materials / Decals / Sounds / Skybox** (Models and Decals also arm their placement
+  tools) — and **SCRIPTS** (scripting). The Groups panel opens via the Groups tool.
 - **Play**: the green **▶ Preview** button bottom-left (hotkey **G**), or its dropdown
   caret → **Start Game**. Preview lets you walk around; Start Game also spawns you at the
   level's spawn point and fires `on_game_start`.
@@ -166,7 +167,7 @@ and a **volume mixer** (authored levels + player sliders).
 
 ### A — Browse & preview the sound library
 
-1. Click the **SOUNDS** button (bottom-left toolbar, speaker icon). The panel lists the
+1. Click **ASSETS** (bottom-left toolbar) → **Sounds**. The panel lists the
    sounds, tagged by category (Music / Ambient / SFX) with **loop / spatial** flags.
 2. Click the **▶** on any row to hear it right there in the editor (click again to stop).
    **Expect:** the three test sounds play.
@@ -263,7 +264,7 @@ the same music/ambient/positional audio and the pause-menu sliders all work ther
 
 ## Workflow: stamp a decal (sticker / crack / paint)
 
-1. Click the **Decal** tool in the left toolbar (bottom of the strip). The **DECALS**
+1. Click **ASSETS** (bottom-left toolbar) → **Decals**. The **DECALS**
    panel opens with a grid of decal textures (Overlay kind; Surface is a later phase).
 2. Click a texture tile — it highlights, and the tool is armed.
 3. Hover any wall, floor, platform, or stair: a translucent **ghost** of the decal sticks
@@ -294,7 +295,7 @@ wall-run/floor mesh.
 
 ## Workflow: place a shape primitive (cylinder / wedge / box)
 
-1. Click the **Shape** tool in the left toolbar (between Stair and Object). A popover
+1. Click the **Shape** tool in the left toolbar (between Stair and Groups). A popover
    opens beside it with **◍ Cylinder / ◺ Wedge / ▤ Box** — pick one (the button keeps
    your last choice on re-click).
 2. Place it:

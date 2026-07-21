@@ -17,13 +17,31 @@ const TOOLS: ToolDef[] = [
   { id: "platform",        label: "Platform", shortcut: "L", variants: [{ id: "platform", label: "▭ Rectangle" }, { id: "poly-platform", label: "⬠ Polygon" }] },
   { id: "stair",           label: "Stair",     shortcut: "T", variants: [{ id: "stair", label: "▤ Stair" }, { id: "ladder", label: "☰ Ladder" }] },
   { id: "shape-cylinder",  label: "Shape",    shortcut: "B", variants: [{ id: "shape-cylinder", label: "◍ Cylinder" }, { id: "shape-wedge", label: "◺ Wedge" }, { id: "shape-box", label: "▤ Box" }] },
-  { id: "object",          label: "Object",   shortcut: "O" },
   { id: "groups",          label: "Groups",   shortcut: "Z" },
   { id: "spawnpoint",      label: "Spawn",    shortcut: "N" },
   { id: "trigger-volume",  label: "Trigger",  shortcut: "U" },
-  { id: "decal",           label: "Decal",    shortcut: "K" },
   { id: "light-point",     label: "Light",    shortcut: "G", variants: [{ id: "light-point", label: "◉ Point" }, { id: "light-spot", label: "◭ Spot" }, { id: "light-directional", label: "☀ Directional" }] },
 ];
+
+// ASSETS flyout: everything import-an-asset-and-use-it lives here. "tool" rows arm a
+// placement tool (App opens its browser panel — object→assets, decal→decals); "panel"
+// rows just toggle their browser panel.
+type AssetEntry =
+  | { label: string; Icon: React.FC<{ color: string }>; kind: "tool"; tool: ToolId }
+  | { label: string; Icon: React.FC<{ color: string }>; kind: "panel"; panel: Exclude<LeftPanelId, null> };
+
+const ASSET_ENTRIES: AssetEntry[] = [
+  { label: "Models",    Icon: TOOL_ICONS.object, kind: "tool",  tool: "object" },
+  { label: "Materials", Icon: IconMaterial,      kind: "panel", panel: "materials" },
+  { label: "Decals",    Icon: TOOL_ICONS.decal,  kind: "tool",  tool: "decal" },
+  { label: "Sounds",    Icon: IconAudio,         kind: "panel", panel: "audio" },
+  { label: "Skybox",    Icon: IconSkybox,        kind: "panel", panel: "skybox" },
+];
+
+const assetEntryActive = (e: AssetEntry, activeTool: ToolId, openPanel: LeftPanelId) =>
+  e.kind === "tool"
+    ? activeTool === e.tool || openPanel === (e.tool === "object" ? "assets" : "decals")
+    : openPanel === e.panel;
 
 interface ToolbarProps {
   activeTool:    ToolId;
@@ -43,7 +61,8 @@ interface ToolbarProps {
 export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, onPreview, onNewGame, onContinue, onOcclusionTest, hasGameSave, isPreview, spawnMode = "initial", onSpawnMode }: ToolbarProps) {
   const [showGameMenu, setShowGameMenu] = useState(false);
   // Placement-variant popover opened by its group button (no tool armed yet).
-  const [openMenu, setOpenMenu] = useState<ToolId | null>(null);
+  // "assets-menu" is the ASSETS flyout (not a ToolId).
+  const [openMenu, setOpenMenu] = useState<ToolId | "assets-menu" | null>(null);
   // Re-evaluated whenever the menu opens (opening flips showGameMenu → re-render),
   // so it reflects a save written since the last play session.
   const canContinue = showGameMenu && (hasGameSave?.() ?? false);
@@ -80,7 +99,6 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         const active = activeTool === tool.id
           || activeVariantId !== undefined
           || (tool.id === "groups"          && openPanel === "groups")
-          || (tool.id === "object"          && openPanel === "assets")
           || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
         const highlight = active || menuOpen;
         const Icon = TOOL_ICONS[activeVariantId ?? tool.id];
@@ -191,84 +209,77 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
 
       <div style={{ flex: 1 }} />
 
-      {/* Materials panel button */}
+      {/* ASSETS group button — flyout with Models / Materials / Decals / Sounds / Skybox */}
       {(() => {
-        const matActive = openPanel === "materials";
+        const activeEntry = ASSET_ENTRIES.find(e => assetEntryActive(e, activeTool, openPanel));
+        const menuOpen = openMenu === "assets-menu";
+        const highlight = !!activeEntry || menuOpen;
+        const ButtonIcon = activeEntry?.Icon ?? IconMaterial;
+        const color = highlight ? "#80aaff" : "#7a7a7a";
         return (
+          <div style={{ position: "relative", display: "flex" }}>
           <button
-            title="Materials panel"
-            onClick={() => onPanelToggle(matActive ? null : "materials")}
+            title="Assets — models, materials, decals, sounds, skybox"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowGameMenu(false);
+              setOpenMenu(menuOpen ? null : "assets-menu");
+            }}
             style={{
               width: 48, height: 36, border: "none", cursor: "pointer",
               borderRadius: 8, display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center", gap: 2,
-              background: matActive ? "rgba(80,140,255,0.2)" : "transparent",
-              outline: matActive ? "1px solid rgba(80,140,255,0.45)" : "none",
+              background: highlight ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: highlight ? "1px solid rgba(80,140,255,0.45)" : "none",
               transition: "all 0.15s",
             }}
-            onMouseEnter={e => { if (!matActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
-            onMouseLeave={e => { if (!matActive) e.currentTarget.style.background = "transparent"; }}
+            onMouseEnter={e => { if (!highlight) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = "transparent"; }}
           >
-            <IconMaterial color={matActive ? "#80aaff" : "#7a7a7a"} />
-            <span style={{ fontSize: 6, letterSpacing: 0.5, color: matActive ? "#80aaff" : "#7a7a7a",
-                           opacity: 0.85, fontFamily: "monospace" }}>
-              MATS
+            <ButtonIcon color={color} />
+            <span style={{ fontSize: 6, letterSpacing: 0.5, color, opacity: 0.85, fontFamily: "monospace" }}>
+              ASSETS
             </span>
           </button>
-        );
-      })()}
-
-      {/* Audio panel button */}
-      {(() => {
-        const audioActive = openPanel === "audio";
-        return (
-          <button
-            title="Sounds panel"
-            onClick={() => onPanelToggle(audioActive ? null : "audio")}
-            style={{
-              width: 48, height: 36, border: "none", cursor: "pointer",
-              borderRadius: 8, display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: 2,
-              background: audioActive ? "rgba(80,140,255,0.2)" : "transparent",
-              outline: audioActive ? "1px solid rgba(80,140,255,0.45)" : "none",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { if (!audioActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
-            onMouseLeave={e => { if (!audioActive) e.currentTarget.style.background = "transparent"; }}
-          >
-            <IconAudio color={audioActive ? "#80aaff" : "#7a7a7a"} />
-            <span style={{ fontSize: 6, letterSpacing: 0.5, color: audioActive ? "#80aaff" : "#7a7a7a",
-                           opacity: 0.85, fontFamily: "monospace" }}>
-              SOUNDS
-            </span>
-          </button>
-        );
-      })()}
-
-      {/* Skybox panel button */}
-      {(() => {
-        const skyActive = openPanel === "skybox";
-        return (
-          <button
-            title="Skybox panel"
-            onClick={() => onPanelToggle(skyActive ? null : "skybox")}
-            style={{
-              width: 48, height: 36, border: "none", cursor: "pointer",
-              borderRadius: 8, display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: 2,
-              background: skyActive ? "rgba(80,140,255,0.2)" : "transparent",
-              outline: skyActive ? "1px solid rgba(80,140,255,0.45)" : "none",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { if (!skyActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
-            onMouseLeave={e => { if (!skyActive) e.currentTarget.style.background = "transparent"; }}
-          >
-            <IconSkybox color={skyActive ? "#80aaff" : "#7a7a7a"} />
-            <span style={{ fontSize: 6, letterSpacing: 0.5, color: skyActive ? "#80aaff" : "#7a7a7a",
-                           opacity: 0.85, fontFamily: "monospace" }}>
-              SKYBOX
-            </span>
-          </button>
+          {menuOpen && (
+            <div style={{
+              position: "absolute", left: "100%", bottom: 0, marginLeft: 6, zIndex: 100,
+              background: "rgba(28,28,28,0.98)", border: "1px solid rgba(255,255,255,0.14)",
+              borderRadius: 6, padding: 4, minWidth: 150,
+              display: "flex", flexDirection: "column", gap: 2,
+              boxShadow: "0 4px 14px rgba(0,0,0,0.4)",
+            }}>
+              {ASSET_ENTRIES.map(entry => {
+                const on = assetEntryActive(entry, activeTool, openPanel);
+                return (
+                  <button
+                    key={entry.label}
+                    onClick={() => {
+                      setOpenMenu(null);
+                      if (entry.kind === "tool") onToolSelect(entry.tool);
+                      else onPanelToggle(on ? null : entry.panel);
+                    }}
+                    style={{
+                      padding: "6px 10px", textAlign: "left", fontSize: 12, fontFamily: "monospace",
+                      cursor: "pointer", border: "none", borderRadius: 4, whiteSpace: "nowrap",
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: on ? "rgba(80,140,255,0.25)" : "transparent",
+                      color: on ? "#cfe0ff" : "#c2cadb",
+                    }}
+                    onMouseEnter={e => { if (!on) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={e => { if (!on) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <entry.Icon color={on ? "#cfe0ff" : "#9aa3b5"} />
+                    {entry.label}
+                  </button>
+                );
+              })}
+              <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+                Import &amp; place assets — Esc closes.
+              </div>
+            </div>
+          )}
+          </div>
         );
       })()}
 
