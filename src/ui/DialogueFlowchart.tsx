@@ -257,18 +257,30 @@ export function DialogueFlowchart({
       if (o.next && byId.has(o.next)) {
         const t = byId.get(o.next)!;
         const tp = posOf(t);
-        const x2 = tp.x + BOX_W / 2;
-        const y2 = tp.y - 6;
-        // Control-point reach scales with distance; loop-backs (target above
-        // the source port) get a much wider sweep so the curve arcs around
-        // instead of hairpinning at the port and slicing across boxes.
-        const dist = Math.hypot(x2 - x1, y2 - y1);
-        const k = y2 < y1 ? Math.min(280, 80 + dist * 0.5) : Math.min(160, 40 + dist * 0.25);
-        edges.push({
-          key: `${n.id}-${o.id}`,
-          color: "rgba(128,170,255,0.75)",
-          d: `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2} ${y2 - k}, ${x2} ${y2}`,
-        });
+        const th = boxHeight(t);
+        // Enter the target on the side facing the source port: left edge when
+        // the boxes sit roughly level (port height inside the target's span),
+        // underneath when the target is above, top for the normal downward case.
+        let d: string;
+        if (tp.x > x1 && y1 >= tp.y && y1 <= tp.y + th) {
+          const x2 = tp.x - 6;
+          const y2 = tp.y + th / 2;
+          const k = Math.min(140, Math.max(24, (x2 - x1) / 2));
+          d = `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2 - k} ${y2}, ${x2} ${y2}`;
+        } else if (tp.y + th < y1) {
+          // Option-less targets have an `end` chip hanging below center —
+          // shift the underneath entry left of it.
+          const x2 = tp.x + BOX_W / 2 + (t.options.length === 0 ? -50 : 0);
+          const y2 = tp.y + th + 6;
+          const k = Math.min(200, 60 + Math.hypot(x2 - x1, y2 - y1) * 0.3);
+          d = `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2} ${y2 + k}, ${x2} ${y2}`;
+        } else {
+          const x2 = tp.x + BOX_W / 2;
+          const y2 = tp.y - 6;
+          const k = Math.min(160, 40 + Math.hypot(x2 - x1, y2 - y1) * 0.25);
+          d = `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2} ${y2 - k}, ${x2} ${y2}`;
+        }
+        edges.push({ key: `${n.id}-${o.id}`, color: "rgba(128,170,255,0.75)", d });
       } else if (o.next) {
         edges.push({
           key: `${n.id}-${o.id}`,
