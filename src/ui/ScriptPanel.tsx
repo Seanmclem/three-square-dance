@@ -29,6 +29,7 @@ import type {
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { HelpTooltip } from "@/ui/HelpTooltip";
+import { DialogueFlowchart } from "@/ui/DialogueFlowchart";
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -2509,6 +2510,8 @@ function DialogueEditor({
   onChange: (d: DialogueTreeDef) => void;
   onDelete: () => void;
 }) {
+  const [showFlowchart, setShowFlowchart] = useState(false);
+
   function set<K extends keyof DialogueTreeDef>(key: K, val: DialogueTreeDef[K]): void {
     onChange({ ...dialogue, [key]: val });
   }
@@ -2672,8 +2675,24 @@ function DialogueEditor({
         >
           {dialogue.label || "Dialogue"}
         </span>
+        <button
+          title="Open the flowchart view — the whole conversation as a node-and-arrow chart beside this panel. Click a box there to jump to its card here."
+          style={{ ...S.btn(showFlowchart), fontSize: 10, color: showFlowchart ? "#80aaff" : "#c0c0c0" }}
+          onClick={() => setShowFlowchart((v) => !v)}
+        >
+          Flowchart
+        </button>
         {help && <HelpTooltip side="below" align="right" text={help} />}
       </div>
+
+      {showFlowchart && (
+        <DialogueFlowchart
+          dialogue={dialogue}
+          onChange={onChange}
+          onJumpToNode={jumpToNode}
+          onClose={() => setShowFlowchart(false)}
+        />
+      )}
 
       <div style={{ flex: 1, overflowY: "auto" }}>
         <div style={{ padding: "8px 12px" }}>

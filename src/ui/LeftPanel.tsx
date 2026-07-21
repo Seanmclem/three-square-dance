@@ -121,7 +121,7 @@ export function LeftPanel({
   }
 
   return (
-    <div style={{
+    <div id="wb-leftpanel" style={{
       position: "absolute",
       left: 64,
       top: 48,

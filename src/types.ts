@@ -1176,6 +1176,7 @@ export interface DialogueNode {
   speaker?:  string;               // per-node override of tree speaker
   portrait?: string;               // per-node override
   options:   DialogueOption[];     // empty (or all condition-filtered) = ends after last line
+  editorPos?: { x: number; y: number }; // flowchart-view box position (editor-only; runtime ignores)
 }
 
 export interface DialogueTreeDef {

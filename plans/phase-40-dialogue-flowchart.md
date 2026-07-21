@@ -4,6 +4,11 @@
 > chart view wasn't needed — the card stack itself should feel nested instead.
 > See **`plans/phase-40-dialogue-nested-tree.md`** for what actually shipped.
 > Kept for the design record; nothing below was built.
+>
+> **REVIVED in modified form as Phase 41 (2026-07-21):** the flowchart came
+> back as an *optional secondary view* docked to the right of the left panel
+> (which stays open as the primary editor — no fullscreen modal, no side
+> pane, no edge labels). See **`plans/phase-41-dialogue-flowchart-view.md`**.
 
 ## Context / problem
 

@@ -97,6 +97,29 @@ Reading the image against the chart:
 - Need more room anyway? **Drag the panel's right edge** — the whole left
   panel is resizable (280–600px) and remembers its width.
 
+### The flowchart view
+
+Want to see the *actual* chart? Hit **Flowchart** in the dialogue's header
+(next to the ← back button). It opens a secondary view over everything to the
+right of the panel — the same tree drawn as boxes and arrows:
+
+![The Blue Bunny Talk dialogue as a flowchart — auto-arranged layers, arrows into each destination, end chips on ending responses](docs/images/dialogue-flowchart.png)
+
+- Each **box is a page node**: id badge (+ `· start`), the speaker, its
+  line(s), then one row per response with a **port dot** where its arrow
+  leaves (blue = leads somewhere, grey = ends, red = missing target).
+- Arrows land on the top of the destination box; responses that end the
+  conversation (and nodes with no responses) get a small **`end`** chip. A
+  dangling target shows a red **`⚠ … missing`** chip; unreachable nodes get
+  an **amber** outline — the same validations the card stack shows.
+- The panel stays open and stays the editor: **click a box** and its card
+  scrolls into view (with a flash) on the left; edits there redraw the chart
+  live. The chart itself never edits text or wiring.
+- **Drag boxes** to rearrange (positions are saved with the dialogue),
+  **drag the background** to pan, **scroll** to zoom. **Auto-arrange**
+  re-lays everything out layer by layer from the start node. **Esc** or ✕
+  closes.
+
 ---
 
 ## Creating a dialogue
@@ -291,6 +314,7 @@ Dialogues serialize inside each zone (`zones[].dialogues`):
         "id": "n1",
         "lines": ["Halt! Who goes there?", "State your business."],
         "speaker": "…",            // optional per-node override
+        "editorPos": { "x": 0, "y": 0 }, // optional — flowchart-view box position (editor-only)
         "options": [
           {
             "id": "o1",
