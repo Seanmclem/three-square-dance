@@ -142,6 +142,18 @@ export const IconTriggerVolume = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconScript = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
+    {/* bulleted list of script rows */}
+    <circle cx="4" cy="5" r="1.4" fill={color} fillOpacity="0.8"/>
+    <circle cx="4" cy="10" r="1.4" fill={color} fillOpacity="0.8"/>
+    <circle cx="4" cy="15" r="1.4" fill={color} fillOpacity="0.8"/>
+    <line x1="7.5" y1="5"  x2="16.5" y2="5"  stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    <line x1="7.5" y1="10" x2="16.5" y2="10" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+    <line x1="7.5" y1="15" x2="16.5" y2="15" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+
 export const IconDecal = ({ color }: IconProps) => (
   <svg width="22" height="22" viewBox="0 0 20 20" fill="none">
     {/* peeling sticker: rounded square with a lifted corner */}
