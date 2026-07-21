@@ -9,20 +9,26 @@ import type { DialogueNode, DialogueTreeDef } from "@/types";
 // dragging a box persists DialogueNode.editorPos (runtime ignores it).
 
 const BOX_W = 220;
-const PAD = 10;      // box top/bottom padding
+const PAD = 12;      // box padding
 const HEADER_H = 20; // id badge + speaker row
 const LINES_H = 30;  // fixed two-line preview of the node's first line
-const OPT_H = 20;    // one port row per response option
+const SEC_GAP = 8;   // vertical gap between the card's sections
+const OPT_H = 26;    // one response well per option
+const OPT_GAP = 6;   // gap between response wells
 const GAP_X = 70;    // horizontal gap between boxes in a layer
 const GAP_Y = 70;    // vertical gap between layers
 const CHIP_DX = 52;  // end / missing chips sit this far right of their port
 
 function boxHeight(n: DialogueNode): number {
-  return PAD + HEADER_H + LINES_H + n.options.length * OPT_H + PAD;
+  const opts = n.options.length;
+  return (
+    PAD + HEADER_H + SEC_GAP + LINES_H + PAD +
+    (opts > 0 ? SEC_GAP + opts * OPT_H + (opts - 1) * OPT_GAP : 0)
+  );
 }
 
 function portY(optIndex: number): number {
-  return PAD + HEADER_H + LINES_H + optIndex * OPT_H + OPT_H / 2;
+  return PAD + HEADER_H + SEC_GAP + LINES_H + SEC_GAP + optIndex * (OPT_H + OPT_GAP) + OPT_H / 2;
 }
 
 // Synthetic pointer events (tests) have no active pointer to capture — don't
@@ -444,6 +450,9 @@ export function DialogueFlowchart({
                   width: BOX_W,
                   boxSizing: "border-box",
                   padding: PAD,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: SEC_GAP,
                   background: "rgba(34,37,46,0.97)",
                   borderRadius: 6,
                   border: unreachable ? "1px solid rgba(204,153,68,0.8)" : "1px solid rgba(255,255,255,0.12)",
@@ -496,36 +505,46 @@ export function DialogueFlowchart({
                     ? `"${n.lines.filter(Boolean).join(" · ")}"`
                     : <span style={{ color: "#5a6474", fontStyle: "italic" }}>(no lines)</span>}
                 </div>
-                {n.options.map((o) => (
-                  <div
-                    key={o.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      height: OPT_H,
-                      boxSizing: "border-box",
-                      fontSize: 10,
-                      color: "#98a2b8",
-                    }}
-                  >
-                    <span style={{ color: "#5a6474" }}>▸</span>
-                    <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {o.text || <span style={{ fontStyle: "italic", color: "#5a6474" }}>(response)</span>}
-                    </span>
-                    <span
-                      style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        marginRight: -PAD - 4,
-                        background:
-                          o.next && byId.has(o.next) ? "#80aaff" : o.next ? "#cc6666" : "#5a6474",
-                      }}
-                    />
+                {n.options.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: OPT_GAP }}>
+                    {n.options.map((o) => (
+                      <div
+                        key={o.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          height: OPT_H,
+                          boxSizing: "border-box",
+                          padding: "0 8px",
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: 5,
+                          fontSize: 10,
+                          color: "#98a2b8",
+                        }}
+                      >
+                        <span style={{ color: "#5a6474" }}>▸</span>
+                        <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {o.text || <span style={{ fontStyle: "italic", color: "#5a6474" }}>(response)</span>}
+                        </span>
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            flexShrink: 0,
+                            // straddle the card border so the well visually reaches its port:
+                            // well pad 8 + well border 1 + card pad 12 + half the dot
+                            marginRight: -25,
+                            background:
+                              o.next && byId.has(o.next) ? "#80aaff" : o.next ? "#cc6666" : "#5a6474",
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             );
           })}
