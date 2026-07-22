@@ -143,6 +143,9 @@ export function pasteClipboard(
     for (const ent of clip.entities) {
       const id = newId(ent.type);
       pasted.push({ type: ent.type, id });
+      // A pasted copy of a prefab-instance member is UNLINKED — a duplicate
+      // stamp would collide with the original in re-expansion diffing.
+      delete (ent.def as { prefab?: unknown }).prefab;
 
       switch (ent.type) {
         case "wall": {

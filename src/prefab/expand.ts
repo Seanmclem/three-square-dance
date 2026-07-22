@@ -100,9 +100,10 @@ export function remapScripts(scripts: ScriptDef[] | undefined, idMap: Map<string
 // ── Instantiation ────────────────────────────────────────────────────────────
 
 interface Materialized {
-  type: EditorObjectType;
-  id:   string;
-  def:  unknown;
+  type:      EditorObjectType;
+  id:        string;
+  memberKey: string;
+  def:       unknown;
 }
 
 /** Transform template members to world space with fresh (or supplied) ids,
@@ -167,7 +168,7 @@ function materializeMembers(
         break;
       }
     }
-    return { type: member.type, id, def };
+    return { type: member.type, id, memberKey: member.memberKey, def };
   });
 }
 
@@ -179,6 +180,36 @@ function addMember(world: WorldState, zoneId: string, m: Materialized): void {
     case "stair":          world.addStair(zoneId, m.def as StairDef); break;
     case "ladder":         world.addLadder(zoneId, m.def as LadderDef); break;
   }
+}
+
+function removeMember(world: WorldState, zoneId: string, type: EditorObjectType, id: string): void {
+  switch (type) {
+    case "object":         world.removeObject(zoneId, id); break;
+    case "trigger-volume": world.removeTriggerVolume(zoneId, id); break;
+    case "shape":          world.removeShape(zoneId, id); break;
+    case "stair":          world.removeStair(zoneId, id); break;
+    case "ladder":         world.removeLadder(zoneId, id); break;
+  }
+}
+
+/** Current members of an instance, scanned from the zone's PREFABABLE collections. */
+export function collectInstanceMembers(
+  world: WorldState, zoneId: string, instanceId: string,
+): Map<string, { type: EditorObjectType; id: string }> {
+  const zone = world.zones.get(zoneId);
+  const out = new Map<string, { type: EditorObjectType; id: string }>();
+  if (!zone) return out;
+  const scan = (type: EditorObjectType, arr: Array<{ id: string; prefab?: PrefabStamp }> | undefined): void => {
+    for (const e of arr ?? []) {
+      if (e.prefab?.instanceId === instanceId) out.set(e.prefab.memberKey, { type, id: e.id });
+    }
+  };
+  scan("object", zone.objects);
+  scan("trigger-volume", zone.triggerVolumes);
+  scan("shape", zone.shapes);
+  scan("stair", zone.stairs);
+  scan("ladder", zone.ladders);
+  return out;
 }
 
 /**
@@ -210,4 +241,61 @@ export function instantiatePrefab(
     }
   });
   return { instanceId: record.id, refs };
+}
+
+/**
+ * Diff-apply the prefab (at the record's current variables/origin) to an
+ * existing instance: members present in both keep their entity id (external
+ * refs / group membership / selection survive) and are replaced exactly
+ * (remove + re-add under the same id — a shallow update-merge couldn't drop
+ * stale fields); new memberKeys are added; gone ones removed. One transaction
+ * (joins the caller's if already open).
+ */
+export function reexpandInstance(world: WorldState, zoneId: string, prefab: PrefabDef, instanceId: string): void {
+  const zone = world.zones.get(zoneId);
+  const record = zone?.prefabInstances?.find(r => r.id === instanceId);
+  if (!record) return;
+  const desired  = expandPrefab(prefab, record.variables).filter(m => PREFABABLE.has(m.type));
+  const existing = collectInstanceMembers(world, zoneId, instanceId);
+  const existingIds = new Map([...existing].map(([key, e]) => [key, e.id]));
+  const mats = materializeMembers(desired, record, zoneId, existingIds);
+  world.transaction(`update prefab ${prefab.name}`, () => {
+    const desiredKeys = new Set(mats.map(m => m.memberKey));
+    for (const [key, e] of existing) {
+      if (!desiredKeys.has(key)) removeMember(world, zoneId, e.type, e.id);
+    }
+    for (const m of mats) {
+      const e = existing.get(m.memberKey);
+      if (e) removeMember(world, zoneId, e.type, e.id);   // same id re-added below when types match
+      addMember(world, zoneId, m);
+    }
+    world.updatePrefabInstance(zoneId, instanceId, { version: prefab.version });
+  });
+}
+
+/** Strip prefab stamps from all members and remove the link record. */
+export function unlinkInstance(world: WorldState, zoneId: string, instanceId: string): void {
+  const members = collectInstanceMembers(world, zoneId, instanceId);
+  world.transaction("unlink prefab instance", () => {
+    for (const e of members.values()) {
+      const changes = { prefab: undefined };
+      switch (e.type) {
+        case "object":         world.updateObject(zoneId, e.id, changes); break;
+        case "trigger-volume": world.updateTriggerVolume(zoneId, e.id, changes); break;
+        case "shape":          world.updateShape(zoneId, e.id, changes); break;
+        case "stair":          world.updateStair(zoneId, e.id, changes); break;
+        case "ladder":         world.updateLadder(zoneId, e.id, changes); break;
+      }
+    }
+    world.removePrefabInstance(zoneId, instanceId);
+  });
+}
+
+/** Delete the whole instance: every member plus the link record. */
+export function deleteInstance(world: WorldState, zoneId: string, instanceId: string): void {
+  const members = collectInstanceMembers(world, zoneId, instanceId);
+  world.transaction("delete prefab instance", () => {
+    for (const e of members.values()) removeMember(world, zoneId, e.type, e.id);
+    world.removePrefabInstance(zoneId, instanceId);
+  });
 }

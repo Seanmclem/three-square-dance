@@ -29,6 +29,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
+import { reexpandInstance, unlinkInstance, deleteInstance } from "@/prefab/expand";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -73,7 +74,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, PrefabDef } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -1041,6 +1042,19 @@ export default function App() {
       setIsDirty(false);
       const activeId = world.activeZoneId;
       if (activeId) await zones.loadZone(activeId);
+      // Prefab staleness sweep (Phase 45): re-expand any instance whose record
+      // was expanded against an older prefab version. Dirty so the refresh
+      // persists on the next save; missing prefabs keep their expanded copies.
+      for (const zone of world.zones.values()) {
+        for (const rec of [...(zone.prefabInstances ?? [])]) {
+          const def = world.prefabLibrary?.find(p => p.id === rec.prefabId);
+          if (!def) { console.warn(`[prefabs] instance ${rec.id} references missing prefab ${rec.prefabId} — left as expanded`); continue; }
+          if (rec.version < def.version) {
+            reexpandInstance(world, zone.id, def, rec.id);
+            setIsDirty(true);
+          }
+        }
+      }
       // Restore the scene's saved editor viewpoint (stamped on save; absent on old files)
       const pose = file.metadata?.editorCamera;
       if (pose) sceneRef.current?.editorCamera?.setPose(pose);
@@ -2757,6 +2771,91 @@ export default function App() {
     // prefabTick bumps on prefabinstance:added/removed; zones covers scene loads.
   }, [prefabTick, zones, prefabs]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Selected entity is a prefab-instance member → resolve its record + def for
+  // the PropertiesPanel Prefab section.
+  const selPrefabInfo = useMemo(() => {
+    const stamp = (selected?.data as { prefab?: { instanceId: string } } | null | undefined)?.prefab;
+    if (!selected || !stamp) return null;
+    const zone   = worldRef.current?.zones.get(selected.zoneId);
+    const record = zone?.prefabInstances?.find(r => r.id === stamp.instanceId);
+    const prefab = record ? prefabs.find(p => p.id === record.prefabId) : undefined;
+    return record && prefab ? { prefab, record } : null;
+    // prefabTick keeps the record view fresh after variable/origin commits.
+  }, [selected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** After a re-expansion, the selected member's def was replaced (same id) or
+   *  removed — refresh or drop the selection so the panel shows live data. */
+  const refreshSelectionAfterReexpand = (): void => {
+    const world = worldRef.current;
+    setSelected(prev => {
+      if (!prev) return prev;
+      const zone = world?.zones.get(prev.zoneId);
+      const arr: Array<{ id: string }> | undefined =
+        prev.type === "object" ? zone?.objects :
+        prev.type === "trigger-volume" ? zone?.triggerVolumes :
+        prev.type === "shape" ? zone?.shapes :
+        prev.type === "stair" ? zone?.stairs :
+        prev.type === "ladder" ? zone?.ladders : undefined;
+      const data = arr?.find(e => e.id === prev.id);
+      if (!data) { busRef.current.emit("object:deselected", {}); return null; }
+      return { ...prev, data: data as SelectedObjectPayload["data"] };
+    });
+    setPrefabTick(t => t + 1);
+  };
+
+  const handlePrefabVariablesChange = (vars: Record<string, PrefabVarValue>): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info || !selected) return;
+    world.transaction(`edit ${info.prefab.name} variables`, () => {
+      world.updatePrefabInstance(selected.zoneId, info.record.id, { variables: { ...info.record.variables, ...vars } });
+      reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+    });
+    syncHistory();
+    refreshSelectionAfterReexpand();
+  };
+
+  const handlePrefabOriginChange = (origin: { position: Vec3; rotationY: number }): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info || !selected) return;
+    world.transaction(`move ${info.prefab.name} instance`, () => {
+      world.updatePrefabInstance(selected.zoneId, info.record.id, { origin });
+      reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+    });
+    syncHistory();
+    refreshSelectionAfterReexpand();
+  };
+
+  const handlePrefabReexpand = (): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info || !selected) return;
+    reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+    syncHistory();
+    refreshSelectionAfterReexpand();
+  };
+
+  const handlePrefabUnlink = (): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info || !selected) return;
+    unlinkInstance(world, selected.zoneId, info.record.id);
+    syncHistory();
+    refreshSelectionAfterReexpand();
+  };
+
+  const handlePrefabDeleteInstance = (): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info || !selected) return;
+    deleteInstance(world, selected.zoneId, info.record.id);
+    syncHistory();
+    busRef.current.emit("object:deselected", {});
+    setSelected(null);
+    setPrefabTick(t => t + 1);
+  };
+
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
@@ -2987,6 +3086,12 @@ export default function App() {
           return aabb ? defaultColliderFromAABB(aabb.center, aabb.size) : null;
         }}
         hullPointsFor={objectId => objectPlacerRef.current?.getLocalHullPoints(objectId) ?? null}
+        prefabInfo={selPrefabInfo}
+        onPrefabVariablesChange={handlePrefabVariablesChange}
+        onPrefabOriginChange={handlePrefabOriginChange}
+        onPrefabReexpand={handlePrefabReexpand}
+        onPrefabUnlink={handlePrefabUnlink}
+        onPrefabDeleteInstance={handlePrefabDeleteInstance}
       />
       <CoordinateDisplay coords={coords} />
       </>}

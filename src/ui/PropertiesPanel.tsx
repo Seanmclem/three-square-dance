@@ -5,6 +5,7 @@ import type {
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
+  PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
@@ -388,6 +389,14 @@ interface PropertiesPanelProps {
   defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
   // Auto-fit convex hull points from the model's geometry (Phase 27; null = unavailable).
   hullPointsFor?:           (objectId: string) => Vec3[] | null;
+  // Prefab instance (Phase 45): set when the selection is a member of a placed
+  // prefab instance — renders the Prefab section on the root screen.
+  prefabInfo?:              { prefab: PrefabDef; record: PrefabInstanceRecord } | null;
+  onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
+  onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
+  onPrefabReexpand?:        () => void;
+  onPrefabUnlink?:          () => void;
+  onPrefabDeleteInstance?:  () => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -402,6 +411,7 @@ export function PropertiesPanel({
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
+  prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -605,6 +615,16 @@ export function PropertiesPanel({
                 onPress={() => push(s)}
               />
             ))}
+            {prefabInfo && (
+              <PrefabSection
+                info={prefabInfo}
+                onVariablesChange={onPrefabVariablesChange}
+                onOriginChange={onPrefabOriginChange}
+                onReexpand={onPrefabReexpand}
+                onUnlink={onPrefabUnlink}
+                onDeleteInstance={onPrefabDeleteInstance}
+              />
+            )}
             <GroupsAccordion
               open={groupsOpen}
               onToggle={() => setGroupsOpen(v => !v)}
@@ -835,6 +855,172 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
 }
 
 // ── GroupsAccordion ───────────────────────────────────────────────────────────
+
+// ── PrefabSection (Phase 45) ─────────────────────────────────────────────────
+// Shown on a member's root screen. Variable edits and origin edits commit an
+// update-record + re-expand transaction upstream; the section's values come
+// from the live PrefabInstanceRecord, so it survives re-expansion.
+
+function PrefabVarField({ def, value, onCommit }: {
+  def: PrefabVariableDef; value: PrefabVarValue; onCommit: (v: PrefabVarValue) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  if (def.type === "boolean") {
+    return (
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <input type="checkbox" checked={value === true} onChange={e => onCommit(e.target.checked)} />
+        <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace" }}>{def.label ?? def.name}</span>
+      </label>
+    );
+  }
+  if (def.type === "choice") {
+    return (
+      <div>
+        <div style={LABEL}>{(def.label ?? def.name).toUpperCase()}</div>
+        <select
+          value={String(value)}
+          onChange={e => onCommit(e.target.value)}
+          style={{ ...NUM_INPUT, color: "#dde3f0" }}
+        >
+          {(def.options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    );
+  }
+  const commitNumber = (): void => {
+    const n = Number(draft);
+    if (!Number.isFinite(n)) { setDraft(String(value)); return; }
+    const step = def.step ?? 1;
+    let v = Math.round(n / step) * step;
+    if (def.min !== undefined) v = Math.max(def.min, v);
+    if (def.max !== undefined) v = Math.min(def.max, v);
+    setDraft(String(v));
+    if (v !== value) onCommit(v);
+  };
+  return (
+    <div>
+      <div style={LABEL}>{(def.label ?? def.name).toUpperCase()}</div>
+      <input
+        type="number" value={draft} min={def.min} max={def.max} step={def.step ?? 1}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commitNumber}
+        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={{ ...NUM_INPUT, color: "#dde3f0" }}
+      />
+    </div>
+  );
+}
+
+function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance }: {
+  info:               { prefab: PrefabDef; record: PrefabInstanceRecord };
+  onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
+  onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
+  onReexpand?:        () => void;
+  onUnlink?:          () => void;
+  onDeleteInstance?:  () => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const [hovered, setHovered] = useState(false);
+  const { prefab, record } = info;
+
+  const originField = (label: string, value: number, apply: (v: number) => void) => (
+    <OriginNumField key={label} label={label} value={value} onCommit={apply} />
+  );
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.05)" }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>
+          <span style={{ color: prefab.kind === "generator" ? "#7fb069" : "#80aaff", marginRight: 6 }}>
+            {prefab.kind === "generator" ? "ƒ" : "⬡"}
+          </span>
+          Prefab · {prefab.name}
+        </span>
+        <span style={{ color: "#505060", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          {prefab.variables.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {prefab.variables.map(v => (
+                <PrefabVarField
+                  key={v.name}
+                  def={v}
+                  value={record.variables[v.name] ?? v.default}
+                  onCommit={val => onVariablesChange?.({ [v.name]: val })}
+                />
+              ))}
+            </div>
+          )}
+
+          <div>
+            <div style={LABEL}>INSTANCE ORIGIN</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {originField("X", record.origin.position.x, v => onOriginChange?.({ ...record.origin, position: { ...record.origin.position, x: v } }))}
+              {originField("Y", record.origin.position.y, v => onOriginChange?.({ ...record.origin, position: { ...record.origin.position, y: v } }))}
+              {originField("Z", record.origin.position.z, v => onOriginChange?.({ ...record.origin, position: { ...record.origin.position, z: v } }))}
+              {originField("ROT°", record.origin.rotationY, v => onOriginChange?.({ ...record.origin, rotationY: v }))}
+            </div>
+            <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>
+              Moves the whole instance. Walkable top sits 1m above origin Y for platform tiles.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <PrefabBtn label="Re-expand" title="Rebuild members from the prefab (resets manual member tweaks)" onClick={onReexpand} />
+            <PrefabBtn label="Unlink" title="Detach members into plain entities — prefab edits stop affecting them" onClick={onUnlink} />
+            <PrefabBtn label="Delete instance" title="Remove every member and the prefab link" onClick={onDeleteInstance} danger />
+          </div>
+          <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.5 }}>
+            Members stay linked to the prefab — manual tweaks to individual members reset on the next re-expansion. Unlink first for a one-off copy.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OriginNumField({ label, value, onCommit }: { label: string; value: number; onCommit: (v: number) => void }) {
+  const [draft, setDraft] = useState(String(Math.round(value * 100) / 100));
+  useEffect(() => { setDraft(String(Math.round(value * 100) / 100)); }, [value]);
+  return (
+    <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ ...LABEL, marginBottom: 2, fontSize: 9 }}>{label}</div>
+      <input
+        type="number" value={draft} step={0.5}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={() => { const n = Number(draft); if (Number.isFinite(n) && n !== value) onCommit(n); else setDraft(String(Math.round(value * 100) / 100)); }}
+        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        style={{ ...NUM_INPUT, color: "#dde3f0", padding: "4px 6px" }}
+      />
+    </div>
+  );
+}
+
+function PrefabBtn({ label, title, onClick, danger }: { label: string; title: string; onClick?: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={!onClick}
+      style={{
+        background: "transparent",
+        border: `1px solid ${danger ? "rgba(180,90,90,0.3)" : "rgba(80,140,255,0.25)"}`,
+        borderRadius: 3, cursor: "pointer",
+        color: danger ? "#c98080" : "#9db8e8",
+        fontSize: 9, padding: "3px 8px", fontFamily: "monospace", letterSpacing: 0.3,
+      }}
+    >{label}</button>
+  );
+}
 
 function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
   open:           boolean;
