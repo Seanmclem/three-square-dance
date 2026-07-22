@@ -1087,6 +1087,522 @@
           ]
         }
       ]
+    },
+    {
+      "id": "platform_grass_center",
+      "label": "Platform Grass Center",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_center.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_58d24749",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0.75,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_grass_side",
+      "label": "Platform Grass Side",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_side.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_95188ad3",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0.75,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_grass_corner",
+      "label": "Platform Grass Corner",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_corner.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_87369e6a",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0.75,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_dirt_center",
+      "label": "Platform Dirt Center",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_center.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_dirt_side",
+      "label": "Platform Dirt Side",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_side.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_dirt_corner",
+      "label": "Platform Dirt Corner",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_corner.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_single",
+      "label": "Platform Grass Cube",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_single.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_bd052a0d",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_dirt_single",
+      "label": "Platform Dirt Cube",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_single.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_center_tall",
+      "label": "Platform Grass Center Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_center_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_8b35bae9",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0.95,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.1,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_grass_corner_tall",
+      "label": "Platform Grass Corner Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_corner_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_side_tall",
+      "label": "Platform Grass Side Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_side_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_bottom_tall",
+      "label": "Platform Grass Bottom Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_bottom_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_145ebecb",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": -0.95,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.1,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_grass_corner_bottom_tall",
+      "label": "Platform Grass Corner Bottom Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_corner_bottom_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_corner_center_tall",
+      "label": "Platform Grass Corner Center Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_corner_center_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_side_bottom_tall",
+      "label": "Platform Grass Side Bottom Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_side_bottom_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_grass_side_center_tall",
+      "label": "Platform Grass Side Center Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_grass_side_center_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_82c87555",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0,
+            "z": 0.95
+          },
+          "size": {
+            "x": 2,
+            "y": 2,
+            "z": 0.1
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_dirt_center_tall",
+      "label": "Platform Dirt Center Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_center_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      },
+      "colliders": [
+        {
+          "id": "col_15548551",
+          "shape": "box",
+          "offset": {
+            "x": 0,
+            "y": 0.95,
+            "z": 0
+          },
+          "size": {
+            "x": 2,
+            "y": 0.1,
+            "z": 2
+          },
+          "isSensor": false
+        }
+      ]
+    },
+    {
+      "id": "platform_dirt_corner_tall",
+      "label": "Platform Dirt Corner Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_corner_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "platform_dirt_side_tall",
+      "label": "Platform Dirt Side Tall",
+      "category": "Tiles",
+      "path": "/assets/models/platform_dirt_side_tall.gltf",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "tile"
+      ],
+      "dateAdded": "2026-07-21",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Ultimate Platformer Pack",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     }
   ]
 }
