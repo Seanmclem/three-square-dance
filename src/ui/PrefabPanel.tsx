@@ -9,6 +9,7 @@ interface PrefabPanelProps {
   onPlaceGenerator:(generatorId: string) => void;  // creates a library def on first use, then places
   onRename:        (prefabId: string, name: string) => void;
   onDelete:        (prefabId: string) => void;
+  onEdit:          (prefabId: string) => void;     // isolated edit mode (snapshot prefabs, Phase 47)
 }
 
 /**
@@ -18,7 +19,7 @@ interface PrefabPanelProps {
  * prefabs (phase 46).
  */
 export function PrefabPanel({
-  prefabs, instanceCounts, onPlacePrefab, onPlaceGenerator, onRename, onDelete,
+  prefabs, instanceCounts, onPlacePrefab, onPlaceGenerator, onRename, onDelete, onEdit,
 }: PrefabPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft,     setDraft]     = useState("");
@@ -98,6 +99,18 @@ export function PrefabPanel({
                     fontSize: 9, padding: "3px 8px", fontFamily: "monospace", flexShrink: 0,
                   }}
                 >Place</button>
+
+                {p.kind === "snapshot" && (
+                  <button
+                    onClick={() => onEdit(p.id)}
+                    title="Edit the prefab in isolation — saving updates every placed instance"
+                    style={{
+                      background: "rgba(240,180,60,0.08)", border: "1px solid rgba(240,180,60,0.3)",
+                      borderRadius: 3, cursor: "pointer", color: "#f0c060",
+                      fontSize: 9, padding: "3px 8px", fontFamily: "monospace", flexShrink: 0,
+                    }}
+                  >Edit</button>
+                )}
 
                 <button
                   onClick={() => onDelete(p.id)}

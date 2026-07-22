@@ -108,6 +108,12 @@ export class WorldState {
     this._bus.emit("zone:added", { zone });
   }
 
+  /** Unjournaled, like addZone. Exists for the prefab edit mode's staging zone
+   *  (Phase 47) — nothing else removes zones (single-zone-per-scene model). */
+  removeZone(zoneId: string): void {
+    this.zones.delete(zoneId);
+  }
+
   setActiveZone(zoneId: string): void {
     this.activeZoneId = zoneId;
     this._bus.emit("zone:activated", { zoneId });
@@ -834,7 +840,9 @@ export class WorldState {
       metadata:    { ...(this.metadata ?? { name: "Untitled", version: "1", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() }), uvVersion: 1 },  // Phase 10.8: every save is world-space-UV
       world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
-      zones:       [...this.zones.values()],
+      // The prefab edit mode's staging zone must NEVER serialize (belt-and-braces
+      // on top of the App's save/autosave gates — Phase 47).
+      zones:       [...this.zones.values()].filter(z => z.id !== "__prefab_edit__"),
       transitions: [...this.transitions.values()],
       groups:      this.groups,
     };

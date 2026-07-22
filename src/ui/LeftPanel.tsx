@@ -84,6 +84,7 @@ interface LeftPanelProps {
   onPlaceGenerator:     (generatorId: string) => void;
   onPrefabRename:       (prefabId: string, name: string) => void;
   onPrefabDelete:       (prefabId: string) => void;
+  onPrefabEdit:         (prefabId: string) => void;
 }
 
 export function LeftPanel({
@@ -100,7 +101,7 @@ export function LeftPanel({
   stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing,
   worldItems, onWorldItemsChange, projectSceneIds,
   decalTextures, selectedDecalId, onDecalSelect,
-  prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete,
+  prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete, onPrefabEdit,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -220,6 +221,7 @@ export function LeftPanel({
                 onPlaceGenerator={onPlaceGenerator}
                 onRename={onPrefabRename}
                 onDelete={onPrefabDelete}
+                onEdit={onPrefabEdit}
               />
             )}
             {panelId === "groups" && (

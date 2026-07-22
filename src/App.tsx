@@ -29,7 +29,9 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
-import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab } from "@/prefab/expand";
+import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab, findInstances } from "@/prefab/expand";
+import { PrefabEditSession } from "@/prefab/PrefabEditSession";
+import { PrefabEditBar } from "@/ui/PrefabEditBar";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -195,6 +197,11 @@ export default function App() {
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
   const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
+  // Isolated prefab edit mode (Phase 47). The ref gates autosave/save/play
+  // synchronously (state is for rendering the bar + disabling UI).
+  const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
+  const editingPrefabRef = useRef(false);
+  const editSessionRef   = useRef<PrefabEditSession | null>(null);
   // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
   const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
@@ -390,6 +397,10 @@ export default function App() {
     segmentHighlighter.init();
 
     const writeAutosave = () => {
+      // NEVER persist while prefab edit mode holds the staging zone — the 60s
+      // tick and beforeunload would write the user's world with its real zone
+      // unloaded (the 2026-07-16 autosave-contamination class).
+      if (editingPrefabRef.current) return;
       if (!worldRef.current || restoringRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
       // Only write when THIS tab changed the world since load (content-compared, so
@@ -1066,6 +1077,7 @@ export default function App() {
   // Kept for TopBar's <input type="file"> fallback path
   /** Drop project context (saving the current scene first unless `skipSave`). */
   const closeProject = useCallback(async (opts?: { skipSave?: boolean }): Promise<void> => {
+    if (editingPrefabRef.current) return;   // no project close under prefab edit mode
     const proj = projectRef.current;
     if (!proj) return;
     if (!opts?.skipSave && canOverwriteScene(proj.sceneId)) {
@@ -1104,6 +1116,7 @@ export default function App() {
   }, [handleLoadFromJSON, closeProject]);
 
   const handleSave = useCallback(async (): Promise<void> => {
+    if (editingPrefabRef.current) return;   // prefab edit mode: Save lives in the amber bar
     const world = worldRef.current;
     if (!world) return;
     stampCameraPose();
@@ -1285,6 +1298,7 @@ export default function App() {
   }, [projectPending, adoptProject, handleLoadFromJSON]);
 
   const handleProjectSceneSwitch = useCallback(async (target: string): Promise<void> => {
+    if (editingPrefabRef.current) return;   // no scene switches under prefab edit mode
     const proj = projectRef.current;
     if (!proj || target === proj.sceneId) return;
     try {
@@ -1390,15 +1404,18 @@ export default function App() {
 
 
   const handlePreviewEnter = useCallback((): void => {
+    if (editingPrefabRef.current) return;
     previewRef.current?.enter("preview");
   }, []);
 
   const handleNewGame = useCallback((): void => {
+    if (editingPrefabRef.current) return;
     previewRef.current?.enter("game", { resume: false });
     scriptEngineRef.current?.onGameStart();
   }, []);
 
   const handleContinue = useCallback((): void => {
+    if (editingPrefabRef.current) return;
     previewRef.current?.enter("game", { resume: true });
     scriptEngineRef.current?.onGameStart();
   }, []);
@@ -2845,6 +2862,54 @@ export default function App() {
     refreshSelectionAfterReexpand();
   };
 
+  // ── Isolated prefab edit mode (Phase 47) ───────────────────────────────────
+
+  const handleEditPrefab = (prefabId: string): void => {
+    const world = worldRef.current, zones = zonesRef.current, history = historyRef.current;
+    const prefab = prefabs.find(p => p.id === prefabId);
+    if (!world || !zones || !history || !prefab || prefab.kind !== "snapshot" || editingPrefabRef.current) return;
+    editSessionRef.current ??= new PrefabEditSession(world, zones, history, () => sceneRef.current?.editorCamera ?? null);
+    editingPrefabRef.current = true;
+    setEditingPrefab({ id: prefab.id, name: prefab.name });
+    busRef.current.emit("object:deselected", {});
+    setSelected(null);
+    setLeftPanel(null);
+    void editSessionRef.current.enter(prefab);
+  };
+
+  const handlePrefabEditSave = (): void => {
+    const session = editSessionRef.current;
+    if (!session?.active) return;
+    void (async () => {
+      const updated = await session.saveAndExit();
+      editingPrefabRef.current = false;
+      setEditingPrefab(null);
+      if (!updated) return;
+      applyPrefabs(prefabs.map(p => p.id === updated.id ? updated : p));
+      // Propagate: re-expand every open-scene instance in ONE undoable transaction.
+      const world = worldRef.current;
+      if (world) {
+        const instances = findInstances(world, updated.id);
+        if (instances.length > 0) {
+          world.transaction(`update prefab ${updated.name} instances`, () => {
+            for (const { zoneId, record } of instances) reexpandInstance(world, zoneId, updated, record.id);
+          });
+          syncHistory();
+        }
+      }
+      setPrefabTick(t => t + 1);
+    })();
+  };
+
+  const handlePrefabEditCancel = (): void => {
+    const session = editSessionRef.current;
+    if (!session?.active) return;
+    void session.cancel().then(() => {
+      editingPrefabRef.current = false;
+      setEditingPrefab(null);
+    });
+  };
+
   /** Capture the multi-selection as a snapshot prefab; the originals are
    *  replaced (in one undo step) by the prefab's first linked instance. */
   const handleCreatePrefab = (refs: SelectedRef[]): void => {
@@ -3026,7 +3091,15 @@ export default function App() {
         onPlaceGenerator={handlePlaceGenerator}
         onPrefabRename={handlePrefabRename}
         onPrefabDelete={handlePrefabDelete}
+        onPrefabEdit={handleEditPrefab}
       />
+      {editingPrefab && (
+        <PrefabEditBar
+          prefabName={editingPrefab.name}
+          onSave={handlePrefabEditSave}
+          onCancel={handlePrefabEditCancel}
+        />
+      )}
       <TopBar
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
