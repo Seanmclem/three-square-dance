@@ -34,7 +34,6 @@ type AssetEntry =
 
 const ASSET_ENTRIES: AssetEntry[] = [
   { label: "Models",    Icon: TOOL_ICONS.object, kind: "tool",  tool: "object" },
-  { label: "Prefabs",   Icon: TOOL_ICONS.prefab, kind: "panel", panel: "prefabs" },
   { label: "Materials", Icon: IconMaterial,      kind: "panel", panel: "materials" },
   { label: "Decals",    Icon: TOOL_ICONS.decal,  kind: "tool",  tool: "decal" },
   { label: "Sounds",    Icon: IconAudio,         kind: "panel", panel: "audio" },
@@ -284,6 +283,37 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             </div>
           )}
           </div>
+        );
+      })()}
+
+      {/* Prefabs panel button — prefabs are authored arrangements of world
+          entities (project data), not imported assets, so they live OUTSIDE
+          the Assets flyout as their own button. */}
+      {(() => {
+        const prefabsActive = openPanel === "prefabs" || activeTool === "prefab";
+        const color = prefabsActive ? "#80aaff" : "#7a7a7a";
+        const PrefabIcon = TOOL_ICONS.prefab;
+        return (
+          <button
+            title="Prefabs — reusable entity groups with linked instances"
+            onClick={() => onPanelToggle(openPanel === "prefabs" ? null : "prefabs")}
+            style={{
+              width: 48, height: 48, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: prefabsActive ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: prefabsActive ? "1px solid rgba(80,140,255,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!prefabsActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!prefabsActive) e.currentTarget.style.background = "transparent"; }}
+          >
+            <PrefabIcon color={color} />
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+                           textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
+              Prefabs
+            </span>
+          </button>
         );
       })()}
 
