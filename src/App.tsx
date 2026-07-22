@@ -29,7 +29,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
-import { reexpandInstance, unlinkInstance, deleteInstance } from "@/prefab/expand";
+import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab } from "@/prefab/expand";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -2845,6 +2845,30 @@ export default function App() {
     refreshSelectionAfterReexpand();
   };
 
+  /** Capture the multi-selection as a snapshot prefab; the originals are
+   *  replaced (in one undo step) by the prefab's first linked instance. */
+  const handleCreatePrefab = (refs: SelectedRef[]): void => {
+    const world = worldRef.current;
+    if (!world || refs.length === 0) return;
+    const zoneId = refs[0].zoneId;
+    const name = `Prefab ${prefabs.length + 1}`;
+    const cap = captureSnapshotPrefab(world, refs, name);
+    if (!cap) return;
+    if (cap.skipped.length > 0) {
+      console.warn(`[prefabs] skipped non-capturable selection types: ${cap.skipped.join(", ")} (walls/floors/platforms are node-backed — not capturable v1)`);
+    }
+    applyPrefabs([...prefabs, cap.prefab]);   // library write (not undoable, items precedent)
+    world.transaction(`create prefab ${name}`, () => {
+      removeEntities(world, zoneId, cap.captured);
+      instantiatePrefab(world, zoneId, cap.prefab, cap.origin);   // joins this transaction
+    });
+    syncHistory();
+    busRef.current.emit("object:deselected", {});
+    setSelected(null);
+    setPrefabTick(t => t + 1);
+    setLeftPanel("prefabs");   // show the new prefab (rename it there)
+  };
+
   const handlePrefabDeleteInstance = (): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
@@ -3092,6 +3116,7 @@ export default function App() {
         onPrefabReexpand={handlePrefabReexpand}
         onPrefabUnlink={handlePrefabUnlink}
         onPrefabDeleteInstance={handlePrefabDeleteInstance}
+        onCreatePrefab={handleCreatePrefab}
       />
       <CoordinateDisplay coords={coords} />
       </>}

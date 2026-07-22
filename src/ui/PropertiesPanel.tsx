@@ -392,6 +392,8 @@ interface PropertiesPanelProps {
   // Prefab instance (Phase 45): set when the selection is a member of a placed
   // prefab instance — renders the Prefab section on the root screen.
   prefabInfo?:              { prefab: PrefabDef; record: PrefabInstanceRecord } | null;
+  // Capture the multi-selection as a snapshot prefab (Phase 46).
+  onCreatePrefab?:          (refs: SelectedRef[]) => void;
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onPrefabReexpand?:        () => void;
@@ -412,6 +414,7 @@ export function PropertiesPanel({
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
+  onCreatePrefab,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -500,6 +503,13 @@ export function PropertiesPanel({
           {onCopy      && <button style={ACTION_BTN} onClick={onCopy}>Copy</button>}
           {onBake && multiSelected.every(r => r.type === "shape") && (
             <button style={ACTION_BTN} onClick={() => onBake(multiSelected)}>Bake → GLB asset</button>
+          )}
+          {onCreatePrefab && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder"].includes(r.type)) && (
+            <button
+              style={{ ...ACTION_BTN, color: "#9db8e8", borderColor: "rgba(80,140,255,0.3)" }}
+              title="Save this selection as a reusable prefab; the selection becomes its first linked instance"
+              onClick={() => onCreatePrefab(multiSelected)}
+            >⬡ Create Prefab</button>
           )}
           {onDelete    && (
             <button
@@ -598,6 +608,16 @@ export function PropertiesPanel({
             onToggleGroups={() => setGroupsOpen(v => !v)}
             onObjectUpdate={onObjectUpdate}
             bus={bus}
+            prefabSection={prefabInfo ? (
+              <PrefabSection
+                info={prefabInfo}
+                onVariablesChange={onPrefabVariablesChange}
+                onOriginChange={onPrefabOriginChange}
+                onReexpand={onPrefabReexpand}
+                onUnlink={onPrefabUnlink}
+                onDeleteInstance={onPrefabDeleteInstance}
+              />
+            ) : null}
           />
         ) : selected.type === "checkpoint" ? (
           <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
@@ -5176,7 +5196,7 @@ function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus, prefabSection }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
@@ -5185,6 +5205,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
   onToggleGroups:   () => void;
   onObjectUpdate:   (changes: Partial<WorldObject>) => void;
   bus?:             EventBus;
+  prefabSection?:   React.ReactNode;   // PrefabSection when this volume is an instance member (Phase 46)
 }) {
   const vol = selected.data as TriggerVolume | null;
   const [editMode, setEditModeState] = useState<"move" | "resize">(TRIGGER_EDIT_MODE);
@@ -5436,6 +5457,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
         >Delete Volume</button>
       )}
     </div>
+    {prefabSection}
     <GroupsAccordion
       open={groupsOpen}
       onToggle={onToggleGroups}

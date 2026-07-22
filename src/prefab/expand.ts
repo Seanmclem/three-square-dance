@@ -299,3 +299,87 @@ export function deleteInstance(world: WorldState, zoneId: string, instanceId: st
     world.removePrefabInstance(zoneId, instanceId);
   });
 }
+
+/** Remove a mixed-type set of entities (used when capture replaces the originals). */
+export function removeEntities(world: WorldState, zoneId: string, refs: { type: EditorObjectType; id: string }[]): void {
+  for (const r of refs) removeMember(world, zoneId, r.type, r.id);
+}
+
+// ── Snapshot capture (Phase 46) ──────────────────────────────────────────────
+
+function anchorPoints(type: EditorObjectType, def: unknown): Vec3[] {
+  const d = def as { position?: Vec3; start?: Vec3; end?: Vec3 };
+  if (type === "stair") return [d.start!, d.end!];
+  return d.position ? [d.position] : [];
+}
+
+function shiftAnchors(type: EditorObjectType, def: unknown, dx: number, dy: number, dz: number): void {
+  const move = (p: Vec3): void => { p.x -= dx; p.y -= dy; p.z -= dz; };
+  const d = def as { position?: Vec3; start?: Vec3; end?: Vec3 };
+  if (type === "stair") { move(d.start!); move(d.end!); return; }
+  if (d.position) move(d.position);
+}
+
+/**
+ * Capture the selection as a snapshot prefab template. Template space: XZ pivot
+ * at the anchors' centroid, y = 0 at the lowest anchor. memberKey = the source
+ * entity id at capture time (also the key intra-prefab script refs remap
+ * through on instantiation). Non-PREFABABLE refs are skipped and reported.
+ * Does NOT touch the world — the caller decides whether to replace the
+ * originals with a placed instance.
+ */
+export function captureSnapshotPrefab(
+  world: WorldState, refs: { type: EditorObjectType; id: string; zoneId: string }[], name: string,
+): { prefab: PrefabDef; origin: { position: Vec3; rotationY: number }; captured: { type: EditorObjectType; id: string }[]; skipped: EditorObjectType[] } | null {
+  const usable = refs.filter(r => PREFABABLE.has(r.type));
+  const skipped = [...new Set(refs.filter(r => !PREFABABLE.has(r.type)).map(r => r.type))];
+  if (usable.length === 0) return null;
+  const zone = world.zones.get(usable[0].zoneId);
+  if (!zone) return null;
+
+  const lookup = (type: EditorObjectType, id: string): unknown => {
+    switch (type) {
+      case "object":         return zone.objects.find(e => e.id === id);
+      case "trigger-volume": return zone.triggerVolumes?.find(e => e.id === id);
+      case "shape":          return zone.shapes?.find(e => e.id === id);
+      case "stair":          return zone.stairs.find(e => e.id === id);
+      case "ladder":         return zone.ladders?.find(e => e.id === id);
+      default:               return undefined;
+    }
+  };
+
+  const picked: { type: EditorObjectType; id: string; def: unknown }[] = [];
+  for (const r of usable) {
+    const src = lookup(r.type, r.id);
+    if (src) picked.push({ type: r.type, id: r.id, def: structuredClone(src) });
+  }
+  if (picked.length === 0) return null;
+
+  // Pivot: XZ centroid of all anchors, y at the lowest anchor.
+  const anchors = picked.flatMap(p => anchorPoints(p.type, p.def));
+  const px = anchors.reduce((s, a) => s + a.x, 0) / anchors.length;
+  const pz = anchors.reduce((s, a) => s + a.z, 0) / anchors.length;
+  const py = Math.min(...anchors.map(a => a.y));
+
+  const template: PrefabTemplateEntity[] = picked.map(p => {
+    shiftAnchors(p.type, p.def, px, py, pz);
+    delete (p.def as { prefab?: unknown }).prefab;   // capturing another instance's member → fresh template
+    return { memberKey: p.id, type: p.type, def: p.def };
+  });
+
+  const prefab: PrefabDef = {
+    id:        `pfb_${uuid8()}`,
+    name,
+    kind:      "snapshot",
+    version:   1,
+    variables: [],
+    template,
+    dateAdded: new Date().toISOString().slice(0, 10),
+  };
+  return {
+    prefab,
+    origin:   { position: { x: px, y: py, z: pz }, rotationY: 0 },
+    captured: picked.map(p => ({ type: p.type, id: p.id })),
+    skipped,
+  };
+}
