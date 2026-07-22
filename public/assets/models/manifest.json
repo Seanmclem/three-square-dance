@@ -1123,7 +1123,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_center_thumb.png"
     },
     {
       "id": "platform_grass_side",
@@ -1160,7 +1161,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_side_thumb.png"
     },
     {
       "id": "platform_grass_corner",
@@ -1197,7 +1199,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_thumb.png"
     },
     {
       "id": "platform_dirt_center",
@@ -1217,7 +1220,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_center_thumb.png"
     },
     {
       "id": "platform_dirt_side",
@@ -1237,7 +1241,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_side_thumb.png"
     },
     {
       "id": "platform_dirt_corner",
@@ -1257,7 +1262,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_corner_thumb.png"
     },
     {
       "id": "platform_grass_single",
@@ -1294,7 +1300,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_single_thumb.png"
     },
     {
       "id": "platform_dirt_single",
@@ -1314,7 +1321,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_single_thumb.png"
     },
     {
       "id": "platform_grass_center_tall",
@@ -1351,7 +1359,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_tall",
@@ -1371,7 +1380,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_grass_corner_tall_thumb.png"
     },
     {
       "id": "platform_grass_side_tall",
@@ -1391,7 +1401,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_grass_side_tall_thumb.png"
     },
     {
       "id": "platform_grass_bottom_tall",
@@ -1428,7 +1439,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_bottom_tall",
@@ -1448,7 +1460,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_grass_corner_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_center_tall",
@@ -1468,7 +1481,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_grass_corner_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_side_bottom_tall",
@@ -1488,7 +1502,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_grass_side_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_side_center_tall",
@@ -1525,7 +1540,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_side_center_tall_thumb.png"
     },
     {
       "id": "platform_dirt_center_tall",
@@ -1562,7 +1578,8 @@
           },
           "isSensor": false
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_center_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_tall",
@@ -1582,7 +1599,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_corner_tall_thumb.png"
     },
     {
       "id": "platform_dirt_side_tall",
@@ -1602,7 +1620,8 @@
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "patreonUrl": "https://www.patreon.com/quaternius",
         "license": "CC0"
-      }
+      },
+      "thumbnail": "/assets/models/platform_dirt_side_tall_thumb.png"
     }
   ]
 }
