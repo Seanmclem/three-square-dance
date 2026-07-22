@@ -51,7 +51,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'prefabs' | null;
 
 export interface GroupDef {
   id:   string;
@@ -141,7 +141,7 @@ export interface SkyboxManifest {
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────
 
-export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "groups" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box" | "light-point" | "light-spot" | "light-directional";
+export type ToolId = "select" | "select-face" | "select-vertex" | "select-edge" | "floor" | "poly-floor" | "wall" | "platform" | "poly-platform" | "stair" | "ladder" | "object" | "groups" | "spawnpoint" | "trigger-volume" | "decal" | "shape-cylinder" | "shape-wedge" | "shape-box" | "light-point" | "light-spot" | "light-directional" | "prefab";
 export type ZoneType = "outdoor" | "indoor" | "dungeon";
 export type OpeningType = "door" | "window" | "arch" | "passage";
 export type StairStyle = "straight" | "l-shape" | "spiral";
@@ -151,7 +151,7 @@ export type CameraMode = "fps" | "thirdperson";
 export type PreviewMode = "preview" | "game" | "occlusion";
 /** Gameplay semantics (defaultSpawn, hide editor furniture, gizmo/node-dot lockout) — everything but plain preview. */
 export const isGameplayMode = (m: PreviewMode): boolean => m !== "preview";
-export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "ladder" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape" | "light";
+export type EditorObjectType = "wall" | "floor" | "platform" | "stair" | "ladder" | "object" | "terrain" | "trigger" | "trim" | "opening" | "spawn" | "trigger-volume" | "checkpoint" | "decal" | "shape" | "light" | "prefab-instance";
 export type TransitionEffect = "fade" | "none";
 
 // ─── Vec / transform ─────────────────────────────────────────────────────────
@@ -390,6 +390,11 @@ export interface BusEvents {
   // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
   "mover:set":             { targetId: string; op: "start" | "stop" | "toggle" };
   "state:changed":         { key: string; value: JsonValue };
+  // Prefabs (Phase 44). Instance records are pure metadata — no ZoneManager listener.
+  "prefab:selected":       { prefab: PrefabDef };   // panel → PrefabTool: arm placement
+  "prefabinstance:added":   { zoneId: string; record: PrefabInstanceRecord };
+  "prefabinstance:updated": { zoneId: string; id: string; changes: Partial<PrefabInstanceRecord> };
+  "prefabinstance:removed": { zoneId: string; id: string };
 }
 
 export type BusEventName = keyof BusEvents;
@@ -769,6 +774,7 @@ export interface StairDef {
   railingMaterialOverrides?: MaterialOverrides;
   csgCutter?:              StairCutterDef;
   groupIds?:               string[];
+  prefab?:                 PrefabStamp;   // member of a placed prefab instance (Phase 44)
 }
 
 // ─── Ladders (Phase 34) ──────────────────────────────────────────────────────
@@ -796,6 +802,7 @@ export interface LadderDef {
   noCollider?: boolean;       // skip the solid slab (the dressed geometry has its own collision)
   floorLevel?: number;
   groupIds?: string[];
+  prefab?:   PrefabStamp;     // member of a placed prefab instance (Phase 44)
 }
 
 // ─── Parametric shape primitives (Phase 22) ─────────────────────────────────
@@ -874,6 +881,7 @@ export interface ShapeDef {
   shearZ?: number;
   mover?:  MoverDef;
   sound?:  AttachedSound;       // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
+  prefab?: PrefabStamp;         // member of a placed prefab instance (Phase 44)
 }
 
 // ─── Movers — scripted geometry motion (Phase 31) ────────────────────────────
@@ -943,6 +951,7 @@ export interface WorldObject {
   colliders?: AttachedCollider[];
   mover?:     MoverDef;
   sound?:     AttachedSound;   // attached spatial emitter — a PositionalAudio that follows the mesh, incl. movers (Phase 36)
+  prefab?:    PrefabStamp;     // set when this object is a member of a placed prefab instance (Phase 44)
 }
 
 /**
@@ -956,6 +965,60 @@ export interface AttachedSound {
   loop?:        boolean;  // default true for an ambient emitter
   refDistance?: number;   // PositionalAudio reference distance (default 1)
   maxDistance?: number;   // PositionalAudio max distance (default 20)
+}
+
+// ─── Prefabs (Phase 44) ──────────────────────────────────────────────────────
+// Reusable groupings of entities (+ scripts) placed as linked instances. Scenes
+// always store the fully-EXPANDED entities plus light link metadata (the stamp
+// on each member + a per-zone instance record) — the runtime renders expanded
+// entities and ignores the metadata entirely.
+
+export type PrefabVarValue = number | boolean | string;
+
+export interface PrefabVariableDef {
+  name:     string;                            // param key, e.g. "width"
+  label?:   string;
+  type:     'number' | 'boolean' | 'choice';
+  default:  PrefabVarValue;
+  min?:     number;                            // number
+  max?:     number;
+  step?:    number;
+  options?: string[];                          // choice
+}
+
+/** One template member in prefab-local space (origin at the prefab pivot). */
+export interface PrefabTemplateEntity {
+  memberKey: string;         // stable role id — snapshot: source entity id at capture; generator: e.g. "tile_2_3"
+  type:      EditorObjectType;
+  def:       unknown;        // WorldObject | TriggerVolume | ShapeDef | StairDef | LadderDef
+}
+
+export interface PrefabDef {
+  id:           string;                  // pfb_<uuid8>
+  name:         string;
+  kind:         'snapshot' | 'generator';
+  version:      number;                  // ++ on every template/default edit — instance staleness check
+  generatorId?: string;                  // kind === "generator": key into the GENERATORS registry
+  variables:    PrefabVariableDef[];     // generator params (snapshot variables are a later increment)
+  template?:    PrefabTemplateEntity[];  // kind === "snapshot" only
+  dateAdded:    string;
+}
+
+/** Stamped on every expanded member entity. instanceId = PrefabInstanceRecord.id. */
+export interface PrefabStamp {
+  prefabId:   string;
+  instanceId: string;
+  memberKey:  string;
+}
+
+/** Per-zone instance record — the durable link (variables + origin + version).
+ *  Keyed by `id` (pfi_<uuid8>) so the undo journal's generic by-id machinery applies. */
+export interface PrefabInstanceRecord {
+  id:        string;                            // pfi_<uuid8> — referenced by member stamps as instanceId
+  prefabId:  string;
+  version:   number;                            // PrefabDef.version at last expansion
+  variables: Record<string, PrefabVarValue>;
+  origin:    { position: Vec3; rotationY: number };  // degrees, matching entity rotation convention
 }
 
 export interface ZoneDef {
@@ -977,6 +1040,7 @@ export interface ZoneDef {
   shapes?:         ShapeDef[];
   dialogues?:      DialogueTreeDef[];
   lights?:         LightDef[];
+  prefabInstances?: PrefabInstanceRecord[];   // Phase 44 — link records for placed prefab instances
 }
 
 /**
@@ -1151,6 +1215,7 @@ export interface GameConfig {
   gameVersion:  1;
   items?:       ItemDef[];
   stateSchema?: Record<string, StateSchema>;
+  prefabs?:     PrefabDef[];   // cross-scene prefab library (Phase 44)
 }
 
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */
@@ -1243,6 +1308,7 @@ export interface TriggerVolume {
   scripts?:  ScriptDef[];
   groupIds?: string[];
   visual?:   TriggerVolumeVisual;   // optional in-world fill; absent/disabled = wireframe only
+  prefab?:   PrefabStamp;           // member of a placed prefab instance (Phase 44)
 }
 
 // Optional decorative fill for a trigger volume (a "warp box"). Rendered in preview AND

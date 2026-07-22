@@ -34,6 +34,7 @@ type AssetEntry =
 
 const ASSET_ENTRIES: AssetEntry[] = [
   { label: "Models",    Icon: TOOL_ICONS.object, kind: "tool",  tool: "object" },
+  { label: "Prefabs",   Icon: TOOL_ICONS.prefab, kind: "panel", panel: "prefabs" },
   { label: "Materials", Icon: IconMaterial,      kind: "panel", panel: "materials" },
   { label: "Decals",    Icon: TOOL_ICONS.decal,  kind: "tool",  tool: "decal" },
   { label: "Sounds",    Icon: IconAudio,         kind: "panel", panel: "audio" },

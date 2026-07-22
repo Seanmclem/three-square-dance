@@ -26,6 +26,9 @@ import { BrushFaceHighlighter } from "@/editor/BrushFaceHighlighter";
 import { BrushFaceEditor } from "@/editor/BrushFaceEditor";
 import { BrushEdgeEditor } from "@/editor/BrushEdgeEditor";
 import { ObjectTool } from "@/editor/ObjectTool";
+import { PrefabTool } from "@/editor/PrefabTool";
+import { GENERATORS } from "@/prefab/generators";
+import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -70,7 +73,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, PrefabDef } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -189,6 +192,8 @@ export default function App() {
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
+  const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
+  const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
   // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
   const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
@@ -301,6 +306,7 @@ export default function App() {
     const brushFaceEditor    = new BrushFaceEditor(scene.scene, world, bus, scene.camera, canvas);
     const brushEdgeEditor    = new BrushEdgeEditor(scene.scene, world, bus, scene.camera, canvas);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
+    const prefabTool         = new PrefabTool(scene.scene, world, bus);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
     const openingDragger = new OpeningDragHandler(scene.scene, scene.camera, canvas, world, bus, history);
     const gizmoManager   = new GizmoManager(scene.scene, scene.camera, canvas, world, bus);
@@ -321,6 +327,12 @@ export default function App() {
     // on_state_changed). Registered schema is authored per-level (world.stateSchema) and
     // applied on preview:start; see DEFAULT_STATE_SCHEMA for the fallback.
     gameState.attach(bus);
+
+    // Prefab library (Phase 44): with no project open, the library lives in
+    // localStorage; a project open below (or later) replaces it from game.json.
+    const sessionPrefabs = loadSessionPrefabs();
+    world.prefabLibrary = sessionPrefabs;
+    setPrefabs(sessionPrefabs);
 
     // Seed world with the demo zone and make it the active zone immediately
     world.addZone(createDemoZone());
@@ -361,6 +373,7 @@ export default function App() {
     brushFaceEditor.init();
     brushEdgeEditor.init();
     objectTool.init();
+    prefabTool.init();
     nodeDragger.init();
     openingDragger.init();
     gizmoManager.init();
@@ -495,6 +508,9 @@ export default function App() {
             world.gameStateSchema = store.game.stateSchema;
             setWorldItems(store.game.items ?? []);
             setGameSchema(store.game.stateSchema ?? {});
+            if (promoteSessionPrefabs(store.game)) setIsDirty(true);
+            world.prefabLibrary = store.game.prefabs;
+            setPrefabs(store.game.prefabs ?? []);
           } else {
             setProjectPending({ name: last.name, dir: last.dir, sceneId: last.sceneId });
           }
@@ -861,6 +877,9 @@ export default function App() {
       bus.on("object:added",         ({ object })   => { if (object.groupIds?.length)   bumpMembership(); }),
       bus.on("triggervolume:added",  ({ volume })   => { if (volume.groupIds?.length)   bumpMembership(); }),
       bus.on("shape:added",          ({ shape })    => { if (shape.groupIds?.length)    bumpMembership(); }),
+      // Prefab instance records changed (place/delete/undo) → refresh panel counts.
+      bus.on("prefabinstance:added",   () => setPrefabTick(t => t + 1)),
+      bus.on("prefabinstance:removed", () => setPrefabTick(t => t + 1)),
     ];
 
     return () => {
@@ -890,6 +909,7 @@ export default function App() {
       openingDragger.dispose();
       nodeDragger.dispose();
       objectTool.dispose();
+      prefabTool.dispose();
       brushEdgeEditor.dispose();
       brushFaceEditor.dispose();
       brushFaceHighlighter.dispose();
@@ -1043,6 +1063,8 @@ export default function App() {
     if (worldRef.current) {
       worldRef.current.gameItems = undefined;
       worldRef.current.gameStateSchema = undefined;
+      worldRef.current.prefabLibrary = loadSessionPrefabs();
+      setPrefabs(worldRef.current.prefabLibrary);
     }
     setGameSchema({});
     void clearLastProject();
@@ -1160,12 +1182,15 @@ export default function App() {
     setProject(ctx);
     setProjectPending(null);
     fileHandleRef.current = null;
+    if (promoteSessionPrefabs(store.game)) setIsDirty(true);
     if (worldRef.current) {
       worldRef.current.gameItems       = store.game.items;
       worldRef.current.gameStateSchema = store.game.stateSchema;
+      worldRef.current.prefabLibrary   = store.game.prefabs;
     }
     setWorldItems(store.game.items ?? []);
     setGameSchema(store.game.stateSchema ?? {});
+    setPrefabs(store.game.prefabs ?? []);
     void persistLastProject(store.dir, store.name, sceneId);
   }, []);
 
@@ -2661,6 +2686,77 @@ export default function App() {
     setIsDirty(true);
   };
 
+  // ── Prefab library (Phase 44) ───────────────────────────────────────────────
+  // Library edits persist to the project's game.json (written on Save) or, with
+  // no project open, to the localStorage session library. Not undoable (items/
+  // stateSchema precedent — game config sits outside the scene's undo journal).
+
+  const applyPrefabs = (next: PrefabDef[]): void => {
+    const world = worldRef.current;
+    const proj  = projectRef.current;
+    if (proj) {
+      proj.store.game.prefabs = next;
+      setIsDirty(true);
+    } else {
+      saveSessionPrefabs(next);
+    }
+    if (world) world.prefabLibrary = next;
+    setPrefabs(next);
+  };
+
+  const armPrefabPlacement = (prefab: PrefabDef): void => {
+    setActiveTool("prefab");
+    busRef.current.emit("tool:select", { tool: "prefab" });
+    busRef.current.emit("prefab:selected", { prefab });
+  };
+
+  const handlePlacePrefab = (prefabId: string): void => {
+    const prefab = prefabs.find(p => p.id === prefabId);
+    if (prefab) armPrefabPlacement(prefab);
+  };
+
+  /** First placement of a built-in generator creates its library entry. */
+  const handlePlaceGenerator = (generatorId: string): void => {
+    const gen = GENERATORS[generatorId];
+    if (!gen) return;
+    const existing = prefabs.find(p => p.kind === "generator" && p.generatorId === generatorId);
+    if (existing) { armPrefabPlacement(existing); return; }
+    const prefab: PrefabDef = {
+      id:          `pfb_${crypto.randomUUID().slice(0, 8)}`,
+      name:        gen.label,
+      kind:        "generator",
+      version:     1,
+      generatorId: gen.id,
+      variables:   structuredClone(gen.variables),
+      dateAdded:   new Date().toISOString().slice(0, 10),
+    };
+    applyPrefabs([...prefabs, prefab]);
+    armPrefabPlacement(prefab);
+  };
+
+  const handlePrefabRename = (prefabId: string, name: string): void => {
+    applyPrefabs(prefabs.map(p => p.id === prefabId ? { ...p, name } : p));
+  };
+
+  const handlePrefabDelete = (prefabId: string): void => {
+    if ((prefabInstanceCounts.get(prefabId) ?? 0) > 0) return;  // panel disables, belt-and-braces
+    applyPrefabs(prefabs.filter(p => p.id !== prefabId));
+  };
+
+  const prefabInstanceCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    const world = worldRef.current;
+    if (world) {
+      for (const zone of world.zones.values()) {
+        for (const rec of zone.prefabInstances ?? []) {
+          counts.set(rec.prefabId, (counts.get(rec.prefabId) ?? 0) + 1);
+        }
+      }
+    }
+    return counts;
+    // prefabTick bumps on prefabinstance:added/removed; zones covers scene loads.
+  }, [prefabTick, zones, prefabs]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
@@ -2801,6 +2897,12 @@ export default function App() {
         decalTextures={decalTextures}
         selectedDecalId={selectedDecalId}
         onDecalSelect={handleDecalSelect}
+        prefabs={prefabs}
+        prefabInstanceCounts={prefabInstanceCounts}
+        onPlacePrefab={handlePlacePrefab}
+        onPlaceGenerator={handlePlaceGenerator}
+        onPrefabRename={handlePrefabRename}
+        onPrefabDelete={handlePrefabDelete}
       />
       <TopBar
         activeFloor={activeFloor}

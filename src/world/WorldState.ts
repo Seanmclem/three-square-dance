@@ -4,7 +4,7 @@ import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks, LightDef,
-  ItemDef, StateSchema,
+  ItemDef, StateSchema, PrefabDef, PrefabInstanceRecord,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -25,6 +25,10 @@ export class WorldState {
   // hand-builds its output from the listed fields (activeZoneId precedent).
   gameItems?:       ItemDef[];
   gameStateSchema?: Record<string, StateSchema>;
+  // Prefab library (Phase 44) — session-only mirror of the App's library state
+  // (game.json prefabs when a project is open, else the localStorage session
+  // library). Same non-serialized contract as gameItems.
+  prefabLibrary?:   PrefabDef[];
 
   // ── Undo journal ────────────────────────────────────────────────────────────
   private _history:  HistoryManager | null = null;
@@ -617,6 +621,36 @@ export class WorldState {
     this._bus.emit("decal:removed", { zoneId, id });
   }
 
+  // ── Prefab instance records (Phase 44) ───────────────────────────────────────
+  // Pure link metadata for placed prefab instances — no meshes, no ZoneManager
+  // listener; journaled so undoing an instance delete restores the link.
+
+  addPrefabInstance(zoneId: string, record: PrefabInstanceRecord): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    if (!zone.prefabInstances) zone.prefabInstances = [];
+    this._touch("prefabInstance", zoneId, record.id);
+    zone.prefabInstances.push(record);
+    this._bus.emit("prefabinstance:added", { zoneId, record });
+  }
+
+  updatePrefabInstance(zoneId: string, id: string, changes: Partial<PrefabInstanceRecord>): void {
+    const zone = this.zones.get(zoneId);
+    const rec  = zone?.prefabInstances?.find(r => r.id === id);
+    if (!rec) return;
+    this._touch("prefabInstance", zoneId, id);
+    Object.assign(rec, changes);
+    this._bus.emit("prefabinstance:updated", { zoneId, id, changes });
+  }
+
+  removePrefabInstance(zoneId: string, id: string): void {
+    const zone = this.zones.get(zoneId);
+    if (!zone) return;
+    this._touch("prefabInstance", zoneId, id);
+    zone.prefabInstances = (zone.prefabInstances ?? []).filter(r => r.id !== id);
+    this._bus.emit("prefabinstance:removed", { zoneId, id });
+  }
+
   // ── Transition mutations ─────────────────────────────────────────────────────
 
   addTransition(transition: TransitionDef): void {
@@ -714,6 +748,11 @@ export class WorldState {
       case "transition":
         if (state !== "removed") this._bus.emit("transition:added", { transition: target as TransitionDef });
         break;
+      case "prefabInstance":
+        if (state === "added")        this._bus.emit("prefabinstance:added", { zoneId: z, record: target as PrefabInstanceRecord });
+        else if (state === "removed") this._bus.emit("prefabinstance:removed", { zoneId: z, id });
+        else                          this._bus.emit("prefabinstance:updated", { zoneId: z, id, changes: target as Partial<PrefabInstanceRecord> });
+        break;
     }
   }
 
@@ -772,6 +811,7 @@ export class WorldState {
       case "checkpoint":    return (zone.checkpoints ??= []);
       case "decal":         return (zone.decals ??= []);
       case "light":         return (zone.lights ??= []);
+      case "prefabInstance": return (zone.prefabInstances ??= []);
       default:              return null;
     }
   }

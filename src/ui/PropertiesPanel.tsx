@@ -69,6 +69,7 @@ const TOOL_INFO: Record<ToolId, ToolInfo> = {
   "light-point":       { desc: "Click to place a point light (glows in all directions).",              hint: "Click to place light" },
   "light-spot":        { desc: "Click to place a spot light (cone, aims straight down; adjust aim in the panel).", hint: "Click to place light" },
   "light-directional": { desc: "Click to place a directional light (parallel rays, like an extra sun).", hint: "Click to place light" },
+  prefab:      { desc: "Click to place the picked prefab. R rotates 90°, Esc stops.", hint: "Pick a prefab in the Prefabs panel" },
 };
 
 

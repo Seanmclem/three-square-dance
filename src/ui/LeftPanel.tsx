@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, PrefabDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -8,6 +8,7 @@ import { SkyboxBrowser } from "@/ui/SkyboxBrowser";
 import { DecalBrowser } from "@/ui/DecalBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
+import { PrefabPanel } from "@/ui/PrefabPanel";
 
 interface LeftPanelProps {
   panelId:         LeftPanelId;
@@ -76,6 +77,13 @@ interface LeftPanelProps {
   decalTextures:   DecalTexDef[];
   selectedDecalId: string | null;
   onDecalSelect:   (id: string | null, kind: DecalKind) => void;
+  // prefabs panel (Phase 44)
+  prefabs:              PrefabDef[];
+  prefabInstanceCounts: Map<string, number>;
+  onPlacePrefab:        (prefabId: string) => void;
+  onPlaceGenerator:     (generatorId: string) => void;
+  onPrefabRename:       (prefabId: string, name: string) => void;
+  onPrefabDelete:       (prefabId: string) => void;
 }
 
 export function LeftPanel({
@@ -92,6 +100,7 @@ export function LeftPanel({
   stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing,
   worldItems, onWorldItemsChange, projectSceneIds,
   decalTextures, selectedDecalId, onDecalSelect,
+  prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -201,6 +210,16 @@ export function LeftPanel({
                 decals={decalTextures}
                 selectedId={selectedDecalId}
                 onSelect={onDecalSelect}
+              />
+            )}
+            {panelId === "prefabs" && (
+              <PrefabPanel
+                prefabs={prefabs}
+                instanceCounts={prefabInstanceCounts}
+                onPlacePrefab={onPlacePrefab}
+                onPlaceGenerator={onPlaceGenerator}
+                onRename={onPrefabRename}
+                onDelete={onPrefabDelete}
               />
             )}
             {panelId === "groups" && (

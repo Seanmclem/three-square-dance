@@ -229,6 +229,14 @@ export const IconLight = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconPrefab = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+    {/* hexagon package with a linked copy */}
+    <path d="M11 3 L18 7 V15 L11 19 L4 15 V7 Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" fill={color} fillOpacity="0.15"/>
+    <path d="M20 12 L24 14.3 V19 L20 21.3 L16 19 V16.6" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   "select-face":    IconSelectFace,
@@ -252,4 +260,5 @@ export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   "light-point":       IconLight,
   "light-spot":        IconLight,
   "light-directional": IconLight,
+  prefab:              IconPrefab,
 };
