@@ -694,3 +694,29 @@ runtime side can't boot an OPFS project (not HTTP-served) — test manifest/
 game.json merging against the committed fixture
 `runtime.html?manifest=/games/pj-fixture/manifest.json` instead
 (see `test-plans/phase-33-projects.md`).
+
+---
+
+## 10. Lessons from the prefab sessions (2026-07-21, phases 43–47)
+
+- **Multi-select can't be driven by extension shift-clicks.** `computer left_click`
+  with `modifiers: "shift"` did not set `shiftKey` on the MouseEvent the canvas
+  receives, and synthetic dispatched shift-clicks lose the raycast fight with
+  trigger-volume pick surfaces. Reliable path: put the entities in a group
+  (`addGroup` + `writeGroupIds` via mutators) and click the Groups panel's
+  **Select** button — that runs the production `_setSelection` multi-select.
+- **Hidden tab ⇒ TriggerSystem never fires.** rAF freezes in a background tab, so
+  a teleported player just hovers (body y stuck at the teleport value — that's the
+  tell) and `on_player_enter` never triggers. Any `computer screenshot` activates
+  the tab and resumes the loop; re-teleport after that.
+- **Writing real files from an automation tab without an FSA grant:** run a tiny
+  CORS'd localhost `http.server` (validate slugs + PNG signatures server-side) and
+  have in-page code POST the bytes to it. Used to batch-generate the 19 tile
+  thumbnails via the app's own `renderModelThumbnail` (`/src/editor/thumbnailRenderer.ts`
+  imported by Vite URL — a fresh module instance is fine, the stage is self-contained).
+- **Prefab-specific probes:** instance records live at
+  `__world.zones.get(z).prefabInstances`; members are the entities whose
+  `.prefab.instanceId` matches. During isolated edit mode
+  (`__world.activeZoneId === "__prefab_edit__"`), `toJSON().zones` must never
+  contain the staging zone, and a dispatched `beforeunload` must leave
+  `worldeditor_autosave` byte-identical (the gate test).
