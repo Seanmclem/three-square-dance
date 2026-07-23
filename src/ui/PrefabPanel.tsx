@@ -35,14 +35,7 @@ export function PrefabPanel({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "6px 8px 6px 12px", flexShrink: 0,
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}>
-        <span style={{ color: "#8a92a6", fontSize: 10, letterSpacing: 1, fontFamily: "monospace" }}>PREFABS</span>
-      </div>
-
+      {/* No header row — the LeftPanel wrapper already titles the panel "PREFABS". */}
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {prefabs.length === 0 && unplacedGenerators.length === 0 && (
           <div style={{ padding: "24px 16px", color: "#8a92a6", fontSize: 10, textAlign: "center", fontFamily: "monospace" }}>
