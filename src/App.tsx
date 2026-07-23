@@ -2727,7 +2727,11 @@ export default function App() {
     const proj  = projectRef.current;
     if (proj) {
       proj.store.game.prefabs = next;
-      setIsDirty(true);
+      // Write game.json IMMEDIATELY (asset-import precedent: manifest.json writes on
+      // import, not on Save). Otherwise a placed instance dangles — its def exists
+      // only in this tab's memory and every other/fresh session sees an instance
+      // with no definition (no variables panel, no re-expansion).
+      void proj.store.writeGame().catch(e => console.warn("[prefabs] game.json write failed:", e));
     } else {
       saveSessionPrefabs(next);
     }
@@ -2798,8 +2802,7 @@ export default function App() {
     if (!selected || !stamp) return null;
     const zone   = worldRef.current?.zones.get(selected.zoneId);
     const record = zone?.prefabInstances?.find(r => r.id === stamp.instanceId);
-    const prefab = record ? prefabs.find(p => p.id === record.prefabId) : undefined;
-    if (!record || !prefab || !zone) return null;
+    if (!record || !zone) return null;
     if (multiSelected.length > 1) {
       const memberIds = new Set<string>();
       for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? []]) {
@@ -2809,7 +2812,10 @@ export default function App() {
       }
       if (multiSelected.length !== memberIds.size || !multiSelected.every(r => memberIds.has(r.id))) return null;
     }
-    return { prefab, record };
+    // prefab === null → orphaned instance (def missing from the library, e.g. a
+    // game.json that predates the immediate-write fix). The section renders a
+    // degraded view: Unlink / Delete instance still work, variables don't.
+    return { prefab: prefabs.find(p => p.id === record.prefabId) ?? null, record };
     // prefabTick keeps the record view fresh after variable/origin commits.
   }, [selected, multiSelected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2836,10 +2842,11 @@ export default function App() {
   const handlePrefabVariablesChange = (vars: Record<string, PrefabVarValue>): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
-    if (!world || !info || !selected) return;
-    world.transaction(`edit ${info.prefab.name} variables`, () => {
+    if (!world || !info?.prefab || !selected) return;
+    const prefab = info.prefab;
+    world.transaction(`edit ${prefab.name} variables`, () => {
       world.updatePrefabInstance(selected.zoneId, info.record.id, { variables: { ...info.record.variables, ...vars } });
-      reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+      reexpandInstance(world, selected.zoneId, prefab, info.record.id);
     });
     syncHistory();
     refreshSelectionAfterReexpand();
@@ -2848,10 +2855,11 @@ export default function App() {
   const handlePrefabOriginChange = (origin: { position: Vec3; rotationY: number }): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
-    if (!world || !info || !selected) return;
-    world.transaction(`move ${info.prefab.name} instance`, () => {
+    if (!world || !info?.prefab || !selected) return;
+    const prefab = info.prefab;
+    world.transaction(`move ${prefab.name} instance`, () => {
       world.updatePrefabInstance(selected.zoneId, info.record.id, { origin });
-      reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+      reexpandInstance(world, selected.zoneId, prefab, info.record.id);
     });
     syncHistory();
     refreshSelectionAfterReexpand();
@@ -2860,7 +2868,7 @@ export default function App() {
   const handlePrefabReexpand = (): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
-    if (!world || !info || !selected) return;
+    if (!world || !info?.prefab || !selected) return;
     reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
     syncHistory();
     refreshSelectionAfterReexpand();

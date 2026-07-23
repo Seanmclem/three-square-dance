@@ -390,8 +390,10 @@ interface PropertiesPanelProps {
   // Auto-fit convex hull points from the model's geometry (Phase 27; null = unavailable).
   hullPointsFor?:           (objectId: string) => Vec3[] | null;
   // Prefab instance (Phase 45): set when the selection is a member of a placed
-  // prefab instance — renders the Prefab section on the root screen.
-  prefabInfo?:              { prefab: PrefabDef; record: PrefabInstanceRecord } | null;
+  // prefab instance — renders the Prefab section on the root screen. prefab is
+  // null when the instance's definition is missing from the library (orphan) —
+  // the section degrades to Unlink / Delete instance.
+  prefabInfo?:              { prefab: PrefabDef | null; record: PrefabInstanceRecord } | null;
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
@@ -948,7 +950,7 @@ function PrefabVarField({ def, value, onCommit }: {
 }
 
 function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance }: {
-  info:               { prefab: PrefabDef; record: PrefabInstanceRecord };
+  info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord };
   onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onReexpand?:        () => void;
@@ -958,6 +960,34 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
   const [open, setOpen] = useState(true);
   const [hovered, setHovered] = useState(false);
   const { prefab, record } = info;
+
+  // Orphaned instance: the definition is gone from the library (deleted, or a
+  // game.json that never got it). Variables/re-expansion are impossible; the
+  // members are still real entities — offer the operations that don't need the def.
+  if (!prefab) {
+    return (
+      <div>
+        <div style={{ ...ROW_BASE, cursor: "default", borderBottom: "none" }}>
+          <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>
+            <span style={{ color: "#e0a050", marginRight: 6 }}>⚠</span>
+            Prefab instance · definition missing
+          </span>
+        </div>
+        <div style={{ padding: "0 16px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ color: "#c2cadb", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5 }}>
+            These pieces belong to a prefab whose definition isn't in this project's
+            library ({record.prefabId}) — it was deleted, or the session that created
+            it never saved. The pieces themselves are fine. Unlink to keep them as
+            plain objects, or delete the whole instance.
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            <PrefabBtn label="Unlink" title="Detach the members into plain, independent entities" onClick={onUnlink} />
+            <PrefabBtn label="Delete instance" title="Remove every member and the prefab link" onClick={onDeleteInstance} danger />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const originField = (label: string, value: number, apply: (v: number) => void) => (
     <OriginNumField key={label} label={label} value={value} onCommit={apply} />

@@ -1,3 +1,43 @@
 {
-  "gameVersion": 1
+  "gameVersion": 1,
+  "prefabs": [
+    {
+      "id": "pfb_ba7de97d",
+      "name": "Tiled Platform",
+      "kind": "generator",
+      "version": 1,
+      "generatorId": "tiled-platform",
+      "variables": [
+        {
+          "name": "width",
+          "label": "Width (tiles)",
+          "type": "number",
+          "default": 3,
+          "min": 2,
+          "max": 32,
+          "step": 1
+        },
+        {
+          "name": "depth",
+          "label": "Depth (tiles)",
+          "type": "number",
+          "default": 3,
+          "min": 2,
+          "max": 32,
+          "step": 1
+        },
+        {
+          "name": "tileSet",
+          "label": "Tile set",
+          "type": "choice",
+          "default": "grass",
+          "options": [
+            "grass",
+            "dirt"
+          ]
+        }
+      ],
+      "dateAdded": "2026-07-23"
+    }
+  ]
 }
