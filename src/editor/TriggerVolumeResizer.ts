@@ -67,6 +67,10 @@ export class TriggerVolumeResizer implements IEditorModule {
       }),
       this._bus.on("triggervolume:select", ({ id }) => { this._selectedId = id; this._sync(); }),
       this._bus.on("object:deselected", () => { this._selectedId = null; this._sync(); }),
+      // Single-object tool — detach on multi-selection (prefab instances etc.).
+      this._bus.on("selection:changed", ({ refs }) => {
+        if (refs.length > 1 && this._selectedId && this._state !== "DRAG") { this._selectedId = null; this._sync(); }
+      }),
       this._bus.on("zone:activated", ({ zoneId }) => {
         this._activeZoneId = zoneId;
         this._selectedId = null;

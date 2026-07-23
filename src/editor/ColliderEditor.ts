@@ -112,6 +112,12 @@ export class ColliderEditor implements IEditorModule {
         this._sync();
       }),
       this._bus.on("object:deselected", () => { this._selectedId = null; this._resetPanelState(); this._sync(); }),
+      // Multi-selection (e.g. a whole prefab instance): the collider editor is a
+      // single-object tool — detach instead of decorating the primary member with
+      // a tile-sized wireframe + handles (fires after the primary's object:selected).
+      this._bus.on("selection:changed", ({ refs }) => {
+        if (refs.length > 1 && this._selectedId) { this._selectedId = null; this._resetPanelState(); this._sync(); }
+      }),
       this._bus.on("zone:activated", ({ zoneId }) => {
         this._activeZoneId = zoneId;
         this._selectedId = null;

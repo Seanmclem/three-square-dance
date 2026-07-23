@@ -77,6 +77,10 @@ export class ShapeResizer implements IEditorModule {
         this._sync();
       }),
       this._bus.on("object:deselected", () => { this._selectedId = null; this._enabled = false; this._sync(); }),
+      // Single-object tool — detach on multi-selection (prefab instances etc.).
+      this._bus.on("selection:changed", ({ refs }) => {
+        if (refs.length > 1 && this._selectedId) { this._selectedId = null; this._enabled = false; this._sync(); }
+      }),
       this._bus.on("shape:removed", ({ id }) => {
         if (id === this._selectedId) { this._selectedId = null; this._sync(); }
       }),
