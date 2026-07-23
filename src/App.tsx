@@ -523,6 +523,7 @@ export default function App() {
             if (promoteSessionPrefabs(store.game)) setIsDirty(true);
             world.prefabLibrary = store.game.prefabs;
             setPrefabs(store.game.prefabs ?? []);
+            syncPrefabInstances();   // library is authoritative now — heal/refresh instances
           } else {
             setProjectPending({ name: last.name, dir: last.dir, sceneId: last.sceneId });
           }
@@ -1033,6 +1034,61 @@ export default function App() {
     return false;
   }, []);
 
+  /**
+   * Prefab instance sweep (Phase 45 + v4.42.2), run whenever the world OR the
+   * library becomes authoritative (scene load, project open):
+   * - Staleness: a record expanded against an older prefab version re-expands.
+   * - Orphan auto-heal: a GENERATOR instance whose def is missing (created
+   *   before defs wrote game.json immediately) is fully described by its record
+   *   variables — infer the generator from the exact variable key set and
+   *   relink to (or recreate) that generator's library def. Snapshot orphans
+   *   stay orphans (their template is genuinely lost).
+   * Skipped mid-boot-restore (restoringRef): the project library isn't loaded
+   * yet, and healing against the empty session library would mint duplicate
+   * defs — the project-open sites re-run the sweep once the library is real.
+   */
+  const syncPrefabInstances = useCallback((): void => {
+    const world = worldRef.current;
+    if (!world || restoringRef.current) return;
+    for (const zone of world.zones.values()) {
+      for (const rec of [...(zone.prefabInstances ?? [])]) {
+        let def = world.prefabLibrary?.find(p => p.id === rec.prefabId);
+        if (!def) {
+          const recKeys = Object.keys(rec.variables).sort().join(",");
+          const gen = Object.values(GENERATORS).find(g => g.variables.map(v => v.name).sort().join(",") === recKeys);
+          if (!gen) { console.warn(`[prefabs] instance ${rec.id} references missing prefab ${rec.prefabId} — left as expanded`); continue; }
+          def = world.prefabLibrary?.find(p => p.kind === "generator" && p.generatorId === gen.id);
+          if (!def) {
+            def = {
+              id: `pfb_${crypto.randomUUID().slice(0, 8)}`, name: gen.label, kind: "generator",
+              version: 1, generatorId: gen.id, variables: structuredClone(gen.variables),
+              dateAdded: new Date().toISOString().slice(0, 10),
+            };
+            const next = [...(world.prefabLibrary ?? []), def];
+            world.prefabLibrary = next;
+            const proj = projectRef.current;
+            if (proj) {
+              proj.store.game.prefabs = next;
+              void proj.store.writeGame().catch(e => console.warn("[prefabs] game.json write failed:", e));
+            } else {
+              saveSessionPrefabs(next);
+            }
+            setPrefabs(next);
+          }
+          console.info(`[prefabs] relinked orphaned instance ${rec.id} to generator def ${def.id} (${gen.label})`);
+          world.updatePrefabInstance(zone.id, rec.id, { prefabId: def.id, version: def.version });
+          setIsDirty(true);
+          continue;   // members are already expanded correctly — relink only
+        }
+        if (rec.version < def.version) {
+          reexpandInstance(world, zone.id, def, rec.id);
+          setIsDirty(true);
+        }
+      }
+    }
+    setPrefabTick(t => t + 1);
+  }, []);
+
   const handleLoadFromJSON = useCallback(async (json: unknown): Promise<void> => {
     const world = worldRef.current;
     const zones = zonesRef.current;
@@ -1053,19 +1109,7 @@ export default function App() {
       setIsDirty(false);
       const activeId = world.activeZoneId;
       if (activeId) await zones.loadZone(activeId);
-      // Prefab staleness sweep (Phase 45): re-expand any instance whose record
-      // was expanded against an older prefab version. Dirty so the refresh
-      // persists on the next save; missing prefabs keep their expanded copies.
-      for (const zone of world.zones.values()) {
-        for (const rec of [...(zone.prefabInstances ?? [])]) {
-          const def = world.prefabLibrary?.find(p => p.id === rec.prefabId);
-          if (!def) { console.warn(`[prefabs] instance ${rec.id} references missing prefab ${rec.prefabId} — left as expanded`); continue; }
-          if (rec.version < def.version) {
-            reexpandInstance(world, zone.id, def, rec.id);
-            setIsDirty(true);
-          }
-        }
-      }
+      syncPrefabInstances();
       // Restore the scene's saved editor viewpoint (stamped on save; absent on old files)
       const pose = file.metadata?.editorCamera;
       if (pose) sceneRef.current?.editorCamera?.setPose(pose);
@@ -1218,8 +1262,9 @@ export default function App() {
     setWorldItems(store.game.items ?? []);
     setGameSchema(store.game.stateSchema ?? {});
     setPrefabs(store.game.prefabs ?? []);
+    syncPrefabInstances();   // library is authoritative now — heal/refresh instances
     void persistLastProject(store.dir, store.name, sceneId);
-  }, []);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const bumpProject = (): void => {
     const p = projectRef.current;
