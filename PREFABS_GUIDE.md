@@ -39,6 +39,8 @@ breaks the worlds that used it (see **Orphans** below).
 
 ## Creating
 
+![The Prefabs toolbar panel — the library list with Place (and Edit on snapshot prefabs)](docs/images/prefabs-panel.png)
+
 **A generator prefab** — open the **Prefabs** toolbar panel. Built-in
 generators are always listed; the first time you hit **Place** on one, it
 becomes a library entry (stored in your project's `game.json` immediately).
@@ -63,6 +65,8 @@ and NOT shifted per instance. Prefer relative/targeted actions (`open_door`,
 
 ## Placing
 
+![Placement armed — the green ghost footprint follows the cursor](docs/images/prefab-ghost.png)
+
 Prefabs panel → **Place** → click in the viewport. The green ghost box shows
 the footprint; **R** rotates 90°, **Esc** stops, and placement stays armed for
 repeated clicks. For platform tiles, the walkable top sits **1m above** where
@@ -72,6 +76,8 @@ you click.
 
 Click any piece of a placed instance and the **whole instance** selects — one
 gizmo moves it all, and the properties panel shows the **Prefab section**:
+
+![A selected Tiled Platform instance — whole-instance highlight, group gizmo, and the Prefab section with settings, position, and actions](docs/images/prefab-instance.png)
 
 - **Settings** (generator parameters like width/depth/tile-set): per-instance,
   applied live as you type (short debounce) or step the arrows. These are
@@ -99,6 +105,8 @@ Prefabs panel → **Edit** (amber, snapshot prefabs only — a generator's
 parameters *are* its interface). The world temporarily disappears and the
 prefab's pieces appear alone at the origin. Use all the normal tools: move
 things, add objects, edit scripts, delete pieces.
+
+![Isolated edit mode — just the prefab's pieces on an empty grid, with the amber Save/Cancel bar](docs/images/prefab-edit-mode.png)
 
 - **Save** (amber top bar): the recipe updates and **every placed instance in
   the scene rebuilds to match** — one undo step. Other scenes in the project
