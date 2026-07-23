@@ -2789,16 +2789,29 @@ export default function App() {
   }, [prefabTick, zones, prefabs]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Selected entity is a prefab-instance member → resolve its record + def for
-  // the PropertiesPanel Prefab section.
+  // the PropertiesPanel Prefab section. For a multi-selection (click-on-member
+  // expands to the whole instance, Phase 47.1) the section only shows when the
+  // selection is EXACTLY that one instance's full member set — a mixed or
+  // partial selection keeps the plain multi view (its generic Delete etc.).
   const selPrefabInfo = useMemo(() => {
     const stamp = (selected?.data as { prefab?: { instanceId: string } } | null | undefined)?.prefab;
     if (!selected || !stamp) return null;
     const zone   = worldRef.current?.zones.get(selected.zoneId);
     const record = zone?.prefabInstances?.find(r => r.id === stamp.instanceId);
     const prefab = record ? prefabs.find(p => p.id === record.prefabId) : undefined;
-    return record && prefab ? { prefab, record } : null;
+    if (!record || !prefab || !zone) return null;
+    if (multiSelected.length > 1) {
+      const memberIds = new Set<string>();
+      for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? []]) {
+        for (const e of arr as Array<{ id: string; prefab?: { instanceId: string } }>) {
+          if (e.prefab?.instanceId === record.id) memberIds.add(e.id);
+        }
+      }
+      if (multiSelected.length !== memberIds.size || !multiSelected.every(r => memberIds.has(r.id))) return null;
+    }
+    return { prefab, record };
     // prefabTick keeps the record view fresh after variable/origin commits.
-  }, [selected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected, multiSelected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   /** After a re-expansion, the selected member's def was replaced (same id) or
    *  removed — refresh or drop the selection so the panel shows live data. */

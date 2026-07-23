@@ -495,23 +495,37 @@ export function PropertiesPanel({
             <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{summary}</div>
           </div>
         </div>
+        {/* Whole prefab instance selected (click-on-any-member expands to all):
+            show its controls; the generic Delete yields to Delete-instance. */}
+        {prefabInfo && (
+          <PrefabSection
+            info={prefabInfo}
+            onVariablesChange={onPrefabVariablesChange}
+            onOriginChange={onPrefabOriginChange}
+            onReexpand={onPrefabReexpand}
+            onUnlink={onPrefabUnlink}
+            onDeleteInstance={onPrefabDeleteInstance}
+          />
+        )}
         <div style={{ padding: 16 }}>
           <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginBottom: 12, lineHeight: 1.5 }}>
-            Drag the gizmo to move all together (translate only). Rotate/scale need a single selection.
+            {prefabInfo
+              ? "Drag the gizmo to move the whole instance. Shift-click a member to select just it."
+              : "Drag the gizmo to move all together (translate only). Rotate/scale need a single selection."}
           </div>
           {onDuplicate && <button style={ACTION_BTN} onClick={onDuplicate}>Duplicate</button>}
           {onCopy      && <button style={ACTION_BTN} onClick={onCopy}>Copy</button>}
           {onBake && multiSelected.every(r => r.type === "shape") && (
             <button style={ACTION_BTN} onClick={() => onBake(multiSelected)}>Bake → GLB asset</button>
           )}
-          {onCreatePrefab && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder"].includes(r.type)) && (
+          {onCreatePrefab && !prefabInfo && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder"].includes(r.type)) && (
             <button
               style={{ ...ACTION_BTN, color: "#9db8e8", borderColor: "rgba(80,140,255,0.3)" }}
               title="Save this selection as a reusable prefab; the selection becomes its first linked instance"
               onClick={() => onCreatePrefab(multiSelected)}
             >⬡ Create Prefab</button>
           )}
-          {onDelete    && (
+          {onDelete && !prefabInfo && (
             <button
               style={{ ...ACTION_BTN, color: "#ff6b6b", borderColor: "rgba(255,107,107,0.3)", marginBottom: 0 }}
               onClick={onDelete}

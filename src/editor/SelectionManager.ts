@@ -155,9 +155,40 @@ export class SelectionManager implements IEditorModule {
       if (this._activeTool !== "select-vertex") this._subVertex = null;
     }
     if (additive) { this._toggleInSelection(root); return; }
+    // Prefab instance members select as ONE unit (Phase 47.1): a plain click on any
+    // stamped member selects every member of its instance (clicked one = primary).
+    // Shift/Cmd-click still toggles the single member (the tweak-one-tile escape
+    // hatch), and sub-object modes keep raw behavior.
+    if (this._activeTool === "select") {
+      const refs = this._instanceMemberRefs(root);
+      if (refs) { this._setSelection(refs); return; }
+    }
     // Same-root re-click with a different face still needs a re-emit.
     if (this._selected === root && this._extraRefs.length === 0) { this._emitSelected(root); return; }
     this._select(root);
+  }
+
+  /** If the root's entity is a prefab-instance member, every member's ref
+   *  (clicked one first, so it becomes primary); else null. */
+  private _instanceMemberRefs(root: THREE.Object3D): SelectedRef[] | null {
+    const data = this._getDataRecord(root) as { prefab?: { instanceId: string } } | null;
+    const instanceId = data?.prefab?.instanceId;
+    if (!instanceId) return null;
+    const zoneId = root.userData.zoneId as string;
+    const zone = this._worldState.zones.get(zoneId);
+    if (!zone) return null;
+    const refs: SelectedRef[] = [{ id: root.userData.editorId, type: root.userData.editorType, zoneId }];
+    const gather = (type: EditorObjectType, arr: Array<{ id: string; prefab?: { instanceId: string } }> | undefined): void => {
+      for (const e of arr ?? []) {
+        if (e.prefab?.instanceId === instanceId && e.id !== root.userData.editorId) refs.push({ id: e.id, type, zoneId });
+      }
+    };
+    gather("object", zone.objects);
+    gather("trigger-volume", zone.triggerVolumes);
+    gather("shape", zone.shapes);
+    gather("stair", zone.stairs);
+    gather("ladder", zone.ladders);
+    return refs;
   }
 
   /**

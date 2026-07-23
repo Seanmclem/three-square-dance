@@ -565,7 +565,51 @@ export class GizmoManager implements IEditorModule {
     if (delta.lengthSq() < 1e-6) { this._pivotStart.copy(this._pivot.position); return; }
     const movedNodes = new Set<string>();
     for (const ref of this._groupRefs) this._translateRef(ref, delta, movedNodes);
+    this._syncPrefabOrigin(delta);
     this._pivotStart.copy(this._pivot.position);
+  }
+
+  /** Dragging a whole prefab instance must also move its record's origin, or the
+   *  next re-expansion (width change, prefab save) would snap the members back to
+   *  the stale origin. Applies only when the dragged refs are exactly one
+   *  instance's full member set — partial subsets leave the origin alone. Runs
+   *  inside the caller's move transaction so undo reverts origin + members together. */
+  private _syncPrefabOrigin(delta: THREE.Vector3): void {
+    const zoneId = this._groupRefs[0]?.zoneId;
+    const zone = zoneId ? this._worldState.zones.get(zoneId) : undefined;
+    if (!zone) return;
+    const findStamp = (ref: SelectedRef): string | null => {
+      const arr: Array<{ id: string; prefab?: { instanceId: string } }> | undefined =
+        ref.type === "object" ? zone.objects :
+        ref.type === "trigger-volume" ? zone.triggerVolumes :
+        ref.type === "shape" ? zone.shapes :
+        ref.type === "stair" ? zone.stairs :
+        ref.type === "ladder" ? zone.ladders : undefined;
+      return arr?.find(e => e.id === ref.id)?.prefab?.instanceId ?? null;
+    };
+    const ids = this._groupRefs.map(findStamp);
+    const instanceId = ids[0];
+    if (!instanceId || !ids.every(id => id === instanceId)) return;
+    const record = zone.prefabInstances?.find(r => r.id === instanceId);
+    if (!record) return;
+    // Full member set? Count the instance's members across the PREFABABLE collections.
+    const memberCount =
+      zone.objects.filter(o => o.prefab?.instanceId === instanceId).length +
+      (zone.triggerVolumes ?? []).filter(v => v.prefab?.instanceId === instanceId).length +
+      (zone.shapes ?? []).filter(s => s.prefab?.instanceId === instanceId).length +
+      zone.stairs.filter(s => s.prefab?.instanceId === instanceId).length +
+      (zone.ladders ?? []).filter(l => l.prefab?.instanceId === instanceId).length;
+    if (memberCount !== this._groupRefs.length) return;
+    this._worldState.updatePrefabInstance(zoneId!, instanceId, {
+      origin: {
+        position: {
+          x: record.origin.position.x + delta.x,
+          y: record.origin.position.y + delta.y,
+          z: record.origin.position.z + delta.z,
+        },
+        rotationY: record.origin.rotationY,
+      },
+    });
   }
 
   /** Offset one entity by delta; shared nodes (dedupe via movedNodes) move exactly once. */
