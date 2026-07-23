@@ -29,7 +29,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
-import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab, findInstances } from "@/prefab/expand";
+import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
 import { PrefabEditSession } from "@/prefab/PrefabEditSession";
 import { PrefabEditBar } from "@/ui/PrefabEditBar";
 import { NodeDragger } from "@/editor/NodeDragger";
@@ -202,6 +202,9 @@ export default function App() {
   const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
   const editingPrefabRef = useRef(false);
   const editSessionRef   = useRef<PrefabEditSession | null>(null);
+  // Swallow selection-teardown events while a prefab re-expansion is in flight
+  // (members are removed + re-added; without this the panel unmounts mid-edit).
+  const suppressSelRef   = useRef(false);
   // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
   const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
@@ -695,7 +698,11 @@ export default function App() {
         setSelected(payload);
         if (payload.type === "trigger-volume") setLeftPanel("scripts");
       }),
-      bus.on("object:deselected", ()            => setSelected(null)),
+      // suppressSelRef: a prefab re-expansion removes + re-adds members, which
+      // cascades object:deselected / shrinking selection:changed from
+      // SelectionManager — swallowing them keeps the Prefab panel mounted (and
+      // its focused input alive) until the instance is re-selected.
+      bus.on("object:deselected", ()            => { if (!suppressSelRef.current) setSelected(null); }),
       bus.on("object:updated", ({ id, zoneId }) => {
         // Refresh selected.data with a fresh reference so the panel (e.g. ScriptEditor)
         // re-renders from current data. Without this, object script edits read a stale
@@ -706,7 +713,7 @@ export default function App() {
           return obj ? { ...prev, data: obj } : prev;
         });
       }),
-      bus.on("selection:changed", ({ refs }) => setMultiSelected(refs)),
+      bus.on("selection:changed", ({ refs }) => { if (!suppressSelRef.current) setMultiSelected(refs); }),
       bus.on("floortool:suggest-auto-floor", payload => setAutoFloorPrompt(payload)),
       bus.on("tool:placed", ({ type }) => {
         if (type !== "object") {
@@ -2884,17 +2891,44 @@ export default function App() {
     setPrefabTick(t => t + 1);
   };
 
+  /**
+   * Re-expansion removes + re-adds members, so SelectionManager drops the whole
+   * selection (and the panel would unmount — jarring mid-edit). Instead:
+   * suppress the teardown events, let the transaction run, then re-select the
+   * instance's (possibly changed) member set once its meshes have rebuilt.
+   * The React panel state never clears, so a focused variables input survives.
+   */
+  const withInstanceReselect = (zoneId: string, instanceId: string, primaryId: string | undefined, fn: () => void): void => {
+    suppressSelRef.current = true;
+    try { fn(); } finally {
+      window.setTimeout(() => {
+        suppressSelRef.current = false;
+        const world = worldRef.current;
+        const members = world ? collectInstanceMembers(world, zoneId, instanceId) : new Map();
+        if (members.size === 0) { busRef.current.emit("object:deselected", {}); setSelected(null); setPrefabTick(t => t + 1); return; }
+        const refs: SelectedRef[] = [...members.values()].map(e => ({ id: e.id, type: e.type, zoneId }));
+        if (primaryId) {
+          const i = refs.findIndex(r => r.id === primaryId);
+          if (i > 0) refs.unshift(refs.splice(i, 1)[0]);
+        }
+        busRef.current.emit("selection:set", { refs });
+        setPrefabTick(t => t + 1);
+      }, 150);   // member meshes rebuild async (cached models — well under this)
+    }
+  };
+
   const handlePrefabVariablesChange = (vars: Record<string, PrefabVarValue>): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
     if (!world || !info?.prefab || !selected) return;
     const prefab = info.prefab;
-    world.transaction(`edit ${prefab.name} variables`, () => {
-      world.updatePrefabInstance(selected.zoneId, info.record.id, { variables: { ...info.record.variables, ...vars } });
-      reexpandInstance(world, selected.zoneId, prefab, info.record.id);
+    withInstanceReselect(selected.zoneId, info.record.id, selected.id, () => {
+      world.transaction(`edit ${prefab.name} variables`, () => {
+        world.updatePrefabInstance(selected.zoneId, info.record.id, { variables: { ...info.record.variables, ...vars } });
+        reexpandInstance(world, selected.zoneId, prefab, info.record.id);
+      });
     });
     syncHistory();
-    refreshSelectionAfterReexpand();
   };
 
   const handlePrefabOriginChange = (origin: { position: Vec3; rotationY: number }): void => {
@@ -2902,21 +2936,24 @@ export default function App() {
     const info = selPrefabInfo;
     if (!world || !info?.prefab || !selected) return;
     const prefab = info.prefab;
-    world.transaction(`move ${prefab.name} instance`, () => {
-      world.updatePrefabInstance(selected.zoneId, info.record.id, { origin });
-      reexpandInstance(world, selected.zoneId, prefab, info.record.id);
+    withInstanceReselect(selected.zoneId, info.record.id, selected.id, () => {
+      world.transaction(`move ${prefab.name} instance`, () => {
+        world.updatePrefabInstance(selected.zoneId, info.record.id, { origin });
+        reexpandInstance(world, selected.zoneId, prefab, info.record.id);
+      });
     });
     syncHistory();
-    refreshSelectionAfterReexpand();
   };
 
   const handlePrefabReexpand = (): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
     if (!world || !info?.prefab || !selected) return;
-    reexpandInstance(world, selected.zoneId, info.prefab, info.record.id);
+    const prefab = info.prefab;
+    withInstanceReselect(selected.zoneId, info.record.id, selected.id, () => {
+      reexpandInstance(world, selected.zoneId, prefab, info.record.id);
+    });
     syncHistory();
-    refreshSelectionAfterReexpand();
   };
 
   const handlePrefabUnlink = (): void => {

@@ -901,7 +901,9 @@ function PrefabVarField({ def, value, onCommit }: {
   def: PrefabVariableDef; value: PrefabVarValue; onCommit: (v: PrefabVarValue) => void;
 }) {
   const [draft, setDraft] = useState(String(value));
+  const debounceRef = useRef<number | null>(null);
   useEffect(() => { setDraft(String(value)); }, [value]);
+  useEffect(() => () => { if (debounceRef.current != null) window.clearTimeout(debounceRef.current); }, []);
 
   if (def.type === "boolean") {
     return (
@@ -925,8 +927,8 @@ function PrefabVarField({ def, value, onCommit }: {
       </div>
     );
   }
-  const commitNumber = (): void => {
-    const n = Number(draft);
+  const commitNumber = (raw: string): void => {
+    const n = Number(raw);
     if (!Number.isFinite(n)) { setDraft(String(value)); return; }
     const step = def.step ?? 1;
     let v = Math.round(n / step) * step;
@@ -935,14 +937,26 @@ function PrefabVarField({ def, value, onCommit }: {
     setDraft(String(v));
     if (v !== value) onCommit(v);
   };
+  // Live commit, debounced: spinner arrows / typed digits apply without needing a
+  // blur, but a half-typed "1" (min-clamped to 2) gets 600ms to become "12" first.
+  // Blur / Enter still commit immediately.
+  const queueCommit = (raw: string): void => {
+    setDraft(raw);
+    if (debounceRef.current != null) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => { debounceRef.current = null; commitNumber(raw); }, 600);
+  };
+  const flushCommit = (raw: string): void => {
+    if (debounceRef.current != null) { window.clearTimeout(debounceRef.current); debounceRef.current = null; }
+    commitNumber(raw);
+  };
   return (
     <div>
       <div style={LABEL}>{(def.label ?? def.name).toUpperCase()}</div>
       <input
         type="number" value={draft} min={def.min} max={def.max} step={def.step ?? 1}
-        onChange={e => setDraft(e.target.value)}
-        onBlur={commitNumber}
-        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        onChange={e => queueCommit(e.target.value)}
+        onBlur={e => flushCommit(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") flushCommit((e.target as HTMLInputElement).value); }}
         style={{ ...NUM_INPUT, color: "#dde3f0" }}
       />
     </div>
