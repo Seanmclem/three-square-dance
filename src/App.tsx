@@ -2900,6 +2900,13 @@ export default function App() {
    */
   const withInstanceReselect = (zoneId: string, instanceId: string, primaryId: string | undefined, fn: () => void): void => {
     suppressSelRef.current = true;
+    // Cleanly detach the 3D-side systems (SelectionManager tints, GizmoManager
+    // group tracking, TransformControls) BEFORE the rebuild — otherwise the
+    // gizmo re-tracks meshes on every shrinking selection:changed while those
+    // meshes are being disposed/rebuilt async, and can end up holding half-dead
+    // geometry (renders as melted/stretched tiles). App's React listeners are
+    // suppressed, so the panel stays mounted throughout.
+    busRef.current.emit("object:deselected", {});
     try { fn(); } finally {
       window.setTimeout(() => {
         suppressSelRef.current = false;
