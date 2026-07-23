@@ -1669,6 +1669,8 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
   const [ghost,    setGhost]    = useState(plat?.editorGhost ?? false);
   const { schedule, flush } = useFieldDebounce(300);
 
+  // Value deps (not just selected.id): undo/gizmo commits refresh selected.data
+  // under the same id, and the drafts must follow (RectFloorFields precedent).
   useEffect(() => {
     setPosStr({ x: String(plat?.position.x ?? 0), y: String(plat?.position.y ?? 0), z: String(plat?.position.z ?? 0) });
     setRotYStr(String(plat?.rotation?.y ?? 0));
@@ -1678,9 +1680,11 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
     setHasRail(plat?.hasRailing ?? false);
     setFloorLvl(plat?.floorLevel ?? 0);
     setGhost(plat?.editorGhost ?? false);
-  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { setRotYStr(String(plat?.rotation?.y ?? 0)); }, [plat?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ // eslint-disable-line react-hooks/exhaustive-deps
+    selected.id, plat?.position.x, plat?.position.y, plat?.position.z, plat?.rotation?.y,
+    plat?.size.width, plat?.size.depth, plat?.thickness, plat?.railingHeight,
+    plat?.hasRailing, plat?.floorLevel, plat?.editorGhost,
+  ]);
 
   const commitPos   = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (!Number.isFinite(n)) return; onObjectUpdate({ position: { ...(plat?.position ?? { x: 0, y: 0, z: 0 }), [axis]: n } } as unknown as Partial<WorldObject>); };
   const commitRotY  = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ rotation: { x: 0, y: n, z: 0 } } as unknown as Partial<WorldObject>); };
@@ -3050,10 +3054,19 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
   const [floorLvl, setFloorLvl] = useState(objData?.floor ?? 0);
   const { schedule } = useFieldDebounce(150);
 
+  // Value deps (not just selected.id): undo commits refresh selected.data under the
+  // same id, and the drafts must follow. Stored record preferred over the payload —
+  // it's the refreshed source (rotation is stored in degrees, same units as payload).
   useEffect(() => {
-    setDraft({ position: toStr(selected.position), rotation: toStr(selected.rotation), scale: toStr(selected.scale) });
-    setFloorLvl((selected.data as WorldObject | null)?.floor ?? 0);
-  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    const src = objData ?? selected;
+    setDraft({ position: toStr(src.position), rotation: toStr(src.rotation), scale: toStr(src.scale) });
+    setFloorLvl(objData?.floor ?? 0);
+  }, [ // eslint-disable-line react-hooks/exhaustive-deps
+    selected.id,
+    objData?.position.x, objData?.position.y, objData?.position.z,
+    objData?.rotation.x, objData?.rotation.y, objData?.rotation.z,
+    objData?.scale.x, objData?.scale.y, objData?.scale.z,
+  ]);
 
   const commit = (group: GroupKey, axis: "x" | "y" | "z", raw: string): void => {
     setDraft(prev => {

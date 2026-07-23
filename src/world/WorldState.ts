@@ -676,8 +676,9 @@ export class WorldState {
       this._setEntity(c.kind, c.zoneId, c.id, v == null ? null : structuredClone(v));
     }
     // Phase 2 — emit the existing per-entity events so ZoneManager rebuilds only what changed.
+    // No blanket deselect: the selection survives undo/redo the same way it survives live
+    // edits — `*:removed` prunes deleted entities, `*:rebuilt`/`*:updated` re-attach the rest.
     for (const c of changes) this._emitChange(c, dir);
-    this._bus.emit("object:deselected", {});
     this._applying = false;
   }
 
