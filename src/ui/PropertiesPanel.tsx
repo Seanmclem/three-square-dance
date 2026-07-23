@@ -1040,7 +1040,7 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
           )}
 
           <div>
-            <div style={LABEL}>INSTANCE ORIGIN</div>
+            <div style={LABEL}>POSITION</div>
             <div style={{ display: "flex", gap: 6 }}>
               {originField("X", record.origin.position.x, v => onOriginChange?.({ ...record.origin, position: { ...record.origin.position, x: v } }))}
               {originField("Y", record.origin.position.y, v => onOriginChange?.({ ...record.origin, position: { ...record.origin.position, y: v } }))}
@@ -1048,17 +1048,19 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
               {originField("ROT°", record.origin.rotationY, v => onOriginChange?.({ ...record.origin, rotationY: v }))}
             </div>
             <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", marginTop: 4 }}>
-              Moves the whole instance. Walkable top sits 1m above origin Y for platform tiles.
+              Platform tiles are walked on 1m above Y.
             </div>
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            <PrefabBtn label="Re-expand" title="Rebuild members from the prefab (resets manual member tweaks)" onClick={onReexpand} />
-            <PrefabBtn label="Unlink" title="Detach members into plain entities — prefab edits stop affecting them" onClick={onUnlink} />
-            <PrefabBtn label="Delete instance" title="Remove every member and the prefab link" onClick={onDeleteInstance} danger />
+            <PrefabBtn label="Reset from prefab" title="Rebuild all pieces from the prefab. Settings and position keep their values; hand-edits to individual pieces are discarded" onClick={onReexpand} />
+            <PrefabBtn label="Unlink" title="Detach into plain, independent objects — prefab updates stop affecting them" onClick={onUnlink} />
+            <PrefabBtn label="Delete instance" title="Remove every piece and the prefab link" onClick={onDeleteInstance} danger />
           </div>
           <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.5 }}>
-            Members stay linked to the prefab — manual tweaks to individual members reset on the next re-expansion. Unlink first for a one-off copy.
+            The settings and position above are saved per placed copy and never reset.
+            Only hand-edits to individual pieces (shift-click) are overwritten when the
+            pieces rebuild — Unlink first if you want to keep those.
           </div>
         </div>
       )}
