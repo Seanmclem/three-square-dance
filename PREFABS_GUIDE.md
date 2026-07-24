@@ -150,6 +150,90 @@ walkable top at origin+1m regardless.
 
 ---
 
+## Authoring a new generator (code)
+
+Unlike snapshots, generators aren't made in the editor — each one is a small
+**TypeScript module** compiled into the app. There's no text-script or DSL:
+you write a function that takes the parameter values and returns the pieces.
+
+Two steps:
+
+**1. Write the module** — `src/prefab/generators/<yourName>.ts`, exporting a
+`PrefabGenerator`:
+
+```ts
+import type { PrefabTemplateEntity, PrefabVarValue, WorldObject } from "@/types";
+import type { PrefabGenerator } from "@/prefab/generators";
+
+export const fenceRow: PrefabGenerator = {
+  id:    "fence-row",              // stable key — instance records reference it forever
+  label: "Fence Row",              // what the Prefabs panel shows
+  variables: [
+    { name: "count",   label: "Posts",   type: "number", default: 4, min: 2, max: 40, step: 1 },
+    { name: "spacing", label: "Spacing", type: "number", default: 2, min: 1, max: 8,  step: 0.5 },
+  ],
+  expand(vars: Record<string, PrefabVarValue>): PrefabTemplateEntity[] {
+    const n = Math.max(2, Math.min(40, Math.round(Number(vars.count ?? 4))));
+    const gap = Number(vars.spacing ?? 2);
+    const out: PrefabTemplateEntity[] = [];
+    for (let i = 0; i < n; i++) {
+      const def: WorldObject = {
+        id: `post_${i}`,                    // template-local — replaced with a real id at placement
+        assetId: "platform_dirt_single",    // any id from the model library
+        position: { x: (i - (n - 1) / 2) * gap, y: 0, z: 0 },  // PREFAB-LOCAL space
+        rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 },
+        floor: 0,
+        properties: { interactable: false, npcSpawn: false, lootTableId: null, triggerEventId: null },
+      };
+      out.push({ memberKey: `post_${i}`, type: "object", def });
+    }
+    return out;
+  },
+};
+```
+
+**2. Register it** — add one line to the `GENERATORS` record in
+`src/prefab/generators/index.ts`:
+
+```ts
+export const GENERATORS: Record<string, PrefabGenerator> = {
+  [tiledPlatform.id]: tiledPlatform,
+  [fenceRow.id]:      fenceRow,
+};
+```
+
+That's everything. It appears under **BUILT-IN GENERATORS** in the Prefabs
+panel; the first Place creates its library entry, and its variables show up as
+the instance settings automatically.
+
+**Rules the pipeline relies on:**
+
+- **Pure and deterministic.** Same variable values in → identical pieces out,
+  every time. No randomness, no reading outside state — rebuilds (settings
+  changes, Reset, load-time refresh) regenerate from scratch and must
+  reproduce exactly.
+- **`memberKey` is each piece's identity.** Use stable role-style keys
+  (`tile_2_3`, `post_0`) — rebuilds diff old vs new pieces by key, which is
+  what keeps surviving pieces' entity ids (and external references to them)
+  intact when a parameter changes.
+- **Prefab-local space.** Emit positions relative to the placement point
+  (the pipeline applies the instance's position + rotation). For the Tiled
+  Platform convention, y=0 at the origin with walkable surfaces above it.
+- **Allowed piece types:** object, trigger-volume, shape, stair, ladder —
+  same set as snapshot capture. `assetId`s must exist in the model library
+  (missing ones render as fallback boxes).
+- **Clamp your inputs.** The panel enforces min/max, but hand-edited JSON
+  reaches `expand` too — clamp defensively like the example.
+- **Keep the variable-name set unique per generator.** Orphaned instances
+  auto-heal by matching their saved variable names against registered
+  generators — two generators with identical `{count, spacing}`-style
+  signatures would be ambiguous.
+
+Generators never ship to the runtime — scenes store the expanded pieces, so a
+published game needs none of this code.
+
+---
+
 ## JSON reference (debugging / hand-authoring)
 
 **Library** (`game.json`):
