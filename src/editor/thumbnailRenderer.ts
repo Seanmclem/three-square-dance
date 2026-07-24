@@ -18,7 +18,9 @@ let _renderer: THREE.WebGLRenderer | null = null;
 
 function getRenderer(): THREE.WebGLRenderer {
   if (!_renderer) {
-    _renderer = new THREE.WebGLRenderer({ antialias: true });
+    // alpha:true so icon renders (Phase 48) can output transparent PNGs; with an
+    // opaque scene.background set, normal thumbnail output is unchanged.
+    _renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     _renderer.setSize(THUMB_SIZE, THUMB_SIZE);
     _renderer.setPixelRatio(1);
   }
@@ -71,8 +73,9 @@ export class ThumbnailStage {
   /** True when the model had no measurable geometry (nothing to render). */
   get isEmpty(): boolean { return this._radius === 0; }
 
-  /** Render one frame at THUMB_SIZE² and return it as a PNG data URL. */
-  render(params: StageParams = DEFAULT_STAGE): string | null {
+  /** Render one frame at THUMB_SIZE² and return it as a PNG data URL.
+   *  opts.transparent renders against a fully transparent background (icon mode). */
+  render(params: StageParams = DEFAULT_STAGE, opts?: { transparent?: boolean }): string | null {
     if (this._radius === 0) return null;
     try {
       const renderer = getRenderer();
@@ -93,7 +96,15 @@ export class ThumbnailStage {
       this._camera.updateProjectionMatrix();
       this._camera.lookAt(this._center);
 
-      renderer.render(this._scene, this._camera);
+      if (opts?.transparent) {
+        const bg = this._scene.background;
+        this._scene.background = null;
+        renderer.setClearColor(0x000000, 0);
+        renderer.render(this._scene, this._camera);
+        this._scene.background = bg;
+      } else {
+        renderer.render(this._scene, this._camera);
+      }
       return renderer.domElement.toDataURL("image/png");
     } catch {
       return null;

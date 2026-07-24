@@ -11,6 +11,10 @@ interface Props {
   needsFolderGrant: boolean;
   onCancel:         () => void;
   onSave:           (dataUrl: string) => void;
+  // Icon mode (Phase 48): transparent-background render saved into the graphics
+  // library instead of overwriting the model thumbnail.
+  onSaveIcon?:            (dataUrl: string) => void;
+  needsGraphicsFolderGrant?: boolean;
 }
 
 const OVERLAY: React.CSSProperties = {
@@ -35,13 +39,15 @@ const SLIDER_ROW: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: "#7a7a7a",
 };
 
-export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave }: Props) {
+export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave, onSaveIcon, needsGraphicsFolderGrant }: Props) {
   const [status,  setStatus]  = useState<"loading" | "ready" | "error">("loading");
   const [preview, setPreview] = useState<string | null>(null);
   const [params,  setParams]  = useState<StageParams>(DEFAULT_STAGE);
+  const [iconMode, setIconMode] = useState(false);
 
   const stageRef  = useRef<ThumbnailStage | null>(null);
   const paramsRef = useRef<StageParams>(DEFAULT_STAGE);
+  const iconRef   = useRef(false);
   const dragRef   = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -71,7 +77,14 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
     paramsRef.current = { ...paramsRef.current, ...patch };
     setParams(paramsRef.current);
     const stage = stageRef.current;
-    if (stage) setPreview(stage.render(paramsRef.current));
+    if (stage) setPreview(stage.render(paramsRef.current, { transparent: iconRef.current }));
+  };
+
+  const setMode = (icon: boolean): void => {
+    iconRef.current = icon;
+    setIconMode(icon);
+    const stage = stageRef.current;
+    if (stage) setPreview(stage.render(paramsRef.current, { transparent: icon }));
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLElement>): void => {
@@ -121,7 +134,13 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
               width: THUMB_SIZE, height: THUMB_SIZE, alignSelf: "center",
               borderRadius: 5, overflow: "hidden",
               border: "1px solid rgba(255,255,255,0.08)",
-              background: "#2e2e33",
+              // Icon mode: checkerboard so the transparent background reads correctly.
+              background: iconMode ? "#4a4a4a" : "#2e2e33",
+              backgroundImage: iconMode
+                ? "linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%), linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%)"
+                : "none",
+              backgroundSize: iconMode ? "16px 16px, 16px 16px" : "auto",
+              backgroundPosition: iconMode ? "0 0, 8px 8px" : "0 0",
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: status === "ready" ? "grab" : "default",
               touchAction: "none", userSelect: "none",
@@ -164,9 +183,16 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
             Reset view
           </button>
 
-          {needsFolderGrant && (
+          {onSaveIcon && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#9aa3b5", cursor: "pointer" }}>
+              <input type="checkbox" checked={iconMode} onChange={e => setMode(e.currentTarget.checked)} />
+              Icon (transparent background) — saved to the graphics library
+            </label>
+          )}
+
+          {(iconMode ? needsGraphicsFolderGrant : needsFolderGrant) && (
             <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "6px 9px", fontSize: 10, color: "#c09050" }}>
-              Saving will ask for access to <span style={{ color: "#d8b060" }}>public/assets/models</span>.
+              Saving will ask for access to <span style={{ color: "#d8b060" }}>{iconMode ? "public/assets/graphics" : "public/assets/models"}</span>.
             </div>
           )}
         </div>
@@ -177,9 +203,9 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
           <button
             style={BTN(status === "ready" && !!preview)}
             disabled={status !== "ready" || !preview}
-            onClick={() => { if (preview) onSave(preview); }}
+            onClick={() => { if (preview) (iconMode && onSaveIcon ? onSaveIcon : onSave)(preview); }}
           >
-            Save Thumbnail
+            {iconMode ? "Save Icon" : "Save Thumbnail"}
           </button>
         </div>
       </div>

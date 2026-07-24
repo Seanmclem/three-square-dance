@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay, IconScript, IconMaterial, IconAudio, IconSkybox } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconScript, IconMaterial, IconAudio, IconSkybox, IconGraphic } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
@@ -38,6 +38,7 @@ const ASSET_ENTRIES: AssetEntry[] = [
   { label: "Decals",    Icon: TOOL_ICONS.decal,  kind: "tool",  tool: "decal" },
   { label: "Sounds",    Icon: IconAudio,         kind: "panel", panel: "audio" },
   { label: "Skybox",    Icon: IconSkybox,        kind: "panel", panel: "skybox" },
+  { label: "Graphics",  Icon: IconGraphic,       kind: "panel", panel: "graphics" },
 ];
 
 const assetEntryActive = (e: AssetEntry, activeTool: ToolId, openPanel: LeftPanelId) =>
@@ -211,7 +212,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
 
       {TOOLS.map(renderTool)}
 
-      {/* ASSETS group button — flyout with Models / Materials / Decals / Sounds / Skybox */}
+      {/* ASSETS group button — flyout with Models / Materials / Decals / Sounds / Skybox / Graphics */}
       {(() => {
         const activeEntry = ASSET_ENTRIES.find(e => assetEntryActive(e, activeTool, openPanel));
         const menuOpen = openMenu === "assets-menu";
@@ -221,7 +222,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         return (
           <div style={{ position: "relative", display: "flex" }}>
           <button
-            title="Assets — models, materials, decals, sounds, skybox"
+            title="Assets — models, materials, decals, sounds, skybox, graphics"
             onClick={(e) => {
               e.stopPropagation();
               setShowGameMenu(false);

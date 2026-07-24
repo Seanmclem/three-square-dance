@@ -51,7 +51,7 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'prefabs' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'graphics' | 'prefabs' | null;
 
 export interface GroupDef {
   id:   string;
@@ -137,6 +137,27 @@ export interface SkyboxDef {
 export interface SkyboxManifest {
   version:  string;
   skyboxes: SkyboxDef[];
+}
+
+// ─── 2D graphics asset types (Phase 48) ──────────────────────────────────────
+// Flat images (icons, HUD art, UI graphics — PNG with transparency, jpg, webp).
+// Mirrors SoundDef/SoundManifest: one manifest at public/assets/graphics/
+// manifest.json, loaded by AssetManager.initGraphics(). Consumed as <img src>
+// by item icons and custom GUI elements — never as scene textures.
+
+export interface GraphicDef {
+  id:           string;
+  label:        string;
+  category?:    string;   // pill filter — "Icons", "HUD", pack name…
+  path:         string;   // /assets/graphics/<file>.(png|jpg|webp)
+  width?:       number;   // intrinsic px, read at import via createImageBitmap
+  height?:      number;
+  attribution?: Attribution;
+}
+
+export interface GraphicsManifest {
+  version:  string;
+  graphics: GraphicDef[];
 }
 
 // ─── Primitive helpers ────────────────────────────────────────────────────────

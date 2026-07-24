@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest } from "@/types";
+import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest } from "@/types";
 
 export type { MaterialDef };
 
@@ -18,6 +18,7 @@ export class AssetManager {
   private readonly _audioBufferCache = new Map<string, AudioBuffer>();
   private _audioLoader: THREE.AudioLoader | null = null;
   private _skyboxRegistry:  Record<string, SkyboxDef>   = {};
+  private _graphicsRegistry: Record<string, GraphicDef> = {};
   private readonly _skyboxTextureCache = new Map<string, THREE.Texture>();
   private _rgbeLoader: { loadAsync: (url: string) => Promise<THREE.DataTexture> } | null = null;
   private _missingAssetIds    = new Set<string>();
@@ -45,6 +46,12 @@ export class AssetManager {
   private _resolve(path: string): string {
     if (!this._baseUrl) return path;
     return new URL(path.replace(/^\//, ''), this._baseUrl).href;
+  }
+
+  /** Public resolve for raw <img src> consumers (item icons, GUI graphics) so
+   *  /assets/** paths respect the runtime shell's assetsBase. */
+  resolveUrl(path: string): string {
+    return this._resolve(path);
   }
 
   setQuality(q: QualityScale): void {
@@ -232,6 +239,37 @@ export class AssetManager {
     this._audioBufferCache.set(id, buffer);
     return buffer;
   }
+
+  // ─── 2D graphics (Phase 48) — mirrors initDecals ─────────────────────────────
+
+  /** Fetch graphics/manifest.json, populate the 2D-graphics registry, return the list. */
+  async initGraphics(opts?: { verifyFiles?: boolean }): Promise<GraphicDef[]> {
+    try {
+      const res = await fetch(this._resolve('/assets/graphics/manifest.json'));
+      if (!res.ok) {
+        console.warn('AssetManager: no graphics manifest found — graphics picker will be empty');
+        this._graphicsRegistry = {};
+        return [];
+      }
+      const manifest: GraphicsManifest = await res.json();
+      const checks = opts?.verifyFiles === false
+        ? manifest.graphics.map(() => true)
+        : await Promise.all(manifest.graphics.map(g => this._fileExists(g.path)));
+      const present = manifest.graphics.filter((_, i) => checks[i]);
+      const missing = manifest.graphics.filter((_, i) => !checks[i]);
+      if (missing.length)
+        console.info(`AssetManager: ${missing.length} graphic(s) missing files, hidden:`, missing.map(g => g.id));
+      this._graphicsRegistry = Object.fromEntries(present.map(g => [g.id, g]));
+      return present;
+    } catch (err) {
+      console.warn('AssetManager: failed to load graphics manifest', err);
+      this._graphicsRegistry = {};
+      return [];
+    }
+  }
+
+  getGraphicDef(id: string): GraphicDef | undefined { return this._graphicsRegistry[id]; }
+  getGraphicList(): GraphicDef[] { return Object.values(this._graphicsRegistry); }
 
   // ─── Skyboxes (Phase 37) ─────────────────────────────────────────────────────
 

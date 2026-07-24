@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import { ownedItems, type OwnedItem } from "@/scripting/inventory";
+import { assetManager } from "@/core/AssetManager";
 
 /**
  * Inventory bag overlay (Phase 32, view-only). Split into a container and a
@@ -107,7 +108,7 @@ function BagListStyle({ items, selectedIndex, onSelect }: BagStyleProps) {
               }}
             >
               {it.def?.icon ? (
-                <img src={it.def.icon} alt="" style={{ width: 28, height: 28, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+                <img src={assetManager.resolveUrl(it.def.icon)} alt="" style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 4, flexShrink: 0 }} />
               ) : (
                 <div style={{ width: 28, height: 28, borderRadius: 4, flexShrink: 0, background: "rgba(255,255,255,0.08)" }} />
               )}

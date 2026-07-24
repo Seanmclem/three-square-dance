@@ -113,6 +113,15 @@ export const IconAudio = ({ color }: IconProps) => (
   </svg>
 );
 
+export const IconGraphic = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+    <rect x="5" y="5" width="18" height="18" rx="2" stroke={color} strokeWidth="1.5"/>
+    <path d="M9 14 l3.5 -6 3.5 6 z" fill={color} fillOpacity="0.55" stroke={color} strokeWidth="1.2" strokeLinejoin="round"/>
+    <circle cx="18.5" cy="10" r="1.8" stroke={color} strokeWidth="1.3"/>
+    <path d="M8 19.5 h12" stroke={color} strokeWidth="1.5" strokeLinecap="round"/>
+  </svg>
+);
+
 export const IconSkybox = ({ color }: IconProps) => (
   <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
     <rect x="4" y="5" width="20" height="18" rx="2" stroke={color} strokeWidth="1.5"/>

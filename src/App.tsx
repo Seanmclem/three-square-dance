@@ -66,6 +66,7 @@ import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { AudioImporterModal } from "@/ui/AudioImporterModal";
+import { GraphicsImporterModal } from "@/ui/GraphicsImporterModal";
 import { SkyboxImporterModal } from "@/ui/SkyboxImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
@@ -76,7 +77,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, PrefabDef, PrefabVarValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -155,6 +156,9 @@ export default function App() {
   const [skyboxDir,       setSkyboxDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [skyboxes,        setSkyboxes]         = useState<SkyboxDef[]>([]);
   const [skyboxImporterOpen, setSkyboxImporterOpen] = useState(false);
+  const [graphicsDir,     setGraphicsDir]      = useState<FileSystemDirectoryHandle | null>(null);
+  const [graphics,        setGraphics]         = useState<GraphicDef[]>([]);
+  const [graphicsImporterOpen, setGraphicsImporterOpen] = useState(false);
   const [pendingSkyboxEdit, setPendingSkyboxEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
@@ -276,6 +280,8 @@ export default function App() {
       setSounds(defs);
       bus.emit("sounds:loaded", { sounds: defs });
     }).catch(err => console.error("initAudio failed:", err));
+    assetManager.initGraphics().then(defs => setGraphics(defs))
+      .catch(err => console.error("initGraphics failed:", err));
     // Awaited before the scene load (below) so the registry is ready when the loaded
     // scene's world:sky fires — otherwise a saved image skybox would fail to _applySkybox
     // on cold load and silently fall back to the procedural sky.
@@ -2135,6 +2141,11 @@ export default function App() {
     setSounds(assetManager.getSoundList());
   };
 
+  const handleGraphicsReload = (): void => {
+    assetManager.initGraphics().then(defs => setGraphics(defs))
+      .catch(err => console.error("graphics reload failed:", err));
+  };
+
   const handleSkyboxesReload = (): void => {
     assetManager.initSkyboxes().then(defs => {
       setSkyboxes(defs);
@@ -2440,6 +2451,38 @@ export default function App() {
     assetManager.updateAsset(asset.id, { thumbnail: `${cleanPath}?v=${Date.now()}` });
     setAssets(assetManager.getAssetList());
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
+  };
+
+  // Save a transparent icon render of a model into the graphics library (Phase 48).
+  const handleSaveIcon = async (asset: AssetDef, dataUrl: string): Promise<void> => {
+    setStagingAsset(null);
+    const dir = await ensureDir(graphicsDir, setGraphicsDir);
+    if (!dir) return;
+    const fileName = `${asset.id}_icon.png`;
+    try {
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const fw = await fh.createWritable();
+      await fw.write(dataURLtoArrayBuffer(dataUrl));
+      await fw.close();
+
+      let manifest: GraphicsManifest = { version: "1.0", graphics: [] };
+      try {
+        const mh = await dir.getFileHandle("manifest.json");
+        manifest = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
+      } catch { /* new manifest */ }
+      const graphic: GraphicDef = {
+        id: `${asset.id}_icon`, label: `${asset.label} icon`, category: "Icons",
+        path: `/assets/graphics/${fileName}`, width: 256, height: 256,
+        ...(asset.attribution ? { attribution: asset.attribution } : {}),
+      };
+      manifest.graphics = manifest.graphics.filter(g => g.id !== graphic.id);
+      manifest.graphics.push(graphic);
+      const mw = await dir.getFileHandle("manifest.json", { create: true });
+      const w  = await mw.createWritable();
+      await w.write(JSON.stringify(manifest, null, 2));
+      await w.close();
+    } catch (err) { console.error("icon save failed:", err); return; }
+    handleGraphicsReload();
   };
 
   // ── Bake shapes → GLB (Phase 26) ──────────────────────────────────────────
@@ -3153,6 +3196,8 @@ export default function App() {
         onSkyboxImport={() => setSkyboxImporterOpen(true)}
         onDeleteSkyboxes={handleDeleteSkyboxes}
         onEditSkyboxes={handleRequestSkyboxEdit}
+        graphics={graphics}
+        onGraphicsImport={() => setGraphicsImporterOpen(true)}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}
@@ -3466,6 +3511,15 @@ SquareDance
         />
       )}
 
+      {graphicsImporterOpen && (
+        <GraphicsImporterModal
+          graphicsDir={graphicsDir}
+          onGraphicsDirSet={setGraphicsDir}
+          onComplete={() => { setGraphicsImporterOpen(false); handleGraphicsReload(); }}
+          onClose={() => setGraphicsImporterOpen(false)}
+        />
+      )}
+
       {skyboxImporterOpen && (
         <SkyboxImporterModal
           skyboxDir={skyboxDir}
@@ -3506,8 +3560,10 @@ SquareDance
         <ThumbnailStagerModal
           asset={stagingAsset}
           needsFolderGrant={!modelsDir}
+          needsGraphicsFolderGrant={!graphicsDir}
           onCancel={() => setStagingAsset(null)}
           onSave={dataUrl => void handleSaveThumbnail(stagingAsset, dataUrl)}
+          onSaveIcon={dataUrl => void handleSaveIcon(stagingAsset, dataUrl)}
         />
       )}
 

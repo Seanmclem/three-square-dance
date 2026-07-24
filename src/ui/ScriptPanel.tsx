@@ -26,8 +26,11 @@ import type {
   DialogueNode,
   DialogueOption,
   ItemDef,
+  GraphicDef,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
+import { GraphicPickerPopover } from "@/ui/GraphicsBrowser";
+import { assetManager } from "@/core/AssetManager";
 import { HelpTooltip } from "@/ui/HelpTooltip";
 import { DialogueFlowchart } from "@/ui/DialogueFlowchart";
 
@@ -252,6 +255,7 @@ export interface ScriptPanelProps {
   worldItems: ItemDef[];
   onWorldItemsChange: (items: ItemDef[]) => void;
   projectSceneIds?: string[];
+  graphics: GraphicDef[];
 }
 
 type TabId = "level" | "object" | "dialogue" | "state" | "items";
@@ -286,6 +290,7 @@ export function ScriptPanel({
   worldItems,
   onWorldItemsChange,
   projectSceneIds,
+  graphics,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -436,7 +441,7 @@ export function ScriptPanel({
           )}
         </>
       ) : tab === "items" ? (
-        <ItemsEditor items={worldItems} help={tabHelp} onChange={onWorldItemsChange} />
+        <ItemsEditor items={worldItems} help={tabHelp} onChange={onWorldItemsChange} graphics={graphics} />
       ) : tab === "dialogue" ? (
         (() => {
           const editingDialogue = editingDialogueId
@@ -3432,10 +3437,12 @@ function ItemsEditor({
   items,
   help,
   onChange,
+  graphics,
 }: {
   items: ItemDef[];
   help?: string;
   onChange: (items: ItemDef[]) => void;
+  graphics: GraphicDef[];
 }) {
   function replace(id: string, next: ItemDef): void {
     onChange(items.map((it) => (it.id === id ? next : it)));
@@ -3485,6 +3492,7 @@ function ItemsEditor({
           <ItemRow
             key={it.id}
             item={it}
+            graphics={graphics}
             onReplace={(next) => replace(it.id, next)}
             onRemove={() => remove(it.id)}
           />
@@ -3496,13 +3504,16 @@ function ItemsEditor({
 
 function ItemRow({
   item,
+  graphics,
   onReplace,
   onRemove,
 }: {
   item: ItemDef;
+  graphics: GraphicDef[];
   onReplace: (next: ItemDef) => void;
   onRemove: () => void;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   function set<K extends keyof ItemDef>(key: K, val: ItemDef[K]): void {
     onReplace({ ...item, [key]: val });
   }
@@ -3526,7 +3537,7 @@ function ItemRow({
         }}
       >
         {item.icon ? (
-          <img src={item.icon} alt="" style={{ width: 24, height: 24, objectFit: "cover", borderRadius: 3, flexShrink: 0 }} />
+          <img src={assetManager.resolveUrl(item.icon)} alt="" style={{ width: 24, height: 24, objectFit: "contain", borderRadius: 3, flexShrink: 0 }} />
         ) : (
           <div style={{ width: 24, height: 24, borderRadius: 3, flexShrink: 0, background: "rgba(255,255,255,0.08)" }} />
         )}
@@ -3543,13 +3554,20 @@ function ItemRow({
           ×
         </button>
       </div>
-      <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 4, position: "relative" }}>
         <input
           style={{ ...S.field, flex: 1 }}
           placeholder="Icon URL (optional)"
           value={item.icon ?? ""}
           onChange={(e) => set("icon", e.target.value || undefined)}
         />
+        <button
+          style={{ ...S.btn(), padding: "3px 8px" }}
+          title="Pick from the graphics library (Assets → Graphics)"
+          onClick={() => setPickerOpen((v) => !v)}
+        >
+          Pick
+        </button>
         <input
           type="number"
           min={1}
@@ -3559,6 +3577,13 @@ function ItemRow({
           value={item.stackSize ?? ""}
           onChange={(e) => set("stackSize", parseInt(e.target.value, 10) || undefined)}
         />
+        {pickerOpen && (
+          <GraphicPickerPopover
+            graphics={graphics}
+            onPick={(g) => set("icon", g.path)}
+            onClose={() => setPickerOpen(false)}
+          />
+        )}
       </div>
       <input
         style={{ ...S.field, marginBottom: 4 }}
