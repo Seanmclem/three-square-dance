@@ -259,6 +259,11 @@ level with the test tab's stale in-memory copy.
 window.__lsSnapshot = {
   value: localStorage.getItem('worldeditor_autosave'),
   ts:    localStorage.getItem('worldeditor_autosave_ts'),
+  // ⚠ ALSO snapshot the game save: exiting editor preview writes
+  // `worldeditor_gamesave` even in plain preview mode (bit the 2026-07-24 GUI
+  // session — test gameState keys landed in the user's Continue save). Restore
+  // it at session end. Runtime tabs: snapshot `runtime_gamesave:*` keys too.
+  gamesave: localStorage.getItem('worldeditor_gamesave'),
 };
 // Return the FULL snapshot value, not just a boolean — `window.__lsSnapshot` dies on the
 // first reload/navigation, and if you've overwritten the autosave by then the user's level
