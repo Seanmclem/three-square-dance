@@ -37,9 +37,10 @@ export class ControlSchemeManager {
   private _dialogueOpen = false;
   private _pauseOpen    = false;
   private _bagOpen      = false;
+  private _uiMenuOpen   = false;   // custom GUI menu (Phase 49)
   private _unsub: Array<() => void> = [];
 
-  private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen || this._bagOpen; }
+  private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen || this._bagOpen || this._uiMenuOpen; }
 
   constructor(
     _dom: HTMLCanvasElement,      // canvas — reserved for future pointer-lock re-entry wiring
@@ -64,6 +65,8 @@ export class ControlSchemeManager {
       this._bus.on("pause:closed",     () => { this._pauseOpen = false; }),
       this._bus.on("bag:show",         () => { this._bagOpen = true; }),
       this._bus.on("bag:closed",       () => { this._bagOpen = false; }),
+      this._bus.on("ui:menu-shown",    () => { this._uiMenuOpen = true; }),
+      this._bus.on("ui:menu-closed",   () => { this._uiMenuOpen = false; }),
     );
     this._setScheme(this._guessScheme());
   }

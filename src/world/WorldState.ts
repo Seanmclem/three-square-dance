@@ -4,7 +4,7 @@ import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks, LightDef,
-  ItemDef, StateSchema, PrefabDef, PrefabInstanceRecord,
+  ItemDef, StateSchema, PrefabDef, PrefabInstanceRecord, UiElementDef,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -25,6 +25,7 @@ export class WorldState {
   // hand-builds its output from the listed fields (activeZoneId precedent).
   gameItems?:       ItemDef[];
   gameStateSchema?: Record<string, StateSchema>;
+  gameUiElements?:  UiElementDef[];
   // Prefab library (Phase 44) — session-only mirror of the App's library state
   // (game.json prefabs when a project is open, else the localStorage session
   // library). Same non-serialized contract as gameItems.

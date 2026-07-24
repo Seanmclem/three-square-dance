@@ -368,7 +368,13 @@ export interface BusEvents {
   // Overlay → DialogueRunner: player picked options[index] of the shown node
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string };
-  "ui:show":               { elementId: string };
+  // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
+  // it survives scene transitions and saves; these events cover menu interaction:
+  // overlay → engine on option select, and overlay → ControlSchemeManager for
+  // menu-mode input routing while a GUI menu is up.
+  "ui:menu-pick":          { elementId: string; optionId: string };
+  "ui:menu-shown":         { elementId: string };
+  "ui:menu-closed":        { elementId: string };
   "trigger:volume-enter":  { volumeId: string };
   "trigger:volume-exit":   { volumeId: string };
   "triggervolume:added":   { zoneId: string; volume: TriggerVolume };
@@ -611,6 +617,7 @@ export interface WorldConfig {
   stateSchema?:    Record<string, StateSchema>;   // authored gameplay-state keys (defaults + numeric clamp)
   items?:          ItemDef[];                     // item registry — inventory counts live at gameState `inv.<id>`
   audio?:          WorldAudio;                    // scene-level ambient/music + authored mix (Phase 36)
+  uiElements?:     UiElementDef[];                // custom GUI registry — visibility lives at gameState `__ui.<id>` (Phase 49)
 }
 
 // ─── Audio (Phase 36) ─────────────────────────────────────────────────────────
@@ -1166,6 +1173,7 @@ export type ActionType =
   | 'fade_screen'
   | 'teleport_player'
   | 'show_ui'
+  | 'hide_ui'
   | 'run_script'
   | 'load_scene'
   | 'start_mover'
@@ -1237,6 +1245,7 @@ export interface GameConfig {
   items?:       ItemDef[];
   stateSchema?: Record<string, StateSchema>;
   prefabs?:     PrefabDef[];   // cross-scene prefab library (Phase 44)
+  uiElements?:  UiElementDef[]; // cross-scene custom GUI registry (Phase 49)
 }
 
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */
@@ -1318,6 +1327,77 @@ export interface ScriptDef {
   actions:    ScriptAction[];
   oneShot:    boolean;
 }
+
+// ─── Custom game GUI (Phase 49) ──────────────────────────────────────────────
+// Author-defined HUD widgets + simple menus, rendered by GameGuiOverlay in both
+// shells. A registry like items: scene-level defs in WorldConfig.uiElements,
+// game-level in GameConfig.uiElements, merged by mergeUiElementDefs (scene wins
+// on duplicate id). Visibility lives in gameState at `__ui.<id>` — set by the
+// show_ui / hide_ui script actions — so it survives scene transitions, persists
+// into the runtime save, and resets on New Game. Widgets bound to a stateKey
+// re-render live via `state:changed`.
+
+export type UiAnchor = 'top-left' | 'top-center' | 'top-right'
+                     | 'bottom-left' | 'bottom-center' | 'bottom-right';
+
+interface UiElementBase {
+  id:            string;      // ui_<uuid8> — visibility key is `__ui.<id>`
+  label:         string;      // editor display name
+  anchor:        UiAnchor;
+  offsetX?:      number;      // px inward from the anchored corner/edge (default 16)
+  offsetY?:      number;
+  startVisible?: boolean;     // shown without show_ui (default false)
+}
+
+export interface UiBarElement extends UiElementBase {
+  kind: 'bar';
+  stateKey: string;           // numeric gameState key (e.g. "health")
+  max?: number;               // full-bar value (default 100)
+  width?: number;             // px, default 160
+  height?: number;            // px, default 14
+  color?: string;             // fill color, default "#e05555"
+  graphicId?: string;         // optional GraphicDef icon left of the bar
+}
+
+export interface UiCounterElement extends UiElementBase {
+  kind: 'counter';
+  stateKey: string;           // any key incl. `inv.<itemId>`
+  graphicId?: string;
+  prefix?: string;            // shown before the number (default "×")
+  size?: number;              // icon px (default 24)
+}
+
+export interface UiLabelElement extends UiElementBase {
+  kind: 'label';
+  text: string;
+  fontSize?: number;          // px, default 13
+  color?: string;             // default "#dde3f0"
+}
+
+export interface UiImageElement extends UiElementBase {
+  kind: 'image';
+  graphicId: string;
+  width?: number;             // px; absent = the graphic's intrinsic width (capped)
+  height?: number;
+  opacity?: number;           // 0..1, default 1
+}
+
+export interface UiMenuOption {
+  id:          string;             // stable key for the editor
+  text:        string;
+  conditions?: ScriptCondition[];  // ALL must pass or the option is hidden (dialogue precedent)
+  actions?:    ScriptAction[];     // run on pick, through ScriptEngine dispatch
+  closeOnPick?: boolean;           // default true — hide the menu after picking
+}
+
+export interface UiMenuElement extends UiElementBase {
+  kind: 'menu';
+  title?: string;
+  options: UiMenuOption[];
+}
+
+export type UiElementDef = UiBarElement | UiCounterElement | UiLabelElement
+                         | UiImageElement | UiMenuElement;
 
 export interface TriggerVolume {
   id:       string;

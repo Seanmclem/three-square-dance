@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, GraphicDef, PrefabDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -76,6 +76,8 @@ interface LeftPanelProps {
   worldItems:           ItemDef[];
   projectSceneIds?:     string[];
   onWorldItemsChange:   (items: ItemDef[]) => void;
+  uiElements:           UiElementDef[];
+  onUiElementsChange:   (uiElements: UiElementDef[]) => void;
   // decals panel
   decalTextures:   DecalTexDef[];
   selectedDecalId: string | null;
@@ -103,7 +105,7 @@ export function LeftPanel({
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneLights, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing,
-  worldItems, onWorldItemsChange, projectSceneIds,
+  worldItems, onWorldItemsChange, projectSceneIds, uiElements, onUiElementsChange,
   decalTextures, selectedDecalId, onDecalSelect,
   prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete, onPrefabEdit,
 }: LeftPanelProps) {
@@ -281,6 +283,8 @@ export function LeftPanel({
                 projectSceneIds={projectSceneIds}
                 onWorldItemsChange={onWorldItemsChange}
                 graphics={graphics}
+                uiElements={uiElements}
+                onUiElementsChange={onUiElementsChange}
               />
             )}
           </div>

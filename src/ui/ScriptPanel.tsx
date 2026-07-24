@@ -27,6 +27,9 @@ import type {
   DialogueOption,
   ItemDef,
   GraphicDef,
+  UiElementDef,
+  UiMenuOption,
+  UiAnchor,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { GraphicPickerPopover } from "@/ui/GraphicsBrowser";
@@ -152,6 +155,7 @@ const ACTION_TYPES: ActionType[] = [
   "fade_screen",
   "fire_event",
   "give_item",
+  "hide_ui",
   "light_off",
   "light_on",
   "load_scene",
@@ -217,6 +221,20 @@ function blankItem(): ItemDef {
   };
 }
 
+const UI_KINDS = ["bar", "counter", "label", "image", "menu"] as const;
+const UI_ANCHORS: UiAnchor[] = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"];
+
+function blankUiElement(kind: (typeof UI_KINDS)[number]): UiElementDef {
+  const base = { id: `ui_${crypto.randomUUID().slice(0, 8)}`, anchor: "top-left" as UiAnchor };
+  switch (kind) {
+    case "bar":     return { ...base, kind, label: "New Bar",     stateKey: "health" };
+    case "counter": return { ...base, kind, label: "New Counter", stateKey: "" };
+    case "label":   return { ...base, kind, label: "New Label",   text: "Text…" };
+    case "image":   return { ...base, kind, label: "New Image",   graphicId: "" };
+    case "menu":    return { ...base, kind, label: "New Menu", anchor: "bottom-center", options: [] };
+  }
+}
+
 /** First free auto node id (n1, n2, …). */
 function nextNodeId(nodes: DialogueNode[]): string {
   let k = 1;
@@ -256,9 +274,11 @@ export interface ScriptPanelProps {
   onWorldItemsChange: (items: ItemDef[]) => void;
   projectSceneIds?: string[];
   graphics: GraphicDef[];
+  uiElements: UiElementDef[];
+  onUiElementsChange: (uiElements: UiElementDef[]) => void;
 }
 
-type TabId = "level" | "object" | "dialogue" | "state" | "items";
+type TabId = "level" | "object" | "dialogue" | "state" | "items" | "ui";
 
 // ── ScriptPanel ───────────────────────────────────────────────────────────────
 
@@ -291,6 +311,8 @@ export function ScriptPanel({
   onWorldItemsChange,
   projectSceneIds,
   graphics,
+  uiElements,
+  onUiElementsChange,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -380,7 +402,9 @@ export function ScriptPanel({
               : stateScope === "game"
                 ? "GAME scope: shared defaults + clamps for every scene in the project (game.json). A scene's own entry for the same key overrides these. Saved with the project on Save."
                 : "SCENE scope: this scene's own keys — they override the project's GAME entries for the same key while this scene is loaded."
-            : "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds.";
+            : tab === "items"
+              ? "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds."
+              : "Custom in-game UI — health bars, counters, labels, images, and simple menus. Elements start hidden unless 'visible at start' is on; scripts show/hide them with the show_ui / hide_ui actions. Bars and counters bind to a state key and update live; menu options run actions when picked.";
 
   return (
     <div style={S.root}>
@@ -394,7 +418,7 @@ export function ScriptPanel({
       </datalist>
       {/* Tabs */}
       <div style={S.tabs}>
-        {(["level", "object", "dialogue", "state", "items"] as TabId[]).map((t) => (
+        {(["level", "object", "dialogue", "state", "items", "ui"] as TabId[]).map((t) => (
           <button
             key={t}
             style={S.tab(tab === t)}
@@ -404,7 +428,7 @@ export function ScriptPanel({
               setEditingDialogueId(null);
             }}
           >
-            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : t === "state" ? "STATE" : "ITEMS"}
+            {t === "level" ? "LEVEL" : t === "object" ? "SELECTED" : t === "dialogue" ? "DIALOGUE" : t === "state" ? "STATE" : t === "items" ? "ITEMS" : "UI"}
           </button>
         ))}
       </div>
@@ -442,6 +466,28 @@ export function ScriptPanel({
         </>
       ) : tab === "items" ? (
         <ItemsEditor items={worldItems} help={tabHelp} onChange={onWorldItemsChange} graphics={graphics} />
+      ) : tab === "ui" ? (
+        <UiElementsEditor
+          elements={uiElements}
+          help={tabHelp}
+          onChange={onUiElementsChange}
+          graphics={graphics}
+          zoneObjects={zoneObjects}
+          zonePlatforms={zonePlatforms}
+          zoneShapes={zoneShapes}
+          zoneLights={zoneLights}
+          zoneStairs={zoneStairs}
+          zoneWalls={zoneWalls}
+          zoneFloors={zoneFloors}
+          zoneCheckpoints={zoneCheckpoints}
+          triggerVolumes={triggerVolumes}
+          groups={groups}
+          assets={assets}
+          zoneDialogues={zoneDialogues}
+          worldItems={worldItems}
+          uiElements={uiElements}
+          projectSceneIds={projectSceneIds}
+        />
       ) : tab === "dialogue" ? (
         (() => {
           const editingDialogue = editingDialogueId
@@ -464,6 +510,7 @@ export function ScriptPanel({
               assets={assets}
               zoneDialogues={zoneDialogues}
               worldItems={worldItems}
+              uiElements={uiElements}
               projectSceneIds={projectSceneIds}
               onBack={() => setEditingDialogueId(null)}
               onChange={(d) =>
@@ -504,6 +551,7 @@ export function ScriptPanel({
           assets={assets}
           zoneDialogues={zoneDialogues}
           worldItems={worldItems}
+          uiElements={uiElements}
           projectSceneIds={projectSceneIds}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
@@ -846,6 +894,7 @@ function ScriptEditor({
   assets,
   zoneDialogues,
   worldItems,
+  uiElements,
   projectSceneIds,
   ownerIsEntity,
   selectedObjectId,
@@ -868,6 +917,7 @@ function ScriptEditor({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
@@ -1124,6 +1174,7 @@ function ScriptEditor({
               assets={assets}
               zoneDialogues={zoneDialogues}
               worldItems={worldItems}
+              uiElements={uiElements}
               projectSceneIds={projectSceneIds}
               onChange={(na) =>
                 set(
@@ -1646,6 +1697,7 @@ function ActionRow({
   assets,
   zoneDialogues,
   worldItems,
+  uiElements,
   projectSceneIds,
   onChange,
   onRemove,
@@ -1664,6 +1716,7 @@ function ActionRow({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
@@ -1719,6 +1772,7 @@ function ActionRow({
         assets={assets}
         zoneDialogues={zoneDialogues}
         worldItems={worldItems}
+        uiElements={uiElements}
         projectSceneIds={projectSceneIds}
         onChange={onChange}
       />
@@ -1741,6 +1795,7 @@ function ActionFields({
   assets,
   zoneDialogues,
   worldItems,
+  uiElements,
   projectSceneIds,
   onChange,
 }: {
@@ -1758,6 +1813,7 @@ function ActionFields({
   assets: AssetDef[];
   zoneDialogues: DialogueTreeDef[];
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   onChange: (a: ScriptAction) => void;
 }) {
@@ -2373,13 +2429,23 @@ function ActionFields({
       );
 
     case "show_ui":
+    case "hide_ui":
       return (
-        <input
-          style={S.field}
-          placeholder="UI element ID"
+        <select
+          style={S.select}
           value={action.uiElementId ?? ""}
-          onChange={(e) => set({ uiElementId: e.target.value })}
-        />
+          onChange={(e) => set({ uiElementId: e.target.value || undefined })}
+        >
+          <option value="">— UI element (SCRIPTS → UI tab) —</option>
+          {uiElements.map((el) => (
+            <option key={el.id} value={el.id}>
+              {el.label} ({el.kind})
+            </option>
+          ))}
+          {action.uiElementId && !uiElements.some((el) => el.id === action.uiElementId) && (
+            <option value={action.uiElementId}>{action.uiElementId} (custom)</option>
+          )}
+        </select>
       );
 
     case "run_script":
@@ -2477,6 +2543,7 @@ function DialogueList({
 function DialogueEditor({
   dialogue,
   worldItems,
+  uiElements,
   projectSceneIds,
   zoneObjects,
   zonePlatforms,
@@ -2497,6 +2564,7 @@ function DialogueEditor({
 }: {
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -2602,6 +2670,7 @@ function DialogueEditor({
         depth={depth}
         dialogue={dialogue}
         worldItems={worldItems}
+        uiElements={uiElements}
         projectSceneIds={projectSceneIds}
         isStart={node.id === dialogue.startNode}
         zoneObjects={zoneObjects}
@@ -2824,6 +2893,7 @@ function DialogueNodeCard({
   depth,
   dialogue,
   worldItems,
+  uiElements,
   projectSceneIds,
   isStart,
   zoneObjects,
@@ -2847,6 +2917,7 @@ function DialogueNodeCard({
   depth: number;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   isStart: boolean;
   zoneObjects: WorldObject[];
@@ -3037,6 +3108,7 @@ function DialogueNodeCard({
             onToggleOpen={(v) => setOpenIds((m) => ({ ...m, [opt.id]: v }))}
             dialogue={dialogue}
             worldItems={worldItems}
+            uiElements={uiElements}
             projectSceneIds={projectSceneIds}
             zoneObjects={zoneObjects}
             zonePlatforms={zonePlatforms}
@@ -3117,6 +3189,7 @@ function DialogueOptionRow({
   onToggleOpen,
   dialogue,
   worldItems,
+  uiElements,
   projectSceneIds,
   zoneObjects,
   zonePlatforms,
@@ -3141,6 +3214,7 @@ function DialogueOptionRow({
   onToggleOpen: (open: boolean) => void;
   dialogue: DialogueTreeDef;
   worldItems: ItemDef[];
+  uiElements: UiElementDef[];
   projectSceneIds?: string[];
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -3338,6 +3412,7 @@ function DialogueOptionRow({
           assets={assets}
           zoneDialogues={zoneDialogues}
           worldItems={worldItems}
+          uiElements={uiElements}
           projectSceneIds={projectSceneIds}
           onChange={(na) =>
             set({ actions: actions.map((x, j) => (j === i ? na : x)) })
@@ -3604,6 +3679,406 @@ function ItemRow({
         />
         <span style={{ color: "#6a7488", fontSize: 10 }}>on New Game</span>
       </label>
+    </div>
+  );
+}
+
+// ── UiElementsEditor (UI tab, Phase 49) ───────────────────────────────────────
+// Edits the custom-GUI registry (WorldConfig.uiElements / game.json). Rendered
+// by GameGuiOverlay while playing; visibility is scripted via show_ui/hide_ui.
+
+interface UiZoneBag {
+  zoneObjects: WorldObject[];
+  zonePlatforms: PlatformDef[];
+  zoneShapes: ShapeDef[];
+  zoneLights: LightDef[];
+  zoneStairs: StairDef[];
+  zoneWalls: WallDef[];
+  zoneFloors: FloorDef[];
+  zoneCheckpoints: CheckpointDef[];
+  triggerVolumes: TriggerVolume[];
+  groups: GroupDef[];
+  assets: AssetDef[];
+  zoneDialogues: DialogueTreeDef[];
+  worldItems: ItemDef[];
+  uiElements: UiElementDef[];
+  projectSceneIds?: string[];
+}
+
+function UiElementsEditor({
+  elements,
+  help,
+  onChange,
+  graphics,
+  ...zoneBag
+}: {
+  elements: UiElementDef[];
+  help?: string;
+  onChange: (elements: UiElementDef[]) => void;
+  graphics: GraphicDef[];
+} & UiZoneBag) {
+  const [newKind, setNewKind] = useState<(typeof UI_KINDS)[number]>("bar");
+
+  function replace(id: string, next: UiElementDef): void {
+    onChange(elements.map((el) => (el.id === id ? next : el)));
+  }
+  function remove(id: string): void {
+    if (confirm("Delete this UI element? Scripts referencing it keep the raw id.")) {
+      onChange(elements.filter((el) => el.id !== id));
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, padding: "6px 10px", flexShrink: 0 }}>
+        {help && <HelpTooltip side="below" align="right" text={help} />}
+        <select style={S.select} value={newKind} onChange={(e) => setNewKind(e.target.value as (typeof UI_KINDS)[number])}>
+          {UI_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+        <button style={S.btn(true)} onClick={() => onChange([...elements, blankUiElement(newKind)])}>
+          + New
+        </button>
+      </div>
+      <div style={S.scroll}>
+        {elements.length === 0 && (
+          <div style={{ color: "#98a2b8", fontSize: 11, padding: "16px 12px", textAlign: "center" }}>
+            No UI elements yet — pick a kind and hit + New. Bars and counters
+            bind to a state key; menus list options that run actions. Show them
+            in-game with the show_ui action (or "visible at start").
+          </div>
+        )}
+        {elements.map((el) => (
+          <UiElementRow
+            key={el.id}
+            element={el}
+            graphics={graphics}
+            zoneBag={zoneBag}
+            onReplace={(next) => replace(el.id, next)}
+            onRemove={() => remove(el.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Small graphic-id field: readonly id text + Pick button + popover.
+function GraphicIdField({
+  value,
+  graphics,
+  placeholder,
+  onChange,
+}: {
+  value: string | undefined;
+  graphics: GraphicDef[];
+  placeholder: string;
+  onChange: (id: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const def = value ? graphics.find((g) => g.id === value) : undefined;
+  return (
+    <div style={{ display: "flex", gap: 4, flex: 1, position: "relative", alignItems: "center" }}>
+      {def && (
+        <img src={assetManager.resolveUrl(def.path)} alt="" style={{ width: 20, height: 20, objectFit: "contain", flexShrink: 0 }} />
+      )}
+      <input
+        style={{ ...S.field, flex: 1 }}
+        placeholder={placeholder}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      />
+      <button style={{ ...S.btn(), padding: "3px 8px" }} title="Pick from the graphics library" onClick={() => setOpen((v) => !v)}>
+        Pick
+      </button>
+      {open && (
+        <GraphicPickerPopover
+          graphics={graphics}
+          onPick={(g) => onChange(g.id)}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function UiElementRow({
+  element,
+  graphics,
+  zoneBag,
+  onReplace,
+  onRemove,
+}: {
+  element: UiElementDef;
+  graphics: GraphicDef[];
+  zoneBag: UiZoneBag;
+  onReplace: (next: UiElementDef) => void;
+  onRemove: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  function set(changes: Partial<UiElementDef>): void {
+    onReplace({ ...element, ...changes } as UiElementDef);
+  }
+
+  const numField = (val: number | undefined, ph: string, title: string, onVal: (n: number | undefined) => void, width = 58) => (
+    <input
+      type="number"
+      style={{ ...S.field, flex: `0 0 ${width}px` }}
+      placeholder={ph}
+      title={title}
+      value={val ?? ""}
+      onChange={(e) => onVal(e.target.value === "" ? undefined : Number(e.target.value))}
+    />
+  );
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
+      margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)",
+    }}>
+      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+        <span style={{
+          fontSize: 9, color: "#80aaff", background: "rgba(80,140,255,0.12)",
+          border: "1px solid rgba(80,140,255,0.25)", borderRadius: 3,
+          padding: "2px 5px", flexShrink: 0, letterSpacing: 0.5,
+        }}>{element.kind}</span>
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Label"
+          value={element.label}
+          onChange={(e) => set({ label: e.target.value })}
+        />
+        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
+        <select
+          style={{ ...S.select, flex: 1 }}
+          title="Screen anchor"
+          value={element.anchor}
+          onChange={(e) => set({ anchor: e.target.value as UiAnchor })}
+        >
+          {UI_ANCHORS.map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        {numField(element.offsetX, "x 16", "offset from the anchored edge (px)", (n) => set({ offsetX: n }))}
+        {numField(element.offsetY, "y 16", "offset from the anchored edge (px)", (n) => set({ offsetY: n }))}
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0 }} title="Shown without needing a show_ui action">
+          <input
+            type="checkbox"
+            checked={!!element.startVisible}
+            onChange={(e) => set({ startVisible: e.target.checked || undefined })}
+          />
+          visible at start
+        </label>
+      </div>
+
+      {element.kind === "bar" && (
+        <>
+          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+            <input
+              style={{ ...S.field, flex: 1 }}
+              placeholder="State key (e.g. health)"
+              list="wb-state-keys"
+              value={element.stateKey}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+            {numField(element.max, "max 100", "value at which the bar is full", (n) => set({ max: n }))}
+          </div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {numField(element.width, "w 160", "bar width (px)", (n) => set({ width: n }))}
+            {numField(element.height, "h 14", "bar height (px)", (n) => set({ height: n }))}
+            <input
+              type="color"
+              style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
+              title="fill color"
+              value={element.color ?? "#e05555"}
+              onChange={(e) => set({ color: e.target.value })}
+            />
+            <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon (optional)" onChange={(id) => set({ graphicId: id })} />
+          </div>
+        </>
+      )}
+
+      {element.kind === "counter" && (
+        <>
+          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
+            <input
+              style={{ ...S.field, flex: 1 }}
+              placeholder="State key (e.g. inv.<item> or coins)"
+              list="wb-state-keys"
+              value={element.stateKey}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+            <input
+              style={{ ...S.field, flex: "0 0 48px" }}
+              placeholder="×"
+              title="text before the number"
+              value={element.prefix ?? ""}
+              onChange={(e) => set({ prefix: e.target.value || undefined })}
+            />
+            {numField(element.size, "px 24", "icon size (px)", (n) => set({ size: n }), 52)}
+          </div>
+          <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon (optional)" onChange={(id) => set({ graphicId: id })} />
+        </>
+      )}
+
+      {element.kind === "label" && (
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <input
+            style={{ ...S.field, flex: 1 }}
+            placeholder="Text"
+            value={element.text}
+            onChange={(e) => set({ text: e.target.value })}
+          />
+          {numField(element.fontSize, "px 13", "font size", (n) => set({ fontSize: n }), 52)}
+          <input
+            type="color"
+            style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
+            title="text color"
+            value={element.color ?? "#dde3f0"}
+            onChange={(e) => set({ color: e.target.value })}
+          />
+        </div>
+      )}
+
+      {element.kind === "image" && (
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="graphic" onChange={(id) => set({ graphicId: id ?? "" })} />
+          {numField(element.width, "w", "width (px; blank = image size)", (n) => set({ width: n }), 48)}
+          {numField(element.height, "h", "height (px)", (n) => set({ height: n }), 48)}
+        </div>
+      )}
+
+      {element.kind === "menu" && (
+        <>
+          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
+            <input
+              style={{ ...S.field, flex: 1 }}
+              placeholder="Title (optional)"
+              value={element.title ?? ""}
+              onChange={(e) => set({ title: e.target.value || undefined })}
+            />
+            <button style={{ ...S.btn(), fontSize: 10 }} onClick={() => setExpanded((v) => !v)}>
+              {expanded ? "▾" : "▸"} {element.options.length} option{element.options.length !== 1 ? "s" : ""}
+            </button>
+          </div>
+          {expanded && (
+            <div style={{ paddingLeft: 6, borderLeft: "2px solid rgba(80,140,255,0.2)" }}>
+              {element.options.map((opt, i) => (
+                <UiMenuOptionRow
+                  key={opt.id}
+                  option={opt}
+                  graphics={graphics}
+                  zoneBag={zoneBag}
+                  onChange={(next) => set({ options: element.options.map((o, j) => (j === i ? next : o)) })}
+                  onRemove={() => set({ options: element.options.filter((_, j) => j !== i) })}
+                />
+              ))}
+              <button
+                style={{ ...S.btn(), fontSize: 10, marginBottom: 4 }}
+                onClick={() => set({ options: [...element.options, { id: `opt_${crypto.randomUUID().slice(0, 8)}`, text: "" }] })}
+              >
+                + Add option
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function UiMenuOptionRow({
+  option,
+  zoneBag,
+  onChange,
+  onRemove,
+}: {
+  option: UiMenuOption;
+  graphics: GraphicDef[];
+  zoneBag: UiZoneBag;
+  onChange: (next: UiMenuOption) => void;
+  onRemove: () => void;
+}) {
+  function set(changes: Partial<UiMenuOption>): void {
+    onChange({ ...option, ...changes });
+  }
+  const conditions = option.conditions ?? [];
+  const actions = option.actions ?? [];
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.02)", borderRadius: 4, padding: "5px 6px",
+      marginBottom: 4, border: "1px solid rgba(255,255,255,0.05)",
+    }}>
+      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+        <input
+          style={{ ...S.field, flex: 1 }}
+          placeholder="Option text"
+          value={option.text}
+          onChange={(e) => set({ text: e.target.value })}
+        />
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0 }} title="Hide the menu after this option is picked">
+          <input
+            type="checkbox"
+            checked={option.closeOnPick !== false}
+            onChange={(e) => set({ closeOnPick: e.target.checked ? undefined : false })}
+          />
+          close
+        </label>
+        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 9, color: "#8b94a8", letterSpacing: 0.5 }}>CONDITIONS (all must pass)</span>
+        <button
+          style={{ ...S.btn(), fontSize: 10 }}
+          onClick={() => set({ conditions: [...conditions, { type: "has_state" } as ScriptCondition] })}
+        >
+          + Add
+        </button>
+      </div>
+      {conditions.map((c, i) => (
+        <ConditionRow
+          key={i}
+          condition={c}
+          worldItems={zoneBag.worldItems}
+          onChange={(nc) => set({ conditions: conditions.map((x, j) => (j === i ? nc : x)) })}
+          onRemove={() => set({ conditions: conditions.filter((_, j) => j !== i) })}
+        />
+      ))}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
+        <span style={{ fontSize: 9, color: "#8b94a8", letterSpacing: 0.5 }}>ACTIONS (run on pick)</span>
+        <button
+          style={{ ...S.btn(), fontSize: 10 }}
+          onClick={() => set({ actions: [...actions, { type: "set_state" } as ScriptAction] })}
+        >
+          + Add
+        </button>
+      </div>
+      {actions.map((a, i) => (
+        <ActionRow
+          key={i}
+          action={a}
+          zoneObjects={zoneBag.zoneObjects}
+          zonePlatforms={zoneBag.zonePlatforms}
+          zoneShapes={zoneBag.zoneShapes}
+          zoneLights={zoneBag.zoneLights}
+          zoneStairs={zoneBag.zoneStairs}
+          zoneWalls={zoneBag.zoneWalls}
+          zoneFloors={zoneBag.zoneFloors}
+          zoneCheckpoints={zoneBag.zoneCheckpoints}
+          triggerVolumes={zoneBag.triggerVolumes}
+          groups={zoneBag.groups}
+          assets={zoneBag.assets}
+          zoneDialogues={zoneBag.zoneDialogues}
+          worldItems={zoneBag.worldItems}
+          uiElements={zoneBag.uiElements}
+          projectSceneIds={zoneBag.projectSceneIds}
+          onChange={(na) => set({ actions: actions.map((x, j) => (j === i ? na : x)) })}
+          onRemove={() => set({ actions: actions.filter((_, j) => j !== i) })}
+        />
+      ))}
     </div>
   );
 }

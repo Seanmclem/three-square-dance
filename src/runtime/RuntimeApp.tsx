@@ -15,6 +15,7 @@ import { PreviewHUD } from "@/ui/PreviewHUD";
 import { DialogueOverlay, type DialogueOverlayProps } from "@/ui/DialogueOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
 import { BagOverlay } from "@/ui/BagOverlay";
+import { GameGuiOverlay } from "@/ui/GameGuiOverlay";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { FpsCounter } from "@/ui/FpsCounter";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
@@ -233,6 +234,7 @@ export default function RuntimeApp() {
       assetManager.initAssets({ verifyFiles: false }).catch(err => console.error("initAssets failed:", err));
       assetManager.initDecals({ verifyFiles: false }).catch(err => console.error("initDecals failed:", err));
       assetManager.initAudio({ verifyFiles: false }).catch(err => console.error("initAudio failed:", err));
+      assetManager.initGraphics({ verifyFiles: false }).catch(err => console.error("initGraphics failed:", err));
       // Awaited below so the skybox registry is populated before the scene's world:sky
       // fires (SceneManager._applySkybox needs the SkyboxDef to load its image).
       const skyboxesReady = assetManager.initSkyboxes({ verifyFiles: false })
@@ -324,6 +326,10 @@ export default function RuntimeApp() {
 
       {shell === "playing" && (
         <PreviewHUD bus={busRef.current} activeZoneName={zoneName} scheme={previewScheme} />
+      )}
+
+      {shell === "playing" && worldRef.current && (
+        <GameGuiOverlay bus={busRef.current} world={worldRef.current} />
       )}
 
       {shell === "playing" && previewScheme === "touch" && input && (

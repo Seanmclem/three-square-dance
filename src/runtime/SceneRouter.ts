@@ -108,6 +108,7 @@ export class SceneRouter {
       // fields, merged under the scene's own registry/schema by the readers.
       world.gameItems       = this.deps.manifest.game?.items;
       world.gameStateSchema = this.deps.manifest.game?.stateSchema;
+      world.gameUiElements  = this.deps.manifest.game?.uiElements;
       if (!world.activeZoneId) throw new Error(`Scene "${sceneId}" has no zones`);
       await zones.loadZone(world.activeZoneId);
 

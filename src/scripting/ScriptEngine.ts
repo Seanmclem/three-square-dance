@@ -7,6 +7,7 @@ import type {
 import { gameState } from "./GameState";
 import { DialogueRunner } from "./DialogueRunner";
 import { invKey, itemRegistry } from "./inventory";
+import { uiKey, uiRegistry } from "./uiElements";
 
 function isVec3(v: unknown): v is Vec3 {
   return !!v && typeof v === "object"
@@ -24,6 +25,41 @@ function compareNum(a: number, op: CompareOp, b: number): boolean {
     case "==": return a === b;
     case "!=": return a !== b;
   }
+}
+
+/**
+ * Pure condition check over the gameState singleton — the single rule set,
+ * shared by the engine, DialogueRunner (via checkConditions), and
+ * GameGuiOverlay (menu option filtering).
+ */
+export function checkScriptConditions(conditions: ScriptCondition[]): boolean {
+  for (const c of conditions) {
+    switch (c.type) {
+      case "has_state": {
+        const v = gameState.get(c.stateKey ?? "");
+        if (v === undefined || v === null || v === false) return false;
+        break;
+      }
+      case "compare_number": {
+        const v      = Number(gameState.get(c.stateKey ?? "") ?? 0);
+        const target = Number(c.stateValue ?? 0);
+        if (!compareNum(v, c.compareOp ?? "==", target)) return false;
+        break;
+      }
+      case "has_item": {
+        // owned <op> count — op defaults to ">=" ("has at least N"), so
+        // pre-existing conditions keep their exact semantics.
+        const owned = Number(gameState.get(invKey(c.itemId ?? "")) ?? 0);
+        if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
+        break;
+      }
+      case "npc_alive":
+      case "npc_dead":
+        // stub — NPC system Phase 13
+        break;
+    }
+  }
+  return true;
 }
 
 export class ScriptEngine {
@@ -66,6 +102,18 @@ export class ScriptEngine {
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
     sub("state:changed",         ({ key })       => this.fire("on_state_changed", key));
+
+    // Custom GUI menus (Phase 49): the overlay emits the picked option; the
+    // engine re-checks its conditions, dispatches its actions through the real
+    // pipeline, and closes the menu unless closeOnPick is explicitly false.
+    sub("ui:menu-pick", ({ elementId, optionId }) => {
+      const el = uiRegistry(this._state).find(e => e.id === elementId);
+      if (el?.kind !== "menu") return;
+      const opt = el.options.find(o => o.id === optionId);
+      if (!opt || !this.checkConditions(opt.conditions ?? [])) return;
+      this.runActions(opt.actions ?? []);
+      if (opt.closeOnPick !== false) gameState.set(uiKey(elementId), false);
+    });
 
     this._runner.attach();
     this._startTimers();
@@ -177,33 +225,7 @@ export class ScriptEngine {
 
   /** Public so DialogueRunner can filter option conditions with the same rules. */
   checkConditions(conditions: ScriptCondition[]): boolean {
-    for (const c of conditions) {
-      switch (c.type) {
-        case "has_state": {
-          const v = gameState.get(c.stateKey ?? "");
-          if (v === undefined || v === null || v === false) return false;
-          break;
-        }
-        case "compare_number": {
-          const v      = Number(gameState.get(c.stateKey ?? "") ?? 0);
-          const target = Number(c.stateValue ?? 0);
-          if (!compareNum(v, c.compareOp ?? "==", target)) return false;
-          break;
-        }
-        case "has_item": {
-          // owned <op> count — op defaults to ">=" ("has at least N"), so
-          // pre-existing conditions keep their exact semantics.
-          const owned = Number(gameState.get(invKey(c.itemId ?? "")) ?? 0);
-          if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
-          break;
-        }
-        case "npc_alive":
-        case "npc_dead":
-          // stub — NPC system Phase 13
-          break;
-      }
-    }
-    return true;
+    return checkScriptConditions(conditions);
   }
 
   // ─── Action dispatch ──────────────────────────────────────────────────────
@@ -421,8 +443,15 @@ export class ScriptEngine {
         break;
       }
 
+      // GUI visibility lives in gameState (`__ui.<id>`) — the overlay derives
+      // from it via state:changed, so shown elements survive scene transitions,
+      // persist into the save, and reset on New Game.
       case "show_ui":
-        if (action.uiElementId) this._bus.emit("ui:show", { elementId: action.uiElementId });
+        if (action.uiElementId) gameState.set(uiKey(action.uiElementId), true);
+        break;
+
+      case "hide_ui":
+        if (action.uiElementId) gameState.set(uiKey(action.uiElementId), false);
         break;
 
       case "run_script":

@@ -58,6 +58,7 @@ import { PreviewHUD } from "@/ui/PreviewHUD";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
 import { BagOverlay } from "@/ui/BagOverlay";
+import { GameGuiOverlay } from "@/ui/GameGuiOverlay";
 import { DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
@@ -77,7 +78,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, PrefabDef, PrefabVarValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -199,6 +200,7 @@ export default function App() {
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
+  const [worldUiElements, setWorldUiElements]  = useState<UiElementDef[]>([]);
   const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
   // Isolated prefab edit mode (Phase 47). The ref gates autosave/save/play
@@ -527,7 +529,9 @@ export default function App() {
             fileHandleRef.current = null;
             world.gameItems       = store.game.items;
             world.gameStateSchema = store.game.stateSchema;
+            world.gameUiElements  = store.game.uiElements;
             setWorldItems(store.game.items ?? []);
+            setWorldUiElements(store.game.uiElements ?? []);
             setGameSchema(store.game.stateSchema ?? {});
             if (promoteSessionPrefabs(store.game)) setIsDirty(true);
             world.prefabLibrary = store.game.prefabs;
@@ -620,6 +624,7 @@ export default function App() {
               await handleLoadFromJSON(file);
               worldRef.current!.gameItems       = proj.store.game.items;
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
+              worldRef.current!.gameUiElements  = proj.store.game.uiElements;
               const next = { ...proj, sceneId: back };
               projectRef.current = next; setProject(next);
               void persistLastProject(proj.store.dir, proj.store.name, back);
@@ -651,6 +656,7 @@ export default function App() {
             const world = worldRef.current!;
             world.gameItems       = proj.store.game.items;
             world.gameStateSchema = proj.store.game.stateSchema;
+            world.gameUiElements  = proj.store.game.uiElements;
             // Keep proj.sceneId in lockstep with the loaded world so any save targets the right file.
             const next = { ...projectRef.current!, sceneId };
             projectRef.current = next; setProject(next);
@@ -751,6 +757,9 @@ export default function App() {
         setWorldItems(projectRef.current
           ? (projectRef.current.store.game.items ?? [])
           : (world.world?.items ?? []));
+        setWorldUiElements(projectRef.current
+          ? (projectRef.current.store.game.uiElements ?? [])
+          : (world.world?.uiElements ?? []));
         const z = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         setZoneScripts(z?.scripts ?? []);
         setZoneDialogues(z?.dialogues ?? []);
@@ -1146,6 +1155,7 @@ export default function App() {
     if (worldRef.current) {
       worldRef.current.gameItems = undefined;
       worldRef.current.gameStateSchema = undefined;
+      worldRef.current.gameUiElements = undefined;
       worldRef.current.prefabLibrary = loadSessionPrefabs();
       setPrefabs(worldRef.current.prefabLibrary);
     }
@@ -1270,9 +1280,11 @@ export default function App() {
     if (worldRef.current) {
       worldRef.current.gameItems       = store.game.items;
       worldRef.current.gameStateSchema = store.game.stateSchema;
+      worldRef.current.gameUiElements  = store.game.uiElements;
       worldRef.current.prefabLibrary   = store.game.prefabs;
     }
     setWorldItems(store.game.items ?? []);
+    setWorldUiElements(store.game.uiElements ?? []);
     setGameSchema(store.game.stateSchema ?? {});
     setPrefabs(store.game.prefabs ?? []);
     syncPrefabInstances();   // library is authoritative now — heal/refresh instances
@@ -1369,6 +1381,7 @@ export default function App() {
       const world = worldRef.current!;
       world.gameItems       = proj.store.game.items;
       world.gameStateSchema = proj.store.game.stateSchema;
+      world.gameUiElements  = proj.store.game.uiElements;
       const next = { ...proj, sceneId: target };
       projectRef.current = next;
       setProject(next);
@@ -2812,6 +2825,26 @@ export default function App() {
     setIsDirty(true);
   };
 
+  // Custom GUI registry (Phase 49) — the UI tab. Same scoping as items: project
+  // open → the shared game.json registry (written on Save; not undoable), else
+  // the scene's own WorldConfig.uiElements.
+  const handleUiElementsChange = (uiElements: UiElementDef[]): void => {
+    const world = worldRef.current;
+    if (!world?.world) return;
+    const proj = projectRef.current;
+    if (proj) {
+      proj.store.game.uiElements = uiElements;
+      world.gameUiElements = uiElements;
+      setWorldUiElements(uiElements);
+      setIsDirty(true);
+      return;
+    }
+    world.transaction("edit ui", () => { world.world!.uiElements = uiElements; });
+    setWorldUiElements(uiElements);
+    syncHistory();
+    setIsDirty(true);
+  };
+
   // ── Prefab library (Phase 44) ───────────────────────────────────────────────
   // Library edits persist to the project's game.json (written on Save) or, with
   // no project open, to the localStorage session library. Not undoable (items/
@@ -3237,6 +3270,8 @@ export default function App() {
         worldItems={worldItems}
         onWorldItemsChange={handleWorldItemsChange}
         projectSceneIds={project ? project.store.sceneIds : undefined}
+        uiElements={worldUiElements}
+        onUiElementsChange={handleUiElementsChange}
         decalTextures={decalTextures}
         selectedDecalId={selectedDecalId}
         onDecalSelect={handleDecalSelect}
@@ -3412,6 +3447,10 @@ export default function App() {
           scheme={previewScheme}
           mode={previewMode ?? "game"}
         />
+      )}
+
+      {isPreview && worldRef.current && (
+        <GameGuiOverlay bus={busRef.current} world={worldRef.current} />
       )}
 
       {isPreview && previewScheme === "touch" && previewRef.current?.input && (
