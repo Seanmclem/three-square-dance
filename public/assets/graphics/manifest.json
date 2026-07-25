@@ -1,4 +1,29 @@
 {
   "version": "1.0",
-  "graphics": []
+  "graphics": [
+    {
+      "id": "heart",
+      "label": "heart",
+      "category": "Icons",
+      "path": "/assets/graphics/heart.png",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "coin",
+      "label": "coin",
+      "category": "Icons",
+      "path": "/assets/graphics/coin.png",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "id": "key",
+      "label": "key",
+      "category": "Icons",
+      "path": "/assets/graphics/key.png",
+      "width": 64,
+      "height": 64
+    }
+  ]
 }

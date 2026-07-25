@@ -10,14 +10,16 @@ interface GraphicsBrowserProps {
 
 const catOf = (g: GraphicDef) => g.category ?? "Other";
 
-// Checkerboard backdrop so transparent PNGs read correctly (DecalBrowser precedent).
+// Checkerboard backdrop so transparent PNGs read correctly. The image layer is
+// listed FIRST — CSS paints the first background layer on top, so the checker
+// must come after the url() or it draws over the graphic.
 const checkerTile = (path: string): React.CSSProperties => ({
   width: "100%", aspectRatio: "1", borderRadius: 3,
   backgroundColor: "#4a4a4a",
-  backgroundImage: `linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%), linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%), url("${assetManager.resolveUrl(path)}")`,
-  backgroundSize: "12px 12px, 12px 12px, contain",
-  backgroundPosition: "0 0, 6px 6px, center",
-  backgroundRepeat: "repeat, repeat, no-repeat",
+  backgroundImage: `url("${assetManager.resolveUrl(path)}"), linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%), linear-gradient(45deg, #3a3a3a 25%, transparent 25%, transparent 75%, #3a3a3a 75%)`,
+  backgroundSize: "contain, 12px 12px, 12px 12px",
+  backgroundPosition: "center, 0 0, 6px 6px",
+  backgroundRepeat: "no-repeat, repeat, repeat",
 });
 
 export function GraphicsBrowser({ graphics, onImport }: GraphicsBrowserProps) {
