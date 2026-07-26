@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { assetManager } from "@/core/AssetManager";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
-import { colliderWorldTransform, defaultColliderFromAABB } from "@/physics/attachedColliderMath";
+import { colliderLocalQuat, colliderWorldTransform, defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -65,7 +65,8 @@ export class ColliderEditor implements IEditorModule {
 
   // Editor-session UI state driven by the Colliders panel (reset on selection change).
   private readonly _hidden = new Set<string>();     // collider ids with visuals hidden
-  private _moveId: string | null = null;            // collider with the translate gizmo
+  private _moveId: string | null = null;            // collider with the translate/rotate gizmo
+  private _moveMode: "translate" | "rotate" = "translate";
   private _moveControls: TransformControls | null = null;
   private readonly _moveProxy = new THREE.Group();
   private _moveDragging = false;
@@ -83,18 +84,20 @@ export class ColliderEditor implements IEditorModule {
   ) {}
 
   init(): void {
-    // Per-collider translate gizmo: TransformControls on a proxy at the collider's
-    // world center; dragging writes the offset back through updateObject (undo via
-    // the surrounding transaction, same as the face handles).
+    // Per-collider translate/rotate gizmo: TransformControls on a proxy at the
+    // collider's world center; dragging writes the offset (or local rotation) back
+    // through updateObject (undo via the surrounding transaction, same as the face
+    // handles).
     this._moveControls = new TransformControls(this._camera, this._canvas);
     this._moveControls.setMode("translate");
     this._moveControls.setSize(0.5);
+    this._moveControls.setRotationSnap(THREE.MathUtils.degToRad(15));
     this._scene.add(this._moveProxy);
     this._scene.add(this._moveControls);
     this._moveControls.addEventListener("dragging-changed", e => {
       this._moveDragging = e.value as boolean;
       this._bus.emit("gizmo:dragging", { isDragging: this._moveDragging });
-      if (this._moveDragging) this._world.beginTransaction("move collider");
+      if (this._moveDragging) this._world.beginTransaction(this._moveMode === "rotate" ? "rotate collider" : "move collider");
       else { this._world.commitTransaction(); this._sync(); }
     });
     this._moveControls.addEventListener("objectChange", () => this._onMoveGizmoChange());
@@ -138,9 +141,9 @@ export class ColliderEditor implements IEditorModule {
         for (const id of hidden) this._hidden.add(id);
         this._sync();
       }),
-      this._bus.on("collider:move", ({ objectId, colliderId }) => {
+      this._bus.on("collider:move", ({ objectId, colliderId, mode }) => {
         if (objectId !== this._selectedId) return;
-        this._setMove(colliderId);
+        this._setMove(colliderId, mode ?? "translate");
         this._sync();
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
@@ -162,11 +165,17 @@ export class ColliderEditor implements IEditorModule {
         if (button === 0 && this._state === "DRAG") this._commitDrag();
       }),
       this._bus.on("input:keydown", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._altDown = true;
+        if (code === "AltLeft" || code === "AltRight") {
+          this._altDown = true;
+          this._moveControls?.setRotationSnap(null);   // Alt = free rotation, like free resize
+        }
         if (code === "Escape" && this._state === "DRAG") this._cancelDrag();
       }),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._altDown = false;
+        if (code === "AltLeft" || code === "AltRight") {
+          this._altDown = false;
+          this._moveControls?.setRotationSnap(THREE.MathUtils.degToRad(15));
+        }
       }),
     );
   }
@@ -192,9 +201,14 @@ export class ColliderEditor implements IEditorModule {
     this._setMove(null);
   }
 
-  private _setMove(colliderId: string | null): void {
-    if (colliderId === this._moveId) return;
+  private _setMove(colliderId: string | null, mode: "translate" | "rotate" = "translate"): void {
+    if (colliderId === this._moveId && mode === this._moveMode) return;
     this._moveId = colliderId;
+    this._moveMode = mode;
+    this._moveControls?.setMode(mode);
+    // Rotate about the collider's own axes (proxy wears the collider world quat);
+    // translate keeps the world-axis arrows.
+    this._moveControls?.setSpace(mode === "rotate" ? "local" : "world");
     // The object gizmo sits on top of most colliders — keep it out of the way
     // while a collider is being placed.
     this._bus.emit("gizmo:suspend", { source: "collider-move", suspended: colliderId !== null });
@@ -211,15 +225,27 @@ export class ColliderEditor implements IEditorModule {
       mc.visible = false;
       return;
     }
+    // Rotation only applies to box/capsule (sphere is symmetric; hull/trimesh
+    // orientation lives in their points) — the panel only offers Rotate there,
+    // but guard against stale mode after a shape switch.
+    if (this._moveMode === "rotate" && c.shape !== "box" && c.shape !== "capsule") {
+      mc.detach();
+      mc.visible = false;
+      return;
+    }
     if (!this._moveDragging) {
       const t = colliderWorldTransform(obj, c);
       this._moveProxy.position.set(t.pos.x, t.pos.y, t.pos.z);
+      this._moveProxy.quaternion.set(t.quat.x, t.quat.y, t.quat.z, t.quat.w);
     }
     mc.attach(this._moveProxy);
     mc.visible = true;
   }
 
-  /** Translate-gizmo drag: proxy world position → collider local offset (pre-scale). */
+  /**
+   * Gizmo drag: proxy world transform → collider local data. Translate writes the
+   * pre-scale offset; rotate writes the local euler (deg), retiring legacy rotationY.
+   */
   private _onMoveGizmoChange(): void {
     const obj = this._selectedObject();
     if (!obj || !this._moveId || !this._selectedId) return;
@@ -231,16 +257,34 @@ export class ColliderEditor implements IEditorModule {
     const invQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       obj.rotation.x * DEG2RAD, obj.rotation.y * DEG2RAD, obj.rotation.z * DEG2RAD,
     )).invert();
-    const local = this._moveProxy.position.clone()
-      .sub(new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z))
-      .applyQuaternion(invQuat);
-    const offset: Vec3 = {
-      x: +(local.x / (obj.scale.x || 1)).toFixed(3),
-      y: +(local.y / (obj.scale.y || 1)).toFixed(3),
-      z: +(local.z / (obj.scale.z || 1)).toFixed(3),
-    };
+
+    let patch: Partial<AttachedCollider>;
+    if (this._moveMode === "rotate") {
+      const localQuat = invQuat.clone().multiply(this._moveProxy.quaternion);
+      const e = new THREE.Euler().setFromQuaternion(localQuat, "XYZ");
+      const RAD2DEG = 180 / Math.PI;
+      patch = {
+        rotation: {
+          x: +(e.x * RAD2DEG).toFixed(2),
+          y: +(e.y * RAD2DEG).toFixed(2),
+          z: +(e.z * RAD2DEG).toFixed(2),
+        },
+        rotationY: undefined,
+      };
+    } else {
+      const local = this._moveProxy.position.clone()
+        .sub(new THREE.Vector3(obj.position.x, obj.position.y, obj.position.z))
+        .applyQuaternion(invQuat);
+      patch = {
+        offset: {
+          x: +(local.x / (obj.scale.x || 1)).toFixed(3),
+          y: +(local.y / (obj.scale.y || 1)).toFixed(3),
+          z: +(local.z / (obj.scale.z || 1)).toFixed(3),
+        },
+      };
+    }
     // Writing the full array materializes the implicit auto-box, like the face handles.
-    const next = list.map(x => x.id === this._moveId ? { ...x, offset } : x);
+    const next = list.map(x => x.id === this._moveId ? { ...x, ...patch } : x);
     this._world.updateObject(this._activeZoneId, this._selectedId, { colliders: next });
     this._positionAll();
   }
@@ -507,11 +551,11 @@ export class ColliderEditor implements IEditorModule {
     newSizeLocal = Math.max(MIN, this._altDown ? newSizeLocal : snap(newSizeLocal));
 
     // Keep the opposite face pinned: shift the local offset by half the size delta
-    // along the collider-local axis, rotated by the collider's local yaw into the
-    // object frame (offset is stored in object space).
+    // along the collider-local axis, rotated by the collider's local rotation into
+    // the object frame (offset is stored in object space).
     const o = d.orig;
-    const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size[axisKey]) / 2);
-    if (o.rotationY) shift.applyAxisAngle(new THREE.Vector3(0, 1, 0), o.rotationY * Math.PI / 180);
+    const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size[axisKey]) / 2)
+      .applyQuaternion(colliderLocalQuat(o));
     const offset: Vec3 = { x: o.offset.x + shift.x, y: o.offset.y + shift.y, z: o.offset.z + shift.z };
     const size:   Vec3 = { ...o.size, [axisKey]: newSizeLocal };
 

@@ -3192,6 +3192,7 @@ function hullFromPoints(c: AttachedCollider, points: Vec3[]): AttachedCollider {
     ...c, shape: "hull", points,
     offset: { x: 0, y: 0, z: 0 },
     size: { x: +(maxX - minX).toFixed(4), y: +(maxY - minY).toFixed(4), z: +(maxZ - minZ).toFixed(4) },
+    rotation: undefined,
     rotationY: undefined,
     indices: undefined,
   };
@@ -3218,6 +3219,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
   // wireframes/handles so overlapping ones don't fight. All reset when the screen closes.
   const [hideObjGizmo, setHideObjGizmo] = useState(false);
   const [moveId,       setMoveId]       = useState<string | null>(null);
+  const [moveMode,     setMoveMode]     = useState<"translate" | "rotate">("translate");
   const [hiddenIds,    setHiddenIds]    = useState<Set<string>>(new Set());
 
   useEffect(() => () => {
@@ -3230,17 +3232,18 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
     setHideObjGizmo(hide);
     bus?.emit("gizmo:suspend", { source: "colliders-panel", suspended: hide });
   };
-  const toggleMove = (id: string): void => {
-    const next = moveId === id ? null : id;
+  const toggleMove = (id: string, mode: "translate" | "rotate" = "translate"): void => {
+    const next = moveId === id && moveMode === mode ? null : id;
     setMoveId(next);
-    bus?.emit("collider:move", { objectId: selected.id, colliderId: next });
+    setMoveMode(mode);
+    bus?.emit("collider:move", { objectId: selected.id, colliderId: next, mode });
   };
   const toggleHidden = (id: string): void => {
     const n = new Set(hiddenIds);
     if (n.has(id)) n.delete(id); else n.add(id);
     setHiddenIds(n);
     bus?.emit("collider:hidden", { objectId: selected.id, hidden: [...n] });
-    if (n.has(id) && moveId === id) toggleMove(id);   // hiding the focused collider drops its gizmo
+    if (n.has(id) && moveId === id) toggleMove(id, moveMode);   // hiding the focused collider drops its gizmo
   };
 
   // Draft strings so intermediate input ("0.", "-") doesn't get clobbered; resync
@@ -3254,7 +3257,8 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
     for (const c of list) {
       d[`${c.id}.ox`] = String(c.offset.x); d[`${c.id}.oy`] = String(c.offset.y); d[`${c.id}.oz`] = String(c.offset.z);
       d[`${c.id}.sx`] = String(c.size.x);   d[`${c.id}.sy`] = String(c.size.y);   d[`${c.id}.sz`] = String(c.size.z);
-      d[`${c.id}.ry`] = String(c.rotationY ?? 0);
+      const rot = c.rotation ?? { x: 0, y: c.rotationY ?? 0, z: 0 };   // legacy yaw-only fallback
+      d[`${c.id}.rx`] = String(rot.x); d[`${c.id}.ry`] = String(rot.y); d[`${c.id}.rz`] = String(rot.z);
     }
     return d;
   };
@@ -3287,10 +3291,14 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
           const v = next[`${c.id}.${k}`];
           return v !== undefined ? toNum(v) : fallback;
         };
+        const rot = c.rotation ?? { x: 0, y: c.rotationY ?? 0, z: 0 };
         updateCollider(c.id, {
-          offset:    { x: g("ox", c.offset.x), y: g("oy", c.offset.y), z: g("oz", c.offset.z) },
-          size:      { x: g("sx", c.size.x),   y: g("sy", c.size.y),   z: g("sz", c.size.z) },
-          rotationY: g("ry", c.rotationY ?? 0),
+          offset: { x: g("ox", c.offset.x), y: g("oy", c.offset.y), z: g("oz", c.offset.z) },
+          size:   { x: g("sx", c.size.x),   y: g("sy", c.size.y),   z: g("sz", c.size.z) },
+          // Rotation only means anything on box/capsule — don't grow other shapes' data.
+          ...(c.shape === "box" || c.shape === "capsule"
+            ? { rotation: { x: g("rx", rot.x), y: g("ry", rot.y), z: g("rz", rot.z) }, rotationY: undefined }
+            : {}),
         });
       });
       return next;
@@ -3371,18 +3379,30 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               >👁</button>
               <button
                 title="Toggle a move gizmo on this collider"
-                onClick={() => toggleMove(c.id)}
+                onClick={() => toggleMove(c.id, "translate")}
                 style={{
                   padding: "2px 7px", borderRadius: 3, cursor: "pointer", fontFamily: "monospace", fontSize: 9,
-                  border: `1px solid ${moveId === c.id ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"}`,
-                  background: moveId === c.id ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
-                  color: moveId === c.id ? "#80aaff" : "#808080",
+                  border: `1px solid ${moveId === c.id && moveMode === "translate" ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"}`,
+                  background: moveId === c.id && moveMode === "translate" ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
+                  color: moveId === c.id && moveMode === "translate" ? "#80aaff" : "#808080",
                 }}
               >Move</button>
+              {(c.shape === "box" || c.shape === "capsule") && (
+                <button
+                  title="Toggle a rotate gizmo on this collider (15° steps, hold Alt for free)"
+                  onClick={() => toggleMove(c.id, "rotate")}
+                  style={{
+                    padding: "2px 7px", borderRadius: 3, cursor: "pointer", fontFamily: "monospace", fontSize: 9,
+                    border: `1px solid ${moveId === c.id && moveMode === "rotate" ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"}`,
+                    background: moveId === c.id && moveMode === "rotate" ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
+                    color: moveId === c.id && moveMode === "rotate" ? "#80aaff" : "#808080",
+                  }}
+                >Rotate</button>
+              )}
               <button
                 title="Remove collider"
                 onClick={() => {
-                  if (moveId === c.id) toggleMove(c.id);
+                  if (moveId === c.id) toggleMove(c.id, moveMode);
                   write(colliders.filter(x => x.id !== c.id));
                 }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "#885555", fontSize: 12, lineHeight: 1, padding: "0 2px" }}
@@ -3460,10 +3480,14 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
             </div>
           </div>
           )}
-          {c.shape === "box" && (
+          {(c.shape === "box" || c.shape === "capsule") && (
             <div>
-              <div style={LABEL}>ROTATION (Y°)</div>
-              <div style={{ display: "flex", gap: 4 }}>{numField(c, "ry", "R°")}</div>
+              <div style={LABEL}>ROTATION (°)</div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {numField(c, "rx", "X", "#ff6b6b")}
+                {numField(c, "ry", "Y", "#6bff8a")}
+                {numField(c, "rz", "Z", "#6b8aff")}
+              </div>
             </div>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>

@@ -25,11 +25,28 @@ export function defaultColliderFromAABB(center: Vec3, size: Vec3): AttachedColli
 }
 
 /**
+ * Collider-local rotation as a quaternion. `rotation` (full euler XYZ, deg) wins;
+ * legacy `rotationY` (yaw-only) is the fallback so pre-existing scenes and baked
+ * asset presets load unchanged. Identity for sphere (symmetric) — hull/trimesh
+ * callers never reach this (points encode orientation).
+ */
+export function colliderLocalQuat(c: AttachedCollider): THREE.Quaternion {
+  const q = new THREE.Quaternion();
+  if (c.shape === "sphere") return q;
+  if (c.rotation) {
+    return q.setFromEuler(new THREE.Euler(
+      c.rotation.x * DEG2RAD, c.rotation.y * DEG2RAD, c.rotation.z * DEG2RAD));
+  }
+  if (c.rotationY) q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), c.rotationY * DEG2RAD);
+  return q;
+}
+
+/**
  * World transform + Rapier-ready half extents for an attached collider.
  *
  * Scale is applied in the collider's LOCAL frame (offsets and box extents scale
- * componentwise) — exact for axis-aligned colliders; an approximation when
- * rotationY ≠ 0 under non-uniform object scale. Sphere/capsule radii use the
+ * componentwise) — exact for axis-aligned colliders; an approximation when the
+ * collider is rotated under non-uniform object scale. Sphere/capsule radii use the
  * max relevant scale axis so the shape never shrinks inside the visual mesh.
  */
 export function colliderWorldTransform(obj: WorldObject, c: AttachedCollider): ColliderWorldTransform {
@@ -46,10 +63,7 @@ export function colliderWorldTransform(obj: WorldObject, c: AttachedCollider): C
     z: obj.position.z + worldOffset.z,
   };
 
-  const yaw = (c.rotationY ?? 0) * DEG2RAD;
-  const quat = objQuat.clone();
-  if (yaw && c.shape !== "sphere")
-    quat.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
+  const quat = objQuat.clone().multiply(colliderLocalQuat(c));
 
   let halfExtents: Vec3;
   if (c.shape === "box") {

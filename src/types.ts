@@ -300,8 +300,8 @@ export interface BusEvents {
   // Suspend/restore the object TransformControls. Sources are independent (panel
   // toggle, collider move gizmo) — the gizmo stays off while any source suspends.
   "gizmo:suspend":         { source: string; suspended: boolean };
-  // Toggle the per-collider translate gizmo (null = off). Editor-session only.
-  "collider:move":         { objectId: string; colliderId: string | null };
+  // Toggle the per-collider gizmo (null = off). Editor-session only.
+  "collider:move":         { objectId: string; colliderId: string | null; mode?: "translate" | "rotate" };
   // Per-collider editor visibility (hidden wireframes/handles). Editor-session only.
   "collider:hidden":       { objectId: string; hidden: string[] };
   "camera:jump":           { x: number; z: number };
@@ -950,7 +950,8 @@ export interface AttachedCollider {
   shape:      AttachedColliderShape;
   offset:     Vec3;                   // local, pre-scale, relative to object origin
   size:       Vec3;                   // box: full extents; sphere: x = radius; capsule: x = radius, y = full height; hull: points AABB (display only)
-  rotationY?: number;                 // deg, local yaw (box/capsule; ignored for sphere/hull)
+  rotation?:  Vec3;                   // deg, local euler XYZ (box/capsule; ignored for sphere/hull/trimesh)
+  rotationY?: number;                 // legacy yaw-only rotation — read when `rotation` is absent; writers emit `rotation`
   isSensor:   boolean;                // sensor fires on_player_enter/on_player_exit; solid blocks movement
   // Hull/trimesh only (Phase 27/27b): vertices, object-local, pre-scale, relative
   // to the object origin + offset. Encodes shape AND orientation — exact under
