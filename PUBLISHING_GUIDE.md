@@ -189,6 +189,13 @@ get assets to the host:
    own `public/assets/` copy) and drop game folders next to it with
    `"assetsBase": "/"` — nothing extra to copy, no CORS.
 
+> **Maybe-TODO (future editor work):** Publish… could build a self-contained
+> bundle itself — walk the project's scenes + game.json, collect every
+> referenced asset id (models, materials, decals, sounds, skyboxes,
+> graphics), and copy just those files plus pruned manifests into the target.
+> That would remove this whole manual step and ship only what the game uses.
+> Until then, the three options above are the path.
+
 What must stay consistent, whichever way you choose:
 
 - The **six manifest files** (`textures` / `models` / `decals` / `audio` /
@@ -215,7 +222,7 @@ every fetch fails with a TypeError — the runtime's error screen calls this
 out by name when it happens to the manifest.
 
 Everything the runtime fetches from your host needs the header: the game
-manifest, scene JSONs, the three asset manifests, textures, and GLBs. The
+manifest, scene JSONs, the asset manifests, textures, GLBs, images, and sounds. The
 blanket rule (`* `) is appropriate here — this is public static content:
 
 ```
