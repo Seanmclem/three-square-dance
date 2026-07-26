@@ -1622,6 +1622,813 @@
         "license": "CC0"
       },
       "thumbnail": "/assets/models/platform_dirt_side_tall_thumb.png"
+    },
+    {
+      "id": "cannonball",
+      "label": "Cannonball",
+      "category": "Platform: Objects",
+      "path": "/assets/models/cannonball.gltf",
+      "thumbnail": "/assets/models/cannonball_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bridge_modular",
+      "label": "Bridge Modular",
+      "category": "Platform: Objects",
+      "path": "/assets/models/bridge_modular.gltf",
+      "thumbnail": "/assets/models/bridge_modular_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bridge_small",
+      "label": "Bridge Small",
+      "category": "Platform: Objects",
+      "path": "/assets/models/bridge_small.gltf",
+      "thumbnail": "/assets/models/bridge_small_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "door",
+      "label": "Door",
+      "category": "Platform: Objects",
+      "path": "/assets/models/door.gltf",
+      "thumbnail": "/assets/models/door_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "hazard_spiketrap",
+      "label": "Hazard SpikeTrap",
+      "category": "Platform: Objects",
+      "path": "/assets/models/hazard_spiketrap.gltf",
+      "thumbnail": "/assets/models/hazard_spiketrap_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "animations": [
+        "SpikeTrap_Activate"
+      ],
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "lever",
+      "label": "Lever",
+      "category": "Platform: Objects",
+      "path": "/assets/models/lever.gltf",
+      "thumbnail": "/assets/models/lever_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "animations": [
+        "Lever_Off",
+        "Lever_On"
+      ],
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_6",
+      "label": "Numbers 6",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_6.gltf",
+      "thumbnail": "/assets/models/numbers_6_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "spikes",
+      "label": "Spikes",
+      "category": "Platform: Objects",
+      "path": "/assets/models/spikes.gltf",
+      "thumbnail": "/assets/models/spikes_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bridge_modular_center",
+      "label": "Bridge Modular Center",
+      "category": "Platform: Objects",
+      "path": "/assets/models/bridge_modular_center.gltf",
+      "thumbnail": "/assets/models/bridge_modular_center_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cannon",
+      "label": "Cannon",
+      "category": "Platform: Objects",
+      "path": "/assets/models/cannon.gltf",
+      "thumbnail": "/assets/models/cannon_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "fence_1",
+      "label": "Fence 1",
+      "category": "Platform: Objects",
+      "path": "/assets/models/fence_1.gltf",
+      "thumbnail": "/assets/models/fence_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "fence_corner",
+      "label": "Fence Corner",
+      "category": "Platform: Objects",
+      "path": "/assets/models/fence_corner.gltf",
+      "thumbnail": "/assets/models/fence_corner_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "hazard_cylinder",
+      "label": "Hazard Cylinder",
+      "category": "Platform: Objects",
+      "path": "/assets/models/hazard_cylinder.gltf",
+      "thumbnail": "/assets/models/hazard_cylinder_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "fence_middle",
+      "label": "Fence Middle",
+      "category": "Platform: Objects",
+      "path": "/assets/models/fence_middle.gltf",
+      "thumbnail": "/assets/models/fence_middle_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "stairs_modular_middle",
+      "label": "Stairs Modular Middle",
+      "category": "Platform: Objects",
+      "path": "/assets/models/stairs_modular_middle.gltf",
+      "thumbnail": "/assets/models/stairs_modular_middle_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "arrow",
+      "label": "Arrow",
+      "category": "Platform: Objects",
+      "path": "/assets/models/arrow.gltf",
+      "thumbnail": "/assets/models/arrow_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_3",
+      "label": "Numbers 3",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_3.gltf",
+      "thumbnail": "/assets/models/numbers_3_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "arrow_side",
+      "label": "Arrow Side",
+      "category": "Platform: Objects",
+      "path": "/assets/models/arrow_side.gltf",
+      "thumbnail": "/assets/models/arrow_side_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "plant_small",
+      "label": "Plant Small",
+      "category": "Platform: Objects",
+      "path": "/assets/models/plant_small.gltf",
+      "thumbnail": "/assets/models/plant_small_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "stairs",
+      "label": "Stairs",
+      "category": "Platform: Objects",
+      "path": "/assets/models/stairs.gltf",
+      "thumbnail": "/assets/models/stairs_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "chest",
+      "label": "Chest",
+      "category": "Platform: Objects",
+      "path": "/assets/models/chest.gltf",
+      "thumbnail": "/assets/models/chest_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "animations": [
+        "Chest_Close",
+        "Chest_Open"
+      ],
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bouncer",
+      "label": "Bouncer",
+      "category": "Platform: Objects",
+      "path": "/assets/models/bouncer.gltf",
+      "thumbnail": "/assets/models/bouncer_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "animations": [
+        "Bouncer_Bounce",
+        "Bouncer_Idle"
+      ],
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "pipe_t",
+      "label": "Pipe T",
+      "category": "Platform: Objects",
+      "path": "/assets/models/pipe_t.gltf",
+      "thumbnail": "/assets/models/pipe_t_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bomb",
+      "label": "Bomb",
+      "category": "Platform: Objects",
+      "path": "/assets/models/bomb.gltf",
+      "thumbnail": "/assets/models/bomb_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "arrow_up",
+      "label": "Arrow Up",
+      "category": "Platform: Objects",
+      "path": "/assets/models/arrow_up.gltf",
+      "thumbnail": "/assets/models/arrow_up_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_2",
+      "label": "Numbers 2",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_2.gltf",
+      "thumbnail": "/assets/models/numbers_2_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_4",
+      "label": "Numbers 4",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_4.gltf",
+      "thumbnail": "/assets/models/numbers_4_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "tower",
+      "label": "Tower",
+      "category": "Platform: Objects",
+      "path": "/assets/models/tower.gltf",
+      "thumbnail": "/assets/models/tower_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "goal_flag",
+      "label": "Goal Flag",
+      "category": "Platform: Objects",
+      "path": "/assets/models/goal_flag.gltf",
+      "thumbnail": "/assets/models/goal_flag_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "plant_large",
+      "label": "Plant Large",
+      "category": "Platform: Objects",
+      "path": "/assets/models/plant_large.gltf",
+      "thumbnail": "/assets/models/plant_large_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "stairs_modular_start",
+      "label": "Stairs Modular Start",
+      "category": "Platform: Objects",
+      "path": "/assets/models/stairs_modular_start.gltf",
+      "thumbnail": "/assets/models/stairs_modular_start_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "hazard_saw",
+      "label": "Hazard Saw",
+      "category": "Platform: Objects",
+      "path": "/assets/models/hazard_saw.gltf",
+      "thumbnail": "/assets/models/hazard_saw_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_9",
+      "label": "Numbers 9",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_9.gltf",
+      "thumbnail": "/assets/models/numbers_9_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_7",
+      "label": "Numbers 7",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_7.gltf",
+      "thumbnail": "/assets/models/numbers_7_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "spikyball",
+      "label": "SpikyBall",
+      "category": "Platform: Objects",
+      "path": "/assets/models/spikyball.gltf",
+      "thumbnail": "/assets/models/spikyball_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_0",
+      "label": "Numbers 0",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_0.gltf",
+      "thumbnail": "/assets/models/numbers_0_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "stairs_small",
+      "label": "Stairs Small",
+      "category": "Platform: Objects",
+      "path": "/assets/models/stairs_small.gltf",
+      "thumbnail": "/assets/models/stairs_small_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_8",
+      "label": "Numbers 8",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_8.gltf",
+      "thumbnail": "/assets/models/numbers_8_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "pipe_end",
+      "label": "Pipe End",
+      "category": "Platform: Objects",
+      "path": "/assets/models/pipe_end.gltf",
+      "thumbnail": "/assets/models/pipe_end_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_5",
+      "label": "Numbers 5",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_5.gltf",
+      "thumbnail": "/assets/models/numbers_5_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "numbers_1",
+      "label": "Numbers 1",
+      "category": "Platform: Objects",
+      "path": "/assets/models/numbers_1.gltf",
+      "thumbnail": "/assets/models/numbers_1_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "pipe_90",
+      "label": "Pipe 90",
+      "category": "Platform: Objects",
+      "path": "/assets/models/pipe_90.gltf",
+      "thumbnail": "/assets/models/pipe_90_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "pipe_straight",
+      "label": "Pipe Straight",
+      "category": "Platform: Objects",
+      "path": "/assets/models/pipe_straight.gltf",
+      "thumbnail": "/assets/models/pipe_straight_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "stairs_modular_end",
+      "label": "Stairs Modular End",
+      "category": "Platform: Objects",
+      "path": "/assets/models/stairs_modular_end.gltf",
+      "thumbnail": "/assets/models/stairs_modular_end_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [],
+      "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
     }
   ]
 }
