@@ -1,0 +1,12 @@
+{
+  "manifestVersion": 1,
+  "id": "platfrom-obby",
+  "name": "Platfrom Obby",
+  "version": "1.0.0",
+  "entryScene": "level_1",
+  "scenes": {
+    "level_1": "scenes/level_1.json"
+  },
+  "assetsBase": "/",
+  "game": "game.json"
+}
