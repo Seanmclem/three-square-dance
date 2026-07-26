@@ -28,7 +28,7 @@ Two kinds of prefab:
 
 | Kind | Where it comes from | What it contains |
 |---|---|---|
-| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/tile-set in, a grid of kit tiles out. |
+| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/height/tile-set in, a box of kit tiles out. Height (layers) grows *downward* — the walk surface stays put and extra 2m bands stack below it (repeating middle pieces + a bottom cap). |
 | **Snapshot** (⬡) | **You**, by capturing a selection | A frozen copy of the entities you selected — models, trigger volumes, shapes, stairs, ladders, with their scripts. The door case: model + trigger + open script, captured once, placed everywhere. |
 
 Under the hood an instance is real entities plus a small link record — the
@@ -79,7 +79,7 @@ gizmo moves it all, and the properties panel shows the **Prefab section**:
 
 ![A selected Tiled Platform instance — whole-instance highlight, group gizmo, and the Prefab section with settings, position, and actions](docs/images/prefab-instance.png)
 
-- **Settings** (generator parameters like width/depth/tile-set): per-instance,
+- **Settings** (generator parameters like width/depth/height/tile-set): per-instance,
   applied live as you type (short debounce) or step the arrows. These are
   *yours per copy* and **never reset** — not by prefab edits, not by Reset.
 - **Position** (X/Y/Z/ROT°): moves the whole instance; equivalent to dragging
@@ -255,7 +255,7 @@ published game needs none of this code.
 ```jsonc
 { "id": "pfi_f65c07d1", "prefabId": "pfb_5a31a5da",
   "version": 3,                                  // recipe version last built against
-  "variables": { "width": 4, "depth": 3, "tileSet": "grass" },
+  "variables": { "width": 4, "depth": 3, "height": 2, "tileSet": "grass" },
   "origin": { "position": { "x": -26, "y": 0, "z": -16.5 }, "rotationY": 0 } }
 ```
 

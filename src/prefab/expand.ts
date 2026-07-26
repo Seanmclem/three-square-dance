@@ -43,10 +43,13 @@ export function expandPrefab(prefab: PrefabDef, vars: Record<string, PrefabVarVa
   return structuredClone(prefab.template ?? []);
 }
 
-/** Schema defaults, overlaid with any provided values. */
+/** Schema defaults, overlaid with any provided values. Generator prefabs read
+ *  the REGISTRY schema — library defs snapshot variables at creation and go
+ *  stale when a generator gains one. */
 export function defaultVars(prefab: PrefabDef, overrides?: Record<string, PrefabVarValue>): Record<string, PrefabVarValue> {
+  const schema = (prefab.kind === "generator" && prefab.generatorId && GENERATORS[prefab.generatorId]?.variables) || prefab.variables;
   const vars: Record<string, PrefabVarValue> = {};
-  for (const v of prefab.variables) vars[v.name] = v.default;
+  for (const v of schema) vars[v.name] = v.default;
   return { ...vars, ...overrides };
 }
 

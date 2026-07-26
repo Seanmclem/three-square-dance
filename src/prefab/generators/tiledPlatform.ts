@@ -7,11 +7,40 @@ import type { PrefabGenerator } from "@/prefab/generators";
 // with the walkable top at tile-origin.y + 1, so an instance placed at ground
 // level is walked on at y = origin.y + 1.
 //
+// Height (layers) grows DOWNWARD from the walk surface — the top stays at
+// origin.y + 1 and extra 2m bands stack below it, using the kit's vertical
+// set: *_tall top edges, repeating *_center_tall middle edges, *_bottom_tall
+// bottom edges, flat top/underside sheets for interior cells (hollow middle —
+// interior middle bands emit no member at all). Height 1 emits exactly the
+// legacy single-height output, byte-identical memberKeys included.
+//
 // Tile orientation (measured from the models): at rotY 0 a Corner's outward
 // skirt faces are −X and +Z; a Side's outward face is +Z. Rotations below point
 // each tile's skirt out of the platform.
 
 const PITCH = 2;
+const LAYER = 2;   // vertical pitch — every kit piece spans 2m of height
+
+type Band = "single" | "top" | "middle" | "bottom";
+
+/** Kit piece for a grid role at a vertical band — null = no piece (hollow interior).
+ *  Grass ships the full stacking set; dirt only ships full-height blocks, which
+ *  repeat for every band (and its interior has no underside sheet). */
+function assetFor(set: "grass" | "dirt", role: "corner" | "side" | "center", band: Band): string | null {
+  if (band === "single") return `platform_${set}_${role}`;
+  if (set === "dirt") {
+    if (role === "center") return band === "top" ? "platform_dirt_center_tall" : null;
+    return `platform_dirt_${role}_tall`;
+  }
+  if (role === "center") {
+    if (band === "top")    return "platform_grass_center_tall";   // flat grass sheet
+    if (band === "bottom") return "platform_grass_bottom_tall";   // flat underside sheet
+    return null;
+  }
+  if (band === "top")    return `platform_grass_${role}_tall`;
+  if (band === "bottom") return `platform_grass_${role}_bottom_tall`;
+  return `platform_grass_${role}_center_tall`;
+}
 
 /** Local X axis of the grid = width (i), local Z = depth (j). */
 function tileRole(i: number, j: number, w: number, d: number): { role: "corner" | "side" | "center"; rotY: number } {
@@ -31,29 +60,38 @@ export const tiledPlatform: PrefabGenerator = {
   id:    "tiled-platform",
   label: "Tiled Platform",
   variables: [
-    { name: "width",   label: "Width (tiles)", type: "number", default: 3, min: 2, max: 32, step: 1 },
-    { name: "depth",   label: "Depth (tiles)", type: "number", default: 3, min: 2, max: 32, step: 1 },
-    { name: "tileSet", label: "Tile set",      type: "choice", default: "grass", options: ["grass", "dirt"] },
+    { name: "width",   label: "Width (tiles)",   type: "number", default: 3, min: 2, max: 32, step: 1 },
+    { name: "depth",   label: "Depth (tiles)",   type: "number", default: 3, min: 2, max: 32, step: 1 },
+    { name: "height",  label: "Height (layers)", type: "number", default: 1, min: 1, max: 8,  step: 1 },
+    { name: "tileSet", label: "Tile set",        type: "choice", default: "grass", options: ["grass", "dirt"] },
   ],
   expand(vars: Record<string, PrefabVarValue>): PrefabTemplateEntity[] {
     const w   = Math.max(2, Math.min(32, Math.round(Number(vars.width ?? 3))));
     const d   = Math.max(2, Math.min(32, Math.round(Number(vars.depth ?? 3))));
+    const h   = Math.max(1, Math.min(8,  Math.round(Number(vars.height ?? 1))));
     const set = vars.tileSet === "dirt" ? "dirt" : "grass";
     const out: PrefabTemplateEntity[] = [];
-    for (let i = 0; i < w; i++) {
-      for (let j = 0; j < d; j++) {
-        const { role, rotY } = tileRole(i, j, w, d);
-        const def: WorldObject = {
-          id:       `tile_${i}_${j}`,   // template-local id; replaced on instantiation
-          label:    `Tile ${i},${j}`,
-          assetId:  `platform_${set}_${role}`,
-          position: { x: (i - (w - 1) / 2) * PITCH, y: 0, z: (j - (d - 1) / 2) * PITCH },
-          rotation: { x: 0, y: rotY, z: 0 },
-          scale:    { x: 1, y: 1, z: 1 },
-          floor:    0,
-          properties: { interactable: false, npcSpawn: false, lootTableId: null, triggerEventId: null },
-        };
-        out.push({ memberKey: `tile_${i}_${j}`, type: "object", def });
+    for (let k = 0; k < h; k++) {
+      const band: Band = h === 1 ? "single" : k === 0 ? "top" : k === h - 1 ? "bottom" : "middle";
+      for (let i = 0; i < w; i++) {
+        for (let j = 0; j < d; j++) {
+          const { role, rotY } = tileRole(i, j, w, d);
+          const assetId = assetFor(set, role, band);
+          if (!assetId) continue;   // hollow interior band
+          // Top layer keeps the legacy key so height edits diff-update in place.
+          const key = k === 0 ? `tile_${i}_${j}` : `tile_${i}_${j}_L${k}`;
+          const def: WorldObject = {
+            id:       key,   // template-local id; replaced on instantiation
+            label:    `Tile ${i},${j}${k > 0 ? ` L${k}` : ""}`,
+            assetId,
+            position: { x: (i - (w - 1) / 2) * PITCH, y: -k * LAYER, z: (j - (d - 1) / 2) * PITCH },
+            rotation: { x: 0, y: rotY, z: 0 },
+            scale:    { x: 1, y: 1, z: 1 },
+            floor:    0,
+            properties: { interactable: false, npcSpawn: false, lootTableId: null, triggerEventId: null },
+          };
+          out.push({ memberKey: key, type: "object", def });
+        }
       }
     }
     return out;

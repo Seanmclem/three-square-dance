@@ -15,6 +15,7 @@ import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } f
 import { HelpTooltip } from "@/ui/HelpTooltip";
 import { ControlsSection } from "@/ui/ControlsSection";
 import { CreditsModal } from "@/ui/CreditsModal";
+import { GENERATORS } from "@/prefab/generators";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -974,6 +975,10 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
   const [open, setOpen] = useState(true);
   const [hovered, setHovered] = useState(false);
   const { prefab, record } = info;
+  // Generator prefabs render the REGISTRY's variable schema, not the def's
+  // stored copy — library defs snapshot variables at creation and go stale
+  // when a generator gains one (e.g. tiled-platform "height", v4.44.4).
+  const varDefs = (prefab?.kind === "generator" && prefab.generatorId && GENERATORS[prefab.generatorId]?.variables) || prefab?.variables || [];
 
   // Orphaned instance: the definition is gone from the library (deleted, or a
   // game.json that never got it). Variables/re-expansion are impossible; the
@@ -1026,9 +1031,9 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
 
       {open && (
         <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          {prefab.variables.length > 0 && (
+          {varDefs.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {prefab.variables.map(v => (
+              {varDefs.map(v => (
                 <PrefabVarField
                   key={v.name}
                   def={v}

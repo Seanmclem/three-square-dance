@@ -1082,8 +1082,14 @@ export default function App() {
       for (const rec of [...(zone.prefabInstances ?? [])]) {
         let def = world.prefabLibrary?.find(p => p.id === rec.prefabId);
         if (!def) {
-          const recKeys = Object.keys(rec.variables).sort().join(",");
-          const gen = Object.values(GENERATORS).find(g => g.variables.map(v => v.name).sort().join(",") === recKeys);
+          // Subset match, not exact: generators gain variables over time (e.g.
+          // tiled-platform "height"), and old records only carry the keys that
+          // existed when they were placed.
+          const recKeys = Object.keys(rec.variables);
+          const gen = Object.values(GENERATORS).find(g => {
+            const names = new Set(g.variables.map(v => v.name));
+            return recKeys.length > 0 && recKeys.every(k => names.has(k));
+          });
           if (!gen) { console.warn(`[prefabs] instance ${rec.id} references missing prefab ${rec.prefabId} — left as expanded`); continue; }
           def = world.prefabLibrary?.find(p => p.kind === "generator" && p.generatorId === gen.id);
           if (!def) {
