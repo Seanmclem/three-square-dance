@@ -18,7 +18,7 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 > dropdown-driven `load_scene` picker, and a **▶ Play** button that opens the
 > runtime. **Publish…** (⋯ menu) copies the project's JSON to any folder you
 > pick — note it copies *manifests and scenes only*, never `/assets/**` (see
-> §"What goes in the bundle"). The manual steps below remain valid as the
+> §2 "Assets" for the three ways to ship them). The manual steps below remain valid as the
 > by-hand appendix and for understanding what the editor generates.
 
 The dev server already serves everything the runtime needs. The whole loop is:
@@ -92,8 +92,15 @@ my-game/
 └── assets/                    ← copy of public/assets (or the subset you use)
     ├── textures/manifest.json + texture folders
     ├── models/manifest.json   + .glb files (collider presets ride the manifest)
-    └── decals/manifest.json   + .png files
+    ├── decals/manifest.json   + .png files
+    ├── audio/manifest.json    + sound files
+    ├── skyboxes/manifest.json + equirect images
+    └── graphics/manifest.json + 2D images (item icons, custom-GUI art)
 ```
+
+> ⚠ **The editor's Publish… button does NOT fill in `assets/`.** It copies
+> manifests and scene JSONs only — the assets tree is yours to provide (three
+> ways, see §2 "Assets").
 
 Upload that folder anywhere that serves static files **with CORS enabled**,
 then open:
@@ -169,12 +176,26 @@ Save worlds normally in the editor (Ctrl+S / Save). Requirements per scene:
 
 ### Assets
 
-Copy your project's `public/assets/` folder — or prune it to what your scenes
-actually use. What must stay consistent:
+**Publish… never copies `/assets/**`** — the editor's asset library is shared
+by every game, so the bundle step deliberately leaves it to you. Three ways to
+get assets to the host:
 
-- The three manifest files (`textures/models/decals` `manifest.json`) — the
-  scene JSONs reference assets **by id**, and these map ids → files.
-  Pruning = delete the files *and* their manifest entries.
+1. **Copy `public/assets/` alongside the bundle** (the layout in "The short
+   version") — or prune it to what your scenes actually use.
+2. **Share one assets tree between games**: host the tree once and point each
+   game's `"assetsBase"` at it (`"../shared/"` on the same host, or a full
+   URL on a CORS-enabled origin). Update the tree once, every game gets it.
+3. **Same-origin hosting**: deploy the built `dist/` (it contains the repo's
+   own `public/assets/` copy) and drop game folders next to it with
+   `"assetsBase": "/"` — nothing extra to copy, no CORS.
+
+What must stay consistent, whichever way you choose:
+
+- The **six manifest files** (`textures` / `models` / `decals` / `audio` /
+  `skyboxes` / `graphics` `manifest.json`) — scenes and game.json reference
+  assets **by id**, and these map ids → files. Pruning = delete the files
+  *and* their manifest entries. `graphics/` is easy to forget: it carries
+  item icons and custom-GUI images (hearts, coins, menu art).
 - Imported/baked model collider presets live **inside**
   `models/manifest.json`, so physics ships automatically with the tree.
 - Texture defs that use `{quality}` paths need the quality folders present
@@ -336,6 +357,7 @@ curl -s -D - -o /dev/null https://your-host/my-game/manifest.json | grep -i acce
 | Error screen: "not valid JSON … HTML fallback" | Wrong manifest URL — many hosts return an HTML 200 page for missing files |
 | Menu loads, world is magenta checkerboard | Asset tree missing/mislocated — check `assetsBase` and that `assets/textures/manifest.json` resolves on your host |
 | Models missing but floors/walls textured | `assets/models/` files or manifest entries pruned incorrectly |
+| Item icons / GUI images blank, world fine | `assets/graphics/` (or `audio/`, `skyboxes/`) left out of the copy — only textures/models/decals were shipped |
 | Spawns at origin + console warn | Scene saved without a spawn point |
 | Portal does nothing, console error | `load_scene` Scene id doesn't match a manifest `scenes` key |
 | Continue resumes somewhere weird | The autosave captured the player mid-fall/out of bounds — add floors/walls at edges (there's no kill-plane respawn yet) |
@@ -347,6 +369,6 @@ curl -s -D - -o /dev/null https://your-host/my-game/manifest.json | grep -i acce
 - [ ] Every scene has a spawn point; first zone is the intended entry zone
 - [ ] `manifest.json`: unique stable `id`, `entryScene` ∈ `scenes`, paths match the folder layout
 - [ ] `load_scene` ids in trigger volumes match manifest scene keys
-- [ ] `assets/` copied (with the three manifest files), pruned entries removed from manifests too
+- [ ] `assets/` copied — Publish… does NOT do this — with all six manifest files (textures, models, decals, audio, skyboxes, graphics); pruned entries removed from manifests too
 - [ ] Host serves `Access-Control-Allow-Origin` (curl check above)
 - [ ] Play it once from the deployed URL: textures non-magenta, portals work, Continue works after a reload
