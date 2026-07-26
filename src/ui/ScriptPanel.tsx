@@ -3731,11 +3731,16 @@ function UiElementsEditor({
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, padding: "6px 10px", flexShrink: 0 }}>
-        {help && <HelpTooltip side="below" align="right" text={help} />}
-        <select style={S.select} value={newKind} onChange={(e) => setNewKind(e.target.value as (typeof UI_KINDS)[number])}>
+        <select
+          style={{ ...S.select, width: 110, flex: "0 0 auto" }}
+          value={newKind}
+          onChange={(e) => setNewKind(e.target.value as (typeof UI_KINDS)[number])}
+        >
           {UI_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
-        <button style={S.btn(true)} onClick={() => onChange([...elements, blankUiElement(newKind)])}>
+        {/* (?) sits beside + New so its right-aligned popover stays on-screen */}
+        {help && <HelpTooltip side="below" align="right" text={help} />}
+        <button style={{ ...S.btn(true), whiteSpace: "nowrap", flexShrink: 0 }} onClick={() => onChange([...elements, blankUiElement(newKind)])}>
           + New
         </button>
       </div>
