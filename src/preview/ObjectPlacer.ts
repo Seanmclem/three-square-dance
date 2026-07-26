@@ -58,7 +58,11 @@ export class ObjectPlacer {
   /** Build an object's mesh and wire up its animation mixer. Returns the scene-ready root. */
   async build(obj: WorldObject, zoneId: string): Promise<THREE.Object3D> {
     // Missing-file model (e.g. gitignored / closed-source): skip the wasted 404 fetch.
-    if (assetManager.isAssetMissing(obj.assetId)) return this._register(obj.id, this._fallbackBox(obj, zoneId));
+    if (assetManager.isAssetMissing(obj.assetId)) {
+      const box = this._fallbackBox(obj, zoneId);
+      box.userData["assetId"] = obj.assetId;
+      return this._register(obj.id, box);
+    }
     const def  = assetManager.getAssetDef(obj.assetId);
     const path = def?.path ?? `/assets/models/${obj.assetId}.glb`;
     const isGltf = !/\.obj$/i.test(path);
@@ -95,12 +99,17 @@ export class ObjectPlacer {
           size:   { x: size.x,   y: size.y,   z: size.z },
         };
       }
+      // Which model this mesh was built from — ZoneManager compares it against
+      // object:updated payloads to detect a model swap needing a full rebuild.
+      mesh.userData["assetId"] = obj.assetId;
       if (clips.length) this._setupMixer(obj, mesh, clips);
       if (obj.material) void this._applyMaterial(obj.id, obj.material, mesh);
       return this._register(obj.id, mesh);
     } catch (err) {
       console.warn(`ObjectPlacer: failed to load model for asset "${obj.assetId}"`, err);
-      return this._register(obj.id, this._fallbackBox(obj, zoneId));
+      const box = this._fallbackBox(obj, zoneId);
+      box.userData["assetId"] = obj.assetId;
+      return this._register(obj.id, box);
     }
   }
 

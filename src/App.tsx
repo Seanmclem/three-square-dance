@@ -211,6 +211,12 @@ export default function App() {
   // Swallow selection-teardown events while a prefab re-expansion is in flight
   // (members are removed + re-added; without this the panel unmounts mid-edit).
   const suppressSelRef   = useRef(false);
+  // Undo/redo of an instance-affecting transaction replays the same remove/
+  // re-add churn as a re-expansion — with a prefab instance selected, the
+  // gizmo must detach first or it holds half-disposed tile meshes (the
+  // v4.42.7 melt, reachable via Cmd+Z). The memoized undo/redo handlers read
+  // the current instance-selection context through this ref.
+  const undoInstanceCtxRef = useRef<{ zoneId: string; instanceId: string; primaryId: string } | null>(null);
   // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
   const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
@@ -1566,18 +1572,29 @@ export default function App() {
   }, [syncHistory]);
 
   const handleUndo = useCallback((): void => {
-    historyRef.current?.undo();
+    const ctx = undoInstanceCtxRef.current;
+    if (ctx) {
+      // withInstanceReselect closes over stable refs/setters only — safe here.
+      withInstanceReselect(ctx.zoneId, ctx.instanceId, ctx.primaryId, () => historyRef.current?.undo());
+    } else {
+      historyRef.current?.undo();
+    }
     setActiveTool("select");
     busRef.current.emit("tool:select", { tool: "select" });
     syncHistory();
-  }, [syncHistory]);
+  }, [syncHistory]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRedo = useCallback((): void => {
-    historyRef.current?.redo();
+    const ctx = undoInstanceCtxRef.current;
+    if (ctx) {
+      withInstanceReselect(ctx.zoneId, ctx.instanceId, ctx.primaryId, () => historyRef.current?.redo());
+    } else {
+      historyRef.current?.redo();
+    }
     setActiveTool("select");
     busRef.current.emit("tool:select", { tool: "select" });
     syncHistory();
-  }, [syncHistory]);
+  }, [syncHistory]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const captureClipboard = useCallback((): Clipboard | null => {
     const world = worldRef.current;
@@ -2946,6 +2963,13 @@ export default function App() {
     return { prefab: prefabs.find(p => p.id === record.prefabId) ?? null, record };
     // prefabTick keeps the record view fresh after variable/origin commits.
   }, [selected, multiSelected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mirror the instance-selection context for the memoized undo/redo handlers.
+  useEffect(() => {
+    undoInstanceCtxRef.current = selPrefabInfo && selected
+      ? { zoneId: selected.zoneId, instanceId: selPrefabInfo.record.id, primaryId: selected.id }
+      : null;
+  }, [selPrefabInfo, selected]);
 
   /** After a re-expansion, the selected member's def was replaced (same id) or
    *  removed — refresh or drop the selection so the panel shows live data. */

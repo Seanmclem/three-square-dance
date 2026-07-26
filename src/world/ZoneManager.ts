@@ -377,6 +377,20 @@ export class ZoneManager {
         this._despawnEntity(id);
       }),
       this._bus.on("object:updated", ({ id, zoneId, changes }) => {
+        // Undo/redo of a prefab re-expansion: the journal collapses remove +
+        // re-add of the same id into ONE update whose payload swaps the MODEL
+        // (e.g. a tile flips corner↔side when the grid grows). Transform/
+        // collider patching can't render that — rebuild the object the way
+        // remove+add would have (mesh, colliders, mover, shadows).
+        if (changes.assetId) {
+          const built = this._loadedZones.get(zoneId)?.objectMeshes.get(id)?.userData["assetId"];
+          const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
+          if (obj && built !== undefined && built !== changes.assetId) {
+            this._removeObject(zoneId, id);
+            void this._addObject(zoneId, { ...obj, ...changes }).then(() => this._refreshStaticShadows(zoneId));
+            return;
+          }
+        }
         // Script move_object targeting a SHAPE (runtime-only, like object moves):
         // local-space geometry means repositioning is a pure transform update on
         // mesh + collider — no rebuild, and WorldState stays untouched by design.
