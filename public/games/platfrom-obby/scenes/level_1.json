@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -33.319840668412226,
-        "y": 3,
-        "z": -41.75058658986262
+        "x": -38.1027262882269,
+        "y": 12.818817435736584,
+        "z": -25.23984376830258
       },
-      "radius": 21.43661019747842,
-      "phi": 1.2099999999999966,
-      "theta": -0.3049999999999991
+      "radius": 8.290288980693552,
+      "phi": 1.5449999999999882,
+      "theta": 2.909369999983908
     }
   },
   "world": {
@@ -728,61 +728,43 @@
               "id": "col_8db7ca75",
               "shape": "box",
               "offset": {
-                "x": 1.2499985694885254,
-                "y": 1.4051508158445358,
-                "z": 1.0304949283599854
+                "x": 1.0872511875325566,
+                "y": 1.696375815523546,
+                "z": 1.03
               },
               "size": {
                 "x": 4.5,
-                "y": 3,
+                "y": 1.25,
                 "z": 0.5
               },
-              "isSensor": false
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 27
+              }
             },
             {
               "id": "col_a5655ecb",
               "shape": "box",
               "offset": {
-                "x": 0.9999985694885254,
-                "y": 1.6551508158445358,
-                "z": -1.0304949283599854
+                "x": 1.0445023750651132,
+                "y": 1.604751631047092,
+                "z": -1.03
               },
               "size": {
                 "x": 4,
-                "y": 3.5,
+                "y": 1.25,
                 "z": 0.5
               },
-              "isSensor": false
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 27
+              }
             }
           ]
-        },
-        {
-          "id": "obj_c6052b21",
-          "assetId": "stairs_modular_start",
-          "position": {
-            "x": -35.55772815618118,
-            "y": 11.79273819365478,
-            "z": -27.038379030469766
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "colliders": []
         },
         {
           "id": "obj_b59095e4",
@@ -4401,6 +4383,34 @@
             "instanceId": "pfi_4af2ec67",
             "memberKey": "tile_4_2_L3"
           }
+        },
+        {
+          "id": "obj_ed9e4f3e",
+          "assetId": "stairs_modular_end",
+          "position": {
+            "x": -35.51403714552372,
+            "y": 11.81479498802407,
+            "z": -27.037569713951818
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": []
         }
       ],
       "prefabInstances": [
