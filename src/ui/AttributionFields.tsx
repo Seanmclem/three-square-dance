@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { Attribution, LicenseId } from "@/types";
 
 export const LICENSES: LicenseId[] = ["CC0", "CC BY", "CC BY-SA", "CC BY-ND", "CC BY-NC", "CC BY-NC-SA", "Other"];
@@ -12,11 +13,30 @@ const LABEL: React.CSSProperties = { color: "#646464", fontSize: 9, letterSpacin
 
 /** Controlled attribution form (author / patreon / source / license). Reused by both
  *  import modals and the edit dialog. `disabled` greys all inputs (used by bulk "apply" toggles). */
-export function AttributionFields({ value, onChange, disabledKeys }: {
+export function AttributionFields({ value, onChange, disabledKeys, autofillFrom }: {
   value:    Attribution;
   onChange: (a: Attribution) => void;
   disabledKeys?: Partial<Record<keyof Attribution, boolean>>;  // when a field's "apply to all" is off (bulk)
+  autofillFrom?: Attribution[];  // existing library attributions — offers a fill-from-existing picker
 }) {
+  // Distinct packs (full attribution) and authors (author-level fields only —
+  // pack name/URL stay blank so a new pack from a known author is one pick + two fields).
+  const presets = useMemo(() => {
+    const packs   = new Map<string, Attribution>();
+    const authors = new Map<string, Attribution>();
+    for (const a of autofillFrom ?? []) {
+      if (a.sourceName && !packs.has(a.sourceName)) packs.set(a.sourceName, { ...a });
+      if (a.author && !authors.has(a.author)) {
+        authors.set(a.author, {
+          author: a.author,
+          ...(a.patreonUrl   ? { patreonUrl:   a.patreonUrl   } : {}),
+          ...(a.license      ? { license:      a.license      } : {}),
+          ...(a.licenseOther ? { licenseOther: a.licenseOther } : {}),
+        });
+      }
+    }
+    return { packs: [...packs.values()], authors: [...authors.values()] };
+  }, [autofillFrom]);
   const set = (patch: Partial<Attribution>) => onChange({ ...value, ...patch });
   const dis = (k: keyof Attribution) => disabledKeys?.[k] ?? false;
 
@@ -35,6 +55,39 @@ export function AttributionFields({ value, onChange, disabledKeys }: {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {(presets.packs.length > 0 || presets.authors.length > 0) && (
+        <div>
+          <div style={LABEL}>AUTOFILL FROM LIBRARY</div>
+          <select
+            style={{ ...INPUT, cursor: "pointer" }}
+            value=""
+            onChange={e => {
+              const v = e.currentTarget.value;
+              if (!v) return;
+              const preset = v.startsWith("p")
+                ? presets.packs[Number(v.slice(1))]
+                : presets.authors[Number(v.slice(1))];
+              if (preset) onChange({ ...value, ...preset });
+            }}
+          >
+            <option value="">Pick an existing pack / author…</option>
+            {presets.packs.length > 0 && (
+              <optgroup label="Packs">
+                {presets.packs.map((p, i) => (
+                  <option key={`p${i}`} value={`p${i}`}>
+                    {p.sourceName}{p.author ? ` — ${p.author}` : ""}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {presets.authors.length > 0 && (
+              <optgroup label="Authors">
+                {presets.authors.map((a, i) => <option key={`a${i}`} value={`a${i}`}>{a.author}</option>)}
+              </optgroup>
+            )}
+          </select>
+        </div>
+      )}
       {field("author", "AUTHOR", "e.g. Quaternius")}
       {field("sourceName", "SOURCE / KIT NAME", "e.g. Ultimate Nature Pack")}
       {field("sourceUrl", "SOURCE / KIT URL", "https://…")}

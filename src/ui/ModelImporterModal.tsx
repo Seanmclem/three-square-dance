@@ -9,6 +9,7 @@ interface Props {
   modelsDir:      FileSystemDirectoryHandle | null;
   onModelsDirSet: (dir: FileSystemDirectoryHandle) => void;
   existingTags:   string[];   // suggestions — the manifest isn't read until the import step
+  existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
   onComplete:     (assets: AssetDef[]) => void;
   onClose:        () => void;
 }
@@ -129,7 +130,7 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#646464", fontSize: 10, letterSpacing: 1,
 };
 
-export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, onComplete, onClose }: Props) {
+export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, existingAttributions, onComplete, onClose }: Props) {
   const [phase,      setPhase]      = useState<Phase>("pick");
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
   const [collidable,    setCollidable]    = useState(true);
@@ -386,7 +387,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, on
               {/* Attribution (optional) — applies to all imported models */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "#7a7a7a" }}>Attribution (optional — applies to all)</span>
-                <AttributionFields value={attribution} onChange={setAttribution} />
+                <AttributionFields value={attribution} onChange={setAttribution} autofillFrom={existingAttributions} />
               </div>
 
               {/* Entry list */}

@@ -3569,6 +3569,7 @@ SquareDance
           modelsDir={modelsDir}
           onModelsDirSet={dir => setModelsDir(dir)}
           existingTags={[...new Set(assets.flatMap(a => a.tags))].sort()}
+          existingAttributions={assets.flatMap(a => a.attribution ? [a.attribution] : [])}
           onComplete={imported => {
             handleAssetsReload();
             setShowImporter(false);
