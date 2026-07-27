@@ -165,9 +165,10 @@ export class EditorCamera {
     if (this._keys["KeyD"]) { this.targetFocus.x += cosA * s; this.targetFocus.z -= sinA * s; }
 
     // Arrows are split from WASD: up/down = focus elevation, left/right = orbit yaw
-    if (this._keys["ArrowUp"])   this.targetFocus.y += s;
-    if (this._keys["ArrowDown"]) this.targetFocus.y -= s;
-    const rot = 0.025 * dt * 60;   // ~1.5 rad/s
+    const vs = s * 0.5;
+    if (this._keys["ArrowUp"])   this.targetFocus.y += vs;
+    if (this._keys["ArrowDown"]) this.targetFocus.y -= vs;
+    const rot = 0.015 * dt * 60;   // ~0.9 rad/s
     if (this._keys["ArrowLeft"])  this.targetSpherical.theta += rot;
     if (this._keys["ArrowRight"]) this.targetSpherical.theta -= rot;
 
