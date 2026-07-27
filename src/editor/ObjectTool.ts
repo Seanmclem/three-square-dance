@@ -76,6 +76,7 @@ export class ObjectTool implements IEditorModule {
   update(_dt: number): void {}
 
   dispose(): void {
+    this._assetId = null;   // teardown is not a user-facing disarm — don't emit into a dying bus
     this._reset();
     this._unsubs.forEach(u => u());
   }
@@ -183,9 +184,13 @@ export class ObjectTool implements IEditorModule {
   }
 
   private _reset(): void {
+    const wasArmed = this._assetId !== null;
     this._clearGhost();
     this._state   = "IDLE";
     this._assetId = null;
     document.body.style.cursor = "";
+    // Tell the panel we disarmed, so its highlight doesn't outlive the ghost. A stale
+    // highlight makes the next click on that tile a "deselect" that places nothing.
+    if (wasArmed) this._bus.emit("objecttool:disarmed", {});
   }
 }

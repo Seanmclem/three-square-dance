@@ -214,6 +214,10 @@ export interface BusEvents {
   "object:deselected":     Record<string, never>;
   "object:updated":        { id: string; zoneId: string; changes: Partial<WorldObject> };
   "asset:selected":        { assetId: string };
+  // ObjectTool announcing it disarmed itself (Escape / right-click / tool switch), so the
+  // AssetBrowser highlight can follow. Without this the panel keeps showing an asset as
+  // selected while the tool is idle, and the next click on that tile reads as "deselect".
+  "objecttool:disarmed":   Record<string, never>;
   "asset:dropped":         { assetId: string; screenPos: { x: number; y: number } };
   "wall:added":            { zoneId: string; wall: WallDef };
   "wall:updated":          { zoneId: string; wallId: string; changes: Partial<WallDef>; segmentOnly?: boolean };

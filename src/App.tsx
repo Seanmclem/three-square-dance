@@ -741,6 +741,8 @@ export default function App() {
         syncHistory();
       }),
       bus.on("assets:loaded",   ({ assets: defs }) => setAssets(defs)),
+      // ObjectTool disarmed itself — drop the panel highlight so it can't outlive the ghost.
+      bus.on("objecttool:disarmed", () => setSelectedAssetId(null)),
       bus.on("zone:added",      ()               => setZones([...world.zones.values()])),
       bus.on("zone:activated",  ({ zoneId })     => {
         setActiveZoneId(zoneId);
@@ -2255,9 +2257,18 @@ export default function App() {
     setSkyboxes(assetManager.getSkyboxList());
   };
 
+  // Picking an asset arms the ObjectTool. It must re-arm the tool first: ObjectTool ignores
+  // `asset:selected` unless it is the active tool, so after anything that switched tools
+  // (Escape, right-click, placing then selecting) the click would otherwise do nothing at
+  // all. Mirrors handleDecalSelect, which has always re-armed its tool this way.
   const handleAssetSelect = (id: string | null): void => {
     setSelectedAssetId(id);
-    if (id) busRef.current.emit("asset:selected", { assetId: id });
+    if (!id) return;
+    if (activeTool !== "object") {
+      setActiveTool("object");
+      busRef.current.emit("tool:select", { tool: "object" });   // before asset:selected — order matters
+    }
+    busRef.current.emit("asset:selected", { assetId: id });
   };
 
   // Open the delete-confirm dialog, computing how many placed objects use the assets.
