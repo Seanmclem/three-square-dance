@@ -3389,7 +3389,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               >Move</button>
               {(c.shape === "box" || c.shape === "capsule") && (
                 <button
-                  title="Toggle a rotate gizmo on this collider (2.5° steps, hold Alt for free)"
+                  title="Toggle a rotate gizmo on this collider (1° steps, hold Alt for free)"
                   onClick={() => toggleMove(c.id, "rotate")}
                   style={{
                     padding: "2px 7px", borderRadius: 3, cursor: "pointer", fontFamily: "monospace", fontSize: 9,
