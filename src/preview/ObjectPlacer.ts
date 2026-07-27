@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
+import type { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import { assetManager } from "@/core/AssetManager";
@@ -28,10 +29,19 @@ export class ObjectPlacer {
   private readonly _despawned = new Set<string>();
   private _previewingId: string | null = null;
 
-  constructor(private readonly _bus: EventBus) {
+  // Runtime-shell InstancedMesh pooling (never set in the editor). Type-only
+  // import keeps the pool module out of the editor bundle.
+  private readonly _pool: InstancedObjectPool | null;
+
+  constructor(private readonly _bus: EventBus, opts?: { instancing?: InstancedObjectPool }) {
+    this._pool = opts?.instancing ?? null;
     // Script-driven actions (Phase 10.9). Object id is already group-resolved by ScriptEngine.
     this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) => this.previewClip(id, clipName, { loop, hold, blend }));
     this._bus.on("object:updated", ({ id, changes }) => {
+      if (import.meta.env.DEV && this._meshes.get(id)?.userData["_instanced"] &&
+          (changes.material || changes.position || changes.rotation || changes.scale)) {
+        console.warn(`[ObjectPlacer] pooled object "${id}" received a runtime mutation — instancing eligibility scan gap`);
+      }
       if (changes.material) void this._applyMaterial(id, changes.material);
       // move_object (and editor transform edits): apply to the live mesh for any object,
       // not just the selected one. Script edits are runtime-only (data untouched).
@@ -41,6 +51,9 @@ export class ObjectPlacer {
     // preview doesn't rebuild the zone), matching ZoneManager's non-object despawn.
     this._bus.on("object:despawn", ({ id }) => {
       const mesh = this._meshes.get(id);
+      if (import.meta.env.DEV && mesh?.userData["_instanced"]) {
+        console.warn(`[ObjectPlacer] pooled object "${id}" received despawn — instancing eligibility scan gap`);
+      }
       if (mesh) mesh.visible = false;
       this._mixers.get(id)?.stopAllAction();
       this._active.delete(id);
@@ -67,6 +80,20 @@ export class ObjectPlacer {
     const path = def?.path ?? `/assets/models/${obj.assetId}.glb`;
     const isGltf = !/\.obj$/i.test(path);
     try {
+      // Runtime instancing: eligible objects register a placement in the pool
+      // and get a proxy Object3D (userData + transform, no children) so the
+      // collider/audio/interact paths keyed on the id map keep working.
+      if (isGltf && this._pool) {
+        const pooled = await this._pool.tryAdd(obj, zoneId);
+        if (pooled) {
+          const proxy = new THREE.Object3D();
+          this._applyTransform(proxy, obj, zoneId);
+          if (pooled.localAABB) proxy.userData["localAABB"] = pooled.localAABB;
+          proxy.userData["assetId"] = obj.assetId;
+          proxy.userData["_instanced"] = true;
+          return this._register(obj.id, proxy);
+        }
+      }
       let mesh: THREE.Object3D;
       let clips: THREE.AnimationClip[] = [];
       if (isGltf) {
@@ -170,6 +197,7 @@ export class ObjectPlacer {
 
   /** Tear down an object's mixer/clip state. Geometry disposal is ZoneManager's job. */
   remove(objectId: string): void {
+    this._pool?.release(objectId);
     if (this._previewingId === objectId) this._previewingId = null;
     const mixer = this._mixers.get(objectId);
     if (mixer) {

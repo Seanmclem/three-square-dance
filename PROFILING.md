@@ -138,18 +138,25 @@ each **placed object is its own `Object3D`** (`ObjectPlacer.build`). Identical p
 already **share `BufferGeometry`** (GLTF cache + `SkeletonUtils.clone` / `Object3D.clone`) — good
 for memory/uploads — but they are **not batched**, so N copies = N draw calls.
 
-**When `InstancedMesh` would help (future, not currently warranted).** It collapses many copies of
-the *same* geometry into **one draw call**, but only fits **many identical *static* props**:
-same asset + material, **no overrides**, **not skinned/animated**, **no CSG cut**. Excluded:
-- skinned/animated objects (per-instance bone matrices — would need instanced skinning),
-- override / CSG-cut meshes (unique geometry per instance),
-- walls/floors/stairs (already unique or merged).
+**`InstancedMesh` pooling — SHIPPED for the runtime shell (Phase 50, v4.46.0).**
+`src/world/InstancedObjectPool.ts`, constructed only by `RuntimeApp` and injected into
+`ObjectPlacer` — the editor never builds a pool, so all the editor-integration costs
+(instanced picking, per-instance edits, rebuilds) were never paid. Eligible placed objects
+render as one `InstancedMesh` per `(assetId, submesh)` sharing the cached GLTF
+geometry/materials; ObjectPlacer registers a proxy `Object3D` (userData + `localAABB`) so
+colliders/audio/interact keep working. Measured on the 126-tile obby level (runtime shell):
+**784 → 68 draw calls** (~11×), triangles unchanged, colliders identical (135), zero
+geometry growth across scene-reload cycles. Ineligible objects fall back to the normal
+clone path — the static exclusion list:
+- skinned/animated assets (incl. `autoPlayAnimation`), transparent materials,
+- per-object state: `material` override, `mover`, `sound`, `properties.interactable`,
+- any object (or group member) targeted by a mutating script action — found by a
+  container-agnostic deep walk of the level data (scripts, dialogue options, GUI menus),
+- `.obj` assets, CSG-cut meshes, walls/floors/stairs (already unique or merged).
 
-The real cost of adopting it isn't the batching — it's **editor integration**: instanced picking
-& selection (by `instanceId`), per-instance transforms/edits, add/remove rebuilds. So treat it as
-a **"reach for it when a scene actually has hundreds of repeated static props"** optimization,
-decided by the draw-call number below — not a speculative rewrite. (A scene of walls/floors + a
-skinned character gains nothing.)
+The **editor** still draws N copies = N draw calls by design; if editor-viewport draw calls
+ever become the bottleneck, the planned follow-up is prefab consolidation (merge a prefab
+instance's members render-side while not being edited) — see `plans/phase-50-runtime-instancing.md`.
 
 **Measure draw calls** (per `TESTING.md §2`):
 

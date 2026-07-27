@@ -7,6 +7,7 @@ import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { MoverSystem } from "@/world/MoverSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
+import { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { PreviewController } from "@/preview/PreviewController";
 import { AudioSystem } from "@/audio/AudioSystem";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
@@ -75,7 +76,10 @@ export default function RuntimeApp() {
 
     const world        = new WorldState(bus);
     worldRef.current   = world;
-    const objectPlacer = new ObjectPlacer(bus);
+    // Runtime-only draw-call collapse: repeated static kit objects render as
+    // InstancedMesh pools (the editor shell never constructs one).
+    const instancing   = new InstancedObjectPool(scene.scene, bus, world);
+    const objectPlacer = new ObjectPlacer(bus, { instancing });
     const movers       = new MoverSystem(bus);
     const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     const preview      = new PreviewController(bus, world, scene, zones, movers);
@@ -201,6 +205,7 @@ export default function RuntimeApp() {
       g.__world = world; g.__zones = zones; g.__bus = bus;
       g.__scriptEngine = scriptEngine; g.__preview = preview; g.__gameState = gameState;
       g.__movers = movers;
+      g.__instancing = instancing;
       g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, physicsWorld, router: null, manifest: null };
       // Dynamic import: testHelpers statically imports @/editor/bakeShapes —
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.
@@ -275,6 +280,7 @@ export default function RuntimeApp() {
       doSaveRef.current = null;
       preview.exit();
       audio.dispose();
+      instancing.dispose();
       scene.dispose();
     };
   }, []);
