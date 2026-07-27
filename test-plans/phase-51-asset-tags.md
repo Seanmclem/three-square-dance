@@ -15,7 +15,7 @@ byte-unchanged by `git diff --quiet` afterwards.
 | # | Check | Expected | Result |
 |---|---|---|---|
 | 1 | Backfill loaded | 111 assets, none untagged, 19 tiles keep `platformer`+`tile`, counts match the script summary | ✅ 0 untagged; counts exact (cc0 96, platformer 63, platformer-game-kit 63, prop 44, …) |
-| 2 | `#` toggle swaps the strip | Chips become tags, frequency-ordered; toggling back keeps the category selection | ✅ `[cc0][platformer][platformer-game-kit][prop]` + `More ▾`; category state preserved both ways |
+| 2 | Facet switcher swaps the strip | Chips become tags, frequency-ordered; switching back keeps the category selection | ✅ `[cc0][platformer][platformer-game-kit][prop]` + `More ▾`; category state preserved both ways |
 | 3 | Tag filter narrows | Tile count equals the manifest count for that tag | ✅ `platformer` → 63 shown = 63 expected |
 | 4 | Multi-tag **ANDs** | Intersection, not union | ✅ `platformer`+`prop` → 44 (AND) not 63 (OR); toggle reads `#2`; active chips pinned to the strip front |
 | 5 | Composes with a category | Count equals assets matching category **and** tag | ✅ `Nature` + `cc0` → exactly 1 tile, **Rock 2** — strictly fewer than both 13 Nature and 96 cc0 |
@@ -32,6 +32,24 @@ and `import-test,Foliage` committed as two chips on the comma.
 **Tag-mode category pill:** with a category active, tag mode renders a
 clearable `Nature ✕` pill, so the hidden category filter can't be mistaken for
 "the tag filter found nothing". Verified in check 7.
+
+## Follow-up pass (v4.48.1) — mode made legible
+
+The checks above all passed while the UI was still **unreadable**: they asserted
+counts and event wiring, never "can a user tell which facet they're looking
+at?". The answer was no — tag chips reused the category pill style verbatim, so
+the only cue was a small `#` button tinting blue, and 11 of 15 tags sat behind
+`More ▾`. A passing functional suite hid a dead-obvious UX defect; worth
+remembering when writing checks for a *visual* feature.
+
+Re-verified after the fix (same tab protocol):
+
+| Check | Result |
+|---|---|
+| Facet is named, not implied | ✅ `Categories \| Tags` segmented control, active segment highlighted |
+| Tags look like tags | ✅ chips render `#cc0 96`, `#platformer 63`, `#platformer-game-kit 63`, `#prop 44`, wrapping to a second row |
+| Filtering unchanged | ✅ `#prop` → 44 tiles = 44 in the manifest |
+| Active count + clear | ✅ `Tags 1` on the segment, `clear` appears, resets to 111 and disappears |
 
 ## Regressions (`TESTING.md` §7)
 

@@ -15,6 +15,19 @@ const CAT_BTN = (active: boolean): React.CSSProperties => ({
   transition: "background 0.1s, color 0.1s",
 });
 
+// Facet switcher. Named segments, not a bare "#" — the strip below changes meaning,
+// and identically-styled pills gave no hint which facet you were looking at.
+const SEG_BTN = (active: boolean): React.CSSProperties => ({
+  flexShrink: 0,
+  fontSize: 10, padding: "3px 10px", borderRadius: 3,
+  border: "none", cursor: "pointer",
+  background: active ? "rgba(80,140,255,0.25)" : "transparent",
+  color: active ? "#80aaff" : "#c2cadb",
+  letterSpacing: 0.5, whiteSpace: "nowrap",
+  transition: "background 0.1s, color 0.1s",
+});
+const COUNT_SPAN: React.CSSProperties = { opacity: 0.55, marginLeft: 4 };
+
 interface AssetBrowserProps {
   assets:          AssetDef[];
   selectedAssetId: string | null;
@@ -142,6 +155,38 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
         />
       </div>
 
+      {/* Facet switcher — says which of the two the strip below is showing */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px 4px", flexShrink: 0 }}>
+        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2 }}>
+          <button
+            style={SEG_BTN(filterMode === "cat")}
+            onClick={() => { setFilterMode("cat"); setPopoutOpen(false); }}
+          >
+            Categories
+          </button>
+          <button
+            style={SEG_BTN(filterMode === "tag")}
+            onClick={() => { setFilterMode("tag"); setPopoutOpen(false); }}
+          >
+            Tags{activeTags.size > 0 && <span style={COUNT_SPAN}>{activeTags.size}</span>}
+          </button>
+        </div>
+        <span style={{ flex: 1 }} />
+        {(activeTags.size > 0 || category !== "All") && (
+          <button
+            onClick={clearFilters}
+            title="Clear the category and tag filters"
+            style={{
+              flexShrink: 0, fontSize: 10, padding: "3px 8px", borderRadius: 3,
+              background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+              cursor: "pointer", color: "#c2cadb", letterSpacing: 0.5,
+            }}
+          >
+            clear
+          </button>
+        )}
+      </div>
+
       {/* Category strip — fixed, no scroll */}
       <div style={{ position: "relative", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 2, padding: "0 8px 4px", flexWrap: "wrap" }}>
@@ -182,7 +227,8 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 </button>
               )}
 
-              {/* Tag chips — multi-select, ANDed */}
+              {/* Tag chips — multi-select, ANDed. `#` + count so they can't be mistaken
+                  for category pills, which are exclusive and countless. */}
               {tagStrip.map(tag => (
                 <button
                   key={tag}
@@ -191,7 +237,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                   onMouseEnter={e => { if (!activeTags.has(tag)) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
                   onMouseLeave={e => { if (!activeTags.has(tag)) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
                 >
-                  {tag}
+                  #{tag}<span style={COUNT_SPAN}>{tagCounts.get(tag) ?? 0}</span>
                 </button>
               ))}
               {ALL_TAGS.length === 0 && (
@@ -199,16 +245,6 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
               )}
             </>
           )}
-
-          {/* Mode toggle — shows the active tag count so the filter stays visible from
-              category mode (where the tag chips are hidden). */}
-          <button
-            style={CAT_BTN(filterMode === "tag")}
-            title={filterMode === "tag" ? "Back to categories" : "Filter by tag"}
-            onClick={() => { setFilterMode(m => (m === "cat" ? "tag" : "cat")); setPopoutOpen(false); }}
-          >
-            #{activeTags.size > 0 ? activeTags.size : ""}
-          </button>
 
           {/* More button — full row below the pills */}
           {(filterMode === "cat" ? overflowCats.length : overflowTags.length) > 0 && (
@@ -270,7 +306,9 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                     }
                   }}
                 >
-                  {filterMode === "cat" ? item : `${item}  ${tagCounts.get(item) ?? 0}`}
+                  {filterMode === "cat"
+                    ? item
+                    : <>#{item}<span style={COUNT_SPAN}>{tagCounts.get(item) ?? 0}</span></>}
                 </button>
               );
             })}
