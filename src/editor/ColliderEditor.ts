@@ -11,6 +11,7 @@ import type { IEditorModule, ToolId, WorldObject, AttachedCollider, ScreenPos, V
 
 const GRID = 0.5;
 const MIN  = 0.1;    // smallest collider size along any axis
+const ROT_SNAP_DEG = 5;   // rotate-gizmo snap (Alt = free)
 const HANDLE = 0.2;
 const GAP  = 0.3;    // face handles sit this far OUTSIDE each face
 
@@ -91,7 +92,7 @@ export class ColliderEditor implements IEditorModule {
     this._moveControls = new TransformControls(this._camera, this._canvas);
     this._moveControls.setMode("translate");
     this._moveControls.setSize(0.5);
-    this._moveControls.setRotationSnap(THREE.MathUtils.degToRad(15));
+    this._moveControls.setRotationSnap(THREE.MathUtils.degToRad(ROT_SNAP_DEG));
     this._scene.add(this._moveProxy);
     this._scene.add(this._moveControls);
     this._moveControls.addEventListener("dragging-changed", e => {
@@ -174,7 +175,7 @@ export class ColliderEditor implements IEditorModule {
       this._bus.on("input:keyup", ({ code }) => {
         if (code === "AltLeft" || code === "AltRight") {
           this._altDown = false;
-          this._moveControls?.setRotationSnap(THREE.MathUtils.degToRad(15));
+          this._moveControls?.setRotationSnap(THREE.MathUtils.degToRad(ROT_SNAP_DEG));
         }
       }),
     );
