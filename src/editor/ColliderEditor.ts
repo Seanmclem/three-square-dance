@@ -9,7 +9,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, WorldObject, AttachedCollider, ScreenPos, Vec3 } from "@/types";
 
-const GRID = 0.5;
+const GRID = 0.25;   // face-handle drag-snap increment (Alt = free)
 const MIN  = 0.1;    // smallest collider size along any axis
 const ROT_SNAP_DEG = 5;   // rotate-gizmo snap (Alt = free)
 const HANDLE = 0.2;
