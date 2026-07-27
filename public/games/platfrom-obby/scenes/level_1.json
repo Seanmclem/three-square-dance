@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -31.51911787363249,
+        "x": -33.319840668412226,
         "y": 3,
-        "z": -29.043304776428215
+        "z": -41.75058658986262
       },
-      "radius": 16.053930523449054,
-      "phi": 1.0700000000000023,
-      "theta": -0.5649999999999992
+      "radius": 21.43661019747842,
+      "phi": 1.2099999999999966,
+      "theta": -0.3049999999999991
     }
   },
   "world": {
@@ -41,12 +41,12 @@
     "playerSettings": {
       "cameraMode": "thirdperson",
       "moveSpeed": 6,
-      "jumpHeight": 1.2,
+      "jumpHeight": 3,
       "fov": 75,
       "thirdPersonDistance": 4,
       "thirdPersonHeight": 2,
       "modelAssetId": "character",
-      "characterScale": 0.4
+      "characterScale": 0.6
     },
     "stateSchema": {
       "health": {
@@ -84,11 +84,739 @@
       "stairs": [],
       "objects": [
         {
+          "id": "obj_0e510787",
+          "label": "Tile 0,0",
+          "assetId": "platform_grass_corner_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 9.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_0"
+          }
+        },
+        {
+          "id": "obj_8bc8a517",
+          "label": "Tile 0,1",
+          "assetId": "platform_grass_side_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 9.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_1"
+          }
+        },
+        {
+          "id": "obj_89a7ba0d",
+          "label": "Tile 0,2",
+          "assetId": "platform_grass_corner_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 9.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_2"
+          }
+        },
+        {
+          "id": "obj_9925024a",
+          "label": "Tile 1,0",
+          "assetId": "platform_grass_side_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 9.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_0"
+          }
+        },
+        {
+          "id": "obj_1ea02977",
+          "label": "Tile 1,1",
+          "assetId": "platform_grass_center_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 9.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_1"
+          }
+        },
+        {
+          "id": "obj_c5cc493e",
+          "label": "Tile 1,2",
+          "assetId": "platform_grass_side_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 9.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_2"
+          }
+        },
+        {
+          "id": "obj_8dcd1044",
+          "label": "Tile 2,0",
+          "assetId": "platform_grass_corner_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 9.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_0"
+          }
+        },
+        {
+          "id": "obj_84745336",
+          "label": "Tile 2,1",
+          "assetId": "platform_grass_side_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 9.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_1"
+          }
+        },
+        {
+          "id": "obj_5379389b",
+          "label": "Tile 2,2",
+          "assetId": "platform_grass_corner_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 9.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_2"
+          }
+        },
+        {
+          "id": "obj_1ab0c785",
+          "label": "Tile 0,0 L1",
+          "assetId": "platform_grass_corner_bottom_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 7.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_0_L1"
+          }
+        },
+        {
+          "id": "obj_da89fd73",
+          "label": "Tile 0,1 L1",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 7.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_1_L1"
+          }
+        },
+        {
+          "id": "obj_50dc579a",
+          "label": "Tile 0,2 L1",
+          "assetId": "platform_grass_corner_bottom_tall",
+          "position": {
+            "x": -42.98546594385466,
+            "y": 7.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_0_2_L1"
+          }
+        },
+        {
+          "id": "obj_18c5bf10",
+          "label": "Tile 1,0 L1",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 7.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_0_L1"
+          }
+        },
+        {
+          "id": "obj_7508ce51",
+          "label": "Tile 1,1 L1",
+          "assetId": "platform_grass_bottom_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 7.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_1_L1"
+          }
+        },
+        {
+          "id": "obj_992cbe3b",
+          "label": "Tile 1,2 L1",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -40.98546594385466,
+            "y": 7.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_1_2_L1"
+          }
+        },
+        {
+          "id": "obj_ba0c6bc9",
+          "label": "Tile 2,0 L1",
+          "assetId": "platform_grass_corner_bottom_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 7.874838355622726,
+            "z": -30.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_0_L1"
+          }
+        },
+        {
+          "id": "obj_43626414",
+          "label": "Tile 2,1 L1",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 7.874838355622726,
+            "z": -28.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_1_L1"
+          }
+        },
+        {
+          "id": "obj_fdf91724",
+          "label": "Tile 2,2 L1",
+          "assetId": "platform_grass_corner_bottom_tall",
+          "position": {
+            "x": -38.98546594385466,
+            "y": 7.874838355622726,
+            "z": -26.56678531831541
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_73824787",
+            "memberKey": "tile_2_2_L1"
+          }
+        },
+        {
+          "id": "obj_91758e68",
+          "assetId": "stairs_modular_start",
+          "position": {
+            "x": -37.5,
+            "y": 10.821980789135306,
+            "z": -27.037569713951818
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": [
+            {
+              "id": "col_14413460",
+              "shape": "box",
+              "offset": {
+                "x": 1.13,
+                "y": 0.432,
+                "z": -0.137
+              },
+              "size": {
+                "x": 4.5,
+                "y": 1,
+                "z": 2.561
+              },
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 25
+              }
+            },
+            {
+              "id": "col_8db7ca75",
+              "shape": "box",
+              "offset": {
+                "x": 1.2499985694885254,
+                "y": 1.4051508158445358,
+                "z": 1.0304949283599854
+              },
+              "size": {
+                "x": 4.5,
+                "y": 3,
+                "z": 0.5
+              },
+              "isSensor": false
+            },
+            {
+              "id": "col_a5655ecb",
+              "shape": "box",
+              "offset": {
+                "x": 0.9999985694885254,
+                "y": 1.6551508158445358,
+                "z": -1.0304949283599854
+              },
+              "size": {
+                "x": 4,
+                "y": 3.5,
+                "z": 0.5
+              },
+              "isSensor": false
+            }
+          ]
+        },
+        {
+          "id": "obj_c6052b21",
+          "assetId": "stairs_modular_start",
+          "position": {
+            "x": -35.55772815618118,
+            "y": 11.79273819365478,
+            "z": -27.038379030469766
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": []
+        },
+        {
+          "id": "obj_b59095e4",
+          "assetId": "stairs",
+          "position": {
+            "x": -40.39238033157351,
+            "y": 8.206900442515547,
+            "z": -25.281971268633665
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.8,
+            "y": 0.8,
+            "z": 0.8
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
           "id": "obj_80b7ea59",
           "label": "Tile 0,0",
           "assetId": "platform_grass_corner",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -121,7 +849,7 @@
           "label": "Tile 0,1",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -154,7 +882,7 @@
           "label": "Tile 0,2",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -187,7 +915,7 @@
           "label": "Tile 0,3",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -220,7 +948,7 @@
           "label": "Tile 0,4",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -253,7 +981,7 @@
           "label": "Tile 0,5",
           "assetId": "platform_grass_corner",
           "position": {
-            "x": -38.764049694332584,
+            "x": -40.95426780485529,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -286,7 +1014,7 @@
           "label": "Tile 1,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -319,7 +1047,7 @@
           "label": "Tile 1,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -352,7 +1080,7 @@
           "label": "Tile 1,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -385,7 +1113,7 @@
           "label": "Tile 1,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -418,7 +1146,7 @@
           "label": "Tile 1,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -451,7 +1179,7 @@
           "label": "Tile 1,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -36.764049694332584,
+            "x": -38.95426780485529,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -484,7 +1212,7 @@
           "label": "Tile 2,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -517,7 +1245,7 @@
           "label": "Tile 2,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -550,7 +1278,7 @@
           "label": "Tile 2,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -583,7 +1311,7 @@
           "label": "Tile 2,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -616,7 +1344,7 @@
           "label": "Tile 2,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -649,7 +1377,7 @@
           "label": "Tile 2,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -34.764049694332584,
+            "x": -36.95426780485529,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -682,7 +1410,7 @@
           "label": "Tile 3,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -715,7 +1443,7 @@
           "label": "Tile 3,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -748,7 +1476,7 @@
           "label": "Tile 3,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -781,7 +1509,7 @@
           "label": "Tile 3,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -814,7 +1542,7 @@
           "label": "Tile 3,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -847,7 +1575,7 @@
           "label": "Tile 3,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -32.764049694332584,
+            "x": -34.95426780485529,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -880,7 +1608,7 @@
           "label": "Tile 4,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -913,7 +1641,7 @@
           "label": "Tile 4,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -946,7 +1674,7 @@
           "label": "Tile 4,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -979,7 +1707,7 @@
           "label": "Tile 4,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -1012,7 +1740,7 @@
           "label": "Tile 4,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -1045,7 +1773,7 @@
           "label": "Tile 4,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -30.76404969433258,
+            "x": -32.95426780485529,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -1078,7 +1806,7 @@
           "label": "Tile 5,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -1111,7 +1839,7 @@
           "label": "Tile 5,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -1144,7 +1872,7 @@
           "label": "Tile 5,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -1177,7 +1905,7 @@
           "label": "Tile 5,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -1210,7 +1938,7 @@
           "label": "Tile 5,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -1243,7 +1971,7 @@
           "label": "Tile 5,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -28.76404969433258,
+            "x": -30.954267804855288,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -1276,7 +2004,7 @@
           "label": "Tile 6,0",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -1309,7 +2037,7 @@
           "label": "Tile 6,1",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
@@ -1342,7 +2070,7 @@
           "label": "Tile 6,2",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
@@ -1375,7 +2103,7 @@
           "label": "Tile 6,3",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
@@ -1408,7 +2136,7 @@
           "label": "Tile 6,4",
           "assetId": "platform_grass_center",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
@@ -1441,7 +2169,7 @@
           "label": "Tile 6,5",
           "assetId": "platform_grass_side",
           "position": {
-            "x": -26.76404969433258,
+            "x": -28.954267804855288,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -1472,9 +2200,9 @@
         {
           "id": "obj_68eb0c95",
           "label": "Tile 7,0",
-          "assetId": "platform_grass_corner",
+          "assetId": "platform_grass_side",
           "position": {
-            "x": -24.76404969433258,
+            "x": -26.954267804855288,
             "y": 6.425364034535831,
             "z": -27.711187332298913
           },
@@ -1505,15 +2233,15 @@
         {
           "id": "obj_0b1b6c4e",
           "label": "Tile 7,1",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
-            "x": -24.76404969433258,
+            "x": -26.954267804855288,
             "y": 6.425364034535831,
             "z": -25.711187332298913
           },
           "rotation": {
             "x": 0,
-            "y": 90,
+            "y": 0,
             "z": 0
           },
           "scale": {
@@ -1538,15 +2266,15 @@
         {
           "id": "obj_91517ebd",
           "label": "Tile 7,2",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
-            "x": -24.76404969433258,
+            "x": -26.954267804855288,
             "y": 6.425364034535831,
             "z": -23.711187332298913
           },
           "rotation": {
             "x": 0,
-            "y": 90,
+            "y": 0,
             "z": 0
           },
           "scale": {
@@ -1571,15 +2299,15 @@
         {
           "id": "obj_236e7b38",
           "label": "Tile 7,3",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
-            "x": -24.76404969433258,
+            "x": -26.954267804855288,
             "y": 6.425364034535831,
             "z": -21.711187332298913
           },
           "rotation": {
             "x": 0,
-            "y": 90,
+            "y": 0,
             "z": 0
           },
           "scale": {
@@ -1604,15 +2332,15 @@
         {
           "id": "obj_fcc5e0d5",
           "label": "Tile 7,4",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
-            "x": -24.76404969433258,
+            "x": -26.954267804855288,
             "y": 6.425364034535831,
             "z": -19.711187332298913
           },
           "rotation": {
             "x": 0,
-            "y": 90,
+            "y": 0,
             "z": 0
           },
           "scale": {
@@ -1637,9 +2365,207 @@
         {
           "id": "obj_7e54d751",
           "label": "Tile 7,5",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -26.954267804855288,
+            "y": 6.425364034535831,
+            "z": -17.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_7_5"
+          }
+        },
+        {
+          "id": "obj_ac3c526e",
+          "label": "Tile 8,0",
           "assetId": "platform_grass_corner",
           "position": {
-            "x": -24.76404969433258,
+            "x": -24.954267804855288,
+            "y": 6.425364034535831,
+            "z": -27.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_8_0"
+          }
+        },
+        {
+          "id": "obj_4847f2b7",
+          "label": "Tile 8,1",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -24.954267804855288,
+            "y": 6.425364034535831,
+            "z": -25.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_8_1"
+          }
+        },
+        {
+          "id": "obj_dc17aab1",
+          "label": "Tile 8,2",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -24.954267804855288,
+            "y": 6.425364034535831,
+            "z": -23.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_8_2"
+          }
+        },
+        {
+          "id": "obj_899849f8",
+          "label": "Tile 8,3",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -24.954267804855288,
+            "y": 6.425364034535831,
+            "z": -21.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_8_3"
+          }
+        },
+        {
+          "id": "obj_ee692f1d",
+          "label": "Tile 8,4",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -24.954267804855288,
+            "y": 6.425364034535831,
+            "z": -19.711187332298913
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_70657625",
+            "memberKey": "tile_8_4"
+          }
+        },
+        {
+          "id": "obj_0ebc4e5d",
+          "label": "Tile 8,5",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -24.954267804855288,
             "y": 6.425364034535831,
             "z": -17.711187332298913
           },
@@ -1664,7 +2590,34 @@
           "prefab": {
             "prefabId": "pfb_a15c07b6",
             "instanceId": "pfi_70657625",
-            "memberKey": "tile_7_5"
+            "memberKey": "tile_8_5"
+          }
+        },
+        {
+          "id": "obj_2c04f2dd",
+          "assetId": "stairs",
+          "position": {
+            "x": -40.39238033157351,
+            "y": 9.806308518222341,
+            "z": -25.281971268633665
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.8,
+            "y": 0.8,
+            "z": 0.8
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
           }
         },
         {
@@ -1672,9 +2625,9 @@
           "label": "Tile 0,0",
           "assetId": "platform_grass_corner_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 10.322454217323465,
-            "z": -27
+            "x": -33.330974562477934,
+            "y": 11.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1705,9 +2658,9 @@
           "label": "Tile 0,1",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 10.322454217323465,
-            "z": -25
+            "x": -33.330974562477934,
+            "y": 11.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1738,9 +2691,9 @@
           "label": "Tile 0,2",
           "assetId": "platform_grass_corner_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 10.322454217323465,
-            "z": -23
+            "x": -33.330974562477934,
+            "y": 11.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1771,9 +2724,9 @@
           "label": "Tile 1,0",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -31.523662701347515,
-            "y": 10.322454217323465,
-            "z": -27
+            "x": -31.330974562477934,
+            "y": 11.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1804,9 +2757,9 @@
           "label": "Tile 1,1",
           "assetId": "platform_grass_center_tall",
           "position": {
-            "x": -31.523662701347515,
-            "y": 10.322454217323465,
-            "z": -25
+            "x": -31.330974562477934,
+            "y": 11.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1837,9 +2790,9 @@
           "label": "Tile 1,2",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -31.523662701347515,
-            "y": 10.322454217323465,
-            "z": -23
+            "x": -31.330974562477934,
+            "y": 11.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1870,9 +2823,9 @@
           "label": "Tile 2,0",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -29.523662701347515,
-            "y": 10.322454217323465,
-            "z": -27
+            "x": -29.330974562477934,
+            "y": 11.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1903,9 +2856,9 @@
           "label": "Tile 2,1",
           "assetId": "platform_grass_center_tall",
           "position": {
-            "x": -29.523662701347515,
-            "y": 10.322454217323465,
-            "z": -25
+            "x": -29.330974562477934,
+            "y": 11.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1936,9 +2889,9 @@
           "label": "Tile 2,2",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -29.523662701347515,
-            "y": 10.322454217323465,
-            "z": -23
+            "x": -29.330974562477934,
+            "y": 11.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -1969,9 +2922,9 @@
           "label": "Tile 3,0",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -27.523662701347515,
-            "y": 10.322454217323465,
-            "z": -27
+            "x": -27.330974562477934,
+            "y": 11.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2002,9 +2955,9 @@
           "label": "Tile 3,1",
           "assetId": "platform_grass_center_tall",
           "position": {
-            "x": -27.523662701347515,
-            "y": 10.322454217323465,
-            "z": -25
+            "x": -27.330974562477934,
+            "y": 11.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2035,9 +2988,9 @@
           "label": "Tile 3,2",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -27.523662701347515,
-            "y": 10.322454217323465,
-            "z": -23
+            "x": -27.330974562477934,
+            "y": 11.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2068,9 +3021,9 @@
           "label": "Tile 4,0",
           "assetId": "platform_grass_corner_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 10.322454217323465,
-            "z": -27
+            "x": -25.330974562477934,
+            "y": 11.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2101,9 +3054,9 @@
           "label": "Tile 4,1",
           "assetId": "platform_grass_side_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 10.322454217323465,
-            "z": -25
+            "x": -25.330974562477934,
+            "y": 11.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2134,9 +3087,9 @@
           "label": "Tile 4,2",
           "assetId": "platform_grass_corner_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 10.322454217323465,
-            "z": -23
+            "x": -25.330974562477934,
+            "y": 11.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2165,11 +3118,11 @@
         {
           "id": "obj_547ed147",
           "label": "Tile 0,0 L1",
-          "assetId": "platform_grass_corner_bottom_tall",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 8.322454217323465,
-            "z": -27
+            "x": -33.330974562477934,
+            "y": 9.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2198,11 +3151,11 @@
         {
           "id": "obj_ca20e6d1",
           "label": "Tile 0,1 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 8.322454217323465,
-            "z": -25
+            "x": -33.330974562477934,
+            "y": 9.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2231,11 +3184,11 @@
         {
           "id": "obj_dfd0897a",
           "label": "Tile 0,2 L1",
-          "assetId": "platform_grass_corner_bottom_tall",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -33.52366270134752,
-            "y": 8.322454217323465,
-            "z": -23
+            "x": -33.330974562477934,
+            "y": 9.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2264,11 +3217,11 @@
         {
           "id": "obj_57ddb2fc",
           "label": "Tile 1,0 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -31.523662701347515,
-            "y": 8.322454217323465,
-            "z": -27
+            "x": -31.330974562477934,
+            "y": 9.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2295,46 +3248,13 @@
           }
         },
         {
-          "id": "obj_3752086d",
-          "label": "Tile 1,1 L1",
-          "assetId": "platform_grass_bottom_tall",
-          "position": {
-            "x": -31.523662701347515,
-            "y": 8.322454217323465,
-            "z": -25
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "zoneId": "demo",
-          "prefab": {
-            "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_4af2ec67",
-            "memberKey": "tile_1_1_L1"
-          }
-        },
-        {
           "id": "obj_9b04ca4d",
           "label": "Tile 1,2 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -31.523662701347515,
-            "y": 8.322454217323465,
-            "z": -23
+            "x": -31.330974562477934,
+            "y": 9.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2363,11 +3283,11 @@
         {
           "id": "obj_fa7c42a3",
           "label": "Tile 2,0 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -29.523662701347515,
-            "y": 8.322454217323465,
-            "z": -27
+            "x": -29.330974562477934,
+            "y": 9.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2394,46 +3314,13 @@
           }
         },
         {
-          "id": "obj_1c5abf6e",
-          "label": "Tile 2,1 L1",
-          "assetId": "platform_grass_bottom_tall",
-          "position": {
-            "x": -29.523662701347515,
-            "y": 8.322454217323465,
-            "z": -25
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "zoneId": "demo",
-          "prefab": {
-            "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_4af2ec67",
-            "memberKey": "tile_2_1_L1"
-          }
-        },
-        {
           "id": "obj_ea7a3f14",
           "label": "Tile 2,2 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -29.523662701347515,
-            "y": 8.322454217323465,
-            "z": -23
+            "x": -29.330974562477934,
+            "y": 9.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2462,11 +3349,11 @@
         {
           "id": "obj_0e9fb5ce",
           "label": "Tile 3,0 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -27.523662701347515,
-            "y": 8.322454217323465,
-            "z": -27
+            "x": -27.330974562477934,
+            "y": 9.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2493,46 +3380,13 @@
           }
         },
         {
-          "id": "obj_b4b43221",
-          "label": "Tile 3,1 L1",
-          "assetId": "platform_grass_bottom_tall",
-          "position": {
-            "x": -27.523662701347515,
-            "y": 8.322454217323465,
-            "z": -25
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "zoneId": "demo",
-          "prefab": {
-            "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_4af2ec67",
-            "memberKey": "tile_3_1_L1"
-          }
-        },
-        {
           "id": "obj_238abfaa",
           "label": "Tile 3,2 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -27.523662701347515,
-            "y": 8.322454217323465,
-            "z": -23
+            "x": -27.330974562477934,
+            "y": 9.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2561,11 +3415,11 @@
         {
           "id": "obj_41e6bb6c",
           "label": "Tile 4,0 L1",
-          "assetId": "platform_grass_corner_bottom_tall",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 8.322454217323465,
-            "z": -27
+            "x": -25.330974562477934,
+            "y": 9.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2594,11 +3448,11 @@
         {
           "id": "obj_28384395",
           "label": "Tile 4,1 L1",
-          "assetId": "platform_grass_side_bottom_tall",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 8.322454217323465,
-            "z": -25
+            "x": -25.330974562477934,
+            "y": 9.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2627,11 +3481,11 @@
         {
           "id": "obj_49f620b5",
           "label": "Tile 4,2 L1",
-          "assetId": "platform_grass_corner_bottom_tall",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -25.523662701347515,
-            "y": 8.322454217323465,
-            "z": -23
+            "x": -25.330974562477934,
+            "y": 9.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2658,13 +3512,13 @@
           }
         },
         {
-          "id": "obj_0e510787",
-          "label": "Tile 0,0",
-          "assetId": "platform_grass_corner_tall",
+          "id": "obj_3a470393",
+          "label": "Tile 0,0 L2",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 8.115522723407905,
-            "z": -28.516971039048816
+            "x": -33.330974562477934,
+            "y": 7.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2686,18 +3540,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_0"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_0_L2"
           }
         },
         {
-          "id": "obj_8bc8a517",
-          "label": "Tile 0,1",
-          "assetId": "platform_grass_side_tall",
+          "id": "obj_c3aab5b7",
+          "label": "Tile 0,1 L2",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 8.115522723407905,
-            "z": -26.516971039048816
+            "x": -33.330974562477934,
+            "y": 7.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2719,18 +3573,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_1_L2"
           }
         },
         {
-          "id": "obj_89a7ba0d",
-          "label": "Tile 0,2",
-          "assetId": "platform_grass_corner_tall",
+          "id": "obj_fb9d0515",
+          "label": "Tile 0,2 L2",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 8.115522723407905,
-            "z": -24.516971039048816
+            "x": -33.330974562477934,
+            "y": 7.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2752,18 +3606,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_2"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_2_L2"
           }
         },
         {
-          "id": "obj_9925024a",
-          "label": "Tile 1,0",
-          "assetId": "platform_grass_side_tall",
+          "id": "obj_7a1dbfc1",
+          "label": "Tile 1,0 L2",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 8.115522723407905,
-            "z": -28.516971039048816
+            "x": -31.330974562477934,
+            "y": 7.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2785,18 +3639,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_0"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_1_0_L2"
           }
         },
         {
-          "id": "obj_1ea02977",
-          "label": "Tile 1,1",
-          "assetId": "platform_grass_center_tall",
+          "id": "obj_64431cf8",
+          "label": "Tile 1,2 L2",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 8.115522723407905,
-            "z": -26.516971039048816
+            "x": -31.330974562477934,
+            "y": 7.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2818,51 +3672,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_1_2_L2"
           }
         },
         {
-          "id": "obj_c5cc493e",
-          "label": "Tile 1,2",
-          "assetId": "platform_grass_side_tall",
+          "id": "obj_63471252",
+          "label": "Tile 2,0 L2",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 8.115522723407905,
-            "z": -24.516971039048816
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "zoneId": "demo",
-          "prefab": {
-            "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_2"
-          }
-        },
-        {
-          "id": "obj_8dcd1044",
-          "label": "Tile 2,0",
-          "assetId": "platform_grass_corner_tall",
-          "position": {
-            "x": -37.755618732385905,
-            "y": 8.115522723407905,
-            "z": -28.516971039048816
+            "x": -29.330974562477934,
+            "y": 7.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2884,18 +3705,150 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_0"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_2_0_L2"
           }
         },
         {
-          "id": "obj_84745336",
-          "label": "Tile 2,1",
-          "assetId": "platform_grass_side_tall",
+          "id": "obj_a37fc172",
+          "label": "Tile 2,2 L2",
+          "assetId": "platform_grass_side_center_tall",
           "position": {
-            "x": -37.755618732385905,
-            "y": 8.115522723407905,
-            "z": -26.516971039048816
+            "x": -29.330974562477934,
+            "y": 7.691077672043956,
+            "z": -23.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_2_2_L2"
+          }
+        },
+        {
+          "id": "obj_34bc8e8b",
+          "label": "Tile 3,0 L2",
+          "assetId": "platform_grass_side_center_tall",
+          "position": {
+            "x": -27.330974562477934,
+            "y": 7.691077672043956,
+            "z": -27.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_3_0_L2"
+          }
+        },
+        {
+          "id": "obj_56ecebc4",
+          "label": "Tile 3,2 L2",
+          "assetId": "platform_grass_side_center_tall",
+          "position": {
+            "x": -27.330974562477934,
+            "y": 7.691077672043956,
+            "z": -23.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_3_2_L2"
+          }
+        },
+        {
+          "id": "obj_1c20e07a",
+          "label": "Tile 4,0 L2",
+          "assetId": "platform_grass_corner_center_tall",
+          "position": {
+            "x": -25.330974562477934,
+            "y": 7.691077672043956,
+            "z": -27.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_0_L2"
+          }
+        },
+        {
+          "id": "obj_5f49926e",
+          "label": "Tile 4,1 L2",
+          "assetId": "platform_grass_side_center_tall",
+          "position": {
+            "x": -25.330974562477934,
+            "y": 7.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2917,18 +3870,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_1_L2"
           }
         },
         {
-          "id": "obj_5379389b",
-          "label": "Tile 2,2",
-          "assetId": "platform_grass_corner_tall",
+          "id": "obj_19d012f7",
+          "label": "Tile 4,2 L2",
+          "assetId": "platform_grass_corner_center_tall",
           "position": {
-            "x": -37.755618732385905,
-            "y": 8.115522723407905,
-            "z": -24.516971039048816
+            "x": -25.330974562477934,
+            "y": 7.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2950,18 +3903,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_2"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_2_L2"
           }
         },
         {
-          "id": "obj_1ab0c785",
-          "label": "Tile 0,0 L1",
+          "id": "obj_c81f42ba",
+          "label": "Tile 0,0 L3",
           "assetId": "platform_grass_corner_bottom_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 6.115522723407905,
-            "z": -28.516971039048816
+            "x": -33.330974562477934,
+            "y": 5.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -2983,18 +3936,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_0_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_0_L3"
           }
         },
         {
-          "id": "obj_da89fd73",
-          "label": "Tile 0,1 L1",
+          "id": "obj_542f0d2a",
+          "label": "Tile 0,1 L3",
           "assetId": "platform_grass_side_bottom_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 6.115522723407905,
-            "z": -26.516971039048816
+            "x": -33.330974562477934,
+            "y": 5.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3016,18 +3969,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_1_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_1_L3"
           }
         },
         {
-          "id": "obj_50dc579a",
-          "label": "Tile 0,2 L1",
+          "id": "obj_d9372c67",
+          "label": "Tile 0,2 L3",
           "assetId": "platform_grass_corner_bottom_tall",
           "position": {
-            "x": -41.755618732385905,
-            "y": 6.115522723407905,
-            "z": -24.516971039048816
+            "x": -33.330974562477934,
+            "y": 5.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3049,18 +4002,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_0_2_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_0_2_L3"
           }
         },
         {
-          "id": "obj_18c5bf10",
-          "label": "Tile 1,0 L1",
+          "id": "obj_9fc37020",
+          "label": "Tile 1,0 L3",
           "assetId": "platform_grass_side_bottom_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 6.115522723407905,
-            "z": -28.516971039048816
+            "x": -31.330974562477934,
+            "y": 5.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3082,18 +4035,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_0_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_1_0_L3"
           }
         },
         {
-          "id": "obj_7508ce51",
-          "label": "Tile 1,1 L1",
+          "id": "obj_0f8d5cb4",
+          "label": "Tile 1,1 L3",
           "assetId": "platform_grass_bottom_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 6.115522723407905,
-            "z": -26.516971039048816
+            "x": -31.330974562477934,
+            "y": 5.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3115,18 +4068,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_1_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_1_1_L3"
           }
         },
         {
-          "id": "obj_992cbe3b",
-          "label": "Tile 1,2 L1",
+          "id": "obj_61a36306",
+          "label": "Tile 1,2 L3",
           "assetId": "platform_grass_side_bottom_tall",
           "position": {
-            "x": -39.755618732385905,
-            "y": 6.115522723407905,
-            "z": -24.516971039048816
+            "x": -31.330974562477934,
+            "y": 5.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3148,18 +4101,18 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_1_2_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_1_2_L3"
           }
         },
         {
-          "id": "obj_ba0c6bc9",
-          "label": "Tile 2,0 L1",
-          "assetId": "platform_grass_corner_bottom_tall",
+          "id": "obj_f58ebffc",
+          "label": "Tile 2,0 L3",
+          "assetId": "platform_grass_side_bottom_tall",
           "position": {
-            "x": -37.755618732385905,
-            "y": 6.115522723407905,
-            "z": -28.516971039048816
+            "x": -29.330974562477934,
+            "y": 5.691077672043956,
+            "z": -27.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3181,22 +4134,55 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_0_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_2_0_L3"
           }
         },
         {
-          "id": "obj_43626414",
-          "label": "Tile 2,1 L1",
+          "id": "obj_77c67717",
+          "label": "Tile 2,1 L3",
+          "assetId": "platform_grass_bottom_tall",
+          "position": {
+            "x": -29.330974562477934,
+            "y": 5.691077672043956,
+            "z": -25.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_2_1_L3"
+          }
+        },
+        {
+          "id": "obj_daddddd8",
+          "label": "Tile 2,2 L3",
           "assetId": "platform_grass_side_bottom_tall",
           "position": {
-            "x": -37.755618732385905,
-            "y": 6.115522723407905,
-            "z": -26.516971039048816
+            "x": -29.330974562477934,
+            "y": 5.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
-            "y": 90,
+            "y": 0,
             "z": 0
           },
           "scale": {
@@ -3214,18 +4200,150 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_1_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_2_2_L3"
           }
         },
         {
-          "id": "obj_fdf91724",
-          "label": "Tile 2,2 L1",
+          "id": "obj_149ec5f9",
+          "label": "Tile 3,0 L3",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -27.330974562477934,
+            "y": 5.691077672043956,
+            "z": -27.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_3_0_L3"
+          }
+        },
+        {
+          "id": "obj_9d87ea71",
+          "label": "Tile 3,1 L3",
+          "assetId": "platform_grass_bottom_tall",
+          "position": {
+            "x": -27.330974562477934,
+            "y": 5.691077672043956,
+            "z": -25.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_3_1_L3"
+          }
+        },
+        {
+          "id": "obj_c2ac07c1",
+          "label": "Tile 3,2 L3",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -27.330974562477934,
+            "y": 5.691077672043956,
+            "z": -23.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_3_2_L3"
+          }
+        },
+        {
+          "id": "obj_ae7f0642",
+          "label": "Tile 4,0 L3",
           "assetId": "platform_grass_corner_bottom_tall",
           "position": {
-            "x": -37.755618732385905,
-            "y": 6.115522723407905,
-            "z": -24.516971039048816
+            "x": -25.330974562477934,
+            "y": 5.691077672043956,
+            "z": -27.65373075114503
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_0_L3"
+          }
+        },
+        {
+          "id": "obj_bd1a084f",
+          "label": "Tile 4,1 L3",
+          "assetId": "platform_grass_side_bottom_tall",
+          "position": {
+            "x": -25.330974562477934,
+            "y": 5.691077672043956,
+            "z": -25.65373075114503
           },
           "rotation": {
             "x": 0,
@@ -3247,21 +4365,22 @@
           "zoneId": "demo",
           "prefab": {
             "prefabId": "pfb_a15c07b6",
-            "instanceId": "pfi_73824787",
-            "memberKey": "tile_2_2_L1"
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_1_L3"
           }
         },
         {
-          "id": "obj_91758e68",
-          "assetId": "stairs_modular_start",
+          "id": "obj_5f12d17b",
+          "label": "Tile 4,2 L3",
+          "assetId": "platform_grass_corner_bottom_tall",
           "position": {
-            "x": -37.5,
-            "y": 9.111479025097054,
-            "z": -26
+            "x": -25.330974562477934,
+            "y": 5.691077672043956,
+            "z": -23.65373075114503
           },
           "rotation": {
             "x": 0,
-            "y": 0,
+            "y": 90,
             "z": 0
           },
           "scale": {
@@ -3270,637 +4389,17 @@
             "z": 1
           },
           "floor": 0,
-          "zoneId": "demo",
           "properties": {
             "interactable": false,
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
           },
-          "colliders": [
-            {
-              "id": "col_14413460",
-              "shape": "box",
-              "offset": {
-                "x": 0.29,
-                "y": -0.154,
-                "z": -0.137
-              },
-              "size": {
-                "x": 2.561,
-                "y": 1,
-                "z": 2.561
-              },
-              "isSensor": false
-            }
-          ]
-        },
-        {
-          "id": "obj_c6052b21",
-          "assetId": "stairs_modular_start",
-          "position": {
-            "x": -35.55772815618118,
-            "y": 10.082236429616527,
-            "z": -26.000809316517948
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
           "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "colliders": [
-            {
-              "id": "col_c6c72bc5",
-              "shape": "hull",
-              "offset": {
-                "x": 0,
-                "y": 0,
-                "z": 0
-              },
-              "size": {
-                "x": 2.2374,
-                "y": 2.4334,
-                "z": 2.561
-              },
-              "isSensor": false,
-              "points": [
-                {
-                  "x": 1.2185,
-                  "y": 0.7829,
-                  "z": -1.0659
-                },
-                {
-                  "x": 1.2247,
-                  "y": 0.7771,
-                  "z": 0.1276
-                },
-                {
-                  "x": 0.1346,
-                  "y": -0.0948,
-                  "z": -0.8996
-                },
-                {
-                  "x": 0.1346,
-                  "y": -0.0948,
-                  "z": 0.8996
-                },
-                {
-                  "x": 1.2185,
-                  "y": 0.7829,
-                  "z": 1.1993
-                },
-                {
-                  "x": 0.1233,
-                  "y": -0.0948,
-                  "z": 0.9701
-                },
-                {
-                  "x": -0.1049,
-                  "y": -0.0948,
-                  "z": 0.8996
-                },
-                {
-                  "x": 0.1055,
-                  "y": -0.0583,
-                  "z": 1.0147
-                },
-                {
-                  "x": -0.2928,
-                  "y": 0.0184,
-                  "z": 1.1857
-                },
-                {
-                  "x": 0.13,
-                  "y": -0.0948,
-                  "z": 0.9553
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0759,
-                  "z": -1.124
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0759,
-                  "z": 1.124
-                },
-                {
-                  "x": -1,
-                  "y": -0.0551,
-                  "z": 1.124
-                },
-                {
-                  "x": -0.0758,
-                  "y": 1.9851,
-                  "z": -0.9025
-                },
-                {
-                  "x": 1,
-                  "y": 2.3386,
-                  "z": 0.9013
-                },
-                {
-                  "x": 1,
-                  "y": 2.3386,
-                  "z": -0.9013
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.0001,
-                  "z": 1.2752
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0489,
-                  "z": 1.2591
-                },
-                {
-                  "x": -0.0688,
-                  "y": -0.0948,
-                  "z": 0.9785
-                },
-                {
-                  "x": 1,
-                  "y": 0.9797,
-                  "z": -1.2752
-                },
-                {
-                  "x": 1,
-                  "y": 0.9307,
-                  "z": -1.2591
-                },
-                {
-                  "x": 0.1499,
-                  "y": -0.0583,
-                  "z": -0.9997
-                },
-                {
-                  "x": 1.2219,
-                  "y": 0.8099,
-                  "z": -1.0706
-                },
-                {
-                  "x": 1,
-                  "y": 1.0724,
-                  "z": -1.2805
-                },
-                {
-                  "x": 0.1499,
-                  "y": -0.0583,
-                  "z": 0.9997
-                },
-                {
-                  "x": -1,
-                  "y": 0.1574,
-                  "z": 1.2344
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.1856,
-                  "z": 1.2752
-                },
-                {
-                  "x": -1,
-                  "y": 1.2551,
-                  "z": 1.0117
-                },
-                {
-                  "x": -1,
-                  "y": 0.0724,
-                  "z": 1.2393
-                },
-                {
-                  "x": -0.9592,
-                  "y": 1.2832,
-                  "z": 1.0524
-                },
-                {
-                  "x": 1,
-                  "y": 2.2628,
-                  "z": 1.0524
-                },
-                {
-                  "x": -0.074,
-                  "y": 1.9648,
-                  "z": 0.9974
-                },
-                {
-                  "x": -0.1131,
-                  "y": 1.9593,
-                  "z": 0.9923
-                },
-                {
-                  "x": -0.9592,
-                  "y": 1.3321,
-                  "z": 1.0364
-                },
-                {
-                  "x": -0.9592,
-                  "y": 1.3523,
-                  "z": 0.9919
-                },
-                {
-                  "x": -0.1185,
-                  "y": 1.9649,
-                  "z": 0.9629
-                },
-                {
-                  "x": -0.1203,
-                  "y": 1.9693,
-                  "z": 0.9025
-                },
-                {
-                  "x": 1,
-                  "y": 2.3318,
-                  "z": 0.9919
-                },
-                {
-                  "x": -0.0758,
-                  "y": 1.9851,
-                  "z": 0.9025
-                },
-                {
-                  "x": 1.2374,
-                  "y": 0.8084,
-                  "z": 0.1276
-                },
-                {
-                  "x": 1,
-                  "y": 1.1651,
-                  "z": 1.2752
-                },
-                {
-                  "x": 1,
-                  "y": 1.0724,
-                  "z": 1.2805
-                },
-                {
-                  "x": 1.2136,
-                  "y": 0.9262,
-                  "z": 1.2041
-                },
-                {
-                  "x": 1,
-                  "y": 2.3116,
-                  "z": 1.0364
-                },
-                {
-                  "x": -1,
-                  "y": -0.0491,
-                  "z": -1.2043
-                },
-                {
-                  "x": -1,
-                  "y": 0.1938,
-                  "z": -1.0437
-                },
-                {
-                  "x": -1,
-                  "y": 1.085,
-                  "z": -1.0117
-                },
-                {
-                  "x": -0.1049,
-                  "y": -0.0948,
-                  "z": -0.8996
-                },
-                {
-                  "x": -0.1185,
-                  "y": 1.97,
-                  "z": 0.8421
-                },
-                {
-                  "x": -0.074,
-                  "y": 1.9648,
-                  "z": -0.9974
-                },
-                {
-                  "x": 1,
-                  "y": 2.2628,
-                  "z": -1.0524
-                },
-                {
-                  "x": -0.9629,
-                  "y": 1.2813,
-                  "z": -1.0524
-                },
-                {
-                  "x": 1,
-                  "y": 1.1651,
-                  "z": -1.2752
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.1856,
-                  "z": -1.2752
-                },
-                {
-                  "x": 1.2136,
-                  "y": 0.9262,
-                  "z": -1.0706
-                },
-                {
-                  "x": -0.1203,
-                  "y": 1.9693,
-                  "z": -0.9025
-                },
-                {
-                  "x": -0.9629,
-                  "y": 1.3571,
-                  "z": -0.9013
-                },
-                {
-                  "x": -0.1185,
-                  "y": 1.9649,
-                  "z": -0.9629
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0692,
-                  "z": 1.2147
-                },
-                {
-                  "x": 1,
-                  "y": 0.9797,
-                  "z": 1.2752
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.0928,
-                  "z": 1.2805
-                },
-                {
-                  "x": -1,
-                  "y": -0.0126,
-                  "z": 1.2344
-                },
-                {
-                  "x": -1,
-                  "y": -0.0394,
-                  "z": 1.2257
-                },
-                {
-                  "x": -0.1004,
-                  "y": -0.0948,
-                  "z": 0.9553
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0489,
-                  "z": -1.2591
-                },
-                {
-                  "x": -1,
-                  "y": -0.0394,
-                  "z": -1.2257
-                },
-                {
-                  "x": -1,
-                  "y": 0.1841,
-                  "z": 1.2257
-                },
-                {
-                  "x": -0.9592,
-                  "y": 1.359,
-                  "z": 0.9013
-                },
-                {
-                  "x": 1.2292,
-                  "y": 0.9276,
-                  "z": 0.1276
-                },
-                {
-                  "x": 1.2219,
-                  "y": 0.8099,
-                  "z": 1.2041
-                },
-                {
-                  "x": -1,
-                  "y": 0.1938,
-                  "z": 1.0437
-                },
-                {
-                  "x": -1,
-                  "y": 0.1574,
-                  "z": -1.2344
-                },
-                {
-                  "x": -1,
-                  "y": -0.0551,
-                  "z": -1.124
-                },
-                {
-                  "x": 1,
-                  "y": 2.3318,
-                  "z": -0.9919
-                },
-                {
-                  "x": -1,
-                  "y": 1.2817,
-                  "z": -1.003
-                },
-                {
-                  "x": -0.9629,
-                  "y": 1.3302,
-                  "z": -1.0364
-                },
-                {
-                  "x": -0.1185,
-                  "y": 1.97,
-                  "z": -0.8421
-                },
-                {
-                  "x": -1,
-                  "y": -0.0491,
-                  "z": 1.2043
-                },
-                {
-                  "x": -1,
-                  "y": 0.1938,
-                  "z": 1.2043
-                },
-                {
-                  "x": -1,
-                  "y": 1.0485,
-                  "z": 0.9815
-                },
-                {
-                  "x": 0.0148,
-                  "y": -0.0948,
-                  "z": 0.9831
-                },
-                {
-                  "x": -0.0936,
-                  "y": -0.0948,
-                  "z": 0.9701
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.0001,
-                  "z": -1.2752
-                },
-                {
-                  "x": 0.0985,
-                  "y": -0.0948,
-                  "z": -0.9785
-                },
-                {
-                  "x": 0.1055,
-                  "y": -0.0583,
-                  "z": -1.0147
-                },
-                {
-                  "x": -1,
-                  "y": 1.2914,
-                  "z": 0.821
-                },
-                {
-                  "x": 1,
-                  "y": 2.3116,
-                  "z": -1.0364
-                },
-                {
-                  "x": -1,
-                  "y": 1.2914,
-                  "z": -0.9816
-                },
-                {
-                  "x": -1,
-                  "y": 1.2974,
-                  "z": -0.9013
-                },
-                {
-                  "x": -1,
-                  "y": 0.1841,
-                  "z": -1.2257
-                },
-                {
-                  "x": -1,
-                  "y": 1.2551,
-                  "z": -1.0117
-                },
-                {
-                  "x": 0.0985,
-                  "y": -0.0948,
-                  "z": 0.9785
-                },
-                {
-                  "x": -0.9592,
-                  "y": 0.0928,
-                  "z": -1.2805
-                },
-                {
-                  "x": 0.1233,
-                  "y": -0.0948,
-                  "z": -0.9701
-                },
-                {
-                  "x": -0.0936,
-                  "y": -0.0948,
-                  "z": -0.9701
-                },
-                {
-                  "x": -0.9592,
-                  "y": -0.0692,
-                  "z": -1.2147
-                },
-                {
-                  "x": -1,
-                  "y": 1.2914,
-                  "z": 0.9816
-                },
-                {
-                  "x": -0.1131,
-                  "y": 1.9593,
-                  "z": -0.9923
-                },
-                {
-                  "x": -0.9629,
-                  "y": 1.3504,
-                  "z": -0.9919
-                },
-                {
-                  "x": -1,
-                  "y": 0.0724,
-                  "z": -1.2393
-                },
-                {
-                  "x": 0.13,
-                  "y": -0.0948,
-                  "z": -0.9553
-                },
-                {
-                  "x": -0.1004,
-                  "y": -0.0948,
-                  "z": -0.9553
-                },
-                {
-                  "x": 0.0148,
-                  "y": -0.0948,
-                  "z": -0.9831
-                },
-                {
-                  "x": -1,
-                  "y": 1.2817,
-                  "z": 1.003
-                },
-                {
-                  "x": -1,
-                  "y": 1.2974,
-                  "z": 0.9013
-                },
-                {
-                  "x": -1,
-                  "y": -0.0126,
-                  "z": -1.2344
-                },
-                {
-                  "x": -0.0688,
-                  "y": -0.0948,
-                  "z": -0.9785
-                }
-              ]
-            }
-          ]
-        },
-        {
-          "id": "obj_b59095e4",
-          "assetId": "stairs",
-          "position": {
-            "x": -38.93093393649434,
-            "y": 8.191805641257629,
-            "z": -23.15295719106122
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.8,
-            "y": 0.8,
-            "z": 0.8
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_4af2ec67",
+            "memberKey": "tile_4_2_L3"
           }
         }
       ],
@@ -3910,13 +4409,13 @@
           "prefabId": "pfb_a15c07b6",
           "version": 1,
           "variables": {
-            "width": 8,
+            "width": 9,
             "depth": 6,
             "tileSet": "grass"
           },
           "origin": {
             "position": {
-              "x": -31.76404969433258,
+              "x": -32.95426780485529,
               "y": 6.425364034535831,
               "z": -22.711187332298913
             },
@@ -3931,13 +4430,13 @@
             "width": 5,
             "depth": 3,
             "tileSet": "grass",
-            "height": 2
+            "height": 4
           },
           "origin": {
             "position": {
-              "x": -29.523662701347515,
-              "y": 10.322454217323465,
-              "z": -25
+              "x": -29.330974562477934,
+              "y": 11.691077672043956,
+              "z": -25.65373075114503
             },
             "rotationY": 0
           }
@@ -3954,9 +4453,9 @@
           },
           "origin": {
             "position": {
-              "x": -39.755618732385905,
-              "y": 8.115522723407905,
-              "z": -26.516971039048816
+              "x": -40.98546594385466,
+              "y": 9.874838355622726,
+              "z": -28.56678531831541
             },
             "rotationY": 0
           }
@@ -3966,12 +4465,12 @@
         {
           "id": "ladder_d61edc91",
           "position": {
-            "x": -38.91315553558006,
+            "x": -40.36393824972998,
             "y": 7.42132033622498,
-            "z": -22.95066364173625
+            "z": -25.14886001321445
           },
           "rotationY": 0,
-          "height": 1.6,
+          "height": 3.3,
           "width": 1.1,
           "rungSpacing": 0.35,
           "material": "concrete_01",
