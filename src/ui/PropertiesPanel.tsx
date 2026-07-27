@@ -3219,7 +3219,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
   // wireframes/handles so overlapping ones don't fight. All reset when the screen closes.
   const [hideObjGizmo, setHideObjGizmo] = useState(false);
   const [moveId,       setMoveId]       = useState<string | null>(null);
-  const [moveMode,     setMoveMode]     = useState<"translate" | "rotate">("translate");
+  const [moveMode,     setMoveMode]     = useState<"translate" | "rotate" | "resize">("translate");
   const [hiddenIds,    setHiddenIds]    = useState<Set<string>>(new Set());
 
   useEffect(() => () => {
@@ -3232,7 +3232,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
     setHideObjGizmo(hide);
     bus?.emit("gizmo:suspend", { source: "colliders-panel", suspended: hide });
   };
-  const toggleMove = (id: string, mode: "translate" | "rotate" = "translate"): void => {
+  const toggleMove = (id: string, mode: "translate" | "rotate" | "resize" = "translate"): void => {
     const next = moveId === id && moveMode === mode ? null : id;
     setMoveId(next);
     setMoveMode(mode);
@@ -3398,6 +3398,18 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
                     color: moveId === c.id && moveMode === "rotate" ? "#80aaff" : "#808080",
                   }}
                 >Rotate</button>
+              )}
+              {c.shape === "box" && (
+                <button
+                  title="Toggle resize drag-handles on this collider (0.25m steps, hold Alt for free)"
+                  onClick={() => toggleMove(c.id, "resize")}
+                  style={{
+                    padding: "2px 7px", borderRadius: 3, cursor: "pointer", fontFamily: "monospace", fontSize: 9,
+                    border: `1px solid ${moveId === c.id && moveMode === "resize" ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"}`,
+                    background: moveId === c.id && moveMode === "resize" ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
+                    color: moveId === c.id && moveMode === "resize" ? "#80aaff" : "#808080",
+                  }}
+                >Resize</button>
               )}
               <button
                 title="Remove collider"

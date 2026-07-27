@@ -304,8 +304,9 @@ export interface BusEvents {
   // Suspend/restore the object TransformControls. Sources are independent (panel
   // toggle, collider move gizmo) — the gizmo stays off while any source suspends.
   "gizmo:suspend":         { source: string; suspended: boolean };
-  // Toggle the per-collider gizmo (null = off). Editor-session only.
-  "collider:move":         { objectId: string; colliderId: string | null; mode?: "translate" | "rotate" };
+  // Toggle the per-collider gizmo (null = off). Editor-session only. "resize"
+  // shows the face drag-handles (box only) instead of a TransformControls.
+  "collider:move":         { objectId: string; colliderId: string | null; mode?: "translate" | "rotate" | "resize" };
   // Per-collider editor visibility (hidden wireframes/handles). Editor-session only.
   "collider:hidden":       { objectId: string; hidden: string[] };
   "camera:jump":           { x: number; z: number };

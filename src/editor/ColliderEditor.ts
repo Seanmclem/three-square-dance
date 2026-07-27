@@ -66,8 +66,8 @@ export class ColliderEditor implements IEditorModule {
 
   // Editor-session UI state driven by the Colliders panel (reset on selection change).
   private readonly _hidden = new Set<string>();     // collider ids with visuals hidden
-  private _moveId: string | null = null;            // collider with the translate/rotate gizmo
-  private _moveMode: "translate" | "rotate" = "translate";
+  private _moveId: string | null = null;            // collider with the active gizmo mode
+  private _moveMode: "translate" | "rotate" | "resize" = "translate";
   private _moveControls: TransformControls | null = null;
   private readonly _moveProxy = new THREE.Group();
   private _moveDragging = false;
@@ -202,14 +202,17 @@ export class ColliderEditor implements IEditorModule {
     this._setMove(null);
   }
 
-  private _setMove(colliderId: string | null, mode: "translate" | "rotate" = "translate"): void {
+  private _setMove(colliderId: string | null, mode: "translate" | "rotate" | "resize" = "translate"): void {
     if (colliderId === this._moveId && mode === this._moveMode) return;
     this._moveId = colliderId;
     this._moveMode = mode;
-    this._moveControls?.setMode(mode);
-    // Rotate about the collider's own axes (proxy wears the collider world quat);
-    // translate keeps the world-axis arrows.
-    this._moveControls?.setSpace(mode === "rotate" ? "local" : "world");
+    // "resize" has no TransformControls — the face handles are its gizmo.
+    if (mode !== "resize") {
+      this._moveControls?.setMode(mode);
+      // Rotate about the collider's own axes (proxy wears the collider world quat);
+      // translate keeps the world-axis arrows.
+      this._moveControls?.setSpace(mode === "rotate" ? "local" : "world");
+    }
     // The object gizmo sits on top of most colliders — keep it out of the way
     // while a collider is being placed.
     this._bus.emit("gizmo:suspend", { source: "collider-move", suspended: colliderId !== null });
@@ -226,10 +229,12 @@ export class ColliderEditor implements IEditorModule {
       mc.visible = false;
       return;
     }
+    // "resize" mode renders face handles instead of a TransformControls.
     // Rotation only applies to box/capsule (sphere is symmetric; hull/trimesh
     // orientation lives in their points) — the panel only offers Rotate there,
     // but guard against stale mode after a shape switch.
-    if (this._moveMode === "rotate" && c.shape !== "box" && c.shape !== "capsule") {
+    if (this._moveMode === "resize" ||
+        (this._moveMode === "rotate" && c.shape !== "box" && c.shape !== "capsule")) {
       mc.detach();
       mc.visible = false;
       return;
@@ -324,7 +329,10 @@ export class ColliderEditor implements IEditorModule {
     for (const c of list) {
       if (this._hidden.has(c.id)) continue;   // panel eye-toggle: skip visuals entirely
       this._buildWireframe(obj, c);
-      if (c.shape === "box") this._buildHandles(c.id);
+      // Face handles are a gizmo mode now (v4.47.0), not a default: they render
+      // only for the collider whose panel "Resize" toggle is active — one gizmo
+      // on screen at a time instead of cubes stacked on the object gizmo.
+      if (c.shape === "box" && this._moveId === c.id && this._moveMode === "resize") this._buildHandles(c.id);
     }
     this._positionAll();
   }
