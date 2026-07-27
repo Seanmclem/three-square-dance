@@ -1,18 +1,23 @@
 import { useState } from "react";
 import type { Attribution } from "@/types";
 import { AttributionFields } from "@/ui/AttributionFields";
+import { TagInput } from "@/ui/TagInput";
 
 export interface EditPatch {
   label?:       string;
   category?:    string;
   attribution?: Partial<Attribution>;
+  tags?:        string[];   // single edit — full replacement
+  tagsAdd?:     string[];   // bulk edit — unioned into each selected item's existing tags
 }
 
 interface EditMetadataDialogProps {
   items:           { id: string; label: string }[];
   noun:            "model" | "material" | "sound" | "skybox";
   categoryOptions: string[];
-  initial:         { label: string; category: string; attribution: Attribution };
+  initial:         { label: string; category: string; attribution: Attribution; tags?: string[] };
+  /** Omit to hide the TAGS field entirely (call sites whose def has no `tags`). */
+  tagSuggestions?: string[];
   needsFolderGrant: boolean;
   folderHint:      string;
   onCancel:        () => void;
@@ -33,7 +38,7 @@ const S = {
 
 const NEW = "__new__";
 
-export function EditMetadataDialog({ items, noun, categoryOptions, initial, needsFolderGrant, folderHint, onCancel, onSave }: EditMetadataDialogProps) {
+export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagSuggestions, needsFolderGrant, folderHint, onCancel, onSave }: EditMetadataDialogProps) {
   const bulk = items.length > 1;
 
   const [label,    setLabel]    = useState(initial.label);
@@ -41,9 +46,13 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, need
   const [catSel,   setCatSel]   = useState(knownCat ? initial.category : NEW);
   const [catNew,   setCatNew]   = useState(knownCat ? "" : initial.category);
   const [attr,     setAttr]     = useState<Attribution>(initial.attribution);
+  // Bulk starts empty — the field ADDS tags there, it never replaces (tags the
+  // dialog can't show must not be silently dropped across a multi-select).
+  const [tags,     setTags]     = useState<string[]>(bulk ? [] : (initial.tags ?? []));
 
   // Bulk "apply to all" toggles
   const [applyCategory, setApplyCategory] = useState(false);
+  const [applyTags, setApplyTags] = useState(false);
   const [applyAttr, setApplyAttr] = useState<Record<string, boolean>>({});
   const toggleAttr = (k: string) => setApplyAttr(p => ({ ...p, [k]: !p[k] }));
 
@@ -57,11 +66,15 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, need
 
   const handleSave = () => {
     if (!bulk) {
-      onSave({ label: label.trim() || initial.label, category, attribution: attr });
+      onSave({
+        label: label.trim() || initial.label, category, attribution: attr,
+        ...(tagSuggestions ? { tags } : {}),
+      });
       return;
     }
     const patch: EditPatch = {};
     if (applyCategory) patch.category = category;
+    if (applyTags && tags.length) patch.tagsAdd = tags;
     const a: Partial<Attribution> = {};
     if (applyAttr.author)     a.author     = attr.author;
     if (applyAttr.sourceName) a.sourceName = attr.sourceName;
@@ -116,6 +129,27 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, need
             />
           )}
         </div>
+
+        {tagSuggestions && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={S.label}>{bulk ? `ADD TAGS TO ALL ${items.length}` : "TAGS"}</div>
+              {bulk && <ApplyBox on={applyTags} set={() => setApplyTags(v => !v)}>apply</ApplyBox>}
+            </div>
+            <TagInput
+              value={tags}
+              onChange={setTags}
+              suggestions={tagSuggestions}
+              disabled={bulk && !applyTags}
+              placeholder={bulk ? "Tag to add to all…" : "Add a tag…"}
+            />
+            {bulk && (
+              <div style={{ color: "#6a7a90", fontSize: 9, marginTop: 4 }}>
+                Added to each item's existing tags — nothing is removed.
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <div style={S.label}>ATTRIBUTION</div>

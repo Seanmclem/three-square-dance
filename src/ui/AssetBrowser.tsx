@@ -3,6 +3,7 @@ import type { AssetDef, AssetCategory } from "@/types";
 
 const KNOWN_ORDER = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
+const TAG_STRIP_COUNT = 4; // tag chips are shorter than category names, so one more fits
 
 const CAT_BTN = (active: boolean): React.CSSProperties => ({
   flexShrink: 0,
@@ -27,6 +28,10 @@ interface AssetBrowserProps {
 export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDeleteAssets, onEdit, onRestage }: AssetBrowserProps) {
   const [search,   setSearch]   = useState("");
   const [category, setCategory] = useState<AssetCategory | "All">("All");
+  // The pill strip shows EITHER categories (exclusive) or tags (multi-select AND).
+  // Both filters stay live across the toggle — see `filtered` below.
+  const [filterMode, setFilterMode] = useState<"cat" | "tag">("cat");
+  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [popoutOpen, setPopoutOpen] = useState(false);
   // Manage mode: tiles become multi-select checkboxes for batch delete
   const [manage, setManage]     = useState(false);
@@ -90,11 +95,32 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   const stripSet   = new Set(stripCats);
   const overflowCats = CATEGORIES.filter(c => !stripSet.has(c));
 
+  // Tags, most-used first (frequency is the useful default when there may be dozens;
+  // the category strip's recency ordering doesn't transfer — you multi-select tags).
+  const tagCounts = new Map<string, number>();
+  for (const a of assets) for (const t of a.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  const ALL_TAGS = [...tagCounts.keys()]
+    .sort((a, b) => (tagCounts.get(b)! - tagCounts.get(a)!) || a.localeCompare(b));
+
+  // Active tags always stay visible in the strip; the rest fill the remaining slots.
+  const activeInOrder = ALL_TAGS.filter(t => activeTags.has(t));
+  const tagStrip      = [
+    ...activeInOrder,
+    ...ALL_TAGS.filter(t => !activeTags.has(t)).slice(0, Math.max(0, TAG_STRIP_COUNT - activeInOrder.length)),
+  ];
+  const overflowTags  = ALL_TAGS.filter(t => !tagStrip.includes(t));
+
+  const toggleTag = (tag: string) =>
+    setActiveTags(prev => { const n = new Set(prev); n.has(tag) ? n.delete(tag) : n.add(tag); return n; });
+
+  const clearFilters = () => { setCategory("All"); setActiveTags(new Set()); };
+
   const filtered = assets.filter(a => {
-    const matchCat = category === "All" || a.category === category;
-    const q        = search.toLowerCase();
-    const matchQ   = !q || a.label.toLowerCase().includes(q) || a.tags.some(t => t.toLowerCase().includes(q));
-    return matchCat && matchQ;
+    const matchCat  = category === "All" || a.category === category;
+    const matchTags = activeTags.size === 0 || [...activeTags].every(t => a.tags.includes(t));
+    const q         = search.toLowerCase();
+    const matchQ    = !q || a.label.toLowerCase().includes(q) || a.tags.some(t => t.toLowerCase().includes(q));
+    return matchCat && matchTags && matchQ;
   });
 
   return (
@@ -119,32 +145,76 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
       {/* Category strip — fixed, no scroll */}
       <div style={{ position: "relative", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 2, padding: "0 8px 4px", flexWrap: "wrap" }}>
-          {/* All */}
-          <button
-            style={CAT_BTN(category === "All")}
-            onClick={() => selectCategory("All")}
-            onMouseEnter={e => { if (category !== "All") e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
-            onMouseLeave={e => { if (category !== "All") e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-          >All</button>
+          {filterMode === "cat" ? (
+            <>
+              {/* All */}
+              <button
+                style={CAT_BTN(category === "All")}
+                onClick={() => selectCategory("All")}
+                onMouseEnter={e => { if (category !== "All") e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
+                onMouseLeave={e => { if (category !== "All") e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+              >All</button>
 
-          {/* Strip pills */}
-          {stripCats.map(cat => (
-            <button
-              key={cat}
-              style={CAT_BTN(category === cat)}
-              onClick={() => selectCategory(cat)}
-              onMouseEnter={e => { if (category !== cat) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
-              onMouseLeave={e => { if (category !== cat) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-            >
-              {cat}
-            </button>
-          ))}
+              {/* Strip pills */}
+              {stripCats.map(cat => (
+                <button
+                  key={cat}
+                  style={CAT_BTN(category === cat)}
+                  onClick={() => selectCategory(cat)}
+                  onMouseEnter={e => { if (category !== cat) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
+                  onMouseLeave={e => { if (category !== cat) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              {/* The category filter is still live but its pills are hidden — surface it
+                  so a forgotten category doesn't read as "the tag filter found nothing". */}
+              {category !== "All" && (
+                <button
+                  style={{ ...CAT_BTN(true), background: "rgba(255,255,255,0.06)", color: "#c2cadb" }}
+                  title="Clear the category filter"
+                  onClick={() => setCategory("All")}
+                >
+                  {category as string} ✕
+                </button>
+              )}
+
+              {/* Tag chips — multi-select, ANDed */}
+              {tagStrip.map(tag => (
+                <button
+                  key={tag}
+                  style={CAT_BTN(activeTags.has(tag))}
+                  onClick={() => toggleTag(tag)}
+                  onMouseEnter={e => { if (!activeTags.has(tag)) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
+                  onMouseLeave={e => { if (!activeTags.has(tag)) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                >
+                  {tag}
+                </button>
+              ))}
+              {ALL_TAGS.length === 0 && (
+                <span style={{ fontSize: 10, color: "#7a7a7a", padding: "4px 2px" }}>No tags yet</span>
+              )}
+            </>
+          )}
+
+          {/* Mode toggle — shows the active tag count so the filter stays visible from
+              category mode (where the tag chips are hidden). */}
+          <button
+            style={CAT_BTN(filterMode === "tag")}
+            title={filterMode === "tag" ? "Back to categories" : "Filter by tag"}
+            onClick={() => { setFilterMode(m => (m === "cat" ? "tag" : "cat")); setPopoutOpen(false); }}
+          >
+            #{activeTags.size > 0 ? activeTags.size : ""}
+          </button>
 
           {/* More button — full row below the pills */}
-          {overflowCats.length > 0 && (
+          {(filterMode === "cat" ? overflowCats.length : overflowTags.length) > 0 && (
             <button
               style={{
-                ...CAT_BTN(overflowCats.includes(category as AssetCategory)),
+                ...CAT_BTN(filterMode === "cat" && overflowCats.includes(category as AssetCategory)),
                 width: "100%", marginTop: 4, textAlign: "center",
                 justifyContent: "center",
               }}
@@ -152,7 +222,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
               onMouseEnter={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
               onMouseLeave={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
             >
-              {overflowCats.includes(category as AssetCategory)
+              {filterMode === "cat" && overflowCats.includes(category as AssetCategory)
                 ? `${category as string} ▾`
                 : "More ▾"}
             </button>
@@ -172,34 +242,38 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
               boxShadow: "0 4px 16px rgba(0,0,0,0.5)",
             }}
           >
-            {overflowCats.map(cat => (
-              <button
-                key={cat}
-                onClick={() => selectCategory(cat)}
-                style={{
-                  display: "block", width: "100%", textAlign: "left",
-                  background: category === cat ? "rgba(80,140,255,0.2)" : "transparent",
-                  border: "none", cursor: "pointer",
-                  color: category === cat ? "#80aaff" : "#808080",
-                  fontSize: 11, padding: "6px 12px",
-                  letterSpacing: 0.4, transition: "background 0.1s, color 0.1s",
-                }}
-                onMouseEnter={e => {
-                  if (category !== cat) {
-                    e.currentTarget.style.background = "rgba(80,140,255,0.1)";
-                    e.currentTarget.style.color = "#8aaad0";
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (category !== cat) {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#808080";
-                  }
-                }}
-              >
-                {cat}
-              </button>
-            ))}
+            {/* Tag mode stays open across clicks — tags are multi-select. */}
+            {(filterMode === "cat" ? overflowCats : overflowTags).map(item => {
+              const on = filterMode === "cat" ? category === item : activeTags.has(item);
+              return (
+                <button
+                  key={item}
+                  onClick={() => filterMode === "cat" ? selectCategory(item) : toggleTag(item)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    background: on ? "rgba(80,140,255,0.2)" : "transparent",
+                    border: "none", cursor: "pointer",
+                    color: on ? "#80aaff" : "#808080",
+                    fontSize: 11, padding: "6px 12px",
+                    letterSpacing: 0.4, transition: "background 0.1s, color 0.1s",
+                  }}
+                  onMouseEnter={e => {
+                    if (!on) {
+                      e.currentTarget.style.background = "rgba(80,140,255,0.1)";
+                      e.currentTarget.style.color = "#8aaad0";
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!on) {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "#808080";
+                    }
+                  }}
+                >
+                  {filterMode === "cat" ? item : `${item}  ${tagCounts.get(item) ?? 0}`}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -306,6 +380,21 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
             textAlign: "center", paddingTop: 20,
           }}>
             {assets.length === 0 ? "No assets yet — import a model to get started." : "No results."}
+            {/* An accidental 2-tag AND shouldn't read as a broken panel. */}
+            {assets.length > 0 && (activeTags.size > 0 || category !== "All") && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  onClick={clearFilters}
+                  style={{
+                    background: "rgba(80,140,255,0.12)", border: "1px solid rgba(80,140,255,0.25)",
+                    borderRadius: 4, cursor: "pointer", color: "#80aaff",
+                    fontSize: 10, padding: "4px 10px", letterSpacing: 0.5,
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           filtered.map(asset => {

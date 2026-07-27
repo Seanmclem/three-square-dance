@@ -86,7 +86,7 @@ const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Charact
 type PendingEdit = {
   ids:     string[];
   items:   { id: string; label: string }[];
-  initial: { label: string; category: string; attribution: Attribution };
+  initial: { label: string; category: string; attribution: Attribution; tags?: string[] };
 };
 import { HistoryManager } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
@@ -2403,6 +2403,7 @@ export default function App() {
         label:       single ? defs[0]!.label : "",
         category:    single ? defs[0]!.category : commonOr(defs.map(d => d.category)),
         attribution: single ? (defs[0]!.attribution ?? {}) : {},
+        tags:        single ? [...defs[0]!.tags] : [],
       },
     });
   };
@@ -2448,15 +2449,28 @@ export default function App() {
     if (!pending) return;
     const dir = await ensureDir(modelsDir, setModelsDir);
     if (!dir) return;
+    // Tags are an array, so they need explicit merge semantics the generic shallow
+    // `patchEntry` can't express: a single edit replaces the list, a bulk edit only
+    // unions in (tags the dialog never showed must not be silently dropped).
+    const resolveTags = (a: AssetDef): string[] =>
+      patch.tagsAdd ? [...new Set([...a.tags, ...patch.tagsAdd])]
+                    : (patch.tags ?? a.tags);
     try {
       const mh   = await dir.getFileHandle("manifest.json");
       const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
-      data.assets = data.assets.map(a => pending.ids.includes(a.id) ? patchEntry(a, patch) : a);
+      data.assets = data.assets.map(a =>
+        pending.ids.includes(a.id) ? { ...patchEntry(a, patch), tags: resolveTags(a) } : a);
       const w = await mh.createWritable();
       await w.write(JSON.stringify(data, null, 2));
       await w.close();
     } catch (err) { console.error("asset edit failed:", err); return; }
-    pending.ids.forEach(id => assetManager.updateAsset(id, patch as Partial<AssetDef>));
+    pending.ids.forEach(id => {
+      const def = assetManager.getAssetDef(id);
+      if (!def) return;
+      // `tagsAdd` is not an AssetDef field — resolve it away before it reaches the registry.
+      const { tagsAdd: _drop, ...rest } = patch;
+      assetManager.updateAsset(id, { ...rest, tags: resolveTags(def) } as Partial<AssetDef>);
+    });
     setAssets(assetManager.getAssetList());
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
   };
@@ -3543,6 +3557,7 @@ SquareDance
         <ModelImporterModal
           modelsDir={modelsDir}
           onModelsDirSet={dir => setModelsDir(dir)}
+          existingTags={[...new Set(assets.flatMap(a => a.tags))].sort()}
           onComplete={imported => {
             handleAssetsReload();
             setShowImporter(false);
@@ -3618,6 +3633,7 @@ SquareDance
           noun="model"
           categoryOptions={ASSET_CATEGORIES}
           initial={pendingAssetEdit.initial}
+          tagSuggestions={[...new Set(assets.flatMap(a => a.tags))].sort()}
           needsFolderGrant={!modelsDir}
           folderHint="public/assets/models"
           onCancel={() => setPendingAssetEdit(null)}

@@ -3,10 +3,12 @@ import { LoadingManager } from "three";
 import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
 import { renderModelThumbnail, releaseThumbnailRenderer, dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { AttributionFields } from "@/ui/AttributionFields";
+import { TagInput } from "@/ui/TagInput";
 
 interface Props {
   modelsDir:      FileSystemDirectoryHandle | null;
   onModelsDirSet: (dir: FileSystemDirectoryHandle) => void;
+  existingTags:   string[];   // suggestions — the manifest isn't read until the import step
   onComplete:     (assets: AssetDef[]) => void;
   onClose:        () => void;
 }
@@ -127,12 +129,13 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#646464", fontSize: 10, letterSpacing: 1,
 };
 
-export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onClose }: Props) {
+export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, onComplete, onClose }: Props) {
   const [phase,      setPhase]      = useState<Phase>("pick");
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
   const [collidable,    setCollidable]    = useState(true);
   const [bulkNewCat,    setBulkNewCat]    = useState<string | null>(null);
   const [attribution,   setAttribution]   = useState<Attribution>({});
+  const [tags,          setTags]          = useState<string[]>([]);
   const [progress,   setProgress]   = useState("");
   const [error,      setError]      = useState<string | null>(null);
   const [results,    setResults]    = useState<AssetDef[]>([]);
@@ -257,7 +260,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
           ...(destThumb ? { thumbnail: `/assets/models/${destThumb}` } : {}),
           collidable,
           colliderType: "box",
-          tags:         [],
+          tags:         [...tags],
           dateAdded:    new Date().toISOString().slice(0, 10),
           ...(animations.length ? { animations } : {}),
           ...(Object.keys(attribution).length ? { attribution } : {}),
@@ -372,6 +375,12 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, onComplete, onCl
                     }}
                   />
                 )}
+              </div>
+
+              {/* Tags (optional) — applies to all imported models */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Tags (optional — applies to all)</span>
+                <TagInput value={tags} onChange={setTags} suggestions={existingTags} />
               </div>
 
               {/* Attribution (optional) — applies to all imported models */}
