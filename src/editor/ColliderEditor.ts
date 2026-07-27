@@ -332,7 +332,10 @@ export class ColliderEditor implements IEditorModule {
       // Face handles are a gizmo mode now (v4.47.0), not a default: they render
       // only for the collider whose panel "Resize" toggle is active — one gizmo
       // on screen at a time instead of cubes stacked on the object gizmo.
-      if (c.shape === "box" && this._moveId === c.id && this._moveMode === "resize") this._buildHandles(c.id);
+      // Box: 6 face pulls. Sphere: any handle drags radius (center pinned).
+      // Capsule: sides drag radius, ends drag height (v4.48.0).
+      if (c.shape !== "hull" && c.shape !== "trimesh" &&
+          this._moveId === c.id && this._moveMode === "resize") this._buildHandles(c.id);
     }
     this._positionAll();
   }
@@ -433,11 +436,14 @@ export class ColliderEditor implements IEditorModule {
 
     for (const h of this._handles) {
       const c = byId.get(h.userData["colliderId"] as string);
-      if (!c || c.shape !== "box") { h.visible = false; continue; }
+      if (!c || c.shape === "hull" || c.shape === "trimesh") { h.visible = false; continue; }
       const t = colliderWorldTransform(obj, c);
       const face = h.userData["faceAxis"] as Face;
       const axis = FACE_AXIS[face];
-      const half = Math.abs(axis.x) ? t.halfExtents.x : Math.abs(axis.y) ? t.halfExtents.y : t.halfExtents.z;
+      // Sphere halfExtents are {r,r,r}; capsule Y needs cyl-half + cap radius.
+      const half = Math.abs(axis.y)
+        ? (c.shape === "capsule" ? t.halfExtents.y + t.halfExtents.x : t.halfExtents.y)
+        : Math.abs(axis.x) ? t.halfExtents.x : t.halfExtents.z;
       const q = new THREE.Quaternion(t.quat.x, t.quat.y, t.quat.z, t.quat.w);
       const p = axis.clone().multiplyScalar(half + GAP).applyQuaternion(q);
       h.position.set(t.pos.x + p.x, t.pos.y + p.y, t.pos.z + p.z);
@@ -538,12 +544,24 @@ export class ColliderEditor implements IEditorModule {
     const axisWorld = axisLocal.clone().applyQuaternion(q).normalize();
 
     const axisKey: "x" | "y" | "z" = Math.abs(FACE_AXIS[d.face].x) ? "x" : Math.abs(FACE_AXIS[d.face].y) ? "y" : "z";
-    const scaleComp = Math.abs(axisKey === "x" ? obj.scale.x : axisKey === "y" ? obj.scale.y : obj.scale.z) || 1;
+    const shape = d.orig.shape;
+    // Radius drags (sphere any axis, capsule sides) keep the CENTER pinned —
+    // these shapes are center-symmetric, so face-pinning would just wander the
+    // center. Box faces and capsule ends pin the opposite face/cap end.
+    const radiusDrag = shape === "sphere" || (shape === "capsule" && axisKey !== "y");
+    // Scale components mirror colliderWorldTransform's per-shape rules.
+    const scaleComp =
+      shape === "sphere"                     ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.y), Math.abs(obj.scale.z)) || 1 :
+      shape === "capsule" && axisKey !== "y" ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.z)) || 1 :
+      Math.abs(axisKey === "x" ? obj.scale.x : axisKey === "y" ? obj.scale.y : obj.scale.z) || 1;
 
-    // Pinned (opposite) face center in world space.
-    const halfWorld = origWorld.halfExtents[axisKey];
+    // Pinned point in world space (opposite face/cap end, or the center).
+    const halfWorld =
+      shape === "capsule" && axisKey === "y"
+        ? origWorld.halfExtents.y + origWorld.halfExtents.x   // cyl half + cap radius = true cap end
+        : origWorld.halfExtents[axisKey];
     const center = new THREE.Vector3(origWorld.pos.x, origWorld.pos.y, origWorld.pos.z);
-    const pinned = center.clone().sub(axisWorld.clone().multiplyScalar(halfWorld));
+    const pinned = radiusDrag ? center.clone() : center.clone().sub(axisWorld.clone().multiplyScalar(halfWorld));
 
     // Axis-constrained projection: plane through the pinned point containing the axis,
     // oriented toward the camera (TransformControls-style).
@@ -555,18 +573,33 @@ export class ColliderEditor implements IEditorModule {
     const hit = new THREE.Vector3();
     if (!ray.intersectPlane(plane, hit)) return;
 
-    // New world size along the axis → local (pre-scale) units.
+    // New world size along the axis → local (pre-scale) units. Radius drags
+    // measure from the center, so the value IS the new radius; face drags
+    // measure from the pinned opposite face, so it's the new full extent.
     let newSizeLocal = hit.clone().sub(pinned).dot(axisWorld) / scaleComp;
     newSizeLocal = Math.max(MIN, this._altDown ? newSizeLocal : snap(newSizeLocal));
 
-    // Keep the opposite face pinned: shift the local offset by half the size delta
-    // along the collider-local axis, rotated by the collider's local rotation into
-    // the object frame (offset is stored in object space).
     const o = d.orig;
-    const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size[axisKey]) / 2)
-      .applyQuaternion(colliderLocalQuat(o));
-    const offset: Vec3 = { x: o.offset.x + shift.x, y: o.offset.y + shift.y, z: o.offset.z + shift.z };
-    const size:   Vec3 = { ...o.size, [axisKey]: newSizeLocal };
+    let offset: Vec3 = o.offset;
+    let size:   Vec3;
+    if (radiusDrag) {
+      size = { ...o.size, x: newSizeLocal };            // sphere/capsule radius lives in size.x
+    } else if (shape === "capsule") {
+      // Capsule height drag: size.y is the FULL height incl. caps; pin the far cap
+      // end by shifting the center half the delta (box idiom).
+      const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size.y) / 2)
+        .applyQuaternion(colliderLocalQuat(o));
+      offset = { x: o.offset.x + shift.x, y: o.offset.y + shift.y, z: o.offset.z + shift.z };
+      size = { ...o.size, y: newSizeLocal };
+    } else {
+      // Box: keep the opposite face pinned — shift the local offset by half the
+      // size delta along the collider-local axis, rotated by the collider's local
+      // rotation into the object frame (offset is stored in object space).
+      const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size[axisKey]) / 2)
+        .applyQuaternion(colliderLocalQuat(o));
+      offset = { x: o.offset.x + shift.x, y: o.offset.y + shift.y, z: o.offset.z + shift.z };
+      size = { ...o.size, [axisKey]: newSizeLocal };
+    }
 
     // Writing the full array materializes the implicit auto-box on first drag.
     const next = d.origList.map(c => c.id === d.colliderId ? { ...c, offset, size } : c);

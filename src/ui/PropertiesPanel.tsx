@@ -3399,7 +3399,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
                   }}
                 >Rotate</button>
               )}
-              {c.shape === "box" && (
+              {c.shape !== "hull" && c.shape !== "trimesh" && (
                 <button
                   title="Toggle resize drag-handles on this collider (0.25m steps, hold Alt for free)"
                   onClick={() => toggleMove(c.id, "resize")}
