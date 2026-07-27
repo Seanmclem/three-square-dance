@@ -3509,7 +3509,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               onChange={e => updateCollider(c.id, { isSensor: e.target.checked })}
             />
             <span style={{ fontSize: 10, color: "#9090a0" }}>
-              Sensor — fires on_player_enter / on_player_exit scripts instead of blocking
+              Sensor — doesn't block; the player walks through it, and entering / leaving fires on_player_enter / on_player_exit scripts
             </span>
           </label>
         </div>
