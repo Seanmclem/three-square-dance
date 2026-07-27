@@ -3282,6 +3282,18 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
   const updateCollider = (id: string, patch: Partial<AttachedCollider>): void =>
     write((colliders ?? []).map(c => c.id === id ? { ...c, ...patch } : c));
 
+  // Refit a primitive collider to the model's local AABB (the auto-box source):
+  // box takes the bounds verbatim, sphere/capsule derive radius/height the same
+  // way reshapeCollider does. Axis-aligned fit — rotation resets.
+  const refitCollider = (c: AttachedCollider): AttachedCollider => {
+    if (!defCol) return c;
+    const { offset, size } = defCol;
+    const base = { ...c, offset: { ...offset }, rotation: undefined, rotationY: undefined };
+    if (c.shape === "sphere")  return { ...base, size: { x: Math.max(size.x, size.y, size.z) / 2, y: 0, z: 0 } };
+    if (c.shape === "capsule") return { ...base, size: { x: Math.max(size.x, size.z) / 2, y: size.y, z: 0 } };
+    return { ...base, size: { ...size } };
+  };
+
   // Numeric field: update draft immediately, debounce the data write.
   const editField = (c: AttachedCollider, key: string, raw: string): void => {
     setDraft(prev => {
@@ -3488,6 +3500,13 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
                   {numField(c, "sx", "R")}
                   {numField(c, "sy", "H")}
                 </>
+              )}
+              {defCol && (
+                <button
+                  style={{ ...COLLIDER_BTN(false), flex: "none", padding: "3px 10px" }}
+                  title="Refit to the model's bounds (resets offset, size and rotation)"
+                  onClick={() => write(colliders.map(x => x.id === c.id ? refitCollider(x) : x))}
+                >Refit</button>
               )}
             </div>
           </div>
