@@ -169,8 +169,8 @@ export class EditorCamera {
     if (this._keys["ArrowUp"])   this.targetFocus.y += vs;
     if (this._keys["ArrowDown"]) this.targetFocus.y -= vs;
     const rot = 0.015 * dt * 60;   // ~0.9 rad/s
-    if (this._keys["ArrowLeft"])  this.targetSpherical.theta += rot;
-    if (this._keys["ArrowRight"]) this.targetSpherical.theta -= rot;
+    if (this._keys["ArrowLeft"])  this.targetSpherical.theta -= rot;
+    if (this._keys["ArrowRight"]) this.targetSpherical.theta += rot;
 
     const zoomStep = this.targetSpherical.radius * 0.04 * dt * 60;
     if (this._keys["Equal"] || this._keys["NumpadAdd"])      this.targetSpherical.radius = Math.max(3, this.targetSpherical.radius - zoomStep);
