@@ -78,7 +78,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -2486,6 +2486,41 @@ export default function App() {
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
   };
 
+  /** Save a placed object's collider set into its asset's manifest entry as the
+   *  model-level default (placement resolves obj.colliders ?? def.colliders ?? auto
+   *  box). The source object's own override is cleared so it tracks the default from
+   *  now on (undoable — undo restores the override, not the manifest), and sibling
+   *  placements without overrides rebuild against the new set. */
+  const handleSaveCollidersToAsset = async (objectId: string, assetId: string, colliders: AttachedCollider[]): Promise<void> => {
+    const zoneId = selected?.id === objectId ? selected.zoneId : activeZoneId;
+    if (!zoneId) return;
+    const dir = await ensureDir(modelsDir, setModelsDir);
+    if (!dir) return;
+    const saved = structuredClone(colliders);
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
+      data.assets = data.assets.map(a => a.id === assetId ? { ...a, colliders: saved } : a);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("save colliders to asset failed:", err); return; }
+    assetManager.updateAsset(assetId, { colliders: saved });
+    setAssets(assetManager.getAssetList());
+    busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
+    worldRef.current?.transaction("save colliders to asset", () => {
+      worldRef.current?.updateObject(zoneId, objectId, { colliders: undefined });
+    });
+    syncHistory();
+    setSelected(prev => prev && prev.id === objectId ? { ...prev, data: { ...(prev.data as WorldObject), colliders: undefined } } : prev);
+    // Sibling placements with no override: data is already correct (undefined), they
+    // just need a collider rebuild against the new default — bus only, no journal.
+    for (const o of worldRef.current?.zones.get(zoneId)?.objects ?? []) {
+      if (o.assetId === assetId && o.id !== objectId && o.colliders === undefined)
+        busRef.current.emit("object:updated", { id: o.id, zoneId, changes: { colliders: undefined } });
+    }
+  };
+
   // Write a re-staged thumbnail PNG next to the model + point the manifest at it.
   const handleSaveThumbnail = async (asset: AssetDef, dataUrl: string): Promise<void> => {
     setStagingAsset(null);
@@ -3427,6 +3462,7 @@ export default function App() {
           const aabb = objectPlacerRef.current?.getLocalAABB(objectId);
           return aabb ? defaultColliderFromAABB(aabb.center, aabb.size) : null;
         }}
+        onSaveCollidersToAsset={(objectId, assetId, colliders) => void handleSaveCollidersToAsset(objectId, assetId, colliders)}
         hullPointsFor={objectId => objectPlacerRef.current?.getLocalHullPoints(objectId) ?? null}
         prefabInfo={selPrefabInfo}
         onPrefabVariablesChange={handlePrefabVariablesChange}

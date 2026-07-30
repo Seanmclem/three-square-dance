@@ -405,7 +405,9 @@ export class ZoneManager {
             return;
           }
         }
-        if (changes.position || changes.rotation || changes.scale || changes.colliders || changes.mover) {
+        // `"colliders" in changes` (not truthiness): clearing the override back to
+        // undefined — the object re-tracks the asset default — must also rebuild.
+        if (changes.position || changes.rotation || changes.scale || "colliders" in changes || changes.mover) {
           const entry = this._loadedZones.get(zoneId);
           const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
           if (entry && obj) {

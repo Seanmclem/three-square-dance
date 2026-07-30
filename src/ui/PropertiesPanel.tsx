@@ -281,7 +281,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
         return n === 0 ? "none" : `${n} collider${n !== 1 ? "s" : ""}`;
       }
       const def = assets.find(a => a.id === obj?.assetId);
-      if (def?.colliders?.length) return `auto (${def.colliders.length} boxes)`;
+      if (def?.colliders?.length) return `auto (${def.colliders.length} preset${def.colliders.length !== 1 ? "s" : ""})`;
       return def?.collidable ? "auto box" : "none";
     }
     case "sound": {
@@ -388,6 +388,7 @@ interface PropertiesPanelProps {
   onBake?:                  (refs: SelectedRef[]) => void;
   // Auto-fit box from the placed model's local AABB (null until the mesh is built).
   defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
+  onSaveCollidersToAsset?:  (objectId: string, assetId: string, colliders: AttachedCollider[]) => void;
   // Auto-fit convex hull points from the model's geometry (Phase 27; null = unavailable).
   hullPointsFor?:           (objectId: string) => Vec3[] | null;
   // Prefab instance (Phase 45): set when the selection is a member of a placed
@@ -415,7 +416,7 @@ export function PropertiesPanel({
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, hullPointsFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
 }: PropertiesPanelProps) {
@@ -717,6 +718,7 @@ export function PropertiesPanel({
             assets={assets}
             onObjectUpdate={onObjectUpdate}
             defaultColliderFor={defaultColliderFor}
+            onSaveCollidersToAsset={onSaveCollidersToAsset}
             hullPointsFor={hullPointsFor}
             bus={bus}
           />
@@ -3198,11 +3200,12 @@ function hullFromPoints(c: AttachedCollider, points: Vec3[]): AttachedCollider {
   };
 }
 
-function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor, hullPointsFor, bus }: {
+function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor, bus }: {
   selected:           SelectedObjectPayload;
   assets:             AssetDef[];
   onObjectUpdate:     (c: Partial<WorldObject>) => void;
   defaultColliderFor?: (objectId: string) => AttachedCollider | null;
+  onSaveCollidersToAsset?: (objectId: string, assetId: string, colliders: AttachedCollider[]) => void;
   hullPointsFor?:      (objectId: string) => Vec3[] | null;
   bus?:               EventBus;
 }) {
@@ -3350,7 +3353,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
         {objGizmoToggle}
         <div style={INFO}>
           {presetCols?.length
-            ? `This asset ships ${presetCols.length} preset collider${presetCols.length > 1 ? "s" : ""} (baked from its source shapes) — the player collides with them in preview and game. Customize to edit this copy's set.`
+            ? `This model has ${presetCols.length} default collider${presetCols.length > 1 ? "s" : ""} (from a bake or a saved custom set) — the player collides with them in preview and game. Customize to edit this copy's set.`
             : collidable
               ? "Auto box collider fitted from the model's bounds — the player collides with it in preview and game. Customize to edit shape, size or offset."
               : "This asset isn't marked collidable, so it has no automatic collider. Add one to make it solid."}
@@ -3534,6 +3537,20 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
         </div>
       ))}
       <button style={ACTION_BTN} onClick={() => write([...colliders, newBox()])}>+ Add collider</button>
+      {objData?.assetId && onSaveCollidersToAsset && (
+        <>
+          <button
+            style={{ ...ACTION_BTN, borderColor: "rgba(120,200,140,0.35)", background: "rgba(80,200,120,0.1)", color: "#80cc90" }}
+            title="Write this collider set into the model's library entry (assets/models/manifest.json)"
+            onClick={() => onSaveCollidersToAsset(selected.id, objData.assetId, colliders)}
+          >Save as default for this model</button>
+          <div style={INFO}>
+            Makes this set the model's default colliders: every placement of
+            “{assetDef?.label ?? objData.assetId}” that hasn't customized its own
+            switches to it — including this one, which goes back to tracking the default.
+          </div>
+        </>
+      )}
     </div>
   );
 }
