@@ -344,6 +344,9 @@ export interface BusEvents {
   "input:keyup":           { code: string };
   "history:restore":       Record<string, never>;
   "assets:loaded":         { assets: AssetDef[] };
+  // A model FILE was rewritten in place (re-origin) — same assetId, new geometry.
+  // ZoneManager rebuilds every placed copy so meshes/localAABB/colliders refresh.
+  "asset:model-updated":   { assetId: string };
   "leftpanel:open":        { panelId: LeftPanelId };
   "leftpanel:close":       Record<string, never>;
   // Audio (Phase 36) — consumed by AudioSystem. `id` is a SoundDef id; a positional

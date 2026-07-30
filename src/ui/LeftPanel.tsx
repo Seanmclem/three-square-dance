@@ -20,6 +20,7 @@ interface LeftPanelProps {
   onDeleteAssets:  (ids: string[]) => void;
   onEditAssets:    (ids: string[]) => void;
   onRestageAsset:  (id: string) => void;
+  onReoriginAsset: (id: string) => void;
   materials:        MaterialDef[];
   onMaterialImport: () => void;
   onDeleteMaterials:(ids: string[]) => void;
@@ -93,7 +94,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onClose,
+  panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onReoriginAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onDeleteSounds, onEditSounds,
   skyboxes, selectedSkybox, onSkyboxSelect, onSkyboxImport, onDeleteSkyboxes, onEditSkyboxes,
@@ -184,6 +185,7 @@ export function LeftPanel({
                 onDeleteAssets={onDeleteAssets}
                 onEdit={onEditAssets}
                 onRestage={onRestageAsset}
+                onReorigin={onReoriginAsset}
               />
             )}
             {panelId === "materials" && (

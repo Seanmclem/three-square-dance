@@ -73,6 +73,8 @@ import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
+import { ReoriginModal } from "@/ui/ReoriginModal";
+import { applyGltfReorigin, instanceWorldShift } from "@/core/gltfReorigin";
 import { dataURLtoArrayBuffer, renderModelThumbnail } from "@/editor/thumbnailRenderer";
 import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
@@ -171,6 +173,7 @@ export default function App() {
   >(null);
   const [pendingAssetEdit,    setPendingAssetEdit]    = useState<PendingEdit | null>(null);
   const [stagingAsset,        setStagingAsset]        = useState<AssetDef | null>(null);
+  const [reoriginAsset,       setReoriginAsset]       = useState<AssetDef | null>(null);
   const [pendingMaterialEdit, setPendingMaterialEdit] = useState<PendingEdit | null>(null);
   const [zones,           setZones]            = useState<ZoneDef[]>([]);
   const [activeZoneId,    setActiveZoneId]     = useState<string | null>(DEMO_ZONE_ID);
@@ -2549,6 +2552,50 @@ export default function App() {
     busRef.current.emit("assets:loaded", { assets: assetManager.getAssetList() });
   };
 
+  // Re-origin a model (Phase 50): rewrite the GLTF/GLB in place so its geometry
+  // sits on/around the origin, optionally shifting placed copies to compensate.
+  const handleApplyReorigin = async (asset: AssetDef, delta: Vec3, compensate: boolean): Promise<void> => {
+    const dir = await ensureDir(modelsDir, setModelsDir);
+    if (!dir) return;
+    const fileName = asset.path.split("/").pop();
+    if (!fileName) return;
+    try {
+      const fh    = await dir.getFileHandle(fileName);
+      const bytes = await (await fh.getFile()).arrayBuffer();
+      const out   = applyGltfReorigin(bytes, fileName, delta);
+      const w     = await fh.createWritable();
+      await w.write(out);
+      await w.close();
+    } catch (err) { console.error("re-origin failed:", err); return; }
+    setReoriginAsset(null);
+    assetManager.evictModel(asset.id);
+    const world = worldRef.current;
+    if (compensate && world) {
+      world.transaction("re-origin placed copies", () => {
+        for (const [zoneId, zone] of world.zones) {
+          for (const o of zone.objects) {
+            if (o.assetId !== asset.id) continue;
+            const s = instanceWorldShift(delta, o.rotation, o.scale);
+            world.updateObject(zoneId, o.id, {
+              position: { x: o.position.x - s.x, y: o.position.y - s.y, z: o.position.z - s.z },
+            });
+          }
+        }
+      });
+      syncHistory();
+    }
+    // A selected copy's mesh is about to be torn down — drop the selection so the
+    // gizmo isn't left attached to a dead Object3D.
+    setSelected(prev => {
+      if (prev && prev.type === "object" && (prev.data as WorldObject | null)?.assetId === asset.id) {
+        busRef.current.emit("object:deselected", {});
+        return null;
+      }
+      return prev;
+    });
+    busRef.current.emit("asset:model-updated", { assetId: asset.id });
+  };
+
   // Save a transparent icon render of a model into the graphics library (Phase 48).
   const handleSaveIcon = async (asset: AssetDef, dataUrl: string): Promise<void> => {
     setStagingAsset(null);
@@ -3305,6 +3352,7 @@ export default function App() {
         onDeleteAssets={handleRequestAssetDelete}
         onEditAssets={handleRequestAssetEdit}
         onRestageAsset={id => { const a = assets.find(x => x.id === id); if (a) setStagingAsset(a); }}
+        onReoriginAsset={id => { const a = assets.find(x => x.id === id); if (a) setReoriginAsset(a); }}
         materials={materialList}
         onMaterialImport={openMaterialImporter}
         onDeleteMaterials={handleRequestMaterialDelete}
@@ -3697,6 +3745,17 @@ SquareDance
           onCancel={() => setStagingAsset(null)}
           onSave={dataUrl => void handleSaveThumbnail(stagingAsset, dataUrl)}
           onSaveIcon={dataUrl => void handleSaveIcon(stagingAsset, dataUrl)}
+        />
+      )}
+
+      {reoriginAsset && (
+        <ReoriginModal
+          asset={reoriginAsset}
+          placedCount={[...(worldRef.current?.zones.values() ?? [])]
+            .reduce((n, z) => n + z.objects.filter(o => o.assetId === reoriginAsset.id).length, 0)}
+          needsFolderGrant={!modelsDir}
+          onCancel={() => setReoriginAsset(null)}
+          onApply={(delta, compensate) => void handleApplyReorigin(reoriginAsset, delta, compensate)}
         />
       )}
 

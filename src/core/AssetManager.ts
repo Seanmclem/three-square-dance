@@ -8,6 +8,7 @@ export class AssetManager {
   private readonly _textureCache  = new Map<string, THREE.Texture>();
   private readonly _materialCache = new Map<string, THREE.MeshStandardMaterial>();
   private readonly _gltfCache     = new Map<string, unknown>();
+  private readonly _modelVersion  = new Map<string, number>();
   private readonly _textureLoader = new THREE.TextureLoader();
   private _gltfLoader: unknown    = null;
   private _renderer: THREE.WebGLRenderer | null = null;
@@ -375,6 +376,15 @@ export class AssetManager {
     this._assetRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
   }
 
+  /** Bust every cache layer for a model whose file was rewritten in place
+   *  (re-origin). The version counter defeats the browser HTTP cache on the
+   *  next fetch; the registry entry itself is untouched. */
+  evictModel(id: string): void {
+    this._gltfCache.delete(id);
+    this._gltfCache.delete(`obj:${id}`);
+    this._modelVersion.set(id, (this._modelVersion.get(id) ?? 0) + 1);
+  }
+
   /** Drop assets from the registry (and any cached GLTF) after a manifest delete. */
   removeAssets(ids: string[]): void {
     for (const id of ids) {
@@ -578,7 +588,8 @@ export class AssetManager {
     const loader = this._gltfLoader as { loadAsync: (url: string) => Promise<unknown> };
     const def  = this._assetRegistry[assetId];
     const url  = def?.path ?? `/assets/models/${assetId}.glb`;
-    const gltf = await loader.loadAsync(this._resolve(url));
+    const v    = this._modelVersion.get(assetId);
+    const gltf = await loader.loadAsync(this._resolve(v ? `${url}?v=${v}` : url));
     this._gltfCache.set(assetId, gltf);
     return gltf;
   }

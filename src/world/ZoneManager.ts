@@ -370,6 +370,17 @@ export class ZoneManager {
         this._removeObject(zoneId, id);
         this._refreshStaticShadows(zoneId);
       }),
+      // Re-origin: the model file changed under an unchanged assetId, so rebuild
+      // every placed copy the way remove+add would (mesh, localAABB, colliders).
+      this._bus.on("asset:model-updated", ({ assetId }) => {
+        for (const zoneId of this._loadedZones.keys()) {
+          const objs = this._worldState.zones.get(zoneId)?.objects.filter(o => o.assetId === assetId) ?? [];
+          for (const obj of objs) {
+            this._removeObject(zoneId, obj.id);
+            void this._addObject(zoneId, obj).then(() => this._refreshStaticShadows(zoneId));
+          }
+        }
+      }),
       // Script-driven despawn_object for NON-object entities (platforms, stairs, walls,
       // floors, trigger volumes). Objects are handled by ObjectPlacer; a group target is
       // already fanned out to member ids by ScriptEngine before this fires.
