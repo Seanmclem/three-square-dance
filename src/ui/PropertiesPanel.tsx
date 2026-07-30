@@ -3061,6 +3061,8 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     scale:    toStr(selected.scale),
   });
   const [floorLvl, setFloorLvl] = useState(objData?.floor ?? 0);
+  const isUniform = (v: Vec3): boolean => v.x === v.y && v.y === v.z;
+  const [uniformScale, setUniformScale] = useState(() => isUniform((objData ?? selected).scale));
   const { schedule } = useFieldDebounce(150);
 
   // Value deps (not just selected.id): undo commits refresh selected.data under the
@@ -3077,12 +3079,31 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     objData?.scale.x, objData?.scale.y, objData?.scale.z,
   ]);
 
+  // Uniform default per selection: on for uniformly-scaled objects, off when the
+  // axes already differ (a single field would misrepresent them).
+  useEffect(() => {
+    setUniformScale(isUniform((objData ?? selected).scale));
+  }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const commit = (group: GroupKey, axis: "x" | "y" | "z", raw: string): void => {
     setDraft(prev => {
       const next: Draft = { ...prev, [group]: { ...prev[group], [axis]: raw } };
-      const g = next[group];
-      schedule(() => onObjectUpdate({ [group]: { x: toNum(g.x), y: toNum(g.y), z: toNum(g.z) } } as Partial<WorldObject>));
+      // Incomplete tokens (".", "-", "") stay in the draft without a data write —
+      // committing NaN→0 makes the value-resync effect clobber the field mid-keystroke
+      // (typing ".5" became "0" then "05").
+      if (Number.isFinite(parseFloat(raw))) {
+        const g = next[group];
+        schedule(() => onObjectUpdate({ [group]: { x: toNum(g.x), y: toNum(g.y), z: toNum(g.z) } } as Partial<WorldObject>));
+      }
       return next;
+    });
+  };
+
+  const commitUniformScale = (raw: string): void => {
+    setDraft(prev => {
+      const n = parseFloat(raw);
+      if (Number.isFinite(n)) schedule(() => onObjectUpdate({ scale: { x: n, y: n, z: n } } as Partial<WorldObject>));
+      return { ...prev, scale: { x: raw, y: raw, z: raw } };
     });
   };
 
@@ -3090,18 +3111,36 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
       {GROUPS.map(({ key, label, step }) => (
         <div key={key}>
-          <div style={{ ...LABEL, marginBottom: 4 }}>{label}</div>
-          <div style={{ display: "flex", gap: 4 }}>
-            {AXES.map(({ axis, color }) => (
-              <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
-                <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
-                <input type="text" inputMode="decimal" value={draft[key][axis]} step={step}
-                  onChange={e => commit(key, axis, e.target.value)}
-                  style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
-                />
-              </div>
-            ))}
+          <div style={{ ...LABEL, marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span>{label}</span>
+            {key === "scale" && (
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#9090a0", letterSpacing: 0 }}>
+                <input type="checkbox" checked={uniformScale} onChange={e => setUniformScale(e.target.checked)} style={{ margin: 0 }} />
+                Uniform
+              </label>
+            )}
           </div>
+          {key === "scale" && uniformScale ? (
+            <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <span style={{ color: "#c0c0c0", fontSize: 9 }}>XYZ</span>
+              <input type="text" inputMode="decimal" value={draft.scale.x} step={step}
+                onChange={e => commitUniformScale(e.target.value)}
+                style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+              />
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 4 }}>
+              {AXES.map(({ axis, color }) => (
+                <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+                  <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
+                  <input type="text" inputMode="decimal" value={draft[key][axis]} step={step}
+                    onChange={e => commit(key, axis, e.target.value)}
+                    style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
       <div>
