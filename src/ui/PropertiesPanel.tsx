@@ -3121,8 +3121,8 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
             )}
           </div>
           {key === "scale" && uniformScale ? (
-            <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
-              <input type="text" inputMode="decimal" value={draft.scale.x} step={step}
+            <div style={{ width: "calc((100% - 8px) / 3)", display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
+              <input type="number" value={draft.scale.x} step={step}
                 onChange={e => commitUniformScale(e.target.value)}
                 style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
               />
@@ -3132,7 +3132,7 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
               {AXES.map(({ axis, color }) => (
                 <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
                   <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
-                  <input type="text" inputMode="decimal" value={draft[key][axis]} step={step}
+                  <input type="number" value={draft[key][axis]} step={step}
                     onChange={e => commit(key, axis, e.target.value)}
                     style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
                   />
