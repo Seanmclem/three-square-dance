@@ -15,7 +15,12 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "Grass_3"
+            "name" : "Grass_3",
+            "translation" : [
+                0,
+                -0.9076903462409973,
+                0
+            ]
         }
     ],
     "materials" : [
