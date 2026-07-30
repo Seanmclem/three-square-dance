@@ -3110,13 +3110,13 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
   return (
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
       {GROUPS.map(({ key, label, step }) => (
-        <div key={key}>
+        <div key={key} style={key === "scale" ? { marginTop: 8 } : undefined}>
           <div style={{ ...LABEL, marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>{label}</span>
             {key === "scale" && (
               <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#9090a0", letterSpacing: 0 }}>
                 <input type="checkbox" checked={uniformScale} onChange={e => setUniformScale(e.target.checked)} style={{ margin: 0 }} />
-                Uniform
+                Uniform scale
               </label>
             )}
           </div>
