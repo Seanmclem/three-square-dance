@@ -3122,7 +3122,6 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           </div>
           {key === "scale" && uniformScale ? (
             <div style={{ display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
-              <span style={{ color: "#c0c0c0", fontSize: 9 }}>XYZ</span>
               <input type="text" inputMode="decimal" value={draft.scale.x} step={step}
                 onChange={e => commitUniformScale(e.target.value)}
                 style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
