@@ -35,7 +35,7 @@ const NUM_INPUT: React.CSSProperties = {
 };
 
 const LABEL: React.CSSProperties = {
-  color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 4,
+  color: "#c2cadb", fontSize: 11, letterSpacing: 1, marginBottom: 4,
 };
 
 const ROW_BASE: React.CSSProperties = {
@@ -3111,10 +3111,10 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
       {GROUPS.map(({ key, label, step }) => (
         <div key={key} style={key === "scale" ? { marginTop: 8 } : undefined}>
-          <div style={{ ...LABEL, marginBottom: 4, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ ...LABEL, marginBottom: 4, display: "flex", gap: 12, alignItems: "center" }}>
             <span>{label}</span>
             {key === "scale" && (
-              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", color: "#9090a0", letterSpacing: 0 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer", letterSpacing: 0 }}>
                 <input type="checkbox" checked={uniformScale} onChange={e => setUniformScale(e.target.checked)} style={{ margin: 0 }} />
                 Uniform scale
               </label>
