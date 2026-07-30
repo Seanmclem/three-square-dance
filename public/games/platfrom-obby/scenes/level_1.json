@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -38.1027262882269,
-        "y": 12.818817435736584,
-        "z": -25.23984376830258
+        "x": -38.089548152920166,
+        "y": 12.284367993197773,
+        "z": -23.946285272505822
       },
-      "radius": 8.290288980693552,
-      "phi": 1.5449999999999882,
-      "theta": 2.909369999983908
+      "radius": 8.08687732741237,
+      "phi": 1.3057963267948967,
+      "theta": 18.976729999989278
     }
   },
   "world": {
@@ -4411,6 +4411,90 @@
             "triggerEventId": null
           },
           "colliders": []
+        },
+        {
+          "id": "obj_6b840a3c",
+          "assetId": "grass_2",
+          "position": {
+            "x": -37.99179160499287,
+            "y": 6.415313907210517,
+            "z": -25.086712763630697
+          },
+          "rotation": {
+            "x": -180,
+            "y": 42.591862973714136,
+            "z": -180
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": []
+        },
+        {
+          "id": "obj_80f68cde",
+          "assetId": "plant_small",
+          "position": {
+            "x": -43.0946190546915,
+            "y": 10.870794657311874,
+            "z": -26.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": -13.070900930225458,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": []
+        },
+        {
+          "id": "obj_4dd3e15c",
+          "assetId": "plant_large",
+          "position": {
+            "x": -40.77159505895993,
+            "y": 7.422134238198476,
+            "z": -18.211364481498123
+          },
+          "rotation": {
+            "x": 0,
+            "y": -13.954464481832343,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": []
         }
       ],
       "prefabInstances": [
@@ -4466,6 +4550,20 @@
               "x": -40.98546594385466,
               "y": 9.874838355622726,
               "z": -28.56678531831541
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_30a2f445",
+          "prefabId": "pfb_c1006ccb",
+          "version": 2,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -39.497944673742424,
+              "y": 7.421320336224979,
+              "z": -21.49963505257046
             },
             "rotationY": 0
           }

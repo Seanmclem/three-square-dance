@@ -38,6 +38,213 @@
         }
       ],
       "dateAdded": "2026-07-26"
+    },
+    {
+      "id": "pfb_c1006ccb",
+      "name": "Pipe base and corner",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_92addde7",
+          "type": "object",
+          "def": {
+            "id": "obj_92addde7",
+            "assetId": "pipe_90",
+            "position": {
+              "x": 0.0020553262575759845,
+              "y": 2.0009636547164726,
+              "z": 0.0003649474295350785
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            }
+          }
+        },
+        {
+          "memberKey": "obj_3a3b389d",
+          "type": "object",
+          "def": {
+            "id": "obj_3a3b389d",
+            "assetId": "pipe_straight",
+            "position": {
+              "x": -0.0020553262575759845,
+              "y": 0,
+              "z": -0.00036494742953863124
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-07-28"
+    },
+    {
+      "id": "pfb_741ffb6f",
+      "name": "Stairs - wood - 2length",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_91758e68",
+          "type": "object",
+          "def": {
+            "id": "obj_91758e68",
+            "assetId": "stairs_modular_start",
+            "position": {
+              "x": -0.992981427238135,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "colliders": [
+              {
+                "id": "col_14413460",
+                "shape": "box",
+                "offset": {
+                  "x": 0.9715181518472376,
+                  "y": 0.7718654201387437,
+                  "z": -0.137
+                },
+                "size": {
+                  "x": 4.5,
+                  "y": 0.25,
+                  "z": 2.561
+                },
+                "isSensor": false,
+                "rotation": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 25
+                }
+              },
+              {
+                "id": "col_8db7ca75",
+                "shape": "box",
+                "offset": {
+                  "x": 1.0872511875325566,
+                  "y": 1.696375815523546,
+                  "z": 1.03
+                },
+                "size": {
+                  "x": 4.5,
+                  "y": 1.25,
+                  "z": 0.5
+                },
+                "isSensor": false,
+                "rotation": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 27
+                }
+              },
+              {
+                "id": "col_a5655ecb",
+                "shape": "box",
+                "offset": {
+                  "x": 1.0445023750651132,
+                  "y": 1.604751631047092,
+                  "z": -1.03
+                },
+                "size": {
+                  "x": 4,
+                  "y": 1.25,
+                  "z": 0.5
+                },
+                "isSensor": false,
+                "rotation": {
+                  "x": 0,
+                  "y": 0,
+                  "z": 27
+                }
+              }
+            ]
+          }
+        },
+        {
+          "memberKey": "obj_ed9e4f3e",
+          "type": "object",
+          "def": {
+            "id": "obj_ed9e4f3e",
+            "assetId": "stairs_modular_end",
+            "position": {
+              "x": 0.9929814272381421,
+              "y": 0.9928141988887642,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "colliders": []
+          }
+        }
+      ],
+      "dateAdded": "2026-07-30"
     }
   ]
 }
