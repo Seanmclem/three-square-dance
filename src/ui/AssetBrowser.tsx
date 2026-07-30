@@ -409,7 +409,14 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
       {/* Grid */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 8px",
-        display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4,
+        // Fixed 96px cells, not `3` and not `1fr`: a wider panel buys MORE tiles per row
+        // rather than fatter ones. The width must be a definite px — with `1fr` the
+        // square's height (width:100% + aspect-ratio) contributes ~0 to grid row sizing,
+        // rows collapse to the label, and the tiles overlap each other.
+        display: "grid", gridTemplateColumns: "repeat(auto-fill, 96px)",
+        // start, not space-between: at 2 columns space-between flings them to opposite
+        // edges with a canyon between.
+        justifyContent: "start", gridAutoRows: "min-content", gap: 4,
         alignContent: "start",
       }}>
         {filtered.length === 0 ? (
@@ -449,7 +456,10 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                   border: sel ? `1px solid rgba(${accent},0.5)` : "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 4, cursor: "pointer", padding: 2,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                  overflow: "hidden", minHeight: 80,
+                  // 92px square thumb + label. The old `minHeight: 80` capped the row while
+                  // the image rendered at full column width, and `overflow:hidden` silently
+                  // cropped the difference — that was the letterboxing.
+                  overflow: "hidden", width: 96, minHeight: 108,
                 }}
               >
                 {manage && (
@@ -466,11 +476,14 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                   <img
                     src={asset.thumbnail}
                     alt={asset.label}
-                    style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 3 }}
+                    // contain, not cover: thumbnails are square renders, so nothing is ever
+                    // cropped even if the box is off-square. flexShrink:0 stops the column
+                    // flex from compressing the square.
+                    style={{ width: "100%", aspectRatio: "1", objectFit: "contain", flexShrink: 0, display: "block", borderRadius: 3 }}
                   />
                 ) : (
                   <div style={{
-                    width: "100%", aspectRatio: "1",
+                    width: "100%", aspectRatio: "1", flexShrink: 0,
                     background: "rgba(55,55,55,0.5)", borderRadius: 3,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 18, color: "#505050",

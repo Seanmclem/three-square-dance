@@ -489,7 +489,9 @@
       "collidable": true,
       "colliderType": "box",
       "tags": [
-        "animated"
+        "animated",
+        "platformer-game-kit",
+        "platformer"
       ],
       "dateAdded": "2026-06-18",
       "animations": [
@@ -3137,6 +3139,571 @@
         "nature"
       ],
       "dateAdded": "2026-07-27",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_default",
+      "label": "Cube Default",
+      "category": "Props",
+      "path": "/assets/models/cube_default.gltf",
+      "thumbnail": "/assets/models/cube_default_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_question",
+      "label": "Cube Question",
+      "category": "Props",
+      "path": "/assets/models/cube_question.gltf",
+      "thumbnail": "/assets/models/cube_question_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_exclamation",
+      "label": "Cube Exclamation",
+      "category": "Props",
+      "path": "/assets/models/cube_exclamation.gltf",
+      "thumbnail": "/assets/models/cube_exclamation_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_crate",
+      "label": "Cube Crate",
+      "category": "Props",
+      "path": "/assets/models/cube_crate.gltf",
+      "thumbnail": "/assets/models/cube_crate_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_bricks",
+      "label": "Cube Bricks",
+      "category": "Props",
+      "path": "/assets/models/cube_bricks.gltf",
+      "thumbnail": "/assets/models/cube_bricks_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_spikes",
+      "label": "Cube Spikes",
+      "category": "Props",
+      "path": "/assets/models/cube_spikes.gltf",
+      "thumbnail": "/assets/models/cube_spikes_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "prop",
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "character_gun",
+      "label": "Character Gun",
+      "category": "Characters",
+      "path": "/assets/models/character_gun.gltf",
+      "thumbnail": "/assets/models/character_gun_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer-game-kit",
+        "platformer"
+      ],
+      "dateAdded": "2026-07-30",
+      "animations": [
+        "Death",
+        "Duck",
+        "HitReact",
+        "Idle",
+        "Idle_Gun",
+        "Idle_Shoot",
+        "Jump",
+        "Jump_Idle",
+        "Jump_Land",
+        "No",
+        "Punch",
+        "Run",
+        "Run_Gun",
+        "Run_Shoot",
+        "Walk",
+        "Walk_Gun",
+        "Wave",
+        "Yes"
+      ],
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "skull",
+      "label": "Skull",
+      "category": "Characters",
+      "path": "/assets/models/skull.gltf",
+      "thumbnail": "/assets/models/skull_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "enemies",
+        "platformer-game-kit",
+        "platformer"
+      ],
+      "dateAdded": "2026-07-30",
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "crab",
+      "label": "Crab",
+      "category": "Characters",
+      "path": "/assets/models/crab.gltf",
+      "thumbnail": "/assets/models/crab_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "enemies",
+        "platformer-game-kit",
+        "platformer"
+      ],
+      "dateAdded": "2026-07-30",
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "bee",
+      "label": "Bee",
+      "category": "Characters",
+      "path": "/assets/models/bee.gltf",
+      "thumbnail": "/assets/models/bee_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "enemies",
+        "platformer-game-kit",
+        "platformer"
+      ],
+      "dateAdded": "2026-07-30",
+      "animations": [
+        "Bite_Front",
+        "Death",
+        "Flying",
+        "HitRecieve"
+      ],
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "enemy",
+      "label": "Enemy",
+      "category": "Characters",
+      "path": "/assets/models/enemy.gltf",
+      "thumbnail": "/assets/models/enemy_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "enemies",
+        "platformer-game-kit",
+        "platformer"
+      ],
+      "dateAdded": "2026-07-30",
+      "animations": [
+        "Bite_Front",
+        "Bite_InPlace",
+        "Dance",
+        "Death",
+        "HitRecieve",
+        "Idle",
+        "Jump",
+        "No",
+        "Walk",
+        "Yes"
+      ],
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_dirt_single",
+      "label": "Cube Dirt Single",
+      "category": "Land",
+      "path": "/assets/models/cube_dirt_single.gltf",
+      "thumbnail": "/assets/models/cube_dirt_single_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "cube_grass_single",
+      "label": "Cube Grass Single",
+      "category": "Land",
+      "path": "/assets/models/cube_grass_single.gltf",
+      "thumbnail": "/assets/models/cube_grass_single_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "thunder",
+      "label": "Thunder",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/thunder.gltf",
+      "thumbnail": "/assets/models/thunder_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "gem_pink",
+      "label": "Gem Pink",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/gem_pink.gltf",
+      "thumbnail": "/assets/models/gem_pink_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart",
+      "label": "Heart",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/heart.gltf",
+      "thumbnail": "/assets/models/heart_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart_half",
+      "label": "Heart Half",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/heart_half.gltf",
+      "thumbnail": "/assets/models/heart_half_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "gem_green",
+      "label": "Gem Green",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/gem_green.gltf",
+      "thumbnail": "/assets/models/gem_green_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "coin",
+      "label": "Coin",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/coin.gltf",
+      "thumbnail": "/assets/models/coin_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "star_outline",
+      "label": "Star Outline",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/star_outline.gltf",
+      "thumbnail": "/assets/models/star_outline_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "key",
+      "label": "Key",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/key.gltf",
+      "thumbnail": "/assets/models/key_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart_outline",
+      "label": "Heart Outline",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/heart_outline.gltf",
+      "thumbnail": "/assets/models/heart_outline_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "gem_blue",
+      "label": "Gem Blue",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/gem_blue.gltf",
+      "thumbnail": "/assets/models/gem_blue_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "star",
+      "label": "Star",
+      "category": "Powerups and Pickups",
+      "path": "/assets/models/star.gltf",
+      "thumbnail": "/assets/models/star_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "items"
+      ],
+      "dateAdded": "2026-07-30",
       "attribution": {
         "author": "Quaternius",
         "sourceName": "Platformer Game Kit",
