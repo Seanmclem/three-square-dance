@@ -25,6 +25,8 @@ TESTING.md §9 OPFS picker stub — all checks below passed unless marked human.
 |---|---|---|---|
 | 1 | Assets panel → Manage | ⌖ button appears between 📷 and Delete, disabled at 0 or 2+ checked | ✅ |
 | 2 | Check one model → ⌖ | Modal opens: plain-language origin summary ("base is 0.33 below the origin, off-center sideways by X 0.11, Z −0.01") | ✅ |
+| 2b | Marker preview (v4.52.1) | Orbitable model render with amber origin sphere+cross, green Base marker, blue Center marker, line from origin to the selected target; selected marker bright/enlarged, other dimmed; radio labels + legend carry matching color dots | ✅ (Tree: base view = green on amber cross at trunk base, center view = bright blue mid-canopy + line up the trunk) |
+| 2c | Preview interaction | Drag orbits, scroll zooms (stager-style); markers stay visible through geometry (depthTest off) | ✅ |
 | 3 | Mode radios | Base (default) / Center; shift line updates with the exact delta | ✅ |
 | 4 | Placed copies line | "Move the 1 placed copy…" checkbox, default on; hidden when 0 placed | ✅ (1 copy) |
 | 5 | Grant warning | Shown when `modelsDir` not yet granted | ✅ |
