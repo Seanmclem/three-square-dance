@@ -283,6 +283,13 @@ The trigger is independent of the action — **any** trigger can drive a telepor
              positionKey:"checkpoint", facingSource:"key", facingKey:"checkpoint" }] }
 ```
 
+> **Phase 53:** the death half of this loop now has a first-class form —
+> `on_state_equals health == 0` → **`respawn_player`**, which fades out,
+> reads the same stored-pose key (falling back to a chosen checkpoint, then
+> the world default spawn), optionally restores health, and fades back in.
+> The manual assembly above remains the underlying mechanism and still works.
+> Recipes with screenshots: **`HAZARDS_GUIDE.md`**.
+
 To store a **fixed** marker instead of the live player, use `posSource:"coords"`
 (or an `object` source). Facing can also be a plain number key (a generic
 variable) rather than a pose.

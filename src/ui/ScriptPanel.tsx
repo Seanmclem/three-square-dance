@@ -1007,7 +1007,13 @@ function ScriptEditor({
             ))}
           </select>
 
-          {needsTarget && (!ownerIsEntity || script.trigger.type === "on_dialogue_end") && (
+          {/* State triggers' target is a state KEY, never "this entity" — the
+              picker must render even on entity-owned scripts (else the key is
+              unauthorable and the engine's targetId injection mis-keys it). */}
+          {needsTarget && (!ownerIsEntity
+            || script.trigger.type === "on_dialogue_end"
+            || script.trigger.type === "on_state_changed"
+            || script.trigger.type === "on_state_equals") && (
             <TargetPicker
               triggerType={script.trigger.type}
               targetId={script.trigger.targetId ?? ""}
@@ -1017,7 +1023,10 @@ function ScriptEditor({
               onChange={(id) => setTrigger({ targetId: id })}
             />
           )}
-          {needsTarget && ownerIsEntity && script.trigger.type !== "on_dialogue_end" && (
+          {needsTarget && ownerIsEntity
+            && script.trigger.type !== "on_dialogue_end"
+            && script.trigger.type !== "on_state_changed"
+            && script.trigger.type !== "on_state_equals" && (
             <div
               style={{
                 color: "#98a2b8",
