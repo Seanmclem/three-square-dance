@@ -678,95 +678,6 @@
           }
         },
         {
-          "id": "obj_91758e68",
-          "assetId": "stairs_modular_start",
-          "position": {
-            "x": -37.5,
-            "y": 10.821980789135306,
-            "z": -27.037569713951818
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "colliders": [
-            {
-              "id": "col_14413460",
-              "shape": "box",
-              "offset": {
-                "x": 1.13,
-                "y": 0.432,
-                "z": -0.137
-              },
-              "size": {
-                "x": 4.5,
-                "y": 1,
-                "z": 2.561
-              },
-              "isSensor": false,
-              "rotation": {
-                "x": 0,
-                "y": 0,
-                "z": 25
-              }
-            },
-            {
-              "id": "col_8db7ca75",
-              "shape": "box",
-              "offset": {
-                "x": 1.0872511875325566,
-                "y": 1.696375815523546,
-                "z": 1.03
-              },
-              "size": {
-                "x": 4.5,
-                "y": 1.25,
-                "z": 0.5
-              },
-              "isSensor": false,
-              "rotation": {
-                "x": 0,
-                "y": 0,
-                "z": 27
-              }
-            },
-            {
-              "id": "col_a5655ecb",
-              "shape": "box",
-              "offset": {
-                "x": 1.0445023750651132,
-                "y": 1.604751631047092,
-                "z": -1.03
-              },
-              "size": {
-                "x": 4,
-                "y": 1.25,
-                "z": 0.5
-              },
-              "isSensor": false,
-              "rotation": {
-                "x": 0,
-                "y": 0,
-                "z": 27
-              }
-            }
-          ]
-        },
-        {
           "id": "obj_b59095e4",
           "assetId": "stairs",
           "position": {
@@ -4385,34 +4296,6 @@
           }
         },
         {
-          "id": "obj_ed9e4f3e",
-          "assetId": "stairs_modular_end",
-          "position": {
-            "x": -35.51403714552372,
-            "y": 11.81479498802407,
-            "z": -27.037569713951818
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "colliders": []
-        },
-        {
           "id": "obj_6b840a3c",
           "assetId": "grass_2",
           "position": {
@@ -4492,9 +4375,289 @@
             "interactable": false,
             "npcSpawn": false,
             "lootTableId": null,
+            "triggerEventId": null,
+            "interactLabel": ""
+          },
+          "colliders": []
+        },
+        {
+          "id": "obj_985106b8",
+          "assetId": "stairs_modular_start",
+          "position": {
+            "x": -37.5,
+            "y": 10.821980789135306,
+            "z": -27.037569713951818
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": [
+            {
+              "id": "col_14413460",
+              "shape": "box",
+              "offset": {
+                "x": 1.13,
+                "y": 0.432,
+                "z": -0.137
+              },
+              "size": {
+                "x": 4.5,
+                "y": 1,
+                "z": 2.561
+              },
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 25
+              }
+            },
+            {
+              "id": "col_8db7ca75",
+              "shape": "box",
+              "offset": {
+                "x": 1.0872511875325566,
+                "y": 1.696375815523546,
+                "z": 1.03
+              },
+              "size": {
+                "x": 4.5,
+                "y": 1.25,
+                "z": 0.5
+              },
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 27
+              }
+            },
+            {
+              "id": "col_a5655ecb",
+              "shape": "box",
+              "offset": {
+                "x": 1.0445023750651132,
+                "y": 1.604751631047092,
+                "z": -1.03
+              },
+              "size": {
+                "x": 4,
+                "y": 1.25,
+                "z": 0.5
+              },
+              "isSensor": false,
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 27
+              }
+            }
+          ]
+        },
+        {
+          "id": "obj_00e8cad7",
+          "assetId": "stairs_modular_end",
+          "position": {
+            "x": -35.51403714552372,
+            "y": 11.81479498802407,
+            "z": -27.037569713951818
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
             "triggerEventId": null
           },
           "colliders": []
+        },
+        {
+          "id": "obj_224efd3e",
+          "assetId": "goal_flag",
+          "position": {
+            "x": -41,
+            "y": 10.870794657311874,
+            "z": -27.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_271daad1",
+          "assetId": "tower",
+          "position": {
+            "x": -41,
+            "y": 10.870794657311874,
+            "z": -33.46079095323328
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_eb9d141d",
+          "assetId": "hazard_spiketrap",
+          "position": {
+            "x": -36.5,
+            "y": 7.42132033622498,
+            "z": -26
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_9184ee36",
+          "assetId": "bouncer",
+          "position": {
+            "x": -31,
+            "y": 12.687033973733104,
+            "z": -24.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_0032f646",
+          "assetId": "bouncer",
+          "position": {
+            "x": -28,
+            "y": 12.687033973733104,
+            "z": -25
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_0508e4a6",
+          "assetId": "bouncer",
+          "position": {
+            "x": -38,
+            "y": 7.421320336224979,
+            "z": -23.64414704159936
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
         }
       ],
       "prefabInstances": [
@@ -4585,7 +4748,8 @@
           "floorLevel": 0,
           "invisible": true
         }
-      ]
+      ],
+      "triggerVolumes": []
     }
   ],
   "transitions": [],
