@@ -132,6 +132,7 @@ const TRIGGER_TYPES: TriggerType[] = [
   "on_interact",
   "on_timer",
   "on_state_changed",
+  "on_state_equals",
   "on_level_load",
   "on_game_start",
   "on_health_zero",
@@ -164,6 +165,7 @@ const ACTION_TYPES: ActionType[] = [
   "play_animation",
   "play_music",
   "play_sound",
+  "respawn_player",
   "run_script",
   "set_state",
   "show_dialogue",
@@ -939,6 +941,7 @@ function ScriptEditor({
     script.trigger.type === "on_player_exit" ||
     script.trigger.type === "on_interact" ||
     script.trigger.type === "on_state_changed" ||
+    script.trigger.type === "on_state_equals" ||
     script.trigger.type === "on_dialogue_end";
 
   return (
@@ -993,6 +996,7 @@ function ScriptEditor({
               setTrigger({
                 type: e.target.value as TriggerType,
                 targetId: undefined,
+                stateValue: undefined,
               })
             }
           >
@@ -1037,6 +1041,15 @@ function ScriptEditor({
               onChange={(e) =>
                 setTrigger({ interval: parseFloat(e.target.value) || 1 })
               }
+            />
+          )}
+
+          {script.trigger.type === "on_state_equals" && (
+            <input
+              style={{ ...S.field, marginTop: 4 }}
+              placeholder="Equals value (number / true / false / text)"
+              value={script.trigger.stateValue == null ? "" : String(script.trigger.stateValue)}
+              onChange={(e) => setTrigger({ stateValue: coerceStateValue(e.target.value) })}
             />
           )}
 
@@ -1289,13 +1302,13 @@ function TargetPicker({
       </select>
     );
   }
-  // on_state_changed: the target is the state key to watch
+  // on_state_changed / on_state_equals: the target is the state key to watch
   return (
     <input
       list="wb-state-keys"
       style={S.field}
       placeholder={
-        triggerType === "on_state_changed"
+        triggerType === "on_state_changed" || triggerType === "on_state_equals"
           ? "State key (e.g. health)"
           : "Target ID"
       }
@@ -2427,6 +2440,74 @@ function ActionFields({
           />
         </div>
       );
+
+    case "respawn_player": {
+      // Destination priority at runtime: stored key → checkpoint → default spawn.
+      const dest = action.positionKey != null ? "key" : action.targetId ? "checkpoint" : "spawn";
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <select
+            style={S.select}
+            value={dest}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "key")        set({ positionKey: action.positionKey ?? "checkpoint", targetId: undefined });
+              else if (v === "checkpoint") set({ positionKey: undefined, targetId: action.targetId ?? "" });
+              else                    set({ positionKey: undefined, targetId: undefined });
+            }}
+          >
+            <option value="key">Respawn at: stored position key</option>
+            <option value="checkpoint">Respawn at: a checkpoint</option>
+            <option value="spawn">Respawn at: world default spawn</option>
+          </select>
+          {dest === "key" && (
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+              value={action.positionKey ?? ""}
+              onChange={(e) => set({ positionKey: e.target.value })}
+            />
+          )}
+          {dest === "checkpoint" && (
+            <select
+              style={S.select}
+              value={action.targetId ?? ""}
+              onChange={(e) => set({ targetId: e.target.value || undefined })}
+            >
+              <option value="">— pick a checkpoint —</option>
+              {zoneCheckpoints.map((cp) => (
+                <option key={cp.id} value={cp.id}>
+                  {cp.label || cp.id}
+                </option>
+              ))}
+            </select>
+          )}
+          <div style={{ display: "flex", gap: 4 }}>
+            <input
+              style={{ ...S.field, flex: 1 }}
+              placeholder="Fade color (#000)"
+              value={action.fadeColor ?? ""}
+              onChange={(e) => set({ fadeColor: e.target.value })}
+            />
+            <input
+              type="number"
+              style={{ ...S.field, width: 60 }}
+              placeholder="sec"
+              value={action.fadeDuration ?? ""}
+              onChange={(e) => set({ fadeDuration: parseFloat(e.target.value) || 0.4 })}
+            />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#98a2b8", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={action.restoreHealth ?? false}
+              onChange={(e) => set({ restoreHealth: e.target.checked || undefined })}
+            />
+            Restore health to its default
+          </label>
+        </div>
+      );
+    }
 
     case "show_ui":
     case "hide_ui":

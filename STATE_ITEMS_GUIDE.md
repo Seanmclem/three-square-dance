@@ -59,7 +59,11 @@ writing them**. The vocabulary:
 | `has_item`       | your owned count of an item compares true (`≥` by default; also `<`, `==`, … — so "fewer than 5 coins" works too) — see Layer 3 |
 
 **Reacting:** the `on_state_changed` trigger fires a script whenever a given
-key changes — e.g. watch `health` and show a death screen at `<= 0`.
+key changes — narrow with conditions if only some values matter. When you only
+care about ONE value, use **`on_state_equals`** instead: state key + the value
+to match, fires exactly when the key *becomes* that value (e.g.
+`on_state_equals health == 0` → `respawn_player` is the whole death handler).
+`on_health_zero` is shorthand for that health case.
 
 **Lifetime:** values live for the whole play session, across every
 `load_scene`, and are captured by save games automatically. **New Game wipes
@@ -249,6 +253,7 @@ and spend. That loop is the skeleton of most item-driven game design.
 | The same currency/keys across all my levels | project open → ITEMS tab and STATE **GAME** scope (they live in `game.json`) |
 | A rule that only applies in one level | STATE **THIS SCENE** scope (overrides GAME for that key) |
 | React the instant a value changes | `on_state_changed` trigger targeting the key |
+| React when a value *becomes exactly X* | `on_state_equals` trigger — key + the value to match |
 | Reset everything for a fresh run | that's **New Game** — it wipes values and re-seeds defaults |
 
 **Rule of thumb:** if the *player* should see and hold it → **item**. If only

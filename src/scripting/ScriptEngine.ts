@@ -2,7 +2,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type {
   ZoneDef, WorldConfig, ScriptDef, ScriptAction, ScriptCondition,
-  TriggerType, Vec3, CompareOp, DialogueTreeDef,
+  TriggerType, Vec3, CompareOp, DialogueTreeDef, JsonValue,
 } from "@/types";
 import { gameState } from "./GameState";
 import { DialogueRunner } from "./DialogueRunner";
@@ -101,7 +101,14 @@ export class ScriptEngine {
     sub("trigger:volume-exit",   ({ volumeId })  => this.fire("on_player_exit",  volumeId));
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
-    sub("state:changed",         ({ key })       => this.fire("on_state_changed", key));
+    sub("state:changed",         ({ key, value }) => {
+      this.fire("on_state_changed", key);
+      this._fireStateEquals(key, value);
+      // The long-dead on_health_zero stub, finally wired: transition-only for
+      // free — GameState.set no-ops equal values and clamps health at 0, so
+      // re-damage while dead can't re-fire until health rises again.
+      if (key === "health" && typeof value === "number" && value <= 0) this.fire("on_health_zero", null);
+    });
 
     // Custom GUI menus (Phase 49): the overlay emits the picked option; the
     // engine re-checks its conditions, dispatches its actions through the real
@@ -179,6 +186,28 @@ export class ScriptEngine {
   }
 
   // ─── Firing ───────────────────────────────────────────────────────────────
+
+  /**
+   * on_state_equals: run the key's bucket filtered by the authored value.
+   * Not routed through fire() — that runs whole buckets, and the value filter
+   * is per-script. No wildcard bucket: a state key (targetId) is required.
+   * Only fires on real transitions (GameState emits only on actual change);
+   * seeded defaults never emit, and delete_state emits value: null.
+   */
+  private _fireStateEquals(key: string, value: JsonValue): void {
+    if (!this._active) return;
+    const bucket = this._index.get(`on_state_equals:${key}`);
+    if (!bucket) return;
+    const equal = (a: JsonValue | undefined, b: JsonValue): boolean => {
+      if (a === b) return true;
+      if (typeof a === "object" && typeof b === "object" && a !== null && b !== null)
+        return JSON.stringify(a) === JSON.stringify(b);
+      return false;
+    };
+    for (const s of bucket) {
+      if (equal(s.trigger.stateValue, value)) this._evalAndRun(s);
+    }
+  }
 
   fire(trigger: TriggerType, targetId: string | null): void {
     if (!this._active) return;
@@ -311,12 +340,49 @@ export class ScriptEngine {
         if (action.eventId) this.fire("on_state_changed", action.eventId);
         break;
 
-      case "fade_screen":
-        this._bus.emit("overlay:fade-in", {
-          color:    action.fadeColor    ?? "#000000",
-          duration: action.fadeDuration ?? 0.3,
-        });
+      case "fade_screen": {
+        const dur = action.fadeDuration ?? 0.3;
+        this._bus.emit("overlay:fade-in", { color: action.fadeColor ?? "#000000", duration: dur });
+        // The overlay HOLDS at opaque until a fade-out (Phase 53), and fade-in
+        // suppresses player input — release both at fade end. duration 0 out =
+        // the pre-53 visual (fade to color, hard cut back). Timer is tracked so
+        // deactivate() cancels it; InputManager also un-suppresses on preview:stop.
+        const t = setTimeout(() => this._bus.emit("overlay:fade-out", { duration: 0 }), dur * 1000);
+        this._timers.push(t);
         break;
+      }
+
+      case "respawn_player": {
+        // Death/respawn in one action: fade to color, then (under cover) teleport,
+        // optionally refill health, and fade back. Destination priority:
+        // stored pose key → checkpoint → the world's default spawn.
+        const dur = action.fadeDuration ?? 0.4;
+        this._bus.emit("overlay:fade-in", { color: action.fadeColor ?? "#000000", duration: dur });
+        const t = setTimeout(() => {
+          let dest: Vec3 | undefined;
+          let facing: number | undefined;
+          const stored = action.positionKey ? gameState.get(action.positionKey) : undefined;
+          if (isVec3(stored)) {
+            dest = stored;
+            const f = (stored as { facing?: unknown }).facing;
+            if (typeof f === "number") facing = f;
+          }
+          if (!dest && action.targetId) {
+            const pose = this._resolveObjectPose(action.targetId);   // checkpoint-aware
+            if (pose) { dest = pose; facing = pose.facing; }
+          }
+          if (!dest) {
+            const spawn = this._state.world?.defaultSpawn;
+            if (spawn) { dest = spawn.position; facing = spawn.facingDeg; }
+          }
+          if (dest) this._bus.emit("character:teleport", { position: dest, facing });
+          else console.warn("[ScriptEngine] respawn_player: no destination (empty stored key, no checkpoint, no default spawn)");
+          if (action.restoreHealth) gameState.resetKey("health");
+          this._bus.emit("overlay:fade-out", { duration: dur });
+        }, dur * 1000);
+        this._timers.push(t);
+        break;
+      }
 
       case "load_scene":
         // Cross-scene routing (runtime shell). Only the runtime's SceneRouter

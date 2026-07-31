@@ -69,6 +69,9 @@ export class InputManager implements IEditorModule {
     this._unsub.push(
       this._bus.on("overlay:fade-in",  () => { this._suppress = true; }),
       this._bus.on("overlay:fade-out", () => { this._suppress = false; }),
+      // A fade sequence cancelled by preview exit (ScriptEngine.deactivate clears
+      // its timers, so the fade-out never fires) must not leave editor input dead.
+      this._bus.on("preview:stop",     () => { this._suppress = false; }),
       this._bus.on("floor:select",     ({ level }) => { this._activeFloorLevel = level; }),
     );
   }

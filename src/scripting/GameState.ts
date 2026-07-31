@@ -29,6 +29,15 @@ export class GameState {
   /** Wire the bus so mutations emit `state:changed`. Called once at app init. */
   attach(bus: EventBus): void { this._bus = bus; }
 
+  /** Re-seed one key from its registered schema default, clamping and emitting
+   *  like any normal write (respawn_player's health refill). No-op for keys
+   *  without a schema default. Unlike reset(), this DOES fire state triggers —
+   *  New Game seeding stays silent by design. */
+  resetKey(key: string): void {
+    const d = this._schema.get(key)?.default;
+    if (d !== undefined) this.set(key, d);
+  }
+
   /** Register a typed key with a default + optional numeric clamp. */
   register(key: string, schema: StateSchema): void {
     this._schema.set(key, schema);

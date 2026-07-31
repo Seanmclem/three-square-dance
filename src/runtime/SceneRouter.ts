@@ -153,9 +153,14 @@ export class SceneRouter {
       scriptEngine.fire("on_level_load", world.activeZoneId);
 
       this.deps.onPlaying?.();
+      // The fade-in at the top now HOLDS (Phase 53) — release it so arrival is
+      // a real fade-through-black instead of the old hard cut (which also left
+      // input suppressed: fade-in mutes it and only fade-out un-mutes).
+      bus.emit("overlay:fade-out", { duration: 0.3 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`SceneRouter: failed to load scene "${sceneId}":`, err);
+      bus.emit("overlay:fade-out", { duration: 0 });   // don't black out the error screen
       this.deps.onError?.(msg);
     } finally {
       this._transitioning = false;

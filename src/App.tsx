@@ -610,6 +610,8 @@ export default function App() {
         // Mid-route teardown (load_scene fired in preview): stay in preview at the React
         // level, just deactivate the old scene's engine — preview:start re-activates the new one.
         if (routingRef.current) { scriptEngine.deactivate(); return; }
+        // A respawn/fade cancelled mid-sequence must not hold black over the editor.
+        setFadeState(null);
         setIsPreview(false);
         setIsGame(false);
         setPreviewMode(null);
@@ -712,7 +714,10 @@ export default function App() {
         setBagOpen(open);
         bus.emit(open ? "bag:show" : "bag:closed", {});
       }),
-      bus.on("overlay:fade-in", payload => setFadeState(payload)),
+      bus.on("overlay:fade-in",  payload => setFadeState({ ...payload, direction: "in" })),
+      // Fade-out reuses the held fade's color; ignore a fade-out with nothing up.
+      bus.on("overlay:fade-out", ({ duration }) =>
+        setFadeState(prev => prev ? { color: prev.color, duration, direction: "out" } : null)),
       bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected", payload => {

@@ -1149,6 +1149,7 @@ export type TriggerType =
   | 'on_timer'
   | 'on_health_zero'
   | 'on_state_changed'
+  | 'on_state_equals'   // targetId = state key; fires when it TRANSITIONS to trigger.stateValue
   | 'on_level_load'
   | 'on_game_start'
   | 'on_dialogue_end';   // targetId = dialogue tree id
@@ -1181,6 +1182,7 @@ export type ActionType =
   | 'fire_event'
   | 'fade_screen'
   | 'teleport_player'
+  | 'respawn_player'
   | 'show_ui'
   | 'hide_ui'
   | 'run_script'
@@ -1218,6 +1220,7 @@ export interface ScriptTrigger {
   delay?:     number;
   repeat?:    boolean;
   interval?:  number;
+  stateValue?: JsonValue;  // on_state_equals: fire when targetId (a state key) transitions to this value
 }
 
 export interface ScriptCondition {
@@ -1324,6 +1327,7 @@ export interface ScriptAction {
   sceneId?:      string;      // load_scene: runtime-manifest scene key (not validated in the editor)
   itemId?:       string;      // give_item / take_item: ItemDef id (inventory key `inv.<id>`)
   count?:        number;      // give_item / take_item: amount (default 1)
+  restoreHealth?: boolean;    // respawn_player: re-seed 'health' to its schema default after the teleport
 }
 
 export interface ScriptDef {

@@ -322,6 +322,14 @@ the user's tab had written. Rules:
 4. If contamination reached the user's live tab, tell them: their open tab holds the junk
    in memory and will write it back on close/reload — they need to delete the stray
    entities in their tab (or reload and delete after).
+4b. **Contamination can reach the user's SCENE FILE, not just the autosave** (2026-07-31):
+   test scripts injected via `zone.scripts` mutation were captured by the 60s autosave
+   tick; the user's tab ingested them and the user pressed **Save**, writing them into
+   `public/games/<project>/scenes/*.json` (their FSA project folder IS the repo path).
+   At session end, also `git diff public/games/` and grep the scene files for your test
+   ids — strip them (preserving the user's content) and commit; then tell the user their
+   open tab still holds the junk in memory and must be reloaded (or the scripts deleted
+   in the SCRIPTS panel) before their next save.
 5. **The periodic autosave tick pollutes mid-test even without a reload** (2026-07-17): a
    60s tick fired while a test cutter drag was in progress and persisted the half-test
    state. So at session end, don't assume the snapshot-restore left things clean — READ

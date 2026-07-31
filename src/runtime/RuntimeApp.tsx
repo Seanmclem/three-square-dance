@@ -152,6 +152,9 @@ export default function RuntimeApp() {
           doSave();
           unloadToMenu();
           setShell("menu");
+          // A held fade must not black out the menu (router transitions manage
+          // their own fade-out on arrival, so only clear on a true exit).
+          setFadeState(null);
         }
       }),
       bus.on("input:scheme-changed", ({ scheme }) => setPreviewScheme(scheme)),
@@ -185,7 +188,10 @@ export default function RuntimeApp() {
         setBagOpen(open);
         bus.emit(open ? "bag:show" : "bag:closed", {});
       }),
-      bus.on("overlay:fade-in", payload => setFadeState(payload)),
+      bus.on("overlay:fade-in",  payload => setFadeState({ ...payload, direction: "in" })),
+      // Fade-out reuses the held fade's color; ignore a fade-out with nothing up.
+      bus.on("overlay:fade-out", ({ duration }) =>
+        setFadeState(prev => prev ? { color: prev.color, duration, direction: "out" } : null)),
     ];
 
     // Esc = direct exit to menu (kbm), mirroring the editor's preview exit.

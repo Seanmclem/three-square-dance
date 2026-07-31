@@ -162,15 +162,33 @@ Every `set`/`adjust`/`delete` that **actually changes the value** emits
 nothing — this kills scripting feedback loops. Object values are compared
 structurally (`JSON.stringify`).
 
-`ScriptEngine.activate()` subscribes and turns each change into a trigger:
+`ScriptEngine.activate()` subscribes and turns each change into triggers:
 
 ```ts
-sub("state:changed", ({ key }) => this.fire("on_state_changed", key));
+sub("state:changed", ({ key, value }) => {
+  this.fire("on_state_changed", key);
+  this._fireStateEquals(key, value);   // on_state_equals (Phase 53)
+  if (key === "health" && typeof value === "number" && value <= 0)
+    this.fire("on_health_zero", null);
+});
 ```
 
 This generalizes the old "flag set fires an event" behavior to **any** state
 change, not just booleans. Scripts fire broadly on the key and narrow via
-conditions.
+conditions — or, since Phase 53, fire only at a specific value:
+
+- **`on_state_equals`** — `targetId` is the state key, `stateValue` the value
+  to match (number / true / false / text). Fires when the key **transitions**
+  to that value: sitting at the value doesn't re-fire (writes of the current
+  value emit nothing), and it can fire again after the key moves away and
+  comes back. Canonical use: `on_state_equals health == 0` → `respawn_player`.
+  Caveats: values *seeded* by schema defaults never emit, so the trigger won't
+  fire for a key that starts at the match value; `delete_state` emits
+  `value: null`, so an authored match value of `null`-like emptiness fires on
+  delete.
+- **`on_health_zero`** — sugar for "health transitioned to ≤ 0" (wired in
+  Phase 53; it was a dead stub before). Because health clamps at 0 and equal
+  writes are no-ops, taking more damage while dead can't re-fire it.
 
 ---
 
@@ -180,7 +198,9 @@ Authored in the Script Panel (`ScriptPanel.tsx`), evaluated in `ScriptEngine`.
 The old `set_flag`/`clear_flag`/`give_item` + `flag_set`/`flag_not_set`/
 `player_has_item` + `on_flag_set`/`on_flag_cleared` were removed in favor of these.
 
-**Trigger:** `on_state_changed` — `targetId` is the state key to watch.
+**Triggers:** `on_state_changed` — `targetId` is the state key to watch;
+`on_state_equals` — same `targetId` plus `stateValue`, fires only on the
+transition to that exact value (§4); `on_health_zero` — health reached 0.
 
 **Conditions:**
 
