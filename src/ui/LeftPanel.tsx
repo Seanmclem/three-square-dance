@@ -160,7 +160,7 @@ export function LeftPanel({
             borderBottom: "1px solid rgba(255,255,255,0.07)",
             flexShrink: 0,
           }}>
-            <span style={{ fontSize: 11, color: "#808080", letterSpacing: 1, fontFamily: "monospace", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 11, color: "#dde3f0", letterSpacing: 1, fontFamily: "monospace", textTransform: "uppercase" }}>
               {panelId}
             </span>
             <button

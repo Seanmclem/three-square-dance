@@ -246,22 +246,32 @@ export const IconPrefab = ({ color }: IconProps) => (
   </svg>
 );
 
+/** Camera (thumbnail re-stage). Takes the usual color prop so the button can
+ *  brighten/dim it like its text siblings — the 📷 emoji it replaces couldn't. */
+export const IconCamera = ({ color, size = 16 }: IconProps & { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" style={{ display: "block" }}>
+    <rect x="3" y="8" width="22" height="15" rx="2.5" stroke={color} strokeWidth="2.2"/>
+    <path d="M10 8 L11.5 4.5 H16.5 L18 8" stroke={color} strokeWidth="2.2" strokeLinejoin="round"/>
+    <circle cx="14" cy="15.5" r="4.5" stroke={color} strokeWidth="2.2"/>
+  </svg>
+);
+
 /** RGB 3-axis translate gizmo (re-origin). Fixed axis colors like the transform
  *  gizmo (X red, Y green, Z blue), so no `color` prop — pass `dim` for disabled. */
-export const IconReorigin = ({ size = 14, dim = false }: { size?: number; dim?: boolean }) => (
-  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" opacity={dim ? 0.3 : 1} style={{ display: "block" }}>
+export const IconReorigin = ({ size = 18, dim = false }: { size?: number; dim?: boolean }) => (
+  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" opacity={dim ? 0.45 : 1} style={{ display: "block" }}>
     {/* up-arrow rotated into the three isometric axes */}
     {([
-      ["#63c96a", 0],     // Y up
-      ["#e25b5b", 120],   // X down-right
-      ["#5b8fe2", -120],  // Z down-left
+      ["#7ce884", 0],     // Y up
+      ["#ff7b6f", 120],   // X down-right
+      ["#77aaff", -120],  // Z down-left
     ] as [string, number][]).map(([c, rot]) => (
       <g key={c} transform={`translate(14,15) rotate(${rot})`}>
-        <line x1="0" y1="0" x2="0" y2="-8" stroke={c} strokeWidth="2.4" strokeLinecap="round"/>
-        <polygon points="0,-13 -3.4,-6.5 3.4,-6.5" fill={c}/>
+        <line x1="0" y1="0" x2="0" y2="-7.5" stroke={c} strokeWidth="3.4" strokeLinecap="round"/>
+        <polygon points="0,-13.5 -4.4,-6 4.4,-6" fill={c}/>
       </g>
     ))}
-    <circle cx="14" cy="15" r="2" fill="#d8d8d8"/>
+    <circle cx="14" cy="15" r="2.6" fill="#ffffff"/>
   </svg>
 );
 

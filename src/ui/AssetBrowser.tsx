@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { AssetDef, AssetCategory } from "@/types";
-import { IconReorigin } from "@/ui/icons";
+import { IconCamera, IconReorigin } from "@/ui/icons";
 
 const KNOWN_ORDER = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
@@ -11,7 +11,7 @@ const CAT_BTN = (active: boolean): React.CSSProperties => ({
   fontSize: 11, padding: "4px 8px", borderRadius: 4,
   border: "none", cursor: "pointer",
   background: active ? "rgba(80,140,255,0.25)" : "rgba(255,255,255,0.04)",
-  color: active ? "#80aaff" : "#808080",
+  color: active ? "#9dbdff" : "#c2cadb",
   letterSpacing: 0.3, whiteSpace: "nowrap",
   transition: "background 0.1s, color 0.1s",
 });
@@ -243,7 +243,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 </button>
               ))}
               {ALL_TAGS.length === 0 && (
-                <span style={{ fontSize: 10, color: "#7a7a7a", padding: "4px 2px" }}>No tags yet</span>
+                <span style={{ fontSize: 10, color: "#9aa3b5", padding: "4px 2px" }}>No tags yet</span>
               )}
             </>
           )}
@@ -291,7 +291,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                     display: "block", width: "100%", textAlign: "left",
                     background: on ? "rgba(80,140,255,0.2)" : "transparent",
                     border: "none", cursor: "pointer",
-                    color: on ? "#80aaff" : "#808080",
+                    color: on ? "#9dbdff" : "#c2cadb",
                     fontSize: 11, padding: "6px 12px",
                     letterSpacing: 0.4, transition: "background 0.1s, color 0.1s",
                   }}
@@ -304,7 +304,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                   onMouseLeave={e => {
                     if (!on) {
                       e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "#808080";
+                      e.currentTarget.style.color = "#c2cadb";
                     }
                   }}
                 >
@@ -343,7 +343,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   borderRadius: 4, cursor: "pointer",
-                  color: "#808080", fontSize: 10, letterSpacing: 0.5,
+                  color: "#c2cadb", fontSize: 10, letterSpacing: 0.5,
                 }}
               >
                 Manage
@@ -360,7 +360,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 background: checked.size ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${checked.size ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 4, cursor: checked.size ? "pointer" : "default",
-                color: checked.size ? "#80aaff" : "#555", fontSize: 10, letterSpacing: 0.5,
+                color: checked.size ? "#9dbdff" : "#8b93a5", fontSize: 10, letterSpacing: 0.5,
               }}
             >
               Edit{checked.size ? ` (${checked.size})` : ""}
@@ -374,10 +374,10 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 background: checked.size === 1 ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${checked.size === 1 ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 4, cursor: checked.size === 1 ? "pointer" : "default",
-                color: checked.size === 1 ? "#80aaff" : "#555", fontSize: 10,
+                display: "flex", alignItems: "center",
               }}
             >
-              📷
+              <IconCamera color={checked.size === 1 ? "#9dbdff" : "#8b93a5"} />
             </button>
             <button
               onClick={() => { if (checked.size === 1) onReorigin([...checked][0]!); }}
@@ -401,7 +401,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 background: checked.size ? "rgba(200,60,60,0.15)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${checked.size ? "rgba(200,60,60,0.35)" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 4, cursor: checked.size ? "pointer" : "default",
-                color: checked.size ? "#cc6666" : "#555", fontSize: 10, letterSpacing: 0.5,
+                color: checked.size ? "#e08585" : "#8b93a5", fontSize: 10, letterSpacing: 0.5,
               }}
             >
               Delete{checked.size ? ` (${checked.size})` : ""}
@@ -413,7 +413,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.08)",
                 borderRadius: 4, cursor: "pointer",
-                color: "#808080", fontSize: 10, letterSpacing: 0.5,
+                color: "#c2cadb", fontSize: 10, letterSpacing: 0.5,
               }}
             >
               Done
@@ -437,7 +437,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
       }}>
         {filtered.length === 0 ? (
           <div style={{
-            gridColumn: "1/-1", color: "#505050", fontSize: 10,
+            gridColumn: "1/-1", color: "#9aa3b5", fontSize: 10,
             textAlign: "center", paddingTop: 20,
           }}>
             {assets.length === 0 ? "No assets yet — import a model to get started." : "No results."}
@@ -502,11 +502,11 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                     width: "100%", aspectRatio: "1", flexShrink: 0,
                     background: "rgba(55,55,55,0.5)", borderRadius: 3,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 18, color: "#505050",
+                    fontSize: 18, color: "#9aa3b5",
                   }}>◻</div>
                 )}
                 <span style={{
-                  fontSize: 8, color: sel ? (manage ? "#cc8888" : "#80aaff") : "#808080",
+                  fontSize: 9, color: sel ? (manage ? "#e08585" : "#9dbdff") : "#c2cadb",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                   width: "100%", textAlign: "center",
                 }}>
