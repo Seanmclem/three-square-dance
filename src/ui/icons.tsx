@@ -246,6 +246,25 @@ export const IconPrefab = ({ color }: IconProps) => (
   </svg>
 );
 
+/** RGB 3-axis translate gizmo (re-origin). Fixed axis colors like the transform
+ *  gizmo (X red, Y green, Z blue), so no `color` prop — pass `dim` for disabled. */
+export const IconReorigin = ({ size = 14, dim = false }: { size?: number; dim?: boolean }) => (
+  <svg width={size} height={size} viewBox="0 0 28 28" fill="none" opacity={dim ? 0.3 : 1} style={{ display: "block" }}>
+    {/* up-arrow rotated into the three isometric axes */}
+    {([
+      ["#63c96a", 0],     // Y up
+      ["#e25b5b", 120],   // X down-right
+      ["#5b8fe2", -120],  // Z down-left
+    ] as [string, number][]).map(([c, rot]) => (
+      <g key={c} transform={`translate(14,15) rotate(${rot})`}>
+        <line x1="0" y1="0" x2="0" y2="-8" stroke={c} strokeWidth="2.4" strokeLinecap="round"/>
+        <polygon points="0,-13 -3.4,-6.5 3.4,-6.5" fill={c}/>
+      </g>
+    ))}
+    <circle cx="14" cy="15" r="2" fill="#d8d8d8"/>
+  </svg>
+);
+
 export const TOOL_ICONS: Record<ToolId, React.FC<IconProps>> = {
   select:           IconSelect,
   "select-face":    IconSelectFace,

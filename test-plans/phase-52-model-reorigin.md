@@ -39,10 +39,10 @@ TESTING.md §9 OPFS picker stub — all checks below passed unless marked human.
 
 ## Not covered by the stub (one-click human checks)
 
-- **Real FSA write:** run ⌖ on a real model with the actual folder grant and
-  confirm the file on disk gains the `__reorigin` node and the viewport model
-  drops/rises to its new pivot after the rebuild (the stub writes to OPFS, so
-  the served file never changes and the visual shift can't be observed).
+- **Real FSA write:** ✅ done by the user on 2026-07-31 — `cannonball.gltf` on
+  disk gained `__reorigin [0, 0.5704, 0.0039]` (Base mode) via the actual
+  folder grant. (Originally: the stub writes to OPFS, so the served file never
+  changes and the visual shift can't be observed.)
 - **.glb container:** the GLB rewrite path (header/chunk/padding) is covered by
   unit-style logic only — re-origin one real `.glb` asset and confirm it still
   loads. (The library is currently all `.gltf`.)

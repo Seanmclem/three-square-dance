@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { AssetDef, AssetCategory } from "@/types";
+import { IconReorigin } from "@/ui/icons";
 
 const KNOWN_ORDER = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
@@ -387,10 +388,10 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 background: checked.size === 1 ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
                 border: `1px solid ${checked.size === 1 ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 4, cursor: checked.size === 1 ? "pointer" : "default",
-                color: checked.size === 1 ? "#80aaff" : "#555", fontSize: 10,
+                display: "flex", alignItems: "center",
               }}
             >
-              ⌖
+              <IconReorigin dim={checked.size !== 1} />
             </button>
             <button
               onClick={() => { if (checked.size) onDeleteAssets([...checked]); }}
