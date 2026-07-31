@@ -488,6 +488,23 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                     color: "#fff", fontSize: 10, lineHeight: 1,
                   }}>{sel ? "✓" : ""}</div>
                 )}
+                {(asset.animations?.length ?? 0) > 0 && (
+                  <div
+                    // Innermost title wins over the tile's, so hovering the badge lists the clips.
+                    title={`${asset.animations!.length} animation${asset.animations!.length === 1 ? "" : "s"}: ${asset.animations!.join(", ")}`}
+                    style={{
+                      position: "absolute", top: 3, right: 3, zIndex: 1,
+                      width: 14, height: 14, borderRadius: 3,
+                      background: "rgba(20,20,20,0.85)",
+                      border: "1px solid rgba(255,255,255,0.25)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <svg width="8" height="8" viewBox="0 0 8 8">
+                      <polygon points="1.5,0.5 7.2,4 1.5,7.5" fill="#dde3f0"/>
+                    </svg>
+                  </div>
+                )}
                 {asset.thumbnail ? (
                   <img
                     src={asset.thumbnail}
