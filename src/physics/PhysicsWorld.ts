@@ -71,6 +71,23 @@ export class PhysicsWorld {
     return this._world.createCollider(desc, body);
   }
 
+  /**
+   * A SENSOR parented to an existing (kinematic mover) body — attached trigger
+   * volumes (Phase 53). KINEMATIC_KINEMATIC is load-bearing: the parent is
+   * kinematic and so is the player capsule, so without it intersectionPairsWith
+   * never produces pairs (the exact case registerAttachedColliders declared out
+   * of scope in Phase 31).
+   */
+  createSensorColliderOn(desc: RAPIER.ColliderDesc, body: RAPIER.RigidBody): RAPIER.Collider {
+    desc.setSensor(true)
+      .setActiveCollisionTypes(
+        RAPIER.ActiveCollisionTypes.DEFAULT
+        | RAPIER.ActiveCollisionTypes.KINEMATIC_KINEMATIC
+        | RAPIER.ActiveCollisionTypes.KINEMATIC_FIXED,
+      );
+    return this._world.createCollider(desc, body);
+  }
+
   removeCollider(collider: RAPIER.Collider): void {
     const parent = collider.parent();
     this._world.removeCollider(collider, true);

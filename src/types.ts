@@ -1418,6 +1418,11 @@ export interface TriggerVolume {
   position: Vec3;
   size:     Vec3;
   rotation?: Vec3;   // degrees, Y = yaw — applied to wireframe + sensor (axis-aligned when absent)
+  // Mover-enabled platform/shape/object id (same zone) this volume rides (Phase 53).
+  // position/size stay the WORLD-SPACE rest pose (tools/panel unchanged); the
+  // host-local conversion happens at collider build. Missing or mover-less host
+  // → plain static sensor at the authored pose (fallback).
+  attachTo?: string;
   zoneId:    string;
   scripts?:  ScriptDef[];
   groupIds?: string[];

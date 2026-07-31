@@ -268,12 +268,32 @@ export class ColliderBuilder {
     return physicsWorld.createSensorCollider(desc);
   }
 
-  static registerVolumeSensor(vol: TriggerVolume): RAPIER.Collider {
-    const desc = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2)
-      .setTranslation(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+  /**
+   * Volume sensor cuboid. With a `host` (the volume is attached to a mover
+   * entity, Phase 53), the def's WORLD-SPACE rest coords convert to body-local
+   * and the sensor parents to the host's kinematic body so it rides the mover;
+   * without one, the classic fixed-body world-space sensor.
+   */
+  static registerVolumeSensor(
+    vol: TriggerVolume,
+    host?: { body: RAPIER.RigidBody; origin: THREE.Vector3; originQuat: THREE.Quaternion },
+  ): RAPIER.Collider {
+    const desc  = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2);
     const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
-    if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
-    return physicsWorld.createSensorCollider(desc);
+    if (!host) {
+      desc.setTranslation(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+      if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
+      return physicsWorld.createSensorCollider(desc);
+    }
+    // World center (position is XZ center + Y BOTTOM) → host-body-local frame.
+    const invQ  = host.originQuat.clone().invert();
+    const local = new THREE.Vector3(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z)
+      .sub(host.origin).applyQuaternion(invQ);
+    const yawQ  = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    const rel   = invQ.clone().multiply(yawQ);
+    desc.setTranslation(local.x, local.y, local.z)
+      .setRotation({ x: rel.x, y: rel.y, z: rel.z, w: rel.w });
+    return physicsWorld.createSensorColliderOn(desc, host.body);
   }
 
   /**

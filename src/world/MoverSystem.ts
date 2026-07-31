@@ -101,6 +101,35 @@ export class MoverSystem {
 
   has(entityId: string): boolean { return this._entries.has(entityId); }
 
+  /** The entry's kinematic body + rest pose — for parenting attached trigger-volume
+   *  sensors (Phase 53). Null when the entity has no mover entry. */
+  hostFor(entityId: string): { body: RAPIER.RigidBody | null; origin: THREE.Vector3; originQuat: THREE.Quaternion } | null {
+    const e = this._entries.get(entityId);
+    return e ? { body: e.body, origin: e.origin, originQuat: e.originQuat } : null;
+  }
+
+  /** Append extra meshes to an entry so they ride the mover (attached volume
+   *  wireframe/fill). Current transforms are captured as their rest pose —
+   *  _applyPose re-poses them about the entity origin and _resetAll restores
+   *  them, both unchanged. NOTE: register() overwrites the mesh list, so
+   *  attachments must be re-added after every host rebuild. */
+  attachMeshes(entityId: string, objs: THREE.Object3D[]): void {
+    const e = this._entries.get(entityId);
+    if (!e) return;
+    for (const obj of objs) e.meshes.push({ obj, pos: obj.position.clone(), quat: obj.quaternion.clone() });
+  }
+
+  /** Remove previously attached meshes (volume deleted/edited while its host
+   *  lives on). entityId null = scan every entry (the volume def may already be
+   *  gone from WorldState when its meshes are torn down). */
+  detachMeshes(entityId: string | null, objs: THREE.Object3D[]): void {
+    const set = new Set(objs);
+    const entries = entityId ? [this._entries.get(entityId)] : [...this._entries.values()];
+    for (const e of entries) {
+      if (e) e.meshes = e.meshes.filter(m => !set.has(m.obj));
+    }
+  }
+
   /**
    * World translation the mover under `bodyHandle` moves by this frame — what a
    * grounded character must add to ride it. Null when the handle isn't a mover.

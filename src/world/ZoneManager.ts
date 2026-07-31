@@ -332,6 +332,7 @@ export class ZoneManager {
       }),
       this._bus.on("platform:removed", ({ zoneId, id }) => {
         this._removePlatform(zoneId, id);
+        this._reattachVolumes(id);   // attached volumes fall back to static sensors
       }),
       this._bus.on("shape:added", ({ zoneId, shape }) => {
         void this._addShape(zoneId, shape);
@@ -341,6 +342,7 @@ export class ZoneManager {
       }),
       this._bus.on("shape:removed", ({ zoneId, id }) => {
         this._removeShape(zoneId, id);
+        this._reattachVolumes(id);   // attached volumes fall back to static sensors
       }),
       this._bus.on("ladder:added", ({ zoneId, ladder }) => {
         void this._addLadder(zoneId, ladder);
@@ -368,6 +370,7 @@ export class ZoneManager {
       }),
       this._bus.on("object:removed", ({ zoneId, id }) => {
         this._removeObject(zoneId, id);
+        this._reattachVolumes(id);   // attached volumes fall back to static sensors
         this._refreshStaticShadows(zoneId);
       }),
       // Re-origin: the model file changed under an unchanged assetId, so rebuild
@@ -1031,6 +1034,7 @@ export class ZoneManager {
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platform.id, { meshes, collider });
     this._syncPlatformMover(platform, meshes, moverBody);
+    this._reattachVolumes(platform.id);
     this._applyDimming();
     this._bus.emit("platform:rebuilt", { zoneId, platformId: platform.id });
   }
@@ -1074,6 +1078,7 @@ export class ZoneManager {
     for (const m of meshes) entry.platformsGroup.add(m);
     entry.platformEntries.set(platformId, { meshes, collider });
     this._syncPlatformMover(resolved, meshes, moverBody);
+    this._reattachVolumes(platformId);
     this._applyDimming();
     this._bus.emit("platform:rebuilt", { zoneId, platformId });
   }
@@ -1114,6 +1119,7 @@ export class ZoneManager {
     for (const m of meshes) entry.shapesGroup.add(m);
     entry.shapeEntries.set(shape.id, { meshes, collider });
     this._syncShapeMover(shape, meshes, moverBody);
+    this._reattachVolumes(shape.id);
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId: shape.id });
   }
@@ -1149,6 +1155,7 @@ export class ZoneManager {
     for (const m of meshes) entry.shapesGroup.add(m);
     entry.shapeEntries.set(shapeId, { meshes, collider });
     this._syncShapeMover(shape, meshes, moverBody);
+    this._reattachVolumes(shapeId);
     this._applyDimming();
     this._bus.emit("shape:rebuilt", { zoneId, shapeId });
   }
@@ -1302,12 +1309,13 @@ export class ZoneManager {
       }
       this._movers.register(obj.id, obj.mover, [mesh], moverBody ?? null, obj.position);
     }
-    if (!effective.length) return;
+    if (!effective.length) { this._reattachVolumes(obj.id); return; }
     const colliders = ColliderBuilder.registerAttachedColliders(obj, effective, moverBody);
     colliders.forEach((c, i) => {
       if (effective![i]!.isSensor) this._volumeSensors.set(c.handle, obj.id);
     });
     entry.objectColliders.set(obj.id, colliders);
+    this._reattachVolumes(obj.id);
   }
 
   private _removeObjectColliders(entry: ZoneEntry, objectId: string): void {
@@ -2134,6 +2142,9 @@ export class ZoneManager {
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false, hideInGame: true };
     group.add(wire);
+    // Attached volume (Phase 53): the wireframe rides the host's mover entry.
+    // It stays a child of the zone group, so selection/dispose are untouched.
+    if (vol.attachTo && this._movers.has(vol.attachTo)) this._movers.attachMeshes(vol.attachTo, [wire]);
     const arr = this._volumeMeshes.get(zoneId) ?? [];
     arr.push(wire);
     this._volumeMeshes.set(zoneId, arr);
@@ -2149,6 +2160,8 @@ export class ZoneManager {
     fill.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     fill.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false };
     group.add(fill);
+    // The gradient fill is a runtime-visible hazard glow — it rides too (Phase 53).
+    if (vol.attachTo && this._movers.has(vol.attachTo)) this._movers.attachMeshes(vol.attachTo, [fill]);
     const arr = this._volumeFills.get(zoneId) ?? [];
     arr.push(fill);
     this._volumeFills.set(zoneId, arr);
@@ -2170,11 +2183,38 @@ export class ZoneManager {
   }
 
   private _buildVolumeCollider(zoneId: string, vol: TriggerVolume): void {
-    const collider = ColliderBuilder.registerVolumeSensor(vol);
+    // Attached volume (Phase 53): parent the sensor to the host's kinematic body
+    // so it rides the mover. Fallback to the classic static world-space sensor
+    // whenever the host is missing, mover-disabled, or body-less (CSG/polygon
+    // platforms, degenerate hulls, sensor-only objects).
+    const host = vol.attachTo ? this._movers.hostFor(vol.attachTo) : null;
+    const collider = ColliderBuilder.registerVolumeSensor(
+      vol,
+      host?.body ? { body: host.body, origin: host.origin, originQuat: host.originQuat } : undefined,
+    );
     this._volumeSensors.set(collider.handle, vol.id);
     const arr = this._volumeColliders.get(zoneId) ?? [];
     arr.push(collider);
     this._volumeColliders.set(zoneId, arr);
+  }
+
+  /**
+   * Phase 53: rebuild every trigger volume attached to `hostId` after the host's
+   * kinematic body / mover entry changed (rebuild frees the body; register()
+   * wipes attached meshes) or the host was removed (volumes fall back to static
+   * sensors at their authored world pose). Volumes not yet built are skipped —
+   * initial loadZone builds hosts before volumes, so this can't double-build.
+   */
+  private _reattachVolumes(hostId: string): void {
+    for (const zoneId of this._loadedZones.keys()) {
+      const vols = this._worldState.zones.get(zoneId)?.triggerVolumes?.filter(v => v.attachTo === hostId) ?? [];
+      for (const vol of vols) {
+        const built = (this._volumeMeshes.get(zoneId) ?? []).some(m => m.userData["editorId"] === vol.id);
+        if (!built) continue;
+        this._removeSingleVolume(zoneId, vol.id);
+        this._addTriggerVolume(zoneId, vol);
+      }
+    }
   }
 
   private _removeTriggerVolumes(zoneId: string): void {
@@ -2182,7 +2222,7 @@ export class ZoneManager {
     if (colliders) {
       for (const c of colliders) {
         this._volumeSensors.delete(c.handle);
-        physicsWorld.removeCollider(c);
+        if (c.isValid()) physicsWorld.removeCollider(c);   // attached sensors die with their host body
       }
       this._volumeColliders.delete(zoneId);
     }
@@ -2205,11 +2245,16 @@ export class ZoneManager {
   }
 
   private _removeSingleVolume(zoneId: string, volumeId: string): void {
+    // Attached volume (Phase 53): pull the visuals out of the host's mover entry
+    // first. The def may already be gone from WorldState (delete path), so
+    // detach by identity across all entries when the host id is unknown.
+    const vol = this._worldState.zones.get(zoneId)?.triggerVolumes?.find(v => v.id === volumeId);
     // Remove wireframe
     const meshArr = this._volumeMeshes.get(zoneId) ?? [];
     const idx = meshArr.findIndex(m => m.userData["editorId"] === volumeId);
     if (idx !== -1) {
       const m = meshArr[idx]!;
+      this._movers.detachMeshes(vol?.attachTo ?? null, [m]);
       m.parent?.remove(m);
       m.geometry.dispose();
       (m.material as THREE.Material).dispose();
@@ -2219,16 +2264,19 @@ export class ZoneManager {
     const fillArr = this._volumeFills.get(zoneId) ?? [];
     const fIdx = fillArr.findIndex(f => f.userData["editorId"] === volumeId);
     if (fIdx !== -1) {
+      this._movers.detachMeshes(vol?.attachTo ?? null, [fillArr[fIdx]!]);
       this._disposeFill(fillArr[fIdx]!);
       fillArr.splice(fIdx, 1);
     }
-    // Remove collider
+    // Remove collider. isValid guard: an attached sensor's collider dies WITH the
+    // host's freed body (host rebuild/delete) — removing it again would touch
+    // freed memory. The handle map entry is dropped either way.
     const colArr = this._volumeColliders.get(zoneId) ?? [];
     const cIdx = colArr.findIndex(c => this._volumeSensors.get(c.handle) === volumeId);
     if (cIdx !== -1) {
       const c = colArr[cIdx]!;
       this._volumeSensors.delete(c.handle);
-      physicsWorld.removeCollider(c);
+      if (c.isValid()) physicsWorld.removeCollider(c);
       colArr.splice(cIdx, 1);
     }
   }

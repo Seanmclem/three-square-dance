@@ -139,9 +139,17 @@ export function pasteClipboard(
     }
     const mapNode = (old: string): string => nodeMap.get(old) ?? old;
 
+    // Entity-id pre-pass (Phase 53): a trigger volume's attachTo must follow its
+    // host when both are pasted together, so every new id is decided up front.
+    const entIdMap = new Map<string, string>();
+    for (const ent of clip.entities) {
+      const oldId = (ent.def as { id?: string }).id;
+      if (oldId) entIdMap.set(oldId, newId(ent.type));
+    }
+
     // 2) Clone each entity with a new id + remapped/offset geometry.
     for (const ent of clip.entities) {
-      const id = newId(ent.type);
+      const id = entIdMap.get((ent.def as { id?: string }).id ?? "") ?? newId(ent.type);
       pasted.push({ type: ent.type, id });
       // A pasted copy of a prefab-instance member is UNLINKED — a duplicate
       // stamp would collide with the original in re-expansion diffing.
@@ -198,7 +206,13 @@ export function pasteClipboard(
         }
         case "trigger-volume": {
           const v = ent.def as TriggerVolume;
-          world.addTriggerVolume(zoneId, { ...v, id, position: off3(v.position, dx, dz) });
+          world.addTriggerVolume(zoneId, {
+            ...v, id,
+            position: off3(v.position, dx, dz),
+            // Host copied alongside → follow its clone; copied alone → stay
+            // attached to the original host.
+            attachTo: v.attachTo ? (entIdMap.get(v.attachTo) ?? v.attachTo) : undefined,
+          });
           break;
         }
         case "shape": {

@@ -626,6 +626,7 @@ export function PropertiesPanel({
             onToggleGroups={() => setGroupsOpen(v => !v)}
             onObjectUpdate={onObjectUpdate}
             bus={bus}
+            zone={zones?.find(z => z.id === selected.zoneId)}
             prefabSection={prefabInfo ? (
               <PrefabSection
                 info={prefabInfo}
@@ -5398,7 +5399,7 @@ function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus, prefabSection }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus, prefabSection, zone }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
@@ -5408,6 +5409,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
   onObjectUpdate:   (changes: Partial<WorldObject>) => void;
   bus?:             EventBus;
   prefabSection?:   React.ReactNode;   // PrefabSection when this volume is an instance member (Phase 46)
+  zone?:            ZoneDef;           // the volume's zone — sources the "Attached to" host list (Phase 53)
 }) {
   const vol = selected.data as TriggerVolume | null;
   const [editMode, setEditModeState] = useState<"move" | "resize">(TRIGGER_EDIT_MODE);
@@ -5529,6 +5531,49 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
           onBlur={e => onObjectUpdate({ rotation: { x: 0, y: parseFloat(e.target.value) || 0, z: 0 } } as Partial<WorldObject>)}
           onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         />
+      </div>
+
+      {/* Attached to (Phase 53): the volume rides a mover-enabled entity — its
+          sensor + visuals follow in preview/game. Position stays the rest pose. */}
+      <div>
+        <div style={LABEL}>ATTACHED TO</div>
+        <select
+          value={vol.attachTo ?? ""}
+          onChange={e => onObjectUpdate({ attachTo: e.target.value || undefined } as Partial<WorldObject>)}
+          style={{
+            width: "100%", padding: "4px 6px", borderRadius: 4, cursor: "pointer",
+            fontFamily: "monospace", fontSize: 10,
+            border: "1px solid rgba(255,255,255,0.1)", background: "rgba(46,46,46,0.9)", color: "#c2cadb",
+          }}
+        >
+          <option value="">— not attached (static) —</option>
+          {(["platforms", "shapes", "objects"] as const).map(kind => {
+            const hosts = ((zone?.[kind] ?? []) as Array<{ id: string; label?: string; assetId?: string; mover?: { enabled?: boolean } }>)
+              .filter(h => h.mover?.enabled);
+            if (!hosts.length) return null;
+            return (
+              <optgroup key={kind} label={kind[0]!.toUpperCase() + kind.slice(1)}>
+                {hosts.map(h => (
+                  <option key={h.id} value={h.id}>
+                    {h.label || h.assetId || h.id} ({h.id.slice(0, 8)})
+                  </option>
+                ))}
+              </optgroup>
+            );
+          })}
+          {/* Dangling host (deleted / mover removed): keep it visible instead of silently clearing. */}
+          {vol.attachTo &&
+            !(["platforms", "shapes", "objects"] as const).some(kind =>
+              ((zone?.[kind] ?? []) as Array<{ id: string; mover?: { enabled?: boolean } }>)
+                .some(h => h.id === vol.attachTo && h.mover?.enabled)) && (
+            <option value={vol.attachTo}>{vol.attachTo} (missing/no mover — static)</option>
+          )}
+        </select>
+        {vol.attachTo && (
+          <div style={{ color: "#9aa3b5", fontSize: 9, marginTop: 3, lineHeight: 1.5 }}>
+            Rides this entity's mover in preview/game. Position above is the rest pose.
+          </div>
+        )}
       </div>
 
       {/* Visual section — optional decorative fill (shows in preview + game) */}

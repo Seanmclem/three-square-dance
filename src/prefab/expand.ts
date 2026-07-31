@@ -146,6 +146,9 @@ function materializeMembers(
         if (record.origin.rotationY !== 0 || v.rotation) {
           v.rotation = { x: v.rotation?.x ?? 0, y: (v.rotation?.y ?? 0) + record.origin.rotationY, z: v.rotation?.z ?? 0 };
         }
+        // Intra-prefab host follows its expanded id; external hosts pass through
+        // (remapScripts semantics).
+        if (v.attachTo) v.attachTo = idMap.get(v.attachTo) ?? v.attachTo;
         v.scripts = remapScripts(v.scripts, idMap, zoneId);
         break;
       }
