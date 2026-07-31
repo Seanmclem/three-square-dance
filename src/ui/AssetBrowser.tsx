@@ -75,12 +75,17 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
       .sort(),
   ];
   const popoutRef  = useRef<HTMLDivElement>(null);
+  const moreBtnRef = useRef<HTMLButtonElement>(null);
 
   // Close popout on outside click
   useEffect(() => {
     if (!popoutOpen) return;
     const handler = (e: MouseEvent) => {
-      if (popoutRef.current && !popoutRef.current.contains(e.target as Node))
+      // The More button is excluded: this mousedown-close would otherwise fire
+      // before the button's own click-toggle, which then REOPENS the popout —
+      // making "click More to close" impossible.
+      if (popoutRef.current && !popoutRef.current.contains(e.target as Node)
+          && !moreBtnRef.current?.contains(e.target as Node))
         setPopoutOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -256,6 +261,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 width: "100%", marginTop: 4, textAlign: "center",
                 justifyContent: "center",
               }}
+              ref={moreBtnRef}
               onClick={() => setPopoutOpen(v => !v)}
               onMouseEnter={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
               onMouseLeave={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
