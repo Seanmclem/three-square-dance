@@ -349,9 +349,10 @@ export class ColliderBuilder {
     const prim = (c.shape === "hull" || c.shape === "trimesh") ? { ...c, shape: "box" as const } : c;
     const { pos, quat, halfExtents } = colliderWorldTransform(obj, prim);
     const desc =
-      prim.shape === "sphere"  ? RAPIER.ColliderDesc.ball(halfExtents.x) :
-      prim.shape === "capsule" ? RAPIER.ColliderDesc.capsule(halfExtents.y, halfExtents.x) :
-                                 RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z);
+      prim.shape === "sphere"   ? RAPIER.ColliderDesc.ball(halfExtents.x) :
+      prim.shape === "capsule"  ? RAPIER.ColliderDesc.capsule(halfExtents.y, halfExtents.x) :
+      prim.shape === "cylinder" ? RAPIER.ColliderDesc.cylinder(halfExtents.y, halfExtents.x) :
+                                  RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z);
     return desc.setTranslation(pos.x, pos.y, pos.z).setRotation(quat);
   }
 

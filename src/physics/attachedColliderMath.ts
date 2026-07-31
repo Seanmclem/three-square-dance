@@ -7,7 +7,7 @@ export interface Quat { x: number; y: number; z: number; w: number }
 export interface ColliderWorldTransform {
   pos:  Vec3;   // world-space center of the collider shape
   quat: Quat;   // world-space orientation
-  /** box: half extents; sphere: x = radius; capsule: x = radius, y = half height (cylindrical part). */
+  /** box: half extents; sphere: x = radius; capsule: x = radius, y = half height (cylindrical part); cylinder: x = radius, y = half height. */
   halfExtents: Vec3;
 }
 
@@ -77,8 +77,11 @@ export function colliderWorldTransform(obj: WorldObject, c: AttachedCollider): C
     halfExtents = { x: r, y: r, z: r };
   } else {
     const r = c.size.x * Math.max(Math.abs(s.x), Math.abs(s.z));
-    // Rapier capsules are half-height of the cylindrical section; keep total height = size.y.
-    const halfH = Math.max(0.01, (c.size.y * Math.abs(s.y)) / 2 - r);
+    // Rapier capsules are half-height of the cylindrical section (caps add to it);
+    // cylinders are simply half the full height. Both keep total height = size.y.
+    const halfH = c.shape === "capsule"
+      ? Math.max(0.01, (c.size.y * Math.abs(s.y)) / 2 - r)
+      : Math.max(0.01, (c.size.y * Math.abs(s.y)) / 2);
     halfExtents = { x: r, y: halfH, z: r };
   }
 

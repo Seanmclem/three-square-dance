@@ -3187,7 +3187,7 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
 
 // ── CollidersScreen ───────────────────────────────────────────────────────────
 
-const COLLIDER_SHAPES: AttachedColliderShape[] = ["box", "sphere", "capsule", "hull"];
+const COLLIDER_SHAPES: AttachedColliderShape[] = ["box", "sphere", "capsule", "cylinder", "hull"];
 
 const COLLIDER_BTN = (active = false): React.CSSProperties => ({
   flex: 1, padding: "5px 0", borderRadius: 4, cursor: active ? "default" : "pointer",
@@ -3207,15 +3207,18 @@ function reshapeCollider(c: AttachedCollider, shape: AttachedColliderShape): Att
   if (shape === "box") {
     size = from === "sphere"
       ? { x: s.x * 2, y: s.x * 2, z: s.x * 2 }        // sphere r → cube 2r
-      : from === "capsule"
-        ? { x: s.x * 2, y: s.y, z: s.x * 2 }           // capsule r,h → box 2r × h × 2r
+      : from === "capsule" || from === "cylinder"
+        ? { x: s.x * 2, y: s.y, z: s.x * 2 }           // capsule/cylinder r,h → box 2r × h × 2r
         : { ...s };                                     // hull AABB → box verbatim
   } else if (shape === "sphere") {
     size = { x: from === "box" ? Math.max(s.x, s.y, s.z) / 2 : s.x, y: 0, z: 0 };
   } else {
+    // capsule / cylinder — both are radius + full height
     size = from === "box"
-      ? { x: Math.max(s.x, s.z) / 2, y: s.y, z: 0 }    // box → capsule r = max(w,d)/2, h = height
-      : { x: s.x, y: s.x * 2, z: 0 };                  // sphere → capsule r, h = 2r
+      ? { x: Math.max(s.x, s.z) / 2, y: s.y, z: 0 }    // box → r = max(w,d)/2, h = height
+      : from === "sphere"
+        ? { x: s.x, y: s.x * 2, z: 0 }                 // sphere → r, h = 2r
+        : { x: s.x, y: s.y, z: 0 };                    // capsule ↔ cylinder: same params
   }
   return { ...c, shape, size, points: undefined, indices: undefined };
 }
@@ -3331,7 +3334,8 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
     const { offset, size } = defCol;
     const base = { ...c, offset: { ...offset }, rotation: undefined, rotationY: undefined };
     if (c.shape === "sphere")  return { ...base, size: { x: Math.max(size.x, size.y, size.z) / 2, y: 0, z: 0 } };
-    if (c.shape === "capsule") return { ...base, size: { x: Math.max(size.x, size.z) / 2, y: size.y, z: 0 } };
+    if (c.shape === "capsule" || c.shape === "cylinder")
+      return { ...base, size: { x: Math.max(size.x, size.z) / 2, y: size.y, z: 0 } };
     return { ...base, size: { ...size } };
   };
 
@@ -3348,8 +3352,8 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
         updateCollider(c.id, {
           offset: { x: g("ox", c.offset.x), y: g("oy", c.offset.y), z: g("oz", c.offset.z) },
           size:   { x: g("sx", c.size.x),   y: g("sy", c.size.y),   z: g("sz", c.size.z) },
-          // Rotation only means anything on box/capsule — don't grow other shapes' data.
-          ...(c.shape === "box" || c.shape === "capsule"
+          // Rotation only means anything on box/capsule/cylinder — don't grow other shapes' data.
+          ...(c.shape === "box" || c.shape === "capsule" || c.shape === "cylinder"
             ? { rotation: { x: g("rx", rot.x), y: g("ry", rot.y), z: g("rz", rot.z) }, rotationY: undefined }
             : {}),
         });
@@ -3440,7 +3444,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
                   color: moveId === c.id && moveMode === "translate" ? "#80aaff" : "#808080",
                 }}
               >Move</button>
-              {(c.shape === "box" || c.shape === "capsule") && (
+              {(c.shape === "box" || c.shape === "capsule" || c.shape === "cylinder") && (
                 <button
                   title="Toggle a rotate gizmo on this collider (1° steps, hold Alt for free)"
                   onClick={() => toggleMove(c.id, "rotate")}
@@ -3474,26 +3478,36 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
               >✕</button>
             </span>
           </div>
-          <div style={{ display: "flex", gap: 4 }}>
-            {COLLIDER_SHAPES.map(s => {
-              // Hull needs the model's geometry (built mesh) to auto-fit from.
-              const hullUnavailable = s === "hull" && !hullPointsFor;
-              return (
-                <button key={s} style={COLLIDER_BTN(c.shape === s)} disabled={c.shape === s || hullUnavailable}
-                  title={s === "hull" ? "Auto-fit a convex hull from the model's geometry" : undefined}
-                  onClick={() => {
-                    if (s === "hull") {
-                      const pts = hullPointsFor?.(selected.id);
-                      if (!pts) { console.warn("hull auto-fit unavailable (mesh not built or degenerate)"); return; }
-                      write(colliders.map(x => x.id === c.id ? hullFromPoints(x, pts) : x));
-                    } else {
-                      write(colliders.map(x => x.id === c.id ? reshapeCollider(x, s) : x));
-                    }
-                  }}>
-                  {s}
-                </button>
-              );
-            })}
+          {/* Dropdown, not a button row — 5 shapes ("cylinder"!) don't fit the panel's min width. */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ ...LABEL, marginBottom: 0 }}>SHAPE</span>
+            <select
+              value={c.shape}
+              onChange={e => {
+                const s = e.target.value as AttachedColliderShape;
+                if (s === c.shape) return;
+                if (s === "hull") {
+                  const pts = hullPointsFor?.(selected.id);
+                  if (!pts) { console.warn("hull auto-fit unavailable (mesh not built or degenerate)"); return; }
+                  write(colliders.map(x => x.id === c.id ? hullFromPoints(x, pts) : x));
+                } else {
+                  write(colliders.map(x => x.id === c.id ? reshapeCollider(x, s) : x));
+                }
+              }}
+              style={{
+                flex: 1, padding: "4px 6px", borderRadius: 4, cursor: "pointer",
+                fontFamily: "monospace", fontSize: 10, textTransform: "capitalize",
+                border: "1px solid rgba(255,255,255,0.1)", background: "rgba(46,46,46,0.9)", color: "#c2cadb",
+              }}
+            >
+              {COLLIDER_SHAPES.map(s => (
+                <option key={s} value={s} disabled={s === "hull" && !hullPointsFor}>
+                  {s}{s === "hull" ? " (auto-fit from model)" : ""}
+                </option>
+              ))}
+              {/* Trimesh comes only from bakes — shown when current, never offered. */}
+              {c.shape === "trimesh" && <option value="trimesh">trimesh</option>}
+            </select>
           </div>
           <div>
             <div style={LABEL}>OFFSET</div>
@@ -3536,7 +3550,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
                 </>
               )}
               {c.shape === "sphere" && numField(c, "sx", "R")}
-              {c.shape === "capsule" && (
+              {(c.shape === "capsule" || c.shape === "cylinder") && (
                 <>
                   {numField(c, "sx", "R")}
                   {numField(c, "sy", "H")}
@@ -3552,7 +3566,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
             </div>
           </div>
           )}
-          {(c.shape === "box" || c.shape === "capsule") && (
+          {(c.shape === "box" || c.shape === "capsule" || c.shape === "cylinder") && (
             <div>
               <div style={LABEL}>ROTATION (°)</div>
               <div style={{ display: "flex", gap: 4 }}>

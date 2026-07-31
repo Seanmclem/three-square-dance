@@ -230,11 +230,11 @@ export class ColliderEditor implements IEditorModule {
       return;
     }
     // "resize" mode renders face handles instead of a TransformControls.
-    // Rotation only applies to box/capsule (sphere is symmetric; hull/trimesh
-    // orientation lives in their points) — the panel only offers Rotate there,
-    // but guard against stale mode after a shape switch.
+    // Rotation only applies to box/capsule/cylinder (sphere is symmetric; hull/
+    // trimesh orientation lives in their points) — the panel only offers Rotate
+    // there, but guard against stale mode after a shape switch.
     if (this._moveMode === "resize" ||
-        (this._moveMode === "rotate" && c.shape !== "box" && c.shape !== "capsule")) {
+        (this._moveMode === "rotate" && c.shape !== "box" && c.shape !== "capsule" && c.shape !== "cylinder")) {
       mc.detach();
       mc.visible = false;
       return;
@@ -353,7 +353,9 @@ export class ColliderEditor implements IEditorModule {
     } else {
       const geo = c.shape === "sphere"
         ? new THREE.SphereGeometry(1, 12, 8)
-        : new THREE.CapsuleGeometry(1, 1, 3, 8);   // scaled per-frame in _positionAll
+        : c.shape === "cylinder"
+          ? new THREE.CylinderGeometry(1, 1, 1, 12, 1)
+          : new THREE.CapsuleGeometry(1, 1, 3, 8);   // capsule scaled per-frame in _positionAll
       const mat = new THREE.MeshBasicMaterial({ color, wireframe: true, transparent: true, opacity: 0.4, depthTest: false });
       wire = new THREE.Mesh(geo, mat);
     }
@@ -422,6 +424,8 @@ export class ColliderEditor implements IEditorModule {
       w.quaternion.set(t.quat.x, t.quat.y, t.quat.z, t.quat.w);
       if (c.shape === "box")         w.scale.set(t.halfExtents.x * 2, t.halfExtents.y * 2, t.halfExtents.z * 2);
       else if (c.shape === "sphere") w.scale.setScalar(t.halfExtents.x);
+      // CylinderGeometry(1,1,1) scales cleanly: radius on XZ, full height on Y.
+      else if (c.shape === "cylinder") w.scale.set(t.halfExtents.x, t.halfExtents.y * 2, t.halfExtents.x);
       else {
         // CapsuleGeometry(1, 1): radius 1, cylinder length 1 → scale radius on XZ; the
         // Y cylinder length scales with the same factor, so bake length via geometry Y.
@@ -545,14 +549,15 @@ export class ColliderEditor implements IEditorModule {
 
     const axisKey: "x" | "y" | "z" = Math.abs(FACE_AXIS[d.face].x) ? "x" : Math.abs(FACE_AXIS[d.face].y) ? "y" : "z";
     const shape = d.orig.shape;
-    // Radius drags (sphere any axis, capsule sides) keep the CENTER pinned —
-    // these shapes are center-symmetric, so face-pinning would just wander the
-    // center. Box faces and capsule ends pin the opposite face/cap end.
-    const radiusDrag = shape === "sphere" || (shape === "capsule" && axisKey !== "y");
+    // Radius drags (sphere any axis, capsule/cylinder sides) keep the CENTER
+    // pinned — these shapes are center-symmetric, so face-pinning would just
+    // wander the center. Box faces and capsule/cylinder ends pin the opposite end.
+    const round = shape === "capsule" || shape === "cylinder";
+    const radiusDrag = shape === "sphere" || (round && axisKey !== "y");
     // Scale components mirror colliderWorldTransform's per-shape rules.
     const scaleComp =
-      shape === "sphere"                     ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.y), Math.abs(obj.scale.z)) || 1 :
-      shape === "capsule" && axisKey !== "y" ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.z)) || 1 :
+      shape === "sphere"        ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.y), Math.abs(obj.scale.z)) || 1 :
+      round && axisKey !== "y"  ? Math.max(Math.abs(obj.scale.x), Math.abs(obj.scale.z)) || 1 :
       Math.abs(axisKey === "x" ? obj.scale.x : axisKey === "y" ? obj.scale.y : obj.scale.z) || 1;
 
     // Pinned point in world space (opposite face/cap end, or the center).
@@ -583,10 +588,10 @@ export class ColliderEditor implements IEditorModule {
     let offset: Vec3 = o.offset;
     let size:   Vec3;
     if (radiusDrag) {
-      size = { ...o.size, x: newSizeLocal };            // sphere/capsule radius lives in size.x
-    } else if (shape === "capsule") {
-      // Capsule height drag: size.y is the FULL height incl. caps; pin the far cap
-      // end by shifting the center half the delta (box idiom).
+      size = { ...o.size, x: newSizeLocal };            // sphere/capsule/cylinder radius lives in size.x
+    } else if (shape === "capsule" || shape === "cylinder") {
+      // Capsule/cylinder height drag: size.y is the FULL height (incl. caps for
+      // capsule); pin the far end by shifting the center half the delta (box idiom).
       const shift = axisLocal.clone().multiplyScalar((newSizeLocal - o.size.y) / 2)
         .applyQuaternion(colliderLocalQuat(o));
       offset = { x: o.offset.x + shift.x, y: o.offset.y + shift.y, z: o.offset.z + shift.z };
