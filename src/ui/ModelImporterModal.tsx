@@ -261,7 +261,9 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
           ...(destThumb ? { thumbnail: `/assets/models/${destThumb}` } : {}),
           collidable,
           colliderType: "box",
-          tags:         [...tags],
+          // "animated" auto-seeds per entry (only models with discovered clips get
+          // it, even in a mixed batch). Seed, not invariant — removable later.
+          tags:         animations.length ? [...new Set([...tags, "animated"])] : [...tags],
           dateAdded:    new Date().toISOString().slice(0, 10),
           ...(animations.length ? { animations } : {}),
           ...(Object.keys(attribution).length ? { attribution } : {}),

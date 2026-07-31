@@ -3289,7 +3289,8 @@
       "colliderType": "box",
       "tags": [
         "platformer-game-kit",
-        "platformer"
+        "platformer",
+        "animated"
       ],
       "dateAdded": "2026-07-30",
       "animations": [
@@ -3331,7 +3332,8 @@
       "tags": [
         "enemies",
         "platformer-game-kit",
-        "platformer"
+        "platformer",
+        "animated"
       ],
       "dateAdded": "2026-07-30",
       "animations": [
@@ -3365,7 +3367,8 @@
       "tags": [
         "enemies",
         "platformer-game-kit",
-        "platformer"
+        "platformer",
+        "animated"
       ],
       "dateAdded": "2026-07-30",
       "animations": [
@@ -3399,7 +3402,8 @@
       "tags": [
         "enemies",
         "platformer-game-kit",
-        "platformer"
+        "platformer",
+        "animated"
       ],
       "dateAdded": "2026-07-30",
       "animations": [
@@ -3427,7 +3431,8 @@
       "tags": [
         "enemies",
         "platformer-game-kit",
-        "platformer"
+        "platformer",
+        "animated"
       ],
       "dateAdded": "2026-07-30",
       "animations": [
