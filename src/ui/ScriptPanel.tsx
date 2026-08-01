@@ -1500,8 +1500,11 @@ function PositionSourcePicker({
   triggerVolumes: TriggerVolume[];
   onChange: (id: string) => void;
 }) {
+  // Prefab members (e.g. every tile of a tiled platform) are generated internals —
+  // dozens per instance, and rebuilds churn their ids — so they're not offered.
+  const objects = zoneObjects.filter((o) => !o.prefab);
   const known =
-    zoneObjects.some((o) => o.id === targetId) ||
+    objects.some((o) => o.id === targetId) ||
     zonePlatforms.some((p) => p.id === targetId) ||
     zoneCheckpoints.some((c) => c.id === targetId) ||
     triggerVolumes.some((v) => v.id === targetId);
@@ -1512,9 +1515,18 @@ function PositionSourcePicker({
       onChange={(e) => onChange(e.target.value)}
     >
       <option value="">— pick entity —</option>
-      {zoneObjects.length > 0 && (
+      {zoneCheckpoints.length > 0 && (
+        <optgroup label="Checkpoints">
+          {zoneCheckpoints.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label || "Checkpoint"} ({c.id.slice(0, 8)})
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {objects.length > 0 && (
         <optgroup label="Objects">
-          {zoneObjects.map((o) => (
+          {objects.map((o) => (
             <option key={o.id} value={o.id}>
               {o.label || o.assetId} ({o.id.slice(0, 8)})
             </option>
@@ -1526,15 +1538,6 @@ function PositionSourcePicker({
           {zonePlatforms.map((p) => (
             <option key={p.id} value={p.id}>
               {p.label || "Platform"} ({p.id.slice(0, 8)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneCheckpoints.length > 0 && (
-        <optgroup label="Checkpoints">
-          {zoneCheckpoints.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label || "Checkpoint"} ({c.id.slice(0, 8)})
             </option>
           ))}
         </optgroup>
@@ -2465,7 +2468,9 @@ function ActionFields({
 
     case "respawn_player": {
       // Destination priority at runtime: stored key → checkpoint → default spawn.
-      const dest = action.positionKey != null ? "key" : action.targetId ? "checkpoint" : "spawn";
+      // targetId "" = checkpoint mode with no pick yet — must be != null, not truthy,
+      // or selecting "a checkpoint" snaps straight back to "spawn".
+      const dest = action.positionKey != null ? "key" : action.targetId != null ? "checkpoint" : "spawn";
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <select
@@ -2494,7 +2499,7 @@ function ActionFields({
             <select
               style={S.select}
               value={action.targetId ?? ""}
-              onChange={(e) => set({ targetId: e.target.value || undefined })}
+              onChange={(e) => set({ targetId: e.target.value })}
             >
               <option value="">— pick a checkpoint —</option>
               {zoneCheckpoints.map((cp) => (

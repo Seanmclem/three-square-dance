@@ -1,8 +1,8 @@
 # Hazards, Death & Respawn — a builder's guide
 
 How to hurt the player, and what happens when you succeed. Everything here
-ships as of Phase 53 (v4.56.0): the `on_state_equals` trigger, the
-`respawn_player` action, and trigger volumes that can **attach to moving
+ships as of Phase 53+: the `on_state_equals` trigger, the `respawn_player`
+action, checkpoint markers, and trigger volumes that can **attach to moving
 things**. If you already built kill floors by hand out of `store_position` +
 `teleport_player`, they still work — this guide shows the shorter road.
 
@@ -11,16 +11,125 @@ things**. If you already built kill floors by hand out of `store_position` +
 
 ---
 
+## The pieces, at a glance
+
+| Piece | Where it lives | What it does |
+|---|---|---|
+| **Health** | built-in state key (SCRIPTS → STATE tab) | starts at 100, clamped 0–100 unless you change its schema |
+| **Checkpoint marker** | Spawn tool → **+ Checkpoint** mode | an inert, named position+facing flag — does nothing until a script references it |
+| **Trigger volume** | Trigger tool | invisible box; fires `on_player_enter` / `on_player_exit` scripts |
+| **`respawn_player`** | script action | the whole death sequence: fade out → teleport → optional health refill → fade in |
+| **`store_position`** | script action | saves a pose (position + facing) into a state key |
+
+Every recipe below is some arrangement of these five.
+
+---
+
+## Checkpoints and respawn — the full wiring
+
+This is the part most games want first, so here it is end to end. There are
+two working patterns; pick by how many checkpoints you have.
+
+### Step 1 — place a checkpoint marker
+
+Open the **Spawn** tool in the left toolbar. It has two modes at the top of
+its panel: **◉ Initial Spawn** (the world's default spawn — every world has
+exactly one) and **+ Checkpoint** (drop as many markers as you like). Switch
+to Checkpoint mode and click where respawns should land. Select a marker to
+give it a **label** ("Checkpoint 1") — labels are what you'll see in every
+dropdown later, so name them.
+
+A marker by itself does *nothing*. It's a bookmark, not a sensor: nothing
+happens when the player walks past one. Making it "count" is Step 2.
+
+### Step 2 — activate it with a trigger volume
+
+Drag a trigger volume across the doorway/ledge the player crosses at that
+point in the level, and give the volume this script:
+
+- **Trigger:** `on_player_enter`
+- **Action:** `store_position` — source **object position**, pick your
+  checkpoint marker, state key `checkpoint`
+
+The entity dropdown groups **Checkpoints first** (platform-kit tiles and
+other prefab internals are filtered out entirely), so your marker is at the
+top. When the player crosses the volume, the marker's position *and facing*
+are saved into the `checkpoint` state key. A later volume doing the same
+overwrites it — **most-recent checkpoint wins automatically.**
+
+> **The state key must match — exactly.** `store_position` writes to whatever
+> key you type, and `respawn_player` reads from whatever key *it* has typed.
+> `checkpoint` vs `Checkpoint` vs a stray-keystroke `checkpointdsa` are three
+> different keys, and a respawn reading an unset key doesn't error — it
+> **silently falls through to the default spawn** (see the destination order
+> below). If deaths keep sending you to the level start, check spelling on
+> both ends first. The key inputs autocomplete known state keys — picking
+> from the suggestion list beats retyping.
+
+You can also skip the marker and store the **player's own position**
+(`store_position` → source: player position). That respawns the player at
+the exact spot they touched the volume — fine for wide-open areas, riskier
+near ledges (they might have clipped the volume mid-jump). Markers give you
+a curated, safe landing spot; that's why they exist.
+
+### Step 3 — respawn there on death
+
+Wherever death is handled (kill floor script or central death handler — next
+section), use **`respawn_player`**. Its destination dropdown has three modes:
+
+- **Stored position key** — reads a pose from a state key (your `checkpoint`
+  key from Step 2). Use this whenever you have **more than one** checkpoint:
+  the key always holds the latest one.
+- **A checkpoint** — pick one specific marker from a dropdown. Simplest
+  possible wiring for a **single**-checkpoint level; no state key involved.
+  (If this dropdown ever did nothing for you: that was a real bug, fixed —
+  selecting the mode used to instantly snap back to "world default spawn".)
+- **World default spawn** — the fallback that always exists.
+
+At runtime the action tries them in order — **stored key → picked checkpoint
+→ default spawn** — using each only if the previous one came up empty. That
+fall-through is deliberate and is why dying *before* the first checkpoint
+doesn't strand you: an empty `checkpoint` key just drops to the default
+spawn. It also means you don't need an `on_game_start` seeding script,
+though storing the player's spawn pose there is harmless if you want one.
+
+The full sequence when the action runs: fade to a color (default black,
+0.4s) → **while the screen is covered** teleport the player (facing
+included, fall speed zeroed) → optionally restore health → fade back in.
+
+> Check **Restore health to its default** on the action — otherwise the
+> player respawns at 0 health and instantly dies again.
+
+### Testing the loop
+
+Enter preview, open SCRIPTS → **STATE** — it shows live key values while
+playing. Cross your checkpoint volume and watch the `checkpoint` key appear
+with an `{x, y, z, facing}` pose. Then jump in the pit: you should fade out,
+land at the marker, and see `health` back at its default. If you land at the
+level start instead, the respawn read an empty destination — key typo'd on
+one end, or the checkpoint volume never fired (is the volume tall enough to
+catch a jumping player?).
+
+---
+
 ## The one script every game wants: a central death handler
 
-Health is a built-in state key (starts at 100, clamped 0–100 unless you
-change it in the STATE tab). Give every hazard one job — *subtract health* —
-and put death itself in a single script:
+Hazards multiply — floors, crushers, enemies, poison. Give every hazard one
+job — *subtract health* — and put death itself in a single level script
+(SCRIPTS panel → LEVEL tab), so there's exactly one place that decides what
+dying means:
 
 - **Trigger:** `on_state_equals`, state key `health`, equals value `0`
-- **Action:** `respawn_player`
+- **Action:** `respawn_player` (destination per the section above, and
+  **Restore health** checked)
+
+The trigger editor for it looks like this — the key and the value to match
+are its only two fields:
 
 ![on_state_equals — state key "health", equals value 0](docs/images/on-state-equals-trigger.png)
+
+And the action, with destination, fade, and the health-restore checkbox in
+one place:
 
 ![respawn_player — destination, fade, and health restore in one action](docs/images/respawn-player-action.png)
 
@@ -31,26 +140,11 @@ health, reaching 0 again fires it again. Exactly the rhythm a death handler
 wants. (`on_health_zero` in the trigger list is shorthand for this exact
 health case — same behavior, no fields to fill.)
 
-`respawn_player` runs the whole death sequence in order: fade to a color
-(default black, 0.4s), then **while the screen is covered** teleport the
-player, optionally restore health to its default, and fade back in. Its
-destination tries three things in order:
-
-1. **Stored position key** — your classic checkpoint convention: checkpoint
-   volumes run `store_position` (player) into a key like `checkpoint`, and
-   respawn reads it. Most-recent checkpoint wins automatically.
-2. **A specific checkpoint** — pick one from the dropdown; uses its position
-   and facing.
-3. **World default spawn** — the fallback that always exists. This is also
-   why dying *before* the first checkpoint no longer strands you: pick
-   "stored position key" and the empty key just falls through to spawn.
-
-> Check **Restore health to its default** on the action — otherwise the player
-> respawns at 0 health and instantly dies again.
-
 ## Recipe: the kill floor
 
-1. Trigger tool → drag a volume across the pit, tall enough to catch a fall.
+1. Trigger tool → drag a volume across the pit, tall enough to catch a fall
+   (a fast-falling player can tunnel past a thin one between frames — a few
+   meters tall is cheap insurance).
 2. On the volume, add an `on_player_enter` script with one action:
    `set_state health = 0` (or `adjust_number health -100`).
 3. The central death handler does the rest.
@@ -58,7 +152,16 @@ destination tries three things in order:
 That's the whole thing. The volume never teleports anyone itself — it just
 kills, and death is handled in one place no matter what caused it.
 
+**The direct variant:** if your game has no health mechanic at all (classic
+obby rules — touch the bad thing, restart), skip the death handler and put
+`respawn_player` straight on the volume's enter script. Same destination
+rules apply. The health route earns its extra script the moment *anything*
+does partial damage, because every hazard then funnels into one death.
+
 ## Recipe: the crusher (a trigger that RIDES a moving platform)
+
+The finished build — a mover platform with a red kill-glow volume attached
+under it, descending onto the walkway:
 
 ![A crusher: mover platform with a red kill-glow volume attached beneath it](docs/images/crusher-attached-volume.png)
 
@@ -66,7 +169,8 @@ kills, and death is handled in one place no matter what caused it.
    distance 4, loop).
 2. Trigger tool → drag a volume covering the space *under* the block's rest
    position.
-3. Select the volume → **ATTACHED TO** → pick the platform.
+3. Select the volume → **ATTACHED TO** (in the volume's properties panel,
+   below ROTATION) → pick the platform:
 
 ![The ATTACHED TO dropdown on a trigger volume](docs/images/attached-to-dropdown.png)
 
@@ -117,10 +221,13 @@ you stand in it, escape if you're quick, die if you're not. Three small
 scripts make that, and the pattern generalizes to poison gas, freezing water,
 or any "hurts while you're inside" zone.
 
+The finished pool — a shallow volume with the orange gradient fill so it
+reads as lava in-game:
+
 ![A lava pool — trigger volume with an orange gradient fill](docs/images/lava-pool.png)
 
 1. Trigger tool → drag a shallow volume over the lava area. Turn on the
-   **Visual** gradient (orange, fade down) so it reads as lava in-game.
+   **Visual** gradient (orange, fade down).
 2. **Two flag scripts on the volume** (its ENTRY/EXIT SCRIPTS list):
    - `on_player_enter` → `set_state in_lava = true`
    - `on_player_exit` → `set_state in_lava = false`
@@ -128,6 +235,9 @@ or any "hurts while you're inside" zone.
    - Trigger `on_timer`, interval `1`, **Repeat every interval** checked
    - Condition `has_state in_lava`
    - Action `adjust_number health -5`
+
+The ticking script, assembled — repeat-timer trigger, the `in_lava` gate,
+and the drain:
 
 ![The ticking script: on_timer + Repeat, gated on in_lava, draining health](docs/images/lava-tick-script.png)
 
@@ -157,12 +267,26 @@ back). **Slow-kill crusher** — put the enter/exit flag scripts on an
 
 ## The fine print
 
+- **Stored poses are foot-level.** `store_position` saves where the feet are
+  (markers sit at floor level too), and teleports land the feet on that
+  point — so a pose stored on a platform respawns *standing on* it, not
+  clipped into it.
+- **A respawn destination that comes up empty falls through silently** —
+  stored key unset (or typo'd) → picked checkpoint → default spawn. No
+  error, no console spam. Great for "death before the first checkpoint",
+  sneaky when the real cause is a misspelled key.
 - `on_state_equals` works for any key, not just health — `coins == 10` →
   open the door, `boss_phase == 2` → change the music.
 - It fires on the **transition** to the value. A key *starting* at the value
   (seeded by a STATE-tab default) doesn't fire it on load.
-- `fade_screen` (the standalone action) now releases the player when the fade
+- `fade_screen` (the standalone action) releases the player when the fade
   ends — before Phase 53 it left input frozen forever. Scene transitions in
   published games also fade back in properly now.
 - Exiting preview mid-death-sequence cancels the pending teleport and clears
   the overlay — nothing leaks into the editor.
+- **Multi-scene games: clear the checkpoint key on arrival.** Game state
+  deliberately survives scene transitions, but a stored pose is just raw
+  coordinates — carried into the next scene, a respawn would land at those
+  same numbers in the *new* scene. Add `delete_state checkpoint` to each
+  scene's `on_level_load` script (checkpoint markers themselves are
+  per-scene, so the picked-checkpoint and default-spawn modes are immune).
