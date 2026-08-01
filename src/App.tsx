@@ -133,6 +133,9 @@ export default function App() {
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
   const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
   const [selected,         setSelected]         = useState<SelectedObjectPayload | null>(null);
+  // Mirror for bus handlers registered once (their `selected` closure is stale).
+  const selectedRef = useRef<SelectedObjectPayload | null>(null);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
   const [multiSelected,    setMultiSelected]    = useState<SelectedRef[]>([]);
   const [materialList,     setMaterialList]     = useState<MaterialDef[]>([]);
   const [quality,          setQuality]          = useState<QualityScale>(
@@ -816,9 +819,14 @@ export default function App() {
           return prev;
         });
       }),
-      bus.on("triggervolume:removed", () => {
+      bus.on("triggervolume:removed", ({ id }) => {
         const z = world.zones.get(world.activeZoneId ?? "");
         setTriggerVolumes(z?.triggerVolumes ?? []);
+        // Undo/redo can delete the volume out from under the selection — without
+        // this the removed volume ghosts in PROPERTIES (stale panel + gizmo).
+        if (selectedRef.current?.type === "trigger-volume" && selectedRef.current.id === id) {
+          bus.emit("object:deselected", {});
+        }
       }),
       bus.on("decal:updated", ({ id }) => {
         // Refresh selected.data (gizmo moves emit decal:updated, panel fields resync from data).

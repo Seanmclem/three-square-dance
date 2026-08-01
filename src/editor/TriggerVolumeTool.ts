@@ -4,7 +4,7 @@ import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
-import type { TriggerVolume, Vec3, Euler3, Scale3, ToolId } from "@/types";
+import type { TriggerVolume, Euler3, Scale3, ToolId } from "@/types";
 
 type State = "IDLE" | "PLACING";
 
@@ -18,7 +18,7 @@ function snap(v: number): number { return Math.round(v / GRID) * GRID; }
 
 function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
-  const mat = new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 0.75 });
+  const mat = new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 1 });
   return new THREE.LineSegments(geo, mat);
 }
 
@@ -27,10 +27,10 @@ export class TriggerVolumeTool {
   private _active       = false;
   private _toolId:      ToolId = "select";
   private _height       = DEFAULT_HEIGHT;
+  private _baseY        = 0;
   private _start:       THREE.Vector3 | null = null;
   private _preview:     THREE.LineSegments | null = null;
   private _activeZoneId = "demo";
-  private _lastWorldPos: Vec3 = { x: 0, y: 0, z: 0 };
   private _lastScreenPos: { x: number; y: number } = { x: 0, y: 0 };
   private _hoveredId:   string | null = null;
   private _selectedId:  string | null = null;
@@ -62,11 +62,10 @@ export class TriggerVolumeTool {
 
       // Hover detection is always on (not gated by _active) so volumes are
       // visually responsive regardless of which tool is active.
-      this._bus.on("input:mousemove", ({ worldPos, screenPos }) => {
-        this._lastWorldPos  = worldPos;
+      this._bus.on("input:mousemove", ({ screenPos }) => {
         this._lastScreenPos = screenPos;
         if (this._state === "PLACING") {
-          this._updatePreview(worldPos);
+          this._updatePreview();
           return;
         }
         const vol = this._findVolumeAt(screenPos);
@@ -78,16 +77,19 @@ export class TriggerVolumeTool {
       }),
 
       // Placement uses mousedown+mouseup (drag gesture), only when tool is active.
+      // Hovering an existing volume does NOT block the gesture (a map-wide kill
+      // floor would make the whole level unplaceable) — a plain click commits
+      // nothing (min-drag check in _finishPlace), so click-to-select still works.
       this._bus.on("input:mousedown", ({ button }) => {
         if (!this._active || button !== 0) return;
-        if (this._state === "IDLE" && !this._hoveredId) {
+        if (this._state === "IDLE") {
           this._clearSelect();
-          this._beginPlace(this._lastWorldPos);
+          this._beginPlace();
         }
       }),
       this._bus.on("input:mouseup", ({ button }) => {
         if (button !== 0) return;
-        if (this._state === "PLACING") this._finishPlace(this._lastWorldPos);
+        if (this._state === "PLACING") this._finishPlace();
       }),
 
       // Volume selection uses input:click. SelectionManager runs first (registered earlier)
@@ -135,7 +137,7 @@ export class TriggerVolumeTool {
       this._bus.on("input:wheel", ({ delta }) => {
         if (!this._active || this._state !== "PLACING") return;
         this._height = Math.max(0.5, this._height - delta * 0.005);
-        if (this._preview) this._refreshPreviewGeometry(this._preview, 0.1, this._height, 0.1);
+        this._updatePreview();
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._active) return;
@@ -230,26 +232,64 @@ export class TriggerVolumeTool {
     }
   }
 
-  private _beginPlace(worldPos: Vec3): void {
-    this._start  = new THREE.Vector3(snap(worldPos.x), 0, snap(worldPos.z));
+  private _setRayFrom(screen: { x: number; y: number }): void {
+    const rect = this._canvas.getBoundingClientRect();
+    const ndcX =  ((screen.x - rect.left) / rect.width)  * 2 - 1;
+    const ndcY = -((screen.y - rect.top)  / rect.height) * 2 + 1;
+    this._raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this._camera);
+  }
+
+  /** Where the cursor lands on real geometry (platform top, terrain, floor…) —
+   *  so a volume drawn on raised land starts THERE, not at y=0. Falls back to
+   *  the y=0 ground plane over empty space. */
+  private _surfacePointAt(screen: { x: number; y: number }): THREE.Vector3 {
+    this._setRayFrom(screen);
+    const hit = this._raycaster
+      .intersectObjects(this._scene.children, true)
+      .find(h => {
+        if (!h.object.visible) return false;
+        const et = h.object.userData["editorType"] as string | undefined;
+        return !!et && et !== "trigger-volume";
+      });
+    if (hit) return hit.point.clone();
+    const { origin, direction } = this._raycaster.ray;
+    const t = -origin.y / direction.y;
+    return t > 0 ? this._raycaster.ray.at(t, new THREE.Vector3()) : new THREE.Vector3();
+  }
+
+  /** The cursor projected onto the placement's base plane — keeps the drag's
+   *  far corner level with the start corner instead of skewing to y=0. */
+  private _pointAtBaseY(screen: { x: number; y: number }): THREE.Vector3 | null {
+    this._setRayFrom(screen);
+    const { origin, direction } = this._raycaster.ray;
+    const t = (this._baseY - origin.y) / direction.y;
+    return t > 0 ? this._raycaster.ray.at(t, new THREE.Vector3()) : null;
+  }
+
+  private _beginPlace(): void {
+    const p      = this._surfacePointAt(this._lastScreenPos);
+    this._baseY  = p.y;
+    this._start  = new THREE.Vector3(snap(p.x), 0, snap(p.z));
     this._height = DEFAULT_HEIGHT;
     this._state  = "PLACING";
     const wire   = makeWireframe(0.1, this._height, 0.1);
-    wire.position.set(this._start.x, this._height / 2, this._start.z);
+    wire.position.set(this._start.x, this._baseY + this._height / 2, this._start.z);
     wire.userData = { editorOnly: false, selectable: false };
     this._scene.add(wire);
     this._preview = wire;
   }
 
-  private _updatePreview(worldPos: Vec3): void {
+  private _updatePreview(): void {
     if (!this._start || !this._preview) return;
-    const ex = snap(worldPos.x);
-    const ez = snap(worldPos.z);
+    const p  = this._pointAtBaseY(this._lastScreenPos);
+    if (!p) return;
+    const ex = snap(p.x);
+    const ez = snap(p.z);
     const w  = Math.max(GRID, Math.abs(ex - this._start.x));
     const d  = Math.max(GRID, Math.abs(ez - this._start.z));
     const cx = (this._start.x + ex) / 2;
     const cz = (this._start.z + ez) / 2;
-    this._preview.position.set(cx, this._height / 2, cz);
+    this._preview.position.set(cx, this._baseY + this._height / 2, cz);
     this._refreshPreviewGeometry(this._preview, w, this._height, d);
   }
 
@@ -258,21 +298,25 @@ export class TriggerVolumeTool {
     wire.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
   }
 
-  private _finishPlace(worldPos: Vec3): void {
+  private _finishPlace(): void {
     if (!this._start || !this._preview) { this._reset(); return; }
-    const ex = snap(worldPos.x);
-    const ez = snap(worldPos.z);
-    const w  = Math.max(GRID, Math.abs(ex - this._start.x));
-    const d  = Math.max(GRID, Math.abs(ez - this._start.z));
+    const p = this._pointAtBaseY(this._lastScreenPos);
+    if (!p) { this._reset(); return; }
+    const ex = snap(p.x);
+    const ez = snap(p.z);
+    const rawW = Math.abs(ex - this._start.x);
+    const rawD = Math.abs(ez - this._start.z);
+    // A plain click (no real drag) places nothing — that gesture is selection.
+    if (rawW < GRID && rawD < GRID) { this._reset(); return; }
+    const w  = Math.max(GRID, rawW);
+    const d  = Math.max(GRID, rawD);
     const cx = (this._start.x + ex) / 2;
     const cz = (this._start.z + ez) / 2;
-
-    if (w < GRID && d < GRID) { this._reset(); return; }
 
     const vol: TriggerVolume = {
       id:       `vol_${crypto.randomUUID().slice(0, 8)}`,
       label:    "Trigger Volume",
-      position: { x: cx, y: 0, z: cz },
+      position: { x: cx, y: this._baseY, z: cz },
       size:     { x: w, y: this._height, z: d },
       zoneId:   this._activeZoneId,
     };

@@ -2136,7 +2136,7 @@ export class ZoneManager {
 
   private _buildVolumeMesh(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
     const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z));
-    const mat = new THREE.LineBasicMaterial({ color: 0xffbb33, transparent: true, opacity: 0.8 });
+    const mat = new THREE.LineBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.9 });
     const wire = new THREE.LineSegments(geo, mat);
     wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
@@ -2312,8 +2312,8 @@ export class ZoneManager {
         mat.color.setHex(0xffdd44); // light yellow — hover
         mat.opacity = 1.0;
       } else {
-        mat.color.setHex(0xffbb33); // amber — idle
-        mat.opacity = 0.45;
+        mat.color.setHex(0xffcc00); // amber — idle (bright: a dim 0.45 wireframe was near-invisible)
+        mat.opacity = 0.9;
       }
     }
   }
