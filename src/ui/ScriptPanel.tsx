@@ -118,6 +118,12 @@ const S = {
     padding: "8px 12px 4px",
     textTransform: "uppercase",
   } as const,
+  fieldLabel: {
+    color: "#8b94a8",
+    fontSize: 9,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  } as const,
   divider: {
     borderTop: "1px solid rgba(255,255,255,0.05)",
     margin: "8px 0",
@@ -1038,14 +1044,23 @@ function ScriptEditor({
             || script.trigger.type === "on_dialogue_end"
             || script.trigger.type === "on_state_changed"
             || script.trigger.type === "on_state_equals") && (
-            <TargetPicker
-              triggerType={script.trigger.type}
-              targetId={script.trigger.targetId ?? ""}
-              triggerVolumes={triggerVolumes}
-              zoneObjects={zoneObjects}
-              zoneDialogues={zoneDialogues}
-              onChange={(id) => setTrigger({ targetId: id })}
-            />
+            <F
+              style={{ marginTop: 4 }}
+              label={
+                script.trigger.type === "on_state_changed" || script.trigger.type === "on_state_equals"
+                  ? "State key to watch"
+                  : "Target"
+              }
+            >
+              <TargetPicker
+                triggerType={script.trigger.type}
+                targetId={script.trigger.targetId ?? ""}
+                triggerVolumes={triggerVolumes}
+                zoneObjects={zoneObjects}
+                zoneDialogues={zoneDialogues}
+                onChange={(id) => setTrigger({ targetId: id })}
+              />
+            </F>
           )}
           {needsTarget && ownerIsEntity
             && script.trigger.type !== "on_dialogue_end"
@@ -1067,15 +1082,17 @@ function ScriptEditor({
 
           {script.trigger.type === "on_timer" && (
             <>
-              <input
-                type="number"
-                style={{ ...S.field, marginTop: 4 }}
-                placeholder="Interval (seconds)"
-                value={script.trigger.interval ?? ""}
-                onChange={(e) =>
-                  setTrigger({ interval: parseFloat(e.target.value) || 1 })
-                }
-              />
+              <F label="Interval (seconds)" style={{ marginTop: 4 }}>
+                <input
+                  type="number"
+                  style={S.field}
+                  placeholder="Interval (seconds)"
+                  value={script.trigger.interval ?? ""}
+                  onChange={(e) =>
+                    setTrigger({ interval: parseFloat(e.target.value) || 1 })
+                  }
+                />
+              </F>
               {/* The engine always supported repeat (setInterval vs setTimeout) —
                   this checkbox was just never authorable. Damage-over-time
                   (HAZARDS_GUIDE lava recipe) depends on it. */}
@@ -1091,12 +1108,14 @@ function ScriptEditor({
           )}
 
           {script.trigger.type === "on_state_equals" && (
-            <input
-              style={{ ...S.field, marginTop: 4 }}
-              placeholder="Equals value (number / true / false / text)"
-              value={script.trigger.stateValue == null ? "" : String(script.trigger.stateValue)}
-              onChange={(e) => setTrigger({ stateValue: coerceStateValue(e.target.value) })}
-            />
+            <F label="Fires when value equals" style={{ marginTop: 4 }}>
+              <input
+                style={S.field}
+                placeholder="number / true / false / text"
+                value={script.trigger.stateValue == null ? "" : String(script.trigger.stateValue)}
+                onChange={(e) => setTrigger({ stateValue: coerceStateValue(e.target.value) })}
+              />
+            </F>
           )}
 
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
@@ -1276,6 +1295,36 @@ function ScriptEditor({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Labeled field wrapper ─────────────────────────────────────────────────────
+// A tiny caption above a field so its meaning survives once a value replaces
+// the placeholder (a filled "checkpoint" input says nothing on its own).
+function F({
+  label,
+  flex,
+  style,
+  children,
+}: {
+  label: string;
+  flex?: React.CSSProperties["flex"];
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        ...(flex !== undefined ? { flex, minWidth: 0 } : {}),
+        ...style,
+      }}
+    >
+      <span style={S.fieldLabel}>{label}</span>
+      {children}
     </div>
   );
 }
@@ -1597,7 +1646,7 @@ function ConditionRow({
 }) {
   return (
     <div
-      style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "center" }}
+      style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "flex-end" }}
     >
       <select
         style={{ ...S.select, flex: "0 0 120px" }}
@@ -1613,23 +1662,27 @@ function ConditionRow({
         ))}
       </select>
       {condition.type === "has_state" && (
-        <input
-          style={{ ...S.field, flex: 1 }}
-          list="wb-state-keys" placeholder="state key"
-          value={condition.stateKey ?? ""}
-          onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
-        />
+        <F label="State key" flex={1}>
+          <input
+            style={S.field}
+            list="wb-state-keys" placeholder="state key"
+            value={condition.stateKey ?? ""}
+            onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
+          />
+        </F>
       )}
       {condition.type === "compare_number" && (
         <>
-          <input
-            style={{ ...S.field, flex: 1 }}
-            list="wb-state-keys" placeholder="state key"
-            value={condition.stateKey ?? ""}
-            onChange={(e) =>
-              onChange({ ...condition, stateKey: e.target.value })
-            }
-          />
+          <F label="State key" flex={1}>
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="state key"
+              value={condition.stateKey ?? ""}
+              onChange={(e) =>
+                onChange({ ...condition, stateKey: e.target.value })
+              }
+            />
+          </F>
           <select
             style={{ ...S.select, flex: "0 0 56px" }}
             value={condition.compareOp ?? ">="}
@@ -1643,34 +1696,38 @@ function ConditionRow({
               </option>
             ))}
           </select>
-          <input
-            type="number"
-            style={{ ...S.field, flex: "0 0 64px" }}
-            placeholder="value"
-            value={
-              typeof condition.stateValue === "number"
-                ? condition.stateValue
-                : ""
-            }
-            onChange={(e) =>
-              onChange({
-                ...condition,
-                stateValue: parseFloat(e.target.value) || 0,
-              })
-            }
-          />
+          <F label="Value" flex="0 0 64px">
+            <input
+              type="number"
+              style={S.field}
+              placeholder="value"
+              value={
+                typeof condition.stateValue === "number"
+                  ? condition.stateValue
+                  : ""
+              }
+              onChange={(e) =>
+                onChange({
+                  ...condition,
+                  stateValue: parseFloat(e.target.value) || 0,
+                })
+              }
+            />
+          </F>
         </>
       )}
       {condition.type === "has_item" && (
         <>
           {/* four controls don't fit one 280px row — item picker gets line 2 */}
           <div style={{ flexBasis: "100%", height: 0 }} />
-          <ItemPicker
-            style={{ ...S.select, flex: 1 }}
-            itemId={condition.itemId ?? ""}
-            worldItems={worldItems}
-            onChange={(id) => onChange({ ...condition, itemId: id || undefined })}
-          />
+          <F label="Item" flex={1}>
+            <ItemPicker
+              style={S.select}
+              itemId={condition.itemId ?? ""}
+              worldItems={worldItems}
+              onChange={(id) => onChange({ ...condition, itemId: id || undefined })}
+            />
+          </F>
           <select
             style={{ ...S.select, flex: "0 0 56px" }}
             title="owned count comparison (default: at least)"
@@ -1685,17 +1742,19 @@ function ConditionRow({
               </option>
             ))}
           </select>
-          <input
-            type="number"
-            min={0}
-            style={{ ...S.field, flex: "0 0 52px" }}
-            placeholder="1"
-            title="count to compare the owned amount against"
-            value={condition.count ?? ""}
-            onChange={(e) =>
-              onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })
-            }
-          />
+          <F label="Count" flex="0 0 52px">
+            <input
+              type="number"
+              min={0}
+              style={S.field}
+              placeholder="1"
+              title="count to compare the owned amount against"
+              value={condition.count ?? ""}
+              onChange={(e) =>
+                onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })
+              }
+            />
+          </F>
         </>
       )}
       <button
@@ -1950,6 +2009,7 @@ function ActionFields({
     case "show_dialogue":
       return (
         <>
+          <F label="Dialogue">
           <select
             style={S.select}
             value={action.dialogueId ?? ""}
@@ -1966,6 +2026,7 @@ function ActionFields({
               <option value={action.dialogueId}>{action.dialogueId} (custom)</option>
             )}
           </select>
+          </F>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Manage dialogues in the DIALOGUE tab.
           </div>
@@ -1976,22 +2037,26 @@ function ActionFields({
     case "take_item":
       return (
         <>
-          <div style={{ display: "flex", gap: 4 }}>
-            <ItemPicker
-              style={{ ...S.select, flex: 1 }}
-              itemId={action.itemId ?? ""}
-              worldItems={worldItems}
-              onChange={(id) => set({ itemId: id || undefined })}
-            />
-            <input
-              type="number"
-              min={1}
-              style={{ ...S.field, flex: "0 0 52px" }}
-              placeholder="1"
-              title="count"
-              value={action.count ?? ""}
-              onChange={(e) => set({ count: parseInt(e.target.value, 10) || undefined })}
-            />
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+            <F label="Item" flex={1}>
+              <ItemPicker
+                style={S.select}
+                itemId={action.itemId ?? ""}
+                worldItems={worldItems}
+                onChange={(id) => set({ itemId: id || undefined })}
+              />
+            </F>
+            <F label="Count" flex="0 0 52px">
+              <input
+                type="number"
+                min={1}
+                style={S.field}
+                placeholder="1"
+                title="count"
+                value={action.count ?? ""}
+                onChange={(e) => set({ count: parseInt(e.target.value, 10) || undefined })}
+              />
+            </F>
           </div>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Manage items in the ITEMS tab.
@@ -2002,15 +2067,19 @@ function ActionFields({
     case "play_sound":
       return (
         <>
-          <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} />
-          <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
-            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3 }}>
+          <F label="Sound">
+            <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} />
+          </F>
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
+            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
               <input type="checkbox" checked={action.loop ?? false} onChange={(e) => set({ loop: e.target.checked || undefined })} />
               loop
             </label>
-            <input type="number" min={0} max={1} step={0.1} style={{ ...S.field, flex: "0 0 64px" }}
-              placeholder="vol" title="volume 0..1"
-              value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            <F label="Volume 0–1" flex="0 0 64px">
+              <input type="number" min={0} max={1} step={0.1} style={S.field}
+                placeholder="vol" title="volume 0..1"
+                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            </F>
           </div>
           <div style={{ color: "#8b94a8", fontSize: 11, padding: "6px 0 2px" }}>Play at (optional — spatial):</div>
           {targetPicker}
@@ -2019,39 +2088,51 @@ function ActionFields({
 
     case "stop_sound":
       return (
-        <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+        <F label="Sound">
+          <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+        </F>
       );
 
     case "play_music":
       return (
         <>
-          <SoundPicker value={action.music} onChange={(id) => set({ music: id })} />
-          <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
-            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3 }}>
+          <F label="Music">
+            <SoundPicker value={action.music} onChange={(id) => set({ music: id })} />
+          </F>
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
+            <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
               <input type="checkbox" checked={action.loop ?? true} onChange={(e) => set({ loop: e.target.checked })} />
               loop
             </label>
-            <input type="number" min={0} max={1} step={0.1} style={{ ...S.field, flex: "0 0 64px" }}
-              placeholder="vol" title="volume 0..1"
-              value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
-            <input type="number" min={0} step={0.5} style={{ ...S.field, flex: "0 0 64px" }}
-              placeholder="fade s" title="crossfade seconds"
-              value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            <F label="Volume 0–1" flex="0 0 64px">
+              <input type="number" min={0} max={1} step={0.1} style={S.field}
+                placeholder="vol" title="volume 0..1"
+                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            </F>
+            <F label="Fade (s)" flex="0 0 64px">
+              <input type="number" min={0} step={0.5} style={S.field}
+                placeholder="fade s" title="crossfade seconds"
+                value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            </F>
           </div>
         </>
       );
 
     case "stop_music":
       return (
-        <input type="number" min={0} step={0.5} style={S.field}
-          placeholder="fade-out seconds (0 = instant)"
-          value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+        <F label="Fade-out seconds (0 = instant)">
+          <input type="number" min={0} step={0.5} style={S.field}
+            placeholder="0"
+            value={action.fadeSeconds ?? ""} onChange={(e) => set({ fadeSeconds: e.target.value === "" ? undefined : Number(e.target.value) })} />
+        </F>
       );
 
     case "set_footstep":
       return (
         <>
-          <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+          <F label="Footstep sound">
+            <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+          </F>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Overrides the player's walking sound (e.g. wood → gravel). Leave empty to revert
             to the default. Pair on_player_enter / on_player_exit on a trigger volume.
@@ -2062,64 +2143,76 @@ function ActionFields({
     case "set_state":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input
-            style={{ ...S.field, flex: 1 }}
-            list="wb-state-keys" placeholder="State key"
-            value={action.stateKey ?? ""}
-            onChange={(e) => set({ stateKey: e.target.value })}
-          />
-          <input
-            style={{ ...S.field, flex: 1 }}
-            placeholder="value (true / 100 / text)"
-            value={action.stateValue == null ? "" : String(action.stateValue)}
-            onChange={(e) =>
-              set({ stateValue: coerceStateValue(e.target.value) })
-            }
-          />
+          <F label="State key" flex={1}>
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="State key"
+              value={action.stateKey ?? ""}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+          </F>
+          <F label="Value" flex={1}>
+            <input
+              style={S.field}
+              placeholder="true / 100 / text"
+              value={action.stateValue == null ? "" : String(action.stateValue)}
+              onChange={(e) =>
+                set({ stateValue: coerceStateValue(e.target.value) })
+              }
+            />
+          </F>
         </div>
       );
 
     case "adjust_number":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input
-            style={{ ...S.field, flex: 1 }}
-            list="wb-state-keys" placeholder="State key (e.g. health)"
-            value={action.stateKey ?? ""}
-            onChange={(e) => set({ stateKey: e.target.value })}
-          />
-          <input
-            type="number"
-            style={{ ...S.field, flex: "0 0 72px" }}
-            placeholder="±delta"
-            value={action.numberDelta ?? ""}
-            onChange={(e) =>
-              set({ numberDelta: parseFloat(e.target.value) || 0 })
-            }
-          />
+          <F label="State key" flex={1}>
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="State key (e.g. health)"
+              value={action.stateKey ?? ""}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+          </F>
+          <F label="± Change" flex="0 0 72px">
+            <input
+              type="number"
+              style={S.field}
+              placeholder="±delta"
+              value={action.numberDelta ?? ""}
+              onChange={(e) =>
+                set({ numberDelta: parseFloat(e.target.value) || 0 })
+              }
+            />
+          </F>
         </div>
       );
 
     case "delete_state":
       return (
-        <input
-          style={S.field}
-          list="wb-state-keys" placeholder="State key"
-          value={action.stateKey ?? ""}
-          onChange={(e) => set({ stateKey: e.target.value })}
-        />
+        <F label="State key">
+          <input
+            style={S.field}
+            list="wb-state-keys" placeholder="State key"
+            value={action.stateKey ?? ""}
+            onChange={(e) => set({ stateKey: e.target.value })}
+          />
+        </F>
       );
 
     case "store_position": {
       const src = action.posSource ?? "player";
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <input
-            style={S.field}
-            list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
-            value={action.stateKey ?? ""}
-            onChange={(e) => set({ stateKey: e.target.value })}
-          />
+          <F label="Save to state key">
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+              value={action.stateKey ?? ""}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+          </F>
           <select
             style={S.select}
             value={src}
@@ -2133,45 +2226,49 @@ function ActionFields({
             <option value="object">Source: object position</option>
             <option value="coords">Source: specific coordinates</option>
           </select>
-          {src === "object" && positionSourcePicker}
+          {src === "object" && <F label="Read position of">{positionSourcePicker}</F>}
           {src === "coords" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ display: "flex", gap: 4 }}>
-                {(["x", "y", "z"] as const).map((ax) => (
-                  <input
-                    key={ax}
-                    type="number"
-                    style={{ ...S.field, flex: 1, minWidth: 0 }}
-                    placeholder={ax}
-                    value={action.position?.[ax] ?? ""}
-                    onChange={(e) =>
-                      set({
-                        position: {
-                          x: 0,
-                          y: 0,
-                          z: 0,
-                          ...action.position,
-                          [ax]: parseFloat(e.target.value) || 0,
-                        },
-                      })
-                    }
-                  />
-                ))}
-              </div>
-              <input
-                type="number"
-                style={{ ...S.field }}
-                placeholder="facing° (optional)"
-                value={action.facing ?? ""}
-                onChange={(e) =>
-                  set({
-                    facing:
-                      e.target.value === ""
-                        ? undefined
-                        : parseFloat(e.target.value) || 0,
-                  })
-                }
-              />
+              <F label="Position (x · y · z)">
+                <div style={{ display: "flex", gap: 4 }}>
+                  {(["x", "y", "z"] as const).map((ax) => (
+                    <input
+                      key={ax}
+                      type="number"
+                      style={{ ...S.field, flex: 1, minWidth: 0 }}
+                      placeholder={ax}
+                      value={action.position?.[ax] ?? ""}
+                      onChange={(e) =>
+                        set({
+                          position: {
+                            x: 0,
+                            y: 0,
+                            z: 0,
+                            ...action.position,
+                            [ax]: parseFloat(e.target.value) || 0,
+                          },
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </F>
+              <F label="Facing ° (optional)">
+                <input
+                  type="number"
+                  style={{ ...S.field }}
+                  placeholder="degrees"
+                  value={action.facing ?? ""}
+                  onChange={(e) =>
+                    set({
+                      facing:
+                        e.target.value === ""
+                          ? undefined
+                          : parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </F>
             </div>
           )}
         </div>
@@ -2180,12 +2277,14 @@ function ActionFields({
 
     case "fire_event":
       return (
-        <input
-          style={S.field}
-          placeholder="Event ID"
-          value={action.eventId ?? ""}
-          onChange={(e) => set({ eventId: e.target.value })}
-        />
+        <F label="Event id">
+          <input
+            style={S.field}
+            placeholder="Event ID"
+            value={action.eventId ?? ""}
+            onChange={(e) => set({ eventId: e.target.value })}
+          />
+        </F>
       );
 
     case "load_scene":
@@ -2196,19 +2295,21 @@ function ActionFields({
         const known = projectSceneIds.includes(cur);
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <select
-              style={S.select}
-              value={cur}
-              onChange={(e) => set({ sceneId: e.target.value || undefined })}
-            >
-              <option value="">— pick scene —</option>
-              {projectSceneIds.map((id) => (
-                <option key={id} value={id}>{id}</option>
-              ))}
-              {cur && !known && (
-                <option value={cur}>{cur} (not in project)</option>
-              )}
-            </select>
+            <F label="Scene">
+              <select
+                style={S.select}
+                value={cur}
+                onChange={(e) => set({ sceneId: e.target.value || undefined })}
+              >
+                <option value="">— pick scene —</option>
+                {projectSceneIds.map((id) => (
+                  <option key={id} value={id}>{id}</option>
+                ))}
+                {cur && !known && (
+                  <option value={cur}>{cur} (not in project)</option>
+                )}
+              </select>
+            </F>
             <div style={{ fontSize: 10, color: "#5f7090" }}>
               Runtime only — routes between this project&apos;s scenes. No-op in editor preview.
             </div>
@@ -2217,12 +2318,14 @@ function ActionFields({
       }
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <input
-            style={S.field}
-            placeholder="Scene id (runtime manifest key)"
-            value={action.sceneId ?? ""}
-            onChange={(e) => set({ sceneId: e.target.value })}
-          />
+          <F label="Scene id">
+            <input
+              style={S.field}
+              placeholder="Scene id (runtime manifest key)"
+              value={action.sceneId ?? ""}
+              onChange={(e) => set({ sceneId: e.target.value })}
+            />
+          </F>
           <div style={{ fontSize: 10, color: "#5f7090" }}>
             Runtime only — must match a scene key in the game&apos;s manifest. Not validated here.
           </div>
@@ -2230,48 +2333,50 @@ function ActionFields({
       );
 
     case "despawn_object":
-      return despawnTargetPicker;
+      return <F label="Target">{despawnTargetPicker}</F>;
 
     case "start_mover":
     case "stop_mover":
     case "toggle_mover":
-      return moverTargetPicker;
+      return <F label="Target">{moverTargetPicker}</F>;
 
     case "light_on":
     case "light_off":
     case "toggle_light":
-      return lightTargetPicker;
+      return <F label="Light">{lightTargetPicker}</F>;
 
     case "open_door":
     case "close_door":
-      return targetPicker;
+      return <F label="Target">{targetPicker}</F>;
 
     case "move_object":
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {targetPicker}
-          <div style={{ display: "flex", gap: 4 }}>
-            {(["x", "y", "z"] as const).map((ax) => (
-              <input
-                key={ax}
-                type="number"
-                style={{ ...S.field, flex: 1 }}
-                placeholder={ax}
-                value={action.position?.[ax] ?? ""}
-                onChange={(e) =>
-                  set({
-                    position: {
-                      x: 0,
-                      y: 0,
-                      z: 0,
-                      ...action.position,
-                      [ax]: parseFloat(e.target.value) || 0,
-                    },
-                  })
-                }
-              />
-            ))}
-          </div>
+          <F label="Target">{targetPicker}</F>
+          <F label="Move to (x · y · z)">
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["x", "y", "z"] as const).map((ax) => (
+                <input
+                  key={ax}
+                  type="number"
+                  style={{ ...S.field, flex: 1 }}
+                  placeholder={ax}
+                  value={action.position?.[ax] ?? ""}
+                  onChange={(e) =>
+                    set({
+                      position: {
+                        x: 0,
+                        y: 0,
+                        z: 0,
+                        ...action.position,
+                        [ax]: parseFloat(e.target.value) || 0,
+                      },
+                    })
+                  }
+                />
+              ))}
+            </div>
+          </F>
         </div>
       );
 
@@ -2279,7 +2384,8 @@ function ActionFields({
       const clipKnown = targetClips.includes(action.animation ?? "");
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {targetPicker}
+          <F label="Target">{targetPicker}</F>
+          <F label="Clip">
           {targetClips.length > 0 ? (
             <select
               style={S.select}
@@ -2310,6 +2416,7 @@ function ActionFields({
               onChange={(e) => set({ animation: e.target.value })}
             />
           )}
+          </F>
           <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
             <label
               style={{
@@ -2375,13 +2482,15 @@ function ActionFields({
     case "change_material":
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {targetPicker}
-          <input
-            style={S.field}
-            placeholder="Material ID"
-            value={action.material ?? ""}
-            onChange={(e) => set({ material: e.target.value })}
-          />
+          <F label="Target">{targetPicker}</F>
+          <F label="Material id">
+            <input
+              style={S.field}
+              placeholder="Material ID"
+              value={action.material ?? ""}
+              onChange={(e) => set({ material: e.target.value })}
+            />
+          </F>
         </div>
       );
 
@@ -2405,35 +2514,39 @@ function ActionFields({
             <option value="key">Destination: from state key</option>
           </select>
           {fromKey ? (
-            <input
-              style={S.field}
-              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
-              value={action.positionKey ?? ""}
-              onChange={(e) => set({ positionKey: e.target.value })}
-            />
+            <F label="State key">
+              <input
+                style={S.field}
+                list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+                value={action.positionKey ?? ""}
+                onChange={(e) => set({ positionKey: e.target.value })}
+              />
+            </F>
           ) : (
-            <div style={{ display: "flex", gap: 4 }}>
-              {(["x", "y", "z"] as const).map((ax) => (
-                <input
-                  key={ax}
-                  type="number"
-                  style={{ ...S.field, flex: 1 }}
-                  placeholder={ax}
-                  value={action.position?.[ax] ?? ""}
-                  onChange={(e) =>
-                    set({
-                      position: {
-                        x: 0,
-                        y: 0,
-                        z: 0,
-                        ...action.position,
-                        [ax]: parseFloat(e.target.value) || 0,
-                      },
-                    })
-                  }
-                />
-              ))}
-            </div>
+            <F label="Destination (x · y · z)">
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["x", "y", "z"] as const).map((ax) => (
+                  <input
+                    key={ax}
+                    type="number"
+                    style={{ ...S.field, flex: 1 }}
+                    placeholder={ax}
+                    value={action.position?.[ax] ?? ""}
+                    onChange={(e) =>
+                      set({
+                        position: {
+                          x: 0,
+                          y: 0,
+                          z: 0,
+                          ...action.position,
+                          [ax]: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </F>
           )}
           <select
             style={S.select}
@@ -2449,21 +2562,25 @@ function ActionFields({
             <option value="key">Facing: from state key</option>
           </select>
           {action.facingSource === "literal" && (
-            <input
-              type="number"
-              style={S.field}
-              placeholder="facing degrees"
-              value={action.facing ?? ""}
-              onChange={(e) => set({ facing: parseFloat(e.target.value) || 0 })}
-            />
+            <F label="Facing °">
+              <input
+                type="number"
+                style={S.field}
+                placeholder="degrees"
+                value={action.facing ?? ""}
+                onChange={(e) => set({ facing: parseFloat(e.target.value) || 0 })}
+              />
+            </F>
           )}
           {action.facingSource === "key" && (
-            <input
-              style={S.field}
-              placeholder="facing state key (number, or a stored pose)"
-              value={action.facingKey ?? ""}
-              onChange={(e) => set({ facingKey: e.target.value })}
-            />
+            <F label="Facing state key">
+              <input
+                style={S.field}
+                list="wb-state-keys" placeholder="a number key, or a stored pose"
+                value={action.facingKey ?? ""}
+                onChange={(e) => set({ facingKey: e.target.value })}
+              />
+            </F>
           )}
         </div>
       );
@@ -2472,21 +2589,25 @@ function ActionFields({
     case "fade_screen":
       return (
         <div style={{ display: "flex", gap: 4 }}>
-          <input
-            style={{ ...S.field, flex: 1 }}
-            placeholder="Color (#000)"
-            value={action.fadeColor ?? ""}
-            onChange={(e) => set({ fadeColor: e.target.value })}
-          />
-          <input
-            type="number"
-            style={{ ...S.field, width: 60 }}
-            placeholder="sec"
-            value={action.fadeDuration ?? ""}
-            onChange={(e) =>
-              set({ fadeDuration: parseFloat(e.target.value) || 0.3 })
-            }
-          />
+          <F label="Color" flex={1}>
+            <input
+              style={S.field}
+              placeholder="#000"
+              value={action.fadeColor ?? ""}
+              onChange={(e) => set({ fadeColor: e.target.value })}
+            />
+          </F>
+          <F label="Seconds" flex="0 0 60px">
+            <input
+              type="number"
+              style={S.field}
+              placeholder="0.3"
+              value={action.fadeDuration ?? ""}
+              onChange={(e) =>
+                set({ fadeDuration: parseFloat(e.target.value) || 0.3 })
+              }
+            />
+          </F>
         </div>
       );
 
@@ -2512,41 +2633,49 @@ function ActionFields({
             <option value="spawn">Respawn at: world default spawn</option>
           </select>
           {dest === "key" && (
-            <input
-              style={S.field}
-              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
-              value={action.positionKey ?? ""}
-              onChange={(e) => set({ positionKey: e.target.value })}
-            />
+            <F label="State key">
+              <input
+                style={S.field}
+                list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+                value={action.positionKey ?? ""}
+                onChange={(e) => set({ positionKey: e.target.value })}
+              />
+            </F>
           )}
           {dest === "checkpoint" && (
-            <select
-              style={S.select}
-              value={action.targetId ?? ""}
-              onChange={(e) => set({ targetId: e.target.value })}
-            >
-              <option value="">— pick a checkpoint —</option>
-              {zoneCheckpoints.map((cp) => (
-                <option key={cp.id} value={cp.id}>
-                  {cp.label || cp.id}
-                </option>
-              ))}
-            </select>
+            <F label="Checkpoint">
+              <select
+                style={S.select}
+                value={action.targetId ?? ""}
+                onChange={(e) => set({ targetId: e.target.value })}
+              >
+                <option value="">— pick a checkpoint —</option>
+                {zoneCheckpoints.map((cp) => (
+                  <option key={cp.id} value={cp.id}>
+                    {cp.label || cp.id}
+                  </option>
+                ))}
+              </select>
+            </F>
           )}
           <div style={{ display: "flex", gap: 4 }}>
-            <input
-              style={{ ...S.field, flex: 1 }}
-              placeholder="Fade color (#000)"
-              value={action.fadeColor ?? ""}
-              onChange={(e) => set({ fadeColor: e.target.value })}
-            />
-            <input
-              type="number"
-              style={{ ...S.field, width: 60 }}
-              placeholder="sec"
-              value={action.fadeDuration ?? ""}
-              onChange={(e) => set({ fadeDuration: parseFloat(e.target.value) || 0.4 })}
-            />
+            <F label="Fade color" flex={1}>
+              <input
+                style={S.field}
+                placeholder="#000"
+                value={action.fadeColor ?? ""}
+                onChange={(e) => set({ fadeColor: e.target.value })}
+              />
+            </F>
+            <F label="Seconds" flex="0 0 60px">
+              <input
+                type="number"
+                style={S.field}
+                placeholder="0.4"
+                value={action.fadeDuration ?? ""}
+                onChange={(e) => set({ fadeDuration: parseFloat(e.target.value) || 0.4 })}
+              />
+            </F>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#98a2b8", cursor: "pointer" }}>
             <input
@@ -2563,6 +2692,7 @@ function ActionFields({
     case "show_ui":
     case "hide_ui":
       return (
+        <F label="UI element">
         <select
           style={S.select}
           value={action.uiElementId ?? ""}
@@ -2578,22 +2708,25 @@ function ActionFields({
             <option value={action.uiElementId}>{action.uiElementId} (custom)</option>
           )}
         </select>
+        </F>
       );
 
     case "run_script":
       return (
-        <textarea
-          style={{
-            ...S.field,
-            height: 80,
-            resize: "vertical",
-            fontFamily: "monospace",
-            fontSize: 10,
-          }}
-          placeholder="// JS — ctx.get('k'), ctx.set('k',v), ctx.has('k'), ctx.adjust('k',n)"
-          value={action.script ?? ""}
-          onChange={(e) => set({ script: e.target.value })}
-        />
+        <F label="JavaScript">
+          <textarea
+            style={{
+              ...S.field,
+              height: 80,
+              resize: "vertical",
+              fontFamily: "monospace",
+              fontSize: 10,
+            }}
+            placeholder="// JS — ctx.get('k'), ctx.set('k',v), ctx.has('k'), ctx.adjust('k',n)"
+            value={action.script ?? ""}
+            onChange={(e) => set({ script: e.target.value })}
+          />
+        </F>
       );
 
     case "spawn_npc":
