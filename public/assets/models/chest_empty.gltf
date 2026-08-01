@@ -291,26 +291,6 @@
                     },
                     "indices" : 14,
                     "material" : 2
-                },
-                {
-                    "attributes" : {
-                        "POSITION" : 15,
-                        "NORMAL" : 16,
-                        "JOINTS_0" : 17,
-                        "WEIGHTS_0" : 18
-                    },
-                    "indices" : 19,
-                    "material" : 3
-                },
-                {
-                    "attributes" : {
-                        "POSITION" : 20,
-                        "NORMAL" : 21,
-                        "JOINTS_0" : 22,
-                        "WEIGHTS_0" : 23
-                    },
-                    "indices" : 24,
-                    "material" : 4
                 }
             ]
         },

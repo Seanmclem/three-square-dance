@@ -2187,6 +2187,34 @@
       }
     },
     {
+      "id": "chest_empty",
+      "label": "Chest (Empty)",
+      "category": "Platform: Objects",
+      "path": "/assets/models/chest_empty.gltf",
+      "thumbnail": "/assets/models/chest_empty_thumb.png",
+      "collidable": true,
+      "colliderType": "box",
+      "tags": [
+        "platformer",
+        "prop",
+        "animated",
+        "cc0",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-08-01",
+      "animations": [
+        "Chest_Close",
+        "Chest_Open"
+      ],
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      }
+    },
+    {
       "id": "bouncer",
       "label": "Bouncer",
       "category": "Platform: Objects",
