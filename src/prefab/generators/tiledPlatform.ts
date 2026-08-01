@@ -24,13 +24,27 @@ const LAYER = 2;   // vertical pitch — every kit piece spans 2m of height
 type Band = "single" | "top" | "middle" | "bottom";
 
 /** Kit piece for a grid role at a vertical band — null = no piece (hollow interior).
- *  Grass ships the full stacking set; dirt only ships full-height blocks, which
- *  repeat for every band (and its interior has no underside sheet). */
+ *
+ *  Both sets stack the same way; only the TOP band differs. The kit's
+ *  `platform_grass_*_center_tall` / `*_bottom_tall` pieces carry no green at all
+ *  (materials are Dirt_1/2/3) — they ARE the dirt body of a grass platform, and
+ *  they have no top face, so they stack seamlessly. Dirt must reuse them for
+ *  everything below the cap: `platform_dirt_*_tall` carries a beveled top rim
+ *  meant to end a platform, so repeating it per band stacked a rounded lip and a
+ *  shadow gap at every layer boundary. The interior cap is likewise a flat sheet
+ *  (`platform_dirt_center`), not the `_tall` side-band piece — whose Dirt_1 is
+ *  20% darker than every other tile in the kit and left a dark square mid-platform. */
 function assetFor(set: "grass" | "dirt", role: "corner" | "side" | "center", band: Band): string | null {
   if (band === "single") return `platform_${set}_${role}`;
   if (set === "dirt") {
-    if (role === "center") return band === "top" ? "platform_dirt_center_tall" : null;
-    return `platform_dirt_${role}_tall`;
+    if (role === "center") {
+      if (band === "top")    return "platform_dirt_center";        // flat dirt cap
+      if (band === "bottom") return "platform_grass_bottom_tall";  // flat underside sheet
+      return null;
+    }
+    if (band === "top") return `platform_dirt_${role}_tall`;
+    if (band === "bottom") return `platform_grass_${role}_bottom_tall`;
+    return `platform_grass_${role}_center_tall`;
   }
   if (role === "center") {
     if (band === "top")    return "platform_grass_center_tall";   // flat grass sheet

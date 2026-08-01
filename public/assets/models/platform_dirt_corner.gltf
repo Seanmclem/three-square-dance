@@ -20,7 +20,6 @@
     ],
     "materials" : [
         {
-            "doubleSided" : true,
             "name" : "Dirt_1",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -34,7 +33,6 @@
             }
         },
         {
-            "doubleSided" : true,
             "name" : "Dirt_2",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
@@ -48,7 +46,6 @@
             }
         },
         {
-            "doubleSided" : true,
             "name" : "Dirt_3",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [

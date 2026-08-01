@@ -96,7 +96,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
       || (tool.id === "trigger-volume"  && openPanel === "scripts" && activeTool === "trigger-volume");
     const highlight = active || menuOpen;
     const Icon = TOOL_ICONS[activeVariantId ?? tool.id];
-    const color = highlight ? "#80aaff" : "#7a7a7a";
+    const iconColor  = highlight ? "#80aaff" : "#9aa3b5";
+    const labelColor = highlight ? "#80aaff" : "#c2cadb";
     const showSpawnMenu   = tool.id === "spawnpoint" && activeTool === "spawnpoint" && menuOpen;
     const showVariantMenu = !!tool.variants && menuOpen;
     return (
@@ -128,8 +129,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         onMouseEnter={e => { if (!highlight) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
         onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = "transparent"; }}
       >
-        <Icon color={color} />
-        <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+        <Icon color={iconColor} />
+        <span style={{ fontSize: 8, letterSpacing: 0.5, color: labelColor, fontFamily: "monospace",
                        textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
           {tool.label}
         </span>
@@ -218,7 +219,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
         const menuOpen = openMenu === "assets-menu";
         const highlight = !!activeEntry || menuOpen;
         const ButtonIcon = activeEntry?.Icon ?? IconMaterial;
-        const color = highlight ? "#80aaff" : "#7a7a7a";
+        const iconColor  = highlight ? "#80aaff" : "#9aa3b5";
+        const labelColor = highlight ? "#80aaff" : "#c2cadb";
         return (
           <div style={{ position: "relative", display: "flex" }}>
           <button
@@ -239,8 +241,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseEnter={e => { if (!highlight) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
             onMouseLeave={e => { if (!highlight) e.currentTarget.style.background = "transparent"; }}
           >
-            <ButtonIcon color={color} />
-            <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+            <ButtonIcon color={iconColor} />
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color: labelColor, fontFamily: "monospace",
                            textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
               Assets
             </span>
@@ -292,7 +294,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
           the Assets flyout as their own button. */}
       {(() => {
         const prefabsActive = openPanel === "prefabs" || activeTool === "prefab";
-        const color = prefabsActive ? "#80aaff" : "#7a7a7a";
+        const iconColor  = prefabsActive ? "#80aaff" : "#9aa3b5";
+        const labelColor = prefabsActive ? "#80aaff" : "#c2cadb";
         const PrefabIcon = TOOL_ICONS.prefab;
         return (
           <button
@@ -309,8 +312,8 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseEnter={e => { if (!prefabsActive) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
             onMouseLeave={e => { if (!prefabsActive) e.currentTarget.style.background = "transparent"; }}
           >
-            <PrefabIcon color={color} />
-            <span style={{ fontSize: 8, letterSpacing: 0.5, color, opacity: 0.7, fontFamily: "monospace",
+            <PrefabIcon color={iconColor} />
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color: labelColor, fontFamily: "monospace",
                            textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
               Prefabs
             </span>
@@ -338,9 +341,9 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             onMouseEnter={e => { if (!scriptsActive) e.currentTarget.style.background = "rgba(255,170,0,0.08)"; }}
             onMouseLeave={e => { if (!scriptsActive) e.currentTarget.style.background = "transparent"; }}
           >
-            <IconScript color={scriptsActive ? "#ffaa00" : "#7a7a7a"} />
-            <span style={{ fontSize: 8, letterSpacing: 0.5, color: scriptsActive ? "#ffaa00" : "#7a7a7a",
-                           opacity: 0.7, fontFamily: "monospace", textAlign: "center",
+            <IconScript color={scriptsActive ? "#ffaa00" : "#9aa3b5"} />
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color: scriptsActive ? "#ffaa00" : "#c2cadb",
+                           fontFamily: "monospace", textAlign: "center",
                            lineHeight: 1.1, maxWidth: 46 }}>
               Scripts
             </span>

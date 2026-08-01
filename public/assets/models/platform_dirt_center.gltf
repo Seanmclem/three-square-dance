@@ -20,7 +20,6 @@
     ],
     "materials" : [
         {
-            "doubleSided" : true,
             "name" : "Dirt_1",
             "pbrMetallicRoughness" : {
                 "baseColorFactor" : [
