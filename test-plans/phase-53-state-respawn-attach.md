@@ -39,6 +39,23 @@ mover/physics/trigger/input manually per TESTING.md).
 | 8 | Copy/paste remap | pasted host+volume pair: attachTo = pasted host's id | ✅ |
 | 9 | Panel | ATTACHED TO select lists mover-enabled hosts; dangling id shown as static | ✅ (dropdown verified; dangling-option rendering by code review) |
 
+## Addendum (v4.56.2) — damage-over-time recipe + timer Repeat authoring
+
+The lava recipe (HAZARDS_GUIDE) exposed that `ScriptTrigger.repeat` was
+engine-supported but **not authorable** — the panel had no control, so UI
+timer scripts could never repeat. Fixed: "Repeat every interval" checkbox on
+the on_timer fields.
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 1 | Repeat checkbox | authors `trigger.repeat` through the real UI | ✅ (WorldState carried `repeat: true`) |
+| 2 | Full lava loop, live | enter → `in_lava=true` → −5/s ticks (15→10→5→0) → on_health_zero → respawn (fade/teleport/health 100/fade-out) → exit → `in_lava=false` → drain stops | ✅ (single recorded event trace, real wall-clock setInterval ticks; volume flag scripts + tick script all authored through the panel) |
+| 3 | Condition gating | ticks continue only while `in_lava` is truthy | ✅ (drain stopped at the exit event) |
+
+Hidden-tab note: the trace showed a second death cycle because the frozen
+TriggerSystem couldn't fire the post-respawn exit until manually stepped — a
+background-tab artifact only; visible tabs fire the exit within a frame.
+
 ## Not covered (known gaps)
 
 - Prefab-expansion attachTo remap is logic-verified only (same idMap idiom as

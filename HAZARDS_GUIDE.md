@@ -110,6 +110,51 @@ the same central death handler fires only when it actually reaches 0. This is
 the payoff of routing everything through health: floors, crushers, enemies
 and poison all *stack* into one death.
 
+## Recipe: the lava pool (damage over time)
+
+Lava shouldn't kill on touch — it should *cook* you: lose health every second
+you stand in it, escape if you're quick, die if you're not. Three small
+scripts make that, and the pattern generalizes to poison gas, freezing water,
+or any "hurts while you're inside" zone.
+
+![A lava pool — trigger volume with an orange gradient fill](docs/images/lava-pool.png)
+
+1. Trigger tool → drag a shallow volume over the lava area. Turn on the
+   **Visual** gradient (orange, fade down) so it reads as lava in-game.
+2. **Two flag scripts on the volume** (its ENTRY/EXIT SCRIPTS list):
+   - `on_player_enter` → `set_state in_lava = true`
+   - `on_player_exit` → `set_state in_lava = false`
+3. **One ticking script at the level scope** (SCRIPTS panel → LEVEL tab):
+   - Trigger `on_timer`, interval `1`, **Repeat every interval** checked
+   - Condition `has_state in_lava`
+   - Action `adjust_number health -5`
+
+![The ticking script: on_timer + Repeat, gated on in_lava, draining health](docs/images/lava-tick-script.png)
+
+How the pieces behave together:
+
+- The timer ticks every second for the whole session, but the **condition is
+  re-checked on every tick** — it only actually drains while the flag is up.
+  Step out and the drain stops instantly; the flag scripts are edge-triggered
+  (enter/exit fire once per crossing, and re-setting a state key to the value
+  it already has is a no-op), so nothing spams.
+- When the drain reaches 0, your central death handler (`on_health_zero` →
+  `respawn_player` with **Restore health** checked) takes over. The respawn
+  teleports the player *out* of the lava, which fires the volume's exit
+  script, which clears `in_lava` — so the drain doesn't follow them home.
+- At −5 per second from 100 health, that's a forgiving 20 seconds; tune the
+  delta and interval for how deadly the lava should feel. A second bigger
+  penalty on the enter script (`adjust_number health -20`) makes touching it
+  sting immediately, with the drain continuing after.
+
+Variations on the same skeleton: **poison that lingers** — don't clear the
+flag on exit; clear it at a healing fountain instead (`set_state in_lava =
+false` on the fountain's enter script). **Regen** — a second repeat timer
+with `adjust_number health +2`, conditioned however you like (or
+unconditioned, so lava and regen fight each other and shallow dips heal
+back). **Slow-kill crusher** — put the enter/exit flag scripts on an
+*attached* volume so the drain zone moves with the machine.
+
 ## The fine print
 
 - `on_state_equals` works for any key, not just health — `coins == 10` →

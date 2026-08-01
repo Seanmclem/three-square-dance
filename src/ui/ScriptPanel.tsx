@@ -1042,15 +1042,28 @@ function ScriptEditor({
           )}
 
           {script.trigger.type === "on_timer" && (
-            <input
-              type="number"
-              style={{ ...S.field, marginTop: 4 }}
-              placeholder="Interval (seconds)"
-              value={script.trigger.interval ?? ""}
-              onChange={(e) =>
-                setTrigger({ interval: parseFloat(e.target.value) || 1 })
-              }
-            />
+            <>
+              <input
+                type="number"
+                style={{ ...S.field, marginTop: 4 }}
+                placeholder="Interval (seconds)"
+                value={script.trigger.interval ?? ""}
+                onChange={(e) =>
+                  setTrigger({ interval: parseFloat(e.target.value) || 1 })
+                }
+              />
+              {/* The engine always supported repeat (setInterval vs setTimeout) —
+                  this checkbox was just never authorable. Damage-over-time
+                  (HAZARDS_GUIDE lava recipe) depends on it. */}
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#98a2b8", cursor: "pointer", padding: "4px 0" }}>
+                <input
+                  type="checkbox"
+                  checked={script.trigger.repeat ?? false}
+                  onChange={(e) => setTrigger({ repeat: e.target.checked || undefined })}
+                />
+                Repeat every interval (off = fire once)
+              </label>
+            </>
           )}
 
           {script.trigger.type === "on_state_equals" && (
