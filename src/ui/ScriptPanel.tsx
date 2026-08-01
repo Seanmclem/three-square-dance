@@ -383,12 +383,36 @@ export function ScriptPanel({
     : null;
 
   // Shared suggestions for every state-key input in the panel (type-or-pick):
-  // registered keys from both schema scopes, plus each item's counter shown by
-  // its label — so nobody has to remember the inv.<id> convention.
+  // registered keys from both schema scopes, every key a script in this zone
+  // reads or writes (so a store_position key like `checkpoint` is offered
+  // everywhere even if it was never registered in the STATE tab), UI-widget
+  // bindings, plus each item's counter shown by its label — so nobody has to
+  // remember the inv.<id> convention.
+  const scriptKeys: string[] = [];
+  const harvestRefs = (conditions?: ScriptCondition[], actions?: ScriptAction[]) => {
+    for (const c of conditions ?? []) if (c.stateKey) scriptKeys.push(c.stateKey);
+    for (const a of actions ?? [])
+      for (const k of [a.stateKey, a.positionKey, a.facingKey]) if (k) scriptKeys.push(k);
+  };
+  const harvest = (scripts?: ScriptDef[]) => {
+    for (const s of scripts ?? []) {
+      if (s.trigger.type === "on_state_equals" && s.trigger.targetId) scriptKeys.push(s.trigger.targetId);
+      harvestRefs(s.conditions, s.actions);
+    }
+  };
+  harvest(zoneScripts);
+  for (const v of triggerVolumes) harvest(v.scripts);
+  for (const o of zoneObjects) harvest(o.scripts);
+  for (const d of zoneDialogues)
+    for (const n of d.nodes)
+      for (const opt of n.options) harvestRefs(opt.conditions, opt.actions);
+  for (const el of uiElements)
+    if ((el.kind === "bar" || el.kind === "counter") && el.stateKey) scriptKeys.push(el.stateKey);
   const knownStateKeys = [...new Set([
     ...Object.keys(gameStateSchema ?? {}),
     ...Object.keys(stateSchema),
-  ])];
+    ...scriptKeys,
+  ])].filter((k) => !worldItems.some((it) => `inv.${it.id}` === k));
 
   // Per-tab description — shown on demand via a (?) in each view's header row.
   const tabHelp =
