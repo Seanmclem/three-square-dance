@@ -1,6 +1,7 @@
 import type { WorldState } from "@/world/WorldState";
+import { membersByGroup } from "@/editor/groupMembers";
 import type {
-  SelectedObjectPayload, SelectedRef, EditorObjectType,
+  SelectedObjectPayload, SelectedRef, EditorObjectType, GroupDef,
   WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
 } from "@/types";
 
@@ -11,6 +12,10 @@ const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair"
 export interface ClipEntity {
   type: EditorObjectType;
   def:  unknown;
+  /** The SOURCE entity's groups, captured at copy time. Held separately from
+   *  `def` because paste rewrites `def.groupIds` — re-pasting the same clipboard
+   *  must remap from the original memberships, not from the last paste's. */
+  groupIds?: string[];
 }
 
 /**
@@ -92,8 +97,48 @@ const off3 = (p: Vec3, dx: number, dz: number): Vec3 => ({ x: p.x + dx, y: p.y, 
 
 function buildClipboard(world: WorldState, zoneId: string, entities: ClipEntity[]): Clipboard | null {
   if (entities.length === 0) return null;
+  // Single funnel for every clipboard — snapshot each source's groups here so
+  // paste can decide their fate without reading (or trusting) def.groupIds.
+  for (const e of entities) {
+    const g = (e.def as { groupIds?: string[] }).groupIds;
+    if (g?.length) e.groupIds = [...g];
+  }
   const nodeIds = entities.flatMap(e => entityNodeIds(e.type, e.def));
   return { zoneId, entities, nodes: cloneNodes(world, zoneId, nodeIds) };
+}
+
+/**
+ * What happens to the source entities' groups on paste.
+ *
+ * A group whose ENTIRE membership is on the clipboard is treated as "you
+ * duplicated the group" — the copies land in a fresh `"<name> copy"` group. A
+ * partially-copied group is dropped, so duplicating one crate out of a group
+ * gives you a loose crate instead of silently growing the original group.
+ *
+ * Returns oldGroupId → newGroupId plus the group defs the caller must create
+ * inside the paste transaction (so undo takes the groups with it).
+ */
+function planGroupRemap(world: WorldState, clip: Clipboard): { map: Map<string, string>; create: GroupDef[] } {
+  const referenced = new Set<string>();
+  for (const e of clip.entities) for (const g of e.groupIds ?? []) referenced.add(g);
+  if (referenced.size === 0) return { map: new Map(), create: [] };
+
+  const sourceIds = new Set(
+    clip.entities.map(e => (e.def as { id?: string }).id).filter((id): id is string => !!id),
+  );
+  const byGroup = membersByGroup(world);
+  const map = new Map<string, string>();
+  const create: GroupDef[] = [];
+  for (const gid of referenced) {
+    const members = byGroup.get(gid) ?? [];
+    const whole = members.length > 0 && members.every(m => sourceIds.has(m.ref.id));
+    if (!whole) continue;
+    const name = world.groups.find(g => g.id === gid)?.name ?? "Group";
+    const def: GroupDef = { id: uuid(), name: `${name} copy` };
+    create.push(def);
+    map.set(gid, def.id);
+  }
+  return { map, create };
 }
 
 /** Deep-clone the current single selection (entity/run + referenced nodes) into a clipboard. */
@@ -129,7 +174,11 @@ export function pasteClipboard(
   const pasted: { type: EditorObjectType; id: string }[] = [];
 
   const label = clip.entities.length > 1 ? `paste ${clip.entities.length} items` : `paste ${clip.entities[0].type}`;
+  const { map: groupMap, create: newGroups } = planGroupRemap(world, clip);
   world.transaction(label, () => {
+    // 0) Duplicated groups first, so the entities below can join them.
+    for (const g of newGroups) world.addGroup(g);
+
     // 1) Clone referenced nodes with new ids (deduped, shared), offset.
     const nodeMap = new Map<string, string>();
     for (const n of clip.nodes) {
@@ -154,6 +203,14 @@ export function pasteClipboard(
       // A pasted copy of a prefab-instance member is UNLINKED — a duplicate
       // stamp would collide with the original in re-expansion diffing.
       delete (ent.def as { prefab?: unknown }).prefab;
+      // Groups: join the duplicated group if the whole group was copied,
+      // otherwise land ungrouped (see planGroupRemap).
+      const nextGroups = (ent.groupIds ?? [])
+        .map(g => groupMap.get(g))
+        .filter((g): g is string => !!g);
+      const gDef = ent.def as { groupIds?: string[] };
+      if (nextGroups.length) gDef.groupIds = nextGroups;
+      else delete gDef.groupIds;
 
       switch (ent.type) {
         case "wall": {

@@ -1713,6 +1713,25 @@ export default function App() {
     syncHistory();
   }, [multiSelected, syncHistory]);
 
+  // Cmd/Ctrl+G and the multi-select panel's "Group Selected": mint a group and
+  // put the whole selection in it, one undo step. The group is created inside
+  // the transaction so undo removes it along with the memberships.
+  const handleGroupSelected = useCallback((): void => {
+    const world = worldRef.current;
+    if (!world || multiSelected.length === 0) return;
+    const groupId = crypto.randomUUID();
+    world.transaction(`group ${multiSelected.length} item${multiSelected.length > 1 ? "s" : ""}`, () => {
+      world.addGroup({ id: groupId, name: "New Group" });
+      for (const ref of multiSelected) {
+        const current = entityGroupIds(world, ref);
+        if (current.includes(groupId)) continue;
+        writeGroupIds(world, ref, [...current, groupId]);
+      }
+    });
+    syncHistory();
+    setLeftPanel("groups");   // so the new group is visible to rename
+  }, [multiSelected, syncHistory]);
+
   const handleRemoveGroupMember = useCallback((groupId: string, ref: SelectedRef): void => {
     const world = worldRef.current;
     if (!world) return;
@@ -1778,6 +1797,7 @@ export default function App() {
         if (e.code === 'KeyC')      { e.preventDefault(); handleCopy(); }
         else if (e.code === 'KeyV') { e.preventDefault(); handlePaste(); }
         else if (e.code === 'KeyD') { e.preventDefault(); handleDuplicate(); }
+        else if (e.code === 'KeyG') { e.preventDefault(); handleGroupSelected(); }
       }
       // Blender-style select-mode hotkeys (Phase 23): 1 = object, 2 = face, 3 = vertex.
       if (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
@@ -1790,7 +1810,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave, handleUndo, handleRedo, handleCopy, handlePaste, handleDuplicate, activeTool]);
+  }, [handleSave, handleUndo, handleRedo, handleCopy, handlePaste, handleDuplicate, handleGroupSelected, activeTool]);
 
   const handleSegmentUpdate = (wallId: string, changes: Partial<WallDef>): void => {
     if (!selected) return;
@@ -3487,6 +3507,8 @@ export default function App() {
         multiSelected={multiSelected}
         onCopy={handleCopy}
         onDuplicate={handleDuplicate}
+        onGroupSelected={handleGroupSelected}
+        onSelectGroup={handleSelectGroupMembers}
         onBake={refs => setBakeRefs(refs)}
         decalTextures={decalTextures}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}

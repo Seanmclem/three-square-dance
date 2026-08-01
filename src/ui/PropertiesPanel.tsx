@@ -384,6 +384,10 @@ interface PropertiesPanelProps {
   multiSelected?:           SelectedRef[];
   onCopy?:                  () => void;
   onDuplicate?:             () => void;
+  // Put the whole current selection into a brand-new group (also Cmd/Ctrl+G).
+  onGroupSelected?:         () => void;
+  // Select every member of a group the current entity belongs to.
+  onSelectGroup?:           (groupId: string) => void;
   // Bake the given shape refs to a GLB asset (Phase 26) — opens the bake dialog.
   onBake?:                  (refs: SelectedRef[]) => void;
   // Auto-fit box from the placed model's local AABB (null until the mesh is built).
@@ -416,7 +420,7 @@ export function PropertiesPanel({
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
 }: PropertiesPanelProps) {
@@ -519,6 +523,13 @@ export function PropertiesPanel({
           </div>
           {onDuplicate && <button style={ACTION_BTN} onClick={onDuplicate}>Duplicate</button>}
           {onCopy      && <button style={ACTION_BTN} onClick={onCopy}>Copy</button>}
+          {onGroupSelected && !prefabInfo && (
+            <button
+              style={{ ...ACTION_BTN, color: "#9db8e8", borderColor: "rgba(80,140,255,0.3)" }}
+              title="Put these in a brand-new group (Cmd/Ctrl+G)"
+              onClick={onGroupSelected}
+            >⊞ Group Selected</button>
+          )}
           {onBake && multiSelected.every(r => r.type === "shape") && (
             <button style={ACTION_BTN} onClick={() => onBake(multiSelected)}>Bake → GLB asset</button>
           )}
@@ -625,6 +636,7 @@ export function PropertiesPanel({
             groupsOpen={groupsOpen}
             onToggleGroups={() => setGroupsOpen(v => !v)}
             onObjectUpdate={onObjectUpdate}
+            onSelectGroup={onSelectGroup}
             bus={bus}
             zone={zones?.find(z => z.id === selected.zoneId)}
             prefabSection={prefabInfo ? (
@@ -670,11 +682,14 @@ export function PropertiesPanel({
               selected={selected}
               groups={groups}
               onObjectUpdate={onObjectUpdate}
+              onSelectGroup={onSelectGroup}
             />
             <ActionsAccordion
               open={actionsOpen}
               onToggle={() => setActionsOpen(v => !v)}
               selected={selected}
+              groups={groups}
+              onSelectGroup={onSelectGroup}
               onCopyRunToFloor={onCopyRunToFloor}
               onFillRunWithFloor={onFillRunWithFloor}
               onAddCeilingToRun={onAddCeilingToRun}
@@ -757,10 +772,12 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake }: {
+function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
+  groups?:            GroupDef[];
+  onSelectGroup?:     (groupId: string) => void;
   onCopyRunToFloor?:  (level: number) => void;
   onFillRunWithFloor?: () => void;
   onAddCeilingToRun?: () => void;
@@ -773,6 +790,10 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
 }) {
   const wallData = selected.type === "wall" ? selected.data as WallDef : null;
   const [hovered, setHovered] = useState(false);
+  // Groups this entity actually belongs to, resolved to defs for their names.
+  const joinedGroups = ((selected.data as { groupIds?: string[] } | null)?.groupIds ?? [])
+    .map(id => groups.find(g => g.id === id))
+    .filter((g): g is GroupDef => !!g);
 
   return (
     <div>
@@ -788,6 +809,21 @@ function ActionsAccordion({ open, onToggle, selected, onCopyRunToFloor, onFillRu
 
       {open && (
         <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          {/* One button per group this entity belongs to — named only when it's
+              in more than one, so the common case stays a plain "Select group". */}
+          {onSelectGroup && joinedGroups.map(g => (
+            <button
+              key={g.id}
+              onClick={() => onSelectGroup(g.id)}
+              title={`Select every member of “${g.name}”`}
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                color: "#80aaff", fontSize: 11, fontFamily: "monospace",
+              }}
+            >{joinedGroups.length > 1 ? `Select group: ${g.name}` : "Select group"}</button>
+          ))}
+
           {onFillRunWithFloor && (
             <button
               onClick={onFillRunWithFloor}
@@ -1110,12 +1146,13 @@ function PrefabBtn({ label, title, onClick, danger }: { label: string; title: st
   );
 }
 
-function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
+function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate, onSelectGroup }: {
   open:           boolean;
   onToggle:       () => void;
   selected:       SelectedObjectPayload;
   groups:         GroupDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onSelectGroup?: (groupId: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const memberIds = (selected.data as { groupIds?: string[] } | null)?.groupIds ?? [];
@@ -1150,24 +1187,36 @@ function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate }: {
           ) : groups.map(g => {
             const checked = memberIds.includes(g.id);
             return (
-              <button
-                key={g.id}
-                onClick={() => toggleGroup(g.id)}
-                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
-                         background: "none", border: "none", cursor: "pointer", padding: "3px 0" }}
-              >
-                <span style={{ width: 14, height: 14, flexShrink: 0, borderRadius: 3,
-                               border: checked ? "1px solid rgba(80,140,255,0.6)" : "1px solid rgba(255,255,255,0.15)",
-                               background: checked ? "rgba(80,140,255,0.7)" : "transparent",
-                               color: "#fff", fontSize: 10, lineHeight: "13px", textAlign: "center" }}>
-                  {checked ? "✓" : ""}
-                </span>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4d6fa8", flexShrink: 0 }} />
-                <span style={{ flex: 1, color: "#b0b0c0", fontSize: 11, fontFamily: "monospace",
-                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {g.name}
-                </span>
-              </button>
+              // Row is a div, not a button — the per-group "Select" action below
+              // can't legally nest inside the membership toggle.
+              <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button
+                  onClick={() => toggleGroup(g.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0, textAlign: "left",
+                           background: "none", border: "none", cursor: "pointer", padding: "3px 0" }}
+                >
+                  <span style={{ width: 14, height: 14, flexShrink: 0, borderRadius: 3,
+                                 border: checked ? "1px solid rgba(80,140,255,0.6)" : "1px solid rgba(255,255,255,0.15)",
+                                 background: checked ? "rgba(80,140,255,0.7)" : "transparent",
+                                 color: "#fff", fontSize: 10, lineHeight: "13px", textAlign: "center" }}>
+                    {checked ? "✓" : ""}
+                  </span>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4d6fa8", flexShrink: 0 }} />
+                  <span style={{ flex: 1, color: "#b0b0c0", fontSize: 11, fontFamily: "monospace",
+                                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {g.name}
+                  </span>
+                </button>
+                {checked && onSelectGroup && (
+                  <button
+                    onClick={() => onSelectGroup(g.id)}
+                    title={`Select every member of “${g.name}”`}
+                    style={{ flexShrink: 0, background: "transparent", border: "1px solid rgba(80,140,255,0.25)",
+                             borderRadius: 3, cursor: "pointer", color: "#9db8e8",
+                             fontSize: 9, padding: "2px 6px", fontFamily: "monospace", letterSpacing: 0.3 }}
+                  >Select group</button>
+                )}
+              </div>
             );
           })}
         </div>
@@ -5399,7 +5448,7 @@ function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, bus, prefabSection, zone }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
@@ -5407,6 +5456,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
   groupsOpen:       boolean;
   onToggleGroups:   () => void;
   onObjectUpdate:   (changes: Partial<WorldObject>) => void;
+  onSelectGroup?:   (groupId: string) => void;
   bus?:             EventBus;
   prefabSection?:   React.ReactNode;   // PrefabSection when this volume is an instance member (Phase 46)
   zone?:            ZoneDef;           // the volume's zone — sources the "Attached to" host list (Phase 53)
@@ -5711,6 +5761,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
       selected={selected}
       groups={groups}
       onObjectUpdate={onObjectUpdate}
+      onSelectGroup={onSelectGroup}
     />
     </>
   );
