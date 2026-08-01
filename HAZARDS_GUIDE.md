@@ -107,8 +107,16 @@ playing. Cross your checkpoint volume and watch the `checkpoint` key appear
 with an `{x, y, z, facing}` pose. Then jump in the pit: you should fade out,
 land at the marker, and see `health` back at its default. If you land at the
 level start instead, the respawn read an empty destination — key typo'd on
-one end, or the checkpoint volume never fired (is the volume tall enough to
-catch a jumping player?).
+one end, or the checkpoint volume never fired. Two ways a volume silently
+misses:
+
+- **It floats above the player's head.** A volume's POSITION Y is its
+  **bottom face**, and the player is only about a meter tall — a volume
+  whose wireframe doesn't touch the ground can pass clean over them (a gate
+  authored 1m up missed by 3cm in practice). Drag it down until the
+  wireframe meets the floor; the extra height above hurts nothing.
+- **It's too short to catch a fall.** A fast-falling player can pass a thin
+  box between frames — make pit volumes a few meters tall.
 
 ---
 
