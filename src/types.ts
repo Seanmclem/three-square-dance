@@ -1297,6 +1297,7 @@ export interface DialogueTreeDef {
 
 export interface ScriptAction {
   type:          ActionType;
+  delay?:        number;     // seconds after the script's actions start before THIS action runs (0/absent = immediate)
   targetId?:     string;
   animation?:    string;
   animationLoop?: boolean;   // play_animation: loop the clip forever

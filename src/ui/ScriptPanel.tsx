@@ -1854,14 +1854,14 @@ function ActionRow({
         style={{
           display: "flex",
           gap: 4,
-          alignItems: "center",
+          alignItems: "flex-end",
           marginBottom: 4,
         }}
       >
         <select
           style={{ ...S.select, flex: 1 }}
           value={action.type}
-          onChange={(e) => onChange({ type: e.target.value as ActionType })}
+          onChange={(e) => onChange({ type: e.target.value as ActionType, delay: action.delay })}
         >
           {[...ACTION_TYPES].sort().map((t) => (
             <option key={t} value={t}>
@@ -1869,8 +1869,18 @@ function ActionRow({
             </option>
           ))}
         </select>
+        <F label="Delay (s)" flex="0 0 52px">
+          <input
+            type="number" min={0} step={0.1}
+            style={S.field}
+            placeholder="0"
+            title="Seconds after the trigger before this action runs — sequence effects within one script"
+            value={action.delay ?? ""}
+            onChange={(e) => onChange({ ...action, delay: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+        </F>
         <button
-          style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
+          style={{ ...S.btn(), padding: "6px 6px", color: "#cc6666" }}
           onClick={onRemove}
         >
           ×

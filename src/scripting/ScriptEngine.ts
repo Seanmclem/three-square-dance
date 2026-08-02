@@ -265,7 +265,18 @@ export class ScriptEngine {
 
   /** Public so DialogueRunner can dispatch a chosen option's effects. */
   runActions(actions: ScriptAction[]): void {
-    for (const action of actions) this._dispatch(action);
+    for (const action of actions) {
+      // Per-action delay: offset from when the script's actions start (i.e. after
+      // any trigger-level delay). Lets one script sequence its effects — e.g.
+      // play_animation Chest_Open now, despawn_object 0.8s later — without a
+      // second delayed script. Timers die with deactivate(), same as trigger delays.
+      if (action.delay && action.delay > 0) {
+        const t = setTimeout(() => this._dispatch(action), action.delay * 1000);
+        this._timers.push(t);
+      } else {
+        this._dispatch(action);
+      }
+    }
   }
 
   /** Find a dialogue tree by id across every zone (tiny data; cross-zone-safe). */
