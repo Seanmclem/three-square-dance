@@ -21,14 +21,21 @@ function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   const mat = new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 1 });
   const wire = new THREE.LineSegments(geo, mat);
   // Faint interior fill so the drag preview reads as a box, not four lines
-  // (matches the placed-volume rendering in ZoneManager).
+  // (matches the placed-volume rendering in ZoneManager — same inset +
+  // renderOrder to avoid coplanar z-fighting / transparent-sort flicker).
   const fill = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
+    insetBox(w, h, d),
     new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide }),
   );
   fill.userData = { selectable: false };
+  fill.renderOrder = 1;
+  wire.renderOrder = 2;
   wire.add(fill);
   return wire;
+}
+
+function insetBox(w: number, h: number, d: number): THREE.BoxGeometry {
+  return new THREE.BoxGeometry(Math.max(0.05, w - 0.04), Math.max(0.05, h - 0.04), Math.max(0.05, d - 0.04));
 }
 
 export class TriggerVolumeTool {
@@ -308,7 +315,7 @@ export class TriggerVolumeTool {
     const fill = wire.children[0] as THREE.Mesh | undefined;
     if (fill) {
       fill.geometry.dispose();
-      fill.geometry = new THREE.BoxGeometry(w, h, d);
+      fill.geometry = insetBox(w, h, d);
     }
   }
 

@@ -2144,11 +2144,22 @@ export class ZoneManager {
     // Editor-only interior fill (child of the wire, so it rides position/rotation/
     // mover attachment and dies with it): 1px edges alone disappear against busy
     // scenes — a faint tinted body makes the box readable at a glance.
+    // Inset a hair on every axis: a full-size fill is exactly coplanar with the
+    // edge lines AND with whatever surface the volume sits flush against (a
+    // ground-level kill floor's bottom face = the terrain plane) — z-fight
+    // shimmer. Explicit renderOrder: fill and edges are at the SAME camera
+    // distance, so the transparent sort otherwise flip-flops per frame.
     const bodyMat = new THREE.MeshBasicMaterial({
       color: 0xffcc00, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide,
     });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z), bodyMat);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(
+      Math.max(0.05, vol.size.x - 0.04),
+      Math.max(0.05, vol.size.y - 0.04),
+      Math.max(0.05, vol.size.z - 0.04),
+    ), bodyMat);
     body.userData = { editorType: "trigger-volume", selectable: false, hideInGame: true };
+    body.renderOrder = 1;
+    wire.renderOrder = 2;   // edges always draw over the fill
     wire.add(body);
     group.add(wire);
     // Attached volume (Phase 53): the wireframe rides the host's mover entry.
