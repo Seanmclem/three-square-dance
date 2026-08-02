@@ -1427,6 +1427,9 @@ export interface TriggerVolume {
   scripts?:  ScriptDef[];
   groupIds?: string[];
   visual?:   TriggerVolumeVisual;   // optional in-world fill; absent/disabled = wireframe only
+  // Editor-only shading override for this volume's wireframe + interior fill
+  // (never rendered in game). Absent = the default amber.
+  editorTint?: { color: string; opacity: number };
   prefab?:   PrefabStamp;           // member of a placed prefab instance (Phase 44)
 }
 

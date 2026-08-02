@@ -2136,7 +2136,7 @@ export class ZoneManager {
 
   private _buildVolumeMesh(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
     const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z));
-    const mat = new THREE.LineBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.9 });
+    const mat = new THREE.LineBasicMaterial({ color: vol.editorTint?.color ?? "#ffcc00", transparent: true, opacity: 0.9 });
     const wire = new THREE.LineSegments(geo, mat);
     wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
@@ -2150,7 +2150,11 @@ export class ZoneManager {
     // shimmer. Explicit renderOrder: fill and edges are at the SAME camera
     // distance, so the transparent sort otherwise flip-flops per frame.
     const bodyMat = new THREE.MeshBasicMaterial({
-      color: 0xffcc00, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide,
+      color: vol.editorTint?.color ?? "#ffcc00",
+      transparent: true,
+      opacity: vol.editorTint?.opacity ?? 0.12,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
     const body = new THREE.Mesh(new THREE.BoxGeometry(
       Math.max(0.05, vol.size.x - 0.04),
@@ -2321,6 +2325,9 @@ export class ZoneManager {
     if (!vol) return;
     this._removeSingleVolume(zoneId, volumeId);
     this._addTriggerVolume(zoneId, vol);
+    // Rebuild resets materials to their build-time colors — reapply hover/select
+    // state (and live-preview an editorTint edit on a selected volume).
+    this._refreshVolumeHighlights(zoneId);
   }
 
   private _refreshVolumeHighlights(zoneId: string): void {
@@ -2328,26 +2335,29 @@ export class ZoneManager {
     if (!meshes) return;
     const hoveredId  = this._hoveredVolumeId.get(zoneId)  ?? null;
     const selectedId = this._selectedVolumeId.get(zoneId) ?? null;
+    const volDefs = this._worldState.zones.get(zoneId)?.triggerVolumes;
     for (const m of meshes) {
       const mat  = m.material as THREE.LineBasicMaterial;
       const id   = m.userData["editorId"] as string;
       const body = m.children[0] as THREE.Mesh | undefined;
       const bmat = body?.material as THREE.MeshBasicMaterial | undefined;
+      // Per-volume editor shading: a custom tint owns the FILL in every state
+      // (so the color picker shows its effect live while the volume is selected);
+      // the EDGES keep the state colors so hover/selection stay legible.
+      const tint = volDefs?.find(v => v.id === id)?.editorTint;
+      if (bmat && tint) { bmat.color.set(tint.color); bmat.opacity = tint.opacity; }
       if (id === selectedId) {
         mat.color.setHex(0x00ffff); // cyan — selected
         mat.opacity = 1.0;
-        bmat?.color.setHex(0x00ffff);
-        if (bmat) bmat.opacity = 0.2;
+        if (bmat && !tint) { bmat.color.setHex(0x00ffff); bmat.opacity = 0.2; }
       } else if (id === hoveredId) {
         mat.color.setHex(0xffdd44); // light yellow — hover
         mat.opacity = 1.0;
-        bmat?.color.setHex(0xffdd44);
-        if (bmat) bmat.opacity = 0.18;
+        if (bmat && !tint) { bmat.color.setHex(0xffdd44); bmat.opacity = 0.18; }
       } else {
-        mat.color.setHex(0xffcc00); // amber — idle (bright: a dim 0.45 wireframe was near-invisible)
+        mat.color.set(tint?.color ?? "#ffcc00"); // amber — idle (bright: a dim 0.45 wireframe was near-invisible)
         mat.opacity = 0.9;
-        bmat?.color.setHex(0xffcc00);
-        if (bmat) bmat.opacity = 0.12;
+        if (bmat && !tint) { bmat.color.setHex(0xffcc00); bmat.opacity = 0.12; }
       }
     }
   }

@@ -5677,6 +5677,36 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
         )}
       </div>
 
+      {/* Editor shading — per-volume tint of the editor-only wireframe + fill */}
+      <div>
+        <div style={LABEL}>EDITOR SHADING</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: vol.editorTint ? 8 : 0 }}>
+          <input
+            type="checkbox"
+            checked={!!vol.editorTint}
+            onChange={e => onObjectUpdate({ editorTint: e.target.checked ? { color: "#ffcc00", opacity: 0.12 } : undefined } as Partial<WorldObject>)}
+          />
+          <span style={{ fontSize: 10, color: "#9090a0" }}>Custom color / opacity (editor only)</span>
+        </label>
+        {vol.editorTint && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Color</span>
+              <input type="color" value={vol.editorTint.color}
+                onChange={e => onObjectUpdate({ editorTint: { ...vol.editorTint!, color: e.target.value } } as Partial<WorldObject>)}
+                style={{ width: 44, height: 22, padding: 0, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3, background: "transparent", cursor: "pointer" }} />
+            </label>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, color: "#9090a0" }}>Fill opacity</span>
+              <input type="number" step={0.05} min={0} max={1} defaultValue={vol.editorTint.opacity} key={vol.id + "-etint"}
+                onBlur={e => onObjectUpdate({ editorTint: { ...vol.editorTint!, opacity: clamp01(parseFloat(e.target.value)) } } as Partial<WorldObject>)}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                style={{ ...NUM_INPUT, width: 100 }} />
+            </label>
+          </div>
+        )}
+      </div>
+
       {/* Scripts section */}
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
