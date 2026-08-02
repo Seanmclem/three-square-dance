@@ -527,6 +527,7 @@ export class ZoneManager {
         this._dimSuspended = true;
         this._applyDimming();
         if (isGameplayMode(mode)) this._setHideInGameVisible(false);
+        this._applyStartHidden();
       }),
       this._bus.on("preview:stop",  () => {
         this._flickerActive = false;
@@ -1378,6 +1379,23 @@ export class ZoneManager {
    */
   private _despawnEntity(id: string): void {
     if (this._setEntityHidden(id, true)) this._despawnedIds.add(id);
+  }
+
+  /**
+   * Hide every entity authored "start hidden" (spawn_object reveals it later).
+   * Runs on preview:start — the runtime router exits/re-enters per scene, so
+   * transitions are covered. Routed through the normal despawn event so both
+   * mesh owners (ObjectPlacer / this) hide + track it and preview:stop restores.
+   */
+  private _applyStartHidden(): void {
+    for (const zoneId of this._loadedZones.keys()) {
+      const zone = this._worldState.zones.get(zoneId);
+      if (!zone) continue;
+      const lists: { id: string; startHidden?: boolean }[][] =
+        [zone.objects, zone.platforms, zone.shapes ?? []];
+      for (const arr of lists)
+        for (const e of arr) if (e.startHidden) this._bus.emit("object:despawn", { id: e.id });
+    }
   }
 
   /** Re-show + re-enable everything despawned during this preview run. */

@@ -1851,6 +1851,21 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
         </span>
       </div>
 
+      <div style={{ marginTop: 10 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={plat?.startHidden ?? false}
+            onChange={e => onObjectUpdate({ startHidden: e.target.checked || undefined } as unknown as Partial<WorldObject>)}
+            style={{ accentColor: "#4d8cff", cursor: "pointer" }}
+          />
+          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>START HIDDEN</span>
+        </label>
+        <span style={{ color: "#505060", fontSize: 9, paddingLeft: 21 }}>
+          Despawned at preview/game start — reveal with spawn_object (secret bridges)
+        </span>
+      </div>
+
       {/* Motion (Phase 31) — polygon platforms bake world-space geometry and can't animate */}
       {plat && !plat.points?.length && (
         <MoverSection entityId={selected.id} mover={plat.mover}
@@ -2059,6 +2074,18 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
           setFloorLvl(n);
           onObjectUpdate({ floorLevel: n } as unknown as Partial<WorldObject>);
         }} />
+      </div>
+
+      <div>
+        <div style={LABEL}>VISIBILITY</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={shape?.startHidden ?? false}
+            onChange={e => onObjectUpdate({ startHidden: e.target.checked || undefined } as unknown as Partial<WorldObject>)}
+          />
+          <span style={{ fontSize: 10, color: "#9090a0" }}>Start hidden — reveal with spawn_object</span>
+        </label>
       </div>
 
       {/* Motion (Phase 31) */}
@@ -3224,6 +3251,18 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
             }}
           />
         )}
+      </div>
+
+      <div>
+        <div style={LABEL}>VISIBILITY</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={objData?.startHidden ?? false}
+            onChange={e => onObjectUpdate({ startHidden: e.target.checked || undefined } as Partial<WorldObject>)}
+          />
+          <span style={{ fontSize: 10, color: "#9090a0" }}>Start hidden — reveal with spawn_object</span>
+        </label>
       </div>
 
       {/* Motion (Phase 31) */}

@@ -737,6 +737,7 @@ export interface PlatformDef {
   groupIds?:              string[];
   mover?:                 MoverDef;
   sound?:                 AttachedSound;   // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
+  startHidden?:           boolean;         // despawned at preview/game start — reveal with spawn_object
 }
 
 export interface StairCutterDef {
@@ -919,6 +920,7 @@ export interface ShapeDef {
   shearZ?: number;
   mover?:  MoverDef;
   sound?:  AttachedSound;       // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
+  startHidden?: boolean;        // despawned at preview/game start — reveal with spawn_object
   prefab?: PrefabStamp;         // member of a placed prefab instance (Phase 44)
 }
 
@@ -990,6 +992,7 @@ export interface WorldObject {
   colliders?: AttachedCollider[];
   mover?:     MoverDef;
   sound?:     AttachedSound;   // attached spatial emitter — a PositionalAudio that follows the mesh, incl. movers (Phase 36)
+  startHidden?: boolean;       // despawned at preview/game start — reveal with spawn_object
   prefab?:    PrefabStamp;     // set when this object is a member of a placed prefab instance (Phase 44)
 }
 
