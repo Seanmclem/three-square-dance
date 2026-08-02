@@ -163,11 +163,12 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio" | "scripts";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
   animations: "Animations", colliders: "Colliders", lights: "Lights", sound: "Sound", audio: "Audio",
+  scripts: "Scripts",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -181,6 +182,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   lights: "WORLD SUN · AMBIENT · PLACED",
   sound: "SPATIAL EMITTER",
   audio: "MIXER · AMBIENT · MUSIC",
+  scripts: "TRIGGERS · ACTIONS",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -200,7 +202,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   platform: ["geo", "mat", "sound"],
   stair:    ["geo", "mat"],
   ladder:   ["geo", "mat"],
-  object:   ["geo", "mat", "colliders", "sound"],
+  object:   ["geo", "mat", "colliders", "sound", "scripts"],
   opening:  ["geo"],
   shape:    ["geo", "mat", "sound"],
 };
@@ -287,6 +289,10 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "sound": {
       const snd = (selected.data as { sound?: { soundId?: string } } | null)?.sound;
       return snd?.soundId ? snd.soundId : "none";
+    }
+    case "scripts": {
+      const n = (selected.data as { scripts?: ScriptDef[] } | null)?.scripts?.length ?? 0;
+      return n === 0 ? "none" : `${n} script${n !== 1 ? "s" : ""}`;
     }
     case "lights":
     case "audio":
@@ -742,6 +748,8 @@ export function PropertiesPanel({
           />
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
+        ) : currentScreen === "scripts" ? (
+          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} />
         ) : null}
       </div>
 
@@ -5488,6 +5496,121 @@ const DEFAULT_VOLUME_VISUAL: TriggerVolumeVisual = {
 };
 const clamp01 = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
 
+/** Shared script list rows (volume ENTRY/EXIT section + object Scripts screen):
+ *  enabled dot, label, trigger + action count, delete — editing happens in the
+ *  Scripts panel. */
+function ScriptListRows({ scripts, emptyHint, onToggle, onDelete }: {
+  scripts:   ScriptDef[];
+  emptyHint: string;
+  onToggle?: (id: string) => void;
+  onDelete?: (id: string) => void;
+}) {
+  return (
+    <>
+      {scripts.length === 0 && (
+        <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>{emptyHint}</div>
+      )}
+      {scripts.map(s => (
+        <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
+                                  background: "rgba(255,255,255,0.03)", borderRadius: 4,
+                                  padding: "4px 8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+          <div
+            onClick={() => onToggle?.(s.id)}
+            title={s.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
+            style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: onToggle ? "pointer" : "default",
+                     background: s.enabled ? "#44cc88" : "#444" }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#b0b0b0", fontSize: 11, fontFamily: "monospace",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {s.label}
+            </div>
+            <div style={{ color: "#00ffcc", fontSize: 9, opacity: 0.7 }}>
+              {s.trigger.type} · {s.actions.length} action{s.actions.length !== 1 ? "s" : ""}
+            </div>
+          </div>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(s.id)}
+              title="Remove this script"
+              style={{ background: "none", border: "none", color: "#664444", fontSize: 13,
+                       cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
+            >×</button>
+          )}
+        </div>
+      ))}
+      {scripts.length > 0 && (
+        <div style={{ color: "#444", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
+          Edit actions in the Scripts panel →
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── ObjectScriptsScreen ───────────────────────────────────────────────────────
+// Scripts attached to a placed object — same list as a volume's ENTRY/EXIT
+// section, editing stays in the Scripts panel. The add button presets the
+// trigger from what the object supports.
+function ObjectScriptsScreen({ selected, onScriptsChange }: {
+  selected: SelectedObjectPayload;
+  onScriptsChange?: (scripts: ScriptDef[]) => void;
+}) {
+  const obj = selected.data as WorldObject | null;
+  if (!obj) return null;
+  const scripts = obj.scripts ?? [];
+  const hasSensor = (obj.colliders ?? []).some(c => c.isSensor);
+  const preset: "on_interact" | "on_player_enter" | "on_game_start" =
+    obj.properties.interactable ? "on_interact" : hasSensor ? "on_player_enter" : "on_game_start";
+
+  const addScript = () => onScriptsChange?.([...scripts, {
+    id: `scr_${crypto.randomUUID().slice(0, 8)}`,
+    label: preset === "on_interact" ? "On Interact" : preset === "on_player_enter" ? "On Enter" : "New Script",
+    zoneId: selected.zoneId,
+    enabled: true,
+    // No targetId — ScriptEngine keys entity triggers on the owning object.
+    trigger: { type: preset },
+    conditions: [], actions: [], oneShot: false,
+  }]);
+
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
+        Scripts ride this object — copies keep them, and prefabs capture them.
+        Target &ldquo;★ this object&rdquo; in an action to affect the object itself.
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={LABEL}>SCRIPTS</div>
+        {onScriptsChange && (
+          <button
+            onClick={addScript}
+            title={`Add a script (trigger preset: ${preset})`}
+            style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                     background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
+                     borderRadius: 3, color: "#44ccaa" }}
+          >+ Add</button>
+        )}
+      </div>
+      <div>
+        <ScriptListRows
+          scripts={scripts}
+          emptyHint="No scripts — hit + Add"
+          onToggle={onScriptsChange ? (id) => onScriptsChange(scripts.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)) : undefined}
+          onDelete={onScriptsChange ? (id) => onScriptsChange(scripts.filter(s => s.id !== id)) : undefined}
+        />
+      </div>
+      {!obj.properties.interactable && !hasSensor && (
+        <div style={{ color: "#9aa3b5", fontSize: 9, lineHeight: 1.5 }}>
+          For on_interact, enable INTERACTABLE on the root screen. For
+          on_player_enter / on_player_exit, add a Sensor collider (Colliders screen).
+        </div>
+      )}
+    </div>
+  );
+}
+
 function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_exit"): ScriptDef {
   return {
     id:         `scr_${crypto.randomUUID().slice(0, 8)}`,
@@ -5790,45 +5913,12 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
             </div>
           )}
         </div>
-        {scripts.length === 0 && (
-          <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>
-            No scripts — add Entry or Exit above
-          </div>
-        )}
-        {scripts.map(s => (
-          <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
-                                    background: "rgba(255,255,255,0.03)", borderRadius: 4,
-                                    padding: "4px 8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-            <div
-              onClick={() => toggleScript(s.id)}
-              title={s.enabled ? "Enabled — click to disable" : "Disabled — click to enable"}
-              style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: "pointer",
-                       background: s.enabled ? "#44cc88" : "#444" }}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: "#b0b0b0", fontSize: 11, fontFamily: "monospace",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {s.label}
-              </div>
-              <div style={{ color: "#00ffcc", fontSize: 9, opacity: 0.7 }}>
-                {s.trigger.type} · {s.actions.length} action{s.actions.length !== 1 ? "s" : ""}
-              </div>
-            </div>
-            {onScriptsChange && (
-              <button
-                onClick={() => deleteScript(s.id)}
-                title="Remove script from this volume"
-                style={{ background: "none", border: "none", color: "#664444", fontSize: 13,
-                         cursor: "pointer", padding: "0 2px", lineHeight: 1 }}
-              >×</button>
-            )}
-          </div>
-        ))}
-        {scripts.length > 0 && (
-          <div style={{ color: "#444", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
-            Edit actions in the Scripts panel →
-          </div>
-        )}
+        <ScriptListRows
+          scripts={scripts}
+          emptyHint="No scripts — add Entry or Exit above"
+          onToggle={onScriptsChange ? toggleScript : undefined}
+          onDelete={onScriptsChange ? deleteScript : undefined}
+        />
       </div>
 
       {onDelete && (
