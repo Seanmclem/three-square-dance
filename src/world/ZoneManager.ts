@@ -2141,6 +2141,15 @@ export class ZoneManager {
     wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false, hideInGame: true };
+    // Editor-only interior fill (child of the wire, so it rides position/rotation/
+    // mover attachment and dies with it): 1px edges alone disappear against busy
+    // scenes — a faint tinted body makes the box readable at a glance.
+    const bodyMat = new THREE.MeshBasicMaterial({
+      color: 0xffcc00, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide,
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z), bodyMat);
+    body.userData = { editorType: "trigger-volume", selectable: false, hideInGame: true };
+    wire.add(body);
     group.add(wire);
     // Attached volume (Phase 53): the wireframe rides the host's mover entry.
     // It stays a child of the zone group, so selection/dispose are untouched.
@@ -2232,6 +2241,9 @@ export class ZoneManager {
         m.parent?.remove(m);
         m.geometry.dispose();
         (m.material as THREE.Material).dispose();
+        m.traverse(o => {   // the interior-fill child
+          if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
+        });
       }
       this._volumeMeshes.delete(zoneId);
     }
@@ -2258,6 +2270,9 @@ export class ZoneManager {
       m.parent?.remove(m);
       m.geometry.dispose();
       (m.material as THREE.Material).dispose();
+      m.traverse(o => {   // the interior-fill child
+        if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
+      });
       meshArr.splice(idx, 1);
     }
     // Remove fill
@@ -2303,17 +2318,25 @@ export class ZoneManager {
     const hoveredId  = this._hoveredVolumeId.get(zoneId)  ?? null;
     const selectedId = this._selectedVolumeId.get(zoneId) ?? null;
     for (const m of meshes) {
-      const mat = m.material as THREE.LineBasicMaterial;
-      const id  = m.userData["editorId"] as string;
+      const mat  = m.material as THREE.LineBasicMaterial;
+      const id   = m.userData["editorId"] as string;
+      const body = m.children[0] as THREE.Mesh | undefined;
+      const bmat = body?.material as THREE.MeshBasicMaterial | undefined;
       if (id === selectedId) {
         mat.color.setHex(0x00ffff); // cyan — selected
         mat.opacity = 1.0;
+        bmat?.color.setHex(0x00ffff);
+        if (bmat) bmat.opacity = 0.2;
       } else if (id === hoveredId) {
         mat.color.setHex(0xffdd44); // light yellow — hover
         mat.opacity = 1.0;
+        bmat?.color.setHex(0xffdd44);
+        if (bmat) bmat.opacity = 0.18;
       } else {
         mat.color.setHex(0xffcc00); // amber — idle (bright: a dim 0.45 wireframe was near-invisible)
         mat.opacity = 0.9;
+        bmat?.color.setHex(0xffcc00);
+        if (bmat) bmat.opacity = 0.12;
       }
     }
   }

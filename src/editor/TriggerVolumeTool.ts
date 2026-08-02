@@ -19,7 +19,16 @@ function snap(v: number): number { return Math.round(v / GRID) * GRID; }
 function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
   const mat = new THREE.LineBasicMaterial({ color: AMBER, transparent: true, opacity: 1 });
-  return new THREE.LineSegments(geo, mat);
+  const wire = new THREE.LineSegments(geo, mat);
+  // Faint interior fill so the drag preview reads as a box, not four lines
+  // (matches the placed-volume rendering in ZoneManager).
+  const fill = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide }),
+  );
+  fill.userData = { selectable: false };
+  wire.add(fill);
+  return wire;
 }
 
 export class TriggerVolumeTool {
@@ -296,6 +305,11 @@ export class TriggerVolumeTool {
   private _refreshPreviewGeometry(wire: THREE.LineSegments, w: number, h: number, d: number): void {
     wire.geometry.dispose();
     wire.geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
+    const fill = wire.children[0] as THREE.Mesh | undefined;
+    if (fill) {
+      fill.geometry.dispose();
+      fill.geometry = new THREE.BoxGeometry(w, h, d);
+    }
   }
 
   private _finishPlace(): void {
@@ -332,6 +346,9 @@ export class TriggerVolumeTool {
       this._scene.remove(this._preview);
       this._preview.geometry.dispose();
       (this._preview.material as THREE.Material).dispose();
+      this._preview.traverse(o => {   // the interior-fill child
+        if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); }
+      });
       this._preview = null;
     }
     this._start  = null;
