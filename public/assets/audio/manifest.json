@@ -55,6 +55,1184 @@
         "author": "Synthesized fixture",
         "license": "CC0"
       }
+    },
+    {
+      "id": "zap1",
+      "label": "zap1",
+      "category": "SFX",
+      "path": "/assets/audio/zap1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "zaptwotone2",
+      "label": "zapTwoTone2",
+      "category": "SFX",
+      "path": "/assets/audio/zaptwotone2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "zaptwotone",
+      "label": "zapTwoTone",
+      "category": "SFX",
+      "path": "/assets/audio/zaptwotone.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "zapthreetoneup",
+      "label": "zapThreeToneUp",
+      "category": "SFX",
+      "path": "/assets/audio/zapthreetoneup.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "zapthreetonedown",
+      "label": "zapThreeToneDown",
+      "category": "SFX",
+      "path": "/assets/audio/zapthreetonedown.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "zap2",
+      "label": "zap2",
+      "category": "SFX",
+      "path": "/assets/audio/zap2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "twotone2",
+      "label": "twoTone2",
+      "category": "SFX",
+      "path": "/assets/audio/twotone2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "twotone1",
+      "label": "twoTone1",
+      "category": "SFX",
+      "path": "/assets/audio/twotone1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "tone1",
+      "label": "tone1",
+      "category": "SFX",
+      "path": "/assets/audio/tone1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "threetone2",
+      "label": "threeTone2",
+      "category": "SFX",
+      "path": "/assets/audio/threetone2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "threetone1",
+      "label": "threeTone1",
+      "category": "SFX",
+      "path": "/assets/audio/threetone1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "spacetrash5",
+      "label": "spaceTrash5",
+      "category": "SFX",
+      "path": "/assets/audio/spacetrash5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "spacetrash4",
+      "label": "spaceTrash4",
+      "category": "SFX",
+      "path": "/assets/audio/spacetrash4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "spacetrash3",
+      "label": "spaceTrash3",
+      "category": "SFX",
+      "path": "/assets/audio/spacetrash3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "spacetrash2",
+      "label": "spaceTrash2",
+      "category": "SFX",
+      "path": "/assets/audio/spacetrash2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "spacetrash1",
+      "label": "spaceTrash1",
+      "category": "SFX",
+      "path": "/assets/audio/spacetrash1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup9",
+      "label": "powerUp9",
+      "category": "SFX",
+      "path": "/assets/audio/powerup9.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup8",
+      "label": "powerUp8",
+      "category": "SFX",
+      "path": "/assets/audio/powerup8.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup7",
+      "label": "powerUp7",
+      "category": "SFX",
+      "path": "/assets/audio/powerup7.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup6",
+      "label": "powerUp6",
+      "category": "SFX",
+      "path": "/assets/audio/powerup6.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup5",
+      "label": "powerUp5",
+      "category": "SFX",
+      "path": "/assets/audio/powerup5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup4",
+      "label": "powerUp4",
+      "category": "SFX",
+      "path": "/assets/audio/powerup4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup3",
+      "label": "powerUp3",
+      "category": "SFX",
+      "path": "/assets/audio/powerup3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup2",
+      "label": "powerUp2",
+      "category": "SFX",
+      "path": "/assets/audio/powerup2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup12",
+      "label": "powerUp12",
+      "category": "SFX",
+      "path": "/assets/audio/powerup12.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup11",
+      "label": "powerUp11",
+      "category": "SFX",
+      "path": "/assets/audio/powerup11.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup10",
+      "label": "powerUp10",
+      "category": "SFX",
+      "path": "/assets/audio/powerup10.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "powerup1",
+      "label": "powerUp1",
+      "category": "SFX",
+      "path": "/assets/audio/powerup1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup7",
+      "label": "phaserUp7",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup7.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup6",
+      "label": "phaserUp6",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup6.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup5",
+      "label": "phaserUp5",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup4",
+      "label": "phaserUp4",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup3",
+      "label": "phaserUp3",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup2",
+      "label": "phaserUp2",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserup1",
+      "label": "phaserUp1",
+      "category": "SFX",
+      "path": "/assets/audio/phaserup1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserdown3",
+      "label": "phaserDown3",
+      "category": "SFX",
+      "path": "/assets/audio/phaserdown3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserdown2",
+      "label": "phaserDown2",
+      "category": "SFX",
+      "path": "/assets/audio/phaserdown2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phaserdown1",
+      "label": "phaserDown1",
+      "category": "SFX",
+      "path": "/assets/audio/phaserdown1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phasejump5",
+      "label": "phaseJump5",
+      "category": "SFX",
+      "path": "/assets/audio/phasejump5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phasejump4",
+      "label": "phaseJump4",
+      "category": "SFX",
+      "path": "/assets/audio/phasejump4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phasejump3",
+      "label": "phaseJump3",
+      "category": "SFX",
+      "path": "/assets/audio/phasejump3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phasejump2",
+      "label": "phaseJump2",
+      "category": "SFX",
+      "path": "/assets/audio/phasejump2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "phasejump1",
+      "label": "phaseJump1",
+      "category": "SFX",
+      "path": "/assets/audio/phasejump1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "pepsound5",
+      "label": "pepSound5",
+      "category": "SFX",
+      "path": "/assets/audio/pepsound5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "pepsound4",
+      "label": "pepSound4",
+      "category": "SFX",
+      "path": "/assets/audio/pepsound4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "pepsound3",
+      "label": "pepSound3",
+      "category": "SFX",
+      "path": "/assets/audio/pepsound3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "pepsound2",
+      "label": "pepSound2",
+      "category": "SFX",
+      "path": "/assets/audio/pepsound2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "pepsound1",
+      "label": "pepSound1",
+      "category": "SFX",
+      "path": "/assets/audio/pepsound1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "lowthreetone",
+      "label": "lowThreeTone",
+      "category": "SFX",
+      "path": "/assets/audio/lowthreetone.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "lowrandom",
+      "label": "lowRandom",
+      "category": "SFX",
+      "path": "/assets/audio/lowrandom.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "lowdown",
+      "label": "lowDown",
+      "category": "SFX",
+      "path": "/assets/audio/lowdown.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser9",
+      "label": "laser9",
+      "category": "SFX",
+      "path": "/assets/audio/laser9.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser8",
+      "label": "laser8",
+      "category": "SFX",
+      "path": "/assets/audio/laser8.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser7",
+      "label": "laser7",
+      "category": "SFX",
+      "path": "/assets/audio/laser7.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser6",
+      "label": "laser6",
+      "category": "SFX",
+      "path": "/assets/audio/laser6.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser5",
+      "label": "laser5",
+      "category": "SFX",
+      "path": "/assets/audio/laser5.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser4",
+      "label": "laser4",
+      "category": "SFX",
+      "path": "/assets/audio/laser4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser3",
+      "label": "laser3",
+      "category": "SFX",
+      "path": "/assets/audio/laser3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser2",
+      "label": "laser2",
+      "category": "SFX",
+      "path": "/assets/audio/laser2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "laser1",
+      "label": "laser1",
+      "category": "SFX",
+      "path": "/assets/audio/laser1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "highup",
+      "label": "highUp",
+      "category": "SFX",
+      "path": "/assets/audio/highup.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
+    },
+    {
+      "id": "highdown",
+      "label": "highDown",
+      "category": "SFX",
+      "path": "/assets/audio/highdown.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney"
+      ],
+      "dateAdded": "2026-08-02",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Digital Audio",
+        "sourceUrl": "https://kenney.nl/assets/digital-audio"
+      }
     }
   ]
 }

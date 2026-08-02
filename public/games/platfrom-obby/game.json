@@ -245,6 +245,288 @@
         }
       ],
       "dateAdded": "2026-07-30"
+    },
+    {
+      "id": "pfb_aeaf3238",
+      "name": "Coin Single",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_573eea53",
+          "type": "object",
+          "def": {
+            "id": "obj_573eea53",
+            "assetId": "coin",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 90,
+              "z": 0
+            },
+            "scale": {
+              "x": 0.8,
+              "y": 0.8,
+              "z": 0.8
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "mover": {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "y",
+              "distance": 0.2,
+              "duration": 0.7,
+              "dwell": 0,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true
+            },
+            "colliders": [
+              {
+                "id": "col_447cc8e9",
+                "shape": "sphere",
+                "offset": {
+                  "x": 0,
+                  "y": 0.9600939750671387,
+                  "z": 0
+                },
+                "size": {
+                  "x": 1.15,
+                  "y": 0,
+                  "z": 0
+                },
+                "isSensor": true
+              }
+            ],
+            "scripts": [
+              {
+                "id": "scr_1dc3ad6b",
+                "label": "coin1",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "adjust_number",
+                    "stateKey": "coins",
+                    "numberDelta": 1
+                  },
+                  {
+                    "type": "despawn_object",
+                    "fadeDuration": 0.15,
+                    "targetId": "self"
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "powerup9"
+                  }
+                ],
+                "oneShot": true
+              }
+            ]
+          }
+        }
+      ],
+      "dateAdded": "2026-08-02"
+    },
+    {
+      "id": "pfb_07e2acef",
+      "name": "Chest - 5 Coins, trigger, indicator.",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "vol_9becbbd8",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_9becbbd8",
+            "label": "Trigger Volume",
+            "position": {
+              "x": -1.3824804065484955,
+              "y": 1.7763568394002505e-15,
+              "z": 0.03925808211056392
+            },
+            "size": {
+              "x": 2,
+              "y": 2.5,
+              "z": 4
+            },
+            "zoneId": "demo",
+            "scripts": [
+              {
+                "id": "scr_4b086343",
+                "label": "open_chest",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter",
+                  "targetId": "vol_9becbbd8"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "targetId": "obj_4ddacd98",
+                    "animation": "Chest_Open",
+                    "animationHold": true
+                  },
+                  {
+                    "type": "despawn_object",
+                    "delay": 0.9,
+                    "targetId": "obj_4ddacd98",
+                    "fadeDuration": 1
+                  },
+                  {
+                    "type": "spawn_object",
+                    "targetId": "obj_079554aa",
+                    "fadeDuration": 0.3
+                  },
+                  {
+                    "type": "spawn_object",
+                    "targetId": "obj_5a26150e",
+                    "fadeDuration": 0.3
+                  },
+                  {
+                    "type": "despawn_object",
+                    "delay": 0.8,
+                    "targetId": "obj_079554aa",
+                    "fadeDuration": 0.3
+                  },
+                  {
+                    "type": "despawn_object",
+                    "delay": 0.8,
+                    "targetId": "obj_5a26150e",
+                    "fadeDuration": 0.3
+                  },
+                  {
+                    "type": "adjust_number",
+                    "stateKey": "coins",
+                    "numberDelta": 5
+                  }
+                ],
+                "oneShot": false
+              }
+            ]
+          }
+        },
+        {
+          "memberKey": "obj_4ddacd98",
+          "type": "object",
+          "def": {
+            "id": "obj_4ddacd98",
+            "assetId": "chest",
+            "position": {
+              "x": -0.11237363371994569,
+              "y": 0,
+              "z": -0.04977349153637789
+            },
+            "rotation": {
+              "x": 0,
+              "y": -90,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "autoPlayAnimation": null,
+            "scripts": []
+          }
+        },
+        {
+          "memberKey": "obj_5a26150e",
+          "type": "object",
+          "def": {
+            "id": "obj_5a26150e",
+            "assetId": "coin",
+            "position": {
+              "x": 0.7534009499762728,
+              "y": 3.68278539540502,
+              "z": -0.5758388109977801
+            },
+            "rotation": {
+              "x": 0,
+              "y": 90,
+              "z": 0
+            },
+            "scale": {
+              "x": 0.6,
+              "y": 0.6,
+              "z": 0.6
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "label": "5 Coin Icon indicator",
+            "startHidden": true
+          }
+        },
+        {
+          "memberKey": "obj_079554aa",
+          "type": "object",
+          "def": {
+            "id": "obj_079554aa",
+            "assetId": "numbers_5",
+            "position": {
+              "x": 0.7414530902921719,
+              "y": 3.7515746971366184,
+              "z": 0.5863542204235586
+            },
+            "rotation": {
+              "x": 0,
+              "y": -90,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "label": "5 Number for Coin",
+            "startHidden": true
+          }
+        }
+      ],
+      "dateAdded": "2026-08-02"
     }
   ]
 }
