@@ -3286,6 +3286,9 @@ export default function App() {
     });
   };
 
+  // Just-created prefab id → the PrefabPanel opens its row in rename mode.
+  const [prefabRenameRequest, setPrefabRenameRequest] = useState<string | null>(null);
+
   /** Capture the multi-selection as a snapshot prefab; the originals are
    *  replaced (in one undo step) by the prefab's first linked instance. */
   const handleCreatePrefab = (refs: SelectedRef[]): void => {
@@ -3307,7 +3310,8 @@ export default function App() {
     busRef.current.emit("object:deselected", {});
     setSelected(null);
     setPrefabTick(t => t + 1);
-    setLeftPanel("prefabs");   // show the new prefab (rename it there)
+    setLeftPanel("prefabs");                 // show the new prefab…
+    setPrefabRenameRequest(cap.prefab.id);   // …with its name ready to type over
   };
 
   // Prefabs panel "Create from selection": handler present only when the current
@@ -3500,6 +3504,8 @@ export default function App() {
         onPrefabEdit={handleEditPrefab}
         onPrefabCreateFromSelection={prefabCreateFromSelection}
         prefabSelectionHint={prefabSelectionHint}
+        prefabRenameRequestId={prefabRenameRequest}
+        onPrefabRenameRequestHandled={() => setPrefabRenameRequest(null)}
       />
       {editingPrefab && (
         <PrefabEditBar

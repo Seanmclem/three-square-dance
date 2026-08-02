@@ -94,6 +94,8 @@ interface LeftPanelProps {
   onPrefabEdit:         (prefabId: string) => void;
   onPrefabCreateFromSelection?: () => void;   // undefined = selection ineligible
   prefabSelectionHint?: string;
+  prefabRenameRequestId?: string | null;      // just-created prefab → rename mode
+  onPrefabRenameRequestHandled?: () => void;
 }
 
 export function LeftPanel({
@@ -112,7 +114,7 @@ export function LeftPanel({
   worldItems, onWorldItemsChange, projectSceneIds, uiElements, onUiElementsChange,
   decalTextures, selectedDecalId, onDecalSelect,
   prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete, onPrefabEdit,
-  onPrefabCreateFromSelection, prefabSelectionHint,
+  onPrefabCreateFromSelection, prefabSelectionHint, prefabRenameRequestId, onPrefabRenameRequestHandled,
 }: LeftPanelProps) {
   const open = panelId !== null;
 
@@ -242,6 +244,8 @@ export function LeftPanel({
                 onEdit={onPrefabEdit}
                 onCreateFromSelection={onPrefabCreateFromSelection}
                 selectionHint={prefabSelectionHint}
+                renameRequestId={prefabRenameRequestId}
+                onRenameRequestHandled={onPrefabRenameRequestHandled}
               />
             )}
             {panelId === "groups" && (

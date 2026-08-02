@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PrefabDef } from "@/types";
 import { GENERATORS } from "@/prefab/generators";
 
@@ -14,6 +14,10 @@ interface PrefabPanelProps {
   // nothing eligible selected — the button renders disabled with selectionHint.
   onCreateFromSelection?: () => void;
   selectionHint?:  string;
+  // A just-created prefab's id: its row opens in rename mode (focused, text
+  // selected, scrolled into view) so the generic name can be typed over.
+  renameRequestId?: string | null;
+  onRenameRequestHandled?: () => void;
 }
 
 /**
@@ -24,10 +28,22 @@ interface PrefabPanelProps {
  */
 export function PrefabPanel({
   prefabs, instanceCounts, onPlacePrefab, onPlaceGenerator, onRename, onDelete, onEdit,
-  onCreateFromSelection, selectionHint,
+  onCreateFromSelection, selectionHint, renameRequestId, onRenameRequestHandled,
 }: PrefabPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft,     setDraft]     = useState("");
+  const selectOnFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!renameRequestId) return;
+    const p = prefabs.find(p => p.id === renameRequestId);
+    if (p) {
+      selectOnFocusRef.current = true;
+      setEditingId(p.id);
+      setDraft(p.name);
+    }
+    onRenameRequestHandled?.();
+  }, [renameRequestId, prefabs, onRenameRequestHandled]);
 
   function commitEdit(id: string): void {
     const name = draft.trim();
@@ -78,6 +94,11 @@ export function PrefabPanel({
                 {editingId === p.id ? (
                   <input
                     autoFocus
+                    ref={el => {
+                      if (!el) return;
+                      el.scrollIntoView({ block: "nearest" });
+                      if (selectOnFocusRef.current) { selectOnFocusRef.current = false; el.select(); }
+                    }}
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onBlur={() => commitEdit(p.id)}
