@@ -3290,6 +3290,23 @@ export default function App() {
     setLeftPanel("prefabs");   // show the new prefab (rename it there)
   };
 
+  // Prefabs panel "Create from selection": handler present only when the current
+  // selection can be captured; otherwise the hint explains why the button is off.
+  const PREFABABLE_TYPES = ["object", "trigger-volume", "shape", "stair", "ladder"];
+  const prefabSelectionRefs: SelectedRef[] =
+    multiSelected.length > 1 ? multiSelected
+    : selected && selected.id !== "__spawn__" ? [{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef]
+    : [];
+  const prefabSelectionEligible =
+    prefabSelectionRefs.some(r => PREFABABLE_TYPES.includes(r.type as string)) && !selPrefabInfo;
+  const prefabSelectionHint =
+    prefabSelectionRefs.length === 0 ? "Select an object, trigger volume, shape, stair, or ladder first"
+    : selPrefabInfo ? "Prefab members can't be re-captured — unlink the instance first"
+    : "Selection has no capturable entities (walls/floors/platforms are node-backed)";
+  const prefabCreateFromSelection = prefabSelectionEligible
+    ? () => handleCreatePrefab(prefabSelectionRefs)
+    : undefined;
+
   const handlePrefabDeleteInstance = (): void => {
     const world = worldRef.current;
     const info = selPrefabInfo;
@@ -3453,6 +3470,8 @@ export default function App() {
         onPrefabRename={handlePrefabRename}
         onPrefabDelete={handlePrefabDelete}
         onPrefabEdit={handleEditPrefab}
+        onPrefabCreateFromSelection={prefabCreateFromSelection}
+        prefabSelectionHint={prefabSelectionHint}
       />
       {editingPrefab && (
         <PrefabEditBar

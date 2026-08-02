@@ -100,6 +100,19 @@ export class SelectionManager implements IEditorModule {
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
+      this._bus.on("selection:toggle-ref", ({ ref })   => this._toggleRef(ref)),
+      // The volume tool owns volume picking (their meshes are selectable:false, so
+      // _cast never sees them); mirror its single-select into this manager's state
+      // so a FOLLOWING shift-click adds to the volume instead of starting over.
+      // No re-emit — the tool already announced object:selected itself.
+      this._bus.on("triggervolume:select", ({ zoneId, id }) => {
+        if (!id || this._selected?.userData.editorId === id) return;
+        const mesh = this._findMesh(id, zoneId);
+        if (!mesh) return;
+        if (this._selected) this._restore(this._selected);
+        this._clearExtras();
+        this._selected = this._resolveRoot(mesh);
+      }),
       // Sub-object selection sink (panel rows, vertex-handle clicks): store + re-emit
       // object:selected so all consumers read one channel.
       this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex, edge }) => {
@@ -245,6 +258,17 @@ export class SelectionManager implements IEditorModule {
     this._extraRefs.push(this._refOf(root));   // add as extra
     this._applyTint(root, SELECT_EMISSIVE, SELECT_INTENSITY);
     this._emitSelectionChanged();
+  }
+
+  /** Toggle one ref in the current selection — the additive-click path for
+   *  entities this manager can't raycast itself (trigger volumes, whose meshes
+   *  are selectable:false; TriggerVolumeTool routes shift-clicks here). */
+  private _toggleRef(ref: SelectedRef): void {
+    const refs = this._selectionRefs();
+    const idx = refs.findIndex(r => r.id === ref.id);
+    if (idx >= 0) refs.splice(idx, 1);
+    else refs.push(ref);
+    this._setSelection(refs);
   }
 
   /**
@@ -624,6 +648,7 @@ export class SelectionManager implements IEditorModule {
       case "ladder":   return zone.ladders?.find(l => l.id === editorId) ?? null;
       case "shape":    return zone.shapes?.find(s => s.id === editorId) ?? null;
       case "object":   return zone.objects.find(o => o.id === editorId) ?? null;
+      case "trigger-volume": return zone.triggerVolumes?.find(v => v.id === editorId) ?? null;
       case "checkpoint": return zone.checkpoints?.find(c => c.id === editorId) ?? null;
       case "light":    return zone.lights?.find(l => l.id === editorId) ?? null;
       case "decal":    return zone.decals?.find(d => d.id === editorId) ?? null;

@@ -330,6 +330,9 @@ export interface BusEvents {
   "input:click":           { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; button: number; shift: boolean; ctrl: boolean; meta: boolean };
   "selection:changed":     { refs: SelectedRef[] };
   "selection:set":         { refs: SelectedRef[] };
+  // Additive-click toggle routed from tools whose entities SelectionManager can't
+  // raycast itself (trigger volumes) — adds/removes one ref from the selection.
+  "selection:toggle-ref":  { ref: SelectedRef };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
   // Stationary right-click (RMB press+release under the drag threshold — orbit drags never fire this).
   "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };

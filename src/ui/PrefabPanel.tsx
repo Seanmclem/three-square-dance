@@ -10,6 +10,10 @@ interface PrefabPanelProps {
   onRename:        (prefabId: string, name: string) => void;
   onDelete:        (prefabId: string) => void;
   onEdit:          (prefabId: string) => void;     // isolated edit mode (snapshot prefabs, Phase 47)
+  // Capture the current viewport selection as a snapshot prefab; undefined =
+  // nothing eligible selected — the button renders disabled with selectionHint.
+  onCreateFromSelection?: () => void;
+  selectionHint?:  string;
 }
 
 /**
@@ -20,6 +24,7 @@ interface PrefabPanelProps {
  */
 export function PrefabPanel({
   prefabs, instanceCounts, onPlacePrefab, onPlaceGenerator, onRename, onDelete, onEdit,
+  onCreateFromSelection, selectionHint,
 }: PrefabPanelProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft,     setDraft]     = useState("");
@@ -36,6 +41,23 @@ export function PrefabPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* No header row — the LeftPanel wrapper already titles the panel "PREFABS". */}
+      <div style={{ padding: "8px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <button
+          onClick={onCreateFromSelection}
+          disabled={!onCreateFromSelection}
+          title={onCreateFromSelection
+            ? "Save the selected entities (scripts included) as a reusable prefab"
+            : selectionHint ?? "Select an object, trigger volume, shape, stair, or ladder first"}
+          style={{
+            width: "100%", padding: "7px 0", borderRadius: 4,
+            border: "1px solid " + (onCreateFromSelection ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.08)"),
+            background: onCreateFromSelection ? "rgba(80,140,255,0.1)" : "rgba(46,46,46,0.5)",
+            color: onCreateFromSelection ? "#9db8e8" : "#5a6070",
+            fontSize: 11, fontFamily: "monospace",
+            cursor: onCreateFromSelection ? "pointer" : "default",
+          }}
+        >⬡ Create from selection</button>
+      </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {prefabs.length === 0 && unplacedGenerators.length === 0 && (
           <div style={{ padding: "24px 16px", color: "#8a92a6", fontSize: 10, textAlign: "center", fontFamily: "monospace" }}>

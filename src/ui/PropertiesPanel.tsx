@@ -699,6 +699,8 @@ export function PropertiesPanel({
               runLinkedFloors={runLinkedFloors}
               onDelete={onDelete}
               onBake={onBake}
+              onCreatePrefab={onCreatePrefab}
+              isPrefabMember={!!prefabInfo}
             />
           </>
         ) : currentScreen === "geo" ? (
@@ -772,7 +774,7 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake }: {
+function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onCreatePrefab, isPrefabMember }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
@@ -787,6 +789,8 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
   runLinkedFloors?:   number[];
   onDelete?:          () => void;
   onBake?:            (refs: SelectedRef[]) => void;
+  onCreatePrefab?:    (refs: SelectedRef[]) => void;
+  isPrefabMember?:    boolean;
 }) {
   const wallData = selected.type === "wall" ? selected.data as WallDef : null;
   const [hovered, setHovered] = useState(false);
@@ -912,6 +916,21 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
                 color: "#80aaff", fontSize: 11, fontFamily: "monospace",
               }}
             >Bake → GLB asset</button>
+          )}
+
+          {/* Single-entity prefab capture (the multi-select view has its own button).
+              Scripts on the entity ride along into the prefab definition. */}
+          {onCreatePrefab && !isPrefabMember
+            && ["object", "trigger-volume", "shape", "stair", "ladder"].includes(selected.type as string) && (
+            <button
+              onClick={() => onCreatePrefab([{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef])}
+              title="Save this entity (scripts included) as a reusable prefab; it becomes the first linked instance"
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                color: "#9db8e8", fontSize: 11, fontFamily: "monospace",
+              }}
+            >⬡ Create Prefab</button>
           )}
 
           {onDelete && (

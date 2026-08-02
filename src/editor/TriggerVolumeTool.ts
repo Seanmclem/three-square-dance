@@ -111,26 +111,34 @@ export class TriggerVolumeTool {
       // Volume selection uses input:click. SelectionManager runs first (registered earlier)
       // and may have already tinted the floor/wall behind the volume. Emitting
       // object:deselected before our object:selected clears SelectionManager's highlight.
-      this._bus.on("input:click", ({ button }) => {
+      this._bus.on("input:click", ({ button, shift, meta, ctrl }) => {
         if (button !== 0 || this._state === "PLACING") return;
         // Only pick volumes under the Select or Trigger tools — never while another tool
         // (Spawn/Floor/Wall/…) is placing, so a placement click can't also select a volume.
         if (!isSelectMode(this._toolId) && this._toolId !== "trigger-volume") return;
         const vol = this._findVolumeAt(this._lastScreenPos);
-        if (vol) {
-          this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint
-          this._selectedId = vol.id;
-          this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: vol.id });
-          this._bus.emit("object:selected", {
-            id:       vol.id,
-            type:     "trigger-volume",
-            zoneId:   this._activeZoneId,
-            position: vol.position,
-            rotation: vol.rotation ?? ZERO_ROT,
-            scale:    UNIT_SCL,
-            data:     vol,
+        if (!vol) return;
+        // Additive click: join SelectionManager's multi-select instead of clobbering
+        // it (volumes can't be raycast by SelectionManager — selectable:false — so
+        // shift-clicks used to silently reset the selection to just this volume).
+        if (shift || meta || ctrl) {
+          this._bus.emit("selection:toggle-ref", {
+            ref: { id: vol.id, type: "trigger-volume", zoneId: this._activeZoneId },
           });
+          return;
         }
+        this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint
+        this._selectedId = vol.id;
+        this._bus.emit("triggervolume:select", { zoneId: this._activeZoneId, id: vol.id });
+        this._bus.emit("object:selected", {
+          id:       vol.id,
+          type:     "trigger-volume",
+          zoneId:   this._activeZoneId,
+          position: vol.position,
+          rotation: vol.rotation ?? ZERO_ROT,
+          scale:    UNIT_SCL,
+          data:     vol,
+        });
       }),
 
       // Clear our selection when something else gets selected or when
