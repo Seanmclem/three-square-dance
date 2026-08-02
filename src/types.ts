@@ -376,6 +376,7 @@ export interface BusEvents {
   // Overlay → DialogueRunner: player picked options[index] of the shown node
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string };
+  "character:launch":      { speed: number };   // spring/bouncer impulse — sets the player's vertical velocity
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
   // overlay → engine on option select, and overlay → ControlSchemeManager for
@@ -1182,6 +1183,7 @@ export type ActionType =
   | 'fire_event'
   | 'fade_screen'
   | 'teleport_player'
+  | 'launch_player'
   | 'respawn_player'
   | 'show_ui'
   | 'hide_ui'
@@ -1317,6 +1319,7 @@ export interface ScriptAction {
   facing?:       number;      // degrees — store_position coords facing / teleport_player literal facing
   facingSource?: 'keep' | 'literal' | 'key';      // teleport_player: how to set look direction
   facingKey?:    string;      // teleport_player: read facing (number, or a pose's .facing) from this key
+  launchSpeed?:  number;      // launch_player: upward velocity m/s (default 12; a jump is ~5)
   stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number

@@ -141,6 +141,7 @@ export class CharacterController {
 
   private _offTeleport: (() => void) | null = null;
   private _offSavePos:  (() => void) | null = null;
+  private _offLaunch:   (() => void) | null = null;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -186,6 +187,17 @@ export class CharacterController {
     this._offSavePos = this._bus.on("character:save-position", ({ key }) => {
       const p = this._body.position;
       gameState.set(key, { x: p.x, y: p.y - capsuleBottom, z: p.z, facing: THREE.MathUtils.radToDeg(this._yaw) });
+    });
+    // Script launch_player → spring/bouncer impulse: write the jump channel
+    // directly. Works while grounded — the grounded clamp only zeroes velY <= 0,
+    // so a positive velocity lifts off next frame. max() lets a spring cancel a
+    // fast fall without ever slowing an even faster existing rise; coyote/jump
+    // buffer are cleared so a buffered press can't double-boost the launch.
+    this._offLaunch = this._bus.on("character:launch", ({ speed }) => {
+      this._exitClimb();
+      this._velY = Math.max(this._velY, speed);
+      this._coyote = 0;
+      this._jumpBuffer = 0;
     });
     // Runtime footstep surface swap (set_footstep action). Empty = revert to authored default.
     this._offFootstep = this._bus.on("character:set-footstep", ({ sound }) => {
@@ -735,6 +747,7 @@ export class CharacterController {
     this._exitClimb();
     this._offTeleport?.();    this._offTeleport   = null;
     this._offSavePos?.();     this._offSavePos    = null;
+    this._offLaunch?.();      this._offLaunch     = null;
     this._offFootstep?.();    this._offFootstep   = null;
     this._offLadderEnter?.(); this._offLadderEnter = null;
     this._offLadderExit?.();  this._offLadderExit  = null;

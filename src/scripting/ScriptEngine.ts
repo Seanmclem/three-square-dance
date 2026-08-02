@@ -395,6 +395,12 @@ export class ScriptEngine {
         break;
       }
 
+      case "launch_player":
+        // Spring/bouncer: sets the player's vertical velocity (the jump channel).
+        // CharacterController is the only listener.
+        this._bus.emit("character:launch", { speed: action.launchSpeed ?? 12 });
+        break;
+
       case "load_scene":
         // Cross-scene routing (runtime shell). Only the runtime's SceneRouter
         // listens — in editor preview this is a deliberate no-op.

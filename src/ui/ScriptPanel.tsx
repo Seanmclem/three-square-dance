@@ -171,6 +171,7 @@ const ACTION_TYPES: ActionType[] = [
   "play_animation",
   "play_music",
   "play_sound",
+  "launch_player",
   "respawn_player",
   "run_script",
   "set_state",
@@ -2696,6 +2697,25 @@ function ActionFields({
         </div>
       );
     }
+
+    case "launch_player":
+      return (
+        <>
+          <F label="Upward speed (m/s)">
+            <input
+              type="number" min={0} step={0.5}
+              style={S.field}
+              placeholder="12"
+              value={action.launchSpeed ?? ""}
+              onChange={(e) => set({ launchSpeed: e.target.value === "" ? undefined : Number(e.target.value) })}
+            />
+          </F>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
+            Springs the player upward — a normal jump is ~5, 12 is a strong bouncer.
+            Pair with on_player_enter on a volume over the pad.
+          </div>
+        </>
+      );
 
     case "show_ui":
     case "hide_ui":
