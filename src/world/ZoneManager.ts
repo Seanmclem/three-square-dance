@@ -11,6 +11,7 @@ import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
+import { fadeMeshes, cancelAllFades } from "@/world/meshFade";
 import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
 import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MAX_SURFACE_DECALS } from "@/world/decals/surfaceDecals";
 import type { ObjectPlacer } from "@/preview/ObjectPlacer";
@@ -166,6 +167,8 @@ export class ZoneManager {
 
   // Non-object entities hidden by a script despawn_object this preview run; restored on preview:stop.
   private readonly _despawnedIds = new Set<string>();
+  // Pending faded-despawn collider-off timers; cleared on preview:stop.
+  private _despawnTimers: ReturnType<typeof setTimeout>[] = [];
 
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
@@ -387,8 +390,25 @@ export class ZoneManager {
       // Script-driven despawn_object for NON-object entities (platforms, stairs, walls,
       // floors, trigger volumes). Objects are handled by ObjectPlacer; a group target is
       // already fanned out to member ids by ScriptEngine before this fires.
-      this._bus.on("object:despawn", ({ id }) => {
-        this._despawnEntity(id);
+      // With a fade, hide/collider-off happen at fade END (a thing you can still
+      // see shouldn't be a ghost); ObjectPlacer fades object meshes, so an object
+      // id has no meshes here and just gets the delayed collider-off.
+      this._bus.on("object:despawn", ({ id, fade }) => {
+        if (fade && fade > 0) {
+          const meshes = this._entityMeshes(id);
+          if (meshes.length) fadeMeshes(meshes, "out", fade, () => this._despawnEntity(id));
+          else this._despawnTimers.push(setTimeout(() => this._despawnEntity(id), fade * 1000));
+        } else {
+          this._despawnEntity(id);
+        }
+      }),
+      // spawn_object: re-show + re-enable colliders immediately (a materializing
+      // thing is solid), then fade the visuals in if asked.
+      this._bus.on("object:spawn", ({ id, fade }) => {
+        const wasHidden = this._despawnedIds.delete(id);
+        if (this._setEntityHidden(id, false) && wasHidden && fade && fade > 0) {
+          fadeMeshes(this._entityMeshes(id), "in", fade);
+        }
       }),
       this._bus.on("object:updated", ({ id, zoneId, changes }) => {
         // Undo/redo of a prefab re-expansion: the journal collapses remove +
@@ -1362,8 +1382,38 @@ export class ZoneManager {
 
   /** Re-show + re-enable everything despawned during this preview run. */
   private _restoreDespawned(): void {
+    // Pending faded despawns must not land after the restore (they'd hide
+    // editor entities); mid-flight fades must not leak clone materials.
+    for (const t of this._despawnTimers) clearTimeout(t);
+    this._despawnTimers = [];
+    cancelAllFades();
     for (const id of this._despawnedIds) this._setEntityHidden(id, false);
     this._despawnedIds.clear();
+  }
+
+  /**
+   * The renderable meshes of a NON-object entity (the sets _setEntityHidden
+   * toggles) — object meshes live in ObjectPlacer. Used for despawn/spawn fades.
+   */
+  private _entityMeshes(id: string): THREE.Object3D[] {
+    for (const [zoneId, entry] of this._loadedZones) {
+      const pe = entry.platformEntries.get(id);
+      if (pe) return [...pe.meshes];
+      const se = entry.stairEntries.get(id);
+      if (se) return [se.group];
+      const she = entry.shapeEntries.get(id);
+      if (she) return [...she.meshes];
+      if (entry.floorColliders.has(id))
+        return entry.floorsGroup.children.filter(m => m.userData["editorId"] === id);
+      const re = entry.wallData.get(id);
+      if (re) return [re.mesh, ...re.trimMeshes];
+      const volMeshes = [
+        ...(this._volumeMeshes.get(zoneId) ?? []).filter(m => m.userData["editorId"] === id),
+        ...(this._volumeFills.get(zoneId)  ?? []).filter(f => f.userData["editorId"] === id),
+      ];
+      if (volMeshes.length) return volMeshes;
+    }
+    return [];
   }
 
   /**

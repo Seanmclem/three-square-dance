@@ -458,7 +458,14 @@ export class ScriptEngine {
 
       case "despawn_object":
         for (const id of this._resolveTargets(action.targetId))
-          this._bus.emit("object:despawn", { id });
+          this._bus.emit("object:despawn", { id, fade: action.fadeDuration });
+        break;
+
+      case "spawn_object":
+        // Opposite of despawn: re-show a hidden entity (+ re-enable colliders).
+        // "Hidden by default" = an on_level_load script despawning it first.
+        for (const id of this._resolveTargets(action.targetId))
+          this._bus.emit("object:spawn", { id, fade: action.fadeDuration });
         break;
 
       // Phase 31 — scripted geometry motion. MoverSystem is the only listener;

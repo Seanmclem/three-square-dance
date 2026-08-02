@@ -178,6 +178,7 @@ const ACTION_TYPES: ActionType[] = [
   "show_dialogue",
   "show_ui",
   "spawn_npc",
+  "spawn_object",
   "set_footstep",
   "start_mover",
   "stop_mover",
@@ -2342,7 +2343,41 @@ function ActionFields({
       );
 
     case "despawn_object":
-      return <F label="Target">{despawnTargetPicker}</F>;
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <F label="Target">{despawnTargetPicker}</F>
+          <F label="Fade out (s) — blank = instant" flex="0 0 auto">
+            <input
+              type="number" min={0} step={0.1}
+              style={{ ...S.field, width: 100 }}
+              placeholder="0"
+              title="Fade the target's materials to invisible over this many seconds. Its collider turns off when the fade completes."
+              value={action.fadeDuration ?? ""}
+              onChange={(e) => set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })}
+            />
+          </F>
+        </div>
+      );
+
+    case "spawn_object":
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <F label="Target">{despawnTargetPicker}</F>
+          <F label="Fade in (s) — blank = instant" flex="0 0 auto">
+            <input
+              type="number" min={0} step={0.1}
+              style={{ ...S.field, width: 100 }}
+              placeholder="0"
+              value={action.fadeDuration ?? ""}
+              onChange={(e) => set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })}
+            />
+          </F>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
+            Re-shows a despawned entity (collider comes back instantly). For a
+            &quot;hidden by default&quot; object, despawn it in an on_level_load script first.
+          </div>
+        </div>
+      );
 
     case "start_mover":
     case "stop_mover":

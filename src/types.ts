@@ -375,7 +375,8 @@ export interface BusEvents {
                              options?: { text: string; hasNext: boolean; picked?: boolean }[] };
   // Overlay → DialogueRunner: player picked options[index] of the shown node
   "dialogue:choose":       { index: number };
-  "object:despawn":        { id: string };
+  "object:despawn":        { id: string; fade?: number };   // fade = seconds to fade out (collider disables at fade end)
+  "object:spawn":          { id: string; fade?: number };   // re-show a despawned/hidden entity; fade = seconds to fade in
   "character:launch":      { speed: number };   // spring/bouncer impulse — sets the player's vertical velocity
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
@@ -1173,6 +1174,7 @@ export type ActionType =
   | 'play_animation'
   | 'spawn_npc'
   | 'despawn_object'
+  | 'spawn_object'
   | 'change_material'
   | 'open_door'
   | 'close_door'

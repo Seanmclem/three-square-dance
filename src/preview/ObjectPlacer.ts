@@ -3,6 +3,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import type { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
+import { fadeMeshes, cancelAllFades } from "@/world/meshFade";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldObject, Vec3 } from "@/types";
@@ -47,19 +48,35 @@ export class ObjectPlacer {
       // not just the selected one. Script edits are runtime-only (data untouched).
       if (changes.position || changes.rotation || changes.scale) this._applyTransformChanges(id, changes);
     });
-    // despawn_object: runtime-only hide. Tracked so preview:stop can un-hide (exiting
-    // preview doesn't rebuild the zone), matching ZoneManager's non-object despawn.
-    this._bus.on("object:despawn", ({ id }) => {
+    // despawn_object: runtime-only hide (optionally faded). Tracked so preview:stop
+    // can un-hide (exiting preview doesn't rebuild the zone), matching ZoneManager's
+    // non-object despawn.
+    this._bus.on("object:despawn", ({ id, fade }) => {
       const mesh = this._meshes.get(id);
       if (import.meta.env.DEV && mesh?.userData["_instanced"]) {
         console.warn(`[ObjectPlacer] pooled object "${id}" received despawn — instancing eligibility scan gap`);
       }
-      if (mesh) mesh.visible = false;
+      if (mesh) {
+        if (fade && fade > 0 && mesh.visible) fadeMeshes([mesh], "out", fade, () => { mesh.visible = false; });
+        else mesh.visible = false;
+      }
       this._mixers.get(id)?.stopAllAction();
       this._active.delete(id);
       this._despawned.add(id);
     });
+    // spawn_object: the opposite — re-show (optionally faded in). Colliders are
+    // ZoneManager's side of the same event. Already-visible targets are a no-op
+    // so a stray spawn can't blink an object.
+    this._bus.on("object:spawn", ({ id, fade }) => {
+      const mesh = this._meshes.get(id);
+      if (!mesh) return;
+      const wasHidden = this._despawned.delete(id);
+      if (!wasHidden && mesh.visible) return;
+      mesh.visible = true;
+      if (fade && fade > 0) fadeMeshes([mesh], "in", fade);
+    });
     this._bus.on("preview:stop", () => {
+      cancelAllFades();   // mid-fade clone materials must not leak into the editor
       for (const id of this._despawned) {
         const mesh = this._meshes.get(id);
         if (mesh) mesh.visible = true;
