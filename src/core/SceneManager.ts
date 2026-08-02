@@ -95,7 +95,7 @@ export class SceneManager {
     // panel edits). The hardcoded fill/rim directionals scale with the sun (baseline
     // ratios 0.6/2.0 and 0.3/2.0) so SUN 0 means genuinely no directional light, and
     // envIntensity drives the IBL term — all three at 0 = a truly dark scene.
-    this._unsubLighting = bus.on("world:lighting", ({ ambient, sun, envIntensity }) => {
+    this._unsubLighting = bus.on("world:lighting", ({ ambient, sun, envIntensity, quality }) => {
       this._ambientLight.color.set(ambient.color);
       this._ambientLight.intensity = ambient.intensity;
       this._sunLight.color.set(sun.color);
@@ -103,6 +103,7 @@ export class SceneManager {
       this._fillLight.intensity = sun.intensity * 0.3;
       this._rimLight.intensity  = sun.intensity * 0.15;
       this.scene.environmentIntensity = envIntensity ?? 1;
+      if (quality) this.setLightingQuality(quality);
     });
     // Skybox selection (WorldState emits on load and on panel edits). "sky" = procedural.
     this._unsubSky = bus.on("world:sky", ({ skybox }) => this._applySkybox(skybox));
@@ -126,11 +127,13 @@ export class SceneManager {
   }
 
   /**
-   * Lighting perf toggle (editor preference, not scene data): "fast" turns off
-   * the fill + rim directionals, leaving sun + ambient + IBL. Each extra
-   * directional adds per-pixel forward-shading cost across the whole frame —
-   * measured ~7ms/frame at retina res on a mid-size level. The runtime shell
-   * never calls this, so published games always play the full "fancy" rig.
+   * Lighting rig quality — a SCENE setting (WorldConfig.lightingQuality, driven
+   * through the world:lighting event on load and panel edits; published games
+   * honor it too). "fast" turns off the fill + rim directionals, leaving sun +
+   * ambient + IBL: each extra directional adds per-pixel forward-shading cost
+   * across the whole frame — measured ~7ms at retina res on a mid-size level.
+   * Note intensity 0 does NOT reclaim that cost (the lights stay in the shader's
+   * light loop); only removing them from the render (this toggle) does.
    */
   setLightingQuality(q: "fancy" | "fast"): void {
     const on = q === "fancy";

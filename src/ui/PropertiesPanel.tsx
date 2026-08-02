@@ -377,11 +377,8 @@ interface PropertiesPanelProps {
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
   // World-level ambient/sun/environment lighting (Lights drilldown page).
-  worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
-  // Editor lighting perf toggle (localStorage pref — published games always "fancy").
-  lightingQuality?:         "fancy" | "fast";
-  onLightingQualityChange?: (q: "fancy" | "fast") => void;
-  onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;
+  worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number; quality?: "fancy" | "fast" };
+  onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number; quality?: "fancy" | "fast" }) => void;
   worldAudio?:              WorldAudio;
   onWorldAudioChange?:      (changes: Partial<WorldAudio>) => void;
   // Active zone's placed lights + row-click selection (LIGHTS list under the Light tool).
@@ -431,7 +428,6 @@ export function PropertiesPanel({
   onEditScript,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
-  lightingQuality, onLightingQualityChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
@@ -625,8 +621,11 @@ export function PropertiesPanel({
         ) : !selected ? (
           currentScreen === "lights" ? (
             <>
-              {lightingQuality && onLightingQualityChange && (
-                <LightingQualitySection quality={lightingQuality} onChange={onLightingQualityChange} />
+              {worldLighting && onWorldLightingChange && (
+                <LightingQualitySection
+                  quality={worldLighting.quality ?? "fancy"}
+                  onChange={q => onWorldLightingChange({ quality: q })}
+                />
               )}
               {worldLighting && onWorldLightingChange && (
                 <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
@@ -5987,7 +5986,7 @@ function LightingQualitySection({ quality, onChange }: {
         {(["fancy", "fast"] as const).map(q => (
           <button key={q} onClick={() => onChange(q)}
             title={q === "fancy"
-              ? "Sun + blue fill + warm rim — how published games always look"
+              ? "Sun + blue fill + warm rim — the full rig"
               : "Sun + ambient only — noticeably faster on big levels; shadowed sides read darker"}
             style={{
               flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
@@ -6000,8 +5999,9 @@ function LightingQualitySection({ quality, onChange }: {
         ))}
       </div>
       <div style={{ color: "#9aa3b5", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
-        Your editor preference only — it never changes the scene, and published
-        games always play FANCY. FAST drops the fill/rim lights for framerate.
+        Saved with the scene — published games use it too. FAST drops the
+        fill/rim lights for framerate on big levels. (Turning light intensity
+        to 0 does NOT save performance — only FAST removes their GPU cost.)
       </div>
     </div>
   );

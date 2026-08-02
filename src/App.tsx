@@ -138,15 +138,6 @@ export default function App() {
   useEffect(() => { selectedRef.current = selected; }, [selected]);
   const [multiSelected,    setMultiSelected]    = useState<SelectedRef[]>([]);
   const [materialList,     setMaterialList]     = useState<MaterialDef[]>([]);
-  // Lighting perf toggle (editor localStorage pref; published games always "fancy").
-  const [lightingQuality, setLightingQuality] = useState<"fancy" | "fast">(
-    () => (localStorage.getItem("editorLighting") as "fancy" | "fast") ?? "fancy",
-  );
-  const handleLightingQualityChange = (q: "fancy" | "fast"): void => {
-    setLightingQuality(q);
-    localStorage.setItem("editorLighting", q);
-    sceneRef.current?.setLightingQuality(q);
-  };
   const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
@@ -245,10 +236,11 @@ export default function App() {
   const [zoneLights,      setZoneLights]       = useState<LightDef[]>([]);
   // World-level ambient/sun (WorldConfig) — synced from the world:lighting bus event;
   // seeded with the visual-parity defaults so the panel works before any load/save.
-  const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity: number }>({
+  const [worldLighting,   setWorldLighting]    = useState<{ ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity: number; quality?: "fancy" | "fast" }>({
     ambient: { color: "#aabbcc", intensity: 0.5 },
     sun:     { color: "#fff4e0", intensity: 2.0 },
     envIntensity: 1,
+    quality: "fancy",
   });
   // Scene-level audio (WorldConfig.audio) — synced from the world:audio bus event (Phase 36).
   const [worldAudio, setWorldAudio] = useState<WorldAudio | undefined>(undefined);
@@ -285,7 +277,6 @@ export default function App() {
 
     const scene     = new SceneManager(canvas, bus);
     sceneRef.current = scene;
-    scene.setLightingQuality((localStorage.getItem("editorLighting") as "fancy" | "fast") ?? "fancy");
     assetManager.init(scene.renderer);
     // Store the promise so the init IIFE can await it before building geometry.
     // initMaterials() races against physicsWorld.init() (WASM instantiation) and can
@@ -909,7 +900,7 @@ export default function App() {
           });
         });
       }),
-      bus.on("world:lighting", ({ ambient, sun, envIntensity }) => setWorldLighting({ ambient, sun, envIntensity: envIntensity ?? 1 })),
+      bus.on("world:lighting", ({ ambient, sun, envIntensity, quality }) => setWorldLighting({ ambient, sun, envIntensity: envIntensity ?? 1, quality: quality ?? "fancy" })),
       bus.on("world:audio", ({ audio }) => setWorldAudio(audio)),
       bus.on("world:sky", ({ skybox }) => setWorldSkybox(skybox)),
       bus.on("spawn:placed", () => {
@@ -1570,7 +1561,7 @@ export default function App() {
     });
   }, []);
 
-  const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }): void => {
+  const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number; quality?: "fancy" | "fast" }): void => {
     const world = worldRef.current;
     if (!world) return;
     // Emits world:lighting → SceneManager applies it and the bus listener syncs panel state.
@@ -3583,8 +3574,6 @@ export default function App() {
         onPlayerSettingsChange={handlePlayerSettingsChange}
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
-        lightingQuality={lightingQuality}
-        onLightingQualityChange={handleLightingQualityChange}
         onWorldLightingChange={handleWorldLightingChange}
         worldAudio={worldAudio}
         onWorldAudioChange={handleWorldAudioChange}

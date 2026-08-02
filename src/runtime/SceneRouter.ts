@@ -109,6 +109,10 @@ export class SceneRouter {
       world.gameItems       = this.deps.manifest.game?.items;
       world.gameStateSchema = this.deps.manifest.game?.stateSchema;
       world.gameUiElements  = this.deps.manifest.game?.uiElements;
+      // Game-wide lighting-quality default (scene's own setting wins). Applied
+      // via updateWorldLighting so the world:lighting re-emit reaches SceneManager.
+      const gameLQ = this.deps.manifest.game?.lightingQuality;
+      if (gameLQ && !world.world?.lightingQuality) world.updateWorldLighting({ quality: gameLQ });
       if (!world.activeZoneId) throw new Error(`Scene "${sceneId}" has no zones`);
       await zones.loadZone(world.activeZoneId);
 

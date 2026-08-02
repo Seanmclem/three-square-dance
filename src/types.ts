@@ -419,7 +419,7 @@ export interface BusEvents {
   "light:set":             { targetId: string; op: "on" | "off" | "toggle" };
   // World-level ambient/sun/environment changed (or loaded) — SceneManager applies it
   // (fill/rim directionals scale with sun intensity; envIntensity drives scene.environmentIntensity).
-  "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
+  "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number; quality?: "fancy" | "fast" };
   "spawn:mode":            { mode: "initial" | "checkpoint" };
   "spawn:placed":          Record<string, never>;
   "group:added":           { group: GroupDef };
@@ -621,6 +621,9 @@ export interface WorldConfig {
   // materials get no environment light — combined with ambient/sun 0 the scene goes
   // truly dark (fill/rim scale with sun automatically).
   envIntensity?:   number;
+  // Lighting rig quality, saved with the scene and honored by published games:
+  // "fancy" (default) = sun + fill + rim; "fast" = sun only (big-level framerate).
+  lightingQuality?: "fancy" | "fast";
   skybox:          string;
   fogColor:        string;
   fogDensity:      number;
@@ -1266,6 +1269,7 @@ export interface GameConfig {
   gameVersion:  1;
   items?:       ItemDef[];
   stateSchema?: Record<string, StateSchema>;
+  lightingQuality?: "fancy" | "fast";   // game-wide default; a scene's own setting wins
   prefabs?:     PrefabDef[];   // cross-scene prefab library (Phase 44)
   uiElements?:  UiElementDef[]; // cross-scene custom GUI registry (Phase 49)
 }
