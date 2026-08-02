@@ -56,12 +56,20 @@ export class ObjectPlacer {
       if (import.meta.env.DEV && mesh?.userData["_instanced"]) {
         console.warn(`[ObjectPlacer] pooled object "${id}" received despawn — instancing eligibility scan gap`);
       }
-      if (mesh) {
-        if (fade && fade > 0 && mesh.visible) fadeMeshes([mesh], "out", fade, () => { mesh.visible = false; });
-        else mesh.visible = false;
+      // Mixer cleanup happens when the object actually disappears — stopping at
+      // fade START resets the pose (a held Chest_Open snaps shut / autoplay
+      // restarts) while the mesh is still fading in view. A preview:stop that
+      // cancels the fade skips the stop entirely — same as an uncompleted despawn.
+      const finish = () => {
+        this._mixers.get(id)?.stopAllAction();
+        this._active.delete(id);
+      };
+      if (mesh && fade && fade > 0 && mesh.visible) {
+        fadeMeshes([mesh], "out", fade, () => { mesh.visible = false; finish(); });
+      } else {
+        if (mesh) mesh.visible = false;
+        finish();
       }
-      this._mixers.get(id)?.stopAllAction();
-      this._active.delete(id);
       this._despawned.add(id);
     });
     // spawn_object: the opposite — re-show (optionally faded in). Colliders are
