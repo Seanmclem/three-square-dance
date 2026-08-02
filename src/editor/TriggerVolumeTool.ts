@@ -25,7 +25,7 @@ function makeWireframe(w: number, h: number, d: number): THREE.LineSegments {
   // renderOrder to avoid coplanar z-fighting / transparent-sort flicker).
   const fill = new THREE.Mesh(
     insetBox(w, h, d),
-    new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.DoubleSide }),
+    new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.15, depthWrite: false, side: THREE.FrontSide }),
   );
   fill.userData = { selectable: false };
   fill.renderOrder = 1;

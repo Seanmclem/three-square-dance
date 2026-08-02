@@ -169,6 +169,9 @@ export class ZoneManager {
   private readonly _despawnedIds = new Set<string>();
   // Pending faded-despawn collider-off timers; cleared on preview:stop.
   private _despawnTimers: ReturnType<typeof setTimeout>[] = [];
+  // Volume interior fills render in the EDITOR only (screen-covering translucent
+  // overdraw is measurable GPU cost in play modes); tracked for rebuilds mid-preview.
+  private _inPreview = false;
 
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
@@ -521,6 +524,8 @@ export class ZoneManager {
       }),
       this._bus.on("preview:start", ({ mode }) => {
         this._flickerActive = true;
+        this._inPreview = true;
+        this._setVolumeFillsVisible(false);
         this._setEditorOnlyVisible(false);
         this._setHiddenWallGhostsVisible(false);
         this._ghostsSolid = true;
@@ -531,6 +536,8 @@ export class ZoneManager {
       }),
       this._bus.on("preview:stop",  () => {
         this._flickerActive = false;
+        this._inPreview = false;
+        this._setVolumeFillsVisible(true);
         this._restoreDespawned();
         this._restoreLightStates();
         this._setEditorOnlyVisible(true);
@@ -1381,6 +1388,15 @@ export class ZoneManager {
     if (this._setEntityHidden(id, true)) this._despawnedIds.add(id);
   }
 
+  /** Show/hide every volume's interior fill (the wire's first child). */
+  private _setVolumeFillsVisible(visible: boolean): void {
+    for (const zoneId of this._loadedZones.keys())
+      for (const m of this._volumeMeshes.get(zoneId) ?? []) {
+        const body = m.children[0];
+        if (body) body.visible = visible;
+      }
+  }
+
   /**
    * Hide every entity authored "start hidden" (spawn_object reveals it later).
    * Runs on preview:start — the runtime router exits/re-enters per scene, so
@@ -2217,19 +2233,23 @@ export class ZoneManager {
     // ground-level kill floor's bottom face = the terrain plane) — z-fight
     // shimmer. Explicit renderOrder: fill and edges are at the SAME camera
     // distance, so the transparent sort otherwise flip-flops per frame.
+    // FrontSide + hidden during preview/game: a map-wide volume's fill is
+    // screen-covering translucent overdraw at retina res (measured multi-ms per
+    // frame) — the editor gets the readability, play modes keep the wireframes.
     const bodyMat = new THREE.MeshBasicMaterial({
       color: vol.editorTint?.color ?? "#ffcc00",
       transparent: true,
       opacity: vol.editorTint?.opacity ?? 0.12,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
     });
     const body = new THREE.Mesh(new THREE.BoxGeometry(
       Math.max(0.05, vol.size.x - 0.04),
       Math.max(0.05, vol.size.y - 0.04),
       Math.max(0.05, vol.size.z - 0.04),
     ), bodyMat);
-    body.userData = { editorType: "trigger-volume", selectable: false, hideInGame: true };
+    body.userData = { editorType: "trigger-volume", selectable: false };
+    body.visible = !this._inPreview;
     body.renderOrder = 1;
     wire.renderOrder = 2;   // edges always draw over the fill
     wire.add(body);
