@@ -378,6 +378,9 @@ interface PropertiesPanelProps {
   onSpawnPositionChange?:   (pos: Vec3) => void;
   // World-level ambient/sun/environment lighting (Lights drilldown page).
   worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
+  // Editor lighting perf toggle (localStorage pref — published games always "fancy").
+  lightingQuality?:         "fancy" | "fast";
+  onLightingQualityChange?: (q: "fancy" | "fast") => void;
   onWorldLightingChange?:   (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;
   worldAudio?:              WorldAudio;
   onWorldAudioChange?:      (changes: Partial<WorldAudio>) => void;
@@ -428,6 +431,7 @@ export function PropertiesPanel({
   onEditScript,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
+  lightingQuality, onLightingQualityChange,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
@@ -621,6 +625,9 @@ export function PropertiesPanel({
         ) : !selected ? (
           currentScreen === "lights" ? (
             <>
+              {lightingQuality && onLightingQualityChange && (
+                <LightingQualitySection quality={lightingQuality} onChange={onLightingQualityChange} />
+              )}
               {worldLighting && onWorldLightingChange && (
                 <WorldLightSection lighting={worldLighting} onChange={onWorldLightingChange} />
               )}
@@ -5965,6 +5972,41 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
 
 // World-level ambient/sun controls — shown under the Light tool so the existing
 // scene lighting is manageable from the same place placed lights are authored.
+// ── LightingQualitySection ────────────────────────────────────────────────────
+// Editor perf preference: FANCY = sun + blue fill + warm rim (the published-game
+// look); FAST = sun + ambient only. Each extra directional light shades every
+// pixel every frame, so FAST buys real framerate on big levels / retina screens.
+function LightingQualitySection({ quality, onChange }: {
+  quality:  "fancy" | "fast";
+  onChange: (q: "fancy" | "fast") => void;
+}) {
+  return (
+    <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={LABEL}>LIGHTING QUALITY</div>
+      <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+        {(["fancy", "fast"] as const).map(q => (
+          <button key={q} onClick={() => onChange(q)}
+            title={q === "fancy"
+              ? "Sun + blue fill + warm rim — how published games always look"
+              : "Sun + ambient only — noticeably faster on big levels; shadowed sides read darker"}
+            style={{
+              flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
+              border: "1px solid " + (quality === q ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
+              background: quality === q ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+              color: quality === q ? "#80aaff" : "#c0c0c0", cursor: "pointer",
+            }}>
+            {q.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <div style={{ color: "#9aa3b5", fontSize: 9, marginTop: 6, lineHeight: 1.5 }}>
+        Your editor preference only — it never changes the scene, and published
+        games always play FANCY. FAST drops the fill/rim lights for framerate.
+      </div>
+    </div>
+  );
+}
+
 function WorldLightSection({ lighting, onChange }: {
   lighting: { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number };
   onChange: (changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number }) => void;

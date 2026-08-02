@@ -125,6 +125,19 @@ export class SceneManager {
     this._raf = requestAnimationFrame(this._loopBound);
   }
 
+  /**
+   * Lighting perf toggle (editor preference, not scene data): "fast" turns off
+   * the fill + rim directionals, leaving sun + ambient + IBL. Each extra
+   * directional adds per-pixel forward-shading cost across the whole frame —
+   * measured ~7ms/frame at retina res on a mid-size level. The runtime shell
+   * never calls this, so published games always play the full "fancy" rig.
+   */
+  setLightingQuality(q: "fancy" | "fast"): void {
+    const on = q === "fancy";
+    this._fillLight.visible = on;
+    this._rimLight.visible  = on;
+  }
+
   private _setupLighting(): THREE.DirectionalLight {
     const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
     sun.position.set(30, 50, 20);

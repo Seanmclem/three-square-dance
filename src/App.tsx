@@ -138,6 +138,15 @@ export default function App() {
   useEffect(() => { selectedRef.current = selected; }, [selected]);
   const [multiSelected,    setMultiSelected]    = useState<SelectedRef[]>([]);
   const [materialList,     setMaterialList]     = useState<MaterialDef[]>([]);
+  // Lighting perf toggle (editor localStorage pref; published games always "fancy").
+  const [lightingQuality, setLightingQuality] = useState<"fancy" | "fast">(
+    () => (localStorage.getItem("editorLighting") as "fancy" | "fast") ?? "fancy",
+  );
+  const handleLightingQualityChange = (q: "fancy" | "fast"): void => {
+    setLightingQuality(q);
+    localStorage.setItem("editorLighting", q);
+    sceneRef.current?.setLightingQuality(q);
+  };
   const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
@@ -276,6 +285,7 @@ export default function App() {
 
     const scene     = new SceneManager(canvas, bus);
     sceneRef.current = scene;
+    scene.setLightingQuality((localStorage.getItem("editorLighting") as "fancy" | "fast") ?? "fancy");
     assetManager.init(scene.renderer);
     // Store the promise so the init IIFE can await it before building geometry.
     // initMaterials() races against physicsWorld.init() (WASM instantiation) and can
@@ -3567,6 +3577,8 @@ export default function App() {
         onPlayerSettingsChange={handlePlayerSettingsChange}
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
+        lightingQuality={lightingQuality}
+        onLightingQualityChange={handleLightingQualityChange}
         onWorldLightingChange={handleWorldLightingChange}
         worldAudio={worldAudio}
         onWorldAudioChange={handleWorldAudioChange}
