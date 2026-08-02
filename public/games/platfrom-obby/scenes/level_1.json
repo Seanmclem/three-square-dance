@@ -939,35 +939,6 @@
           }
         },
         {
-          "id": "obj_9184ee36",
-          "assetId": "bouncer",
-          "position": {
-            "x": -43.60785968555745,
-            "y": 5.635702554630768,
-            "z": -46.06383754964562
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "label": "spring1",
-          "autoPlayAnimation": "Bouncer_Idle"
-        },
-        {
           "id": "obj_a03d1bd5",
           "assetId": "bridge_small",
           "position": {
@@ -6453,35 +6424,6 @@
           }
         },
         {
-          "id": "obj_4ddacd98",
-          "assetId": "chest",
-          "position": {
-            "x": -12.22989322717145,
-            "y": 9.392836500518921,
-            "z": -47.58903157364694
-          },
-          "rotation": {
-            "x": 0,
-            "y": -90,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "autoPlayAnimation": null,
-          "scripts": []
-        },
-        {
           "id": "obj_0fcbeafe",
           "label": "Tile 1,3",
           "assetId": "platform_grass_center",
@@ -10766,7 +10708,7 @@
           "id": "obj_7217f4d9",
           "assetId": "coin",
           "position": {
-            "x": -24.5,
+            "x": -24.01727333818494,
             "y": 8.706748443504317,
             "z": -47.5
           },
@@ -10856,9 +10798,9 @@
           "id": "obj_98535387",
           "assetId": "coin",
           "position": {
-            "x": -20,
-            "y": 9.216824741444283,
-            "z": -47.5
+            "x": -19.78857529954272,
+            "y": 9.22353718905063,
+            "z": -47.46591555408867
           },
           "rotation": {
             "x": 0,
@@ -10943,12 +10885,80 @@
           }
         },
         {
-          "id": "obj_079554aa",
-          "assetId": "numbers_5",
+          "id": "obj_caed087d",
+          "assetId": "bouncer",
           "position": {
-            "x": -11.376066503159333,
-            "y": 13.14441119765554,
-            "z": -46.952903861687005
+            "x": -43.60785968555745,
+            "y": 5.635702554630768,
+            "z": -46.06383754964562
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "spring1",
+          "autoPlayAnimation": "Bouncer_Idle",
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_8d0fd25b",
+            "memberKey": "obj_9184ee36"
+          }
+        },
+        {
+          "id": "obj_0c8f1262",
+          "assetId": "bouncer",
+          "position": {
+            "x": -43.48304091368374,
+            "y": 5.771756225759203,
+            "z": -48.47292038084125
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "spring1",
+          "autoPlayAnimation": "Bouncer_Idle",
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_dab4f59e",
+            "memberKey": "obj_9184ee36"
+          }
+        },
+        {
+          "id": "obj_9ebe6b35",
+          "assetId": "chest",
+          "position": {
+            "x": -12.22989322717145,
+            "y": 9.392836500518921,
+            "z": -47.58903157364694
           },
           "rotation": {
             "x": 0,
@@ -10968,15 +10978,20 @@
             "lootTableId": null,
             "triggerEventId": null
           },
-          "label": "5 Number for Coin",
-          "startHidden": true
+          "autoPlayAnimation": null,
+          "scripts": [],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_4786b2c5",
+            "memberKey": "obj_4ddacd98"
+          }
         },
         {
-          "id": "obj_5a26150e",
+          "id": "obj_cf5dfe97",
           "assetId": "coin",
           "position": {
             "x": -11.364118643475232,
-            "y": 13.075621895923941,
+            "y": 12.276162434522874,
             "z": -48.115096893108344
           },
           "rotation": {
@@ -10998,7 +11013,148 @@
             "triggerEventId": null
           },
           "label": "5 Coin Icon indicator",
-          "startHidden": true
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_4786b2c5",
+            "memberKey": "obj_5a26150e"
+          }
+        },
+        {
+          "id": "obj_de5d0fb3",
+          "assetId": "numbers_5",
+          "position": {
+            "x": -11.376066503159333,
+            "y": 12.344951736254473,
+            "z": -46.952903861687005
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "5 Number for Coin",
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_4786b2c5",
+            "memberKey": "obj_079554aa"
+          }
+        },
+        {
+          "id": "obj_8bb98556",
+          "assetId": "chest",
+          "position": {
+            "x": -28.612373633719947,
+            "y": 12.687033973733104,
+            "z": -26.049773491536378
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "autoPlayAnimation": null,
+          "scripts": [],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_f331434f",
+            "memberKey": "obj_4ddacd98"
+          }
+        },
+        {
+          "id": "obj_0b74c39c",
+          "assetId": "coin",
+          "position": {
+            "x": -27.746599050023725,
+            "y": 15.570359907737057,
+            "z": -26.57583881099778
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "5 Coin Icon indicator",
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_f331434f",
+            "memberKey": "obj_5a26150e"
+          }
+        },
+        {
+          "id": "obj_3f3eedbb",
+          "assetId": "numbers_5",
+          "position": {
+            "x": -27.758546909707828,
+            "y": 15.639149209468655,
+            "z": -25.41364577957644
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "5 Number for Coin",
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_f331434f",
+            "memberKey": "obj_079554aa"
+          }
         }
       ],
       "prefabInstances": [
@@ -11208,6 +11364,62 @@
             },
             "rotationY": 0
           }
+        },
+        {
+          "id": "pfi_4786b2c5",
+          "prefabId": "pfb_07e2acef",
+          "version": 3,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -12.117519593451505,
+              "y": 9.392836500518921,
+              "z": -47.539258082110564
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_f331434f",
+          "prefabId": "pfb_07e2acef",
+          "version": 3,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -28.5,
+              "y": 12.687033973733104,
+              "z": -26
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_8d0fd25b",
+          "prefabId": "pfb_b9f347f5",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -43.62481877187371,
+              "y": 5.635702554630768,
+              "z": -46.09091716880437
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_dab4f59e",
+          "prefabId": "pfb_b9f347f5",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -43.5,
+              "y": 5.771756225759203,
+              "z": -48.5
+            },
+            "rotationY": 0
+          }
         }
       ],
       "ladders": [
@@ -11315,77 +11527,7 @@
           ]
         },
         {
-          "id": "vol_9becbbd8",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -13.5,
-            "y": 9.392836500518923,
-            "z": -47.5
-          },
-          "size": {
-            "x": 2,
-            "y": 2.5,
-            "z": 4
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "scr_4b086343",
-              "label": "open_chest",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter",
-                "targetId": "vol_9becbbd8"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_4ddacd98",
-                  "animation": "Chest_Open",
-                  "animationHold": true
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.9,
-                  "targetId": "obj_4ddacd98",
-                  "fadeDuration": 1
-                },
-                {
-                  "type": "spawn_object",
-                  "targetId": "obj_079554aa",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "spawn_object",
-                  "targetId": "obj_5a26150e",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.8,
-                  "targetId": "obj_079554aa",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.8,
-                  "targetId": "obj_5a26150e",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "adjust_number",
-                  "stateKey": "coins",
-                  "numberDelta": 5
-                }
-              ],
-              "oneShot": false
-            }
-          ]
-        },
-        {
-          "id": "vol_41fa1fe1",
+          "id": "vol_4b2ee12e",
           "label": "Trigger Volume",
           "position": {
             "x": -43.641777858189975,
@@ -11400,7 +11542,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "scr_689aac0e",
+              "id": "script_960f2e65",
               "label": "spring1 bounce",
               "zoneId": "demo",
               "enabled": true,
@@ -11411,7 +11553,7 @@
               "actions": [
                 {
                   "type": "play_animation",
-                  "targetId": "obj_9184ee36",
+                  "targetId": "obj_caed087d",
                   "animation": "Bouncer_Bounce"
                 },
                 {
@@ -11421,7 +11563,206 @@
               ],
               "oneShot": false
             }
-          ]
+          ],
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_8d0fd25b",
+            "memberKey": "vol_41fa1fe1"
+          }
+        },
+        {
+          "id": "vol_4e129c72",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -43.51695908631626,
+            "y": 7.14318479873201,
+            "z": -48.52707961915874
+          },
+          "size": {
+            "x": 1.3,
+            "y": 0.5,
+            "z": 1.3
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_efff2166",
+              "label": "spring1 bounce",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_0c8f1262",
+                  "animation": "Bouncer_Bounce"
+                },
+                {
+                  "type": "launch_player",
+                  "launchSpeed": 20
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_dab4f59e",
+            "memberKey": "vol_41fa1fe1"
+          }
+        },
+        {
+          "id": "vol_c1657fca",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -13.5,
+            "y": 9.392836500518923,
+            "z": -47.5
+          },
+          "size": {
+            "x": 2,
+            "y": 2.5,
+            "z": 4
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_6a12f15e",
+              "label": "open_chest",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter",
+                "targetId": "vol_c1657fca"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_9ebe6b35",
+                  "animation": "Chest_Open",
+                  "animationHold": true
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.9,
+                  "targetId": "obj_9ebe6b35",
+                  "fadeDuration": 1
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_de5d0fb3",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_cf5dfe97",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_de5d0fb3",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_cf5dfe97",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 5
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_4786b2c5",
+            "memberKey": "vol_9becbbd8"
+          }
+        },
+        {
+          "id": "vol_f9d97563",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -29.882480406548495,
+            "y": 12.687033973733106,
+            "z": -25.960741917889436
+          },
+          "size": {
+            "x": 2,
+            "y": 2.5,
+            "z": 4
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_7008fa7d",
+              "label": "open_chest",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter",
+                "targetId": "vol_f9d97563"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_8bb98556",
+                  "animation": "Chest_Open",
+                  "animationHold": true
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.9,
+                  "targetId": "obj_8bb98556",
+                  "fadeDuration": 1
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_3f3eedbb",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_0b74c39c",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_3f3eedbb",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_0b74c39c",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 5
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_f331434f",
+            "memberKey": "vol_9becbbd8"
+          }
         }
       ],
       "scripts": [

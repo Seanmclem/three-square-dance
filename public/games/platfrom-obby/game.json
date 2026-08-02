@@ -349,9 +349,108 @@
       "id": "pfb_07e2acef",
       "name": "Chest - 5 Coins, trigger, indicator.",
       "kind": "snapshot",
-      "version": 1,
+      "version": 5,
       "variables": [],
       "template": [
+        {
+          "memberKey": "obj_4ddacd98",
+          "type": "object",
+          "def": {
+            "id": "obj_4ddacd98",
+            "assetId": "chest",
+            "position": {
+              "x": -0.11237363371994569,
+              "y": 0,
+              "z": -0.04977349153637789
+            },
+            "rotation": {
+              "x": 0,
+              "y": -90,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "autoPlayAnimation": null,
+            "scripts": []
+          }
+        },
+        {
+          "memberKey": "obj_5a26150e",
+          "type": "object",
+          "def": {
+            "id": "obj_5a26150e",
+            "assetId": "coin",
+            "position": {
+              "x": 2.68613578284641,
+              "y": 2.349165964147068,
+              "z": -0.5758388109977801
+            },
+            "rotation": {
+              "x": 0,
+              "y": 90,
+              "z": 0
+            },
+            "scale": {
+              "x": 0.6,
+              "y": 0.6,
+              "z": 0.6
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "label": "5 Coin Icon indicator",
+            "startHidden": true
+          }
+        },
+        {
+          "memberKey": "obj_079554aa",
+          "type": "object",
+          "def": {
+            "id": "obj_079554aa",
+            "assetId": "numbers_5",
+            "position": {
+              "x": 2.674187923162309,
+              "y": 2.4179552658786667,
+              "z": 0.5863542204235586
+            },
+            "rotation": {
+              "x": 0,
+              "y": -90,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "label": "5 Number for Coin",
+            "startHidden": true
+          }
+        },
         {
           "memberKey": "vol_9becbbd8",
           "type": "trigger-volume",
@@ -368,7 +467,7 @@
               "y": 2.5,
               "z": 4
             },
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "scripts": [
               {
                 "id": "scr_4b086343",
@@ -419,6 +518,63 @@
                     "type": "adjust_number",
                     "stateKey": "coins",
                     "numberDelta": 5
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "powerup11"
+                  }
+                ],
+                "oneShot": false
+              }
+            ]
+          }
+        }
+      ],
+      "dateAdded": "2026-08-02"
+    },
+    {
+      "id": "pfb_b9f347f5",
+      "name": "Spring Jumper",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "vol_41fa1fe1",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_41fa1fe1",
+            "label": "Trigger Volume",
+            "position": {
+              "x": -0.01695908631626253,
+              "y": 1.3714285729728068,
+              "z": -0.027079619158740798
+            },
+            "size": {
+              "x": 1.3,
+              "y": 0.5,
+              "z": 1.3
+            },
+            "zoneId": "demo",
+            "scripts": [
+              {
+                "id": "scr_689aac0e",
+                "label": "spring1 bounce",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "targetId": "obj_9184ee36",
+                    "animation": "Bouncer_Bounce"
+                  },
+                  {
+                    "type": "launch_player",
+                    "launchSpeed": 20
                   }
                 ],
                 "oneShot": false
@@ -427,25 +583,25 @@
           }
         },
         {
-          "memberKey": "obj_4ddacd98",
+          "memberKey": "obj_9184ee36",
           "type": "object",
           "def": {
-            "id": "obj_4ddacd98",
-            "assetId": "chest",
+            "id": "obj_9184ee36",
+            "assetId": "bouncer",
             "position": {
-              "x": -0.11237363371994569,
+              "x": 0.01695908631626253,
               "y": 0,
-              "z": -0.04977349153637789
+              "z": 0.027079619158747903
             },
             "rotation": {
               "x": 0,
-              "y": -90,
+              "y": 0,
               "z": 0
             },
             "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
+              "x": 0.7,
+              "y": 0.7,
+              "z": 0.7
             },
             "floor": 0,
             "zoneId": "demo",
@@ -455,74 +611,8 @@
               "lootTableId": null,
               "triggerEventId": null
             },
-            "autoPlayAnimation": null,
-            "scripts": []
-          }
-        },
-        {
-          "memberKey": "obj_5a26150e",
-          "type": "object",
-          "def": {
-            "id": "obj_5a26150e",
-            "assetId": "coin",
-            "position": {
-              "x": 0.7534009499762728,
-              "y": 3.68278539540502,
-              "z": -0.5758388109977801
-            },
-            "rotation": {
-              "x": 0,
-              "y": 90,
-              "z": 0
-            },
-            "scale": {
-              "x": 0.6,
-              "y": 0.6,
-              "z": 0.6
-            },
-            "floor": 0,
-            "zoneId": "demo",
-            "properties": {
-              "interactable": false,
-              "npcSpawn": false,
-              "lootTableId": null,
-              "triggerEventId": null
-            },
-            "label": "5 Coin Icon indicator",
-            "startHidden": true
-          }
-        },
-        {
-          "memberKey": "obj_079554aa",
-          "type": "object",
-          "def": {
-            "id": "obj_079554aa",
-            "assetId": "numbers_5",
-            "position": {
-              "x": 0.7414530902921719,
-              "y": 3.7515746971366184,
-              "z": 0.5863542204235586
-            },
-            "rotation": {
-              "x": 0,
-              "y": -90,
-              "z": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "floor": 0,
-            "zoneId": "demo",
-            "properties": {
-              "interactable": false,
-              "npcSpawn": false,
-              "lootTableId": null,
-              "triggerEventId": null
-            },
-            "label": "5 Number for Coin",
-            "startHidden": true
+            "label": "spring1",
+            "autoPlayAnimation": "Bouncer_Idle"
           }
         }
       ],
