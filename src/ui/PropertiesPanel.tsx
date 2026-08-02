@@ -366,6 +366,8 @@ interface PropertiesPanelProps {
   runLinkedFloors?:         number[];
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
+  // Row click on a script list → open that script's editor in the Scripts panel.
+  onEditScript?:            (scriptId: string) => void;
   zones?:                   ZoneDef[];
   groups?:                  GroupDef[];
   activeZoneId?:            string | null;
@@ -423,6 +425,7 @@ export function PropertiesPanel({
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun,
   onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete,
   onVolumeScriptsChange,
+  onEditScript,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
@@ -638,6 +641,7 @@ export function PropertiesPanel({
             selected={selected}
             onDelete={onDelete}
             onScriptsChange={onVolumeScriptsChange}
+            onEditScript={onEditScript}
             groups={groups}
             groupsOpen={groupsOpen}
             onToggleGroups={() => setGroupsOpen(v => !v)}
@@ -749,7 +753,7 @@ export function PropertiesPanel({
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
-          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} />
+          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} />
         ) : null}
       </div>
 
@@ -5499,11 +5503,13 @@ const clamp01 = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) 
 /** Shared script list rows (volume ENTRY/EXIT section + object Scripts screen):
  *  enabled dot, label, trigger + action count, delete — editing happens in the
  *  Scripts panel. */
-function ScriptListRows({ scripts, emptyHint, onToggle, onDelete }: {
+function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
   scripts:   ScriptDef[];
   emptyHint: string;
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
+  /** Row click → open this script's editor in the Scripts panel. */
+  onOpen?:   (id: string) => void;
 }) {
   return (
     <>
@@ -5520,7 +5526,11 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete }: {
             style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, cursor: onToggle ? "pointer" : "default",
                      background: s.enabled ? "#44cc88" : "#444" }}
           />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            onClick={() => onOpen?.(s.id)}
+            title={onOpen ? "Open this script in the Scripts panel" : undefined}
+            style={{ flex: 1, minWidth: 0, cursor: onOpen ? "pointer" : "default" }}
+          >
             <div style={{ color: "#b0b0b0", fontSize: 11, fontFamily: "monospace",
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {s.label}
@@ -5541,7 +5551,7 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete }: {
       ))}
       {scripts.length > 0 && (
         <div style={{ color: "#444", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
-          Edit actions in the Scripts panel →
+          {onOpen ? "Click a script to edit its actions →" : "Edit actions in the Scripts panel →"}
         </div>
       )}
     </>
@@ -5552,9 +5562,10 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete }: {
 // Scripts attached to a placed object — same list as a volume's ENTRY/EXIT
 // section, editing stays in the Scripts panel. The add button presets the
 // trigger from what the object supports.
-function ObjectScriptsScreen({ selected, onScriptsChange }: {
+function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript }: {
   selected: SelectedObjectPayload;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
+  onEditScript?: (scriptId: string) => void;
 }) {
   const obj = selected.data as WorldObject | null;
   if (!obj) return null;
@@ -5599,6 +5610,7 @@ function ObjectScriptsScreen({ selected, onScriptsChange }: {
           emptyHint="No scripts — hit + Add"
           onToggle={onScriptsChange ? (id) => onScriptsChange(scripts.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)) : undefined}
           onDelete={onScriptsChange ? (id) => onScriptsChange(scripts.filter(s => s.id !== id)) : undefined}
+          onOpen={onEditScript}
         />
       </div>
       {!obj.properties.interactable && !hasSensor && (
@@ -5631,10 +5643,11 @@ function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
+  onEditScript?:    (scriptId: string) => void;
   groups:           GroupDef[];
   groupsOpen:       boolean;
   onToggleGroups:   () => void;
@@ -5918,6 +5931,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
           emptyHint="No scripts — add Entry or Exit above"
           onToggle={onScriptsChange ? toggleScript : undefined}
           onDelete={onScriptsChange ? deleteScript : undefined}
+          onOpen={onEditScript}
         />
       </div>
 

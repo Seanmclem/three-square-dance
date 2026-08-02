@@ -74,6 +74,7 @@ interface LeftPanelProps {
   gameStateSchema?:     Record<string, StateSchema>;
   onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
   isPreviewing?:        boolean;
+  scriptEditRequest?:   { scriptId: string; n: number } | null;
   worldItems:           ItemDef[];
   projectSceneIds?:     string[];
   onWorldItemsChange:   (items: ItemDef[]) => void;
@@ -107,7 +108,7 @@ export function LeftPanel({
   zoneScripts, zoneDialogues, objectScripts, selectedObjectId,
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneLights, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
-  stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing,
+  stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing, scriptEditRequest,
   worldItems, onWorldItemsChange, projectSceneIds, uiElements, onUiElementsChange,
   decalTextures, selectedDecalId, onDecalSelect,
   prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete, onPrefabEdit,
@@ -286,6 +287,7 @@ export function LeftPanel({
                 gameStateSchema={gameStateSchema}
                 onGameStateSchemaChange={onGameStateSchemaChange}
                 isPreviewing={isPreviewing}
+                editRequest={scriptEditRequest}
                 worldItems={worldItems}
                 projectSceneIds={projectSceneIds}
                 onWorldItemsChange={onWorldItemsChange}

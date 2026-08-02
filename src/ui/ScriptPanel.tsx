@@ -280,6 +280,9 @@ export interface ScriptPanelProps {
   onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
   /** True while editor preview/game is running — enables the live-values pane. */
   isPreviewing?: boolean;
+  /** Jump straight into editing a script (row click on a properties-panel list).
+   *  `n` is a nonce so re-clicking the same script re-opens it. */
+  editRequest?: { scriptId: string; n: number } | null;
   worldItems: ItemDef[];
   onWorldItemsChange: (items: ItemDef[]) => void;
   projectSceneIds?: string[];
@@ -317,6 +320,7 @@ export function ScriptPanel({
   gameStateSchema,
   onGameStateSchemaChange,
   isPreviewing,
+  editRequest,
   worldItems,
   onWorldItemsChange,
   projectSceneIds,
@@ -347,6 +351,14 @@ export function ScriptPanel({
       setEditingId(null);
     }
   }, [selectedObjectId]);
+
+  // Row click on a properties-panel script list → jump straight into that
+  // script's editor (SELECTED tab; entity scripts live there).
+  useEffect(() => {
+    if (!editRequest) return;
+    setTab("object");
+    setEditingId(editRequest.scriptId);
+  }, [editRequest]);
 
   const currentScripts: ScriptDef[] =
     tab === "level" ? zoneScripts : (objectScripts ?? []);

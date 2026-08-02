@@ -3318,6 +3318,13 @@ export default function App() {
     setPrefabTick(t => t + 1);
   };
 
+  // Properties-panel script row click → open that script in the Scripts panel.
+  const [scriptEditRequest, setScriptEditRequest] = useState<{ scriptId: string; n: number } | null>(null);
+  const handleEditScriptRow = (scriptId: string): void => {
+    setLeftPanel("scripts");
+    setScriptEditRequest({ scriptId, n: Date.now() });   // nonce: re-click re-opens
+  };
+
   const handleObjectScriptsChange = (objectId: string, scripts: ScriptDef[]): void => {
     if (!selected) return;
     if (selected.type === "trigger-volume") {
@@ -3455,6 +3462,7 @@ export default function App() {
         gameStateSchema={project ? gameSchema : undefined}
         onGameStateSchemaChange={project ? handleGameSchemaChange : undefined}
         isPreviewing={isPreview}
+        scriptEditRequest={scriptEditRequest}
         worldItems={worldItems}
         onWorldItemsChange={handleWorldItemsChange}
         projectSceneIds={project ? project.store.sceneIds : undefined}
@@ -3539,6 +3547,7 @@ export default function App() {
         onBake={refs => setBakeRefs(refs)}
         decalTextures={decalTextures}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
+        onEditScript={handleEditScriptRow}
         zones={zones}
         groups={groups}
         activeZoneId={activeZoneId}
