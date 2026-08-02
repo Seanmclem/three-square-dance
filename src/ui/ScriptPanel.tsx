@@ -1445,110 +1445,108 @@ function ActionTargetPicker({
   zoneLightDefs?: LightDef[];
   onChange: (id: string) => void;
 }) {
-  const known =
-    groups.some((g) => g.id === targetId) ||
-    zoneObjects.some((o) => o.id === targetId) ||
-    zoneShapes.some((s) => s.id === targetId) ||
-    zonePlatforms.some((p) => p.id === targetId) ||
-    zoneStairs.some((s) => s.id === targetId) ||
-    zoneWalls.some((w) => w.id === targetId) ||
-    zoneFloors.some((f) => f.id === targetId) ||
-    triggerVolumes.some((v) => v.id === targetId) ||
-    zoneLightDefs.some((l) => l.id === targetId);
+  // Prefab members (e.g. every tile of a tiled platform) are generated internals —
+  // dozens per instance, and rebuilds churn their ids — so they're not offered.
+  const noPrefab = <T,>(arr: T[]): T[] => arr.filter((e) => !(e as { prefab?: unknown }).prefab);
   const short = (id: string) => id.slice(0, 8);
+  const opts: TargetOpt[] = [
+    ...groups.map((g) => ({ id: g.id, text: `▦ ${g.name}`, group: "Groups" })),
+    ...noPrefab(zoneObjects).map((o) => ({ id: o.id, text: `${o.label || o.assetId} (${short(o.id)})`, group: "Objects" })),
+    ...zonePlatforms.map((p) => ({ id: p.id, text: `${p.label || "Platform"} (${short(p.id)})`, group: "Platforms" })),
+    ...noPrefab(zoneShapes).map((s) => ({ id: s.id, text: `${s.label || s.kind} (${short(s.id)})`, group: "Shapes" })),
+    ...zoneLightDefs.map((l) => ({ id: l.id, text: `💡 ${l.label || l.kind} (${short(l.id)})`, group: "Lights" })),
+    ...noPrefab(zoneStairs).map((s) => ({ id: s.id, text: `${s.label || "Stair"} (${short(s.id)})`, group: "Stairs" })),
+    ...noPrefab(zoneWalls).map((w) => ({ id: w.id, text: `${w.label || "Wall"} (${short(w.id)})`, group: "Walls" })),
+    ...zoneFloors.map((f) => ({ id: f.id, text: `${f.label || `Floor · level ${f.level}`} (${short(f.id)})`, group: "Floors" })),
+    ...noPrefab(triggerVolumes).map((v) => ({ id: v.id, text: `${v.label || "Volume"} (${short(v.id)})`, group: "Trigger Volumes" })),
+  ];
+  return <TargetCombobox targetId={targetId} opts={opts} onChange={onChange} />;
+}
+
+// ── TargetCombobox ────────────────────────────────────────────────────────────
+// Type-to-filter replacement for the plain target <select>: a level with many
+// entities makes an unfiltered dropdown unusable. Text input filters by label
+// or id; the list opens on focus, mousedown picks (fires before blur), Enter
+// picks the first match, Escape closes.
+
+interface TargetOpt { id: string; text: string; group: string }
+
+function TargetCombobox({
+  targetId,
+  opts,
+  onChange,
+}: {
+  targetId: string;
+  opts: TargetOpt[];
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const current = opts.find((o) => o.id === targetId);
+  const display = open ? query : current?.text ?? (targetId ? `${targetId} (custom)` : "");
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? opts.filter((o) => o.text.toLowerCase().includes(q) || o.id.toLowerCase().includes(q))
+    : opts;
+  const pick = (id: string) => { onChange(id); setOpen(false); setQuery(""); };
+  let lastGroup = "";
   return (
-    <select
-      style={S.select}
-      value={targetId}
-      onChange={(e) => onChange(e.target.value)}
-    >
-      <option value="">— pick target —</option>
-      {groups.length > 0 && (
-        <optgroup label="Groups">
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              ▦ {g.name}
-            </option>
-          ))}
-        </optgroup>
+    <div style={{ position: "relative" }}>
+      <input
+        style={S.field}
+        placeholder="— pick target (type to filter) —"
+        value={display}
+        onFocus={() => { setOpen(true); setQuery(""); }}
+        onBlur={() => setOpen(false)}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); }
+          if (e.key === "Enter" && filtered.length > 0) { pick(filtered[0]!.id); (e.target as HTMLInputElement).blur(); }
+        }}
+      />
+      {open && (
+        <div
+          style={{
+            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
+            maxHeight: 220, overflowY: "auto", marginTop: 2,
+            background: "rgba(24,26,33,0.98)", border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: 4, boxShadow: "0 6px 16px rgba(0,0,0,0.5)",
+          }}
+        >
+          {targetId && !q && (
+            <div
+              style={{ padding: "5px 8px", fontSize: 11, color: "#8b94a8", cursor: "pointer" }}
+              onMouseDown={(e) => { e.preventDefault(); pick(""); }}
+            >
+              — clear target —
+            </div>
+          )}
+          {filtered.length === 0 && (
+            <div style={{ padding: "5px 8px", fontSize: 11, color: "#5f7090", fontStyle: "italic" }}>no matches</div>
+          )}
+          {filtered.map((o) => {
+            const header = o.group !== lastGroup ? (lastGroup = o.group) : null;
+            return (
+              <Fragment key={o.id}>
+                {header && <div style={{ ...S.fieldLabel, padding: "5px 8px 2px" }}>{header}</div>}
+                <div
+                  style={{
+                    padding: "4px 8px 4px 14px", fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+                    color: o.id === targetId ? "#80aaff" : "#d4d8e2",
+                    background: o.id === targetId ? "rgba(80,140,255,0.12)" : "transparent",
+                  }}
+                  onMouseDown={(e) => { e.preventDefault(); pick(o.id); }}
+                  onMouseEnter={(e) => { (e.target as HTMLElement).style.background = "rgba(255,255,255,0.08)"; }}
+                  onMouseLeave={(e) => { (e.target as HTMLElement).style.background = o.id === targetId ? "rgba(80,140,255,0.12)" : "transparent"; }}
+                >
+                  {o.text}
+                </div>
+              </Fragment>
+            );
+          })}
+        </div>
       )}
-      {zoneObjects.length > 0 && (
-        <optgroup label="Objects">
-          {zoneObjects.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label || o.assetId} ({short(o.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zonePlatforms.length > 0 && (
-        <optgroup label="Platforms">
-          {zonePlatforms.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label || "Platform"} ({short(p.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneShapes.length > 0 && (
-        <optgroup label="Shapes">
-          {zoneShapes.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label || s.kind} ({short(s.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneLightDefs.length > 0 && (
-        <optgroup label="Lights">
-          {zoneLightDefs.map((l) => (
-            <option key={l.id} value={l.id}>
-              💡 {l.label || l.kind} ({short(l.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneStairs.length > 0 && (
-        <optgroup label="Stairs">
-          {zoneStairs.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.label || "Stair"} ({short(s.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneWalls.length > 0 && (
-        <optgroup label="Walls">
-          {zoneWalls.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.label || "Wall"} ({short(w.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {zoneFloors.length > 0 && (
-        <optgroup label="Floors">
-          {zoneFloors.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label || `Floor · level ${f.level}`} ({short(f.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {triggerVolumes.length > 0 && (
-        <optgroup label="Trigger Volumes">
-          {triggerVolumes.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.label || "Volume"} ({short(v.id)})
-            </option>
-          ))}
-        </optgroup>
-      )}
-      {/* Preserve a hand-entered / cross-zone id that isn't in either list */}
-      {targetId && !known && (
-        <option value={targetId}>{targetId} (custom)</option>
-      )}
-    </select>
+    </div>
   );
 }
 
