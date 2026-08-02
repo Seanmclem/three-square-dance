@@ -46,7 +46,7 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
   const filtered = sounds.filter(s => {
     const matchCat = cat === "All" || catOf(s) === cat;
     const q = search.toLowerCase();
-    return matchCat && (!q || s.label.toLowerCase().includes(q));
+    return matchCat && (!q || s.label.toLowerCase().includes(q) || (s.tags ?? []).some(t => t.toLowerCase().includes(q)));
   });
 
   const pill = (c: string) => (

@@ -174,14 +174,19 @@ and a **volume mixer** (authored levels + player sliders).
 
 ### B — Import your own sound
 
-1. In the SOUNDS panel, click **+ Import Sound** → **Choose audio files…** and pick one or
+1. In the SOUNDS panel, click **+ Import Sound** → **Browse files…** and pick one or
    more `.mp3` / `.wav` / `.ogg` files.
 2. Set each one's **Label**, **category**, and the **loop** / **spatial** checkboxes
    (turn *loop* on for music/ambience; *spatial* on if you'll attach it to an object).
-3. Click **Grant assets/audio folder…** and select the project's
-   `public/assets/audio` folder, then **Import**.
+   Like the model importer, you can **Set all to** a category at once (including
+   **New category…** to invent one), add **Tags** applied to the whole batch, and fill an
+   **Attribution** block — with an **AUTOFILL FROM LIBRARY** picker that pre-fills from
+   packs/authors you've already credited on other assets.
+3. If prompted, **Set folder…** and select the project's `public/assets/audio` folder,
+   then **Import**.
 4. **Expect:** the file is copied in and the new sound appears in the list with a working
-   **▶** preview. (**Manage → Delete** removes sounds.)
+   **▶** preview; a custom category gets its own filter pill. (**Manage → Edit** changes
+   label / category / tags / attribution; **Manage → Delete** removes sounds.)
 
 ### C — Scene ambient loop + background music
 

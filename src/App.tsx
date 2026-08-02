@@ -2193,6 +2193,7 @@ export default function App() {
         label:       single ? defs[0]!.label : "",
         category:    single ? (defs[0]!.category ?? "SFX") : commonOr(defs.map(d => d.category ?? "SFX")),
         attribution: single ? (defs[0]!.attribution ?? {}) : {},
+        tags:        single ? (defs[0]!.tags ?? []) : [],
       },
     });
   };
@@ -2203,15 +2204,24 @@ export default function App() {
     if (!pending) return;
     const dir = await ensureDir(audioDir, setAudioDir);
     if (!dir) return;
+    // Same tag merge semantics as the model edit: single replaces, bulk unions in.
+    const resolveTags = (s: SoundDef): string[] =>
+      patch.tagsAdd ? [...new Set([...(s.tags ?? []), ...patch.tagsAdd])]
+                    : (patch.tags ?? s.tags ?? []);
     try {
       const mh   = await dir.getFileHandle("manifest.json");
       const data = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
-      data.sounds = data.sounds.map(s => pending.ids.includes(s.id) ? patchEntry(s, patch) : s);
+      data.sounds = data.sounds.map(s => pending.ids.includes(s.id) ? { ...patchEntry(s, patch), tags: resolveTags(s) } : s);
       const w = await mh.createWritable();
       await w.write(JSON.stringify(data, null, 2));
       await w.close();
     } catch (err) { console.error("sound edit failed:", err); return; }
-    pending.ids.forEach(id => assetManager.updateSound(id, patch as Partial<SoundDef>));
+    pending.ids.forEach(id => {
+      const def = assetManager.getSoundList().find(s => s.id === id);
+      if (!def) return;
+      const { tagsAdd: _drop, ...rest } = patch;
+      assetManager.updateSound(id, { ...rest, tags: resolveTags(def) } as Partial<SoundDef>);
+    });
     setSounds(assetManager.getSoundList());
   };
 
@@ -3749,6 +3759,9 @@ SquareDance
         <AudioImporterModal
           audioDir={audioDir}
           onAudioDirSet={setAudioDir}
+          existingTags={[...new Set(sounds.flatMap(s => s.tags ?? []))].sort()}
+          existingAttributions={[...sounds, ...assets].flatMap(s => s.attribution ? [s.attribution] : [])}
+          existingCategories={[...new Set(sounds.map(s => s.category ?? "SFX"))]}
           onComplete={() => { setAudioImporterOpen(false); handleSoundsReload(); }}
           onClose={() => setAudioImporterOpen(false)}
         />
@@ -3858,8 +3871,9 @@ SquareDance
         <EditMetadataDialog
           items={pendingSoundEdit.items}
           noun="sound"
-          categoryOptions={["Music", "Ambient", "SFX"]}
+          categoryOptions={[...new Set(["SFX", "Music", "Ambient", ...sounds.map(s => s.category ?? "SFX")])]}
           initial={pendingSoundEdit.initial}
+          tagSuggestions={[...new Set(sounds.flatMap(s => s.tags ?? []))].sort()}
           needsFolderGrant={!audioDir}
           folderHint="public/assets/audio"
           onCancel={() => setPendingSoundEdit(null)}

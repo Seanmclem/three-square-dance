@@ -1,17 +1,21 @@
 import { useState } from "react";
 import type { SoundDef, SoundCategory, SoundManifest, Attribution } from "@/types";
 import { AttributionFields } from "@/ui/AttributionFields";
+import { TagInput } from "@/ui/TagInput";
 
 interface Props {
   audioDir:      FileSystemDirectoryHandle | null;
   onAudioDirSet: (dir: FileSystemDirectoryHandle) => void;
+  existingTags:  string[];   // suggestions — the manifest isn't read until the import step
+  existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
+  existingCategories:   string[];       // categories already in the sound library (incl. custom ones)
   onComplete:    (sounds: SoundDef[]) => void;
   onClose:       () => void;
 }
 
 type Phase = "pick" | "meta" | "importing" | "done";
 
-const CATEGORIES: SoundCategory[] = ["SFX", "Music", "Ambient"];
+const DEFAULT_CATEGORIES: SoundCategory[] = ["SFX", "Music", "Ambient"];
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"]);
 
 type FSPicker = {
@@ -24,12 +28,13 @@ const slugify  = (s: string) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^
 const autoLabel = (n: string) => n.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
 
 interface SoundEntry {
-  id:       string;
-  handle:   FileSystemFileHandle;
-  label:    string;
-  category: SoundCategory;
-  loop:     boolean;
-  spatial:  boolean;
+  id:         string;
+  handle:     FileSystemFileHandle;
+  label:      string;
+  category:   string;
+  showNewCat: boolean;
+  loop:       boolean;
+  spatial:    boolean;
 }
 
 const OVERLAY: React.CSSProperties = {
@@ -52,15 +57,25 @@ const BTN = (active = true): React.CSSProperties => ({
   background: active ? "rgba(80,140,255,0.2)" : "rgba(55,55,55,0.7)",
   color: active ? "#80aaff" : "#646464",
 });
+const STEP_LABEL: React.CSSProperties = {
+  color: "#646464", fontSize: 10, letterSpacing: 1,
+};
 
-export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClose }: Props) {
+export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, existingAttributions, existingCategories, onComplete, onClose }: Props) {
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SoundEntry[]>([]);
+  const [bulkNewCat,  setBulkNewCat]  = useState<string | null>(null);
+  const [attribution, setAttribution] = useState<Attribution>({});
+  const [tags,     setTags]     = useState<string[]>([]);
   const [progress, setProgress] = useState("");
   const [results,  setResults]  = useState<SoundDef[]>([]);
   const [error,    setError]    = useState<string | null>(null);
-  // Shared attribution applied to every sound in this import batch (mirrors ModelImporter).
-  const [attribution, setAttribution] = useState<Attribution>({});
+
+  // Default categories first, then any custom ones already in the library.
+  const categories = [
+    ...DEFAULT_CATEGORIES,
+    ...[...new Set(existingCategories)].filter(c => !DEFAULT_CATEGORIES.includes(c as SoundCategory)).sort(),
+  ];
 
   const update = (id: string, patch: Partial<SoundEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
@@ -75,7 +90,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
       if (!audio.length) return;
       setEntries(audio.map(h => ({
         id: crypto.randomUUID(), handle: h, label: autoLabel(h.name),
-        category: "SFX", loop: false, spatial: false,
+        category: "SFX", showNewCat: false, loop: false, spatial: false,
       })));
       setPhase("meta");
     } catch { /* cancelled */ }
@@ -116,10 +131,11 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
         const base = slugify(e.label) || slugify(autoLabel(e.handle.name));
         const dest = `${base}${ext}`;
         await copyFile(e.handle, audioDir, dest);
+        const resolvedCat = (e.category === "__new__" ? "SFX" : e.category) as SoundCategory;
         const sound: SoundDef = {
-          id: base, label: e.label.trim() || base, category: e.category,
+          id: base, label: e.label.trim() || base, category: resolvedCat,
           path: `/assets/audio/${dest}`, loop: e.loop, spatial: e.spatial,
-          tags: [], dateAdded: new Date().toISOString().slice(0, 10),
+          tags: [...tags], dateAdded: new Date().toISOString().slice(0, 10),
           ...(Object.keys(attribution).length ? { attribution } : {}),
         };
         manifest.sounds = manifest.sounds.filter(s => s.id !== sound.id);
@@ -147,79 +163,190 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, onComplete, onClos
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+
+        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
           <span style={{ fontSize: 13, color: "#d8d8d8", letterSpacing: 1 }}>IMPORT SOUNDS</span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#585870", fontSize: 16 }}>✕</button>
         </div>
 
-        <div style={{ padding: 20, overflowY: "auto" }}>
+        {/* Scrollable body */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+          {/* Step 1 — Pick */}
           {phase === "pick" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ color: "#909090", lineHeight: 1.5 }}>
-                Pick one or more audio files (.mp3 / .wav / .ogg). They'll be copied into
-                your project's <code>assets/audio</code> folder and added to the sound manifest.
+            <>
+              <p style={STEP_LABEL}>SELECT FILES</p>
+              <div style={{ fontSize: 10, color: "#7a7a7a", lineHeight: 1.7 }}>
+                Supported: <span style={{ color: "#80aaff" }}>.mp3 .wav .ogg .m4a .flac .aac</span>
+                — select multiple files at once. They'll be copied into your project's{" "}
+                <code>assets/audio</code> folder and added to the sound manifest.
               </div>
-              <button onClick={pickFiles} style={BTN()}>Choose audio files…</button>
-            </div>
+              {!audioDir && (
+                <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c09050" }}>
+                  Audio folder not set — imports cannot be saved.
+                </div>
+              )}
+              <button style={BTN()} onClick={() => void pickFiles()}>Browse files…</button>
+              {!audioDir && (
+                <button style={{ ...BTN(), background: "rgba(255,180,40,0.1)", color: "#c09050" }} onClick={() => void pickAudioDir()}>
+                  Set audio folder…
+                </button>
+              )}
+            </>
           )}
 
-          {phase === "meta" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {entries.map(e => (
-                <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
-                  <div style={{ color: "#707070", fontSize: 10 }}>{e.handle.name}</div>
-                  <input value={e.label} onChange={ev => update(e.id, { label: ev.target.value })} placeholder="Label" style={INPUT} />
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <select value={e.category} onChange={ev => update(e.id, { category: ev.target.value as SoundCategory })} style={{ ...INPUT, flex: 1 }}>
-                      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {/* Step 2 — Metadata list */}
+          {(phase === "meta" || phase === "importing") && (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <p style={STEP_LABEL}>{entries.length} SOUND{entries.length !== 1 ? "S" : ""}</p>
+                <button style={{ ...BTN(), padding: "3px 8px", fontSize: 10 }} onClick={() => setPhase("pick")}>← Change files</button>
+              </div>
+
+              {/* Set all categories */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
+                  <select
+                    style={{ ...INPUT, flex: 1, cursor: "pointer" }}
+                    defaultValue=""
+                    onChange={e => {
+                      const val = e.currentTarget.value;
+                      if (!val) return;
+                      if (val === "__new__") {
+                        setBulkNewCat("");
+                        setEntries(prev => prev.map(en => ({ ...en, category: "__new__", showNewCat: false })));
+                      } else {
+                        setBulkNewCat(null);
+                        setEntries(prev => prev.map(en => ({ ...en, category: val, showNewCat: false })));
+                      }
+                      e.currentTarget.value = "";
+                    }}
+                  >
+                    <option value="" disabled>Category…</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">New category…</option>
+                  </select>
+                </div>
+                {bulkNewCat !== null && (
+                  <input
+                    style={{ ...INPUT, width: "100%", boxSizing: "border-box" }}
+                    placeholder="New category name (applies to all)"
+                    autoFocus
+                    value={bulkNewCat}
+                    onChange={e => {
+                      const val = e.currentTarget.value;
+                      setBulkNewCat(val);
+                      setEntries(prev => prev.map(en => ({ ...en, category: val || "__new__" })));
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Tags (optional) — applies to all imported sounds */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Tags (optional — applies to all)</span>
+                <TagInput value={tags} onChange={setTags} suggestions={existingTags} />
+              </div>
+
+              {/* Attribution (optional) — applies to all imported sounds */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Attribution (optional — applies to all, shown in Credits)</span>
+                <AttributionFields value={attribution} onChange={setAttribution} autofillFrom={existingAttributions} />
+              </div>
+
+              {/* Entry list */}
+              {entries.map(entry => (
+                <div key={entry.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 5, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={{ fontSize: 10, color: "#80aaff" }}>🔊 {entry.handle.name}</div>
+
+                  {/* Label + Category row */}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      style={{ ...INPUT, flex: 1 }}
+                      value={entry.label}
+                      onChange={e => update(entry.id, { label: e.currentTarget.value })}
+                      placeholder="Label"
+                    />
+                    <select
+                      style={{ ...INPUT, width: 110, cursor: "pointer" }}
+                      value={categories.includes(entry.category) ? entry.category : "__new__"}
+                      onChange={e => {
+                        setBulkNewCat(null);
+                        update(entry.id, { category: e.currentTarget.value, showNewCat: e.currentTarget.value === "__new__" });
+                      }}
+                    >
+                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                      <option value="__new__">
+                        {!categories.includes(entry.category) && entry.category && entry.category !== "__new__"
+                          ? entry.category
+                          : "New…"}
+                      </option>
                     </select>
-                    <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#909090" }}>
-                      <input type="checkbox" checked={e.loop} onChange={ev => update(e.id, { loop: ev.target.checked })} /> loop
+                  </div>
+
+                  {entry.showNewCat && bulkNewCat === null && (
+                    <input
+                      style={INPUT}
+                      placeholder="Category name"
+                      autoFocus
+                      onChange={e => update(entry.id, { category: e.currentTarget.value || "__new__" })}
+                    />
+                  )}
+
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#909090", cursor: "pointer" }}>
+                      <input type="checkbox" checked={entry.loop} onChange={e => update(entry.id, { loop: e.currentTarget.checked })} /> loop
                     </label>
-                    <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#909090" }}>
-                      <input type="checkbox" checked={e.spatial} onChange={ev => update(e.id, { spatial: ev.target.checked })} /> spatial
+                    <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#909090", cursor: "pointer" }}>
+                      <input type="checkbox" checked={entry.spatial} onChange={e => update(entry.id, { spatial: e.currentTarget.checked })} /> spatial
                     </label>
                   </div>
                 </div>
               ))}
 
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: 10 }}>
-                <div style={{ color: "#909090", fontSize: 10, letterSpacing: 1, marginBottom: 8 }}>
-                  ATTRIBUTION (optional — applied to all, shown in Credits)
-                </div>
-                <AttributionFields value={attribution} onChange={setAttribution} />
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <button onClick={pickAudioDir} style={BTN(!audioDir)}>
-                  {audioDir ? "✓ assets/audio folder granted" : "Grant assets/audio folder…"}
-                </button>
-              </div>
               {!audioDir && (
-                <div style={{ color: "#707070", fontSize: 10, lineHeight: 1.4 }}>
-                  Select your project's <code>public/assets/audio</code> folder so the files can be written.
+                <div style={{ background: "rgba(255,60,60,0.06)", border: "1px solid rgba(255,60,60,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c06060" }}>
+                  No audio folder set — select your project's <code>public/assets/audio</code> folder.{" "}
+                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#c09050", fontSize: 10 }} onClick={() => void pickAudioDir()}>Set folder…</button>
                 </div>
               )}
-
-              <button onClick={doImport} disabled={!audioDir} style={{ ...BTN(!!audioDir), marginTop: 4 }}>
-                Import {entries.length} sound{entries.length !== 1 ? "s" : ""}
-              </button>
-            </div>
+              {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
+              {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress || "Importing…"}</div>}
+            </>
           )}
 
-          {phase === "importing" && (
-            <div style={{ color: "#909090" }}>{progress || "Importing…"}</div>
-          )}
-
+          {/* Done */}
           {phase === "done" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {error && <div style={{ color: "#ff6b6b" }}>{error}</div>}
-              <div style={{ color: "#66cc88" }}>Imported {results.length} sound{results.length !== 1 ? "s" : ""}.</div>
-              {results.map(s => <div key={s.id} style={{ color: "#909090", fontSize: 11 }}>• {s.label} ({s.category})</div>)}
-              <button onClick={onClose} style={{ ...BTN(), marginTop: 4 }}>Done</button>
-            </div>
+            <>
+              <p style={STEP_LABEL}>DONE</p>
+              <div style={{ color: "#80cc90", fontSize: 11 }}>✓ &nbsp;{results.length} sound{results.length !== 1 ? "s" : ""} imported.</div>
+              {results.map(s => (
+                <div key={s.id} style={{ fontSize: 10, color: "#808080" }}>
+                  {s.label} — <span style={{ color: "#646464" }}>{s.category}</span>
+                </div>
+              ))}
+              {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
+            </>
           )}
         </div>
+
+        {/* Footer */}
+        {(phase === "meta" || phase === "done") && (
+          <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            {phase === "meta" && (
+              <button
+                style={BTN(!!audioDir)}
+                disabled={!audioDir}
+                onClick={() => void doImport()}
+              >
+                Import {entries.length > 1 ? `all ${entries.length}` : ""}
+              </button>
+            )}
+            {phase === "done" && <button style={BTN()} onClick={onClose}>Close</button>}
+          </div>
+        )}
       </div>
     </div>
   );
