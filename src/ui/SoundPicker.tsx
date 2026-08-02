@@ -27,7 +27,8 @@ export function SoundPicker({ value, onChange, filterCategory, allowNone, style 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const sounds = useMemo(() => {
     const list = assetManager.getSoundList();
-    return filterCategory ? list.filter(s => s.category === filterCategory) : list;
+    return (filterCategory ? list.filter(s => s.category === filterCategory) : list)
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
   }, [filterCategory]);
 
   const preview = () => {

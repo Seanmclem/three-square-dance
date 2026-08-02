@@ -43,11 +43,12 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
   };
 
   const cats = ["All", ...[...new Set(sounds.map(catOf))].sort()];
+  // Natural order so "sound12" sorts after "sound9", not next to "sound1".
   const filtered = sounds.filter(s => {
     const matchCat = cat === "All" || catOf(s) === cat;
     const q = search.toLowerCase();
     return matchCat && (!q || s.label.toLowerCase().includes(q) || (s.tags ?? []).some(t => t.toLowerCase().includes(q)));
-  });
+  }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
 
   const pill = (c: string) => (
     <button key={c} onClick={() => setCat(c)} style={{
