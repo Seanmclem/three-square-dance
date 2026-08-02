@@ -50,6 +50,7 @@ export class TriggerVolumeTool {
   private _lastScreenPos: { x: number; y: number } = { x: 0, y: 0 };
   private _hoveredId:   string | null = null;
   private _selectedId:  string | null = null;
+  private _suppressNextClick = false;
   private _raycaster = new THREE.Raycaster();
 
   private readonly _unsubs: Array<() => void> = [];
@@ -97,6 +98,10 @@ export class TriggerVolumeTool {
       // floor would make the whole level unplaceable) — a plain click commits
       // nothing (min-drag check in _finishPlace), so click-to-select still works.
       this._bus.on("input:mousedown", ({ button }) => {
+        // A fresh gesture: any click-suppression pending from a gizmo drag whose
+        // release never produced an input:click (big drags exceed the threshold)
+        // is stale — clear it so this gesture's click isn't wrongly swallowed.
+        this._suppressNextClick = false;
         if (!this._active || button !== 0) return;
         if (this._state === "IDLE") {
           this._clearSelect();
@@ -111,7 +116,17 @@ export class TriggerVolumeTool {
       // Volume selection uses input:click. SelectionManager runs first (registered earlier)
       // and may have already tinted the floor/wall behind the volume. Emitting
       // object:deselected before our object:selected clears SelectionManager's highlight.
+      // Releasing a gizmo drag fires an input:click (when the pointer lands back
+      // within the drag threshold), and volume picking deliberately ignores the
+      // gizmo's meshes (no editorType) — so without this guard, finishing a drag
+      // over a kill floor deselects the dragged entity and selects the volume.
+      // Same pattern as SelectionManager's gizmo:dragging suppression.
+      this._bus.on("gizmo:dragging", ({ isDragging }) => {
+        if (!isDragging) this._suppressNextClick = true;
+      }),
+
       this._bus.on("input:click", ({ button, shift, meta, ctrl }) => {
+        if (this._suppressNextClick) { this._suppressNextClick = false; return; }
         if (button !== 0 || this._state === "PLACING") return;
         // Only pick volumes under the Select or Trigger tools — never while another tool
         // (Spawn/Floor/Wall/…) is placing, so a placement click can't also select a volume.
