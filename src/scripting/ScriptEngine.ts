@@ -143,33 +143,43 @@ export class ScriptEngine {
 
   loadZone(zone: ZoneDef): void {
     for (const s of zone.scripts ?? []) this._indexScript(s);
-    for (const obj of zone.objects) {
-      for (const s of obj.scripts ?? []) {
-        // Normalise the per-object trigger target so the index key matches what fire() looks up:
-        //  - on_interact's target is always the owning object → key on_interact:<objId>
-        //  - on_player_enter/exit on an object = its attached sensor colliders, which report
-        //    the object id through the volume-sensor path → key <trigger>:<objId>
-        //  - target-less triggers (on_game_start/on_timer/on_level_load/…) fire with null and
-        //    must key to the wildcard; an old ScriptPanel set targetId = objId on these, which
-        //    mis-keys them so they never fire — strip that stale id.
-        let trig = s.trigger;
-        if (trig.type === "on_interact" || trig.type === "on_player_enter" || trig.type === "on_player_exit") {
-          trig = { ...trig, targetId: obj.id };
-        } else if (trig.targetId === obj.id) {
-          trig = { ...trig, targetId: undefined };
-        }
-        this._indexScript(trig === s.trigger ? s : { ...s, trigger: trig });
-      }
+    for (const obj of zone.objects)
+      for (const s of obj.scripts ?? []) this._indexScript(this._ownedScript(s, obj.id));
+    for (const vol of zone.triggerVolumes ?? [])
+      for (const s of vol.scripts ?? []) this._indexScript(this._ownedScript(s, vol.id));
+  }
+
+  /**
+   * Normalise an entity-owned script for the index. The stored def is NEVER
+   * mutated — shallow copies only (the index copy must not share rewritten
+   * trigger/action objects with the def, or undo/saves would corrupt).
+   *  - Entity triggers (on_interact / on_player_enter / on_player_exit) key on
+   *    the OWNER regardless of what was authored — so a duplicated entity's
+   *    scripts fire on the copy (not the source it was stamped with), and blank
+   *    scripts need no stamp at all. Volumes used to inject-only-if-falsy, which
+   *    left duplicated volumes firing on the original.
+   *  - Target-less triggers (on_game_start / on_timer / …) must key to the
+   *    wildcard; a stale authored self-id mis-keys them so they never fire —
+   *    strip it. on_state_equals/on_dialogue_end targetIds (state key /
+   *    dialogue id) pass through untouched.
+   *  - Action targetId "self" resolves to the owner. The def keeps the literal
+   *    "self", which is what makes prefab capture / copy / paste portable —
+   *    every stamped copy re-resolves to its own owner at index time.
+   */
+  private _ownedScript(s: ScriptDef, ownerId: string): ScriptDef {
+    let trig = s.trigger;
+    if (trig.type === "on_interact" || trig.type === "on_player_enter" || trig.type === "on_player_exit") {
+      trig = { ...trig, targetId: ownerId };
+    } else if (trig.targetId === ownerId) {
+      trig = { ...trig, targetId: undefined };
     }
-    for (const vol of zone.triggerVolumes ?? []) {
-      for (const s of vol.scripts ?? []) {
-        // inject targetId = vol.id so the index key matches trigger:volume-enter events
-        const effective: ScriptDef = s.trigger.targetId
-          ? s
-          : { ...s, trigger: { ...s.trigger, targetId: vol.id } };
-        this._indexScript(effective);
-      }
-    }
+    const hasSelf = s.actions.some(a => a.targetId === "self");
+    if (trig === s.trigger && !hasSelf) return s;
+    return {
+      ...s,
+      trigger: trig,
+      actions: hasSelf ? s.actions.map(a => a.targetId === "self" ? { ...a, targetId: ownerId } : a) : s.actions,
+    };
   }
 
   loadWorld(world: WorldConfig): void {
@@ -601,6 +611,13 @@ export class ScriptEngine {
 
   private _resolveTargets(targetId?: string): string[] {
     if (!targetId) return [];
+    // "self" only means something on an entity-owned script (loadZone resolves it
+    // to the owner at index time). Anywhere else — zone scripts, dialogue-option
+    // effects — there is no owner: no-op loudly rather than target a bogus id.
+    if (targetId === "self") {
+      console.warn("[ScriptEngine] action target 'self' outside an entity-owned script — no target");
+      return [];
+    }
     if (!this._state.groups.some(g => g.id === targetId)) return [targetId];
     const zone = this._state.activeZoneId ? this._state.zones.get(this._state.activeZoneId) : undefined;
     if (!zone) return [];

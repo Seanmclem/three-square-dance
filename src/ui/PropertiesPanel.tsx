@@ -5488,13 +5488,15 @@ const DEFAULT_VOLUME_VISUAL: TriggerVolumeVisual = {
 };
 const clamp01 = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
 
-function blankVolumeScript(zoneId: string, volId: string, type: "on_player_enter" | "on_player_exit"): ScriptDef {
+function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_exit"): ScriptDef {
   return {
     id:         `scr_${crypto.randomUUID().slice(0, 8)}`,
     label:      type === "on_player_enter" ? "On Enter" : "On Exit",
     zoneId,
     enabled:    true,
-    trigger:    { type, targetId: volId },
+    // No targetId stamp — ScriptEngine.loadZone force-keys entity triggers on the
+    // OWNING volume at index time, so a stamped id would only go stale on duplicate.
+    trigger:    { type },
     conditions: [],
     actions:    [],
     oneShot:    false,
@@ -5554,7 +5556,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, groups, groups
 
   function addScript(type: "on_player_enter" | "on_player_exit"): void {
     if (!onScriptsChange) return;
-    onScriptsChange([...scripts, blankVolumeScript(vol!.zoneId, vol!.id, type)]);
+    onScriptsChange([...scripts, blankVolumeScript(vol!.zoneId, type)]);
   }
 
   function toggleScript(id: string): void {

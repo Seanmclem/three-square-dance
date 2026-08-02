@@ -1256,6 +1256,9 @@ function ScriptEditor({
               worldItems={worldItems}
               uiElements={uiElements}
               projectSceneIds={projectSceneIds}
+              owner={ownerIsEntity && selectedObjectId
+                ? { id: selectedObjectId, kind: selectedObjectId.startsWith("vol_") ? "volume" : "object" }
+                : undefined}
               onChange={(na) =>
                 set(
                   "actions",
@@ -1433,6 +1436,7 @@ function ActionTargetPicker({
   zoneFloors = [],
   triggerVolumes = [],
   zoneLightDefs = [],
+  owner,
   onChange,
 }: {
   targetId: string;
@@ -1445,6 +1449,8 @@ function ActionTargetPicker({
   zoneFloors?: FloorDef[];
   triggerVolumes?: TriggerVolume[];
   zoneLightDefs?: LightDef[];
+  /** Entity this script rides on — offers the portable "★ this" self target. */
+  owner?: { id: string; kind: "object" | "volume" };
   onChange: (id: string) => void;
 }) {
   // Prefab members (e.g. every tile of a tiled platform) are generated internals —
@@ -1452,6 +1458,9 @@ function ActionTargetPicker({
   const noPrefab = <T,>(arr: T[]): T[] => arr.filter((e) => !(e as { prefab?: unknown }).prefab);
   const short = (id: string) => id.slice(0, 8);
   const opts: TargetOpt[] = [
+    // "self" stays literal in the saved script and re-resolves to whatever entity
+    // carries the script — survives duplicate/copy/prefab stamping.
+    ...(owner ? [{ id: "self", text: `★ this ${owner.kind}`, group: "This" }] : []),
     ...groups.map((g) => ({ id: g.id, text: `▦ ${g.name}`, group: "Groups" })),
     ...noPrefab(zoneObjects).map((o) => ({ id: o.id, text: `${o.label || o.assetId} (${short(o.id)})`, group: "Objects" })),
     ...zonePlatforms.map((p) => ({ id: p.id, text: `${p.label || "Platform"} (${short(p.id)})`, group: "Platforms" })),
@@ -1820,6 +1829,7 @@ function ActionRow({
   worldItems,
   uiElements,
   projectSceneIds,
+  owner,
   onChange,
   onRemove,
 }: {
@@ -1839,6 +1849,7 @@ function ActionRow({
   worldItems: ItemDef[];
   uiElements: UiElementDef[];
   projectSceneIds?: string[];
+  owner?: { id: string; kind: "object" | "volume" };
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -1905,6 +1916,7 @@ function ActionRow({
         worldItems={worldItems}
         uiElements={uiElements}
         projectSceneIds={projectSceneIds}
+        owner={owner}
         onChange={onChange}
       />
     </div>
@@ -1928,6 +1940,7 @@ function ActionFields({
   worldItems,
   uiElements,
   projectSceneIds,
+  owner,
   onChange,
 }: {
   action: ScriptAction;
@@ -1946,6 +1959,7 @@ function ActionFields({
   worldItems: ItemDef[];
   uiElements: UiElementDef[];
   projectSceneIds?: string[];
+  owner?: { id: string; kind: "object" | "volume" };
   onChange: (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void {
@@ -1957,6 +1971,7 @@ function ActionFields({
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       groups={groups}
+      owner={owner}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -1972,6 +1987,7 @@ function ActionFields({
       zoneWalls={zoneWalls}
       zoneFloors={zoneFloors}
       triggerVolumes={triggerVolumes}
+      owner={owner}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -1984,6 +2000,7 @@ function ActionFields({
       groups={groups}
       zonePlatforms={zonePlatforms}
       zoneShapes={zoneShapes}
+      owner={owner}
       onChange={(id) => set({ targetId: id })}
     />
   );

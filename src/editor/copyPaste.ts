@@ -1,5 +1,6 @@
 import type { WorldState } from "@/world/WorldState";
 import { membersByGroup } from "@/editor/groupMembers";
+import { remapScripts } from "@/prefab/expand";
 import type {
   SelectedObjectPayload, SelectedRef, EditorObjectType, GroupDef,
   WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
@@ -258,7 +259,14 @@ export function pasteClipboard(
         }
         case "object": {
           const o = ent.def as WorldObject;
-          world.addObject(zoneId, { ...o, id, position: off3(o.position, dx, dz) });
+          world.addObject(zoneId, {
+            ...o, id,
+            position: off3(o.position, dx, dz),
+            // Fresh script ids + intra-clipboard target remap (prefab machinery):
+            // reused ids collide in the persisted one-shot set, and co-pasted
+            // pairs must reference each other's clones, not the originals.
+            scripts: o.scripts ? remapScripts(o.scripts, entIdMap, zoneId) : undefined,
+          });
           break;
         }
         case "trigger-volume": {
@@ -269,6 +277,7 @@ export function pasteClipboard(
             // Host copied alongside → follow its clone; copied alone → stay
             // attached to the original host.
             attachTo: v.attachTo ? (entIdMap.get(v.attachTo) ?? v.attachTo) : undefined,
+            scripts: v.scripts ? remapScripts(v.scripts, entIdMap, zoneId) : undefined,
           });
           break;
         }
