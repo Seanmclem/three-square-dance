@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -18.19578450158187,
+        "x": -17.757051915144025,
         "y": 5.789248611141304,
-        "z": -45.652389616618926
+        "z": -45.56965863730554
       },
       "radius": 23.253367983159748,
-      "phi": 1.1849999999999994,
-      "theta": 17.092379999807125
+      "phi": 0.7799999999999997,
+      "theta": 17.207379999807145
     }
   },
   "world": {
@@ -54,6 +54,12 @@
         "default": 100,
         "min": 0,
         "max": 100
+      },
+      "coins": {
+        "type": "number",
+        "default": 0,
+        "min": 0,
+        "max": 999
       }
     },
     "defaultSpawn": {
@@ -6472,7 +6478,8 @@
             "lootTableId": null,
             "triggerEventId": null
           },
-          "autoPlayAnimation": null
+          "autoPlayAnimation": null,
+          "scripts": []
         },
         {
           "id": "obj_0fcbeafe",
@@ -10671,6 +10678,126 @@
           "position": {
             "x": -27.962791249504694,
             "y": 8.403405928097873,
+            "z": -47.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.8,
+            "y": 0.8,
+            "z": 0.8
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "mover": {
+            "enabled": true,
+            "kind": "slide",
+            "axis": "y",
+            "distance": 0.2,
+            "duration": 0.7,
+            "dwell": 0,
+            "mode": "loop",
+            "phase": 0,
+            "speed": 45,
+            "autoStart": true
+          },
+          "colliders": [
+            {
+              "id": "col_447cc8e9",
+              "shape": "sphere",
+              "offset": {
+                "x": 0,
+                "y": 0.9600939750671387,
+                "z": 0
+              },
+              "size": {
+                "x": 1.15,
+                "y": 0,
+                "z": 0
+              },
+              "isSensor": true
+            }
+          ],
+          "scripts": [
+            {
+              "id": "scr_1dc3ad6b",
+              "label": "coin1",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 1
+                },
+                {
+                  "type": "despawn_object",
+                  "fadeDuration": 0.15,
+                  "targetId": "self"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
+        },
+        {
+          "id": "obj_72412afe",
+          "assetId": "coin",
+          "position": {
+            "x": -24.201349487407192,
+            "y": 8.895571623700771,
+            "z": -47.481651871762566
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.8,
+            "y": 0.8,
+            "z": 0.8
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "mover": {
+            "enabled": true,
+            "kind": "slide",
+            "axis": "y",
+            "distance": 0.2,
+            "duration": 0.7,
+            "dwell": 0,
+            "mode": "loop",
+            "phase": 0,
+            "speed": 45,
+            "autoStart": true
+          }
+        },
+        {
+          "id": "obj_b412c441",
+          "assetId": "coin",
+          "position": {
+            "x": -19.87373468334199,
+            "y": 9.692279841826078,
             "z": -47.5
           },
           "rotation": {
