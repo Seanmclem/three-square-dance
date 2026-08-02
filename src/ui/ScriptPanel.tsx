@@ -2599,12 +2599,12 @@ function ActionFields({
           </F>
           <F label="Seconds" flex="0 0 60px">
             <input
-              type="number"
+              type="number" min={0} step={0.1}
               style={S.field}
               placeholder="0.3"
               value={action.fadeDuration ?? ""}
               onChange={(e) =>
-                set({ fadeDuration: parseFloat(e.target.value) || 0.3 })
+                set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })
               }
             />
           </F>
@@ -2669,11 +2669,11 @@ function ActionFields({
             </F>
             <F label="Seconds" flex="0 0 60px">
               <input
-                type="number"
+                type="number" min={0} step={0.1}
                 style={S.field}
                 placeholder="0.4"
                 value={action.fadeDuration ?? ""}
-                onChange={(e) => set({ fadeDuration: parseFloat(e.target.value) || 0.4 })}
+                onChange={(e) => set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })}
               />
             </F>
           </div>
