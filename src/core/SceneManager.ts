@@ -48,6 +48,7 @@ export class SceneManager {
   private readonly _ambientLight: THREE.AmbientLight;
   private _fillLight!: THREE.DirectionalLight;   // assigned in _setupLighting
   private _rimLight!:  THREE.DirectionalLight;
+  private _lightingQuality: "fancy" | "fast" = "fancy";
   private readonly _unsubLighting: () => void;
   private readonly _viewHelper:   ViewHelper | null = null;
   private readonly _viewHelperEl: HTMLDivElement | null = null;
@@ -103,7 +104,8 @@ export class SceneManager {
       this._fillLight.intensity = sun.intensity * 0.3;
       this._rimLight.intensity  = sun.intensity * 0.15;
       this.scene.environmentIntensity = envIntensity ?? 1;
-      if (quality) this.setLightingQuality(quality);
+      if (quality) this._lightingQuality = quality;
+      this._applyLightVisibility();
     });
     // Skybox selection (WorldState emits on load and on panel edits). "sky" = procedural.
     this._unsubSky = bus.on("world:sky", ({ skybox }) => this._applySkybox(skybox));
@@ -136,9 +138,23 @@ export class SceneManager {
    * light loop); only removing them from the render (this toggle) does.
    */
   setLightingQuality(q: "fancy" | "fast"): void {
-    const on = q === "fancy";
-    this._fillLight.visible = on;
-    this._rimLight.visible  = on;
+    this._lightingQuality = q;
+    this._applyLightVisibility();
+  }
+
+  /**
+   * A zero-intensity light still costs full shader time (it stays in the
+   * per-pixel light loop) and the sun would even keep rendering its shadow map
+   * — so lights dialed to 0 are removed from the render outright. A dark scene
+   * lit only by placed lights then pays only for those lights.
+   */
+  private _applyLightVisibility(): void {
+    const sunOn = this._sunLight.intensity > 0;
+    this._sunLight.visible     = sunOn;
+    this._ambientLight.visible = this._ambientLight.intensity > 0;
+    const rigOn = sunOn && this._lightingQuality === "fancy";
+    this._fillLight.visible = rigOn;
+    this._rimLight.visible  = rigOn;
   }
 
   private _setupLighting(): THREE.DirectionalLight {
