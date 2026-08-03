@@ -347,6 +347,17 @@ the user's tab had written. Rules:
 
 ### Other lessons
 
+- **⚠️ In a PROJECT tab, the top-bar project ▶ Play button WRITES TO DISK** (2026-08-02).
+  `handleProjectPlay` runs `await handleSave()` before opening the runtime — a full
+  write-through of the scene file, `game.json`, and the manifest into
+  `public/games/<id>/` (the user's FSA project folder IS the repo). A test session that
+  blind-clicks a "▶" button (e.g. `buttons.find(b => b.textContent === '▶')` — several
+  buttons match: sound previews, editor Play, project Play) can silently commit its
+  in-memory test state (test UI elements, prefab defs) to the user's real files. It
+  happened exactly that way: a test `uiElements` entry landed in the user's `game.json`
+  and had to be stripped before committing. Enter preview via the **bottom-left green ▶**
+  (editor preview — no disk writes) and check `git status public/games/` at session end.
+
 - **After cleanup, wait for an autosave tick before closing the tab — and beware
   stale editor tabs.** Deleting test entities updates WorldState, but the periodic
   autosave persists it: poll the top-bar indicator until "autosaved just now", verify

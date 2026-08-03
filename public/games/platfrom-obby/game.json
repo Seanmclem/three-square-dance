@@ -618,5 +618,17 @@
       ],
       "dateAdded": "2026-08-02"
     }
+  ],
+  "uiElements": [
+    {
+      "id": "ui_e30c63db",
+      "anchor": "top-left",
+      "kind": "counter",
+      "label": "Coin Count",
+      "stateKey": "coins",
+      "startVisible": true,
+      "prefix": " ",
+      "graphicId": "coin_icon"
+    }
   ]
 }

@@ -1376,6 +1376,7 @@ interface UiElementBase {
   offsetX?:      number;      // px inward from the anchored corner/edge (default 16)
   offsetY?:      number;
   startVisible?: boolean;     // shown without show_ui (default false)
+  backdrop?:     boolean;     // translucent pill behind the element for contrast on bright scenes (menu ignores — it has its own box)
 }
 
 export interface UiBarElement extends UiElementBase {

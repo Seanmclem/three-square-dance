@@ -38,6 +38,13 @@ const ANCHOR_STYLE = (anchor: UiAnchor, ox: number, oy: number): React.CSSProper
 
 const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0)) || 0;
 
+// Optional contrast pill behind an element (UiElementBase.backdrop) — same
+// translucent dark-grey treatment as the bar track, for bright skies.
+const BACKDROP: React.CSSProperties = {
+  background: "rgba(30,34,44,0.6)", border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 6, padding: "4px 10px",
+};
+
 export function GameGuiOverlay({ bus, world }: Props) {
   // One rev bump per gameState change re-renders the whole overlay (a handful
   // of DOM nodes — no per-element subscriptions needed).
@@ -117,7 +124,7 @@ export function GameGuiOverlay({ bus, world }: Props) {
             const frac = Math.min(1, Math.max(0, num(gameState.get(el.stateKey)) / (max || 1)));
             const src = graphicSrc(el.graphicId);
             return (
-              <div key={el.id} style={{ ...style, display: "flex", alignItems: "center", gap: 6 }}>
+              <div key={el.id} style={{ ...style, display: "flex", alignItems: "center", gap: 6, ...(el.backdrop ? BACKDROP : {}) }}>
                 {src && <img src={src} alt="" style={{ width: 22, height: 22, objectFit: "contain" }} />}
                 <div style={{
                   width: el.width ?? 160, height: el.height ?? 14,
@@ -138,7 +145,7 @@ export function GameGuiOverlay({ bus, world }: Props) {
             return (
               <div key={el.id} style={{ ...style, display: "flex", alignItems: "center", gap: 6,
                 color: "#dde3f0", fontSize: Math.max(12, size * 0.6),
-                textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+                textShadow: "0 1px 3px rgba(0,0,0,0.8)", ...(el.backdrop ? BACKDROP : {}) }}>
                 {src && <img src={src} alt="" style={{ width: size, height: size, objectFit: "contain" }} />}
                 <span data-ui-count={el.id}>{el.prefix ?? "×"}{num(gameState.get(el.stateKey))}</span>
               </div>
@@ -148,7 +155,7 @@ export function GameGuiOverlay({ bus, world }: Props) {
             return (
               <div key={el.id} style={{ ...style, color: el.color ?? "#dde3f0",
                 fontSize: el.fontSize ?? 13, textShadow: "0 1px 3px rgba(0,0,0,0.8)",
-                whiteSpace: "pre-wrap", maxWidth: 360 }}>
+                whiteSpace: "pre-wrap", maxWidth: 360, ...(el.backdrop ? BACKDROP : {}) }}>
                 {el.text}
               </div>
             );
@@ -156,12 +163,18 @@ export function GameGuiOverlay({ bus, world }: Props) {
             const def = assetManager.getGraphicDef(el.graphicId);
             const src = graphicSrc(el.graphicId);
             if (!src) return null;
-            return (
-              <img key={el.id} src={src} alt="" style={{ ...style,
-                width: el.width ?? Math.min(def?.width ?? 64, 256),
-                height: el.height ?? "auto",
-                opacity: el.opacity ?? 1 }} />
-            );
+            const imgStyle: React.CSSProperties = {
+              width: el.width ?? Math.min(def?.width ?? 64, 256),
+              height: el.height ?? "auto",
+              opacity: el.opacity ?? 1,
+            };
+            return el.backdrop
+              ? (
+                <div key={el.id} style={{ ...style, ...BACKDROP, padding: 4 }}>
+                  <img src={src} alt="" style={{ ...imgStyle, display: "block" }} />
+                </div>
+              )
+              : <img key={el.id} src={src} alt="" style={{ ...style, ...imgStyle }} />;
           }
           case "menu": {
             const isActive = activeMenu?.id === el.id;

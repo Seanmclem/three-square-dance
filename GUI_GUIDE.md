@@ -96,6 +96,10 @@ Every element also has:
   top-right, bottom-left, bottom-center, bottom-right) plus x/y pixel offsets.
 - **visible at start** — shown without any script. Leave it off for menus and
   popups you'll open with `show_ui`.
+- **backdrop** — a translucent grey rounded box behind the element, for
+  contrast when the HUD sits over a bright sky (a white counter on a white sky
+  is unreadable without it). Available on every kind except menus, which have
+  their own box.
 
 ### Menus
 
@@ -159,7 +163,8 @@ the scene's version wins (items work the same way).
 
 `UiElementDef` — one entry in `game.json`'s or the scene's `uiElements` array.
 Common fields: `id` (`ui_<uuid8>`), `label`, `anchor`, `offsetX`/`offsetY`
-(px, default 16), `startVisible`. Per kind:
+(px, default 16), `startVisible`, `backdrop` (contrast pill; menus ignore it).
+Per kind:
 
 ```jsonc
 { "kind": "bar",     "stateKey": "health", "max": 100,

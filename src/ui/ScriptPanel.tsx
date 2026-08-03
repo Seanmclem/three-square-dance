@@ -4216,7 +4216,7 @@ function UiElementRow({
         <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end", flexWrap: "wrap" }}>
         <F label="Screen anchor" flex={1}>
           <select
             style={S.select}
@@ -4237,6 +4237,16 @@ function UiElementRow({
           />
           visible at start
         </label>
+        {element.kind !== "menu" && (
+          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Translucent grey box behind the element — keeps it readable on bright skies">
+            <input
+              type="checkbox"
+              checked={!!element.backdrop}
+              onChange={(e) => set({ backdrop: e.target.checked || undefined })}
+            />
+            backdrop
+          </label>
+        )}
       </div>
 
       {element.kind === "bar" && (
