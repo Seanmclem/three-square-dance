@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": 1.5190036767248847,
-        "y": 5.789248611141304,
-        "z": -46.434798415626574
+        "x": -16.29287503264027,
+        "y": 3.531292611087123,
+        "z": -47.083073365251956
       },
       "radius": 30.30000000000003,
       "phi": 0.995000000000003,
@@ -6329,9 +6329,9 @@
             "z": 0
           },
           "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
+            "x": 1.2,
+            "y": 1.2,
+            "z": 1.2
           },
           "floor": 0,
           "zoneId": "demo",
@@ -6356,9 +6356,9 @@
             "z": 0
           },
           "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
+            "x": 1.2,
+            "y": 1.2,
+            "z": 1.2
           },
           "floor": 0,
           "zoneId": "demo",
@@ -6383,9 +6383,9 @@
             "z": 0
           },
           "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
+            "x": 1.2,
+            "y": 1.2,
+            "z": 1.2
           },
           "floor": 0,
           "zoneId": "demo",
@@ -10953,108 +10953,6 @@
           }
         },
         {
-          "id": "obj_9ebe6b35",
-          "assetId": "chest",
-          "position": {
-            "x": -12.22989322717145,
-            "y": 9.392836500518921,
-            "z": -47.58903157364694
-          },
-          "rotation": {
-            "x": 0,
-            "y": -90,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "autoPlayAnimation": null,
-          "scripts": [],
-          "prefab": {
-            "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_4786b2c5",
-            "memberKey": "obj_4ddacd98"
-          }
-        },
-        {
-          "id": "obj_cf5dfe97",
-          "assetId": "coin",
-          "position": {
-            "x": -11.364118643475232,
-            "y": 12.276162434522874,
-            "z": -48.115096893108344
-          },
-          "rotation": {
-            "x": 0,
-            "y": 90,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "label": "5 Coin Icon indicator",
-          "startHidden": true,
-          "prefab": {
-            "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_4786b2c5",
-            "memberKey": "obj_5a26150e"
-          }
-        },
-        {
-          "id": "obj_de5d0fb3",
-          "assetId": "numbers_5",
-          "position": {
-            "x": -11.376066503159333,
-            "y": 12.344951736254473,
-            "z": -46.952903861687005
-          },
-          "rotation": {
-            "x": 0,
-            "y": -90,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "label": "5 Number for Coin",
-          "startHidden": true,
-          "prefab": {
-            "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_4786b2c5",
-            "memberKey": "obj_079554aa"
-          }
-        },
-        {
           "id": "obj_8bb98556",
           "assetId": "chest",
           "position": {
@@ -11092,8 +10990,8 @@
           "id": "obj_0b74c39c",
           "assetId": "coin",
           "position": {
-            "x": -27.746599050023725,
-            "y": 15.570359907737057,
+            "x": -25.81386421715359,
+            "y": 15.036199937880173,
             "z": -26.57583881099778
           },
           "rotation": {
@@ -11126,8 +11024,8 @@
           "id": "obj_3f3eedbb",
           "assetId": "numbers_5",
           "position": {
-            "x": -27.758546909707828,
-            "y": 15.639149209468655,
+            "x": -25.825812076837693,
+            "y": 15.104989239611772,
             "z": -25.41364577957644
           },
           "rotation": {
@@ -11153,6 +11051,108 @@
           "prefab": {
             "prefabId": "pfb_07e2acef",
             "instanceId": "pfi_f331434f",
+            "memberKey": "obj_079554aa"
+          }
+        },
+        {
+          "id": "obj_20d9b0bf",
+          "assetId": "chest",
+          "position": {
+            "x": -12.073099532340207,
+            "y": 9.392836500518918,
+            "z": -47.567364367845066
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "autoPlayAnimation": null,
+          "scripts": [],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_277e6d85",
+            "memberKey": "obj_4ddacd98"
+          }
+        },
+        {
+          "id": "obj_2492ed90",
+          "assetId": "coin",
+          "position": {
+            "x": -9.27459011577385,
+            "y": 11.742002464665987,
+            "z": -48.09342968730647
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "5 Coin Icon indicator",
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_277e6d85",
+            "memberKey": "obj_5a26150e"
+          }
+        },
+        {
+          "id": "obj_072ad413",
+          "assetId": "numbers_5",
+          "position": {
+            "x": -9.286537975457952,
+            "y": 11.810791766397585,
+            "z": -46.93123665588513
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "5 Number for Coin",
+          "startHidden": true,
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_277e6d85",
             "memberKey": "obj_079554aa"
           }
         }
@@ -11368,7 +11368,7 @@
         {
           "id": "pfi_4786b2c5",
           "prefabId": "pfb_07e2acef",
-          "version": 3,
+          "version": 5,
           "variables": {},
           "origin": {
             "position": {
@@ -11382,7 +11382,7 @@
         {
           "id": "pfi_f331434f",
           "prefabId": "pfb_07e2acef",
-          "version": 3,
+          "version": 5,
           "variables": {},
           "origin": {
             "position": {
@@ -11417,6 +11417,20 @@
               "x": -43.5,
               "y": 5.771756225759203,
               "z": -48.5
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_277e6d85",
+          "prefabId": "pfb_07e2acef",
+          "version": 5,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -11.960725898620261,
+              "y": 9.392836500518918,
+              "z": -47.51759087630869
             },
             "rotationY": 0
           }
@@ -11615,81 +11629,6 @@
           }
         },
         {
-          "id": "vol_c1657fca",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -13.5,
-            "y": 9.392836500518923,
-            "z": -47.5
-          },
-          "size": {
-            "x": 2,
-            "y": 2.5,
-            "z": 4
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "script_6a12f15e",
-              "label": "open_chest",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter",
-                "targetId": "vol_c1657fca"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_9ebe6b35",
-                  "animation": "Chest_Open",
-                  "animationHold": true
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.9,
-                  "targetId": "obj_9ebe6b35",
-                  "fadeDuration": 1
-                },
-                {
-                  "type": "spawn_object",
-                  "targetId": "obj_de5d0fb3",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "spawn_object",
-                  "targetId": "obj_cf5dfe97",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.8,
-                  "targetId": "obj_de5d0fb3",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 0.8,
-                  "targetId": "obj_cf5dfe97",
-                  "fadeDuration": 0.3
-                },
-                {
-                  "type": "adjust_number",
-                  "stateKey": "coins",
-                  "numberDelta": 5
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_4786b2c5",
-            "memberKey": "vol_9becbbd8"
-          }
-        },
-        {
           "id": "vol_f9d97563",
           "label": "Trigger Volume",
           "position": {
@@ -11705,7 +11644,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_7008fa7d",
+              "id": "script_11c2447b",
               "label": "open_chest",
               "zoneId": "demo",
               "enabled": true,
@@ -11753,6 +11692,10 @@
                   "type": "adjust_number",
                   "stateKey": "coins",
                   "numberDelta": 5
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup11"
                 }
               ],
               "oneShot": false
@@ -11761,6 +11704,85 @@
           "prefab": {
             "prefabId": "pfb_07e2acef",
             "instanceId": "pfi_f331434f",
+            "memberKey": "vol_9becbbd8"
+          }
+        },
+        {
+          "id": "vol_6b0e2653",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -13.343206305168756,
+            "y": 9.39283650051892,
+            "z": -47.478332794198124
+          },
+          "size": {
+            "x": 2,
+            "y": 2.5,
+            "z": 4
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_bf95fa76",
+              "label": "open_chest",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter",
+                "targetId": "vol_6b0e2653"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_20d9b0bf",
+                  "animation": "Chest_Open",
+                  "animationHold": true
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.9,
+                  "targetId": "obj_20d9b0bf",
+                  "fadeDuration": 1
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_072ad413",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "spawn_object",
+                  "targetId": "obj_2492ed90",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_072ad413",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.8,
+                  "targetId": "obj_2492ed90",
+                  "fadeDuration": 0.3
+                },
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 5
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup11"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_07e2acef",
+            "instanceId": "pfi_277e6d85",
             "memberKey": "vol_9becbbd8"
           }
         }

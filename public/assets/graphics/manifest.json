@@ -24,6 +24,21 @@
       "path": "/assets/graphics/key.png",
       "width": 64,
       "height": 64
+    },
+    {
+      "id": "coin_icon",
+      "label": "Coin icon",
+      "category": "Icons",
+      "path": "/assets/graphics/coin_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     }
   ]
 }
