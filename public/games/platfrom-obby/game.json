@@ -628,7 +628,9 @@
       "stateKey": "coins",
       "startVisible": true,
       "prefix": " ",
-      "graphicId": "coin_icon"
+      "graphicId": "coin_icon",
+      "backdrop": true,
+      "size": 28
     }
   ]
 }
