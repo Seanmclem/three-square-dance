@@ -41,7 +41,7 @@ const num = (v: unknown): number => (typeof v === "number" ? v : Number(v ?? 0))
 // Optional contrast pill behind an element (UiElementBase.backdrop) — same
 // translucent dark-grey treatment as the bar track, for bright skies.
 const BACKDROP: React.CSSProperties = {
-  background: "rgba(30,34,44,0.6)", border: "1px solid rgba(255,255,255,0.12)",
+  background: "rgba(30,34,44,0.4)", border: "1px solid rgba(255,255,255,0.12)",
   borderRadius: 6, padding: "4px 10px",
 };
 
