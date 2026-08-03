@@ -165,6 +165,10 @@ export default function App() {
   const [graphicsDir,     setGraphicsDir]      = useState<FileSystemDirectoryHandle | null>(null);
   const [graphics,        setGraphics]         = useState<GraphicDef[]>([]);
   const [graphicsImporterOpen, setGraphicsImporterOpen] = useState(false);
+  const [pendingGraphicDelete, setPendingGraphicDelete] = useState<
+    { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
+  >(null);
+  const [pendingGraphicEdit, setPendingGraphicEdit] = useState<PendingEdit | null>(null);
   const [pendingSkyboxEdit, setPendingSkyboxEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
@@ -2231,6 +2235,89 @@ export default function App() {
       .catch(err => console.error("graphics reload failed:", err));
   };
 
+  // Open the delete-confirm dialog, counting references to the graphics.
+  // Graphics are referenced two ways: ItemDef.icon stores the PATH, UI elements store the id.
+  const handleRequestGraphicDelete = (ids: string[]): void => {
+    if (!ids.length) return;
+    const idSet  = new Set(ids);
+    const labels = ids.map(id => graphics.find(g => g.id === id)?.label ?? id);
+    const paths  = new Set(ids.map(id => graphics.find(g => g.id === id)?.path).filter(Boolean));
+    const iconHits = worldItems.filter(it => it.icon && paths.has(it.icon)).length;
+    const world = worldRef.current;
+    const uiHits = [...(world?.world?.uiElements ?? []), ...(world?.gameUiElements ?? [])]
+      .filter(el => {
+        const gid = (el as { graphicId?: string }).graphicId;
+        return gid !== undefined && idSet.has(gid);
+      }).length;
+    const contexts: string[] = [];
+    if (iconHits) contexts.push("item icons");
+    if (uiHits)   contexts.push("game UI");
+    setPendingGraphicDelete({ ids, labels, usage: { count: iconHits + uiHits, zones: contexts } });
+  };
+
+  // Delete graphics: drop from the manifest (+ optionally the image files), evict from the registry.
+  const handleConfirmGraphicDelete = async (deleteFiles: boolean): Promise<void> => {
+    const pending = pendingGraphicDelete;
+    setPendingGraphicDelete(null);
+    if (!pending) return;
+    const ids = pending.ids;
+    const dir = await ensureDir(graphicsDir, setGraphicsDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
+      const removed = data.graphics.filter(g => ids.includes(g.id));
+      data.graphics = data.graphics.filter(g => !ids.includes(g.id));
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+      if (deleteFiles) {
+        for (const g of removed) {
+          const fname = g.path.split("/").pop();
+          if (fname) { try { await dir.removeEntry(fname); } catch { /* missing — ignore */ } }
+        }
+      }
+    } catch (err) {
+      console.error("graphic delete failed:", err);
+      return;
+    }
+    assetManager.removeGraphics(ids);
+    setGraphics(prev => prev.filter(g => !ids.includes(g.id)));
+  };
+
+  // Open the graphic metadata editor (label / category / attribution) for one or more graphics.
+  const handleRequestGraphicEdit = (ids: string[]): void => {
+    const defs = ids.map(id => graphics.find(g => g.id === id)).filter(Boolean) as GraphicDef[];
+    if (!defs.length) return;
+    const single = defs.length === 1;
+    setPendingGraphicEdit({
+      ids, items: defs.map(d => ({ id: d.id, label: d.label })),
+      initial: {
+        label:       single ? defs[0]!.label : "",
+        category:    single ? (defs[0]!.category ?? "Icons") : commonOr(defs.map(d => d.category ?? "Icons")),
+        attribution: single ? (defs[0]!.attribution ?? {}) : {},
+      },
+    });
+  };
+
+  const handleConfirmGraphicEdit = async (patch: EditPatch): Promise<void> => {
+    const pending = pendingGraphicEdit;
+    setPendingGraphicEdit(null);
+    if (!pending) return;
+    const dir = await ensureDir(graphicsDir, setGraphicsDir);
+    if (!dir) return;
+    try {
+      const mh   = await dir.getFileHandle("manifest.json");
+      const data = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
+      data.graphics = data.graphics.map(g => pending.ids.includes(g.id) ? patchEntry(g, patch) : g);
+      const w = await mh.createWritable();
+      await w.write(JSON.stringify(data, null, 2));
+      await w.close();
+    } catch (err) { console.error("graphic edit failed:", err); return; }
+    pending.ids.forEach(id => assetManager.updateGraphic(id, patch as Partial<GraphicDef>));
+    setGraphics(assetManager.getGraphicList());
+  };
+
   const handleSkyboxesReload = (): void => {
     assetManager.initSkyboxes().then(defs => {
       setSkyboxes(defs);
@@ -3441,6 +3528,8 @@ export default function App() {
         onEditSkyboxes={handleRequestSkyboxEdit}
         graphics={graphics}
         onGraphicsImport={() => setGraphicsImporterOpen(true)}
+        onDeleteGraphics={handleRequestGraphicDelete}
+        onEditGraphics={handleRequestGraphicEdit}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}
@@ -3780,6 +3869,33 @@ SquareDance
           onGraphicsDirSet={setGraphicsDir}
           onComplete={() => { setGraphicsImporterOpen(false); handleGraphicsReload(); }}
           onClose={() => setGraphicsImporterOpen(false)}
+        />
+      )}
+
+      {pendingGraphicDelete && (
+        <DeleteAssetDialog
+          labels={pendingGraphicDelete.labels}
+          usage={pendingGraphicDelete.usage}
+          needsFolderGrant={!graphicsDir}
+          noun="graphic"
+          usageNoun="reference"
+          usageEffect="Those item icons and UI elements will show blank until reassigned."
+          folderHint="public/assets/graphics"
+          onCancel={() => setPendingGraphicDelete(null)}
+          onConfirm={deleteFiles => void handleConfirmGraphicDelete(deleteFiles)}
+        />
+      )}
+
+      {pendingGraphicEdit && (
+        <EditMetadataDialog
+          items={pendingGraphicEdit.items}
+          noun="graphic"
+          categoryOptions={[...new Set(["Icons", "HUD", ...graphics.map(g => g.category ?? "Icons")])]}
+          initial={pendingGraphicEdit.initial}
+          needsFolderGrant={!graphicsDir}
+          folderHint="public/assets/graphics"
+          onCancel={() => setPendingGraphicEdit(null)}
+          onSave={patch => void handleConfirmGraphicEdit(patch)}
         />
       )}
 

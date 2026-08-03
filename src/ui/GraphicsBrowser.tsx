@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { GraphicDef } from "@/types";
 import { MaterialCategoryPills, orderedMaterialCategories } from "@/ui/materialCategories";
 import { assetManager } from "@/core/AssetManager";
@@ -6,6 +6,8 @@ import { assetManager } from "@/core/AssetManager";
 interface GraphicsBrowserProps {
   graphics: GraphicDef[];
   onImport: () => void;
+  onDeleteGraphics: (ids: string[]) => void;
+  onEdit: (ids: string[]) => void;
 }
 
 const catOf = (g: GraphicDef) => g.category ?? "Other";
@@ -22,9 +24,25 @@ const checkerTile = (path: string): React.CSSProperties => ({
   backgroundRepeat: "no-repeat, repeat, repeat",
 });
 
-export function GraphicsBrowser({ graphics, onImport }: GraphicsBrowserProps) {
-  const [search, setSearch] = useState("");
-  const [cat,    setCat]    = useState<string>("All");
+export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }: GraphicsBrowserProps) {
+  const [search,  setSearch]  = useState("");
+  const [cat,     setCat]     = useState<string>("All");
+  // Manage mode: tiles become multi-select checkboxes for batch edit/delete
+  const [manage,  setManage]  = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+
+  const exitManage  = () => { setManage(false); setChecked(new Set()); };
+  const toggleCheck = (id: string) =>
+    setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  // Drop checks for graphics that no longer exist (e.g. just deleted).
+  useEffect(() => {
+    setChecked(prev => {
+      const ids = new Set(graphics.map(g => g.id));
+      const next = new Set([...prev].filter(id => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [graphics]);
 
   const orderedCats = orderedMaterialCategories([...new Set(graphics.map(catOf))]);
   const q = search.toLowerCase();
@@ -46,9 +64,39 @@ export function GraphicsBrowser({ graphics, onImport }: GraphicsBrowserProps) {
       </div>
 
       <div style={{ padding: "6px 8px", flexShrink: 0, display: "flex", gap: 4 }}>
-        <button onClick={onImport} style={{ flex: 1, padding: "5px 0", background: "rgba(80,140,255,0.12)",
-          border: "1px solid rgba(80,140,255,0.25)", borderRadius: 4, cursor: "pointer",
-          color: "#80aaff", fontSize: 10, letterSpacing: 0.5 }}>+ Import Graphics</button>
+        {!manage ? (
+          <>
+            <button onClick={onImport} style={{ flex: 1, padding: "5px 0", background: "rgba(80,140,255,0.12)",
+              border: "1px solid rgba(80,140,255,0.25)", borderRadius: 4, cursor: "pointer",
+              color: "#80aaff", fontSize: 10, letterSpacing: 0.5 }}>+ Import Graphics</button>
+            {graphics.length > 0 && (
+              <button onClick={() => setManage(true)} title="Select graphics to edit or delete"
+                style={{ flexShrink: 0, padding: "5px 10px",
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 4, cursor: "pointer", color: "#c2cadb", fontSize: 10, letterSpacing: 0.5 }}>Manage</button>
+            )}
+          </>
+        ) : (
+          <>
+            <button onClick={() => { if (checked.size) onEdit([...checked]); }} disabled={checked.size === 0}
+              style={{ flex: 1, padding: "5px 0",
+                background: checked.size ? "rgba(80,140,255,0.12)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size ? "pointer" : "default",
+                color: checked.size ? "#9dbdff" : "#8b93a5", fontSize: 10, letterSpacing: 0.5 }}>
+              Edit{checked.size ? ` (${checked.size})` : ""}</button>
+            <button onClick={() => { if (checked.size) onDeleteGraphics([...checked]); }} disabled={checked.size === 0}
+              style={{ flex: 1, padding: "5px 0",
+                background: checked.size ? "rgba(200,60,60,0.15)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${checked.size ? "rgba(200,60,60,0.35)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 4, cursor: checked.size ? "pointer" : "default",
+                color: checked.size ? "#e08585" : "#8b93a5", fontSize: 10, letterSpacing: 0.5 }}>
+              Delete{checked.size ? ` (${checked.size})` : ""}</button>
+            <button onClick={exitManage} style={{ flexShrink: 0, padding: "5px 10px",
+              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 4, cursor: "pointer", color: "#c2cadb", fontSize: 10, letterSpacing: 0.5 }}>Done</button>
+          </>
+        )}
       </div>
 
       <div style={{ padding: "0 8px 6px", flexShrink: 0, color: "#606070", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
@@ -65,25 +113,41 @@ export function GraphicsBrowser({ graphics, onImport }: GraphicsBrowserProps) {
             {graphics.length === 0 ? "No graphics yet — import PNGs to get started." : "No results."}
           </div>
         ) : (
-          filtered.map(g => (
-            <div
-              key={g.id}
-              title={g.width && g.height ? `${g.label} (${g.width}×${g.height})` : g.label}
-              style={{
-                background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.05)",
-                borderRadius: 4, padding: 2,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                overflow: "hidden", minHeight: 80,
-              }}
-            >
-              <div style={checkerTile(g.path)} />
-              <span style={{
-                fontSize: 8, color: "#9aa3b5",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                width: "100%", textAlign: "center",
-              }}>{g.label}</span>
-            </div>
-          ))
+          filtered.map(g => {
+            const sel = manage && checked.has(g.id);
+            return (
+              <div
+                key={g.id}
+                title={g.width && g.height ? `${g.label} (${g.width}×${g.height})` : g.label}
+                onClick={() => manage && toggleCheck(g.id)}
+                style={{
+                  position: "relative",
+                  background: sel ? "rgba(200,60,60,0.18)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${sel ? "rgba(200,60,60,0.5)" : "rgba(255,255,255,0.05)"}`,
+                  borderRadius: 4, padding: 2, cursor: manage ? "pointer" : "default",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                  overflow: "hidden", minHeight: 80,
+                }}
+              >
+                {manage && (
+                  <div style={{
+                    position: "absolute", top: 3, left: 3, zIndex: 1,
+                    width: 14, height: 14, borderRadius: 3,
+                    background: sel ? "rgba(200,60,60,0.9)" : "rgba(20,20,20,0.8)",
+                    border: `1px solid ${sel ? "rgba(255,140,140,0.8)" : "rgba(255,255,255,0.3)"}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff", fontSize: 10, lineHeight: 1,
+                  }}>{sel ? "✓" : ""}</div>
+                )}
+                <div style={checkerTile(g.path)} />
+                <span style={{
+                  fontSize: 8, color: sel ? "#e08585" : "#9aa3b5",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  width: "100%", textAlign: "center",
+                }}>{g.label}</span>
+              </div>
+            );
+          })
         )}
       </div>
     </div>

@@ -272,6 +272,18 @@ export class AssetManager {
   getGraphicDef(id: string): GraphicDef | undefined { return this._graphicsRegistry[id]; }
   getGraphicList(): GraphicDef[] { return Object.values(this._graphicsRegistry); }
 
+  /** Merge a metadata patch into a registry graphic entry (attribution merged one level deep). */
+  updateGraphic(id: string, patch: Partial<GraphicDef>): void {
+    const def = this._graphicsRegistry[id];
+    if (!def) return;
+    this._graphicsRegistry[id] = { ...def, ...patch, attribution: { ...def.attribution, ...patch.attribution } };
+  }
+
+  /** Drop graphics from the registry after a manifest delete. */
+  removeGraphics(ids: string[]): void {
+    for (const id of ids) delete this._graphicsRegistry[id];
+  }
+
   // ─── Skyboxes (Phase 37) ─────────────────────────────────────────────────────
 
   /** Fetch manifest.json, populate the skybox registry, return the list. */

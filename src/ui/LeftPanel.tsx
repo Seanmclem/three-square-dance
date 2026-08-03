@@ -37,6 +37,8 @@ interface LeftPanelProps {
   onEditSkyboxes:   (ids: string[]) => void;
   graphics:         GraphicDef[];
   onGraphicsImport: () => void;
+  onDeleteGraphics: (ids: string[]) => void;
+  onEditGraphics:   (ids: string[]) => void;
   onClose:         () => void;
   groups:          GroupDef[];
   hiddenGroupIds:  Set<string>;
@@ -103,7 +105,7 @@ export function LeftPanel({
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onDeleteSounds, onEditSounds,
   skyboxes, selectedSkybox, onSkyboxSelect, onSkyboxImport, onDeleteSkyboxes, onEditSkyboxes,
-  graphics, onGraphicsImport,
+  graphics, onGraphicsImport, onDeleteGraphics, onEditGraphics,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
@@ -224,6 +226,8 @@ export function LeftPanel({
               <GraphicsBrowser
                 graphics={graphics}
                 onImport={onGraphicsImport}
+                onDeleteGraphics={onDeleteGraphics}
+                onEdit={onEditGraphics}
               />
             )}
             {panelId === "decals" && (

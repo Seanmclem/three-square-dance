@@ -13,7 +13,7 @@ export interface EditPatch {
 
 interface EditMetadataDialogProps {
   items:           { id: string; label: string }[];
-  noun:            "model" | "material" | "sound" | "skybox";
+  noun:            "model" | "material" | "sound" | "skybox" | "graphic";
   categoryOptions: string[];
   initial:         { label: string; category: string; attribution: Attribution; tags?: string[] };
   /** Omit to hide the TAGS field entirely (call sites whose def has no `tags`). */

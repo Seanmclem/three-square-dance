@@ -54,6 +54,13 @@ coin, key). **+ Import Graphics** copies your own images into
 - Labels are editable per file before importing; the checkerboard in every
   preview shows exactly what's transparent.
 
+**Manage** (beside Import) turns the tiles into checkboxes so you can clean up
+the library: **Edit** changes label / category / attribution (works on a
+multi-select too), **Delete** removes graphics from the library — with an
+optional checkbox to also delete the image files from disk. If a graphic is
+still used by an item icon or a UI element, the delete confirmation warns you
+first; deleting anyway leaves those spots blank until you reassign them.
+
 ## Making an icon from a 3D model
 
 ![The thumbnail stager in icon mode — transparent background, saved to the graphics library](docs/images/icon-stager.png)
