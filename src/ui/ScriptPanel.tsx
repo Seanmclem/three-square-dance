@@ -4181,15 +4181,17 @@ function UiElementRow({
     onReplace({ ...element, ...changes } as UiElementDef);
   }
 
-  const numField = (val: number | undefined, ph: string, title: string, onVal: (n: number | undefined) => void, width = 58) => (
-    <input
-      type="number"
-      style={{ ...S.field, flex: `0 0 ${width}px` }}
-      placeholder={ph}
-      title={title}
-      value={val ?? ""}
-      onChange={(e) => onVal(e.target.value === "" ? undefined : Number(e.target.value))}
-    />
+  const numField = (label: string, val: number | undefined, ph: string, title: string, onVal: (n: number | undefined) => void, width = 58) => (
+    <F label={label} flex={`0 0 ${width}px`}>
+      <input
+        type="number"
+        style={S.field}
+        placeholder={ph}
+        title={title}
+        value={val ?? ""}
+        onChange={(e) => onVal(e.target.value === "" ? undefined : Number(e.target.value))}
+      />
+    </F>
   );
 
   return (
@@ -4197,33 +4199,37 @@ function UiElementRow({
       background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
       margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)",
     }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
+      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
         <span style={{
           fontSize: 9, color: "#80aaff", background: "rgba(80,140,255,0.12)",
           border: "1px solid rgba(80,140,255,0.25)", borderRadius: 3,
-          padding: "2px 5px", flexShrink: 0, letterSpacing: 0.5,
+          padding: "2px 5px", flexShrink: 0, letterSpacing: 0.5, marginBottom: 3,
         }}>{element.kind}</span>
-        <input
-          style={{ ...S.field, flex: 1 }}
-          placeholder="Label"
-          value={element.label}
-          onChange={(e) => set({ label: e.target.value })}
-        />
+        <F label="Element name" flex={1}>
+          <input
+            style={S.field}
+            placeholder="Label"
+            value={element.label}
+            onChange={(e) => set({ label: e.target.value })}
+          />
+        </F>
         <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
-        <select
-          style={{ ...S.select, flex: 1 }}
-          title="Screen anchor"
-          value={element.anchor}
-          onChange={(e) => set({ anchor: e.target.value as UiAnchor })}
-        >
-          {UI_ANCHORS.map((a) => <option key={a} value={a}>{a}</option>)}
-        </select>
-        {numField(element.offsetX, "x 16", "offset from the anchored edge (px)", (n) => set({ offsetX: n }))}
-        {numField(element.offsetY, "y 16", "offset from the anchored edge (px)", (n) => set({ offsetY: n }))}
-        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0 }} title="Shown without needing a show_ui action">
+      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+        <F label="Screen anchor" flex={1}>
+          <select
+            style={S.select}
+            title="Screen anchor"
+            value={element.anchor}
+            onChange={(e) => set({ anchor: e.target.value as UiAnchor })}
+          >
+            {UI_ANCHORS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </F>
+        {numField("X offset", element.offsetX, "16", "offset from the anchored edge (px)", (n) => set({ offsetX: n }))}
+        {numField("Y offset", element.offsetY, "16", "offset from the anchored edge (px)", (n) => set({ offsetY: n }))}
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Shown without needing a show_ui action">
           <input
             type="checkbox"
             checked={!!element.startVisible}
@@ -4235,90 +4241,110 @@ function UiElementRow({
 
       {element.kind === "bar" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-            <input
-              style={{ ...S.field, flex: 1 }}
-              placeholder="State key (e.g. health)"
-              list="wb-state-keys"
-              value={element.stateKey}
-              onChange={(e) => set({ stateKey: e.target.value })}
-            />
-            {numField(element.max, "max 100", "value at which the bar is full", (n) => set({ max: n }))}
+          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+            <F label="State key" flex={1}>
+              <input
+                style={S.field}
+                placeholder="e.g. health"
+                list="wb-state-keys"
+                value={element.stateKey}
+                onChange={(e) => set({ stateKey: e.target.value })}
+              />
+            </F>
+            {numField("Full at", element.max, "100", "value at which the bar is full", (n) => set({ max: n }))}
           </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {numField(element.width, "w 160", "bar width (px)", (n) => set({ width: n }))}
-            {numField(element.height, "h 14", "bar height (px)", (n) => set({ height: n }))}
-            <input
-              type="color"
-              style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
-              title="fill color"
-              value={element.color ?? "#e05555"}
-              onChange={(e) => set({ color: e.target.value })}
-            />
-            <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon (optional)" onChange={(id) => set({ graphicId: id })} />
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+            {numField("Width", element.width, "160", "bar width (px)", (n) => set({ width: n }))}
+            {numField("Height", element.height, "14", "bar height (px)", (n) => set({ height: n }))}
+            <F label="Fill">
+              <input
+                type="color"
+                style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
+                title="fill color"
+                value={element.color ?? "#e05555"}
+                onChange={(e) => set({ color: e.target.value })}
+              />
+            </F>
+            <F label="Icon (optional)" flex={1}>
+              <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
+            </F>
           </div>
         </>
       )}
 
       {element.kind === "counter" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
-            <input
-              style={{ ...S.field, flex: 1 }}
-              placeholder="State key (e.g. inv.<item> or coins)"
-              list="wb-state-keys"
-              value={element.stateKey}
-              onChange={(e) => set({ stateKey: e.target.value })}
-            />
-            <input
-              style={{ ...S.field, flex: "0 0 48px" }}
-              placeholder="×"
-              title="text before the number"
-              value={element.prefix ?? ""}
-              onChange={(e) => set({ prefix: e.target.value || undefined })}
-            />
-            {numField(element.size, "px 24", "icon size (px)", (n) => set({ size: n }), 52)}
+          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+            <F label="State key" flex={1}>
+              <input
+                style={S.field}
+                placeholder="e.g. coins"
+                list="wb-state-keys"
+                value={element.stateKey}
+                onChange={(e) => set({ stateKey: e.target.value })}
+              />
+            </F>
+            <F label="Prefix" flex="0 0 48px">
+              <input
+                style={S.field}
+                placeholder="×"
+                title="text before the number"
+                value={element.prefix ?? ""}
+                onChange={(e) => set({ prefix: e.target.value || undefined })}
+              />
+            </F>
+            {numField("Icon px", element.size, "24", "icon size (px)", (n) => set({ size: n }), 52)}
           </div>
-          <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon (optional)" onChange={(id) => set({ graphicId: id })} />
+          <F label="Icon (optional)">
+            <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
+          </F>
         </>
       )}
 
       {element.kind === "label" && (
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <input
-            style={{ ...S.field, flex: 1 }}
-            placeholder="Text"
-            value={element.text}
-            onChange={(e) => set({ text: e.target.value })}
-          />
-          {numField(element.fontSize, "px 13", "font size", (n) => set({ fontSize: n }), 52)}
-          <input
-            type="color"
-            style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
-            title="text color"
-            value={element.color ?? "#dde3f0"}
-            onChange={(e) => set({ color: e.target.value })}
-          />
+        <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+          <F label="Text shown on screen" flex={1}>
+            <input
+              style={S.field}
+              placeholder="Text"
+              value={element.text}
+              onChange={(e) => set({ text: e.target.value })}
+            />
+          </F>
+          {numField("Font px", element.fontSize, "13", "font size", (n) => set({ fontSize: n }), 52)}
+          <F label="Color">
+            <input
+              type="color"
+              style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
+              title="text color"
+              value={element.color ?? "#dde3f0"}
+              onChange={(e) => set({ color: e.target.value })}
+            />
+          </F>
         </div>
       )}
 
       {element.kind === "image" && (
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="graphic" onChange={(id) => set({ graphicId: id ?? "" })} />
-          {numField(element.width, "w", "width (px; blank = image size)", (n) => set({ width: n }), 48)}
-          {numField(element.height, "h", "height (px)", (n) => set({ height: n }), 48)}
+        <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+          <F label="Graphic" flex={1}>
+            <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="graphic" onChange={(id) => set({ graphicId: id ?? "" })} />
+          </F>
+          {numField("Width", element.width, "auto", "width (px; blank = image size)", (n) => set({ width: n }), 48)}
+          {numField("Height", element.height, "auto", "height (px)", (n) => set({ height: n }), 48)}
         </div>
       )}
 
       {element.kind === "menu" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "center" }}>
-            <input
-              style={{ ...S.field, flex: 1 }}
-              placeholder="Title (optional)"
-              value={element.title ?? ""}
-              onChange={(e) => set({ title: e.target.value || undefined })}
-            />
+          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+            <F label="Menu title (optional)" flex={1}>
+              <input
+                style={S.field}
+                placeholder="Title"
+                value={element.title ?? ""}
+                onChange={(e) => set({ title: e.target.value || undefined })}
+              />
+            </F>
             <button style={{ ...S.btn(), fontSize: 10 }} onClick={() => setExpanded((v) => !v)}>
               {expanded ? "▾" : "▸"} {element.options.length} option{element.options.length !== 1 ? "s" : ""}
             </button>
@@ -4372,14 +4398,16 @@ function UiMenuOptionRow({
       background: "rgba(255,255,255,0.02)", borderRadius: 4, padding: "5px 6px",
       marginBottom: 4, border: "1px solid rgba(255,255,255,0.05)",
     }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
-        <input
-          style={{ ...S.field, flex: 1 }}
-          placeholder="Option text"
-          value={option.text}
-          onChange={(e) => set({ text: e.target.value })}
-        />
-        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0 }} title="Hide the menu after this option is picked">
+      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
+        <F label="Option text" flex={1}>
+          <input
+            style={S.field}
+            placeholder="Option text"
+            value={option.text}
+            onChange={(e) => set({ text: e.target.value })}
+          />
+        </F>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Hide the menu after this option is picked">
           <input
             type="checkbox"
             checked={option.closeOnPick !== false}
