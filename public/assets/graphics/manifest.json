@@ -2,34 +2,40 @@
   "version": "1.0",
   "graphics": [
     {
-      "id": "heart",
-      "label": "heart",
+      "id": "heart_icon",
+      "label": "Heart icon",
       "category": "Icons",
-      "path": "/assets/graphics/heart.png",
-      "width": 64,
-      "height": 64
-    },
-    {
-      "id": "coin",
-      "label": "coin",
-      "category": "Icons",
-      "path": "/assets/graphics/coin.png",
-      "width": 64,
-      "height": 64
-    },
-    {
-      "id": "key",
-      "label": "key",
-      "category": "Icons",
-      "path": "/assets/graphics/key.png",
-      "width": 64,
-      "height": 64
+      "path": "/assets/graphics/heart_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
     },
     {
       "id": "coin_icon",
       "label": "Coin icon",
       "category": "Icons",
       "path": "/assets/graphics/coin_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "key_icon",
+      "label": "Key icon",
+      "category": "Icons",
+      "path": "/assets/graphics/key_icon.png",
       "width": 256,
       "height": 256,
       "attribution": {
