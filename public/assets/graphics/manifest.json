@@ -47,10 +47,10 @@
       }
     },
     {
-      "id": "heart_half_icon",
-      "label": "Heart Half icon",
+      "id": "heart_outline_icon",
+      "label": "Heart Outline icon",
       "category": "Icons",
-      "path": "/assets/graphics/heart_half_icon.png",
+      "path": "/assets/graphics/heart_outline_icon.png",
       "width": 256,
       "height": 256,
       "attribution": {
@@ -62,10 +62,10 @@
       }
     },
     {
-      "id": "heart_outline_icon",
-      "label": "Heart Outline icon",
+      "id": "heart_half_icon",
+      "label": "Heart Half icon",
       "category": "Icons",
-      "path": "/assets/graphics/heart_outline_icon.png",
+      "path": "/assets/graphics/heart_half_icon.png",
       "width": 256,
       "height": 256,
       "attribution": {
