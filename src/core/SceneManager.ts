@@ -276,6 +276,27 @@ export class SceneManager {
       selectable: false, floorLevel: 0, _ownsMaterial: false,
     } satisfies MeshUserData;
     this.scene.add(ground);
+
+    this._gridHelpers = [minor, major];
+    this._groundMesh  = ground;
+  }
+
+  private _gridHelpers: THREE.GridHelper[] = [];
+  private _groundMesh: THREE.Mesh | null = null;
+
+  /**
+   * Editor grid + demo ground visibility (global editor preference). Meshes stay
+   * in the scene (raycasts/placement unaffected — worldPos comes from a math
+   * plane anyway). The helpers' `hideInGame` tag comes off while hidden so
+   * game-mode exit's blanket "restore hideInGame helpers" pass can't resurrect
+   * them; the ground never carries the tag.
+   */
+  setGridVisible(v: boolean): void {
+    for (const h of this._gridHelpers) {
+      h.visible = v;
+      h.userData.hideInGame = v;
+    }
+    if (this._groundMesh) this._groundMesh.visible = v;
   }
 
   onUpdate(cb: UpdateCallback): void {

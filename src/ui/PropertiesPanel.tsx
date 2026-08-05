@@ -420,6 +420,8 @@ interface PropertiesPanelProps {
   onTogglePerfCounter?:     () => void;
   showCrosshair?:           boolean;
   onToggleCrosshair?:       () => void;
+  showGridFloor?:           boolean;
+  onToggleGridFloor?:       () => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -438,6 +440,7 @@ export function PropertiesPanel({
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
+  showGridFloor, onToggleGridFloor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -648,7 +651,8 @@ export function PropertiesPanel({
               lightCount={zoneLights.length} onOpenLights={() => push("lights")}
               onOpenAudio={() => push("audio")}
               showPerfCounter={showPerfCounter} onTogglePerfCounter={onTogglePerfCounter}
-              showCrosshair={showCrosshair} onToggleCrosshair={onToggleCrosshair} />
+              showCrosshair={showCrosshair} onToggleCrosshair={onToggleCrosshair}
+              showGridFloor={showGridFloor} onToggleGridFloor={onToggleGridFloor} />
           )
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
@@ -6239,7 +6243,8 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
 }
 
 function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio,
-  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair }: {
+  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
+  showGridFloor, onToggleGridFloor }: {
   activeTool: ToolId;
   onShowCredits?: () => void;
   lightCount?:   number;
@@ -6249,6 +6254,8 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
   onTogglePerfCounter?: () => void;
   showCrosshair?:       boolean;
   onToggleCrosshair?:   () => void;
+  showGridFloor?:       boolean;
+  onToggleGridFloor?:   () => void;
 }) {
   const info = TOOL_INFO[activeTool];
   return (
@@ -6303,6 +6310,13 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
               <input type="checkbox" checked={showCrosshair ?? true} onChange={onToggleCrosshair}
                 style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
               <span style={{ color: "#c2cadb", fontSize: 11 }}>Crosshair while playing (center of screen)</span>
+            </label>
+          )}
+          {onToggleGridFloor && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
+              <input type="checkbox" checked={showGridFloor ?? true} onChange={onToggleGridFloor}
+                style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#c2cadb", fontSize: 11 }}>Grid floor (the dark ground plane + grid lines)</span>
             </label>
           )}
         </div>

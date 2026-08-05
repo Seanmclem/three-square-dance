@@ -144,6 +144,7 @@ export default function App() {
   // Global preview-overlay toggles (EDITOR section of the panel) — persisted like editorQuality.
   const [showPerfCounter, setShowPerfCounter] = useState(() => localStorage.getItem('editorShowPerf') !== '0');
   const [showCrosshair,   setShowCrosshair]   = useState(() => localStorage.getItem('editorShowCrosshair') !== '0');
+  const [showGridFloor,   setShowGridFloor]   = useState(() => localStorage.getItem('editorShowGrid') !== '0');
   const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -284,6 +285,9 @@ export default function App() {
 
     const scene     = new SceneManager(canvas, bus);
     sceneRef.current = scene;
+    // Apply the persisted grid preference (read directly — this effect runs once,
+    // before any toggle can change the state).
+    if (localStorage.getItem('editorShowGrid') === '0') scene.setGridVisible(false);
     assetManager.init(scene.renderer);
     // Store the promise so the init IIFE can await it before building geometry.
     // initMaterials() races against physicsWorld.init() (WASM instantiation) and can
@@ -1072,6 +1076,13 @@ export default function App() {
 
   const handleToggleCrosshair = (): void =>
     setShowCrosshair(v => { localStorage.setItem('editorShowCrosshair', v ? '0' : '1'); return !v; });
+
+  const handleToggleGridFloor = (): void =>
+    setShowGridFloor(v => {
+      localStorage.setItem('editorShowGrid', v ? '0' : '1');
+      sceneRef.current?.setGridVisible(!v);
+      return !v;
+    });
 
   /** Stamp the current editor viewpoint into metadata so explicit saves carry it.
    *  Deliberately NOT called from the periodic autosave — a camera-only change must
@@ -3644,6 +3655,8 @@ export default function App() {
         onTogglePerfCounter={handleTogglePerfCounter}
         showCrosshair={showCrosshair}
         onToggleCrosshair={handleToggleCrosshair}
+        showGridFloor={showGridFloor}
+        onToggleGridFloor={handleToggleGridFloor}
         onObjectUpdate={handleObjectUpdate}
         onSegmentUpdate={handleSegmentUpdate}
         onFloorNodesUpdate={handleFloorNodesUpdate}
