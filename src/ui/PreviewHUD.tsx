@@ -14,9 +14,10 @@ const EXIT_HINT:       Record<Scheme, string | null> = {
 };
 
 // mode is optional so the runtime shell (which also renders this HUD) needs no edit.
-interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme; mode?: PreviewMode }
+// showCrosshair likewise defaults on — only the editor's global toggle passes it.
+interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme; mode?: PreviewMode; showCrosshair?: boolean }
 
-export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game" }: Props) {
+export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game", showCrosshair = true }: Props) {
   const [zoneName,      setZoneName]      = useState<string | null>(null);
   const [interactLabel, setInteractLabel] = useState<string | null>(null);
   // Phase 28 — occlusion-test badge state (defaults match PreviewController's enter state,
@@ -73,7 +74,7 @@ export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game" }: Props
       )}
 
       {/* Crosshair — hidden in occlusion mode (the rendered view isn't the player's) */}
-      {!isOcclusion && (
+      {!isOcclusion && showCrosshair && (
         <div style={{
           position: "absolute", top: "50%", left: "50%",
           transform: "translate(-50%, -50%)",

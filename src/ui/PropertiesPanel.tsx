@@ -415,6 +415,11 @@ interface PropertiesPanelProps {
   onPrefabReexpand?:        () => void;
   onPrefabUnlink?:          () => void;
   onPrefabDeleteInstance?:  () => void;
+  // Global editor overlay toggles (EDITOR section, nothing-selected view).
+  showPerfCounter?:         boolean;
+  onTogglePerfCounter?:     () => void;
+  showCrosshair?:           boolean;
+  onToggleCrosshair?:       () => void;
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -432,6 +437,7 @@ export function PropertiesPanel({
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
+  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -640,7 +646,9 @@ export function PropertiesPanel({
           ) : (
             <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
               lightCount={zoneLights.length} onOpenLights={() => push("lights")}
-              onOpenAudio={() => push("audio")} />
+              onOpenAudio={() => push("audio")}
+              showPerfCounter={showPerfCounter} onTogglePerfCounter={onTogglePerfCounter}
+              showCrosshair={showCrosshair} onToggleCrosshair={onToggleCrosshair} />
           )
         ) : selected.type === "trigger-volume" ? (
           <TriggerVolumeView
@@ -6230,12 +6238,17 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   );
 }
 
-function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio }: {
+function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio,
+  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair }: {
   activeTool: ToolId;
   onShowCredits?: () => void;
   lightCount?:   number;
   onOpenLights?: () => void;
   onOpenAudio?:  () => void;
+  showPerfCounter?:     boolean;
+  onTogglePerfCounter?: () => void;
+  showCrosshair?:       boolean;
+  onToggleCrosshair?:   () => void;
 }) {
   const info = TOOL_INFO[activeTool];
   return (
@@ -6277,6 +6290,21 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
           >
             CREDITS — imported asset &amp; material authors
           </button>
+          {/* Preview-overlay toggles — persisted globally (localStorage), not per scene. */}
+          {onTogglePerfCounter && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 10 }}>
+              <input type="checkbox" checked={showPerfCounter ?? true} onChange={onTogglePerfCounter}
+                style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#c2cadb", fontSize: 11 }}>Perf counter while playing (FPS · draw calls, top-left)</span>
+            </label>
+          )}
+          {onToggleCrosshair && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
+              <input type="checkbox" checked={showCrosshair ?? true} onChange={onToggleCrosshair}
+                style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#c2cadb", fontSize: 11 }}>Crosshair while playing (center of screen)</span>
+            </label>
+          )}
         </div>
       )}
     </>

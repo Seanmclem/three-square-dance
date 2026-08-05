@@ -141,6 +141,9 @@ export default function App() {
   const [quality,          setQuality]          = useState<QualityScale>(
     () => (localStorage.getItem('editorQuality') as QualityScale) ?? 'high',
   );
+  // Global preview-overlay toggles (EDITOR section of the panel) — persisted like editorQuality.
+  const [showPerfCounter, setShowPerfCounter] = useState(() => localStorage.getItem('editorShowPerf') !== '0');
+  const [showCrosshair,   setShowCrosshair]   = useState(() => localStorage.getItem('editorShowCrosshair') !== '0');
   const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -1063,6 +1066,12 @@ export default function App() {
     assetManager.setQuality(q);
     busRef.current.emit('quality:changed', { quality: q });
   };
+
+  const handleTogglePerfCounter = (): void =>
+    setShowPerfCounter(v => { localStorage.setItem('editorShowPerf', v ? '0' : '1'); return !v; });
+
+  const handleToggleCrosshair = (): void =>
+    setShowCrosshair(v => { localStorage.setItem('editorShowCrosshair', v ? '0' : '1'); return !v; });
 
   /** Stamp the current editor viewpoint into metadata so explicit saves carry it.
    *  Deliberately NOT called from the periodic autosave — a camera-only change must
@@ -3631,6 +3640,10 @@ export default function App() {
         selected={selected}
         materialList={materialList}
         quality={quality}
+        showPerfCounter={showPerfCounter}
+        onTogglePerfCounter={handleTogglePerfCounter}
+        showCrosshair={showCrosshair}
+        onToggleCrosshair={handleToggleCrosshair}
         onObjectUpdate={handleObjectUpdate}
         onSegmentUpdate={handleSegmentUpdate}
         onFloorNodesUpdate={handleFloorNodesUpdate}
@@ -3754,6 +3767,7 @@ export default function App() {
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
           scheme={previewScheme}
           mode={previewMode ?? "game"}
+          showCrosshair={showCrosshair}
         />
       )}
 
@@ -3806,7 +3820,7 @@ export default function App() {
         />
       )}
 
-      {isPreview && <FpsCounter getInfo={getRenderInfo} />}
+      {isPreview && showPerfCounter && <FpsCounter getInfo={getRenderInfo} />}
 
       {!isGame && (
         <div style={{
