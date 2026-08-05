@@ -151,6 +151,34 @@ export function GameGuiOverlay({ bus, world }: Props) {
               </div>
             );
           }
+          case "icons": {
+            // Repeated-icon meter: `count` icons, each worth one icon-unit of the
+            // state value (scaled by `max`). With a half graphic the value rounds
+            // to the nearest half-icon; without one, to the nearest whole.
+            const count = Math.max(1, Math.round(el.count ?? 3));
+            const max   = el.max ?? count;
+            const size  = el.size ?? 24;
+            const raw   = num(gameState.get(el.stateKey)) * (count / (max || 1));
+            const halfSrc = graphicSrc(el.halfGraphicId);
+            const v = halfSrc ? Math.round(raw * 2) / 2 : Math.round(raw);
+            const fullSrc  = graphicSrc(el.fullGraphicId);
+            const emptySrc = graphicSrc(el.emptyGraphicId);
+            if (!fullSrc) return null;
+            return (
+              <div key={el.id} data-ui-icons={el.id}
+                style={{ ...style, display: "flex", alignItems: "center", gap: 3, ...(el.backdrop ? BACKDROP : {}) }}>
+                {Array.from({ length: count }, (_, i) => {
+                  const slot = v >= i + 1 ? "full" : halfSrc && v >= i + 0.5 ? "half" : "empty";
+                  const src  = slot === "full" ? fullSrc : slot === "half" ? halfSrc! : (emptySrc ?? fullSrc);
+                  return (
+                    <img key={i} src={src} alt="" data-ui-slot={slot}
+                      style={{ width: size, height: size, objectFit: "contain",
+                        opacity: slot === "empty" && !emptySrc ? 0.25 : 1 }} />
+                  );
+                })}
+              </div>
+            );
+          }
           case "label":
             return (
               <div key={el.id} style={{ ...style, color: el.color ?? "#dde3f0",

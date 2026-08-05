@@ -1397,6 +1397,19 @@ export interface UiCounterElement extends UiElementBase {
   size?: number;              // icon px (default 24)
 }
 
+// Repeated-icon meter (GTA stars / Zelda hearts): `count` icons, each worth one
+// unit of the state value (scaled by `max` when set), drawn full / half / empty.
+export interface UiIconsElement extends UiElementBase {
+  kind: 'icons';
+  stateKey:        string;  // numeric gameState key (e.g. "health")
+  count?:          number;  // number of icons (default 3)
+  max?:            number;  // state value at all-full (default = count → 1 unit per icon)
+  fullGraphicId:   string;
+  halfGraphicId?:  string;  // omit → values round to whole icons
+  emptyGraphicId?: string;  // omit → the full graphic at 0.25 opacity
+  size?:           number;  // icon px (default 24)
+}
+
 export interface UiLabelElement extends UiElementBase {
   kind: 'label';
   text: string;
@@ -1426,8 +1439,8 @@ export interface UiMenuElement extends UiElementBase {
   options: UiMenuOption[];
 }
 
-export type UiElementDef = UiBarElement | UiCounterElement | UiLabelElement
-                         | UiImageElement | UiMenuElement;
+export type UiElementDef = UiBarElement | UiCounterElement | UiIconsElement
+                         | UiLabelElement | UiImageElement | UiMenuElement;
 
 export interface TriggerVolume {
   id:       string;

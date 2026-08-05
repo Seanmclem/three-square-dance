@@ -231,7 +231,7 @@ function blankItem(): ItemDef {
   };
 }
 
-const UI_KINDS = ["bar", "counter", "label", "image", "menu"] as const;
+const UI_KINDS = ["bar", "counter", "icons", "label", "image", "menu"] as const;
 const UI_ANCHORS: UiAnchor[] = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"];
 
 function blankUiElement(kind: (typeof UI_KINDS)[number]): UiElementDef {
@@ -239,6 +239,7 @@ function blankUiElement(kind: (typeof UI_KINDS)[number]): UiElementDef {
   switch (kind) {
     case "bar":     return { ...base, kind, label: "New Bar",     stateKey: "health" };
     case "counter": return { ...base, kind, label: "New Counter", stateKey: "" };
+    case "icons":   return { ...base, kind, label: "New Hearts",  stateKey: "health", fullGraphicId: "" };
     case "label":   return { ...base, kind, label: "New Label",   text: "Text…" };
     case "image":   return { ...base, kind, label: "New Image",   graphicId: "" };
     case "menu":    return { ...base, kind, label: "New Menu", anchor: "bottom-center", options: [] };
@@ -4104,9 +4105,10 @@ function UiElementsEditor({
       <div style={S.scroll}>
         {elements.length === 0 && (
           <div style={{ color: "#98a2b8", fontSize: 11, padding: "16px 12px", textAlign: "center" }}>
-            No UI elements yet — pick a kind and hit + New. Bars and counters
-            bind to a state key; menus list options that run actions. Show them
-            in-game with the show_ui action (or "visible at start").
+            No UI elements yet — pick a kind and hit + New. Bars, counters and
+            icons (hearts/stars meters) bind to a state key; menus list options
+            that run actions. Show them in-game with the show_ui action (or
+            "visible at start").
           </div>
         )}
         {elements.map((el) => (
@@ -4308,6 +4310,36 @@ function UiElementRow({
           <F label="Icon (optional)">
             <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
           </F>
+        </>
+      )}
+
+      {element.kind === "icons" && (
+        <>
+          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
+            <F label="State key" flex={1}>
+              <input
+                style={S.field}
+                placeholder="e.g. health"
+                list="wb-state-keys"
+                value={element.stateKey}
+                onChange={(e) => set({ stateKey: e.target.value })}
+              />
+            </F>
+            {numField("Icons", element.count, "3", "how many icons to draw", (n) => set({ count: n }), 44)}
+            {numField("Full at", element.max, "= icons", "state value when every icon is full (blank = 1 per icon)", (n) => set({ max: n }), 52)}
+            {numField("Icon px", element.size, "24", "icon size (px)", (n) => set({ size: n }), 52)}
+          </div>
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+            <F label="Full" flex={1}>
+              <GraphicIdField value={element.fullGraphicId} graphics={graphics} placeholder="full icon" onChange={(id) => set({ fullGraphicId: id ?? "" })} />
+            </F>
+            <F label="Half (optional)" flex={1}>
+              <GraphicIdField value={element.halfGraphicId} graphics={graphics} placeholder="half icon" onChange={(id) => set({ halfGraphicId: id })} />
+            </F>
+            <F label="Empty (optional)" flex={1}>
+              <GraphicIdField value={element.emptyGraphicId} graphics={graphics} placeholder="empty icon" onChange={(id) => set({ emptyGraphicId: id })} />
+            </F>
+          </div>
         </>
       )}
 

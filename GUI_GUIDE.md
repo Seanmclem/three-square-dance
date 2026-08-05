@@ -93,6 +93,7 @@ Pick a kind in the dropdown, hit **+ New**, fill in the row:
 |---|---|---|
 | **bar** | A filled bar (health, stamina, progress) | *state key* (numeric), *max* (full-bar value, default 100), width/height, fill color, optional icon |
 | **counter** | Icon + number (coins, keys, ammo) | *state key* — use `inv.<item>` for item counts (the state-key box suggests them), prefix (default ×), optional icon |
+| **icons** | A row of repeated icons — hearts, stars — full / half / empty (GTA stars, Zelda hearts) | *state key* (numeric), *icons* (how many, default 3), *full at* (state value when all are full; blank = 1 per icon), a **Full** graphic, optional **Half** and **Empty** graphics |
 | **label** | A line of text | text, font size, color |
 | **image** | A picture (logo, frame, splash) | a graphic, width/height, opacity |
 | **menu** | A titled list of clickable options | title + options (below) |
@@ -179,6 +180,13 @@ Per kind:
 
 { "kind": "counter", "stateKey": "inv.itm_a1b2c3d4",
   "graphicId": "coin", "prefix": "×", "size": 24 }
+
+{ "kind": "icons",   "stateKey": "Hearts", "count": 3,
+  "fullGraphicId": "heart_icon", "halfGraphicId": "heart_half_icon",
+  "emptyGraphicId": "heart_outline_icon", "size": 24 }
+// count icons, 1 state unit each (set "max" to rescale, e.g. 100 HP over 5 hearts).
+// With a half graphic the value rounds to the nearest half; without, to the
+// nearest whole. No empty graphic = the full one at 25% opacity.
 
 { "kind": "label",   "text": "Find the key", "fontSize": 13, "color": "#dde3f0" }
 
