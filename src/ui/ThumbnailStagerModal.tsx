@@ -38,6 +38,36 @@ const BTN = (active = true): React.CSSProperties => ({
 const SLIDER_ROW: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: "#7a7a7a",
 };
+const NUM_INPUT: React.CSSProperties = {
+  width: 52, boxSizing: "border-box", flexShrink: 0,
+  background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.09)",
+  borderRadius: 4, color: "#c0c0c0", fontFamily: "monospace", fontSize: 10,
+  padding: "3px 5px", outline: "none",
+};
+
+// Numeric twin of a slider: free typing via a local draft (so "0.5" isn't
+// clamped at "0"), live-commits clamped values, snaps display back on blur.
+function NumField({ value, min, max, step, disabled, onCommit }: {
+  value: number; min: number; max: number; step: number;
+  disabled: boolean; onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      type="number" min={min} max={max} step={step} disabled={disabled}
+      value={draft ?? String(Math.round(value * 100) / 100)}
+      onChange={e => {
+        const t = e.currentTarget.value;
+        setDraft(t);
+        const n = Number(t);
+        if (t.trim() !== "" && Number.isFinite(n)) onCommit(Math.min(max, Math.max(min, n)));
+      }}
+      onBlur={() => setDraft(null)}
+      onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+      style={NUM_INPUT}
+    />
+  );
+}
 
 export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave, onSaveIcon, needsGraphicsFolderGrant }: Props) {
   const [status,  setStatus]  = useState<"loading" | "ready" | "error">("loading");
@@ -165,6 +195,8 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
               onChange={e => update({ zoom: Number(e.currentTarget.value) })}
               style={{ flex: 1 }}
             />
+            <NumField value={params.zoom} min={0.4} max={3} step={0.01}
+              disabled={status !== "ready"} onCommit={n => update({ zoom: n })} />
           </div>
           <div style={SLIDER_ROW}>
             <span style={{ width: 34 }}>Light</span>
@@ -174,6 +206,8 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
               onChange={e => update({ light: Number(e.currentTarget.value) })}
               style={{ flex: 1 }}
             />
+            <NumField value={params.light} min={0.2} max={3} step={0.05}
+              disabled={status !== "ready"} onCommit={n => update({ light: n })} />
           </div>
           <button
             style={{ ...BTN(status === "ready"), padding: "4px 10px", alignSelf: "flex-start", fontSize: 10 }}
