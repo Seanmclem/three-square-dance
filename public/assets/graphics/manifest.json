@@ -2,21 +2,6 @@
   "version": "1.0",
   "graphics": [
     {
-      "id": "heart_icon",
-      "label": "Heart icon",
-      "category": "Icons",
-      "path": "/assets/graphics/heart_icon.png",
-      "width": 256,
-      "height": 256,
-      "attribution": {
-        "author": "Quaternius",
-        "sourceName": "Platformer Game Kit",
-        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
-        "patreonUrl": "https://www.patreon.com/quaternius",
-        "license": "CC0"
-      }
-    },
-    {
       "id": "coin_icon",
       "label": "Coin icon",
       "category": "Icons",
@@ -36,6 +21,51 @@
       "label": "Key icon",
       "category": "Icons",
       "path": "/assets/graphics/key_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart_icon",
+      "label": "Heart icon",
+      "category": "Icons",
+      "path": "/assets/graphics/heart_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart_half_icon",
+      "label": "Heart Half icon",
+      "category": "Icons",
+      "path": "/assets/graphics/heart_half_icon.png",
+      "width": 256,
+      "height": 256,
+      "attribution": {
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "patreonUrl": "https://www.patreon.com/quaternius",
+        "license": "CC0"
+      }
+    },
+    {
+      "id": "heart_outline_icon",
+      "label": "Heart Outline icon",
+      "category": "Icons",
+      "path": "/assets/graphics/heart_outline_icon.png",
       "width": 256,
       "height": 256,
       "attribution": {
