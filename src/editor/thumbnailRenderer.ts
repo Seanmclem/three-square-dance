@@ -8,9 +8,13 @@ export interface StageParams {
   pitch: number;  // radians above the horizon
   zoom:  number;  // 1 = model exactly fills the frame; >1 = closer
   light: number;  // light-rig intensity multiplier (1 = default)
+  // Frame offset in fractions of the fitted bounding radius (0 = centered).
+  // Optional so older param objects (ReoriginModal, import-time renders) work unchanged.
+  panX?: number;  // positive = model shifts right in frame
+  panY?: number;  // positive = model shifts up in frame
 }
 
-export const DEFAULT_STAGE: StageParams = { yaw: Math.PI / 4, pitch: 0.45, zoom: 1, light: 1 };
+export const DEFAULT_STAGE: StageParams = { yaw: Math.PI / 4, pitch: 0.45, zoom: 1, light: 1, panX: 0, panY: 0 };
 
 // One shared offscreen renderer — creating a fresh WebGL context per thumbnail
 // exhausts the browser's context pool during bulk imports (later thumbs fail).
@@ -95,6 +99,18 @@ export class ThumbnailStage {
       this._camera.far  = dist * 10;
       this._camera.updateProjectionMatrix();
       this._camera.lookAt(this._center);
+
+      // Pan: pure camera translation after lookAt (orientation unchanged, framing
+      // shifts) — moving the camera left/down makes the model appear right/up.
+      const { panX = 0, panY = 0 } = params;
+      if (panX || panY) {
+        this._camera.updateMatrixWorld();
+        const right = new THREE.Vector3().setFromMatrixColumn(this._camera.matrixWorld, 0);
+        const up    = new THREE.Vector3().setFromMatrixColumn(this._camera.matrixWorld, 1);
+        this._camera.position
+          .addScaledVector(right, -panX * this._radius)
+          .addScaledVector(up,    -panY * this._radius);
+      }
 
       if (opts?.transparent) {
         const bg = this._scene.background;

@@ -47,9 +47,9 @@ const NUM_INPUT: React.CSSProperties = {
 
 // Numeric twin of a slider: free typing via a local draft (so "0.5" isn't
 // clamped at "0"), live-commits clamped values, snaps display back on blur.
-function NumField({ value, min, max, step, disabled, onCommit }: {
+function NumField({ value, min, max, step, disabled, onCommit, width }: {
   value: number; min: number; max: number; step: number;
-  disabled: boolean; onCommit: (n: number) => void;
+  disabled: boolean; onCommit: (n: number) => void; width?: number;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
@@ -64,7 +64,7 @@ function NumField({ value, min, max, step, disabled, onCommit }: {
       }}
       onBlur={() => setDraft(null)}
       onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
-      style={NUM_INPUT}
+      style={width ? { ...NUM_INPUT, width } : NUM_INPUT}
     />
   );
 }
@@ -121,6 +121,12 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
     e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = { x: e.clientX, y: e.clientY };
   };
+  const clampPan = (n: number): number => Math.min(2, Math.max(-2, n));
+  const nudge = (dx: number, dy: number): void => {
+    const p = paramsRef.current;
+    update({ panX: clampPan((p.panX ?? 0) + dx), panY: clampPan((p.panY ?? 0) + dy) });
+  };
+
   const onPointerMove = (e: React.PointerEvent<HTMLElement>): void => {
     const last = dragRef.current;
     if (!last) return;
@@ -128,6 +134,12 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
     const dy = e.clientY - last.y;
     dragRef.current = { x: e.clientX, y: e.clientY };
     const p = paramsRef.current;
+    if (e.shiftKey) {
+      // Pan instead of orbit; /zoom keeps the drag ~1:1 with the cursor when zoomed in.
+      const k = 0.004 / p.zoom;
+      update({ panX: clampPan((p.panX ?? 0) + dx * k), panY: clampPan((p.panY ?? 0) - dy * k) });
+      return;
+    }
     update({
       yaw:   p.yaw - dx * 0.01,
       pitch: Math.min(1.45, Math.max(-1.35, p.pitch + dy * 0.01)),
@@ -183,7 +195,7 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
             )}
           </div>
           <div style={{ fontSize: 9, color: "#585858", textAlign: "center" }}>
-            drag to orbit · scroll to zoom
+            drag to orbit · scroll to zoom · shift-drag to move
           </div>
 
           {/* Sliders */}
@@ -208,6 +220,22 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
             />
             <NumField value={params.light} min={0.2} max={3} step={0.05}
               disabled={status !== "ready"} onCommit={n => update({ light: n })} />
+          </div>
+          <div style={{ ...SLIDER_ROW, gap: 5 }}>
+            <span style={{ width: 34 }}>Move</span>
+            {([["◀", -0.05, 0], ["▶", 0.05, 0], ["▲", 0, 0.05], ["▼", 0, -0.05]] as const).map(([glyph, dx, dy]) => (
+              <button key={glyph} disabled={status !== "ready"} onClick={() => nudge(dx, dy)}
+                title="Nudge the model in the frame"
+                style={{ ...BTN(status === "ready"), padding: "3px 0", width: 20, fontSize: 9, flexShrink: 0 }}>
+                {glyph}
+              </button>
+            ))}
+            <span style={{ marginLeft: "auto" }}>X</span>
+            <NumField value={params.panX ?? 0} min={-2} max={2} step={0.05} width={56}
+              disabled={status !== "ready"} onCommit={n => update({ panX: n })} />
+            <span>Y</span>
+            <NumField value={params.panY ?? 0} min={-2} max={2} step={0.05} width={56}
+              disabled={status !== "ready"} onCommit={n => update({ panY: n })} />
           </div>
           <button
             style={{ ...BTN(status === "ready"), padding: "4px 10px", alignSelf: "flex-start", fontSize: 10 }}
