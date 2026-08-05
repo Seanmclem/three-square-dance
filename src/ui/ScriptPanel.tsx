@@ -4201,12 +4201,17 @@ function UiElementRow({
       background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
       margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)",
     }}>
-      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
+      {/* Kind on its own line above the name — the inline chip read as decoration. */}
+      <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
         <span style={{
-          fontSize: 9, color: "#80aaff", background: "rgba(80,140,255,0.12)",
-          border: "1px solid rgba(80,140,255,0.25)", borderRadius: 3,
-          padding: "2px 5px", flexShrink: 0, letterSpacing: 0.5, marginBottom: 3,
+          fontSize: 11, color: "#9dbdff", background: "rgba(80,140,255,0.14)",
+          border: "1px solid rgba(80,140,255,0.3)", borderRadius: 3,
+          padding: "2px 8px", letterSpacing: 1, textTransform: "uppercase",
         }}>{element.kind}</span>
+        <span style={{ flex: 1 }} />
+        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+      </div>
+      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
         <F label="Element name" flex={1}>
           <input
             style={S.field}
@@ -4215,7 +4220,6 @@ function UiElementRow({
             onChange={(e) => set({ label: e.target.value })}
           />
         </F>
-        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
       </div>
 
       <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end", flexWrap: "wrap" }}>
