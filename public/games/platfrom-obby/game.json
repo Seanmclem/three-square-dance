@@ -349,7 +349,7 @@
       "id": "pfb_07e2acef",
       "name": "Chest - 5 Coins, trigger, indicator.",
       "kind": "snapshot",
-      "version": 5,
+      "version": 6,
       "variables": [],
       "template": [
         {
@@ -522,6 +522,10 @@
                   {
                     "type": "play_sound",
                     "sound": "powerup11"
+                  },
+                  {
+                    "type": "despawn_object",
+                    "targetId": "self"
                   }
                 ],
                 "oneShot": false
