@@ -635,6 +635,17 @@
       "graphicId": "coin_icon",
       "backdrop": true,
       "size": 28
+    },
+    {
+      "id": "ui_c5ab1d38",
+      "anchor": "top-right",
+      "kind": "icons",
+      "label": "Hearts",
+      "stateKey": "Hearts",
+      "fullGraphicId": "heart_icon",
+      "halfGraphicId": "heart_half_icon",
+      "emptyGraphicId": "heart_outline_icon",
+      "startVisible": true
     }
   ]
 }

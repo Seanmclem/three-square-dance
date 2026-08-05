@@ -49,11 +49,11 @@
       "characterScale": 0.6
     },
     "stateSchema": {
-      "health": {
+      "Hearts": {
         "type": "number",
-        "default": 100,
+        "default": 3,
         "min": 0,
-        "max": 100
+        "max": 3
       },
       "coins": {
         "type": "number",
@@ -64,9 +64,9 @@
     },
     "defaultSpawn": {
       "position": {
-        "x": -36.570250410472404,
-        "y": 7.421803576310599,
-        "z": -20.900485066706423
+        "x": -40.756988563220986,
+        "y": 10.892622497653509,
+        "z": -26.125486535374534
       },
       "facingDeg": 0
     }
@@ -11028,12 +11028,12 @@
           }
         },
         {
-          "id": "obj_20d9b0bf",
+          "id": "obj_18deba03",
           "assetId": "chest",
           "position": {
-            "x": -12.073099532340207,
-            "y": 9.392836500518918,
-            "z": -47.567364367845066
+            "x": -12.5903844888918,
+            "y": 9.392836500518921,
+            "z": -47.04977349153638
           },
           "rotation": {
             "x": 0,
@@ -11057,17 +11057,17 @@
           "scripts": [],
           "prefab": {
             "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_277e6d85",
+            "instanceId": "pfi_f6761db7",
             "memberKey": "obj_4ddacd98"
           }
         },
         {
-          "id": "obj_2492ed90",
+          "id": "obj_26770eeb",
           "assetId": "coin",
           "position": {
-            "x": -9.27459011577385,
-            "y": 11.742002464665987,
-            "z": -48.09342968730647
+            "x": -9.791875072325444,
+            "y": 11.74200246466599,
+            "z": -47.57583881099778
           },
           "rotation": {
             "x": 0,
@@ -11091,17 +11091,17 @@
           "startHidden": true,
           "prefab": {
             "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_277e6d85",
+            "instanceId": "pfi_f6761db7",
             "memberKey": "obj_5a26150e"
           }
         },
         {
-          "id": "obj_072ad413",
+          "id": "obj_500ccb03",
           "assetId": "numbers_5",
           "position": {
-            "x": -9.286537975457952,
-            "y": 11.810791766397585,
-            "z": -46.93123665588513
+            "x": -9.803822932009545,
+            "y": 11.810791766397589,
+            "z": -46.41364577957644
           },
           "rotation": {
             "x": 0,
@@ -11125,7 +11125,7 @@
           "startHidden": true,
           "prefab": {
             "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_277e6d85",
+            "instanceId": "pfi_f6761db7",
             "memberKey": "obj_079554aa"
           }
         }
@@ -11339,23 +11339,9 @@
           }
         },
         {
-          "id": "pfi_4786b2c5",
-          "prefabId": "pfb_07e2acef",
-          "version": 5,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": -12.117519593451505,
-              "y": 9.392836500518921,
-              "z": -47.539258082110564
-            },
-            "rotationY": 0
-          }
-        },
-        {
           "id": "pfi_f331434f",
           "prefabId": "pfb_07e2acef",
-          "version": 5,
+          "version": 6,
           "variables": {},
           "origin": {
             "position": {
@@ -11397,13 +11383,27 @@
         {
           "id": "pfi_277e6d85",
           "prefabId": "pfb_07e2acef",
-          "version": 5,
+          "version": 6,
           "variables": {},
           "origin": {
             "position": {
-              "x": -11.960725898620261,
+              "x": -11.962547555048415,
               "y": 9.392836500518918,
               "z": -47.51759087630869
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_f6761db7",
+          "prefabId": "pfb_07e2acef",
+          "version": 6,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -12.478010855171854,
+              "y": 9.392836500518921,
+              "z": -47
             },
             "rotationY": 0
           }
@@ -11509,7 +11509,7 @@
                   "targetId": "cp_848b5582"
                 }
               ],
-              "oneShot": false
+              "oneShot": true
             }
           ]
         },
@@ -11617,7 +11617,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_11c2447b",
+              "id": "script_0924119a",
               "label": "open_chest",
               "zoneId": "demo",
               "enabled": true,
@@ -11669,6 +11669,10 @@
                 {
                   "type": "play_sound",
                   "sound": "powerup11"
+                },
+                {
+                  "type": "despawn_object",
+                  "targetId": "self"
                 }
               ],
               "oneShot": false
@@ -11681,12 +11685,12 @@
           }
         },
         {
-          "id": "vol_6b0e2653",
+          "id": "vol_f150a94c",
           "label": "Trigger Volume",
           "position": {
-            "x": -13.343206305168756,
-            "y": 9.39283650051892,
-            "z": -47.478332794198124
+            "x": -13.86049126172035,
+            "y": 9.392836500518923,
+            "z": -46.960741917889436
           },
           "size": {
             "x": 2,
@@ -11696,48 +11700,48 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_bf95fa76",
+              "id": "script_fab61982",
               "label": "open_chest",
               "zoneId": "demo",
               "enabled": true,
               "trigger": {
                 "type": "on_player_enter",
-                "targetId": "vol_6b0e2653"
+                "targetId": "vol_f150a94c"
               },
               "conditions": [],
               "actions": [
                 {
                   "type": "play_animation",
-                  "targetId": "obj_20d9b0bf",
+                  "targetId": "obj_18deba03",
                   "animation": "Chest_Open",
                   "animationHold": true
                 },
                 {
                   "type": "despawn_object",
                   "delay": 0.9,
-                  "targetId": "obj_20d9b0bf",
+                  "targetId": "obj_18deba03",
                   "fadeDuration": 1
                 },
                 {
                   "type": "spawn_object",
-                  "targetId": "obj_072ad413",
+                  "targetId": "obj_500ccb03",
                   "fadeDuration": 0.3
                 },
                 {
                   "type": "spawn_object",
-                  "targetId": "obj_2492ed90",
+                  "targetId": "obj_26770eeb",
                   "fadeDuration": 0.3
                 },
                 {
                   "type": "despawn_object",
                   "delay": 0.8,
-                  "targetId": "obj_072ad413",
+                  "targetId": "obj_500ccb03",
                   "fadeDuration": 0.3
                 },
                 {
                   "type": "despawn_object",
                   "delay": 0.8,
-                  "targetId": "obj_2492ed90",
+                  "targetId": "obj_26770eeb",
                   "fadeDuration": 0.3
                 },
                 {
@@ -11748,6 +11752,10 @@
                 {
                   "type": "play_sound",
                   "sound": "powerup11"
+                },
+                {
+                  "type": "despawn_object",
+                  "targetId": "self"
                 }
               ],
               "oneShot": false
@@ -11755,9 +11763,45 @@
           ],
           "prefab": {
             "prefabId": "pfb_07e2acef",
-            "instanceId": "pfi_277e6d85",
+            "instanceId": "pfi_f6761db7",
             "memberKey": "vol_9becbbd8"
           }
+        },
+        {
+          "id": "vol_30bcda17",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -35.25,
+            "y": 7.783503335531728,
+            "z": -50.25
+          },
+          "size": {
+            "x": 7.5,
+            "y": 2.5,
+            "z": 0.5
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "scr_5bdde0e7",
+              "label": "checkpoint2 trigger",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "store_position",
+                  "stateKey": "checkpoint",
+                  "posSource": "object",
+                  "targetId": "cp_e4aaa467"
+                }
+              ],
+              "oneShot": true
+            }
+          ]
         }
       ],
       "scripts": [
@@ -11805,6 +11849,16 @@
             "x": -40.9740726628926,
             "y": 10.870794657311873,
             "z": -27.765324133807713
+          },
+          "facingDeg": 0
+        },
+        {
+          "id": "cp_e4aaa467",
+          "label": "Checkpoint3",
+          "position": {
+            "x": -35.360204791409494,
+            "y": 7.841385347896802,
+            "z": -48.88056785441459
           },
           "facingDeg": 0
         }
