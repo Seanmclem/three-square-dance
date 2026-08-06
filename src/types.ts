@@ -1334,6 +1334,7 @@ export interface ScriptAction {
   launchSpeed?:  number;      // launch_player: upward velocity m/s (default 12; a jump is ~5)
   launchHSpeed?: number;      // launch_player: horizontal velocity m/s (0/absent = straight up)
   launchDirDeg?: number;      // launch_player: horizontal direction, degrees on the spawn-facing compass (0 = -Z)
+  launchRelative?: boolean;   // launch_player: direction is relative to the owning entity's Y rotation (0 = its front)
   stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number

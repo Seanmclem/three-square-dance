@@ -270,21 +270,27 @@ export class ScriptEngine {
   // ─── Action dispatch ──────────────────────────────────────────────────────
 
   private _runActions(s: ScriptDef): void {
-    this.runActions(s.actions);
+    // Entity triggers carry the owner in the stamped targetId — thread it through
+    // so owner-relative actions (launch_player's "relative to this volume") can
+    // resolve the owner's pose at dispatch time.
+    const t = s.trigger;
+    const ownerId = (t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact")
+      ? t.targetId : undefined;
+    this.runActions(s.actions, ownerId);
   }
 
-  /** Public so DialogueRunner can dispatch a chosen option's effects. */
-  runActions(actions: ScriptAction[]): void {
+  /** Public so DialogueRunner can dispatch a chosen option's effects (no owner there). */
+  runActions(actions: ScriptAction[], ownerId?: string): void {
     for (const action of actions) {
       // Per-action delay: offset from when the script's actions start (i.e. after
       // any trigger-level delay). Lets one script sequence its effects — e.g.
       // play_animation Chest_Open now, despawn_object 0.8s later — without a
       // second delayed script. Timers die with deactivate(), same as trigger delays.
       if (action.delay && action.delay > 0) {
-        const t = setTimeout(() => this._dispatch(action), action.delay * 1000);
+        const t = setTimeout(() => this._dispatch(action, ownerId), action.delay * 1000);
         this._timers.push(t);
       } else {
-        this._dispatch(action);
+        this._dispatch(action, ownerId);
       }
     }
   }
@@ -298,7 +304,7 @@ export class ScriptEngine {
     return undefined;
   }
 
-  private _dispatch(action: ScriptAction): void {
+  private _dispatch(action: ScriptAction, ownerId?: string): void {
     switch (action.type) {
       case "play_sound": {
         // Positional when targeting an entity/group — resolve each target's pose;
@@ -405,15 +411,23 @@ export class ScriptEngine {
         break;
       }
 
-      case "launch_player":
+      case "launch_player": {
         // Spring/bouncer: sets the player's vertical velocity (the jump channel),
         // plus an optional horizontal shove. CharacterController is the only listener.
+        // launchRelative: direction rotates with the owning entity (a rotated dash
+        // pad launches out of its own front — pose.facing is the owner's Y rotation).
+        let dirDeg = action.launchDirDeg;
+        if (action.launchRelative && ownerId) {
+          const pose = this._resolveObjectPose(ownerId);
+          if (pose) dirDeg = (dirDeg ?? 0) + pose.facing;
+        }
         this._bus.emit("character:launch", {
           speed: action.launchSpeed ?? 12,
           hSpeed: action.launchHSpeed,
-          dirDeg: action.launchDirDeg,
+          dirDeg,
         });
         break;
+      }
 
       case "load_scene":
         // Cross-scene routing (runtime shell). Only the runtime's SceneRouter

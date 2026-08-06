@@ -2807,6 +2807,17 @@ function ActionFields({
               />
             </F>
           </div>
+          {owner && (
+            <label style={{ color: "#98a2b8", fontSize: 11, display: "flex", alignItems: "center", gap: 4, paddingTop: 4 }}
+              title={`0 launches out of the ${owner.kind}'s front (its −Z face before rotating); turning its ROTATION (Y°) turns the launch with it`}>
+              <input
+                type="checkbox"
+                checked={action.launchRelative ?? false}
+                onChange={(e) => set({ launchRelative: e.target.checked || undefined })}
+              />
+              Direction is relative to this {owner.kind}'s rotation (0 = its front)
+            </label>
+          )}
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Springs the player upward — a normal jump is ~5, 12 is a strong bouncer.
             Sideways speed adds a horizontal shove in the given direction (dash pads,
