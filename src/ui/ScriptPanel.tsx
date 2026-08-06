@@ -1979,12 +1979,15 @@ function ActionFields({
     onChange({ ...action, ...changes });
   }
   // move / change_material / play_animation only act on objects at runtime → object-only.
+  // A volume owner is omitted: "★ this volume" would save a self target these actions
+  // silently no-op on (a volume has no mesh/clips/door) — the trap a user hit with
+  // play_animation on a bite-trigger volume, where the CLIP list stayed empty.
   const targetPicker = (
     <ActionTargetPicker
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       groups={groups}
-      owner={owner}
+      owner={owner?.kind === "object" ? owner : undefined}
       onChange={(id) => set({ targetId: id })}
     />
   );
@@ -2005,7 +2008,8 @@ function ActionFields({
     />
   );
   // start/stop/toggle_mover targets the entity types that can carry a mover
-  // (objects, platforms, shapes — Phase 31).
+  // (objects, platforms, shapes — Phase 31). Volumes can't, so a volume owner
+  // is omitted like the object-only picker above.
   const moverTargetPicker = (
     <ActionTargetPicker
       targetId={action.targetId ?? ""}
@@ -2013,7 +2017,7 @@ function ActionFields({
       groups={groups}
       zonePlatforms={zonePlatforms}
       zoneShapes={zoneShapes}
-      owner={owner}
+      owner={owner?.kind === "object" ? owner : undefined}
       onChange={(id) => set({ targetId: id })}
     />
   );
