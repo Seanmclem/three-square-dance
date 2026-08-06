@@ -1388,13 +1388,11 @@ export class ZoneManager {
     if (this._setEntityHidden(id, true)) this._despawnedIds.add(id);
   }
 
-  /** Show/hide every volume's interior fill (the wire's first child). */
+  /** Show/hide every volume's editor-only visuals (interior fill + front arrow — the wire's children). */
   private _setVolumeFillsVisible(visible: boolean): void {
     for (const zoneId of this._loadedZones.keys())
-      for (const m of this._volumeMeshes.get(zoneId) ?? []) {
-        const body = m.children[0];
-        if (body) body.visible = visible;
-      }
+      for (const m of this._volumeMeshes.get(zoneId) ?? [])
+        for (const child of m.children) child.visible = visible;
   }
 
   /**
@@ -2253,6 +2251,21 @@ export class ZoneManager {
     body.renderOrder = 1;
     wire.renderOrder = 2;   // edges always draw over the fill
     wire.add(body);
+    // Front arrow (v4.62.2) — spawn-marker style cone poking out of the volume's
+    // front face (local −Z, what launch_player's relative "direction 0" means).
+    // A child of the wire so it rides rotation/mover attachment and disposal;
+    // editor-only like the interior fill (hidden in preview via the fills toggle).
+    const aScale = Math.min(1.6, Math.max(0.9, Math.min(vol.size.x, vol.size.y) / 2));
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16 * aScale, 0.45 * aScale, 12),
+      new THREE.MeshBasicMaterial({ color: vol.editorTint?.color ?? "#ffcc00", transparent: true, opacity: 0.9, depthWrite: false }),
+    );
+    arrow.rotation.x = -Math.PI / 2;                    // cone +Y → local −Z
+    arrow.position.set(0, 0, -vol.size.z / 2 - 0.3 * aScale);
+    arrow.userData = { editorType: "trigger-volume", selectable: false };
+    arrow.visible = !this._inPreview;
+    arrow.renderOrder = 2;
+    wire.add(arrow);
     group.add(wire);
     // Attached volume (Phase 53): the wireframe rides the host's mover entry.
     // It stays a child of the zone group, so selection/dispose are untouched.
