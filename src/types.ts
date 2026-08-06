@@ -380,7 +380,7 @@ export interface BusEvents {
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string; fade?: number };   // fade = seconds to fade out (collider disables at fade end)
   "object:spawn":          { id: string; fade?: number };   // re-show a despawned/hidden entity; fade = seconds to fade in
-  "character:launch":      { speed: number };   // spring/bouncer impulse — sets the player's vertical velocity
+  "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass)
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
   // overlay → engine on option select, and overlay → ControlSchemeManager for
@@ -1332,6 +1332,8 @@ export interface ScriptAction {
   facingSource?: 'keep' | 'literal' | 'key';      // teleport_player: how to set look direction
   facingKey?:    string;      // teleport_player: read facing (number, or a pose's .facing) from this key
   launchSpeed?:  number;      // launch_player: upward velocity m/s (default 12; a jump is ~5)
+  launchHSpeed?: number;      // launch_player: horizontal velocity m/s (0/absent = straight up)
+  launchDirDeg?: number;      // launch_player: horizontal direction, degrees on the spawn-facing compass (0 = -Z)
   stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number

@@ -86,6 +86,10 @@ export class CharacterController {
   private _yaw     = 0;
   private _pitch   = 0;
   private _velY    = 0;
+  // Horizontal launch/knockback channel (v4.62.0) — additive to input movement,
+  // decays fast on ground, slowly in air. Zero when inactive.
+  private _extVelX = 0;
+  private _extVelZ = 0;
   // Edge-triggered jump: must release the jump input before it fires again (no auto-bounce on landing).
   private _jumpArmed = true;
   private _jumpBuffer = 0;   // s left on a buffered jump press
@@ -175,6 +179,7 @@ export class CharacterController {
       this._exitClimb();   // never carry the climb lock through a warp (soft-lock guard)
       this._body.teleport(new THREE.Vector3(position.x, position.y + capsuleBottom, position.z));
       this._velY = 0;
+      this._extVelX = this._extVelZ = 0;   // don't carry a launch shove through a warp
       this._camY = this._armDist = Number.NaN;   // snap camera smoothing across the warp
       if (facing != null) {                          // set look direction (degrees); undefined = keep current
         this._yaw = THREE.MathUtils.degToRad(facing);
@@ -193,9 +198,16 @@ export class CharacterController {
     // so a positive velocity lifts off next frame. max() lets a spring cancel a
     // fast fall without ever slowing an even faster existing rise; coyote/jump
     // buffer are cleared so a buffered press can't double-boost the launch.
-    this._offLaunch = this._bus.on("character:launch", ({ speed }) => {
+    this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg }) => {
       this._exitClimb();
       this._velY = Math.max(this._velY, speed);
+      // Optional horizontal shove — dirDeg uses the spawn-facing compass (0 = -Z),
+      // replacing (not stacking) any prior shove so repeat pads feel consistent.
+      if (hSpeed) {
+        const rad = THREE.MathUtils.degToRad(dirDeg ?? 0);
+        this._extVelX = -Math.sin(rad) * hSpeed;
+        this._extVelZ = -Math.cos(rad) * hSpeed;
+      }
       this._coyote = 0;
       this._jumpBuffer = 0;
     });
@@ -275,6 +287,20 @@ export class CharacterController {
         this._velY -= 20 * dt;
       }
       dir.y = this._velY * dt;
+
+      // Horizontal launch channel: additive to the input move (walls still block via
+      // the KCC solve). Exponential decay — strong on ground so landings kill the
+      // slide, gentle in air so an arc carries. Snaps to zero below ~0.2 m/s.
+      if (this._extVelX !== 0 || this._extVelZ !== 0) {
+        dir.x += this._extVelX * dt;
+        dir.z += this._extVelZ * dt;
+        const damp = Math.exp((this._body.isGrounded && this._velY <= 0 ? -8 : -1.2) * dt);
+        this._extVelX *= damp;
+        this._extVelZ *= damp;
+        if (this._extVelX * this._extVelX + this._extVelZ * this._extVelZ < 0.04) {
+          this._extVelX = this._extVelZ = 0;
+        }
+      }
 
       // Moving geometry (Phase 31 / v4.25.1 / v4.29.9) — gated on a mover actually
       // running this frame, so a world without live movers pays nothing.
@@ -482,6 +508,7 @@ export class CharacterController {
     this._climbLadder = def;
     this._climbHoldInvert = fromTop;   // held forward = descend until released (see field comment)
     this._velY = 0;
+    this._extVelX = this._extVelZ = 0;   // grabbing a ladder kills launch momentum
     // Wide ladders keep the grab-point lateral position; narrow ones center.
     const p = resolveLadderParams(def);
     if (p.width > CLIMB_FREE_X_WIDTH) {

@@ -406,9 +406,13 @@ export class ScriptEngine {
       }
 
       case "launch_player":
-        // Spring/bouncer: sets the player's vertical velocity (the jump channel).
-        // CharacterController is the only listener.
-        this._bus.emit("character:launch", { speed: action.launchSpeed ?? 12 });
+        // Spring/bouncer: sets the player's vertical velocity (the jump channel),
+        // plus an optional horizontal shove. CharacterController is the only listener.
+        this._bus.emit("character:launch", {
+          speed: action.launchSpeed ?? 12,
+          hSpeed: action.launchHSpeed,
+          dirDeg: action.launchDirDeg,
+        });
         break;
 
       case "load_scene":

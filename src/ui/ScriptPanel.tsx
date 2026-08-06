@@ -2777,18 +2777,41 @@ function ActionFields({
     case "launch_player":
       return (
         <>
-          <F label="Upward speed (m/s)">
-            <input
-              type="number" min={0} step={0.5}
-              style={S.field}
-              placeholder="12"
-              value={action.launchSpeed ?? ""}
-              onChange={(e) => set({ launchSpeed: e.target.value === "" ? undefined : Number(e.target.value) })}
-            />
-          </F>
+          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+            <F label="Upward speed (m/s)" flex={1}>
+              <input
+                type="number" min={0} step={0.5}
+                style={S.field}
+                placeholder="12"
+                value={action.launchSpeed ?? ""}
+                onChange={(e) => set({ launchSpeed: e.target.value === "" ? undefined : Number(e.target.value) })}
+              />
+            </F>
+            <F label="Sideways speed (m/s)" flex={1}>
+              <input
+                type="number" min={0} step={0.5}
+                style={S.field}
+                placeholder="0"
+                value={action.launchHSpeed ?? ""}
+                onChange={(e) => set({ launchHSpeed: e.target.value === "" ? undefined : Number(e.target.value) })}
+              />
+            </F>
+            <F label="Direction (deg)" flex={1}>
+              <input
+                type="number" step={15}
+                style={S.field}
+                placeholder="0"
+                title="World compass, same as spawn facing: 0 launches the way a fresh spawn faces; 90/180/270 rotate around"
+                value={action.launchDirDeg ?? ""}
+                onChange={(e) => set({ launchDirDeg: e.target.value === "" ? undefined : Number(e.target.value) })}
+              />
+            </F>
+          </div>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Springs the player upward — a normal jump is ~5, 12 is a strong bouncer.
-            Pair with on_player_enter on a volume over the pad.
+            Sideways speed adds a horizontal shove in the given direction (dash pads,
+            angled boosters); it fades fast once the player lands. Set Upward to 0
+            for a pure sideways dash. Pair with on_player_enter on a volume over the pad.
           </div>
         </>
       );
