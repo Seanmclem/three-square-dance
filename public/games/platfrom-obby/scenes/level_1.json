@@ -12841,13 +12841,21 @@
           "zoneId": "demo",
           "enabled": true,
           "trigger": {
-            "type": "on_health_zero"
+            "type": "on_state_equals",
+            "targetId": "Hearts",
+            "stateValue": 0
           },
           "conditions": [],
           "actions": [
             {
               "type": "respawn_player",
-              "targetId": ""
+              "positionKey": "checkpoint",
+              "delay": 1.9
+            },
+            {
+              "type": "play_animation",
+              "targetId": "player",
+              "animation": "Death"
             }
           ],
           "oneShot": false
