@@ -146,6 +146,10 @@ export class CharacterController {
   private _offTeleport: (() => void) | null = null;
   private _offSavePos:  (() => void) | null = null;
   private _offLaunch:   (() => void) | null = null;
+  private _offScriptAnim: (() => void) | null = null;
+  // Script-driven avatar clip (play_animation target "player") — overrides the
+  // locomotion state machine until it ends / is cleared / the player moves.
+  private _scriptAnim: { name: string; loop: boolean; hold: boolean } | null = null;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -180,6 +184,7 @@ export class CharacterController {
       this._body.teleport(new THREE.Vector3(position.x, position.y + capsuleBottom, position.z));
       this._velY = 0;
       this._extVelX = this._extVelZ = 0;   // don't carry a launch shove through a warp
+      this._clearScriptAnim();             // a warp (e.g. respawn) ends a scripted pose
       this._camY = this._armDist = Number.NaN;   // snap camera smoothing across the warp
       if (facing != null) {                          // set look direction (degrees); undefined = keep current
         this._yaw = THREE.MathUtils.degToRad(facing);
@@ -210,6 +215,13 @@ export class CharacterController {
       }
       this._coyote = 0;
       this._jumpBuffer = 0;
+    });
+    // Script play_animation targeting the player: "__auto__" clears the override
+    // back to locomotion; anything else plays that clip on the avatar.
+    this._offScriptAnim = this._bus.on("character:play-animation", ({ clipName, loop, hold }) => {
+      if (clipName === "__auto__") { this._clearScriptAnim(); return; }
+      this._scriptAnim = { name: clipName, loop: !!loop, hold: !!hold };
+      this._playByName(clipName, !!loop);
     });
     // Runtime footstep surface swap (set_footstep action). Empty = revert to authored default.
     this._offFootstep = this._bus.on("character:set-footstep", ({ sound }) => {
@@ -514,6 +526,7 @@ export class CharacterController {
     this._climbHoldInvert = fromTop;   // held forward = descend until released (see field comment)
     this._velY = 0;
     this._extVelX = this._extVelZ = 0;   // grabbing a ladder kills launch momentum
+    this._scriptAnim = null;             // climb owns the animation from here
     // Wide ladders keep the grab-point lateral position; narrow ones center.
     const p = resolveLadderParams(def);
     if (p.width > CLIMB_FREE_X_WIDTH) {
@@ -723,10 +736,48 @@ export class CharacterController {
     return !!a && !!c && a.time >= c.duration - 0.02;
   }
 
+  // Play an exact clip by NAME (script override) — unlike _play's intent lookup.
+  private _playByName(name: string, loop: boolean): void {
+    if (!this._mixer) return;
+    const lc = name.toLowerCase();
+    const clip = this._modelAnimations.find(c => c.name === name)
+      ?? this._modelAnimations.find(c => c.name.toLowerCase() === lc)
+      ?? this._modelAnimations.find(c => c.name.toLowerCase().includes(lc));
+    if (!clip) {
+      console.warn(`CharacterController: no clip "${name}" on the avatar — available: [${this._modelAnimations.map(c => c.name).join(", ")}]`);
+      this._scriptAnim = null;
+      return;
+    }
+    const next = this._mixer.clipAction(clip);
+    next.reset();
+    next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
+    next.clampWhenFinished = !loop;
+    next.timeScale = 1;
+    next.fadeIn(0.15).play();
+    this._currentAction?.fadeOut(0.15);
+    this._currentAction  = next;
+    this._currentClipObj = clip;
+    this._currentClip    = `script:${clip.name}`;   // never collides with locomotion intents
+  }
+
+  private _clearScriptAnim(): void {
+    if (!this._scriptAnim) return;
+    this._scriptAnim = null;
+    if (this._climbLadder) return;   // the climb branch owns the animation
+    this._animPhase = "ground";      // locomotion re-resolves (idle/walk/air) next frame
+  }
+
   // Locomotion state machine: ground (idle/walk) → jump takeoff → air-idle loop → land → ground.
   // Each stage falls back gracefully if the model lacks that clip.
   private _updateAnim(airborne: boolean, isMoving: boolean): void {
     if (!this._mixer) return;
+    // Script override: holds until the player moves (no moonwalking), the
+    // one-shot finishes (hold keeps the final pose), or "__auto__"/warp clears it.
+    if (this._scriptAnim) {
+      if (isMoving) this._clearScriptAnim();
+      else if (!this._scriptAnim.loop && !this._scriptAnim.hold && this._animDone()) this._clearScriptAnim();
+      else return;
+    }
     switch (this._animPhase) {
       case "ground":
         if (airborne) this._enterJump();
@@ -780,6 +831,7 @@ export class CharacterController {
     this._offTeleport?.();    this._offTeleport   = null;
     this._offSavePos?.();     this._offSavePos    = null;
     this._offLaunch?.();      this._offLaunch     = null;
+    this._offScriptAnim?.();  this._offScriptAnim = null;
     this._offFootstep?.();    this._offFootstep   = null;
     this._offLadderEnter?.(); this._offLadderEnter = null;
     this._offLadderExit?.();  this._offLadderExit  = null;

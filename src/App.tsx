@@ -3550,6 +3550,7 @@ export default function App() {
         onGraphicsImport={() => setGraphicsImporterOpen(true)}
         onDeleteGraphics={handleRequestGraphicDelete}
         onEditGraphics={handleRequestGraphicEdit}
+        playerModelAssetId={worldRef.current?.world?.playerSettings?.modelAssetId ?? undefined}
         onClose={() => setLeftPanel(null)}
         groups={groups}
         hiddenGroupIds={hiddenGroups}

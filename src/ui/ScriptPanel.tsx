@@ -290,6 +290,8 @@ export interface ScriptPanelProps {
   graphics: GraphicDef[];
   uiElements: UiElementDef[];
   onUiElementsChange: (uiElements: UiElementDef[]) => void;
+  // Avatar model asset id (player settings) — clip list for play_animation target "player".
+  playerModelAssetId?: string;
 }
 
 type TabId = "level" | "object" | "dialogue" | "state" | "items" | "ui";
@@ -328,6 +330,7 @@ export function ScriptPanel({
   graphics,
   uiElements,
   onUiElementsChange,
+  playerModelAssetId,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -600,6 +603,7 @@ export function ScriptPanel({
           worldItems={worldItems}
           uiElements={uiElements}
           projectSceneIds={projectSceneIds}
+          playerModelAssetId={playerModelAssetId}
           ownerIsEntity={tab === "object"}
           selectedObjectId={selectedObjectId}
           onBack={() => setEditingId(null)}
@@ -943,6 +947,7 @@ function ScriptEditor({
   worldItems,
   uiElements,
   projectSceneIds,
+  playerModelAssetId,
   ownerIsEntity,
   selectedObjectId,
   help,
@@ -966,6 +971,7 @@ function ScriptEditor({
   worldItems: ItemDef[];
   uiElements: UiElementDef[];
   projectSceneIds?: string[];
+  playerModelAssetId?: string;
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
   help?: string;
@@ -1276,6 +1282,7 @@ function ScriptEditor({
               worldItems={worldItems}
               uiElements={uiElements}
               projectSceneIds={projectSceneIds}
+              playerModelAssetId={playerModelAssetId}
               owner={ownerIsEntity && selectedObjectId
                 ? { id: selectedObjectId, kind: selectedObjectId.startsWith("vol_") ? "volume" : "object" }
                 : undefined}
@@ -1457,6 +1464,7 @@ function ActionTargetPicker({
   triggerVolumes = [],
   zoneLightDefs = [],
   owner,
+  includePlayer,
   onChange,
 }: {
   targetId: string;
@@ -1471,6 +1479,8 @@ function ActionTargetPicker({
   zoneLightDefs?: LightDef[];
   /** Entity this script rides on — offers the portable "★ this" self target. */
   owner?: { id: string; kind: "object" | "volume" };
+  /** Offer the "★ the player" avatar target (play_animation only). */
+  includePlayer?: boolean;
   onChange: (id: string) => void;
 }) {
   // Prefab members (e.g. every tile of a tiled platform) are generated internals —
@@ -1478,6 +1488,8 @@ function ActionTargetPicker({
   const noPrefab = <T,>(arr: T[]): T[] => arr.filter((e) => !(e as { prefab?: unknown }).prefab);
   const short = (id: string) => id.slice(0, 8);
   const opts: TargetOpt[] = [
+    // "player" targets the avatar (character:play-animation channel), pinned first.
+    ...(includePlayer ? [{ id: "player", text: "★ the player", group: "This" }] : []),
     // "self" stays literal in the saved script and re-resolves to whatever entity
     // carries the script — survives duplicate/copy/prefab stamping.
     ...(owner ? [{ id: "self", text: `★ this ${owner.kind}`, group: "This" }] : []),
@@ -1849,6 +1861,7 @@ function ActionRow({
   worldItems,
   uiElements,
   projectSceneIds,
+  playerModelAssetId,
   owner,
   onChange,
   onRemove,
@@ -1869,6 +1882,7 @@ function ActionRow({
   worldItems: ItemDef[];
   uiElements: UiElementDef[];
   projectSceneIds?: string[];
+  playerModelAssetId?: string;
   owner?: { id: string; kind: "object" | "volume" };
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
@@ -1943,6 +1957,7 @@ function ActionRow({
         worldItems={worldItems}
         uiElements={uiElements}
         projectSceneIds={projectSceneIds}
+        playerModelAssetId={playerModelAssetId}
         owner={owner}
         onChange={onChange}
       />
@@ -1967,6 +1982,7 @@ function ActionFields({
   worldItems,
   uiElements,
   projectSceneIds,
+  playerModelAssetId,
   owner,
   onChange,
 }: {
@@ -1986,6 +2002,7 @@ function ActionFields({
   worldItems: ItemDef[];
   uiElements: UiElementDef[];
   projectSceneIds?: string[];
+  playerModelAssetId?: string;
   owner?: { id: string; kind: "object" | "volume" };
   onChange: (a: ScriptAction) => void;
 }) {
@@ -2001,6 +2018,17 @@ function ActionFields({
       targetId={action.targetId ?? ""}
       zoneObjects={zoneObjects}
       groups={groups}
+      owner={owner?.kind === "object" ? owner : undefined}
+      onChange={(id) => set({ targetId: id })}
+    />
+  );
+  // play_animation can also target the PLAYER avatar (CharacterController override).
+  const animTargetPicker = (
+    <ActionTargetPicker
+      targetId={action.targetId ?? ""}
+      zoneObjects={zoneObjects}
+      groups={groups}
+      includePlayer
       owner={owner?.kind === "object" ? owner : undefined}
       onChange={(id) => set({ targetId: id })}
     />
@@ -2061,7 +2089,9 @@ function ActionFields({
   // Clips available on the action's target object (empty for groups / unknown / no-anim assets).
   const targetObj = zoneObjects.find((o) => o.id === action.targetId);
   const targetClips =
-    assets.find((a) => a.id === targetObj?.assetId)?.animations ?? [];
+    action.targetId === "player"
+      ? (assets.find((a) => a.id === playerModelAssetId)?.animations ?? [])
+      : (assets.find((a) => a.id === targetObj?.assetId)?.animations ?? []);
 
   switch (action.type) {
     case "show_dialogue":
@@ -2476,7 +2506,7 @@ function ActionFields({
       const clipKnown = action.animation === "__auto__" || targetClips.includes(action.animation ?? "");
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <F label="Target">{targetPicker}</F>
+          <F label="Target">{animTargetPicker}</F>
           <F label="Clip">
           {targetClips.length > 0 ? (
             <select
@@ -2503,7 +2533,7 @@ function ActionFields({
             <input
               style={S.field}
               placeholder={
-                targetObj
+                targetObj || action.targetId === "player"
                   ? "Clip name (no clips found on asset)"
                   : "Clip name (pick an object target for a list)"
               }

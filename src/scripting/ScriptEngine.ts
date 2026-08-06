@@ -547,9 +547,16 @@ export class ScriptEngine {
       }
 
       case "play_animation":
-        if (action.animation)
+        if (action.animation) {
+          // "player" targets the avatar (CharacterController override channel),
+          // never the entity resolver — there is no entity with that id.
+          if (action.targetId === "player") {
+            this._bus.emit("character:play-animation", { clipName: action.animation, loop: action.animationLoop, hold: action.animationHold });
+            break;
+          }
           for (const id of this._resolveTargets(action.targetId))
             this._bus.emit("object:play-animation", { id, clipName: action.animation, loop: action.animationLoop, hold: action.animationHold, blend: action.animationBlend });
+        }
         break;
 
       case "change_material": {

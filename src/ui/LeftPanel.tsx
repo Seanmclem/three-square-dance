@@ -39,6 +39,7 @@ interface LeftPanelProps {
   onGraphicsImport: () => void;
   onDeleteGraphics: (ids: string[]) => void;
   onEditGraphics:   (ids: string[]) => void;
+  playerModelAssetId?: string;
   onClose:         () => void;
   groups:          GroupDef[];
   hiddenGroupIds:  Set<string>;
@@ -105,7 +106,7 @@ export function LeftPanel({
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onDeleteSounds, onEditSounds,
   skyboxes, selectedSkybox, onSkyboxSelect, onSkyboxImport, onDeleteSkyboxes, onEditSkyboxes,
-  graphics, onGraphicsImport, onDeleteGraphics, onEditGraphics,
+  graphics, onGraphicsImport, onDeleteGraphics, onEditGraphics, playerModelAssetId,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
   groupMembers, multiSelectedCount, onAddSelectedToGroup, onRemoveGroupMember,
   onSelectGroupMembers, onDeleteGroupMembers, onDuplicateGroupMembers,
@@ -302,6 +303,7 @@ export function LeftPanel({
                 graphics={graphics}
                 uiElements={uiElements}
                 onUiElementsChange={onUiElementsChange}
+                playerModelAssetId={playerModelAssetId}
               />
             )}
           </div>

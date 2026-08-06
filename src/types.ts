@@ -427,6 +427,9 @@ export interface BusEvents {
   "group:updated":         { id: string; name: string };
   "group:visibility":      { groupId: string; visible: boolean };
   "object:play-animation": { id: string; clipName: string; loop?: boolean; hold?: boolean; blend?: number };
+  // play_animation with target "player" — a script clip overrides the avatar's locomotion
+  // state machine until it ends (one-shot), is cleared ("__auto__"), or the player moves.
+  "character:play-animation": { clipName: string; loop?: boolean; hold?: boolean };
   // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
   "mover:set":             { targetId: string; op: "start" | "stop" | "toggle" };
   "state:changed":         { key: string; value: JsonValue };
