@@ -249,6 +249,11 @@ export class CharacterController {
     const isMoving = dir.lengthSq() > 0;
     if (isMoving) dir.multiplyScalar(speed * dt);
     dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
+    // Avatar facing uses the INPUT direction only — captured here, before gravity /
+    // launch shove / mover carry join `dir`. Aiming at the full displacement made
+    // the model wobble while a launch tail decayed (worst moving backwards, where
+    // the shortest-turn side flips at 180°).
+    const faceX = dir.x, faceZ = dir.z;
 
     const jumpHeld = actions.jump;
     if (!jumpHeld) this._jumpArmed = true;   // re-arm on release
@@ -407,7 +412,7 @@ export class CharacterController {
       // While climbing the avatar stays chest-to-the-ladder — the movement-facing
       // rule would spin it to face outward on the way down (input points away).
       if (isMoving && !this._climbLadder) {
-        const targetYaw = Math.atan2(-dir.x, -dir.z);
+        const targetYaw = Math.atan2(-faceX, -faceZ);
         let delta = targetYaw - this._modelYaw;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));   // wrap to [-π, π]
         this._modelYaw += delta * Math.min(1, dt * 10);
