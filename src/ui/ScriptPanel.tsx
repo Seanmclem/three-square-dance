@@ -1095,6 +1095,13 @@ function ScriptEditor({
             </div>
           )}
 
+          {script.trigger.type === "on_health_zero" && (
+            <div style={{ color: "#98a2b8", fontSize: 10, fontStyle: "italic", padding: "4px 0" }}>
+              Fires when the state key named exactly <span style={{ color: "#c8d2e8" }}>health</span> drops
+              to 0. Using a different key for health? Use on_state_equals with that key and value 0 instead.
+            </div>
+          )}
+
           {script.trigger.type === "on_timer" && (
             <>
               <F label="Interval (seconds)" style={{ marginTop: 4 }}>
