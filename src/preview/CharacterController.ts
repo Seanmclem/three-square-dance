@@ -771,10 +771,13 @@ export class CharacterController {
   // Each stage falls back gracefully if the model lacks that clip.
   private _updateAnim(airborne: boolean, isMoving: boolean): void {
     if (!this._mixer) return;
-    // Script override: holds until the player moves (no moonwalking), the
-    // one-shot finishes (hold keeps the final pose), or "__auto__"/warp clears it.
+    // Script override. LOOPING clips (ambient emotes) cancel the moment the player
+    // moves — no moonwalking. One-shots and holds play through movement: they're
+    // deliberate beats (death pose, hit react) usually fired WHILE a key is held,
+    // and a move-cancel would kill them the next frame. A finished one-shot (not
+    // hold) returns to locomotion; "__auto__"/warp/climb clear everything.
     if (this._scriptAnim) {
-      if (isMoving) this._clearScriptAnim();
+      if (this._scriptAnim.loop && isMoving) this._clearScriptAnim();
       else if (!this._scriptAnim.loop && !this._scriptAnim.hold && this._animDone()) this._clearScriptAnim();
       else return;
     }

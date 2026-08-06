@@ -1489,7 +1489,7 @@ function ActionTargetPicker({
   const short = (id: string) => id.slice(0, 8);
   const opts: TargetOpt[] = [
     // "player" targets the avatar (character:play-animation channel), pinned first.
-    ...(includePlayer ? [{ id: "player", text: "★ the player", group: "This" }] : []),
+    ...(includePlayer ? [{ id: "player", text: "★ the player", group: "Player" }] : []),
     // "self" stays literal in the saved script and re-resolves to whatever entity
     // carries the script — survives duplicate/copy/prefab stamping.
     ...(owner ? [{ id: "self", text: `★ this ${owner.kind}`, group: "This" }] : []),
