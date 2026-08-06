@@ -1887,7 +1887,14 @@ function ActionRow({
         <select
           style={{ ...S.select, flex: 1 }}
           value={action.type}
-          onChange={(e) => onChange({ type: e.target.value as ActionType, delay: action.delay })}
+          onChange={(e) => {
+            const type = e.target.value as ActionType;
+            onChange({ type, delay: action.delay,
+              // New launch actions on entity-owned scripts start owner-relative
+              // (direction 0 = the owner's front) — saved worlds are untouched,
+              // absent still means world-compass.
+              ...(type === "launch_player" && owner ? { launchRelative: true } : {}) });
+          }}
         >
           {[...ACTION_TYPES].sort().map((t) => (
             <option key={t} value={t}>
