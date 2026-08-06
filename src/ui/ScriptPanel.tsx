@@ -2459,7 +2459,7 @@ function ActionFields({
       );
 
     case "play_animation": {
-      const clipKnown = targetClips.includes(action.animation ?? "");
+      const clipKnown = action.animation === "__auto__" || targetClips.includes(action.animation ?? "");
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <F label="Target">{targetPicker}</F>
@@ -2471,6 +2471,9 @@ function ActionFields({
               onChange={(e) => set({ animation: e.target.value })}
             >
               <option value="">— pick clip —</option>
+              {/* Pinned like the target picker's "★ this" — resolves at runtime to the
+                  target's auto-play resting clip, which also STOPS a looping clip. */}
+              <option value="__auto__">↩ auto-play (resting) clip</option>
               {targetClips.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -2495,6 +2498,9 @@ function ActionFields({
             />
           )}
           </F>
+          {/* Loop/hold/blend don't apply to the resting-clip sentinel (it always
+              crossfades to the auto-play loop) — hide the row to say so. */}
+          {action.animation !== "__auto__" && (
           <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
             <label
               style={{
@@ -2553,6 +2559,7 @@ function ActionFields({
               />
             </label>
           </div>
+          )}
         </div>
       );
     }

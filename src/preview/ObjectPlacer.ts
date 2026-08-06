@@ -37,7 +37,11 @@ export class ObjectPlacer {
   constructor(private readonly _bus: EventBus, opts?: { instancing?: InstancedObjectPool }) {
     this._pool = opts?.instancing ?? null;
     // Script-driven actions (Phase 10.9). Object id is already group-resolved by ScriptEngine.
-    this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) => this.previewClip(id, clipName, { loop, hold, blend }));
+    // "__auto__" is the panel's pinned "auto-play (resting) clip" sentinel — it routes to
+    // stopPreview, which crossfades back to the auto-play clip (or bind pose), so it also
+    // serves as the script-reachable way to STOP a looping/held clip.
+    this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) =>
+      clipName === "__auto__" ? this.stopPreview(id) : this.previewClip(id, clipName, { loop, hold, blend }));
     this._bus.on("object:updated", ({ id, changes }) => {
       if (import.meta.env.DEV && this._meshes.get(id)?.userData["_instanced"] &&
           (changes.material || changes.position || changes.rotation || changes.scale)) {

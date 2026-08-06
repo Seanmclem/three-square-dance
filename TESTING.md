@@ -243,6 +243,12 @@ sputter — every failure mode below was hit and diagnosed in practice.
 7. **Never block inside the page.** `javascript_tool` containing an in-page
    `await`/`setTimeout` times out (CDP `Runtime.evaluate`, ~45s). Keep page eval
    synchronous; put every wait *between* calls as a Bash `sleep`.
+8. **A state write and a DOM read in the SAME `javascript_tool` call sees the
+   PRE-update DOM.** React batches: `__test.runAction({type:"set_state",…})`
+   followed synchronously by `document.querySelector(...)` reads the overlay
+   from before the re-render — a loop setting 5 values and reading after each
+   returns 5 copies of the initial UI (bit the 2026-08-05 hearts session).
+   Write in one tool call, read in the next.
 
 ### Protecting the user's autosave (localStorage snapshot-restore)
 
