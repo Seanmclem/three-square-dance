@@ -41,12 +41,13 @@
     "playerSettings": {
       "cameraMode": "thirdperson",
       "moveSpeed": 6,
-      "jumpHeight": 3,
+      "jumpHeight": 3.5,
       "fov": 75,
       "thirdPersonDistance": 4,
       "thirdPersonHeight": 2,
       "modelAssetId": "character",
-      "characterScale": 0.6
+      "characterScale": 0.6,
+      "jumpAnimSpeed": 1.2
     },
     "stateSchema": {
       "Hearts": {
@@ -64,9 +65,9 @@
     },
     "defaultSpawn": {
       "position": {
-        "x": -40.756988563220986,
-        "y": 10.892622497653509,
-        "z": -26.125486535374534
+        "x": -35.196842294603805,
+        "y": 8.375446722273528,
+        "z": -74.2617753977061
       },
       "facingDeg": 0
     }
@@ -11292,13 +11293,72 @@
           }
         },
         {
+          "id": "obj_e043c8bb",
+          "assetId": "crab",
+          "position": {
+            "x": -34.787993436397294,
+            "y": 8.338714186504916,
+            "z": -80.3869172017439
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "autoPlayAnimation": "Idle",
+          "scripts": [],
+          "colliders": [
+            {
+              "id": "col_172f13ec",
+              "shape": "box",
+              "offset": {
+                "x": -5.960464477539063e-8,
+                "y": 0.751679808832705,
+                "z": 0.01855784778791364
+              },
+              "size": {
+                "x": 2.543012261390686,
+                "y": 1.5220713000744581,
+                "z": 1.3858419380124536
+              },
+              "isSensor": false
+            }
+          ],
+          "label": "Crab1",
+          "mover": {
+            "enabled": false,
+            "kind": "slide",
+            "axis": "y",
+            "distance": 2,
+            "duration": 2,
+            "dwell": 0,
+            "mode": "loop",
+            "phase": 0,
+            "speed": 45,
+            "autoStart": true
+          }
+        },
+        {
           "id": "obj_266d9a35",
           "label": "Tile 0,0",
           "assetId": "platform_grass_corner",
           "position": {
             "x": -37.92001817906488,
             "y": 7.346407107121243,
-            "z": -78.54149247100148
+            "z": -81.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11331,7 +11391,7 @@
           "position": {
             "x": -37.92001817906488,
             "y": 7.346407107121243,
-            "z": -76.54149247100148
+            "z": -79.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11364,7 +11424,7 @@
           "position": {
             "x": -37.92001817906488,
             "y": 7.346407107121243,
-            "z": -74.54149247100148
+            "z": -77.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11393,15 +11453,15 @@
         {
           "id": "obj_31da75e4",
           "label": "Tile 0,3",
-          "assetId": "platform_grass_corner",
+          "assetId": "platform_grass_side",
           "position": {
             "x": -37.92001817906488,
             "y": 7.346407107121243,
-            "z": -72.54149247100148
+            "z": -75.01438649956901
           },
           "rotation": {
             "x": 0,
-            "y": 0,
+            "y": -90,
             "z": 0
           },
           "scale": {
@@ -11424,13 +11484,46 @@
           }
         },
         {
+          "id": "obj_329cad1d",
+          "label": "Tile 0,4",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -37.92001817906488,
+            "y": 7.346407107121243,
+            "z": -73.01438649956901
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_a39625c4",
+            "memberKey": "tile_0_4"
+          }
+        },
+        {
           "id": "obj_94e05680",
           "label": "Tile 1,0",
           "assetId": "platform_grass_side",
           "position": {
             "x": -35.92001817906488,
             "y": 7.346407107121243,
-            "z": -78.54149247100148
+            "z": -81.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11463,7 +11556,7 @@
           "position": {
             "x": -35.92001817906488,
             "y": 7.346407107121243,
-            "z": -76.54149247100148
+            "z": -79.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11496,7 +11589,7 @@
           "position": {
             "x": -35.92001817906488,
             "y": 7.346407107121243,
-            "z": -74.54149247100148
+            "z": -77.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11525,11 +11618,11 @@
         {
           "id": "obj_71d99d86",
           "label": "Tile 1,3",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
             "x": -35.92001817906488,
             "y": 7.346407107121243,
-            "z": -72.54149247100148
+            "z": -75.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11556,13 +11649,46 @@
           }
         },
         {
+          "id": "obj_f230b701",
+          "label": "Tile 1,4",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -35.92001817906488,
+            "y": 7.346407107121243,
+            "z": -73.01438649956901
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_a39625c4",
+            "memberKey": "tile_1_4"
+          }
+        },
+        {
           "id": "obj_8f08cfc3",
           "label": "Tile 2,0",
           "assetId": "platform_grass_side",
           "position": {
             "x": -33.92001817906488,
             "y": 7.346407107121243,
-            "z": -78.54149247100148
+            "z": -81.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11595,7 +11721,7 @@
           "position": {
             "x": -33.92001817906488,
             "y": 7.346407107121243,
-            "z": -76.54149247100148
+            "z": -79.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11628,7 +11754,7 @@
           "position": {
             "x": -33.92001817906488,
             "y": 7.346407107121243,
-            "z": -74.54149247100148
+            "z": -77.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11657,11 +11783,11 @@
         {
           "id": "obj_8fe3782e",
           "label": "Tile 2,3",
-          "assetId": "platform_grass_side",
+          "assetId": "platform_grass_center",
           "position": {
             "x": -33.92001817906488,
             "y": 7.346407107121243,
-            "z": -72.54149247100148
+            "z": -75.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11688,13 +11814,46 @@
           }
         },
         {
+          "id": "obj_cd8a7737",
+          "label": "Tile 2,4",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -33.92001817906488,
+            "y": 7.346407107121243,
+            "z": -73.01438649956901
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_a39625c4",
+            "memberKey": "tile_2_4"
+          }
+        },
+        {
           "id": "obj_1ff6e932",
           "label": "Tile 3,0",
           "assetId": "platform_grass_corner",
           "position": {
             "x": -31.920018179064883,
             "y": 7.346407107121243,
-            "z": -78.54149247100148
+            "z": -81.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11727,7 +11886,7 @@
           "position": {
             "x": -31.920018179064883,
             "y": 7.346407107121243,
-            "z": -76.54149247100148
+            "z": -79.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11760,7 +11919,7 @@
           "position": {
             "x": -31.920018179064883,
             "y": 7.346407107121243,
-            "z": -74.54149247100148
+            "z": -77.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11789,11 +11948,11 @@
         {
           "id": "obj_dc99821b",
           "label": "Tile 3,3",
-          "assetId": "platform_grass_corner",
+          "assetId": "platform_grass_side",
           "position": {
             "x": -31.920018179064883,
             "y": 7.346407107121243,
-            "z": -72.54149247100148
+            "z": -75.01438649956901
           },
           "rotation": {
             "x": 0,
@@ -11820,16 +11979,17 @@
           }
         },
         {
-          "id": "obj_e043c8bb",
-          "assetId": "crab",
+          "id": "obj_18c2bf8d",
+          "label": "Tile 3,4",
+          "assetId": "platform_grass_corner",
           "position": {
-            "x": -34.787993436397294,
-            "y": 8.338714186504916,
-            "z": -78.65729692056232
+            "x": -31.920018179064883,
+            "y": 7.346407107121243,
+            "z": -73.01438649956901
           },
           "rotation": {
             "x": 0,
-            "y": 0,
+            "y": 90,
             "z": 0
           },
           "scale": {
@@ -11838,72 +11998,18 @@
             "z": 1
           },
           "floor": 0,
-          "zoneId": "demo",
           "properties": {
             "interactable": false,
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
           },
-          "autoPlayAnimation": "Idle",
-          "scripts": [
-            {
-              "id": "scr_3aa1e067",
-              "label": "Crab Bite",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "adjust_number",
-                  "stateKey": "Hearts",
-                  "numberDelta": -1
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "colliders": [
-            {
-              "id": "col_172f13ec",
-              "shape": "box",
-              "offset": {
-                "x": -5.960464477539063e-8,
-                "y": 0.751679808832705,
-                "z": 0.01855784778791364
-              },
-              "size": {
-                "x": 2.543012261390686,
-                "y": 1.5220713000744581,
-                "z": 1.3858419380124536
-              },
-              "isSensor": false
-            },
-            {
-              "id": "col_6eff50e2",
-              "shape": "box",
-              "offset": {
-                "x": -5.960464477539063e-8,
-                "y": 0.751679808832705,
-                "z": 0.01855784778791364
-              },
-              "size": {
-                "x": 3,
-                "y": 2,
-                "z": 2
-              },
-              "isSensor": true,
-              "rotation": {
-                "x": 0,
-                "y": 0,
-                "z": 0
-              }
-            }
-          ],
-          "label": "Crab1"
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_a39625c4",
+            "memberKey": "tile_3_4"
+          }
         }
       ],
       "prefabInstances": [
@@ -12190,7 +12296,7 @@
           "version": 1,
           "variables": {
             "width": 4,
-            "depth": 4,
+            "depth": 5,
             "height": 1,
             "tileSet": "grass"
           },
@@ -12198,7 +12304,7 @@
             "position": {
               "x": -34.92001817906488,
               "y": 7.346407107121243,
-              "z": -75.54149247100148
+              "z": -77.01438649956901
             },
             "rotationY": 0
           }
@@ -12637,7 +12743,89 @@
               ],
               "oneShot": true
             }
-          ]
+          ],
+          "editorTint": {
+            "color": "#4c00ff",
+            "opacity": 0.12
+          }
+        },
+        {
+          "id": "vol_123e5a32",
+          "label": "CrabBiteTrigger",
+          "position": {
+            "x": -34.8161770550719,
+            "y": 8.33952616498961,
+            "z": -79.66188322323767
+          },
+          "size": {
+            "x": 2.2,
+            "y": 0.760473835010389,
+            "z": 1.7000000000000002
+          },
+          "zoneId": "demo",
+          "visual": {
+            "enabled": false,
+            "style": "gradient",
+            "color": "#5a3d8f",
+            "fadeDir": "up",
+            "opacity": 0.8,
+            "fadeHeight": 1,
+            "animate": false
+          },
+          "scripts": [
+            {
+              "id": "scr_f19049fc",
+              "label": "Crab Bite",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_e043c8bb",
+                  "animation": "Bite_Front",
+                  "animationLoop": true
+                },
+                {
+                  "type": "adjust_number",
+                  "stateKey": "Hearts",
+                  "numberDelta": -1
+                },
+                {
+                  "type": "launch_player",
+                  "launchSpeed": 10,
+                  "launchHSpeed": 10,
+                  "launchDirDeg": 180
+                }
+              ],
+              "oneShot": false
+            },
+            {
+              "id": "scr_dea9f70e",
+              "label": "Crab Stop-Bite",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_exit"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_e043c8bb",
+                  "animation": "__auto__"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "editorTint": {
+            "color": "#2b00ff",
+            "opacity": 0.12
+          }
         }
       ],
       "scripts": [
