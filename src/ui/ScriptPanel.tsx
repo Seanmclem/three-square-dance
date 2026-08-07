@@ -2087,7 +2087,10 @@ function ActionFields({
     />
   );
   // Clips available on the action's target object (empty for groups / unknown / no-anim assets).
-  const targetObj = zoneObjects.find((o) => o.id === action.targetId);
+  // "self" stays literal in the saved action (see ActionTargetPicker) — resolve it to the
+  // owning entity here or the clip list stays empty for "★ this object".
+  const resolvedTargetId = action.targetId === "self" ? owner?.id : action.targetId;
+  const targetObj = zoneObjects.find((o) => o.id === resolvedTargetId);
   const targetClips =
     action.targetId === "player"
       ? (assets.find((a) => a.id === playerModelAssetId)?.animations ?? [])

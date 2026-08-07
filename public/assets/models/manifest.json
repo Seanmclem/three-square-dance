@@ -1796,7 +1796,9 @@
       ],
       "dateAdded": "2026-07-26",
       "animations": [
-        "SpikeTrap_Activate"
+        "SpikeTrap_Activate",
+        "SpikeTrap_Up",
+        "SpikeTrap_Down"
       ],
       "attribution": {
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
