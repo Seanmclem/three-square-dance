@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -35.36138431162967,
-        "y": -1.775449389021245,
-        "z": -89.42877822057326
+        "x": -34.61157065635234,
+        "y": -1.3654158690210956,
+        "z": -65.18726186426285
       },
-      "radius": 21.378364638984102,
-      "phi": 0.7150000000000005,
-      "theta": 18.752739999812622
+      "radius": 20.248078005171557,
+      "phi": 0.6500000000000005,
+      "theta": 18.923439999825977
     }
   },
   "world": {
@@ -11209,7 +11209,33 @@
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
-          }
+          },
+          "scripts": [
+            {
+              "id": "scr_cec4e81d",
+              "label": "spike pop intervals",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_timer",
+                "interval": 3,
+                "repeat": true
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Activate",
+                  "animationLoop": false,
+                  "animationHold": true,
+                  "delay": 0
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "label": "spike cube 1"
         },
         {
           "id": "obj_59bc2c20",
@@ -12755,12 +12781,12 @@
           "position": {
             "x": -34.917995160427694,
             "y": 8.33952616498961,
-            "z": -79.81065510707919
+            "z": -79.96065510707918
           },
           "size": {
             "x": 2,
-            "y": 0.760473835010389,
-            "z": 1.4000000000000001
+            "y": 0.6604738350103894,
+            "z": 1.7000000000000002
           },
           "zoneId": "demo",
           "visual": {
@@ -12832,6 +12858,60 @@
             "y": -180,
             "z": 0
           }
+        },
+        {
+          "id": "vol_50dfd99c",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -34.82334347747838,
+            "y": 8.96704399199294,
+            "z": -80.41531097548042
+          },
+          "size": {
+            "x": 1.3,
+            "y": 0.5,
+            "z": 1
+          },
+          "zoneId": "demo",
+          "editorTint": {
+            "color": "#ff0000",
+            "opacity": 0.12
+          },
+          "scripts": [
+            {
+              "id": "scr_b3711c22",
+              "label": "crab stomp",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "launch_player",
+                  "launchSpeed": 8
+                },
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_e043c8bb",
+                  "animation": "Death",
+                  "animationHold": true
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0.5,
+                  "targetId": "obj_e043c8bb",
+                  "fadeDuration": 1
+                },
+                {
+                  "type": "despawn_object",
+                  "targetId": "vol_123e5a32"
+                }
+              ],
+              "oneShot": true
+            }
+          ]
         }
       ],
       "scripts": [
@@ -12855,7 +12935,8 @@
             {
               "type": "play_animation",
               "targetId": "player",
-              "animation": "Death"
+              "animation": "Death",
+              "animationHold": true
             }
           ],
           "oneShot": false
