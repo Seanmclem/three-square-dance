@@ -203,13 +203,17 @@ export class CharacterController {
     // so a positive velocity lifts off next frame. max() lets a spring cancel a
     // fast fall without ever slowing an even faster existing rise; coyote/jump
     // buffer are cleared so a buffered press can't double-boost the launch.
-    this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg }) => {
+    this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg, relativeToPlayer }) => {
       this._exitClimb();
       this._velY = Math.max(this._velY, speed);
       // Optional horizontal shove — dirDeg uses the spawn-facing compass (0 = -Z),
       // replacing (not stacking) any prior shove so repeat pads feel consistent.
       if (hSpeed) {
-        const rad = THREE.MathUtils.degToRad(dirDeg ?? 0);
+        // Player-relative: the engine can't know the look yaw, so it sends a flag and
+        // we add it here. Same compass — `(0,0,-1)` rotated by _yaw IS (-sin, -cos),
+        // so 0 = the way they're looking and 180 = knocked backwards.
+        const base = relativeToPlayer ? THREE.MathUtils.radToDeg(this._yaw) : 0;
+        const rad = THREE.MathUtils.degToRad((dirDeg ?? 0) + base);
         this._extVelX = -Math.sin(rad) * hSpeed;
         this._extVelZ = -Math.cos(rad) * hSpeed;
       }

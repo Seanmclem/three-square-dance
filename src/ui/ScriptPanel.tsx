@@ -101,6 +101,19 @@ const S = {
     fontFamily: "monospace",
     outline: "none",
   } as const,
+  // Segmented picker, matching PropertiesPanel's MOVER_SEG_BTN (Slide/Spin, Loop/Once).
+  seg: (active: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: "4px 0",
+    borderRadius: 4,
+    cursor: active ? "default" : "pointer",
+    fontFamily: "monospace",
+    fontSize: 10,
+    border: "none",
+    background: active ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.6)",
+    color: active ? "#80aaff" : "#c2cadb",
+    outline: active ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
+  }),
   select: {
     width: "100%",
     background: "rgba(46,46,46,0.9)",
@@ -1914,7 +1927,7 @@ function ActionRow({
               // New launch actions on entity-owned scripts start owner-relative
               // (direction 0 = the owner's front) — saved worlds are untouched,
               // absent still means world-compass.
-              ...(type === "launch_player" && owner ? { launchRelative: true } : {}) });
+              ...(type === "launch_player" && owner ? { launchRelativeTo: "entity" as const } : {}) });
           }}
         >
           {[...ACTION_TYPES].sort().map((t) => (
@@ -2821,7 +2834,11 @@ function ActionFields({
       );
     }
 
-    case "launch_player":
+    case "launch_player": {
+      const saved = action.launchRelativeTo ?? (action.launchRelative ? "entity" : "world");
+      // The engine only applies "entity" when there's an owner to read a rotation from,
+      // so an owner-less script shows World rather than highlighting a button it can't offer.
+      const relativeTo = saved === "entity" && !owner ? "world" : saved;
       return (
         <>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
@@ -2854,25 +2871,41 @@ function ActionFields({
               />
             </F>
           </div>
-          {owner && (
-            <label style={{ color: "#98a2b8", fontSize: 11, display: "flex", alignItems: "center", gap: 4, paddingTop: 4 }}
-              title={`0 launches out of the ${owner.kind}'s front (its −Z face before rotating); turning its ROTATION (Y°) turns the launch with it`}>
-              <input
-                type="checkbox"
-                checked={action.launchRelative ?? false}
-                onChange={(e) => set({ launchRelative: e.target.checked || undefined })}
-              />
-              Direction is relative to this {owner.kind}'s rotation (0 = its front)
-            </label>
-          )}
+          {/* What Direction is measured FROM. Pre-v4.63.3 actions only stored the
+              boolean, so fall back to it (true = the owning entity). */}
+          <div style={{ paddingTop: 4 }}>
+            <div style={{ ...S.fieldLabel, marginBottom: 2 }}>Direction is measured from</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {([
+                ["world",  "World", "Fixed compass — 0 is the way a fresh spawn faces, regardless of the player or this entity"],
+                ...(owner ? [["entity", `This ${owner.kind}`, `0 launches out of the ${owner.kind}'s front (its −Z face before rotating); turning its ROTATION (Y°) turns the launch with it`] as const] : []),
+                ["player", "Player", "0 shoves them the way they're looking; 180 always knocks them backwards, whichever way they came in"],
+              ] as const).map(([k, lbl, tip]) => {
+                const active = relativeTo === k;
+                return (
+                  <button
+                    key={k}
+                    disabled={active}
+                    title={tip}
+                    style={S.seg(active)}
+                    onClick={() => set({ launchRelativeTo: k, launchRelative: undefined })}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
             Springs the player upward — a normal jump is ~5, 12 is a strong bouncer.
             Sideways speed adds a horizontal shove in the given direction (dash pads,
             angled boosters); it fades fast once the player lands. Set Upward to 0
             for a pure sideways dash. Pair with on_player_enter on a volume over the pad.
+            {relativeTo === "player" && " Measured from the player: Direction 180 always knocks them backwards, 0 shoves them the way they're looking."}
           </div>
         </>
       );
+    }
 
     case "show_ui":
     case "hide_ui":

@@ -380,7 +380,7 @@ export interface BusEvents {
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string; fade?: number };   // fade = seconds to fade out (collider disables at fade end)
   "object:spawn":          { id: string; fade?: number };   // re-show a despawned/hidden entity; fade = seconds to fade in
-  "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass)
+  "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number; relativeToPlayer?: boolean };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass; relativeToPlayer = CharacterController adds its own look yaw, which only it knows)
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
   // overlay → engine on option select, and overlay → ControlSchemeManager for
@@ -1337,7 +1337,8 @@ export interface ScriptAction {
   launchSpeed?:  number;      // launch_player: upward velocity m/s (default 12; a jump is ~5)
   launchHSpeed?: number;      // launch_player: horizontal velocity m/s (0/absent = straight up)
   launchDirDeg?: number;      // launch_player: horizontal direction, degrees on the spawn-facing compass (0 = -Z)
-  launchRelative?: boolean;   // launch_player: direction is relative to the owning entity's Y rotation (0 = its front)
+  launchRelative?: boolean;   // @deprecated launch_player — superseded by launchRelativeTo; still READ as a fallback (true = 'entity') so pre-v4.63.3 scenes keep working
+  launchRelativeTo?: 'world' | 'entity' | 'player'; // launch_player: what launchDirDeg is measured from — world compass, the owning entity's Y rotation (0 = its front), or the player's facing (180 = always knocked backwards)
   stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number

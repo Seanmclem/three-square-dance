@@ -414,10 +414,13 @@ export class ScriptEngine {
       case "launch_player": {
         // Spring/bouncer: sets the player's vertical velocity (the jump channel),
         // plus an optional horizontal shove. CharacterController is the only listener.
-        // launchRelative: direction rotates with the owning entity (a rotated dash
-        // pad launches out of its own front — pose.facing is the owner's Y rotation).
+        // Direction frame: world compass, the owning entity's Y rotation (a rotated
+        // dash pad launches out of its own front — pose.facing is that rotation), or
+        // the player's own facing (180 = always knocked backwards).
+        // Pre-v4.63.3 actions only have the boolean, so read it as the fallback.
+        const relativeTo = action.launchRelativeTo ?? (action.launchRelative ? "entity" : "world");
         let dirDeg = action.launchDirDeg;
-        if (action.launchRelative && ownerId) {
+        if (relativeTo === "entity" && ownerId) {
           const pose = this._resolveObjectPose(ownerId);
           if (pose) dirDeg = (dirDeg ?? 0) + pose.facing;
         }
@@ -425,6 +428,8 @@ export class ScriptEngine {
           speed: action.launchSpeed ?? 12,
           hSpeed: action.launchHSpeed,
           dirDeg,
+          // The player's look yaw lives in CharacterController — it adds its own.
+          relativeToPlayer: relativeTo === "player",
         });
         break;
       }
