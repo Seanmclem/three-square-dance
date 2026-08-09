@@ -12931,6 +12931,13 @@
                   "type": "adjust_number",
                   "stateKey": "Hearts",
                   "numberDelta": -1
+                },
+                {
+                  "type": "launch_player",
+                  "launchRelativeTo": "player",
+                  "launchSpeed": 6,
+                  "launchHSpeed": 6,
+                  "launchDirDeg": -180
                 }
               ],
               "oneShot": false
