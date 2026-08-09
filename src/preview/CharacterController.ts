@@ -147,6 +147,13 @@ export class CharacterController {
   private _offSavePos:  (() => void) | null = null;
   private _offLaunch:   (() => void) | null = null;
   private _offScriptAnim: (() => void) | null = null;
+  private _offFlash:    (() => void) | null = null;
+  // Damage flash (flash_player). `_flashMats` is captured on the FIRST flash: the
+  // avatar comes from SkeletonUtils.clone, which SHARES materials with the source
+  // asset, so tinting in place would also tint any NPC/prop using the same model.
+  // We clone the avatar's materials once and only ever touch those copies.
+  private _flash: { t: number; dur: number; color: THREE.Color } | null = null;
+  private _flashMats: { mat: THREE.Material; emissive: THREE.Color | null; intensity: number }[] | null = null;
   // Script-driven avatar clip (play_animation target "player") — overrides the
   // locomotion state machine until it ends / is cleared / the player moves.
   private _scriptAnim: { name: string; loop: boolean; hold: boolean } | null = null;
@@ -226,6 +233,16 @@ export class CharacterController {
       if (clipName === "__auto__") { this._clearScriptAnim(); return; }
       this._scriptAnim = { name: clipName, loop: !!loop, hold: !!hold };
       this._playByName(clipName, !!loop);
+    });
+    // Damage flash. In FPS the avatar is hidden (see the visible= line in update),
+    // so there is nothing to tint — hand it to the screen overlay instead.
+    this._offFlash = this._bus.on("character:flash", ({ color, duration }) => {
+      if (this._settings.cameraMode !== "thirdperson") {
+        this._bus.emit("overlay:flash", { color, duration, peak: 0.32 });
+        return;
+      }
+      this._captureFlashMaterials();
+      this._flash = { t: 0, dur: Math.max(0.05, duration), color: new THREE.Color(color) };
     });
     // Runtime footstep surface swap (set_footstep action). Empty = revert to authored default.
     this._offFootstep = this._bus.on("character:set-footstep", ({ sound }) => {
@@ -437,6 +454,7 @@ export class CharacterController {
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
       this._updateAnim(!this._body.isGrounded, isMoving);
+      if (this._flash) this._updateFlash(dt);
     }
 
     // Interact — pick the nearest interactable within range that's roughly in front of the player.
@@ -682,6 +700,53 @@ export class CharacterController {
     }
   }
 
+  /**
+   * Clone every material under the avatar so the flash can tint them safely, and
+   * remember each one's resting emissive. Runs once — later flashes reuse the clones.
+   * Materials without an `emissive` (MeshBasicMaterial and friends) are skipped
+   * rather than special-cased: they'd need their base color mutated, which loses
+   * the original tint on any model that reuses one material across body parts.
+   */
+  private _captureFlashMaterials(): void {
+    if (this._flashMats || !this._modelRoot) return;
+    const captured: { mat: THREE.Material; emissive: THREE.Color | null; intensity: number }[] = [];
+    this._modelRoot.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      const cloned = mats.map((m) => {
+        const c = m.clone();                       // never mutate the shared source-asset material
+        const em = (c as THREE.MeshStandardMaterial).emissive;
+        captured.push({
+          mat: c,
+          emissive: em ? em.clone() : null,
+          intensity: (c as THREE.MeshStandardMaterial).emissiveIntensity ?? 1,
+        });
+        return c;
+      });
+      mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
+    });
+    this._flashMats = captured;
+  }
+
+  /** Pulse the avatar's emissive toward the flash color, then restore on the last frame. */
+  private _updateFlash(dt: number): void {
+    const f = this._flash;
+    if (!f || !this._flashMats) return;
+    f.t += dt;
+    const done = f.t >= f.dur;
+    // Two full pulses over the duration, eased out so the last one is faintest.
+    const k = done ? 0
+      : Math.abs(Math.sin((f.t / f.dur) * Math.PI * 2)) * (1 - f.t / f.dur);
+    for (const e of this._flashMats) {
+      if (!e.emissive) continue;
+      const em = (e.mat as THREE.MeshStandardMaterial).emissive;
+      em.copy(e.emissive).lerp(f.color, k);
+      (e.mat as THREE.MeshStandardMaterial).emissiveIntensity = e.intensity + k * 2;
+    }
+    if (done) this._flash = null;
+  }
+
   private _buildCapsule(): void {
     const r = this._body.capsuleRadius, h = this._body.capsuleHalfHeight;
     const mesh = new THREE.Mesh(
@@ -839,7 +904,11 @@ export class CharacterController {
     this._offSavePos?.();     this._offSavePos    = null;
     this._offLaunch?.();      this._offLaunch     = null;
     this._offScriptAnim?.();  this._offScriptAnim = null;
+    this._offFlash?.();       this._offFlash      = null;
     this._offFootstep?.();    this._offFootstep   = null;
+    // The flash clones are ours alone (the source asset's materials were never touched).
+    for (const e of this._flashMats ?? []) e.mat.dispose();
+    this._flashMats = null; this._flash = null;
     this._offLadderEnter?.(); this._offLadderEnter = null;
     this._offLadderExit?.();  this._offLadderExit  = null;
     this._offLadderGone?.();  this._offLadderGone  = null;

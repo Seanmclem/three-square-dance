@@ -367,6 +367,15 @@ export class ScriptEngine {
         if (action.eventId) this.fire("on_state_changed", action.eventId);
         break;
 
+      case "flash_player":
+        // CharacterController decides model-tint vs screen-flash — it owns cameraMode,
+        // and the avatar is hidden entirely in FPS.
+        this._bus.emit("character:flash", {
+          color: action.flashColor ?? "#ff0000",
+          duration: action.flashDuration ?? 1,
+        });
+        break;
+
       case "fade_screen": {
         const dur = action.fadeDuration ?? 0.3;
         this._bus.emit("overlay:fade-in", { color: action.fadeColor ?? "#000000", duration: dur });

@@ -316,6 +316,11 @@ export interface BusEvents {
   "character:teleport":    { position: Vec3; facing?: number };
   "character:save-position": { key: string };
   "character:triggerdoor": { transitionId: string };
+  // Damage flash. Deliberately NOT overlay:fade-in — that one animates to fully
+  // opaque and makes InputManager/ControlSchemeManager suppress input, which would
+  // freeze the player mid-fight. This peaks at `peak` opacity and releases itself.
+  "overlay:flash":         { color: string; duration: number; peak: number };
+  "character:flash":       { color: string; duration: number };   // tint the avatar (3rd-person) / screen-flash (FPS) — CharacterController picks, it owns cameraMode
   "overlay:fade-in":       { color: string; duration: number };
   "overlay:fade-out":      { duration: number };
   "scene:save":            Record<string, never>;
@@ -1206,6 +1211,7 @@ export type ActionType =
   | 'start_mover'
   | 'stop_mover'
   | 'toggle_mover'
+  | 'flash_player'
   | 'light_on'
   | 'light_off'
   | 'toggle_light'
@@ -1337,6 +1343,8 @@ export interface ScriptAction {
   launchSpeed?:  number;      // launch_player: upward velocity m/s (default 12; a jump is ~5)
   launchHSpeed?: number;      // launch_player: horizontal velocity m/s (0/absent = straight up)
   launchDirDeg?: number;      // launch_player: horizontal direction, degrees on the spawn-facing compass (0 = -Z)
+  flashColor?:    string;     // flash_player: tint/overlay color (default "#ff0000")
+  flashDuration?: number;     // flash_player: seconds the pulse lasts (default 1)
   launchRelative?: boolean;   // @deprecated launch_player — superseded by launchRelativeTo; still READ as a fallback (true = 'entity') so pre-v4.63.3 scenes keep working
   launchRelativeTo?: 'world' | 'entity' | 'player'; // launch_player: what launchDirDeg is measured from — world compass, the owning entity's Y rotation (0 = its front), or the player's facing (180 = always knocked backwards)
   stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)

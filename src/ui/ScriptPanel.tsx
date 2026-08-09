@@ -173,6 +173,7 @@ const ACTION_TYPES: ActionType[] = [
   "delete_state",
   "despawn_object",
   "fade_screen",
+  "flash_player",
   "fire_event",
   "give_item",
   "hide_ui",
@@ -2730,6 +2731,41 @@ function ActionFields({
         </div>
       );
     }
+
+    case "flash_player":
+      return (
+        <>
+          <div style={{ display: "flex", gap: 4 }}>
+            <F label="Color" flex={1}>
+              <input
+                style={S.field}
+                placeholder="#ff0000"
+                value={action.flashColor ?? ""}
+                onChange={(e) => set({ flashColor: e.target.value })}
+              />
+            </F>
+            <F label="Seconds" flex="0 0 60px">
+              <input
+                type="number" min={0} step={0.1}
+                style={S.field}
+                placeholder="1"
+                value={action.flashDuration ?? ""}
+                onChange={(e) =>
+                  set({ flashDuration: e.target.value === "" ? undefined : Number(e.target.value) })
+                }
+              />
+            </F>
+          </div>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
+            Damage feedback — pulses the player twice, then fades out. In third-person
+            the avatar itself flashes; in FPS the avatar is hidden, so it tints the
+            screen edges instead. Works with any player model (and the plain capsule),
+            so changing the model later needs no edits here. Pair with adjust_number
+            on a hazard volume. Unlike fade_screen this never covers the screen or
+            takes the controls away.
+          </div>
+        </>
+      );
 
     case "fade_screen":
       return (

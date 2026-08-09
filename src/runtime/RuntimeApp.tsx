@@ -20,6 +20,7 @@ import { GameGuiOverlay } from "@/ui/GameGuiOverlay";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { FpsCounter } from "@/ui/FpsCounter";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
+import { FlashOverlay, type FlashRequest } from "@/preview/FlashOverlay";
 import { loadManifest, type LoadedManifest } from "./manifest";
 import { SceneRouter } from "./SceneRouter";
 import { writeRuntimeSave, loadRuntimeSave, clearRuntimeSave, type RuntimeSave } from "./saveGame";
@@ -55,6 +56,7 @@ export default function RuntimeApp() {
   const [previewScheme, setPreviewScheme] = useState<Scheme>("kbm");
   const [dialogueState, setDialogueState] = useState<DialogueOverlayProps["dialogue"]>(null);
   const [fadeState, setFadeState]   = useState<FadeRequest | null>(null);
+  const [flashState, setFlashState] = useState<FlashRequest | null>(null);
   const [pauseOpen, setPauseOpen]   = useState(false);
   const [bagOpen, setBagOpen]       = useState(false);
   const [zoneName, setZoneName]     = useState<string | undefined>(undefined);
@@ -188,6 +190,7 @@ export default function RuntimeApp() {
         setBagOpen(open);
         bus.emit(open ? "bag:show" : "bag:closed", {});
       }),
+      bus.on("overlay:flash", payload => setFlashState(payload)),
       bus.on("overlay:fade-in",  payload => setFadeState({ ...payload, direction: "in" })),
       // Fade-out reuses the held fade's color; ignore a fade-out with nothing up.
       bus.on("overlay:fade-out", ({ duration }) =>
@@ -394,6 +397,7 @@ export default function RuntimeApp() {
         }}
       />
       <FadeOverlay fade={fadeState} onComplete={() => setFadeState(null)} />
+      <FlashOverlay flash={flashState} onComplete={() => setFlashState(null)} />
     </div>
   );
 }

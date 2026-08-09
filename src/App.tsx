@@ -50,6 +50,7 @@ import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { gameState, GAMESAVE_KEY, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
+import { FlashOverlay, type FlashRequest } from "@/preview/FlashOverlay";
 import { installTestHelpers } from "@/dev/testHelpers";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
@@ -210,6 +211,7 @@ export default function App() {
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
+  const [flashState,      setFlashState]       = useState<FlashRequest | null>(null);
   const [zoneScripts,     setZoneScripts]      = useState<ScriptDef[]>([]);
   const [zoneDialogues,   setZoneDialogues]    = useState<DialogueTreeDef[]>([]);
   const [stateSchema,     setStateSchema]      = useState<Record<string, StateSchema>>({});
@@ -729,6 +731,7 @@ export default function App() {
         setBagOpen(open);
         bus.emit(open ? "bag:show" : "bag:closed", {});
       }),
+      bus.on("overlay:flash", payload => setFlashState(payload)),
       bus.on("overlay:fade-in",  payload => setFadeState({ ...payload, direction: "in" })),
       // Fade-out reuses the held fade's color; ignore a fade-out with nothing up.
       bus.on("overlay:fade-out", ({ duration }) =>
@@ -4066,6 +4069,10 @@ SquareDance
       <FadeOverlay
         fade={fadeState}
         onComplete={() => setFadeState(null)}
+      />
+      <FlashOverlay
+        flash={flashState}
+        onComplete={() => setFlashState(null)}
       />
     </div>
   );
