@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -34.61157065635234,
+        "x": -39.360020176605914,
         "y": -1.3654158690210956,
-        "z": -65.18726186426285
+        "z": -66.5679758517936
       },
-      "radius": 20.248078005171557,
-      "phi": 0.6500000000000005,
-      "theta": 18.923439999825977
+      "radius": 19.84807800517155,
+      "phi": 1.0100000000000007,
+      "theta": 19.403439999825927
     }
   },
   "world": {
@@ -11226,10 +11226,26 @@
                 {
                   "type": "play_animation",
                   "targetId": "self",
-                  "animation": "SpikeTrap_Activate",
+                  "animation": "SpikeTrap_Up",
                   "animationLoop": false,
                   "animationHold": true,
                   "delay": 0
+                },
+                {
+                  "type": "play_animation",
+                  "delay": 1.5,
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Down"
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 1.5,
+                  "targetId": "vol_d8be00e2"
+                },
+                {
+                  "type": "spawn_object",
+                  "delay": 0,
+                  "targetId": "vol_d8be00e2"
                 }
               ],
               "oneShot": false
@@ -11254,33 +11270,6 @@
             "x": 1.2,
             "y": 1.2,
             "z": 1.2
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          }
-        },
-        {
-          "id": "obj_62b0f1bf",
-          "assetId": "hazard_spiketrap",
-          "position": {
-            "x": -35.017617354244685,
-            "y": 7.039584523910545,
-            "z": -68.16363091167602
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
           },
           "floor": 0,
           "zoneId": "demo",
@@ -12910,6 +12899,41 @@
                 }
               ],
               "oneShot": true
+            }
+          ]
+        },
+        {
+          "id": "vol_d8be00e2",
+          "label": "hurt spikes",
+          "position": {
+            "x": -35,
+            "y": 7.501219535967445,
+            "z": -58.599999999999994
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "scr_158e8b64",
+              "label": "Hurt spikes",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "Hearts",
+                  "numberDelta": -1
+                }
+              ],
+              "oneShot": false
             }
           ]
         }
