@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -39.360020176605914,
-        "y": -1.3654158690210956,
-        "z": -66.5679758517936
+        "x": -39.812732935803005,
+        "y": 1.215231233246801,
+        "z": -64.62300364563185
       },
-      "radius": 19.84807800517155,
-      "phi": 1.0100000000000007,
-      "theta": 19.403439999825927
+      "radius": 20.445070499337447,
+      "phi": 1.0000000000000009,
+      "theta": 19.488439999825914
     }
   },
   "world": {
@@ -11218,7 +11218,7 @@
               "enabled": true,
               "trigger": {
                 "type": "on_timer",
-                "interval": 3,
+                "interval": 4,
                 "repeat": true
               },
               "conditions": [],
@@ -11233,13 +11233,13 @@
                 },
                 {
                   "type": "play_animation",
-                  "delay": 1.5,
+                  "delay": 2,
                   "targetId": "self",
                   "animation": "SpikeTrap_Down"
                 },
                 {
                   "type": "despawn_object",
-                  "delay": 1.5,
+                  "delay": 2,
                   "targetId": "vol_d8be00e2"
                 },
                 {
@@ -12801,7 +12801,7 @@
                 {
                   "type": "play_animation",
                   "targetId": "obj_e043c8bb",
-                  "animation": "Bite_Front",
+                  "animation": "Jump",
                   "animationLoop": true
                 },
                 {
@@ -12815,6 +12815,9 @@
                   "launchHSpeed": 9,
                   "launchDirDeg": 0,
                   "launchRelative": true
+                },
+                {
+                  "type": "flash_player"
                 }
               ],
               "oneShot": false
@@ -12832,7 +12835,8 @@
                 {
                   "type": "play_animation",
                   "targetId": "obj_e043c8bb",
-                  "animation": "__auto__"
+                  "animation": "__auto__",
+                  "delay": 0
                 }
               ],
               "oneShot": false
@@ -12935,9 +12939,12 @@
                 {
                   "type": "launch_player",
                   "launchRelativeTo": "player",
-                  "launchSpeed": 6,
-                  "launchHSpeed": 6,
+                  "launchSpeed": 7.4,
+                  "launchHSpeed": 7.4,
                   "launchDirDeg": -180
+                },
+                {
+                  "type": "flash_player"
                 }
               ],
               "oneShot": false
