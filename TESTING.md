@@ -9,6 +9,75 @@ can pick it up cold and run an interactive pass.
 
 ---
 
+## 0. Desktop era (phases 54–58) — read this first
+
+The app is now a **Deno desktop app**: a CEF (bundled-Chromium) window served by
+the shell's own local `Deno.serve`. All persistence goes over that server
+(`POST /api/<method>`, `POST /api-file/<kind>/<rel>`); the File System Access
+API is gone, and plain-browser tabs can render but not save. This changes the
+testing map:
+
+**The golden trick — drive desktop mode from a normal Chrome tab.** The shell's
+server is ordinary HTTP on `127.0.0.1:<port>` (port printed at launch:
+`grep Listening /tmp/shell-run.log`-style, or read `[desktop] editor window up
+at …`). Load that origin in Chrome via the extension and you get the FULL app
+in desktop mode — `detectDesktop()` succeeds against `/api/getAppInfo`, so
+project saves, asset imports, deletes, autosave, and export all work exactly as
+in the shell window, with complete extension tooling (javascript_tool, console,
+clicks). Everything in §§2–8 applies unchanged in such a tab. This replaced the
+old §9 picker-stubbing wholesale — the real flows are directly drivable now.
+
+**What a Chrome tab cannot cover** (same engine, different window): the CEF
+window itself is not extension-reachable and `--inspect-renderer` did not open
+a CDP port when tried (laufey 0.6.1) — so window-level behavior (the reused
+native runtime window from ▶ Play, `<input type="file">` native dialogs,
+Finder reveals, packaged-VFS serving) is verified via the built-in probes +
+human eyes:
+
+- `WORLDBUILDER_BOOT=spike deno task desktop:hmr` — the harness at `/`
+  auto-runs engine checks **and an editor boot probe** (iframe-loads the real
+  editor, reports canvas count + page errors) and POSTs results to
+  `<stateDir>/spike-results.json`. Run this after ANY serve-layer change — a
+  404'd bundle renders a blank page with zero console errors (the phase-55
+  incident).
+- `WORLDBUILDER_BOOT=probe55` — 13-step project-persistence e2e through the
+  real HTTP api (create/save/read-back/backups/session/autosave/runtime
+  window).
+- The api is curl-able: `curl -X POST -H "content-type: application/json"
+  -d '["<arg1>", …]' http://127.0.0.1:<port>/api/<method>`; binary uploads via
+  `--data-binary @file …/api-file/<kind>/<rel>`.
+- Backend functions unit-test headlessly: `deno run -A <script>` importing
+  `desktop/*.ts` directly (see test-plans/phase-55).
+
+**Workspace protection replaces the localStorage protocol (§3) as the main
+data-safety concern.** In desktop mode, saves/autosaves/imports write REAL
+files: dev workspace content is `<repo>/public` (state in `.worldbuilder/`,
+gitignored). Rules:
+
+1. Commit `public/**` before and after any session that saves or imports
+   (unchanged CLAUDE.md rule — now it covers `public/assets` too, since
+   imports land there).
+2. For destructive or high-volume tests, point the shell at a scratch
+   workspace: `WORLDBUILDER_WORKSPACE=/tmp/wb-test deno task desktop:hmr` —
+   stock assets still appear (served from dist fallthrough; the overlay
+   model), and nothing touches the repo.
+3. The backend itself is the safety net the browser never had: atomic
+   tmp+rename writes, `JSON.parse` guards, 10-deep rotating backups in
+   `<stateDir>/backups/`, deletes to `<stateDir>/trash/`. If a test clobbers
+   a scene, restore from backups/ or git.
+4. The §3 localStorage snapshot protocol still applies to the keys that
+   remain in localStorage (prefs, bindings, prefab session,
+   `worldeditor_gamesave`, `runtime_gamesave:*`) and to plain-vite tabs, but
+   the scene autosave is a workspace file in desktop mode — a test tab and
+   the user's shell window share it via the SERVER, not via localStorage.
+
+**Dev loop reality:** frontend changes need `npm run build` (the shell serves
+`dist/`); `deno task desktop:hmr` hot-reloads only the backend. `npm run dev`
+(vite :7373) still renders the editor with HMR for UI iteration, but nothing
+persists there — it's for layout/visual work, not flow testing.
+
+---
+
 ## 1. Tooling reality — how to drive the browser
 
 The app is a browser canvas app, so testing means clicking inside a browser.
@@ -251,6 +320,12 @@ sputter — every failure mode below was hit and diagnosed in practice.
    Write in one tool call, read in the next.
 
 ### Protecting the user's autosave (localStorage snapshot-restore)
+
+> **Phase 55 update:** in desktop mode the scene autosave is a **workspace
+> file** written via `/api/writeAutosave` — the snippets below no longer guard
+> it (see §0 for what does: git + scratch workspaces + backups/trash). They
+> still matter for the localStorage keys that remain (gamesaves, prefs,
+> prefab session) and for any plain-vite tab.
 
 **The problem:** the app writes `worldeditor_autosave` + `worldeditor_autosave_ts` to
 `localStorage` on every `beforeunload` (tab close/navigate). Because all tabs at
@@ -688,7 +763,15 @@ Editor edits, by contrast, go through `WorldState.updateObject` → persisted + 
 
 ---
 
-## 9. Testing File System Access flows without the native picker
+## 9. ~~Testing File System Access flows without the native picker~~ (OBSOLETE — phase 56)
+
+> **FSA is gone from the app** (phases 55–56): importers, deletes, thumbnails,
+> and projects all go through the shell's HTTP api, which a Chrome tab on the
+> shell's origin drives directly — no picker to stub (see §0). Source-file
+> *selection* is a plain `<input type="file">`; drive it in tests by
+> constructing a `File`/`DataTransfer` and dispatching `change`, or call the
+> `src/assets/assetLibrary.ts` functions from `javascript_tool`. Kept below
+> for history only.
 
 Import/save/delete flows (`ModelImporterModal`, thumbnail re-stage, asset delete)
 call `showDirectoryPicker()` / `showOpenFilePicker()`, which open **native** dialogs
