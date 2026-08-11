@@ -530,6 +530,9 @@ export default function App() {
             restoringRef.current = true;
             await handleLoadFromJSON(JSON.parse(saved.json));
             restored = true;
+            // Surface the counter immediately — an existing autosave with no
+            // visible signal reads as "autosave is gone".
+            setLastAutosaveAt(saved.ts);
           } catch { /* corrupt autosave — fall through to demo zone */ } finally {
             restoringRef.current = false;
           }
