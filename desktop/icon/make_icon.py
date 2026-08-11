@@ -20,18 +20,20 @@ def square_outline(layer_draw, x0, y0, size, stroke, color):
     layer_draw.rectangle([x0 + stroke, y0 + stroke, x0 + size - stroke, y0 + size - stroke],
                          fill=(0, 0, 0, 0))
 
-sq, stroke = 430, 62
+# stroke = side/8; diagonal offset = side*0.52 so each corner lands just shy
+# of the other square's center (brand/style-guide.html §01 construction)
+sq, stroke = 430, 54
 
 # dark square, upper right (opaque, drawn straight on)
 dark = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 dd = ImageDraw.Draw(dark)
-square_outline(dd, 388, 158, sq, stroke, NAVY)
+square_outline(dd, 409, 185, sq, stroke, NAVY)
 img = Image.alpha_composite(img, dark)
 
 # periwinkle square, lower left, composited over
 blue = Image.new("RGBA", (S, S), (0, 0, 0, 0))
 bd = ImageDraw.Draw(blue)
-square_outline(bd, 158, 388, sq, stroke, PERI)
+square_outline(bd, 185, 409, sq, stroke, PERI)
 img = Image.alpha_composite(img, blue)
 
 img.save("/Users/seanclements/repos/2026/three-world-builder/desktop/icon/squaredance.png")
