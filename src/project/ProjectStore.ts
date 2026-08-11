@@ -11,8 +11,9 @@ import { desktop } from "@/shared/desktopApi";
  * ALL project file IO lives here so backends swap underneath without touching
  * App. Phase 55: the backend is the desktop shell — reads go over HTTP against
  * the shell's server (`/games/<id>/…`, same URL shapes the runtime uses),
- * writes go through the bindings bridge (atomic + backed up on the Deno side).
- * The File System Access implementation is gone with it the whole
+ * writes go over its HTTP api (`POST /api/<method>`; atomic + backed up on
+ * the Deno side — the bindings bridge deadlocked per-launch and is unused).
+ * The File System Access implementation is gone and with it the whole
  * handle-permission dance (IDB persistence, re-grant banners, user-activation
  * ordering).
  *
