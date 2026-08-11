@@ -1,7 +1,8 @@
 import type { MaterialDef, MaterialManifest, MaterialCategory, Attribution } from "@/types";
+import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 
 export interface DetectedMap {
-  handle:  FileSystemFileHandle;
+  file:    File;
   srcName: string;
 }
 
@@ -40,14 +41,17 @@ function classifyFile(name: string): keyof MaterialDef["maps"] | "skip" | null {
 
 export class MaterialImporter {
 
-  async scanFolder(sourceDir: FileSystemDirectoryHandle): Promise<DetectedMaps> {
+  /** Classify the files of a picked ambientCG folder (webkitdirectory input).
+   *  Only the folder's top level is scanned — same as the old directory walk. */
+  scanFiles(files: File[]): DetectedMaps {
     const detected: DetectedMaps = {};
-    for await (const [name, handle] of sourceDir.entries()) {
-      if (handle.kind !== "file") continue;
-      const mapKey = classifyFile(name);
+    for (const file of files) {
+      // webkitRelativePath is "<folder>/<name>" for top-level files; deeper files have more segments.
+      if (file.webkitRelativePath && file.webkitRelativePath.split("/").length > 2) continue;
+      const mapKey = classifyFile(file.name);
       if (!mapKey || mapKey === "skip") continue;
       if (!(mapKey in detected)) {
-        detected[mapKey] = { handle: handle as FileSystemFileHandle, srcName: name };
+        detected[mapKey] = { file, srcName: file.name };
       }
     }
     return detected;
@@ -58,35 +62,27 @@ export class MaterialImporter {
     label:        string,
     category:     MaterialCategory,
     attribution:  Attribution,
-    texturesDir:  FileSystemDirectoryHandle,
     detectedMaps: DetectedMaps,
   ): Promise<ImportResult> {
     const result: ImportResult = { materialId, copied: [], skipped: [], failed: [] };
 
-    // Create/open target subfolder + quality subdirectories
-    const outDir = await texturesDir.getDirectoryHandle(materialId, { create: true });
-    const qualityDirs = await Promise.all(
-      (["low", "medium", "high"] as const).map(q => outDir.getDirectoryHandle(q, { create: true })),
-    );
-
     for (const [mapKey, info] of Object.entries(detectedMaps) as Array<[keyof MaterialDef["maps"], DetectedMap]>) {
       const targetName = `${mapKey}.jpg`;
 
-      // Use the high/ folder as the existence check proxy
+      // Use the high/ copy as the existence check proxy
       try {
-        await qualityDirs[2].getFileHandle(targetName);
-        result.skipped.push(targetName);
-        continue;
+        const res = await fetch(`/assets/textures/${materialId}/high/${targetName}`, { cache: "no-store" });
+        if (res.ok) {
+          void res.body?.cancel();
+          result.skipped.push(targetName);
+          continue;
+        }
       } catch { /* doesn't exist — proceed */ }
 
       try {
-        const srcFile = await info.handle.getFile();
-        const buf     = await srcFile.arrayBuffer();
-        for (const qualityDir of qualityDirs) {
-          const outHandle = await qualityDir.getFileHandle(targetName, { create: true });
-          const writable  = await outHandle.createWritable();
-          await writable.write(buf);
-          await writable.close();
+        const buf = await info.file.arrayBuffer();
+        for (const quality of ["low", "medium", "high"] as const) {
+          await writeAssetFile("textures", `${materialId}/${quality}/${targetName}`, buf);
         }
         result.copied.push(targetName);
       } catch (err) {
@@ -96,22 +92,14 @@ export class MaterialImporter {
     }
 
     // Read or create manifest
-    let manifest: MaterialManifest = { version: "1.0", materials: [] };
-    try {
-      const mfHandle = await texturesDir.getFileHandle("manifest.json");
-      const mfFile   = await mfHandle.getFile();
-      manifest = JSON.parse(await mfFile.text()) as MaterialManifest;
-    } catch { /* no manifest yet */ }
+    const manifest = await readManifest<MaterialManifest>("textures", { version: "1.0", materials: [] });
 
     const entry = this._buildEntry(materialId, label, category, attribution, detectedMaps);
     const idx   = manifest.materials.findIndex(m => m.id === materialId);
     if (idx >= 0) manifest.materials[idx] = entry;
     else manifest.materials.push(entry);
 
-    const mfOut  = await texturesDir.getFileHandle("manifest.json", { create: true });
-    const mfWrit = await mfOut.createWritable();
-    await mfWrit.write(JSON.stringify(manifest, null, 2));
-    await mfWrit.close();
+    await writeManifest("textures", manifest);
 
     return result;
   }

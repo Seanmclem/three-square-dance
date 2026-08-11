@@ -3,11 +3,9 @@ import { useState } from "react";
 interface DeleteAssetDialogProps {
   labels:    string[];                  // labels of the items to delete
   usage:     { count: number; zones: string[] };  // in-scene usage across zones
-  needsFolderGrant: boolean;            // true if the asset folder isn't granted yet this session
   noun?:        string;                 // "model" (default) | "material"
   usageNoun?:   string;                 // "placed object" (default) | "surface"
   usageEffect?: string;                 // trailing sentence after the usage warning
-  folderHint?:  string;                 // folder to grant, e.g. "public/assets/models"
   onCancel:  () => void;
   onConfirm: (deleteFiles: boolean) => void;
 }
@@ -29,7 +27,6 @@ const S = {
   list:  { color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", margin: "4px 0 0", paddingLeft: 16 } as React.CSSProperties,
   warn:  { color: "#ccaa44", fontSize: 11, fontFamily: "monospace", lineHeight: 1.4 } as React.CSSProperties,
   check: { display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: "#909090", fontSize: 11, fontFamily: "monospace" } as React.CSSProperties,
-  hint:  { color: "#6a7a90", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 } as React.CSSProperties,
   row:   { display: "flex", gap: 8, justifyContent: "flex-end" } as React.CSSProperties,
   btn: (variant: "ghost" | "danger"): React.CSSProperties => ({
     padding: "6px 14px", borderRadius: 4, cursor: "pointer",
@@ -41,10 +38,9 @@ const S = {
 };
 
 export function DeleteAssetDialog({
-  labels, usage, needsFolderGrant, onCancel, onConfirm,
+  labels, usage, onCancel, onConfirm,
   noun = "model", usageNoun = "placed object",
   usageEffect = "They will show as placeholder boxes until reassigned or removed.",
-  folderHint = "public/assets/models",
 }: DeleteAssetDialogProps) {
   const [deleteFiles, setDeleteFiles] = useState(false);
   const many   = labels.length !== 1;
@@ -76,13 +72,6 @@ export function DeleteAssetDialog({
           <input type="checkbox" checked={deleteFiles} onChange={e => setDeleteFiles(e.target.checked)} />
           Also delete the {noun} file{many ? "s" : ""} from disk (irreversible)
         </label>
-
-        {needsFolderGrant && (
-          <div style={S.hint}>
-            Next, the browser will ask for a folder — select{" "}
-            <strong style={{ color: "#90a4c0" }}>{folderHint}</strong> and allow editing.
-          </div>
-        )}
 
         <div style={S.row}>
           <button style={S.btn("ghost")}  onClick={onCancel}>Cancel</button>

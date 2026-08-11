@@ -10,7 +10,6 @@ import {
 interface Props {
   asset:            AssetDef;
   placedCount:      number;    // placed copies in the loaded world (for the compensate checkbox)
-  needsFolderGrant: boolean;
   onCancel:         () => void;
   onApply:          (delta: Vec3, compensate: boolean) => void;
 }
@@ -121,7 +120,7 @@ function styleMarkers(rig: MarkerRig, mode: Mode): void {
   rig.lineGeo.setFromPoints([new THREE.Vector3(0, 0, 0), rig.targets[mode]]);
 }
 
-export function ReoriginModal({ asset, placedCount, needsFolderGrant, onCancel, onApply }: Props) {
+export function ReoriginModal({ asset, placedCount, onCancel, onApply }: Props) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [bounds, setBounds] = useState<{ min: Vec3; center: Vec3 } | null>(null);
   const [mode,   setMode]   = useState<Mode>("base");
@@ -309,11 +308,6 @@ export function ReoriginModal({ asset, placedCount, needsFolderGrant, onCancel, 
                 placed in other scenes or projects will shift next time they load.
               </div>
 
-              {needsFolderGrant && (
-                <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "6px 9px", fontSize: 10, color: "#c09050" }}>
-                  Saving will ask for access to <span style={{ color: "#d8b060" }}>public/assets/models</span>.
-                </div>
-              )}
             </>
           )}
         </div>

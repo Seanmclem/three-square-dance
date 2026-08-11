@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { SkyboxDef, SkyboxCategory, SkyboxManifest, Attribution } from "@/types";
+import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
 
 interface Props {
-  skyboxDir:      FileSystemDirectoryHandle | null;
-  onSkyboxDirSet: (dir: FileSystemDirectoryHandle) => void;
   onComplete:     (skyboxes: SkyboxDef[]) => void;
   onClose:        () => void;
 }
@@ -14,11 +13,6 @@ type Phase = "pick" | "meta" | "importing" | "done";
 const CATEGORIES: SkyboxCategory[] = ["Day", "Sunset", "Night", "Space", "Studio", "Other"];
 const IMG_EXTS = new Set([".jpg", ".jpeg", ".png", ".hdr"]);
 
-type FSPicker = {
-  showOpenFilePicker:  (opts: unknown) => Promise<FileSystemFileHandle[]>;
-  showDirectoryPicker: (opts: unknown) => Promise<FileSystemDirectoryHandle>;
-};
-
 const getExt    = (n: string) => n.slice(n.lastIndexOf(".")).toLowerCase();
 const slugify   = (s: string) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 const autoLabel = (n: string) => n.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
@@ -26,7 +20,7 @@ const formatOf  = (n: string): SkyboxDef["format"] => getExt(n) === ".hdr" ? "hd
 
 interface SkyboxEntry {
   id:       string;
-  handle:   FileSystemFileHandle;
+  file:     File;
   label:    string;
   category: SkyboxCategory;
 }
@@ -52,7 +46,7 @@ const BTN = (active = true): React.CSSProperties => ({
   color: active ? "#80aaff" : "#646464",
 });
 
-export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onClose }: Props) {
+export function SkyboxImporterModal({ onComplete, onClose }: Props) {
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SkyboxEntry[]>([]);
   const [progress, setProgress] = useState("");
@@ -60,64 +54,39 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
   const [error,    setError]    = useState<string | null>(null);
   // Shared attribution applied to every skybox in this import batch (mirrors AudioImporter).
   const [attribution, setAttribution] = useState<Attribution>({});
+  const filesInputRef = useRef<HTMLInputElement>(null);
 
   const update = (id: string, patch: Partial<SkyboxEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
 
-  async function pickFiles(): Promise<void> {
-    try {
-      const handles = await (window as unknown as FSPicker).showOpenFilePicker({
-        multiple: true,
-        types: [{ description: "Equirectangular image", accept: {
-          "image/*": [".jpg", ".jpeg", ".png"], "application/octet-stream": [".hdr"] } }],
-      });
-      const imgs = handles.filter(h => IMG_EXTS.has(getExt(h.name)));
-      if (!imgs.length) return;
-      setEntries(imgs.map(h => ({
-        id: crypto.randomUUID(), handle: h, label: autoLabel(h.name), category: "Day",
-      })));
-      setPhase("meta");
-    } catch { /* cancelled */ }
-  }
-
-  async function pickSkyboxDir(): Promise<void> {
-    try {
-      const dir = await (window as unknown as FSPicker).showDirectoryPicker({ mode: "readwrite" });
-      onSkyboxDirSet(dir);
-    } catch { /* cancelled */ }
-  }
-
-  async function copyFile(src: FileSystemFileHandle, dir: FileSystemDirectoryHandle, dest: string): Promise<void> {
-    const file = await src.getFile();
-    const dh   = await dir.getFileHandle(dest, { create: true });
-    const w    = await dh.createWritable();
-    await w.write(await file.arrayBuffer());
-    await w.close();
+  function onFilesChosen(list: FileList | null): void {
+    const imgs = [...(list ?? [])].filter(f => IMG_EXTS.has(getExt(f.name)));
+    if (!imgs.length) return;
+    setEntries(imgs.map(f => ({
+      id: crypto.randomUUID(), file: f, label: autoLabel(f.name), category: "Day",
+    })));
+    setPhase("meta");
   }
 
   async function doImport(): Promise<void> {
-    if (!skyboxDir || !entries.length) return;
+    if (!entries.length) return;
     setPhase("importing");
     setError(null);
 
-    let manifest: SkyboxManifest = { version: "1.0", skyboxes: [] };
-    try {
-      const mh = await skyboxDir.getFileHandle("manifest.json");
-      manifest = JSON.parse(await (await mh.getFile()).text()) as SkyboxManifest;
-    } catch { /* new manifest */ }
+    const manifest = await readManifest<SkyboxManifest>("skyboxes", { version: "1.0", skyboxes: [] });
 
     const imported: SkyboxDef[] = [];
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i]!;
-      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.handle.name}`);
+      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.file.name}`);
       try {
-        const ext  = getExt(e.handle.name);
-        const base = slugify(e.label) || slugify(autoLabel(e.handle.name));
+        const ext  = getExt(e.file.name);
+        const base = slugify(e.label) || slugify(autoLabel(e.file.name));
         const dest = `${base}${ext}`;
-        await copyFile(e.handle, skyboxDir, dest);
+        await writeAssetFile("skyboxes", dest, await e.file.arrayBuffer());
         const skybox: SkyboxDef = {
           id: base, label: e.label.trim() || base, category: e.category,
-          path: `/assets/skyboxes/${dest}`, format: formatOf(e.handle.name),
+          path: `/assets/skyboxes/${dest}`, format: formatOf(e.file.name),
           tags: [], dateAdded: new Date().toISOString().slice(0, 10),
           ...(Object.keys(attribution).length ? { attribution } : {}),
         };
@@ -125,15 +94,12 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
         manifest.skyboxes.push(skybox);
         imported.push(skybox);
       } catch (err) {
-        console.warn(`Import failed for ${e.handle.name}:`, err);
+        console.warn(`Import failed for ${e.file.name}:`, err);
       }
     }
 
     try {
-      const mw = await skyboxDir.getFileHandle("manifest.json", { create: true });
-      const wb = await mw.createWritable();
-      await wb.write(JSON.stringify(manifest, null, 2));
-      await wb.close();
+      await writeManifest("skyboxes", manifest);
     } catch (err) {
       setError(`Manifest write failed: ${String(err)}`);
     }
@@ -146,6 +112,11 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+        <input
+          ref={filesInputRef} type="file" multiple style={{ display: "none" }}
+          accept=".jpg,.jpeg,.png,.hdr"
+          onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
           <span style={{ fontSize: 13, color: "#d8d8d8", letterSpacing: 1 }}>IMPORT SKYBOXES</span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#585870", fontSize: 16 }}>✕</button>
@@ -159,7 +130,7 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
                 They'll be copied into your project's <code>assets/skyboxes</code> folder and
                 added to the skybox manifest. HDR gives the best image-based lighting.
               </div>
-              <button onClick={pickFiles} style={BTN()}>Choose image files…</button>
+              <button onClick={() => filesInputRef.current?.click()} style={BTN()}>Choose image files…</button>
             </div>
           )}
 
@@ -167,7 +138,7 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {entries.map(e => (
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
-                  <div style={{ color: "#707070", fontSize: 10 }}>{e.handle.name} · {formatOf(e.handle.name).toUpperCase()}</div>
+                  <div style={{ color: "#707070", fontSize: 10 }}>{e.file.name} · {formatOf(e.file.name).toUpperCase()}</div>
                   <input value={e.label} onChange={ev => update(e.id, { label: ev.target.value })} placeholder="Label" style={INPUT} />
                   <select value={e.category} onChange={ev => update(e.id, { category: ev.target.value as SkyboxCategory })} style={{ ...INPUT }}>
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -182,18 +153,7 @@ export function SkyboxImporterModal({ skyboxDir, onSkyboxDirSet, onComplete, onC
                 <AttributionFields value={attribution} onChange={setAttribution} />
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <button onClick={pickSkyboxDir} style={BTN(!skyboxDir)}>
-                  {skyboxDir ? "✓ assets/skyboxes folder granted" : "Grant assets/skyboxes folder…"}
-                </button>
-              </div>
-              {!skyboxDir && (
-                <div style={{ color: "#707070", fontSize: 10, lineHeight: 1.4 }}>
-                  Select your project's <code>public/assets/skyboxes</code> folder so the files can be written.
-                </div>
-              )}
-
-              <button onClick={doImport} disabled={!skyboxDir} style={{ ...BTN(!!skyboxDir), marginTop: 4 }}>
+              <button onClick={doImport} style={{ ...BTN(), marginTop: 4 }}>
                 Import {entries.length} skybox{entries.length !== 1 ? "es" : ""}
               </button>
             </div>

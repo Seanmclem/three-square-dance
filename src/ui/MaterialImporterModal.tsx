@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { materialImporter } from "@/editor/MaterialImporter";
 import type { DetectedMaps, ImportResult } from "@/editor/MaterialImporter";
 import type { MaterialDef, MaterialCategory, Attribution } from "@/types";
@@ -13,8 +13,6 @@ const MATERIAL_CATEGORIES: MaterialCategory[] = [
 ];
 
 interface Props {
-  texturesDir:      FileSystemDirectoryHandle | null;
-  onTextureDirSet:  (dir: FileSystemDirectoryHandle) => void;
   onComplete:       (material: MaterialDef) => void;
   onClose:          () => void;
 }
@@ -24,6 +22,9 @@ type Phase = "input" | "importing" | "done";
 const MAP_LABELS: Array<keyof DetectedMaps> = [
   "albedo", "normal", "roughness", "metalness", "ao", "displacement",
 ];
+
+// Non-standard attribute — makes the file input pick a whole directory.
+const DIR_INPUT_PROPS = { webkitdirectory: "" } as React.InputHTMLAttributes<HTMLInputElement>;
 
 const OVERLAY: React.CSSProperties = {
   position: "fixed", inset: 0, zIndex: 100,
@@ -69,9 +70,7 @@ function autoLabel(id: string): string {
   return id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function MaterialImporterModal({
-  texturesDir, onTextureDirSet, onComplete, onClose,
-}: Props) {
+export function MaterialImporterModal({ onComplete, onClose }: Props) {
   const [materialId,   setMaterialId]   = useState("");
   const [label,        setLabel]        = useState("");
   const [category,     setCategory]     = useState<MaterialCategory>("Other");
@@ -84,51 +83,32 @@ export function MaterialImporterModal({
       ? { ...prev, ...ACG_ATTRIBUTION }
       : { ...prev, author: undefined, patreonUrl: undefined, license: undefined, licenseOther: undefined });
   };
-  const [sourceDir,    setSourceDir]    = useState<FileSystemDirectoryHandle | null>(null);
+  const [sourceName,   setSourceName]   = useState<string | null>(null);
   const [detectedMaps, setDetectedMaps] = useState<DetectedMaps | null>(null);
   const [phase,        setPhase]        = useState<Phase>("input");
   const [result,       setResult]       = useState<ImportResult | null>(null);
   const [error,        setError]        = useState<string | null>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveLabel = label || autoLabel(materialId || "material");
 
-  // Step 0 — pick destination (textures) folder
-  const pickTexturesDir = async () => {
-    setError(null);
-    try {
-      const dir = await window.showDirectoryPicker({ mode: "readwrite" });
-      onTextureDirSet(dir);
-      if (!dir.name.toLowerCase().includes("textures")) {
-        setError(`⚠ "${dir.name}" doesn't look like the textures folder. Expected public/assets/textures/.`);
-      }
-    } catch (e) {
-      if ((e as DOMException).name !== "AbortError")
-        setError("Could not open folder: " + String(e));
-    }
-  };
-
   // Step 2 — pick ambientCG source folder
-  const pickSourceFolder = async () => {
+  const onSourceChosen = (list: FileList | null) => {
     setError(null);
-    try {
-      const dir = await window.showDirectoryPicker({ mode: "read" });
-      setSourceDir(dir);
-      const maps = await materialImporter.scanFolder(dir);
-      setDetectedMaps(maps);
-    } catch (e) {
-      if ((e as DOMException).name !== "AbortError")
-        setError("Could not open folder: " + String(e));
-    }
+    const files = [...(list ?? [])];
+    if (!files.length) return;
+    setSourceName(files[0]!.webkitRelativePath.split("/")[0] || "folder");
+    setDetectedMaps(materialImporter.scanFiles(files));
   };
 
   const handleImport = async () => {
-    if (!texturesDir || !sourceDir || !detectedMaps) return;
+    if (!detectedMaps) return;
     const id = materialId.trim().replace(/\s+/g, "_").toLowerCase();
     if (!id) { setError("Material id is required"); return; }
     setPhase("importing");
     setError(null);
     try {
-      const res = await materialImporter.importMaterial(id, effectiveLabel, category, attribution, texturesDir, detectedMaps);
+      const res = await materialImporter.importMaterial(id, effectiveLabel, category, attribution, detectedMaps);
       setResult(res);
       setPhase("done");
     } catch (e) {
@@ -157,15 +137,21 @@ export function MaterialImporterModal({
   };
 
   const handleImportAnother = () => {
-    setMaterialId(""); setLabel(""); setCategory("Other"); setAcgAuto(true); setAttribution({ ...ACG_ATTRIBUTION }); setSourceDir(null);
+    setMaterialId(""); setLabel(""); setCategory("Other"); setAcgAuto(true); setAttribution({ ...ACG_ATTRIBUTION }); setSourceName(null);
     setDetectedMaps(null); setPhase("input"); setResult(null); setError(null);
   };
 
-  const canImport = !!(texturesDir && sourceDir && detectedMaps && materialId.trim());
+  const canImport = !!(detectedMaps && materialId.trim());
 
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+
+        <input
+          ref={sourceInputRef} type="file" style={{ display: "none" }}
+          {...DIR_INPUT_PROPS}
+          onChange={e => { onSourceChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
 
         {/* Header */}
         <div>
@@ -176,23 +162,6 @@ export function MaterialImporterModal({
           <div style={{ color: "#646464", fontSize: 10, marginTop: 4 }}>
             Compatible with ambientCG texture sets (albedo / normal / roughness / ao / displacement maps).
           </div>
-        </div>
-
-        {/* Step 0 — destination folder (one-time per session) */}
-        <div>
-          <div style={STEP_LABEL}>DESTINATION — project textures folder{texturesDir ? " ✓" : ""}</div>
-          {texturesDir
-            ? <div style={{ color: "#6bff8a", fontSize: 11 }}>📁 {texturesDir.name}</div>
-            : <>
-                <div style={{ color: "#646464", fontSize: 11, marginBottom: 8, lineHeight: 1.5 }}>
-                  Navigate to <span style={{ color: "#c0c0c0" }}>public/assets/textures/</span> inside this project.
-                  This is where imported files will be written. Only needed once per session.
-                </div>
-                <button style={BTN(true)} onClick={pickTexturesDir}>
-                  Select textures folder…
-                </button>
-              </>
-          }
         </div>
 
         {phase !== "done" && <>
@@ -238,8 +207,8 @@ export function MaterialImporterModal({
           {/* Step 2 — source folder */}
           <div>
             <div style={STEP_LABEL}>2  AMBIENTCG SOURCE FOLDER</div>
-            <button style={BTN(true)} onClick={pickSourceFolder}>
-              {sourceDir ? `📁 ${sourceDir.name}` : "Choose ambientCG folder…"}
+            <button style={BTN(true)} onClick={() => sourceInputRef.current?.click()}>
+              {sourceName ? `📁 ${sourceName}` : "Choose ambientCG folder…"}
             </button>
 
             {detectedMaps && (

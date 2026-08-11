@@ -8,13 +8,11 @@ import {
 
 interface Props {
   asset:            AssetDef;
-  needsFolderGrant: boolean;
   onCancel:         () => void;
   onSave:           (dataUrl: string) => void;
   // Icon mode (Phase 48): transparent-background render saved into the graphics
   // library instead of overwriting the model thumbnail.
   onSaveIcon?:            (dataUrl: string) => void;
-  needsGraphicsFolderGrant?: boolean;
 }
 
 const OVERLAY: React.CSSProperties = {
@@ -69,7 +67,7 @@ function NumField({ value, min, max, step, disabled, onCommit, width }: {
   );
 }
 
-export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave, onSaveIcon, needsGraphicsFolderGrant }: Props) {
+export function ThumbnailStagerModal({ asset, onCancel, onSave, onSaveIcon }: Props) {
   const [status,  setStatus]  = useState<"loading" | "ready" | "error">("loading");
   const [preview, setPreview] = useState<string | null>(null);
   const [params,  setParams]  = useState<StageParams>(DEFAULT_STAGE);
@@ -252,11 +250,6 @@ export function ThumbnailStagerModal({ asset, needsFolderGrant, onCancel, onSave
             </label>
           )}
 
-          {(iconMode ? needsGraphicsFolderGrant : needsFolderGrant) && (
-            <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "6px 9px", fontSize: 10, color: "#c09050" }}>
-              Saving will ask for access to <span style={{ color: "#d8b060" }}>{iconMode ? "public/assets/graphics" : "public/assets/models"}</span>.
-            </div>
-          )}
         </div>
 
         {/* Footer */}

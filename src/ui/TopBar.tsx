@@ -108,7 +108,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
   };
 
   const handleLoadClick = () => {
-    if (onLoadFSA && 'showOpenFilePicker' in window) {
+    if (onLoadFSA) {
       void onLoadFSA();
     } else {
       fileRef.current?.click();

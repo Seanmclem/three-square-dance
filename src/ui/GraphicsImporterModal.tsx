@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { GraphicDef, GraphicsManifest, Attribution } from "@/types";
+import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
 
 interface Props {
-  graphicsDir:      FileSystemDirectoryHandle | null;
-  onGraphicsDirSet: (dir: FileSystemDirectoryHandle) => void;
   onComplete:       (graphics: GraphicDef[]) => void;
   onClose:          () => void;
 }
@@ -13,19 +12,14 @@ type Phase = "pick" | "meta" | "importing" | "done";
 
 const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
-type FSPicker = {
-  showOpenFilePicker:  (opts: unknown) => Promise<FileSystemFileHandle[]>;
-  showDirectoryPicker: (opts: unknown) => Promise<FileSystemDirectoryHandle>;
-};
-
 const getExt    = (n: string) => n.slice(n.lastIndexOf(".")).toLowerCase();
 const slugify   = (s: string) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 const autoLabel = (n: string) => n.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
 
 interface GraphicEntry {
-  id:     string;
-  handle: FileSystemFileHandle;
-  label:  string;
+  id:    string;
+  file:  File;
+  label: string;
 }
 
 const OVERLAY: React.CSSProperties = {
@@ -49,7 +43,7 @@ const BTN = (active = true): React.CSSProperties => ({
   color: active ? "#80aaff" : "#646464",
 });
 
-export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplete, onClose }: Props) {
+export function GraphicsImporterModal({ onComplete, onClose }: Props) {
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<GraphicEntry[]>([]);
   const [progress, setProgress] = useState("");
@@ -59,62 +53,35 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
   const [category, setCategory] = useState("Icons");
   // Shared attribution applied to every graphic in this import batch.
   const [attribution, setAttribution] = useState<Attribution>({});
+  const filesInputRef = useRef<HTMLInputElement>(null);
 
   const update = (id: string, patch: Partial<GraphicEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
 
-  async function pickFiles(): Promise<void> {
-    try {
-      const handles = await (window as unknown as FSPicker).showOpenFilePicker({
-        multiple: true,
-        types: [{ description: "Images", accept: { "image/*": [".png", ".jpg", ".jpeg", ".webp"] } }],
-      });
-      const images = handles.filter(h => IMAGE_EXTS.has(getExt(h.name)));
-      if (!images.length) return;
-      setEntries(images.map(h => ({ id: crypto.randomUUID(), handle: h, label: autoLabel(h.name) })));
-      setPhase("meta");
-    } catch { /* cancelled */ }
-  }
-
-  async function pickGraphicsDir(): Promise<void> {
-    try {
-      const dir = await (window as unknown as FSPicker).showDirectoryPicker({ mode: "readwrite" });
-      onGraphicsDirSet(dir);
-    } catch { /* cancelled */ }
-  }
-
-  // Returns the copied bytes so dimensions can be decoded without re-reading the
-  // source File (whose snapshot can be invalidated by the write on some setups).
-  async function copyFile(src: FileSystemFileHandle, dir: FileSystemDirectoryHandle, dest: string): Promise<ArrayBuffer> {
-    const file = await src.getFile();
-    const buf  = await file.arrayBuffer();
-    const dh   = await dir.getFileHandle(dest, { create: true });
-    const w    = await dh.createWritable();
-    await w.write(buf);
-    await w.close();
-    return buf;
+  function onFilesChosen(list: FileList | null): void {
+    const images = [...(list ?? [])].filter(f => IMAGE_EXTS.has(getExt(f.name)));
+    if (!images.length) return;
+    setEntries(images.map(f => ({ id: crypto.randomUUID(), file: f, label: autoLabel(f.name) })));
+    setPhase("meta");
   }
 
   async function doImport(): Promise<void> {
-    if (!graphicsDir || !entries.length) return;
+    if (!entries.length) return;
     setPhase("importing");
     setError(null);
 
-    let manifest: GraphicsManifest = { version: "1.0", graphics: [] };
-    try {
-      const mh = await graphicsDir.getFileHandle("manifest.json");
-      manifest = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
-    } catch { /* new manifest */ }
+    const manifest = await readManifest<GraphicsManifest>("graphics", { version: "1.0", graphics: [] });
 
     const imported: GraphicDef[] = [];
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i]!;
-      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.handle.name}`);
+      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.file.name}`);
       try {
-        const ext  = getExt(e.handle.name);
-        const base = slugify(e.label) || slugify(autoLabel(e.handle.name));
+        const ext  = getExt(e.file.name);
+        const base = slugify(e.label) || slugify(autoLabel(e.file.name));
         const dest = `${base}${ext}`;
-        const buf = await copyFile(e.handle, graphicsDir, dest);
+        const buf  = await e.file.arrayBuffer();
+        await writeAssetFile("graphics", dest, buf);
         // Intrinsic size — shown in tooltips and useful as a GUI default.
         let width: number | undefined, height: number | undefined;
         try {
@@ -133,15 +100,12 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
         manifest.graphics.push(graphic);
         imported.push(graphic);
       } catch (err) {
-        console.warn(`Import failed for ${e.handle.name}:`, err);
+        console.warn(`Import failed for ${e.file.name}:`, err);
       }
     }
 
     try {
-      const mw = await graphicsDir.getFileHandle("manifest.json", { create: true });
-      const wb = await mw.createWritable();
-      await wb.write(JSON.stringify(manifest, null, 2));
-      await wb.close();
+      await writeManifest("graphics", manifest);
     } catch (err) {
       setError(`Manifest write failed: ${String(err)}`);
     }
@@ -154,6 +118,11 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+        <input
+          ref={filesInputRef} type="file" multiple style={{ display: "none" }}
+          accept=".png,.jpg,.jpeg,.webp"
+          onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
           <span style={{ fontSize: 13, color: "#d8d8d8", letterSpacing: 1 }}>IMPORT GRAPHICS</span>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#585870", fontSize: 16 }}>✕</button>
@@ -167,7 +136,7 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
                 backgrounds work best for icons). They'll be copied into your project's
                 <code> assets/graphics</code> folder and added to the graphics manifest.
               </div>
-              <button onClick={pickFiles} style={BTN()}>Choose image files…</button>
+              <button onClick={() => filesInputRef.current?.click()} style={BTN()}>Choose image files…</button>
             </div>
           )}
 
@@ -175,7 +144,7 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {entries.map(e => (
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
-                  <div style={{ color: "#707070", fontSize: 10 }}>{e.handle.name}</div>
+                  <div style={{ color: "#707070", fontSize: 10 }}>{e.file.name}</div>
                   <input value={e.label} onChange={ev => update(e.id, { label: ev.target.value })} placeholder="Label" style={INPUT} />
                 </div>
               ))}
@@ -193,18 +162,7 @@ export function GraphicsImporterModal({ graphicsDir, onGraphicsDirSet, onComplet
                 <AttributionFields value={attribution} onChange={setAttribution} />
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-                <button onClick={pickGraphicsDir} style={BTN(!graphicsDir)}>
-                  {graphicsDir ? "✓ assets/graphics folder granted" : "Grant assets/graphics folder…"}
-                </button>
-              </div>
-              {!graphicsDir && (
-                <div style={{ color: "#707070", fontSize: 10, lineHeight: 1.4 }}>
-                  Select your project's <code>public/assets/graphics</code> folder so the files can be written.
-                </div>
-              )}
-
-              <button onClick={doImport} disabled={!graphicsDir} style={{ ...BTN(!!graphicsDir), marginTop: 4 }}>
+              <button onClick={doImport} style={{ ...BTN(), marginTop: 4 }}>
                 Import {entries.length} graphic{entries.length !== 1 ? "s" : ""}
               </button>
             </div>

@@ -78,10 +78,10 @@ import { ReoriginModal } from "@/ui/ReoriginModal";
 import { applyGltfReorigin, instanceWorldShift } from "@/core/gltfReorigin";
 import { dataURLtoArrayBuffer, renderModelThumbnail } from "@/editor/thumbnailRenderer";
 import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
-import { writeAssetToLibrary } from "@/core/assetLibraryWriter";
+import { writeAssetToLibrary, writeAssetFile, removeAssetFiles, removeEntries, updateEntries, upsertEntry } from "@/assets/assetLibrary";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -190,16 +190,11 @@ export default function App() {
   const [pendingAssetDelete, setPendingAssetDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
   >(null);
-  const [modelsDir,       setModelsDir]        = useState<FileSystemDirectoryHandle | null>(null);
-  const [texturesDir,     setTexturesDir]      = useState<FileSystemDirectoryHandle | null>(null);
-  const [audioDir,        setAudioDir]         = useState<FileSystemDirectoryHandle | null>(null);
   const [sounds,          setSounds]           = useState<SoundDef[]>([]);
   const [audioImporterOpen, setAudioImporterOpen] = useState(false);
   const [pendingSoundEdit, setPendingSoundEdit] = useState<PendingEdit | null>(null);
-  const [skyboxDir,       setSkyboxDir]        = useState<FileSystemDirectoryHandle | null>(null);
   const [skyboxes,        setSkyboxes]         = useState<SkyboxDef[]>([]);
   const [skyboxImporterOpen, setSkyboxImporterOpen] = useState(false);
-  const [graphicsDir,     setGraphicsDir]      = useState<FileSystemDirectoryHandle | null>(null);
   const [graphics,        setGraphics]         = useState<GraphicDef[]>([]);
   const [graphicsImporterOpen, setGraphicsImporterOpen] = useState(false);
   const [pendingGraphicDelete, setPendingGraphicDelete] = useState<
@@ -209,8 +204,6 @@ export default function App() {
   const [pendingSkyboxEdit, setPendingSkyboxEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
-  // Hint pill shown while a bake-related native picker is open (which dialog is which).
-  const [bakeHint,        setBakeHint]         = useState<string | null>(null);
   const [materialImporterOpen, setMaterialImporterOpen] = useState(false);
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
@@ -2126,26 +2119,10 @@ export default function App() {
   // Delete sounds: drop from the audio manifest + remove the file, then evict from the registry.
   const handleDeleteSounds = async (ids: string[]): Promise<void> => {
     if (!ids.length) return;
-    let dir = audioDir;
-    if (!dir) {
-      try {
-        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
-          .showDirectoryPicker({ mode: "readwrite" });
-        setAudioDir(dir);
-      } catch { return; }   // cancelled
-    }
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
-      const removed = data.sounds.filter(s => ids.includes(s.id));
-      data.sounds = data.sounds.filter(s => !ids.includes(s.id));
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
-      for (const s of removed) {
-        const fname = s.path.split("/").pop();
-        if (fname) { try { await (dir as unknown as { removeEntry: (n: string) => Promise<void> }).removeEntry(fname); } catch { /* missing — ignore */ } }
-      }
+      const removed = await removeEntries<SoundDef>("audio", ids);
+      const rels = removed.map(s => s.path.split("/").pop()).filter((f): f is string => !!f);
+      try { await removeAssetFiles("audio", rels); } catch { /* missing — ignore */ }
     } catch (err) {
       console.error("sound delete failed:", err);
       return;
@@ -2174,19 +2151,12 @@ export default function App() {
     const pending = pendingSoundEdit;
     setPendingSoundEdit(null);
     if (!pending) return;
-    const dir = await ensureDir(audioDir, setAudioDir);
-    if (!dir) return;
     // Same tag merge semantics as the model edit: single replaces, bulk unions in.
     const resolveTags = (s: SoundDef): string[] =>
       patch.tagsAdd ? [...new Set([...(s.tags ?? []), ...patch.tagsAdd])]
                     : (patch.tags ?? s.tags ?? []);
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
-      data.sounds = data.sounds.map(s => pending.ids.includes(s.id) ? { ...patchEntry(s, patch), tags: resolveTags(s) } : s);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<SoundDef>("audio", pending.ids, s => ({ ...patchEntry(s, patch), tags: resolveTags(s) }));
     } catch (err) { console.error("sound edit failed:", err); return; }
     pending.ids.forEach(id => {
       const def = assetManager.getSoundList().find(s => s.id === id);
@@ -2228,21 +2198,11 @@ export default function App() {
     setPendingGraphicDelete(null);
     if (!pending) return;
     const ids = pending.ids;
-    const dir = await ensureDir(graphicsDir, setGraphicsDir);
-    if (!dir) return;
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
-      const removed = data.graphics.filter(g => ids.includes(g.id));
-      data.graphics = data.graphics.filter(g => !ids.includes(g.id));
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      const removed = await removeEntries<GraphicDef>("graphics", ids);
       if (deleteFiles) {
-        for (const g of removed) {
-          const fname = g.path.split("/").pop();
-          if (fname) { try { await dir.removeEntry(fname); } catch { /* missing — ignore */ } }
-        }
+        const rels = removed.map(g => g.path.split("/").pop()).filter((f): f is string => !!f);
+        try { await removeAssetFiles("graphics", rels); } catch { /* missing — ignore */ }
       }
     } catch (err) {
       console.error("graphic delete failed:", err);
@@ -2271,15 +2231,8 @@ export default function App() {
     const pending = pendingGraphicEdit;
     setPendingGraphicEdit(null);
     if (!pending) return;
-    const dir = await ensureDir(graphicsDir, setGraphicsDir);
-    if (!dir) return;
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
-      data.graphics = data.graphics.map(g => pending.ids.includes(g.id) ? patchEntry(g, patch) : g);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<GraphicDef>("graphics", pending.ids, g => patchEntry(g, patch));
     } catch (err) { console.error("graphic edit failed:", err); return; }
     pending.ids.forEach(id => assetManager.updateGraphic(id, patch as Partial<GraphicDef>));
     setGraphics(assetManager.getGraphicList());
@@ -2295,26 +2248,10 @@ export default function App() {
   // Delete skyboxes: drop from the manifest + remove the image, then evict from the registry.
   const handleDeleteSkyboxes = async (ids: string[]): Promise<void> => {
     if (!ids.length) return;
-    let dir = skyboxDir;
-    if (!dir) {
-      try {
-        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
-          .showDirectoryPicker({ mode: "readwrite" });
-        setSkyboxDir(dir);
-      } catch { return; }   // cancelled
-    }
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as SkyboxManifest;
-      const removed = data.skyboxes.filter(s => ids.includes(s.id));
-      data.skyboxes = data.skyboxes.filter(s => !ids.includes(s.id));
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
-      for (const s of removed) {
-        const fname = s.path.split("/").pop();
-        if (fname) { try { await (dir as unknown as { removeEntry: (n: string) => Promise<void> }).removeEntry(fname); } catch { /* missing — ignore */ } }
-      }
+      const removed = await removeEntries<SkyboxDef>("skyboxes", ids);
+      const rels = removed.map(s => s.path.split("/").pop()).filter((f): f is string => !!f);
+      try { await removeAssetFiles("skyboxes", rels); } catch { /* missing — ignore */ }
     } catch (err) {
       console.error("skybox delete failed:", err);
       return;
@@ -2344,15 +2281,8 @@ export default function App() {
     const pending = pendingSkyboxEdit;
     setPendingSkyboxEdit(null);
     if (!pending) return;
-    const dir = await ensureDir(skyboxDir, setSkyboxDir);
-    if (!dir) return;
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as SkyboxManifest;
-      data.skyboxes = data.skyboxes.map(s => pending.ids.includes(s.id) ? patchEntry(s, patch) : s);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<SkyboxDef>("skyboxes", pending.ids, s => patchEntry(s, patch));
     } catch (err) { console.error("skybox edit failed:", err); return; }
     pending.ids.forEach(id => assetManager.updateSkybox(id, patch as Partial<SkyboxDef>));
     setSkyboxes(assetManager.getSkyboxList());
@@ -2396,32 +2326,13 @@ export default function App() {
     if (!pending) return;
     const ids = pending.ids;
 
-    // Manifest write + file removal need a read/write directory handle.
-    let dir = modelsDir;
-    if (!dir) {
-      try {
-        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
-          .showDirectoryPicker({ mode: "readwrite" });
-        setModelsDir(dir);
-      } catch { return; } // cancelled — abort without changing anything
-    }
-
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
-      const removed = data.assets.filter(a => ids.includes(a.id));
-      data.assets   = data.assets.filter(a => !ids.includes(a.id));
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
-
+      const removed = await removeEntries<AssetDef>("models", ids);
       if (deleteFiles) {
         const base = (p?: string) => p?.split("/").pop();
-        for (const a of removed) {
-          for (const f of [base(a.path), base(a.thumbnail), base(a.mtlPath)]) {
-            if (f) { try { await dir.removeEntry(f); } catch { /* missing — ignore */ } }
-          }
-        }
+        const rels = removed.flatMap(a => [base(a.path), base(a.thumbnail), base(a.mtlPath)])
+          .filter((f): f is string => !!f);
+        try { await removeAssetFiles("models", rels); } catch { /* missing — ignore */ }
       }
     } catch (err) {
       console.error("asset delete failed:", err);
@@ -2435,8 +2346,8 @@ export default function App() {
   };
 
   const openMaterialImporter = (): void => {
-    if (!("showDirectoryPicker" in window)) {
-      console.warn("Material importer requires Chrome or Edge.");
+    if (!desktop()) {
+      console.warn("Material importer needs the desktop app.");
       return;
     }
     setMaterialImporterOpen(true);
@@ -2470,28 +2381,11 @@ export default function App() {
     if (!pending) return;
     const ids = pending.ids;
 
-    let dir = texturesDir;
-    if (!dir) {
-      try {
-        dir = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
-          .showDirectoryPicker({ mode: "readwrite" });
-        setTexturesDir(dir);
-      } catch { return; } // cancelled — abort without changing anything
-    }
-
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; materials: MaterialDef[] };
-      data.materials = data.materials.filter(m => !ids.includes(m.id));
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
-
+      await removeEntries<MaterialDef>("textures", ids);
       if (deleteFiles) {
-        for (const id of ids) {
-          try { await (dir as unknown as { removeEntry: (n: string, o?: unknown) => Promise<void> }).removeEntry(id, { recursive: true }); }
-          catch { /* folder missing — ignore */ }
-        }
+        // Each material is a folder (<id>/{low,medium,high}) — trashed whole.
+        try { await removeAssetFiles("textures", ids); } catch { /* folder missing — ignore */ }
       }
     } catch (err) {
       console.error("material delete failed:", err);
@@ -2542,25 +2436,10 @@ export default function App() {
     ...(patch.attribution            ? { attribution: { ...entry.attribution, ...patch.attribution } } : {}),
   });
 
-  const ensureDir = async (
-    cur: FileSystemDirectoryHandle | null,
-    setCur: (d: FileSystemDirectoryHandle) => void,
-  ): Promise<FileSystemDirectoryHandle | null> => {
-    if (cur) return cur;
-    try {
-      const d = await (window as unknown as { showDirectoryPicker: (o: unknown) => Promise<FileSystemDirectoryHandle> })
-        .showDirectoryPicker({ mode: "readwrite" });
-      setCur(d);
-      return d;
-    } catch { return null; }
-  };
-
   const handleConfirmAssetEdit = async (patch: EditPatch): Promise<void> => {
     const pending = pendingAssetEdit;
     setPendingAssetEdit(null);
     if (!pending) return;
-    const dir = await ensureDir(modelsDir, setModelsDir);
-    if (!dir) return;
     // Tags are an array, so they need explicit merge semantics the generic shallow
     // `patchEntry` can't express: a single edit replaces the list, a bulk edit only
     // unions in (tags the dialog never showed must not be silently dropped).
@@ -2568,13 +2447,7 @@ export default function App() {
       patch.tagsAdd ? [...new Set([...a.tags, ...patch.tagsAdd])]
                     : (patch.tags ?? a.tags);
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
-      data.assets = data.assets.map(a =>
-        pending.ids.includes(a.id) ? { ...patchEntry(a, patch), tags: resolveTags(a) } : a);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<AssetDef>("models", pending.ids, a => ({ ...patchEntry(a, patch), tags: resolveTags(a) }));
     } catch (err) { console.error("asset edit failed:", err); return; }
     pending.ids.forEach(id => {
       const def = assetManager.getAssetDef(id);
@@ -2595,16 +2468,9 @@ export default function App() {
   const handleSaveCollidersToAsset = async (objectId: string, assetId: string, colliders: AttachedCollider[]): Promise<void> => {
     const zoneId = selected?.id === objectId ? selected.zoneId : activeZoneId;
     if (!zoneId) return;
-    const dir = await ensureDir(modelsDir, setModelsDir);
-    if (!dir) return;
     const saved = structuredClone(colliders);
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
-      data.assets = data.assets.map(a => a.id === assetId ? { ...a, colliders: saved } : a);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<AssetDef>("models", [assetId], a => ({ ...a, colliders: saved }));
     } catch (err) { console.error("save colliders to asset failed:", err); return; }
     assetManager.updateAsset(assetId, { colliders: saved });
     setAssets(assetManager.getAssetList());
@@ -2625,24 +2491,13 @@ export default function App() {
   // Write a re-staged thumbnail PNG next to the model + point the manifest at it.
   const handleSaveThumbnail = async (asset: AssetDef, dataUrl: string): Promise<void> => {
     setStagingAsset(null);
-    const dir = await ensureDir(modelsDir, setModelsDir);
-    if (!dir) return;
     const fileName =
       asset.thumbnail?.split("/").pop()?.split("?")[0] ||
       `${(asset.path.split("/").pop() ?? asset.id).replace(/\.[^.]+$/, "")}_thumb.png`;
     const cleanPath = `/assets/models/${fileName}`;
     try {
-      const fh = await dir.getFileHandle(fileName, { create: true });
-      const fw = await fh.createWritable();
-      await fw.write(dataURLtoArrayBuffer(dataUrl));
-      await fw.close();
-
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; assets: AssetDef[] };
-      data.assets = data.assets.map(a => a.id === asset.id ? { ...a, thumbnail: cleanPath } : a);
-      const mw = await mh.createWritable();
-      await mw.write(JSON.stringify(data, null, 2));
-      await mw.close();
+      await writeAssetFile("models", fileName, dataURLtoArrayBuffer(dataUrl));
+      await updateEntries<AssetDef>("models", [asset.id], a => ({ ...a, thumbnail: cleanPath }));
     } catch (err) { console.error("thumbnail save failed:", err); return; }
     // ?v= busts the <img> cache in-session; the manifest keeps the clean path.
     assetManager.updateAsset(asset.id, { thumbnail: `${cleanPath}?v=${Date.now()}` });
@@ -2653,17 +2508,14 @@ export default function App() {
   // Re-origin a model (Phase 50): rewrite the GLTF/GLB in place so its geometry
   // sits on/around the origin, optionally shifting placed copies to compensate.
   const handleApplyReorigin = async (asset: AssetDef, delta: Vec3, compensate: boolean): Promise<void> => {
-    const dir = await ensureDir(modelsDir, setModelsDir);
-    if (!dir) return;
     const fileName = asset.path.split("/").pop();
     if (!fileName) return;
     try {
-      const fh    = await dir.getFileHandle(fileName);
-      const bytes = await (await fh.getFile()).arrayBuffer();
+      const res = await fetch(`/assets/models/${fileName}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`model fetch → HTTP ${res.status}`);
+      const bytes = await res.arrayBuffer();
       const out   = applyGltfReorigin(bytes, fileName, delta);
-      const w     = await fh.createWritable();
-      await w.write(out);
-      await w.close();
+      await writeAssetFile("models", fileName, out);
     } catch (err) { console.error("re-origin failed:", err); return; }
     setReoriginAsset(null);
     assetManager.evictModel(asset.id);
@@ -2697,38 +2549,22 @@ export default function App() {
   // Save a transparent icon render of a model into the graphics library (Phase 48).
   const handleSaveIcon = async (asset: AssetDef, dataUrl: string): Promise<void> => {
     setStagingAsset(null);
-    const dir = await ensureDir(graphicsDir, setGraphicsDir);
-    if (!dir) return;
     const fileName = `${asset.id}_icon.png`;
     try {
-      const fh = await dir.getFileHandle(fileName, { create: true });
-      const fw = await fh.createWritable();
-      await fw.write(dataURLtoArrayBuffer(dataUrl));
-      await fw.close();
-
-      let manifest: GraphicsManifest = { version: "1.0", graphics: [] };
-      try {
-        const mh = await dir.getFileHandle("manifest.json");
-        manifest = JSON.parse(await (await mh.getFile()).text()) as GraphicsManifest;
-      } catch { /* new manifest */ }
+      await writeAssetFile("graphics", fileName, dataURLtoArrayBuffer(dataUrl));
       const graphic: GraphicDef = {
         id: `${asset.id}_icon`, label: `${asset.label} icon`, category: "Icons",
         path: `/assets/graphics/${fileName}`, width: 256, height: 256,
         ...(asset.attribution ? { attribution: asset.attribution } : {}),
       };
-      manifest.graphics = manifest.graphics.filter(g => g.id !== graphic.id);
-      manifest.graphics.push(graphic);
-      const mw = await dir.getFileHandle("manifest.json", { create: true });
-      const w  = await mw.createWritable();
-      await w.write(JSON.stringify(manifest, null, 2));
-      await w.close();
+      await upsertEntry("graphics", graphic, { version: "1.0", graphics: [] });
     } catch (err) { console.error("icon save failed:", err); return; }
     handleGraphicsReload();
   };
 
   // ── Bake shapes → GLB (Phase 26) ──────────────────────────────────────────
   // The bake itself never mutates the world (sources stay editable); outputs are
-  // independent so a cancelled save-picker doesn't kill the library write.
+  // independent so a failed local save doesn't kill the library write.
   const handleBakeConfirm = async (opts: { name: string; toLibrary: boolean; toFile: boolean }): Promise<void> => {
     const refs = bakeRefs;
     setBakeRefs(null);
@@ -2738,59 +2574,36 @@ export default function App() {
       const { glb, group, colliders } = await bakeShapes(world, refs);
       try {
         if (opts.toFile) {
-          try {
-            if ("showSaveFilePicker" in window) {
-              setBakeHint(`Choose where to save ${opts.name}.glb (local copy)…`);
-              const handle = await window.showSaveFilePicker({
-                suggestedName: `${opts.name}.glb`,
-                types: [{ description: "glTF Binary", accept: { "model/gltf-binary": [".glb"] } }],
-              });
-              setBakeHint(null);
-              const w = await handle.createWritable();
-              await w.write(glb);
-              await w.close();
-            } else {
-              const url = URL.createObjectURL(new Blob([glb], { type: "model/gltf-binary" }));
-              Object.assign(document.createElement("a"), { href: url, download: `${opts.name}.glb` }).click();
-              URL.revokeObjectURL(url);
-            }
-          } catch (e) {
-            if ((e as DOMException).name !== "AbortError") throw e;   // picker cancel → skip file only
-          }
+          const url = URL.createObjectURL(new Blob([glb], { type: "model/gltf-binary" }));
+          Object.assign(document.createElement("a"), { href: url, download: `${opts.name}.glb` }).click();
+          URL.revokeObjectURL(url);
         }
         if (opts.toLibrary) {
-          if (!modelsDir) setBakeHint("Select your assets/models folder so the asset can join the library…");
-          const dir = await ensureDir(modelsDir, setModelsDir);
-          setBakeHint(null);
-          if (dir) {
-            const thumbUrl = renderModelThumbnail(group);
-            const asset: AssetDef = {
-              id:           opts.name,
-              label:        opts.name,
-              category:     "Baked",
-              path:         `/assets/models/${opts.name}.glb`,
-              ...(thumbUrl ? { thumbnail: `/assets/models/${opts.name}_thumb.png` } : {}),
-              collidable:   true,
-              colliderType: "box",
-              tags:         ["baked"],
-              dateAdded:    new Date().toISOString(),
-              colliders,
-            };
-            await writeAssetToLibrary(dir, {
-              glbName: `${opts.name}.glb`,
-              glb,
-              ...(thumbUrl ? { thumbName: `${opts.name}_thumb.png`, thumbPng: dataURLtoArrayBuffer(thumbUrl) } : {}),
-            }, asset);
-            handleAssetsReload();
-          }
+          const thumbUrl = renderModelThumbnail(group);
+          const asset: AssetDef = {
+            id:           opts.name,
+            label:        opts.name,
+            category:     "Baked",
+            path:         `/assets/models/${opts.name}.glb`,
+            ...(thumbUrl ? { thumbnail: `/assets/models/${opts.name}_thumb.png` } : {}),
+            collidable:   true,
+            colliderType: "box",
+            tags:         ["baked"],
+            dateAdded:    new Date().toISOString(),
+            colliders,
+          };
+          await writeAssetToLibrary({
+            glbName: `${opts.name}.glb`,
+            glb,
+            ...(thumbUrl ? { thumbName: `${opts.name}_thumb.png`, thumbPng: dataURLtoArrayBuffer(thumbUrl) } : {}),
+          }, asset);
+          handleAssetsReload();
         }
       } finally {
-        setBakeHint(null);   // covers picker-cancel paths that skip the inline clears
         disposeBakeGroup(group);
       }
     } catch (err) {
       console.error("bake failed:", err);
-      setBakeHint(null);
     }
   };
 
@@ -2798,15 +2611,8 @@ export default function App() {
     const pending = pendingMaterialEdit;
     setPendingMaterialEdit(null);
     if (!pending) return;
-    const dir = await ensureDir(texturesDir, setTexturesDir);
-    if (!dir) return;
     try {
-      const mh   = await dir.getFileHandle("manifest.json");
-      const data = JSON.parse(await (await mh.getFile()).text()) as { version: string; materials: MaterialDef[] };
-      data.materials = data.materials.map(m => pending.ids.includes(m.id) ? patchEntry(m, patch) : m);
-      const w = await mh.createWritable();
-      await w.write(JSON.stringify(data, null, 2));
-      await w.close();
+      await updateEntries<MaterialDef>("textures", pending.ids, m => patchEntry(m, patch));
     } catch (err) { console.error("material edit failed:", err); return; }
     pending.ids.forEach(id => assetManager.updateMaterial(id, patch as Partial<MaterialDef>));
     setMaterialList(assetManager.getMaterialList());
@@ -3797,8 +3603,6 @@ SquareDance
 
       {showImporter && (
         <ModelImporterModal
-          modelsDir={modelsDir}
-          onModelsDirSet={dir => setModelsDir(dir)}
           existingTags={[...new Set(assets.flatMap(a => a.tags))].sort()}
           existingAttributions={assets.flatMap(a => a.attribution ? [a.attribution] : [])}
           onComplete={imported => {
@@ -3814,7 +3618,6 @@ SquareDance
         <DeleteAssetDialog
           labels={pendingAssetDelete.labels}
           usage={pendingAssetDelete.usage}
-          needsFolderGrant={!modelsDir}
           onCancel={() => setPendingAssetDelete(null)}
           onConfirm={deleteFiles => void handleConfirmAssetDelete(deleteFiles)}
         />
@@ -3822,8 +3625,6 @@ SquareDance
 
       {materialImporterOpen && (
         <MaterialImporterModal
-          texturesDir={texturesDir}
-          onTextureDirSet={setTexturesDir}
           onComplete={() => { setMaterialImporterOpen(false); handleMaterialsReload(); }}
           onClose={() => setMaterialImporterOpen(false)}
         />
@@ -3831,8 +3632,6 @@ SquareDance
 
       {audioImporterOpen && (
         <AudioImporterModal
-          audioDir={audioDir}
-          onAudioDirSet={setAudioDir}
           existingTags={[...new Set(sounds.flatMap(s => s.tags ?? []))].sort()}
           existingAttributions={[...sounds, ...assets].flatMap(s => s.attribution ? [s.attribution] : [])}
           existingCategories={[...new Set(sounds.map(s => s.category ?? "SFX"))]}
@@ -3843,8 +3642,6 @@ SquareDance
 
       {graphicsImporterOpen && (
         <GraphicsImporterModal
-          graphicsDir={graphicsDir}
-          onGraphicsDirSet={setGraphicsDir}
           onComplete={() => { setGraphicsImporterOpen(false); handleGraphicsReload(); }}
           onClose={() => setGraphicsImporterOpen(false)}
         />
@@ -3854,11 +3651,9 @@ SquareDance
         <DeleteAssetDialog
           labels={pendingGraphicDelete.labels}
           usage={pendingGraphicDelete.usage}
-          needsFolderGrant={!graphicsDir}
           noun="graphic"
           usageNoun="reference"
           usageEffect="Those item icons and UI elements will show blank until reassigned."
-          folderHint="public/assets/graphics"
           onCancel={() => setPendingGraphicDelete(null)}
           onConfirm={deleteFiles => void handleConfirmGraphicDelete(deleteFiles)}
         />
@@ -3870,8 +3665,6 @@ SquareDance
           noun="graphic"
           categoryOptions={[...new Set(["Icons", "HUD", ...graphics.map(g => g.category ?? "Icons")])]}
           initial={pendingGraphicEdit.initial}
-          needsFolderGrant={!graphicsDir}
-          folderHint="public/assets/graphics"
           onCancel={() => setPendingGraphicEdit(null)}
           onSave={patch => void handleConfirmGraphicEdit(patch)}
         />
@@ -3879,8 +3672,6 @@ SquareDance
 
       {skyboxImporterOpen && (
         <SkyboxImporterModal
-          skyboxDir={skyboxDir}
-          onSkyboxDirSet={setSkyboxDir}
           onComplete={() => { setSkyboxImporterOpen(false); handleSkyboxesReload(); }}
           onClose={() => setSkyboxImporterOpen(false)}
         />
@@ -3890,11 +3681,9 @@ SquareDance
         <DeleteAssetDialog
           labels={pendingMaterialDelete.labels}
           usage={pendingMaterialDelete.usage}
-          needsFolderGrant={!texturesDir}
           noun="material"
           usageNoun="surface"
           usageEffect="Those surfaces will fall back to the default look until reassigned."
-          folderHint="public/assets/textures"
           onCancel={() => setPendingMaterialDelete(null)}
           onConfirm={deleteFiles => void handleConfirmMaterialDelete(deleteFiles)}
         />
@@ -3907,8 +3696,6 @@ SquareDance
           categoryOptions={ASSET_CATEGORIES}
           initial={pendingAssetEdit.initial}
           tagSuggestions={[...new Set(assets.flatMap(a => a.tags))].sort()}
-          needsFolderGrant={!modelsDir}
-          folderHint="public/assets/models"
           onCancel={() => setPendingAssetEdit(null)}
           onSave={patch => void handleConfirmAssetEdit(patch)}
         />
@@ -3917,8 +3704,6 @@ SquareDance
       {stagingAsset && (
         <ThumbnailStagerModal
           asset={stagingAsset}
-          needsFolderGrant={!modelsDir}
-          needsGraphicsFolderGrant={!graphicsDir}
           onCancel={() => setStagingAsset(null)}
           onSave={dataUrl => void handleSaveThumbnail(stagingAsset, dataUrl)}
           onSaveIcon={dataUrl => void handleSaveIcon(stagingAsset, dataUrl)}
@@ -3930,7 +3715,6 @@ SquareDance
           asset={reoriginAsset}
           placedCount={[...(worldRef.current?.zones.values() ?? [])]
             .reduce((n, z) => n + z.objects.filter(o => o.assetId === reoriginAsset.id).length, 0)}
-          needsFolderGrant={!modelsDir}
           onCancel={() => setReoriginAsset(null)}
           onApply={(delta, compensate) => void handleApplyReorigin(reoriginAsset, delta, compensate)}
         />
@@ -3944,25 +3728,12 @@ SquareDance
         />
       )}
 
-      {bakeHint && (
-        <div style={{
-          position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 70,
-          background: "rgba(28,28,28,0.97)", border: "1px solid rgba(80,140,255,0.45)",
-          borderRadius: 6, padding: "8px 16px", boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
-          color: "#cfe0ff", fontSize: 12, fontFamily: "monospace", pointerEvents: "none",
-        }}>
-          {bakeHint}
-        </div>
-      )}
-
       {pendingMaterialEdit && (
         <EditMetadataDialog
           items={pendingMaterialEdit.items}
           noun="material"
           categoryOptions={MAT_CAT_ORDER}
           initial={pendingMaterialEdit.initial}
-          needsFolderGrant={!texturesDir}
-          folderHint="public/assets/textures"
           onCancel={() => setPendingMaterialEdit(null)}
           onSave={patch => void handleConfirmMaterialEdit(patch)}
         />
@@ -3975,8 +3746,6 @@ SquareDance
           categoryOptions={[...new Set(["SFX", "Music", "Ambient", ...sounds.map(s => s.category ?? "SFX")])]}
           initial={pendingSoundEdit.initial}
           tagSuggestions={[...new Set(sounds.flatMap(s => s.tags ?? []))].sort()}
-          needsFolderGrant={!audioDir}
-          folderHint="public/assets/audio"
           onCancel={() => setPendingSoundEdit(null)}
           onSave={patch => void handleConfirmSoundEdit(patch)}
         />
@@ -3988,8 +3757,6 @@ SquareDance
           noun="skybox"
           categoryOptions={["Day", "Sunset", "Night", "Space", "Studio", "Other"]}
           initial={pendingSkyboxEdit.initial}
-          needsFolderGrant={!skyboxDir}
-          folderHint="public/assets/skyboxes"
           onCancel={() => setPendingSkyboxEdit(null)}
           onSave={patch => void handleConfirmSkyboxEdit(patch)}
         />

@@ -18,8 +18,6 @@ interface EditMetadataDialogProps {
   initial:         { label: string; category: string; attribution: Attribution; tags?: string[] };
   /** Omit to hide the TAGS field entirely (call sites whose def has no `tags`). */
   tagSuggestions?: string[];
-  needsFolderGrant: boolean;
-  folderHint:      string;
   onCancel:        () => void;
   onSave:          (patch: EditPatch) => void;
 }
@@ -31,14 +29,13 @@ const S = {
   label: { color: "#646464", fontSize: 9, letterSpacing: 1, marginBottom: 3 } as React.CSSProperties,
   input: { width: "100%", boxSizing: "border-box", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 4, color: "#c0c0c0", fontFamily: "monospace", fontSize: 11, padding: "5px 8px", outline: "none" } as React.CSSProperties,
   apply: { display: "flex", alignItems: "center", gap: 6, color: "#7a7a7a", fontSize: 9, cursor: "pointer", userSelect: "none" } as React.CSSProperties,
-  hint: { color: "#6a7a90", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 } as React.CSSProperties,
   row: { display: "flex", gap: 8, justifyContent: "flex-end" } as React.CSSProperties,
   btn: (v: "ghost" | "primary"): React.CSSProperties => ({ padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 11, background: v === "primary" ? "rgba(80,140,255,0.2)" : "transparent", border: v === "primary" ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.1)", color: v === "primary" ? "#80aaff" : "#606070" }),
 };
 
 const NEW = "__new__";
 
-export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagSuggestions, needsFolderGrant, folderHint, onCancel, onSave }: EditMetadataDialogProps) {
+export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagSuggestions, onCancel, onSave }: EditMetadataDialogProps) {
   const bulk = items.length > 1;
 
   const [label,    setLabel]    = useState(initial.label);
@@ -164,13 +161,6 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagS
           )}
           <AttributionFields value={attr} onChange={setAttr} disabledKeys={disabledKeys} />
         </div>
-
-        {needsFolderGrant && (
-          <div style={S.hint}>
-            Saving needs file access — the browser will ask for a folder; select{" "}
-            <strong style={{ color: "#90a4c0" }}>{folderHint}</strong> and allow editing.
-          </div>
-        )}
 
         <div style={S.row}>
           <button style={S.btn("ghost")}   onClick={onCancel}>Cancel</button>

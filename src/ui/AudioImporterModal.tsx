@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { SoundDef, SoundCategory, SoundManifest, Attribution } from "@/types";
+import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
 import { TagInput } from "@/ui/TagInput";
 
 interface Props {
-  audioDir:      FileSystemDirectoryHandle | null;
-  onAudioDirSet: (dir: FileSystemDirectoryHandle) => void;
   existingTags:  string[];   // suggestions — the manifest isn't read until the import step
   existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
   existingCategories:   string[];       // categories already in the sound library (incl. custom ones)
@@ -18,18 +17,13 @@ type Phase = "pick" | "meta" | "importing" | "done";
 const DEFAULT_CATEGORIES: SoundCategory[] = ["SFX", "Music", "Ambient"];
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"]);
 
-type FSPicker = {
-  showOpenFilePicker:  (opts: unknown) => Promise<FileSystemFileHandle[]>;
-  showDirectoryPicker: (opts: unknown) => Promise<FileSystemDirectoryHandle>;
-};
-
 const getExt   = (n: string) => n.slice(n.lastIndexOf(".")).toLowerCase();
 const slugify  = (s: string) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 const autoLabel = (n: string) => n.replace(/\.[^.]+$/, "").replace(/[_-]/g, " ");
 
 interface SoundEntry {
   id:         string;
-  handle:     FileSystemFileHandle;
+  file:       File;
   label:      string;
   category:   string;
   showNewCat: boolean;
@@ -61,7 +55,7 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#646464", fontSize: 10, letterSpacing: 1,
 };
 
-export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, existingAttributions, existingCategories, onComplete, onClose }: Props) {
+export function AudioImporterModal({ existingTags, existingAttributions, existingCategories, onComplete, onClose }: Props) {
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SoundEntry[]>([]);
   const [bulkNewCat,  setBulkNewCat]  = useState<string | null>(null);
@@ -70,6 +64,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
   const [progress, setProgress] = useState("");
   const [results,  setResults]  = useState<SoundDef[]>([]);
   const [error,    setError]    = useState<string | null>(null);
+  const filesInputRef = useRef<HTMLInputElement>(null);
 
   // Default categories first, then any custom ones already in the library.
   const categories = [
@@ -80,57 +75,32 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
   const update = (id: string, patch: Partial<SoundEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
 
-  async function pickFiles(): Promise<void> {
-    try {
-      const handles = await (window as unknown as FSPicker).showOpenFilePicker({
-        multiple: true,
-        types: [{ description: "Audio", accept: { "audio/*": [".mp3", ".wav", ".ogg", ".m4a", ".flac", ".aac"] } }],
-      });
-      const audio = handles.filter(h => AUDIO_EXTS.has(getExt(h.name)));
-      if (!audio.length) return;
-      setEntries(audio.map(h => ({
-        id: crypto.randomUUID(), handle: h, label: autoLabel(h.name),
-        category: "SFX", showNewCat: false, loop: false, spatial: false,
-      })));
-      setPhase("meta");
-    } catch { /* cancelled */ }
-  }
-
-  async function pickAudioDir(): Promise<void> {
-    try {
-      const dir = await (window as unknown as FSPicker).showDirectoryPicker({ mode: "readwrite" });
-      onAudioDirSet(dir);
-    } catch { /* cancelled */ }
-  }
-
-  async function copyFile(src: FileSystemFileHandle, dir: FileSystemDirectoryHandle, dest: string): Promise<void> {
-    const file = await src.getFile();
-    const dh   = await dir.getFileHandle(dest, { create: true });
-    const w    = await dh.createWritable();
-    await w.write(await file.arrayBuffer());
-    await w.close();
+  function onFilesChosen(list: FileList | null): void {
+    const audio = [...(list ?? [])].filter(f => AUDIO_EXTS.has(getExt(f.name)));
+    if (!audio.length) return;
+    setEntries(audio.map(f => ({
+      id: crypto.randomUUID(), file: f, label: autoLabel(f.name),
+      category: "SFX", showNewCat: false, loop: false, spatial: false,
+    })));
+    setPhase("meta");
   }
 
   async function doImport(): Promise<void> {
-    if (!audioDir || !entries.length) return;
+    if (!entries.length) return;
     setPhase("importing");
     setError(null);
 
-    let manifest: SoundManifest = { version: "1.0", sounds: [] };
-    try {
-      const mh = await audioDir.getFileHandle("manifest.json");
-      manifest = JSON.parse(await (await mh.getFile()).text()) as SoundManifest;
-    } catch { /* new manifest */ }
+    const manifest = await readManifest<SoundManifest>("audio", { version: "1.0", sounds: [] });
 
     const imported: SoundDef[] = [];
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i]!;
-      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.handle.name}`);
+      setProgress(`Importing ${i + 1} of ${entries.length}: ${e.file.name}`);
       try {
-        const ext  = getExt(e.handle.name);
-        const base = slugify(e.label) || slugify(autoLabel(e.handle.name));
+        const ext  = getExt(e.file.name);
+        const base = slugify(e.label) || slugify(autoLabel(e.file.name));
         const dest = `${base}${ext}`;
-        await copyFile(e.handle, audioDir, dest);
+        await writeAssetFile("audio", dest, await e.file.arrayBuffer());
         const resolvedCat = (e.category === "__new__" ? "SFX" : e.category) as SoundCategory;
         const sound: SoundDef = {
           id: base, label: e.label.trim() || base, category: resolvedCat,
@@ -142,15 +112,12 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
         manifest.sounds.push(sound);
         imported.push(sound);
       } catch (err) {
-        console.warn(`Import failed for ${e.handle.name}:`, err);
+        console.warn(`Import failed for ${e.file.name}:`, err);
       }
     }
 
     try {
-      const mw = await audioDir.getFileHandle("manifest.json", { create: true });
-      const wb = await mw.createWritable();
-      await wb.write(JSON.stringify(manifest, null, 2));
-      await wb.close();
+      await writeManifest("audio", manifest);
     } catch (err) {
       setError(`Manifest write failed: ${String(err)}`);
     }
@@ -163,6 +130,12 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+
+        <input
+          ref={filesInputRef} type="file" multiple style={{ display: "none" }}
+          accept=".mp3,.wav,.ogg,.m4a,.flac,.aac"
+          onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
@@ -182,17 +155,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
                 — select multiple files at once. They'll be copied into your project's{" "}
                 <code>assets/audio</code> folder and added to the sound manifest.
               </div>
-              {!audioDir && (
-                <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c09050" }}>
-                  Audio folder not set — imports cannot be saved.
-                </div>
-              )}
-              <button style={BTN()} onClick={() => void pickFiles()}>Browse files…</button>
-              {!audioDir && (
-                <button style={{ ...BTN(), background: "rgba(255,180,40,0.1)", color: "#c09050" }} onClick={() => void pickAudioDir()}>
-                  Set audio folder…
-                </button>
-              )}
+              <button style={BTN()} onClick={() => filesInputRef.current?.click()}>Browse files…</button>
             </>
           )}
 
@@ -259,7 +222,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
               {/* Entry list */}
               {entries.map(entry => (
                 <div key={entry.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 5, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
-                  <div style={{ fontSize: 10, color: "#80aaff" }}>🔊 {entry.handle.name}</div>
+                  <div style={{ fontSize: 10, color: "#80aaff" }}>🔊 {entry.file.name}</div>
 
                   {/* Label + Category row */}
                   <div style={{ display: "flex", gap: 6 }}>
@@ -306,12 +269,6 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
                 </div>
               ))}
 
-              {!audioDir && (
-                <div style={{ background: "rgba(255,60,60,0.06)", border: "1px solid rgba(255,60,60,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c06060" }}>
-                  No audio folder set — select your project's <code>public/assets/audio</code> folder.{" "}
-                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#c09050", fontSize: 10 }} onClick={() => void pickAudioDir()}>Set folder…</button>
-                </div>
-              )}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
               {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress || "Importing…"}</div>}
             </>
@@ -337,8 +294,7 @@ export function AudioImporterModal({ audioDir, onAudioDirSet, existingTags, exis
           <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
             {phase === "meta" && (
               <button
-                style={BTN(!!audioDir)}
-                disabled={!audioDir}
+                style={BTN()}
                 onClick={() => void doImport()}
               >
                 Import {entries.length > 1 ? `all ${entries.length}` : ""}

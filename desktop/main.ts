@@ -28,6 +28,7 @@ const bootPage = Deno.env.get("WORLDBUILDER_BOOT");
 // every run, so ALL app traffic goes over POST /api/<method> with a JSON
 // array of args; bindings remain registered for spike diagnostics only.
 import * as P from "./projects.ts";
+import * as A from "./assets.ts";
 import { getLastSession, getPref, setLastSession, setPref } from "./workspace.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -49,6 +50,8 @@ const apiMethods: Record<string, (...args: any[]) => unknown> = {
   readAutosave: () => P.readAutosave(ws),
   clearAutosave: () => P.clearAutosave(ws),
   writeExportFile: (name: string, text: string) => P.writeExportFile(ws, name, text),
+  writeAssetManifest: (kind: string, json: string) => A.writeAssetManifest(ws, kind, json),
+  deleteAssetFiles: (kind: string, rels: string[]) => A.deleteAssetFiles(ws, kind, rels),
 };
 
 async function handleApi(req: Request, pathname: string): Promise<Response> {
@@ -69,6 +72,17 @@ async function handleApi(req: Request, pathname: string): Promise<Response> {
 Deno.serve(async (req: Request) => {
   const { pathname } = new URL(req.url);
   if (pathname.startsWith("/api/")) return handleApi(req, pathname);
+  // Binary asset upload: POST /api-file/<kind>/<rel…>, raw bytes as the body.
+  if (pathname.startsWith("/api-file/") && req.method === "POST") {
+    const [kind, ...relParts] = pathname.slice("/api-file/".length).split("/");
+    try {
+      const bytes = new Uint8Array(await req.arrayBuffer());
+      return Response.json(await A.writeAssetFile(ws, kind, relParts.map(decodeURIComponent).join("/"), bytes));
+    } catch (e) {
+      console.error(`[api-file] ${pathname} failed:`, (e as Error).message);
+      return Response.json({ error: (e as Error).message }, { status: 500 });
+    }
+  }
   // Spike harness report sink (kept as a shell-regression tool, /spike.html)
   if (pathname === "/spike-report" && req.method === "POST") {
     await Deno.writeTextFile(spikeResultsPath, await req.text());

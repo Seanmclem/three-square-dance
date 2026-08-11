@@ -46,8 +46,25 @@ export interface DesktopApi {
   readAutosave(): Promise<AutosavePayload | null>;
   clearAutosave(): Promise<void>;
 
-  // single-file export (replaces showSaveFilePicker)
+  // single-file export (replaces the browser save-file picker)
   writeExportFile(name: string, text: string): Promise<{ path: string }>;
+
+  // asset library (binary file uploads use uploadAssetFile below — the JSON
+  // api can't carry bytes)
+  writeAssetManifest(kind: AssetKind, json: string): Promise<void>;
+  deleteAssetFiles(kind: AssetKind, rels: string[]): Promise<{ trashed: number }>;
+}
+
+export type AssetKind = "models" | "textures" | "audio" | "skyboxes" | "graphics" | "decals";
+
+/** Raw-bytes asset write: POST /api-file/<kind>/<rel>. `rel` may contain
+ *  subdirs (textures/<matId>/<quality>/<map>.jpg). Desktop shell only. */
+export async function uploadAssetFile(kind: AssetKind, rel: string, data: Blob | ArrayBuffer | Uint8Array): Promise<{ path: string; byteLength: number }> {
+  const body = data instanceof Blob ? data : new Blob([data instanceof Uint8Array ? (data.slice().buffer as ArrayBuffer) : data]);
+  const res = await fetch(`/api-file/${kind}/${rel.split("/").map(encodeURIComponent).join("/")}`, { method: "POST", body });
+  const json = await res.json() as { error?: string; path: string; byteLength: number };
+  if (!res.ok) throw new Error(json?.error ?? `api-file → HTTP ${res.status}`);
+  return json;
 }
 
 async function call(method: string, args: unknown[]): Promise<unknown> {

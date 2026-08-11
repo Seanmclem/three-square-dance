@@ -2,12 +2,11 @@ import { useState, useRef } from "react";
 import { LoadingManager } from "three";
 import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
 import { renderModelThumbnail, releaseThumbnailRenderer, dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
+import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
 import { TagInput } from "@/ui/TagInput";
 
 interface Props {
-  modelsDir:      FileSystemDirectoryHandle | null;
-  onModelsDirSet: (dir: FileSystemDirectoryHandle) => void;
   existingTags:   string[];   // suggestions — the manifest isn't read until the import step
   existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
   onComplete:     (assets: AssetDef[]) => void;
@@ -37,29 +36,23 @@ function autoLabel(name: string): string {
 }
 
 interface ModelEntry {
-  id:          string;
-  modelHandle: FileSystemFileHandle;
-  mtlHandle:   FileSystemFileHandle | null;
-  label:       string;
-  category:    string;
-  showNewCat:  boolean;
+  id:         string;
+  modelFile:  File;
+  mtlFile:    File | null;
+  label:      string;
+  category:   string;
+  showNewCat: boolean;
 }
 
-type FSPicker = {
-  showOpenFilePicker:  (opts: unknown) => Promise<FileSystemFileHandle[]>;
-  showDirectoryPicker: (opts: unknown) => Promise<FileSystemDirectoryHandle>;
-};
-
 async function generateThumbnail(
-  handle: FileSystemFileHandle,
+  file: File,
   ext: string,
-  mtlHandle?: FileSystemFileHandle | null,
+  mtlFile?: File | null,
 ): Promise<{ thumb: string | null; animations: string[] }> {
   let blobUrl: string | null = null;
   let mtlBlobUrl: string | null = null;
   let animations: string[] = [];
   try {
-    const file = await handle.getFile();
     blobUrl = URL.createObjectURL(file);
 
     let root: import("three").Object3D;
@@ -67,11 +60,10 @@ async function generateThumbnail(
       const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
       const loader = new OBJLoader();
 
-      if (mtlHandle) {
+      if (mtlFile) {
         const { MTLLoader } = await import("three/addons/loaders/MTLLoader.js");
         const manager = new LoadingManager();
         manager.onError = () => {}; // silently ignore missing texture images
-        const mtlFile = await mtlHandle.getFile();
         mtlBlobUrl = URL.createObjectURL(mtlFile);
         const mtlLoader = new MTLLoader(manager);
         mtlLoader.setResourcePath(""); // textures won't resolve, but colors parse fine
@@ -130,7 +122,7 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#646464", fontSize: 10, letterSpacing: 1,
 };
 
-export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, existingAttributions, onComplete, onClose }: Props) {
+export function ModelImporterModal({ existingTags, existingAttributions, onComplete, onClose }: Props) {
   const [phase,      setPhase]      = useState<Phase>("pick");
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
   const [collidable,    setCollidable]    = useState(true);
@@ -140,114 +132,91 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
   const [progress,   setProgress]   = useState("");
   const [error,      setError]      = useState<string | null>(null);
   const [results,    setResults]    = useState<AssetDef[]>([]);
-  const textureHandlesRef = useRef<FileSystemFileHandle[]>([]);
+  const textureFilesRef = useRef<File[]>([]);
+  const filesInputRef   = useRef<HTMLInputElement>(null);
+  const mtlInputRef     = useRef<HTMLInputElement>(null);
+  const mtlForEntryRef  = useRef<string | null>(null);
 
   function updateEntry(id: string, patch: Partial<ModelEntry>): void {
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
   }
 
-  async function pickFiles(): Promise<void> {
-    try {
-      const handles = await (window as unknown as FSPicker).showOpenFilePicker({
-        multiple: true,
-        types: [{ description: "3D Models, Materials & Textures", accept: { "model/*": [".glb", ".gltf", ".obj"], "text/plain": [".mtl"], "image/*": [".png", ".jpg", ".jpeg", ".webp", ".bmp"] } }],
-      });
-      if (!handles.length) return;
+  function onFilesChosen(list: FileList | null): void {
+    const files = [...(list ?? [])];
+    if (!files.length) return;
 
-      // Separate models, mtl, and texture files
-      const models   = handles.filter(h => MODEL_EXTS.has(getExt(h.name)));
-      const mtls     = handles.filter(h => getExt(h.name) === ".mtl");
-      const textures = handles.filter(h => TEXTURE_EXTS.has(getExt(h.name)));
+    // Separate models, mtl, and texture files
+    const models   = files.filter(f => MODEL_EXTS.has(getExt(f.name)));
+    const mtls     = files.filter(f => getExt(f.name) === ".mtl");
+    const textures = files.filter(f => TEXTURE_EXTS.has(getExt(f.name)));
 
-      if (!models.length) return;
+    if (!models.length) return;
 
-      // Auto-pair OBJ files with MTL files by matching base name
-      const mtlMap = new Map(mtls.map(h => [baseName(h.name), h]));
+    // Auto-pair OBJ files with MTL files by matching base name
+    const mtlMap = new Map(mtls.map(f => [baseName(f.name), f]));
 
-      const newEntries: ModelEntry[] = models.map(h => ({
-        id:          crypto.randomUUID(),
-        modelHandle: h,
-        mtlHandle:   getExt(h.name) === ".obj" ? (mtlMap.get(baseName(h.name)) ?? null) : null,
-        label:       autoLabel(h.name),
-        category:    "Props",
-        showNewCat:  false,
-      }));
+    const newEntries: ModelEntry[] = models.map(f => ({
+      id:         crypto.randomUUID(),
+      modelFile:  f,
+      mtlFile:    getExt(f.name) === ".obj" ? (mtlMap.get(baseName(f.name)) ?? null) : null,
+      label:      autoLabel(f.name),
+      category:   "Props",
+      showNewCat: false,
+    }));
 
-      textureHandlesRef.current = textures;
-      setEntries(newEntries);
-      setPhase("meta");
-    } catch { /* cancelled */ }
+    textureFilesRef.current = textures;
+    setEntries(newEntries);
+    setPhase("meta");
   }
 
-  async function pickExtraMtl(entryId: string): Promise<void> {
-    try {
-      const [h] = await (window as unknown as FSPicker).showOpenFilePicker({
-        multiple: false,
-        types: [{ description: "MTL Material", accept: { "text/plain": [".mtl"] } }],
-      });
-      if (h) updateEntry(entryId, { mtlHandle: h });
-    } catch { /* cancelled */ }
+  function onMtlChosen(list: FileList | null): void {
+    const f = list?.[0];
+    const entryId = mtlForEntryRef.current;
+    mtlForEntryRef.current = null;
+    if (f && entryId) updateEntry(entryId, { mtlFile: f });
   }
 
-  async function pickModelsDir(): Promise<void> {
-    try {
-      const dir = await (window as unknown as FSPicker).showDirectoryPicker({ mode: "readwrite" });
-      onModelsDirSet(dir);
-    } catch { /* cancelled */ }
-  }
-
-  async function copyFile(src: FileSystemFileHandle, dir: FileSystemDirectoryHandle, dest: string): Promise<void> {
-    const file = await src.getFile();
-    const dh   = await dir.getFileHandle(dest, { create: true });
-    const w    = await dh.createWritable();
-    await w.write(await file.arrayBuffer());
-    await w.close();
+  async function copyFile(src: File, dest: string): Promise<void> {
+    await writeAssetFile("models", dest, await src.arrayBuffer());
   }
 
   async function doImport(): Promise<void> {
-    if (!modelsDir || !entries.length) return;
+    if (!entries.length) return;
     setPhase("importing");
     setError(null);
 
     // Load manifest once
-    let manifest: AssetManifest = { version: "1.0", assets: [] };
-    try {
-      const mh = await modelsDir.getFileHandle("manifest.json");
-      manifest = JSON.parse(await (await mh.getFile()).text()) as AssetManifest;
-    } catch { /* new manifest */ }
+    const manifest = await readManifest<AssetManifest>("models", { version: "1.0", assets: [] });
 
     // Copy any texture images first (flat copy — MTL references them by filename)
-    for (const texHandle of textureHandlesRef.current) {
-      try { await copyFile(texHandle, modelsDir, texHandle.name); } catch { /* skip */ }
+    for (const texFile of textureFilesRef.current) {
+      try { await copyFile(texFile, texFile.name); } catch { /* skip */ }
     }
 
     const imported: AssetDef[] = [];
 
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]!;
-      setProgress(`Importing ${i + 1} of ${entries.length}: ${entry.modelHandle.name}`);
+      setProgress(`Importing ${i + 1} of ${entries.length}: ${entry.modelFile.name}`);
       try {
-        const modelExt  = getExt(entry.modelHandle.name);
-        const base      = slugify(entry.label) || slugify(autoLabel(entry.modelHandle.name));
+        const modelExt  = getExt(entry.modelFile.name);
+        const base      = slugify(entry.label) || slugify(autoLabel(entry.modelFile.name));
         const destModel = `${base}${modelExt}`;
-        await copyFile(entry.modelHandle, modelsDir, destModel);
+        await copyFile(entry.modelFile, destModel);
 
         let destMtl: string | undefined;
-        if (modelExt === ".obj" && entry.mtlHandle) {
+        if (modelExt === ".obj" && entry.mtlFile) {
           destMtl = `${base}.mtl`;
-          await copyFile(entry.mtlHandle, modelsDir, destMtl);
+          await copyFile(entry.mtlFile, destMtl);
         }
 
         // Generate thumbnail
-        setProgress(`Generating thumbnail ${i + 1} of ${entries.length}: ${entry.modelHandle.name}`);
+        setProgress(`Generating thumbnail ${i + 1} of ${entries.length}: ${entry.modelFile.name}`);
         let destThumb: string | undefined;
-        const { thumb: thumbDataUrl, animations } = await generateThumbnail(entry.modelHandle, modelExt, entry.mtlHandle);
+        const { thumb: thumbDataUrl, animations } = await generateThumbnail(entry.modelFile, modelExt, entry.mtlFile);
         if (thumbDataUrl) {
           destThumb = `${base}_thumb.png`;
-          const thumbHandle = await modelsDir.getFileHandle(destThumb, { create: true });
-          const thumbWriter = await thumbHandle.createWritable();
-          await thumbWriter.write(dataURLtoArrayBuffer(thumbDataUrl));
-          await thumbWriter.close();
+          await writeAssetFile("models", destThumb, dataURLtoArrayBuffer(thumbDataUrl));
         }
 
         const resolvedCat = (entry.category === "__new__" ? "Other" : entry.category) as AssetCategory;
@@ -273,17 +242,14 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
         manifest.assets.push(asset);
         imported.push(asset);
       } catch (err) {
-        console.warn(`Import failed for ${entry.modelHandle.name}:`, err);
+        console.warn(`Import failed for ${entry.modelFile.name}:`, err);
       }
     }
     releaseThumbnailRenderer();
 
     // Write manifest once after all imports
     try {
-      const mw = await modelsDir.getFileHandle("manifest.json", { create: true });
-      const wb = await mw.createWritable();
-      await wb.write(JSON.stringify(manifest, null, 2));
-      await wb.close();
+      await writeManifest("models", manifest);
     } catch (err) {
       setError(`Manifest write failed: ${String(err)}`);
     }
@@ -296,6 +262,17 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
+
+        <input
+          ref={filesInputRef} type="file" multiple style={{ display: "none" }}
+          accept=".glb,.gltf,.obj,.mtl,.png,.jpg,.jpeg,.webp,.bmp"
+          onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
+        <input
+          ref={mtlInputRef} type="file" style={{ display: "none" }}
+          accept=".mtl"
+          onChange={e => { onMtlChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
+        />
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>
@@ -315,17 +292,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
                 — select multiple files at once. Pair <span style={{ color: "#80aaff" }}>.obj + .mtl</span> by selecting both; they're matched by base name.
                 Also select any <span style={{ color: "#80aaff" }}>texture images</span> (.png .jpg …) referenced by the MTL — they'll be copied alongside the model.
               </div>
-              {!modelsDir && (
-                <div style={{ background: "rgba(255,180,40,0.06)", border: "1px solid rgba(255,180,40,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c09050" }}>
-                  Models folder not set — imports cannot be saved.
-                </div>
-              )}
-              <button style={BTN()} onClick={() => void pickFiles()}>Browse files…</button>
-              {!modelsDir && (
-                <button style={{ ...BTN(), background: "rgba(255,180,40,0.1)", color: "#c09050" }} onClick={() => void pickModelsDir()}>
-                  Set models folder…
-                </button>
-              )}
+              <button style={BTN()} onClick={() => filesInputRef.current?.click()}>Browse files…</button>
             </>
           )}
 
@@ -335,7 +302,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <p style={STEP_LABEL}>
                   {entries.length} MODEL{entries.length !== 1 ? "S" : ""}
-                  {textureHandlesRef.current.length > 0 && ` · ${textureHandlesRef.current.length} TEXTURE${textureHandlesRef.current.length !== 1 ? "S" : ""}`}
+                  {textureFilesRef.current.length > 0 && ` · ${textureFilesRef.current.length} TEXTURE${textureFilesRef.current.length !== 1 ? "S" : ""}`}
                 </p>
                 <button style={{ ...BTN(), padding: "3px 8px", fontSize: 10 }} onClick={() => setPhase("pick")}>← Change files</button>
               </div>
@@ -394,19 +361,19 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
 
               {/* Entry list */}
               {entries.map(entry => {
-                const isOBJ = getExt(entry.modelHandle.name) === ".obj";
+                const isOBJ = getExt(entry.modelFile.name) === ".obj";
                 return (
                   <div key={entry.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 5, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
                     {/* File row */}
                     <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 10, color: "#80aaff" }}>📄 {entry.modelHandle.name}</span>
+                      <span style={{ fontSize: 10, color: "#80aaff" }}>📄 {entry.modelFile.name}</span>
                       {isOBJ && (
-                        entry.mtlHandle
-                          ? <span style={{ fontSize: 10, color: "#80cc90" }}>🎨 {entry.mtlHandle.name}</span>
+                        entry.mtlFile
+                          ? <span style={{ fontSize: 10, color: "#80cc90" }}>🎨 {entry.mtlFile.name}</span>
                           : (
                             <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               <span style={{ fontSize: 10, color: "#c09050" }}>⚠ no .mtl</span>
-                              <button style={{ ...BTN(), padding: "1px 7px", fontSize: 9 }} onClick={() => void pickExtraMtl(entry.id)}>+ .mtl</button>
+                              <button style={{ ...BTN(), padding: "1px 7px", fontSize: 9 }} onClick={() => { mtlForEntryRef.current = entry.id; mtlInputRef.current?.click(); }}>+ .mtl</button>
                             </span>
                           )
                       )}
@@ -455,12 +422,6 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
                 <span>Collidable (all) — auto box collider from model bounds</span>
               </label>
 
-              {!modelsDir && (
-                <div style={{ background: "rgba(255,60,60,0.06)", border: "1px solid rgba(255,60,60,0.2)", borderRadius: 4, padding: "8px 10px", fontSize: 10, color: "#c06060" }}>
-                  No models folder set.{" "}
-                  <button style={{ background: "none", border: "none", cursor: "pointer", color: "#c09050", fontSize: 10 }} onClick={() => void pickModelsDir()}>Set folder…</button>
-                </div>
-              )}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
               {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress}</div>}
             </>
@@ -486,8 +447,7 @@ export function ModelImporterModal({ modelsDir, onModelsDirSet, existingTags, ex
           <div style={{ padding: "12px 20px", borderTop: "1px solid rgba(255,255,255,0.07)", flexShrink: 0, display: "flex", justifyContent: "flex-end", gap: 8 }}>
             {phase === "meta" && (
               <button
-                style={BTN(!!modelsDir)}
-                disabled={!modelsDir}
+                style={BTN()}
                 onClick={() => void doImport()}
               >
                 Import {entries.length > 1 ? `all ${entries.length}` : ""}
