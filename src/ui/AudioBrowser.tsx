@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { SoundDef } from "@/types";
+import { AssetFilterBar } from "@/ui/AssetFilterBar";
+import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 
 interface AudioBrowserProps {
   sounds:         SoundDef[];
@@ -10,13 +12,15 @@ interface AudioBrowserProps {
 
 const catOf = (s: SoundDef) => s.category ?? "SFX";
 
+const FACETS: FacetSpec<SoundDef>[] = [
+  { key: "cat",    label: "Categories", always: true, order: "alpha", counts: false, read: catOf },
+  { key: "tag",    label: "Tags",       multi: true, prefix: "#", read: s => s.tags },
+  { key: "pack",   label: "Pack",       read: s => s.attribution?.sourceName },
+  { key: "author", label: "Author",     read: s => s.attribution?.author },
+];
+
 export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: AudioBrowserProps) {
   const [search,  setSearch]  = useState("");
-  const [cat,     setCat]     = useState<string>("All");
-  // The pill strip shows EITHER categories (exclusive) or tags (multi-select AND).
-  // Both filters stay live across the toggle — see `filtered` below.
-  const [filterMode, setFilterMode] = useState<"cat" | "tag">("cat");
-  const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [manage,  setManage]  = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [playing, setPlaying] = useState<string | null>(null);
@@ -46,46 +50,13 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
     void a.play().then(() => setPlaying(s.id)).catch(() => setPlaying(null));
   };
 
-  const cats = ["All", ...[...new Set(sounds.map(catOf))].sort()];
-
-  // Tags, most-used first (frequency is the useful default when there may be dozens).
-  const tagCounts = new Map<string, number>();
-  for (const s of sounds) for (const t of s.tags ?? []) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
-  const ALL_TAGS = [...tagCounts.keys()]
-    .sort((a, b) => (tagCounts.get(b)! - tagCounts.get(a)!) || a.localeCompare(b));
-
-  const toggleTag = (t: string) =>
-    setActiveTags(prev => { const n = new Set(prev); n.has(t) ? n.delete(t) : n.add(t); return n; });
-  const clearFilters = () => { setCat("All"); setActiveTags(new Set()); };
+  const facetState = useFacetFilters(sounds, FACETS);
 
   // Natural order so "sound12" sorts after "sound9", not next to "sound1".
-  const filtered = sounds.filter(s => {
-    const matchCat  = cat === "All" || catOf(s) === cat;
-    const matchTags = activeTags.size === 0 || [...activeTags].every(t => (s.tags ?? []).includes(t));
-    const q = search.toLowerCase();
-    return matchCat && matchTags
-      && (!q || s.label.toLowerCase().includes(q) || (s.tags ?? []).some(t => t.toLowerCase().includes(q)));
-  }).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
-
-  const chip = (key: string, label: React.ReactNode, active: boolean, onClick: () => void, title?: string) => (
-    <button key={key} onClick={onClick} title={title} style={{
-      padding: "2px 8px", borderRadius: 10, fontSize: 10, cursor: "pointer",
-      background: active ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
-      border: `1px solid ${active ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.07)"}`,
-      color: active ? "#80aaff" : "#c2cadb",
-    }}>{label}</button>
-  );
-  const pill = (c: string) => chip(c, c, cat === c, () => setCat(c));
-
-  // Facet switcher — named segments, so the strip below never changes meaning silently.
-  const seg = (mode: "cat" | "tag", label: React.ReactNode) => (
-    <button key={mode} onClick={() => setFilterMode(mode)} style={{
-      padding: "3px 10px", borderRadius: 3, fontSize: 10, cursor: "pointer", border: "none",
-      letterSpacing: 0.5, whiteSpace: "nowrap",
-      background: filterMode === mode ? "rgba(80,140,255,0.25)" : "transparent",
-      color: filterMode === mode ? "#80aaff" : "#c2cadb",
-    }}>{label}</button>
-  );
+  const q = search.toLowerCase();
+  const filtered = facetState.filtered.filter(s =>
+    !q || s.label.toLowerCase().includes(q) || (s.tags ?? []).some(t => t.toLowerCase().includes(q))
+  ).sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true, sensitivity: "base" }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -97,36 +68,10 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
             fontSize: 11, padding: "4px 6px", outline: "none" }} />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px 4px", flexShrink: 0 }}>
-        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2 }}>
-          {seg("cat", "Categories")}
-          {seg("tag", <>Tags{activeTags.size > 0 && <span style={{ opacity: 0.55, marginLeft: 4 }}>{activeTags.size}</span>}</>)}
-        </div>
-        <span style={{ flex: 1 }} />
-        {(activeTags.size > 0 || cat !== "All") && (
-          <button onClick={clearFilters} title="Clear the category and tag filters" style={{
-            flexShrink: 0, fontSize: 10, padding: "3px 8px", borderRadius: 3, background: "transparent",
-            border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", color: "#c2cadb", letterSpacing: 0.5,
-          }}>clear</button>
-        )}
-      </div>
-
-      {/* Strip: category pills OR tag chips. Wraps, and scrolls once tags get numerous. */}
-      <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4,
-        maxHeight: 68, overflowY: "auto" }}>
-        {filterMode === "cat" ? cats.map(pill) : (
-          <>
-            {/* The category filter is still live but its pills are hidden — surface it so a
-                forgotten category doesn't read as "the tag filter found nothing". */}
-            {cat !== "All" && chip("__cat", `${cat} ✕`, false, () => setCat("All"), "Clear the category filter")}
-            {ALL_TAGS.map(t => chip(t, <>#{t}<span style={{ opacity: 0.55, marginLeft: 4 }}>{tagCounts.get(t)}</span></>,
-              activeTags.has(t), () => toggleTag(t)))}
-            {ALL_TAGS.length === 0 && (
-              <span style={{ fontSize: 10, color: "#9aa3b5", padding: "2px" }}>No tags yet</span>
-            )}
-          </>
-        )}
-      </div>
+      <AssetFilterBar
+        facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
+        onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+      />
 
       <div style={{ padding: "6px 8px", flexShrink: 0, display: "flex", gap: 4 }}>
         {!manage ? (

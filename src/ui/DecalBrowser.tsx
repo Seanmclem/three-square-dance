@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { DecalTexDef, DecalKind } from "@/types";
 import { MaterialCategoryPills, orderedMaterialCategories } from "@/ui/materialCategories";
+import { AssetFilterBar } from "@/ui/AssetFilterBar";
+import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 
 interface DecalBrowserProps {
   decals:     DecalTexDef[];
@@ -10,13 +12,21 @@ interface DecalBrowserProps {
 
 const catOf = (d: DecalTexDef) => d.category ?? "Other";
 
+// DecalTexDef has no `tags` field. Facets are computed over the kind-filtered list,
+// because Overlay/Surface is a hard split above them, not another facet.
+const FACETS: FacetSpec<DecalTexDef>[] = [
+  { key: "cat",    label: "Categories", always: true, read: catOf },
+  { key: "pack",   label: "Pack",       read: d => d.attribution?.sourceName },
+  { key: "author", label: "Author",     read: d => d.attribution?.author },
+];
+
 export function DecalBrowser({ decals, selectedId, onSelect }: DecalBrowserProps) {
   const [kind, setKind] = useState<DecalKind>("overlay");
-  const [cat,  setCat]  = useState<string>("All");
 
   const byKind = decals.filter(d => d.kinds.includes(kind));
+  const facetState = useFacetFilters(byKind, FACETS);
   const orderedCats = orderedMaterialCategories([...new Set(byKind.map(catOf))]);
-  const filtered = byKind.filter(d => cat === "All" || catOf(d) === cat);
+  const filtered = facetState.filtered;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -44,9 +54,17 @@ export function DecalBrowser({ decals, selectedId, onSelect }: DecalBrowserProps
       </div>
 
       {/* Category pills */}
-      <div style={{ padding: "0 8px 4px", flexShrink: 0 }}>
-        <MaterialCategoryPills categories={orderedCats} active={cat} onSelect={setCat} />
-      </div>
+      <AssetFilterBar
+        facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
+        onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+        categorySlot={
+          <MaterialCategoryPills
+            categories={orderedCats}
+            active={facetState.sel.cat?.[0] ?? "All"}
+            onSelect={c => (c === "All" ? facetState.clearFacet("cat") : facetState.toggle("cat", c))}
+          />
+        }
+      />
 
       <div style={{ padding: "2px 8px 6px", flexShrink: 0, color: "#606070", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
         Pick a decal, then hover a wall/floor and click to stamp. Scroll = size,

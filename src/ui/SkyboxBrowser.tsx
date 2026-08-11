@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import type { SkyboxDef } from "@/types";
+import { AssetFilterBar } from "@/ui/AssetFilterBar";
+import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 
 interface SkyboxBrowserProps {
   skyboxes:         SkyboxDef[];
@@ -12,9 +14,15 @@ interface SkyboxBrowserProps {
 
 const catOf = (s: SkyboxDef) => s.category ?? "Other";
 
+const FACETS: FacetSpec<SkyboxDef>[] = [
+  { key: "cat",    label: "Categories", always: true, order: "alpha", counts: false, read: catOf },
+  { key: "tag",    label: "Tags",       multi: true, prefix: "#", read: s => s.tags },
+  { key: "pack",   label: "Pack",       read: s => s.attribution?.sourceName },
+  { key: "author", label: "Author",     read: s => s.attribution?.author },
+];
+
 export function SkyboxBrowser({ skyboxes, selectedId, onSelect, onImport, onDeleteSkyboxes, onEdit }: SkyboxBrowserProps) {
   const [search,  setSearch]  = useState("");
-  const [cat,     setCat]     = useState<string>("All");
   const [manage,  setManage]  = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
@@ -30,20 +38,10 @@ export function SkyboxBrowser({ skyboxes, selectedId, onSelect, onImport, onDele
     });
   }, [skyboxes]);
 
-  const cats = ["All", ...[...new Set(skyboxes.map(catOf))].sort()];
-  const filtered = skyboxes.filter(s => {
-    const matchCat = cat === "All" || catOf(s) === cat;
-    const q = search.toLowerCase();
-    return matchCat && (!q || s.label.toLowerCase().includes(q));
-  });
-
-  const pill = (c: string) => (
-    <button key={c} onClick={() => setCat(c)} style={{
-      padding: "2px 8px", borderRadius: 10, fontSize: 10, cursor: "pointer",
-      background: cat === c ? "rgba(80,140,255,0.2)" : "rgba(255,255,255,0.04)",
-      border: `1px solid ${cat === c ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.07)"}`,
-      color: cat === c ? "#80aaff" : "#808080",
-    }}>{c}</button>
+  const facetState = useFacetFilters(skyboxes, FACETS);
+  const q = search.toLowerCase();
+  const filtered = facetState.filtered.filter(s =>
+    !q || s.label.toLowerCase().includes(q) || (s.tags ?? []).some(t => t.toLowerCase().includes(q))
   );
 
   // A tile: procedural "sky" (swatch) or an image skybox (thumbnail). In manage mode,
@@ -86,9 +84,10 @@ export function SkyboxBrowser({ skyboxes, selectedId, onSelect, onImport, onDele
             fontSize: 11, padding: "4px 6px", outline: "none" }} />
       </div>
 
-      <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4 }}>
-        {cats.map(pill)}
-      </div>
+      <AssetFilterBar
+        facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
+        onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+      />
 
       <div style={{ padding: "6px 8px", flexShrink: 0, display: "flex", gap: 4 }}>
         {!manage ? (

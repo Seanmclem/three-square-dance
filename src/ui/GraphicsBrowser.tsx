@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import type { GraphicDef } from "@/types";
 import { MaterialCategoryPills, orderedMaterialCategories } from "@/ui/materialCategories";
+import { AssetFilterBar } from "@/ui/AssetFilterBar";
+import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 import { assetManager } from "@/core/AssetManager";
 
 interface GraphicsBrowserProps {
@@ -24,9 +26,15 @@ const checkerTile = (path: string): React.CSSProperties => ({
   backgroundRepeat: "no-repeat, repeat, repeat",
 });
 
+// GraphicDef has no `tags` field, so there is no tag facet here.
+const FACETS: FacetSpec<GraphicDef>[] = [
+  { key: "cat",    label: "Categories", always: true, read: catOf },
+  { key: "pack",   label: "Pack",       read: g => g.attribution?.sourceName },
+  { key: "author", label: "Author",     read: g => g.attribution?.author },
+];
+
 export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }: GraphicsBrowserProps) {
   const [search,  setSearch]  = useState("");
-  const [cat,     setCat]     = useState<string>("All");
   // Manage mode: tiles become multi-select checkboxes for batch edit/delete
   const [manage,  setManage]  = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -44,10 +52,10 @@ export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }
     });
   }, [graphics]);
 
+  const facetState = useFacetFilters(graphics, FACETS);
   const orderedCats = orderedMaterialCategories([...new Set(graphics.map(catOf))]);
   const q = search.toLowerCase();
-  const filtered = graphics.filter(g =>
-    (cat === "All" || catOf(g) === cat) && (!q || g.label.toLowerCase().includes(q)));
+  const filtered = facetState.filtered.filter(g => !q || g.label.toLowerCase().includes(q));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -59,9 +67,17 @@ export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }
             fontSize: 11, padding: "4px 6px", outline: "none" }} />
       </div>
 
-      <div style={{ padding: "0 8px 4px", flexShrink: 0 }}>
-        <MaterialCategoryPills categories={orderedCats} active={cat} onSelect={setCat} />
-      </div>
+      <AssetFilterBar
+        facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
+        onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+        categorySlot={
+          <MaterialCategoryPills
+            categories={orderedCats}
+            active={facetState.sel.cat?.[0] ?? "All"}
+            onSelect={c => (c === "All" ? facetState.clearFacet("cat") : facetState.toggle("cat", c))}
+          />
+        }
+      />
 
       <div style={{ padding: "6px 8px", flexShrink: 0, display: "flex", gap: 4 }}>
         {!manage ? (

@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.65.0** — last updated 2026-08-10
+**Version 4.66.0** — last updated 2026-08-10
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -163,6 +163,7 @@
 - v4.33.15 — **A ceiling no longer hides its wall run's node dots and edge lines.** User report: one run "lost its corner node-dots and draggable edge-lines" while the run beside it kept both, and a reload didn't bring them back. Not lost — **relocated to roof height**. `NodeDragger._refresh` builds a nodeId→Y anchor map whose wall and floor passes take the *max*, but whose platform pass did a blind `nodeY.set(id, y)`. A node-backed ceiling (Add ceiling → platform carrying the run's own `nodeIds`) therefore overwrote each corner's wall-base anchor (y 0.12) with the ceiling top (y 3.26), and the platform edge loop likewise drew that run's edges at 3.24 — both then sitting under the ceiling and any dimmed upper floor, invisible. The neighbouring run had no ceiling, so it was unaffected; the trigger was simply the next `_refresh` (any drag, or a reload), which is why it looked drag-induced and survived reloads. Fix: the platform pass anchors only nodes nothing else claimed (`if (!nodeY.has(id))`), so the lowest anchor wins and run corners stay grabbable; platform edge lines derive their Y from the two endpoints' resolved dot heights (`min(dotY) − 0.08`, matching the floor edges' `+0.04` convention) and fall back to the platform top only for platform-only nodes. Dragging those corners still moves the ceiling, since it is the same node. Verified on the user's level: the ceiling's four corners report dots at **0.12** (were 3.26), the whole scene's 54 dots resolve to 0.12/3.12 with none at 3.26, all 40 edge-line vertices sit at 0.04, and the linked level-1 corners correctly stay at 3.12.
 - v4.33.14 — **Walls get flat per-face normals (fixes the lit seam where two floors' runs stack).** Follow-up to v4.33.13: with UVs continuous the brick courses lined up, but a hard lighting band remained at the junction. Diagnosed in-browser by elimination — sun `castShadow = false` left the band untouched (not shadow acne), and the two runs' outer faces measured 7mm apart (not an exposed ledge). Cause: `WallBuilder` calls `computeVertexNormals()` on an **indexed** strip whose 4 vertices per polyline point are shared between the side faces and the top/bottom/cap faces, so every side face's normal is averaged with the caps' — measured `n.y ≈ −0.07…−0.11` on the bottom row and `+0.06…+0.13` on the top row, smearing a fake vertical shading gradient up each wall (and rounding the shading across mitered corners — the soft cube corners and glossy smears in the user's screenshots). Invisible on a lone wall; where two runs stack, the lower run's top row (+0.13) abuts the upper run's bottom row (−0.07) and the discontinuity reads as a lit seam across the facade. Fix: new `withFlatNormals(geo)` helper — `toNonIndexed()` + `computeVertexNormals()` + dispose of the indexed original — applied in **both** solid build paths (`build`, `buildRun`) right before `applyUVOffset`. The editor-only translucent ghost mesh keeps its indexed/smoothed geometry (cosmetically irrelevant at 0.12 opacity). Verified in the live preview: side-face normals now exactly `n.y = 0` on every wall **including the CSG'd door run** (three-bvh-csg re-indexes but preserves them), the seam and the corner smearing are gone, vertex count ~5× on wall meshes only (20→96 simple run, 158→516 the big one) with draw calls unchanged (29dc·4k) and FPS 105→110.
 - v4.33.13 — **Copy-to-floor links corners across floors + walls tile continuously up a stack.** Two user reports about stacked runs. (1) **Vertical UV continuity**: `WallBuilder` emitted V from `0`→`H/tileY` on every run while positioning the mesh at `y = elevation`, so a run copied to level 1 restarted its brick course at its own base — a visible horizontal break mid-facade. V is now world-space like U already was (`elevation/tileY` → `(elevation+H)/tileY`) in **both** build paths (single-wall `build` and merged `buildRun`, incl. the closed-loop wrap-around vertex); walls at elevation 0 are byte-identical, so only stacked runs change. (2) **Linked corners**: new **`WallNode.linkId?: string`** (persisted). `handleCopyRunToFloor` no longer orphans the duplicated nodes — the source node adopts a `linkId` on its first copy and each copy joins that group, so a third-floor copy made *from* the second floor joins the same group (all three stay in sync). `WorldState.updateNode` delegates to a new public **`propagateNodeLink(zoneId, nodeId)`** that writes the position onto every link-mate and emits a **separate `node:updated` per mate** — required because `ZoneManager`'s handler rebuilds by node reference, and a mate's walls live on another floor that the dragged node's own rebuild never touches (fill floors / ghosted ceilings sharing the mate rebuild too, for free). Centralizing it in `updateNode` covers every drag path (NodeDragger corner + edge drags, GizmoManager, panel numeric fields) with one hook; the one bypass — `NodeDragger._syncRectCorner`, which mutates `zone.nodes` directly to collapse rect-floor rebuilds — calls `propagateNodeLink` explicitly. **Why not just share one node between floors:** `groupWallRuns`'s `canMerge` requires the shared node to be degree-2 counting walls across the whole zone regardless of floor, so a genuinely shared corner would read as degree-4 and shatter both runs into unmerged single walls, losing the mitered corners. Linking is therefore a *sync* relation, not identity. **Unlink** (user-chosen: per-run button over a copy-time checkbox): the wall-run Actions block shows `⛓ Corners linked to: G, 1` (levels derived from the walls referencing each link-mate — a node carries no level of its own) plus an "Unlink corners from other floors" button → `WorldState.unlinkNodes` drops `linkId` on that run's nodes only, leaving the other floors linked to each other. Scope is position-only by design: height/material/openings stay per-floor, consistent with copy-to-floor already dropping openings.
+- v4.66.0 — **Filter by kit/pack and author, in every asset browser — facets that appear only when they can actually split the library** (user: "there should also just like implicitly be an option to filter by kit-name, or author. For all asset types that let you add one. we may need to clean up the categories/tags/kits/author ui selection a bit. maybe 2 groups or segmented control"). `Attribution.sourceName` ("content pack / kit name") and `Attribution.author` were **display-only** — written at import, shown in `CreditsModal`, never filterable, even though every asset type carries them (`AssetDef`, `MaterialDef`, `SoundDef`, `SkyboxDef`, `GraphicDef`, `DecalTexDef`). They're now facets, and the "implicitly" is the interesting part: **a facet renders only when it has ≥2 distinct values AND at least one value shared by ≥2 items**, so no panel grows controls that can't filter anything. Concretely, against today's manifests: models gets **Pack** (Platformer Game Kit 107 / Ultimate Furniture 20 / Animated Animal 12) but **not Author** (139 of 142 are Quaternius — the filter would be a no-op); sounds and skyboxes get **Author** (Kenney vs the fixtures) but not Pack (one kit each); materials, graphics and decals get **neither**, so those three panels are visually unchanged. The second clause is what keeps Pack off the materials panel, whose `sourceName` holds a *per-texture* name ("Paving Stones 141", "Concrete 034") rather than a kit — a list of singletons filters nothing, and the rule self-corrects when a real kit is imported instead of needing a data migration (user chose this over editing the two materials' attribution). **New `src/ui/assetFilters.ts`** owns the semantics for all six browsers — `FacetSpec { key, label, multi, prefix, always, order, counts, read }`, `buildFacets` (count → drop blanks → order by count desc or alpha → apply the visibility rule), `matchesFacets` (multi = ANDed, exclusive = membership) and the `useFacetFilters` hook, whose `sel` is **self-healing**: a selected value that no longer exists (the last sound carrying a tag was deleted) is dropped from the effective selection rather than filtering the panel to zero, and an active facet that stops being worth showing can't stay the active strip. **New `src/ui/AssetFilterBar.tsx`** is the presentation for the five simpler panels; **AssetBrowser keeps its own strip** (142 assets and dozens of tags need the recency ordering and `More ▾` popout that the small panels don't) and reads its Pack/Author facets from the same module, so semantics can't drift between the two renderers even though the pixels differ. Pack/Author are **exclusive** (an asset has exactly one of each, so multi-select would mean OR — deliberately not built); tags stay multi-select AND. Filters on facets you can't currently see surface as clearable `Value ✕` chips (v4.48.1's "Category ✕" idea, generalized), and `clear` now resets every facet including the empty-grid "Clear filters" button. Two conventions preserved rather than flattened: the bar takes a **`categorySlot`** so materials/graphics/decals keep `MaterialCategoryPills` (domain ordering + its own popout) — rendered in a plain row, because that popout is absolutely positioned and the chip strip's `overflow: auto` would clip it — and category chips stay **bare and alphabetical** in the sounds/skybox panels (`counts: false`, `order: "alpha"`), since per v4.48.1 the count is part of what distinguishes a tag chip from a category pill. Verified in-browser through real clicks in all six panels: models `Pack → Ultimate Furniture Pack 20` filtered 142 → 20 tiles, ANDing `#prop` correctly yielded "No results." (no furniture item carries that tag — checked against the manifest) and the pack surfaced as `Ultimate Furniture Pack ✕` while the tag strip was showing; sounds `Author → Synthesized fixture 3` returned exactly the 3 fixtures; skybox tags rendered with counts; materials/graphics/decals showed no switcher and their category pills filtered as before; zero console errors, no checker overlay.
 - v4.65.0 — **Sounds panel gains the `Categories | Tags` facet switcher (tag filtering, at parity with models)** (user: "the audio-assets left side menu, doesn't let you toggle to and select tags, like models does for example. but the editor let's you add tags"). Exactly right, and the asymmetry was write-only: `SoundDef.tags` has existed since Phase 36, both the `AudioImporterModal` (`TagInput` + `existingTags` suggestions) and the shared `EditMetadataDialog` (`noun: "sound"`, which passes `tagSuggestions`) write it, and `AudioBrowser` matched tags **only** inside the free-text search — so a tag you had just authored was invisible unless you remembered it and typed it. `AudioBrowser` now carries the same two-facet strip as `AssetBrowser`: a `Categories | Tags` segmented control (`seg()`, active-tag count on the `Tags` segment) with a right-aligned `clear` that resets both, tag chips rendering `#tag count` (frequency-ordered, multi-select **ANDed**), and — in tag mode — the live category surfaced as a clearable `Category ✕` chip so a forgotten category can't read as "the tag filter found nothing". Both filters stay live across the toggle and compose with the search box. **Deliberately simpler than the models panel in one respect:** no `TAG_STRIP_COUNT` cap and no `More ▾` popout — the audio strip already wrapped, so every tag is visible at once and the strip is `maxHeight: 68` + `overflowY: auto` instead, which is less code and less hiding (the models panel's popout exists because its 3-column thumbnail grid can't spare the vertical space). Implementation note: the existing `pill()` helper was generalized into a shared `chip(key, label, active, onClick, title?)` so categories and tags cannot drift apart stylistically, and new inactive chip/segment text is `#c2cadb` rather than the panel's older `#808080`. Verified in-browser on the real 65-sound library through real clicks: `#test 3` → exactly the 3 test sounds, ANDing `#loop 2` → the 2 that carry both, `Tags 2` badge + `clear` appear, adding category `Music` on top narrowed it to the single `Test Music Loop - AI` while showing the `Music ✕` chip, and `clear` restored all 65; no console errors. **Not** yet addressed (user, same session, explicitly deferred): filtering by **kit/pack name or author** from `attribution`, for every asset type that records it, and the facet-UI grouping that would need.
 - v4.64.0 — **`flash_player` — model-agnostic damage feedback (avatar tint in 3rd-person, screen vignette in FPS)** (user: "would there be a simple enough action to make the player model visibly flash for a second or 2, when taking damage… In a way that could apply to a different model if I changed the player model later? And could flash red a bit on screen in first person"). New action **`flash_player`** with `flashColor` (default `#ff0000`) + `flashDuration` (default 1s), emitting **`character:flash`**. **`CharacterController` picks the presentation, because it owns `cameraMode`** — and it must, since `update()` sets `_modelRoot.visible = (cameraMode === "thirdperson")` every frame, so in FPS there is no avatar to tint and a model-only flash would silently do nothing in half the project's camera modes. Third-person → pulse the avatar's emissive toward the color (two pulses, amplitude eased out via `|sin(2πt/dur)| · (1 - t/dur)`, `emissiveIntensity` +2k) and restore on the final frame. FPS → emit `overlay:flash`. **Model-agnostic by construction:** the flash traverses whatever is under `_modelRoot` rather than knowing anything about the asset, so swapping `modelAssetId` needs no edits and the "capsule only" fallback flashes too. **The material-sharing trap:** the avatar comes from `cloneSkinned` (SkeletonUtils.clone), which **shares materials with the source asset** — tinting in place would also tint any NPC/prop using the same model. `_captureFlashMaterials()` therefore clones every avatar material once on the FIRST flash, records each one's resting emissive/intensity, and only ever mutates the copies (disposed in `dispose()`; the source materials are never touched). Materials without an `emissive` (MeshBasic et al.) are skipped rather than having their base color mutated, which would lose the original tint on a model that reuses one material across body parts. **New `src/preview/FlashOverlay.tsx`** rather than a mode on `FadeOverlay`, for two reasons: `overlay:fade-in` makes **both** `InputManager` (`:70`) and `ControlSchemeManager` (`:60`) set `_suppress = true` — correct for respawns/scene transitions where the screen HOLDS opaque while the world changes, but a damage flash must never take the controls away mid-fight — and fade animates to *full* opacity, whereas this peaks at **0.32** as a radial vignette (`zIndex` 199, below fade's 200, so a real respawn fade still covers it; `pointerEvents: none`). Wired in **both** shells (`App.tsx`, `RuntimeApp.tsx`) beside the existing FadeOverlay. Back-to-back hits re-arm with no nonce field: each emit carries a fresh payload object, so the `[flash]` dep differs by identity even when the values match (an earlier `key` counter was removed as provably inert). Verified in-browser on the user's real avatar ("character", 11 MeshStandardMaterials): the flash cloned all 11, pulsed emissive `000000 → e10000 → 000000 → 890000` (the eased second pulse) and restored to `000000`/intensity 1, **with the source-asset materials byte-for-byte untouched**; the FPS branch emitted `overlay:flash` without tinting the model and rendered the vignette at opacity 0.32 with `pointerEvents: none`; changing the color re-armed the overlay. (Hidden-tab note: the fade-out is kicked off by a rAF, which is frozen in a background tab, so the overlay holds at peak until its `setTimeout` clears it — same pattern FadeOverlay already uses.)
 - v4.63.3 — **`launch_player` direction can be measured from the PLAYER — knockback that always throws them backwards** (user: "the launch_player action is cool because it can launch relative to the trigger, but what if it could launch relative to the player too/instead? so like the player could always go backwards"). The two compasses were already identical, so this is an addition rather than a new convention: the engine sends `dirDeg` on the spawn-facing compass and `CharacterController` converts it with `x = -sin(θ)`, `z = -cos(θ)`; the player's own look yaw converts the same way, since `(0,0,-1)` rotated by `_yaw` expands to exactly `(-sin(_yaw), -cos(_yaw))` (the `_tmpForward` interact-facing math). Player-relative is therefore just `dirDeg + radToDeg(_yaw)`. **Schema:** `launchRelative: boolean` is superseded by **`launchRelativeTo?: 'world' | 'entity' | 'player'`** — three modes need an enum, since two independent booleans admit a meaningless both-on state. **No data migration**: the old boolean stays in the type, marked deprecated, and is READ as a fallback (`action.launchRelativeTo ?? (action.launchRelative ? 'entity' : 'world')`) in both the engine and the panel, so saved scenes are untouched. **Split of work:** `ScriptEngine` has no handle on the controller and the controller solely owns `_yaw`, so `'player'` sets a new `relativeToPlayer` flag on the `character:launch` payload and `CharacterController` adds its own yaw in the handler — the same engine-stays-out-of-player-state split `character:play-animation` uses. **"The player's facing" = the camera look yaw (`_yaw`), not `_modelYaw`** — `_yaw` is what `store_position`/`teleport_player` already treat as the player's facing and is defined while standing still, whereas `_modelYaw` is the smoothed *movement* direction and holds its last value when idle, which would fire a backwards-launch in a stale direction after a pause. Trade-off: while backpedaling, "backwards" means away from the camera, not away from travel. **Editor:** the owner-only "relative to this X" checkbox becomes a 3-way segmented picker (World · This `<owner.kind>` · Player) in the `MOVER_SEG_BTN` style, with a new `S.seg` in ScriptPanel; the middle option only renders when there's an owner, and an owner-less script showing a saved `'entity'` displays World, matching what the engine actually does. Verified in-browser through the real dispatch: at player yaw 0/90/45/200, mode Player + Direction 180 put the shove **exactly 180° off the look direction every time** (and Direction 0 exactly 0°), World mode ignored yaw, and firing the user's real Crab Bite volume (legacy `launchRelative: true`, volume rotation Y −180) still produced (0, +9) at every yaw — the fallback read working on real content. Panel verified rendering both buttons with the correct active state and hint.
@@ -3429,6 +3430,49 @@ All number inputs: local string state while typing, commit on blur/Enter. Change
 - "+" button activates ZoneTool (emits `tool:select { tool: 'zone' }`)
 - Active zone highlighted with accent border
 
+### assetFilters.ts + AssetFilterBar.tsx (v4.66.0)
+
+Shared facet filtering for **all six** asset browsers. `assetFilters.ts` holds the
+semantics, `AssetFilterBar.tsx` the presentation used by the five simpler panels;
+AssetBrowser renders its own strip but reads its facets from the same module, so the
+two renderers can't drift apart on meaning.
+
+```ts
+interface FacetSpec<T> {
+  key; label;                 // "pack" / "Pack" — state key + segment label
+  multi?;                     // multi-select ANDed (tags); default exclusive
+  prefix?;                    // "#" on tag chips
+  always?;                    // exempt from the visibility rule (category)
+  order?: "count" | "alpha";  // default "count" (most-used first)
+  counts?;                    // default true; category pills stay bare (v4.48.1)
+  read: (item) => string | string[] | undefined;
+}
+buildFacets(items, specs)   // counts, ordering, and the visibility rule
+matchesFacets(item, specs, sel)
+useFacetFilters(items, specs) // → { facets, activeKey, setMode, sel, toggle, clearFacet, clear, activeCount, filtered }
+```
+
+- **The visibility rule:** a facet is rendered only when it has **≥2 distinct values
+  AND at least one value shared by ≥2 items**. So no panel shows a control that can't
+  split its library: models gets Pack but not Author (139/142 Quaternius), sounds and
+  skyboxes get Author but not Pack (one kit each), materials/graphics/decals get
+  neither. The ≥2-items clause is what keeps Pack off the materials panel, whose
+  `sourceName` is a per-texture name, not a kit — and it starts showing by itself once
+  a real kit is imported. Category passes `always`.
+- **`sel` is self-healing:** values that no longer exist are dropped from the effective
+  selection (delete the last sound carrying a tag and the panel doesn't go blank), and
+  an active facet that stops qualifying can't remain the active strip.
+- **Pack/Author are exclusive** — an item has exactly one of each, so multi-select would
+  mean OR; deliberately not built. Tags remain multi-select AND.
+- `AssetFilterBar` omits the segmented control entirely when only one facet qualifies,
+  so a library with no tags and no usable attribution (decals) looks exactly as it did
+  before: a row of category pills. Filters on non-visible facets render as clearable
+  `Value ✕` chips.
+- **`categorySlot`** lets a panel supply its own category row — materials, graphics and
+  decals pass `MaterialCategoryPills` (domain ordering + overflow popout). The slot is
+  rendered in a plain row, NOT inside the chip strip: that popout is absolutely
+  positioned and the strip's `maxHeight`/`overflow: auto` would clip it.
+
 ### AssetBrowser.tsx
 
 - Scrollable grid, assets grouped by category tabs: Furniture, Props, Structures, Lights
@@ -3448,6 +3492,16 @@ All number inputs: local string state while typing, commit on blur/Enter. Change
   behind an empty grid. (Shipped first as a bare `#` toggle; that swapped the
   strip contents with no other visual change, so the mode switch was invisible
   — see v4.48.1.)
+- **`Pack` / `Author` segments (v4.66.0)** join the same switcher, sourced from
+  `assetFilters.ts` (`buildFacets(assets, ATTR_FACETS)`) so they mean exactly what
+  they mean in the other five panels. They appear only when the field can split the
+  library — today that's Pack (3 kits) and not Author (139 of 142 assets are
+  Quaternius). They are **exclusive** and list every value inline with counts (no
+  `More ▾` — that stays category/tag-only, since a library has few kits). This panel
+  keeps its own strip rather than adopting `AssetFilterBar`: the recency ordering and
+  the popout exist for 142 assets and dozens of tags. The validated `mode` (not raw
+  `filterMode`) drives the render, so a facet that stops qualifying falls back to
+  `cat`; `clearFilters` and the empty-grid "Clear filters" reset pack/author too.
 - **Manage mode single-selection actions:** 📷 re-stage thumbnail (v4.3.2) and
   **⌖ re-origin (v4.52.0)** — both enabled only at exactly one checked asset,
   between Edit and Delete. ⌖ → `onReorigin(id)` → `LeftPanel.onReoriginAsset` →
@@ -3462,25 +3516,46 @@ Delete (n) / Done, the pattern GraphicsBrowser later copied), and one row per
 unmount) plus label and a `category · loop · spatial` subline. Rows sort by label
 with `numeric: true`, so `sound12` follows `sound9`.
 
-- **`Categories | Tags` facet switcher (v4.65.0)**, mirroring AssetBrowser:
-  the strip shows EITHER category pills (`All` + the categories actually present,
-  exclusive) OR tag chips (`#tag count`, frequency-ordered, multi-select and
-  **ANDed**). Both filters stay live across the toggle and intersect with the
-  search box; the `Tags` segment carries the active-tag count and a right-aligned
-  `clear` resets both. In tag mode a live category renders as a clearable
-  `Category ✕` chip, so a forgotten category can't be misread as "the tag filter
-  found nothing".
-- **No `More ▾` overflow here** (unlike AssetBrowser): every tag renders, and the
+- **Facet switcher (v4.65.0, generalized v4.66.0)** — rendered by the shared
+  `AssetFilterBar` from a `FacetSpec[]`: `Categories` (exclusive, `always`, bare pills
+  in alphabetical order — `counts: false`, `order: "alpha"`, preserving the pre-v4.65
+  look), `Tags` (`#tag count`, frequency-ordered, multi-select **ANDed**), and
+  `Pack` / `Author` from `attribution`, which appear only when they can split the
+  library. On today's 65 sounds that means **Author** shows (Kenney 62 vs Synthesized
+  fixture 3) and **Pack** does not (one kit, "Digital Audio"). Every facet stays live
+  across the toggle and intersects with the search box; each segment carries its
+  active count, `clear` resets all of them, and filters on hidden facets surface as
+  clearable `Value ✕` chips.
+- **No `More ▾` overflow here** (unlike AssetBrowser): every value renders, and the
   wrapping strip is capped with `maxHeight: 68` / `overflowY: auto` instead. The
   models panel needs the popout because its 3-column thumbnail grid can't spare
   the rows; this list can.
-- `chip(key, label, active, onClick, title?)` is the single style helper behind
-  both category pills and tag chips (`pill()` is a thin wrapper), so the two
-  facets cannot drift apart visually. Inactive chip/segment text is `#c2cadb`.
 - Tags are **authored** in `AudioImporterModal` (`TagInput` with suggestions from
   the existing library) and in the shared `EditMetadataDialog` (`noun: "sound"`,
   which passes `tagSuggestions`, so bulk edits ADD tags rather than replace).
   Before v4.65.0 the browser could only reach them via the search box.
+
+### SkyboxBrowser / MaterialBrowser / DecalBrowser — facet wiring (v4.66.0)
+
+These three had a category row and nothing else. They now go through
+`useFacetFilters` + `AssetFilterBar` (see the `assetFilters.ts` section), so the
+Pack/Author segments switch themselves on if and when the data can use them:
+
+| Panel | Facets today | Why |
+|---|---|---|
+| SkyboxBrowser | Categories, Tags, **Author** | 2 authors (Kenney Assets 5 / Procedural fixture 3); one pack |
+| MaterialBrowser | Categories only | `MaterialDef` has no `tags`; `sourceName` is per-texture (all singletons); 1 author |
+| DecalBrowser | Categories only | `DecalTexDef` has no `tags`; no attribution filled in yet |
+
+- Materials and decals keep **`MaterialCategoryPills`** via `categorySlot` — domain
+  ordering (`orderedMaterialCategories`) and its own overflow popout are unchanged, and
+  with one qualifying facet no segmented control renders at all, so both panels look
+  and behave exactly as they did. `active`/`onSelect` are adapted to the facet state
+  (`sel.cat?.[0] ?? "All"`, `"All"` → `clearFacet("cat")`).
+- **DecalBrowser computes its facets over the kind-filtered list** (`byKind`), because
+  Overlay/Surface is a hard split above the facets, not another facet — counts must
+  describe what's actually in the grid.
+- Skybox category pills keep `counts: false` + `order: "alpha"`, matching their old look.
 
 ### GraphicsBrowser.tsx (Phase 48; Manage mode v4.60.0)
 
@@ -3500,6 +3575,12 @@ then `assetManager.removeGraphics`/`updateGraphic`). Also exports
 **`GraphicPickerPopover`** — a searchable checkerboard mini-grid popover used
 by the ITEMS tab's icon Pick button and the UI tab's graphicId fields; all
 tile/preview srcs go through `assetManager.resolveUrl`.
+
+Filtering goes through `useFacetFilters` + `AssetFilterBar` as of **v4.66.0**, with
+`MaterialCategoryPills` passed as the `categorySlot`. No tag facet (`GraphicDef` has no
+`tags`), and Pack/Author don't qualify yet — 5 graphics, all Quaternius / Platformer
+Game Kit — so the panel renders no segmented control and is visually unchanged. Import a
+second pack and a `Pack` segment appears on its own.
 
 ### GraphicsImporterModal.tsx (Phase 48)
 

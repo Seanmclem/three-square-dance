@@ -1,6 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import type { AssetDef, AssetCategory } from "@/types";
 import { IconCamera, IconReorigin } from "@/ui/icons";
+import { buildFacets, matchesFacets, type FacetSpec, type FacetSel } from "@/ui/assetFilters";
+
+// Pack/Author come from `attribution` and are shared with every other browser (same
+// labels, same "worth showing" rule) — see assetFilters.ts. Category and tag keep this
+// panel's own richer strip: 142 assets and dozens of tags need the `More ▾` popout,
+// which the simpler panels (AssetFilterBar) don't.
+const ATTR_FACETS: FacetSpec<AssetDef>[] = [
+  { key: "pack",   label: "Pack",   read: a => a.attribution?.sourceName },
+  { key: "author", label: "Author", read: a => a.attribution?.author },
+];
 
 const KNOWN_ORDER = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
 const STRIP_COUNT = 3; // how many category pills to show in the strip beside "All"
@@ -45,8 +55,10 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   const [category, setCategory] = useState<AssetCategory | "All">("All");
   // The pill strip shows EITHER categories (exclusive) or tags (multi-select AND).
   // Both filters stay live across the toggle — see `filtered` below.
-  const [filterMode, setFilterMode] = useState<"cat" | "tag">("cat");
+  const [filterMode, setFilterMode] = useState<string>("cat");
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
+  // Pack/Author selections (exclusive — an asset has exactly one of each).
+  const [attrSel, setAttrSel] = useState<FacetSel>({});
   const [popoutOpen, setPopoutOpen] = useState(false);
   // Manage mode: tiles become multi-select checkboxes for batch delete
   const [manage, setManage]     = useState(false);
@@ -133,14 +145,45 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   const toggleTag = (tag: string) =>
     setActiveTags(prev => { const n = new Set(prev); n.has(tag) ? n.delete(tag) : n.add(tag); return n; });
 
-  const clearFilters = () => { setCategory("All"); setActiveTags(new Set()); };
+  // Pack/Author segments appear only when that field can actually split the library
+  // (≥2 distinct values, one of them shared by ≥2 assets) — today: Pack yes (3 kits),
+  // Author no (139 of 142 are Quaternius, so the filter would be a no-op).
+  const attrFacets = buildFacets(assets, ATTR_FACETS);
+  const attrValues = new Map(attrFacets.map(f => [f.key, new Set(f.values.map(v => v.value))]));
+  const attrLive: FacetSel = {};
+  for (const [k, vs] of Object.entries(attrSel)) {
+    const keep = vs.filter(v => attrValues.get(k)?.has(v));
+    if (keep.length) attrLive[k] = keep;
+  }
+  const activeAttrCount = Object.values(attrLive).reduce((n, v) => n + v.length, 0);
+  const toggleAttr = (key: string, value: string) =>
+    setAttrSel(prev => ({ ...prev, [key]: prev[key]?.[0] === value ? [] : [value] }));
+  // A facet that stopped being worth showing must not stay the active strip.
+  const mode = (filterMode === "cat" || filterMode === "tag" || attrFacets.some(f => f.key === filterMode))
+    ? filterMode : "cat";
+
+  const clearFilters = () => { setCategory("All"); setActiveTags(new Set()); setAttrSel({}); };
+
+  // Filters set on the facets the strip isn't currently showing, as clearable chips —
+  // otherwise a live pack silently narrows the grid while you look at tags.
+  const chipStyle = { ...CAT_BTN(true), background: "rgba(255,255,255,0.06)", color: "#c2cadb" };
+  const liveElsewhere = [
+    ...(mode !== "cat" && category !== "All"
+      ? [<button key="__cat" style={chipStyle} title="Clear the category filter"
+          onClick={() => setCategory("All")}>{category as string} ✕</button>]
+      : []),
+    ...attrFacets.filter(f => f.key !== mode && attrLive[f.key]?.length).map(f => (
+      <button key={f.key} style={chipStyle} title={`Clear the ${f.label.toLowerCase()} filter`}
+        onClick={() => toggleAttr(f.key, attrLive[f.key]![0]!)}>{attrLive[f.key]![0]} ✕</button>
+    )),
+  ];
 
   const filtered = assets.filter(a => {
     const matchCat  = category === "All" || a.category === category;
     const matchTags = activeTags.size === 0 || [...activeTags].every(t => a.tags.includes(t));
     const q         = search.toLowerCase();
     const matchQ    = !q || a.label.toLowerCase().includes(q) || a.tags.some(t => t.toLowerCase().includes(q));
-    return matchCat && matchTags && matchQ;
+    return matchCat && matchTags && matchQ && matchesFacets(a, ATTR_FACETS, attrLive);
   });
 
   return (
@@ -162,27 +205,36 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
         />
       </div>
 
-      {/* Facet switcher — says which of the two the strip below is showing */}
+      {/* Facet switcher — says which facet the strip below is showing */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px 4px", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2 }}>
           <button
-            style={SEG_BTN(filterMode === "cat")}
+            style={SEG_BTN(mode === "cat")}
             onClick={() => { setFilterMode("cat"); setPopoutOpen(false); }}
           >
             Categories
           </button>
           <button
-            style={SEG_BTN(filterMode === "tag")}
+            style={SEG_BTN(mode === "tag")}
             onClick={() => { setFilterMode("tag"); setPopoutOpen(false); }}
           >
             Tags{activeTags.size > 0 && <span style={COUNT_SPAN}>{activeTags.size}</span>}
           </button>
+          {attrFacets.map(f => (
+            <button
+              key={f.key}
+              style={SEG_BTN(mode === f.key)}
+              onClick={() => { setFilterMode(f.key); setPopoutOpen(false); }}
+            >
+              {f.label}{(attrLive[f.key]?.length ?? 0) > 0 && <span style={COUNT_SPAN}>{attrLive[f.key]!.length}</span>}
+            </button>
+          ))}
         </div>
         <span style={{ flex: 1 }} />
-        {(activeTags.size > 0 || category !== "All") && (
+        {(activeTags.size > 0 || category !== "All" || activeAttrCount > 0) && (
           <button
             onClick={clearFilters}
-            title="Clear the category and tag filters"
+            title="Clear every filter"
             style={{
               flexShrink: 0, fontSize: 10, padding: "3px 8px", borderRadius: 3,
               background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
@@ -197,7 +249,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
       {/* Category strip — fixed, no scroll */}
       <div style={{ position: "relative", flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 2, padding: "0 8px 4px", flexWrap: "wrap" }}>
-          {filterMode === "cat" ? (
+          {mode === "cat" ? (
             <>
               {/* All */}
               <button
@@ -220,19 +272,33 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                 </button>
               ))}
             </>
+          ) : mode !== "tag" ? (
+            <>
+              {/* Pack / Author — exclusive, one value per asset, few enough to show whole
+                  (no `More ▾`). Counts included, like tags, since they're not exclusive-
+                  with-no-count the way category pills are. */}
+              {liveElsewhere}
+              <button
+                style={CAT_BTN(!attrLive[mode]?.length)}
+                onClick={() => { const cur = attrLive[mode]?.[0]; if (cur) toggleAttr(mode, cur); }}
+              >All</button>
+              {(attrFacets.find(f => f.key === mode)?.values ?? []).map(v => (
+                <button
+                  key={v.value}
+                  style={CAT_BTN(attrLive[mode]?.[0] === v.value)}
+                  onClick={() => toggleAttr(mode, v.value)}
+                  onMouseEnter={e => { if (attrLive[mode]?.[0] !== v.value) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
+                  onMouseLeave={e => { if (attrLive[mode]?.[0] !== v.value) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                >
+                  {v.value}<span style={COUNT_SPAN}>{v.count}</span>
+                </button>
+              ))}
+            </>
           ) : (
             <>
               {/* The category filter is still live but its pills are hidden — surface it
                   so a forgotten category doesn't read as "the tag filter found nothing". */}
-              {category !== "All" && (
-                <button
-                  style={{ ...CAT_BTN(true), background: "rgba(255,255,255,0.06)", color: "#c2cadb" }}
-                  title="Clear the category filter"
-                  onClick={() => setCategory("All")}
-                >
-                  {category as string} ✕
-                </button>
-              )}
+              {liveElsewhere}
 
               {/* Tag chips — multi-select, ANDed. `#` + count so they can't be mistaken
                   for category pills, which are exclusive and countless. */}
@@ -253,11 +319,12 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
             </>
           )}
 
-          {/* More button — full row below the pills */}
-          {(filterMode === "cat" ? overflowCats.length : overflowTags.length) > 0 && (
+          {/* More button — full row below the pills. Only category and tag overflow;
+              Pack/Author list every value inline. */}
+          {(mode === "cat" ? overflowCats.length : mode === "tag" ? overflowTags.length : 0) > 0 && (
             <button
               style={{
-                ...CAT_BTN(filterMode === "cat" && overflowCats.includes(category as AssetCategory)),
+                ...CAT_BTN(mode === "cat" && overflowCats.includes(category as AssetCategory)),
                 width: "100%", marginTop: 4, textAlign: "center",
                 justifyContent: "center",
               }}
@@ -266,7 +333,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
               onMouseEnter={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(80,140,255,0.12)"; }}
               onMouseLeave={e => { if (!overflowCats.includes(category as AssetCategory)) e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
             >
-              {filterMode === "cat" && overflowCats.includes(category as AssetCategory)
+              {mode === "cat" && overflowCats.includes(category as AssetCategory)
                 ? `${category as string} ▾`
                 : "More ▾"}
             </button>
@@ -287,12 +354,12 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
             }}
           >
             {/* Tag mode stays open across clicks — tags are multi-select. */}
-            {(filterMode === "cat" ? overflowCats : overflowTags).map(item => {
-              const on = filterMode === "cat" ? category === item : activeTags.has(item);
+            {(mode === "cat" ? overflowCats : overflowTags).map(item => {
+              const on = mode === "cat" ? category === item : activeTags.has(item);
               return (
                 <button
                   key={item}
-                  onClick={() => filterMode === "cat" ? selectCategory(item) : toggleTag(item)}
+                  onClick={() => mode === "cat" ? selectCategory(item) : toggleTag(item)}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     background: on ? "rgba(80,140,255,0.2)" : "transparent",
@@ -314,7 +381,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
                     }
                   }}
                 >
-                  {filterMode === "cat"
+                  {mode === "cat"
                     ? item
                     : <>#{item}<span style={COUNT_SPAN}>{tagCounts.get(item) ?? 0}</span></>}
                 </button>

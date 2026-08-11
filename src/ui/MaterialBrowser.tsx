@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import type { MaterialDef } from "@/types";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
+import { AssetFilterBar } from "@/ui/AssetFilterBar";
+import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 
 interface MaterialBrowserProps {
   materials:         MaterialDef[];
@@ -11,9 +13,15 @@ interface MaterialBrowserProps {
 
 const catOf = (m: MaterialDef) => m.category ?? "Other";
 
+// MaterialDef has no `tags` field, so there is no tag facet here.
+const FACETS: FacetSpec<MaterialDef>[] = [
+  { key: "cat",    label: "Categories", always: true, read: catOf },
+  { key: "pack",   label: "Pack",       read: m => m.attribution?.sourceName },
+  { key: "author", label: "Author",     read: m => m.attribution?.author },
+];
+
 export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit }: MaterialBrowserProps) {
   const [search,  setSearch]  = useState("");
-  const [matCat,  setMatCat]  = useState<string>("All");
   const [manage,  setManage]  = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
@@ -30,13 +38,10 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
     });
   }, [materials]);
 
+  const facetState = useFacetFilters(materials, FACETS);
   const orderedCats = orderedMaterialCategories([...new Set(materials.map(catOf))]);
-  const filtered = materials.filter(m => {
-    const matchCat = matCat === "All" || catOf(m) === matCat;
-    const q = search.toLowerCase();
-    const matchQ = !q || m.label.toLowerCase().includes(q);
-    return matchCat && matchQ;
-  });
+  const q = search.toLowerCase();
+  const filtered = facetState.filtered.filter(m => !q || m.label.toLowerCase().includes(q));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -53,10 +58,19 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
         />
       </div>
 
-      {/* Category pills */}
-      <div style={{ padding: "0 8px 4px", flexShrink: 0 }}>
-        <MaterialCategoryPills categories={orderedCats} active={matCat} onSelect={setMatCat} />
-      </div>
+      {/* Category pills (own component: domain ordering + overflow popout), plus the
+          Pack/Author segments once attribution can actually split the library. */}
+      <AssetFilterBar
+        facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
+        onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+        categorySlot={
+          <MaterialCategoryPills
+            categories={orderedCats}
+            active={facetState.sel.cat?.[0] ?? "All"}
+            onSelect={c => (c === "All" ? facetState.clearFacet("cat") : facetState.toggle("cat", c))}
+          />
+        }
+      />
 
       {/* Import / Manage toolbar */}
       <div style={{ padding: "6px 8px", flexShrink: 0, display: "flex", gap: 4 }}>
