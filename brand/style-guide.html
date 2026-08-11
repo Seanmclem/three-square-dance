@@ -1,0 +1,278 @@
+<title>SquareDance — Brand Style Guide</title>
+<style>
+  :root {
+    --ink: #131A33;
+    --cobalt: #3B67CE;
+    --cobalt-deep: #2C4FA3;
+    --teal: #3FA096;
+    --teal-deep: #16383F;
+    --paper: #F7F8FA;
+    --card: #FFFFFF;
+    --slate: #5C667D;
+    --hairline: #E3E7EE;
+    --wordmark: "Avenir Next", Avenir, Futura, "Century Gothic", "Trebuchet MS", sans-serif;
+    --mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  /* Deliberately single-theme: a brand guide presents the identity on its own
+     white ground, like a printed book. Every surface is painted explicitly. */
+  html, body { background: var(--paper); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--wordmark);
+    font-weight: 400;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1020px; margin: 0 auto; padding: 0 32px 96px; }
+
+  /* ── structure ── */
+  section { margin-top: 88px; }
+  .eyebrow {
+    display: flex; align-items: baseline; gap: 16px;
+    border-top: 1px solid var(--hairline); padding-top: 14px; margin-bottom: 28px;
+  }
+  .eyebrow .n { font-family: var(--mono); font-size: 12px; color: var(--cobalt); }
+  .eyebrow h2 {
+    margin: 0; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--slate);
+  }
+  h3 { font-size: 15px; font-weight: 600; margin: 0 0 6px; }
+  p  { max-width: 62ch; margin: 0 0 12px; color: var(--slate); font-size: 15px; }
+  p strong { color: var(--ink); font-weight: 600; }
+  .grid { display: grid; gap: 20px; }
+  .cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card {
+    background: var(--card); border: 1px solid var(--hairline);
+    border-radius: 10px; padding: 28px;
+  }
+  .card.center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  .caption { font-family: var(--mono); font-size: 11.5px; color: var(--slate); letter-spacing: 0.02em; }
+
+  /* ── cover ── */
+  .cover { padding-top: 84px; display: flex; flex-direction: column; gap: 30px; }
+  .cover .lockup { display: flex; align-items: center; gap: 34px; }
+  .cover .words { font-weight: 600; font-size: 74px; line-height: 1.02; letter-spacing: -0.02em; }
+  .cover .words .d { color: var(--cobalt); }
+  .cover .meta { font-family: var(--mono); font-size: 12px; color: var(--slate); }
+
+  /* ── wordmark helpers ── */
+  .wm { font-family: var(--wordmark); font-weight: 600; letter-spacing: -0.02em; }
+  .wm .d { color: var(--cobalt); }
+
+  /* ── swatches ── */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
+  .swatch { border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; background: var(--card); }
+  .swatch .chip { height: 92px; }
+  .swatch .info { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+  .swatch .name { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+  .swatch .hex { font-family: var(--mono); font-size: 11.5px; color: var(--slate); }
+  .swatch .role { font-size: 12px; color: var(--slate); }
+
+  /* ── type specimen ── */
+  .spec { display: flex; flex-direction: column; gap: 10px; }
+  .spec .row { display: flex; align-items: baseline; gap: 20px; border-bottom: 1px solid var(--hairline); padding-bottom: 10px; }
+  .spec .tag { font-family: var(--mono); font-size: 11px; color: var(--slate); width: 150px; flex: none; }
+  .alphabet { font-weight: 600; font-size: 30px; letter-spacing: -0.01em; word-break: break-all; line-height: 1.3; }
+
+  /* ── dark band ── */
+  .dark-band { background: var(--ink); border-radius: 12px; padding: 40px; color: #C9D2E8; }
+  .dark-band h3 { color: #FFFFFF; }
+  .dark-band p { color: #9AA6C4; }
+  .dark-band .caption { color: #7E89A8; }
+
+  /* ── do / don't ── */
+  .rule { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+  .rule:last-child { border-bottom: none; }
+  .pill {
+    flex: none; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em;
+    padding: 3px 9px; border-radius: 99px; font-weight: 600;
+  }
+  .pill.do   { background: #E4F2EE; color: #1E6B54; }
+  .pill.dont { background: #F9E8E6; color: #A03B2E; }
+  .rule span { font-size: 14.5px; color: var(--ink); }
+
+  svg text { font-family: var(--wordmark); }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  @media (max-width: 640px) {
+    .cover .words { font-size: 46px; }
+    .cover .lockup { gap: 20px; }
+  }
+</style>
+
+<div class="page">
+
+  <!-- ══ COVER ══ -->
+  <header class="cover">
+    <div class="lockup">
+      <svg width="150" height="150" viewBox="0 0 100 100" role="img" aria-label="SquareDance mark">
+        <rect x="41.5" y="13.5" width="39" height="39" fill="none" stroke="#131A33" stroke-width="7"/>
+        <rect x="19.5" y="45.5" width="39" height="39" fill="none" stroke="#3B67CE" stroke-width="7" stroke-opacity="0.9"/>
+      </svg>
+      <div class="words">square<br><span class="d">dance</span></div>
+    </div>
+    <div class="meta">brand style guide · v1 · 2026 — the desktop world builder &amp; its games</div>
+  </header>
+
+  <!-- ══ 01 THE MARK ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">01</span><h2>The mark</h2></div>
+    <p>Two squares mid-step — one leading, one following, locked at the corner
+    crossing. The <strong>outline mark</strong> is primary. The front square is the
+    accent and sits at 90% opacity so the crossings visibly weave.</p>
+    <div class="grid cols-3">
+      <div class="card center">
+        <svg width="120" height="120" viewBox="0 0 100 100" aria-label="Outline mark">
+          <rect x="41.5" y="13.5" width="39" height="39" fill="none" stroke="#131A33" stroke-width="7"/>
+          <rect x="19.5" y="45.5" width="39" height="39" fill="none" stroke="#3B67CE" stroke-width="7" stroke-opacity="0.9"/>
+        </svg>
+        <div class="caption">outline · primary</div>
+      </div>
+      <div class="card center">
+        <svg width="120" height="120" viewBox="0 0 100 100" aria-label="Filled mark">
+          <rect x="40" y="12" width="44" height="44" rx="7" fill="#131A33"/>
+          <rect x="16" y="36" width="44" height="44" rx="7" fill="#3B67CE"/>
+          <rect x="40" y="36" width="20" height="20" rx="3" fill="#FFFFFF"/>
+        </svg>
+        <div class="caption">filled · small sizes &amp; avatars</div>
+      </div>
+      <div class="card center">
+        <svg width="120" height="120" viewBox="0 0 100 100" aria-label="App icon tile">
+          <rect x="4" y="4" width="92" height="92" rx="20" fill="#FFFFFF" stroke="#E3E7EE"/>
+          <rect x="43" y="19" width="33" height="33" fill="none" stroke="#131A33" stroke-width="6"/>
+          <rect x="24" y="46" width="33" height="33" fill="none" stroke="#3B67CE" stroke-width="6" stroke-opacity="0.9"/>
+        </svg>
+        <div class="caption">app icon · white tile</div>
+      </div>
+    </div>
+    <div style="margin-top:20px" class="card">
+      <h3>Construction</h3>
+      <p style="margin:0">Each square's stroke is <strong>side ÷ 7</strong>. The front square offsets
+      diagonally by <strong>side × 0.55</strong> down-left, so the crossing lands near the back
+      square's corner. Clear space around the mark ≥ one stroke width on all sides.
+      Minimum size: 20&nbsp;px — below that, use the filled mark.</p>
+    </div>
+  </section>
+
+  <!-- ══ 02 LOCKUPS ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">02</span><h2>Lockups</h2></div>
+    <div class="grid cols-2">
+      <div class="card center" style="min-height:200px">
+        <div style="display:flex;align-items:center;gap:26px">
+          <svg width="92" height="92" viewBox="0 0 100 100" aria-hidden="true">
+            <rect x="41.5" y="13.5" width="39" height="39" fill="none" stroke="#131A33" stroke-width="7"/>
+            <rect x="19.5" y="45.5" width="39" height="39" fill="none" stroke="#3B67CE" stroke-width="7" stroke-opacity="0.9"/>
+          </svg>
+          <div class="wm" style="font-size:42px;line-height:1.05">square<br><span class="d">dance</span></div>
+        </div>
+        <div class="caption">stacked · default</div>
+      </div>
+      <div class="card center" style="min-height:200px">
+        <div style="display:flex;align-items:center;gap:22px">
+          <svg width="66" height="66" viewBox="0 0 100 100" aria-hidden="true">
+            <rect x="41.5" y="13.5" width="39" height="39" fill="none" stroke="#131A33" stroke-width="7"/>
+            <rect x="19.5" y="45.5" width="39" height="39" fill="none" stroke="#3B67CE" stroke-width="7" stroke-opacity="0.9"/>
+          </svg>
+          <div class="wm" style="font-size:38px">square <span class="d">dance</span></div>
+        </div>
+        <div class="caption">horizontal · headers &amp; wide spaces</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 03 WORDMARK & LETTER PATTERNS ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">03</span><h2>Wordmark &amp; letter patterns</h2></div>
+    <p>The wordmark is always <strong>lowercase</strong>, set in a geometric sans
+    (Poppins / Montserrat class — rendered here as Avenir&nbsp;Next), weight
+    <strong>600</strong>, tracking <strong>−0.02em</strong>. The two-tone pattern
+    is the brand's signature: the noun in Ink, the verb in Cobalt.</p>
+    <div class="card spec">
+      <div class="row"><span class="tag">wordmark 600</span><span class="wm" style="font-size:40px">square <span class="d">dance</span></span></div>
+      <div class="row"><span class="tag">product names</span><span class="wm" style="font-size:24px">square <span class="d">dance</span>&nbsp;&nbsp;·&nbsp;&nbsp;squaredance <span class="d">runtime</span>&nbsp;&nbsp;·&nbsp;&nbsp;squaredance <span class="d">export</span></span></div>
+      <div class="row"><span class="tag">lowercase set</span><span class="alphabet">abcdefghijklmnopqrstuvwxyz</span></div>
+      <div class="row" style="border-bottom:none"><span class="tag">numerals</span><span class="alphabet" style="font-variant-numeric: tabular-nums">0123456789</span></div>
+    </div>
+    <div style="margin-top:20px" class="card">
+      <h3>The pattern, generalized</h3>
+      <p style="margin:0">Any compound name follows the same dance: <strong>base word in Ink,
+      the moving part in Cobalt</strong>, never capitalized, one space or none. On teal
+      surfaces the accent word takes Teal instead — the pattern survives the palette.</p>
+    </div>
+  </section>
+
+  <!-- ══ 04 COLOR ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">04</span><h2>Color</h2></div>
+    <p>The accent is <strong>Cobalt</strong> — a true blue. The violet-leaning
+    periwinkle from early drafts is retired: hue sits at ~223°, never drifting
+    past 230° into purple. Teal is the secondary family for illustration,
+    charts, and alternate marks. Neutrals carry a slight blue bias.</p>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#131A33"></div><div class="info"><span class="name">Ink</span><span class="hex">#131A33</span><span class="role">back square, headlines, dark grounds</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#3B67CE"></div><div class="info"><span class="name">Cobalt</span><span class="hex">#3B67CE</span><span class="role">front square, accent word, links</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#2C4FA3"></div><div class="info"><span class="name">Cobalt Deep</span><span class="hex">#2C4FA3</span><span class="role">hover / pressed, small text on white</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#3FA096"></div><div class="info"><span class="name">Teal</span><span class="hex">#3FA096</span><span class="role">secondary accent, alt mark front</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#16383F"></div><div class="info"><span class="name">Teal Deep</span><span class="hex">#16383F</span><span class="role">alt mark back, teal-family ink</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#F7F8FA;border-bottom:1px solid #E3E7EE"></div><div class="info"><span class="name">Paper</span><span class="hex">#F7F8FA</span><span class="role">page ground</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#5C667D"></div><div class="info"><span class="name">Slate</span><span class="hex">#5C667D</span><span class="role">supporting text, captions</span></div></div>
+    </div>
+    <div style="margin-top:20px" class="grid cols-2">
+      <div class="card center">
+        <svg width="240" height="86" viewBox="0 0 280 100" aria-label="Teal alternate lockup">
+          <rect x="41.5" y="23.5" width="34" height="34" fill="none" stroke="#16383F" stroke-width="6.4"/>
+          <rect x="22.5" y="50.5" width="34" height="34" fill="none" stroke="#3FA096" stroke-width="6.4" stroke-opacity="0.9"/>
+          <text x="100" y="66" font-size="30" font-weight="600" letter-spacing="-0.6" fill="#16383F">square <tspan fill="#3FA096">dance</tspan></text>
+        </svg>
+        <div class="caption">teal family · secondary contexts</div>
+      </div>
+      <div class="card center">
+        <svg width="240" height="86" viewBox="0 0 280 100" aria-label="Cobalt primary lockup">
+          <rect x="41.5" y="23.5" width="34" height="34" fill="none" stroke="#131A33" stroke-width="6.4"/>
+          <rect x="22.5" y="50.5" width="34" height="34" fill="none" stroke="#3B67CE" stroke-width="6.4" stroke-opacity="0.9"/>
+          <text x="100" y="66" font-size="30" font-weight="600" letter-spacing="-0.6" fill="#131A33">square <tspan fill="#3B67CE">dance</tspan></text>
+        </svg>
+        <div class="caption">cobalt family · primary</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 05 ON DARK ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">05</span><h2>On dark grounds</h2></div>
+    <div class="dark-band">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:48px;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:22px">
+          <svg width="76" height="76" viewBox="0 0 100 100" aria-label="Mark on dark">
+            <rect x="41.5" y="13.5" width="39" height="39" fill="none" stroke="#FFFFFF" stroke-width="7"/>
+            <rect x="19.5" y="45.5" width="39" height="39" fill="none" stroke="#6E8FE0" stroke-width="7" stroke-opacity="0.92"/>
+          </svg>
+          <span class="wm" style="font-size:34px;color:#FFFFFF">square <span style="color:#8AA5EA">dance</span></span>
+        </div>
+        <div style="max-width:360px">
+          <h3>Ink is the ground, not a tint</h3>
+          <p style="margin:0">On Ink, the back square turns white and Cobalt lightens two
+          steps (<span style="font-family:var(--mono);font-size:11.5px">#6E8FE0 / #8AA5EA</span>)
+          to hold contrast. Never place the standard cobalt mark on Ink.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 06 USAGE ══ -->
+  <section>
+    <div class="eyebrow"><span class="n">06</span><h2>Usage</h2></div>
+    <div class="card">
+      <div class="rule"><span class="pill do">do</span><span>Keep the wordmark lowercase everywhere — window titles, docs, marketing.</span></div>
+      <div class="rule"><span class="pill do">do</span><span>Use the filled mark below 20&nbsp;px (favicons, list avatars).</span></div>
+      <div class="rule"><span class="pill do">do</span><span>Let the crossing weave — keep the front square's 90% opacity.</span></div>
+      <div class="rule"><span class="pill dont">don't</span><span>Slide back toward violet — if the blue reads purple, it's off-palette.</span></div>
+      <div class="rule"><span class="pill dont">don't</span><span>Rotate the mark, change the overlap, or outline the filled variant.</span></div>
+      <div class="rule"><span class="pill dont">don't</span><span>Mix the teal and cobalt families in one lockup.</span></div>
+      <div class="rule"><span class="pill dont">don't</span><span>Set the wordmark in another face, capitalize it, or split the two-tone pattern.</span></div>
+    </div>
+  </section>
+
+</div>
