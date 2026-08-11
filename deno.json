@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "desktop": "deno desktop --backend cef -A desktop/main.ts",
+    "desktop:hmr": "deno desktop --hmr --backend cef -A desktop/main.ts",
+    "desktop:compile": "deno desktop --backend cef -A --include dist --include desktop/spike.html -o WorldBuilder.app desktop/main.ts"
+  },
+  "imports": {
+    "@std/http": "jsr:@std/http@^1"
+  }
+}

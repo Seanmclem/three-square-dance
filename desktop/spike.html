@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Phase 54 Spike Harness</title>
+<style>
+  body { background:#14161c; color:#dde3f0; font:14px/1.5 -apple-system, system-ui, sans-serif; margin:0; padding:24px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p.sub { color:#c2cadb; margin:0 0 16px; }
+  table { border-collapse:collapse; width:100%; max-width:720px; }
+  td, th { text-align:left; padding:6px 12px; border-bottom:1px solid #2a2e3a; }
+  th { color:#c2cadb; font-weight:600; }
+  .pass { color:#7ddc8f; } .fail { color:#f2788a; } .info { color:#8fb8f2; }
+  .links { margin-top:20px; }
+  .links a { color:#8fb8f2; margin-right:16px; }
+  #status { margin-top:12px; color:#c2cadb; }
+</style>
+</head>
+<body>
+<h1>World Builder — Phase 54 spike harness</h1>
+<p class="sub">Auto-running webview compatibility checks under the desktop shell.</p>
+<table id="results"><tr><th>Check</th><th>Result</th><th>Detail</th></tr></table>
+<div id="status">Running…</div>
+<div class="links">
+  <a href="/index.html">Open editor →</a>
+  <a href="/runtime.html">Open runtime →</a>
+  <input type="file" id="filePick" style="margin-left:16px"> (manual: native picker check)
+</div>
+<script>
+window.onerror = (msg, src, line) => {
+  fetch("/spike-report", { method: "POST", body: JSON.stringify({ pageError: String(msg) + " @" + src + ":" + line }) });
+};
+(async () => {
+  const rows = [];
+  const table = document.getElementById("results");
+  function add(name, ok, detail) {
+    rows.push({ name, ok, detail: String(detail ?? "") });
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + name + "</td><td class='" +
+      (ok === true ? "pass'>PASS" : ok === false ? "fail'>FAIL" : "info'>INFO") +
+      "</td><td>" + String(detail ?? "") + "</td>";
+    table.appendChild(tr);
+  }
+
+  add("userAgent", null, navigator.userAgent);
+  add("bindings global", typeof bindings !== "undefined", typeof bindings);
+
+  // WebGL2
+  try {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    let renderer = "";
+    if (gl) {
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    }
+    add("WebGL2 context", !!gl, renderer);
+  } catch (e) { add("WebGL2 context", false, e.message); }
+
+  // WebAssembly (trivial module: () => 42)
+  try {
+    const wasm = new Uint8Array([0,97,115,109,1,0,0,0,1,5,1,96,0,1,127,3,2,1,0,7,5,1,1,102,0,0,10,6,1,4,0,65,42,11]);
+    const { instance } = await WebAssembly.instantiate(wasm);
+    add("WebAssembly instantiate", instance.exports.f() === 42, "f() === 42");
+  } catch (e) { add("WebAssembly instantiate", false, e.message); }
+
+  add("Gamepad API", typeof navigator.getGamepads === "function",
+      typeof navigator.getGamepads === "function" ? "navigator.getGamepads present" : "missing");
+  add("Pointer lock API", "requestPointerLock" in document.body, "");
+  add("matchMedia / DPR", !!window.matchMedia, "devicePixelRatio=" + window.devicePixelRatio);
+
+  // Web Audio
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    add("Web Audio", true, "state=" + ctx.state);
+    ctx.close();
+  } catch (e) { add("Web Audio", false, e.message); }
+
+  // localStorage persistence across relaunch
+  try {
+    const prev = localStorage.getItem("spike_ts");
+    localStorage.setItem("spike_ts", String(Date.now()));
+    add("localStorage", true, prev ? "previous run value found (persists across relaunch): " + prev : "first run — relaunch to verify persistence");
+  } catch (e) { add("localStorage", false, e.message); }
+
+  // window.open (expected: blocked or ignored in the shell)
+  try {
+    const w = window.open("about:blank");
+    add("window.open", null, w === null ? "returns null (blocked) — openRuntimeWindow binding required" : "returned a window: " + w);
+    if (w) w.close();
+  } catch (e) { add("window.open", null, "throws: " + e.message); }
+
+  // Preliminary report BEFORE the binding echo tests, so results survive a
+  // hang in the bindings bridge.
+  try {
+    await fetch("/spike-report", { method: "POST", body: JSON.stringify({ ranAt: new Date().toISOString(), preliminary: true, checks: rows }, null, 2) });
+  } catch (e) { /* server unreachable */ }
+
+  // Binding round-trips, each under a timeout so a hang can't stall the harness.
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout after " + ms + " ms")), ms))]);
+  if (typeof bindings !== "undefined") {
+    add("binding fns visible", null, Object.keys(bindings).join(","));
+    try {
+      const t0 = performance.now();
+      const pong = await withTimeout(bindings.spikePing(), 5000);
+      add("bindings ping", pong === "pong", Math.round(performance.now() - t0) + " ms");
+    } catch (e) { add("bindings ping", false, e.message); }
+    // What argument shapes survive the bridge? (string / object / big string)
+    for (const [label, arg] of [["string arg", "hello"], ["object arg", { a: 1, b: "x" }], ["1MB string arg", "s".repeat(1048576)]]) {
+      try {
+        const t0 = performance.now();
+        const res = await withTimeout(bindings.spikeEchoJson(arg), 15000);
+        add("bindings json " + label, res && res.type !== "undefined", Math.round(performance.now() - t0) + " ms — " + JSON.stringify(res).slice(0, 80));
+      } catch (e) { add("bindings json " + label, false, e.message); }
+    }
+    for (const [label, size] of [["1 KB", 1024], ["1 MB", 1048576]]) {
+      try {
+        const payload = new Uint8Array(size);
+        payload[0] = 7; payload[payload.length - 1] = 9;
+        const t0 = performance.now();
+        const res = await withTimeout(bindings.spikeEchoBytes(payload), 30000);
+        const ms = Math.round(performance.now() - t0);
+        add("bindings echo " + label, res.byteLength === payload.byteLength, ms + " ms — backend saw: " + JSON.stringify(res));
+      } catch (e) { add("bindings echo " + label, false, e.message); }
+    }
+  }
+
+  // Editor auto-probe: load the real editor in an iframe, give it 12 s to
+  // boot, then check for a live canvas and collect any page errors.
+  document.getElementById("status").textContent = "Probing editor boot…";
+  try {
+    const probe = await new Promise((resolve) => {
+      const fr = document.createElement("iframe");
+      fr.style.cssText = "width:100%;max-width:960px;height:480px;border:1px solid #2a2e3a;margin-top:16px;display:block;";
+      const errs = [];
+      fr.src = "/index.html";
+      fr.onload = () => {
+        try { fr.contentWindow.addEventListener("error", (e) => errs.push(String(e.message))); } catch (e) { errs.push("hook: " + e.message); }
+        setTimeout(() => {
+          let canvases = -1, hasUI = false;
+          try {
+            canvases = fr.contentDocument.querySelectorAll("canvas").length;
+            hasUI = fr.contentDocument.body.innerText.length > 20;
+          } catch (e) { errs.push("probe: " + e.message); }
+          resolve({ canvases, hasUI, errors: errs.slice(0, 5) });
+        }, 12000);
+      };
+      document.body.appendChild(fr);
+      setTimeout(() => resolve({ timedOut: true, errors: errs.slice(0, 5) }), 25000);
+    });
+    add("editor boot probe", probe.canvases > 0 && probe.errors.length === 0, JSON.stringify(probe).slice(0, 100));
+  } catch (e) { add("editor boot probe", false, e.message); }
+
+  document.getElementById("status").textContent = "Done — reporting…";
+  const payload = { ranAt: new Date().toISOString(), checks: rows };
+  let how = [];
+  try {
+    if (typeof bindings !== "undefined" && bindings.spikeReport) {
+      await bindings.spikeReport(payload);
+      how.push("bindings");
+    }
+  } catch (e) { how.push("bindings FAILED: " + e.message); }
+  try {
+    await fetch("/spike-report", { method: "POST", body: JSON.stringify(payload, null, 2) });
+    how.push("http");
+  } catch (e) { how.push("http FAILED: " + e.message); }
+  document.getElementById("status").textContent = "Done — reported via: " + how.join(", ");
+})();
+</script>
+</body>
+</html>
