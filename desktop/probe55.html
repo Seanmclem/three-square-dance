@@ -31,8 +31,19 @@ then opens the runtime window on the result.</p>
       "</td><td>" + String(detail ?? "") + "</td>";
     table.appendChild(tr);
   }
-  const b = globalThis.bindings;
-  add("bindings present", !!b, typeof b);
+  // HTTP API transport (phase 55: bindings bridge deadlocks intermittently)
+  const call = (m, ...a) => fetch("/api/" + m, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(a),
+  }).then(async r => {
+    const j = await r.json();
+    if (!r.ok) throw new Error((j && j.error) || m + " → HTTP " + r.status);
+    return j;
+  });
+  const b = new Proxy({}, { get: (_t, m) => (...a) => call(m, ...a) });
+  try {
+    const info = await call("getAppInfo");
+    add("HTTP api transport", !!info.serveOrigin, JSON.stringify(info));
+  } catch (e) { add("HTTP api transport", false, e.message); }
 
   try {
     // fixture content (read-only from the repo checkout)

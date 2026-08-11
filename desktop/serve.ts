@@ -36,9 +36,14 @@ export function makeHandler(distDir: string, ws: Workspace): (req: Request) => P
     }
     if (pathname.startsWith("/games/") || pathname.startsWith("/assets/")) {
       const res = await serveDir(req, { fsRoot: ws.contentDir, quiet: true });
-      // The editor re-reads what it just wrote — never let the webview cache it.
-      res.headers.set("cache-control", "no-store");
-      return res;
+      if (res.status !== 404) {
+        // The editor re-reads what it just wrote — never let the webview cache it.
+        res.headers.set("cache-control", "no-store");
+        return res;
+      }
+      // Vite emits the app's OWN hashed js/css chunks under /assets/ as well
+      // (build.assetsDir default) — those exist only in dist, so fall through.
+      // Shadowing them here is exactly what blanked the phase-55 window.
     }
     return serveDir(req, { fsRoot: distDir, quiet: true });
   };

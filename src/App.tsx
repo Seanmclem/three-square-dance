@@ -97,7 +97,7 @@ import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from 
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
 import { seedStartingInventory } from "@/scripting/inventory";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject } from "@/project/ProjectStore";
-import { desktop } from "@/shared/desktopApi";
+import { desktop, detectDesktop } from "@/shared/desktopApi";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { OpenProjectModal } from "@/ui/OpenProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -520,7 +520,9 @@ export default function App() {
       // Wait for physics (WASM) and material registry together. physicsWorld.init() wins the
       // race against initMaterials() on fast hardware, leaving _materialRegistry empty when
       // WallBuilder.build first calls getMaterial() — walls render gray. Awaiting both fixes it.
-      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady]);
+      // detectDesktop resolves the shell-vs-browser question before any
+      // storage code runs — desktop() answers null until this completes.
+      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady, detectDesktop()]);
       if (!active) return; // StrictMode first mount: cleanup already fired, bail out
 
       const saved = await readStoredAutosave().catch(() => null);

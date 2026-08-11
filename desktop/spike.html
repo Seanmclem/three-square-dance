@@ -95,34 +95,14 @@ window.onerror = (msg, src, line) => {
     await fetch("/spike-report", { method: "POST", body: JSON.stringify({ ranAt: new Date().toISOString(), preliminary: true, checks: rows }, null, 2) });
   } catch (e) { /* server unreachable */ }
 
-  // Binding round-trips, each under a timeout so a hang can't stall the harness.
-  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout after " + ms + " ms")), ms))]);
-  if (typeof bindings !== "undefined") {
-    add("binding fns visible", null, Object.keys(bindings).join(","));
-    try {
-      const t0 = performance.now();
-      const pong = await withTimeout(bindings.spikePing(), 5000);
-      add("bindings ping", pong === "pong", Math.round(performance.now() - t0) + " ms");
-    } catch (e) { add("bindings ping", false, e.message); }
-    // What argument shapes survive the bridge? (string / object / big string)
-    for (const [label, arg] of [["string arg", "hello"], ["object arg", { a: 1, b: "x" }], ["1MB string arg", "s".repeat(1048576)]]) {
-      try {
-        const t0 = performance.now();
-        const res = await withTimeout(bindings.spikeEchoJson(arg), 15000);
-        add("bindings json " + label, res && res.type !== "undefined", Math.round(performance.now() - t0) + " ms — " + JSON.stringify(res).slice(0, 80));
-      } catch (e) { add("bindings json " + label, false, e.message); }
-    }
-    for (const [label, size] of [["1 KB", 1024], ["1 MB", 1048576]]) {
-      try {
-        const payload = new Uint8Array(size);
-        payload[0] = 7; payload[payload.length - 1] = 9;
-        const t0 = performance.now();
-        const res = await withTimeout(bindings.spikeEchoBytes(payload), 30000);
-        const ms = Math.round(performance.now() - t0);
-        add("bindings echo " + label, res.byteLength === payload.byteLength, ms + " ms — backend saw: " + JSON.stringify(res));
-      } catch (e) { add("bindings echo " + label, false, e.message); }
-    }
-  }
+  // HTTP api transport check (the transport the app actually uses since
+  // phase 55 — the bindings bridge below is diagnostics only).
+  try {
+    const t0 = performance.now();
+    const res = await fetch("/api/getAppInfo");
+    const info = await res.json();
+    add("HTTP api transport", res.ok && !!info.serveOrigin, Math.round(performance.now() - t0) + " ms — " + JSON.stringify(info).slice(0, 90));
+  } catch (e) { add("HTTP api transport", false, e.message); }
 
   // Editor auto-probe: load the real editor in an iframe, give it 12 s to
   // boot, then check for a live canvas and collect any page errors.
@@ -150,20 +130,37 @@ window.onerror = (msg, src, line) => {
     add("editor boot probe", probe.canvases > 0 && probe.errors.length === 0, JSON.stringify(probe).slice(0, 100));
   } catch (e) { add("editor boot probe", false, e.message); }
 
-  document.getElementById("status").textContent = "Done — reporting…";
-  const payload = { ranAt: new Date().toISOString(), checks: rows };
-  let how = [];
-  try {
-    if (typeof bindings !== "undefined" && bindings.spikeReport) {
-      await bindings.spikeReport(payload);
-      how.push("bindings");
+  // Report the load-bearing results BEFORE bindings diagnostics — a deadlocked
+  // bridge (known per-launch flakiness) must not block them.
+  document.getElementById("status").textContent = "Reporting…";
+  const report = async () => {
+    try {
+      await fetch("/spike-report", { method: "POST", body: JSON.stringify({ ranAt: new Date().toISOString(), checks: rows }, null, 2) });
+      return true;
+    } catch (e) { return false; }
+  };
+  await report();
+
+  // Bindings-bridge diagnostics, LAST (documents the per-launch deadlock and
+  // the Uint8Array serialization bug — the app no longer depends on either).
+  const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout after " + ms + " ms")), ms))]);
+  if (typeof bindings !== "undefined") {
+    try {
+      const t0 = performance.now();
+      const pong = await withTimeout(bindings.spikePing(), 5000);
+      add("bindings ping (diag)", pong === "pong", Math.round(performance.now() - t0) + " ms");
+    } catch (e) { add("bindings ping (diag)", false, e.message); }
+    for (const [label, size] of [["1 KB", 1024], ["1 MB", 1048576]]) {
+      try {
+        const payload = new Uint8Array(size);
+        const t0 = performance.now();
+        const res = await withTimeout(bindings.spikeEchoBytes(payload), 15000);
+        add("bindings echo " + label + " (diag)", res.byteLength === size, Math.round(performance.now() - t0) + " ms");
+      } catch (e) { add("bindings echo " + label + " (diag)", false, e.message); }
     }
-  } catch (e) { how.push("bindings FAILED: " + e.message); }
-  try {
-    await fetch("/spike-report", { method: "POST", body: JSON.stringify(payload, null, 2) });
-    how.push("http");
-  } catch (e) { how.push("http FAILED: " + e.message); }
-  document.getElementById("status").textContent = "Done — reported via: " + how.join(", ");
+  }
+  await report();
+  document.getElementById("status").textContent = "Done.";
 })();
 </script>
 </body>

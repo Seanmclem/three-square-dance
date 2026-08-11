@@ -6,10 +6,6 @@ import {
   assertSafeId,
   atomicWriteText,
   backupExisting,
-  getLastSession,
-  getPref,
-  setLastSession,
-  setPref,
   trashFile,
   type Workspace,
 } from "./workspace.ts";
@@ -134,22 +130,3 @@ export async function writeExportFile(ws: Workspace, name: string, text: string)
   return { path };
 }
 
-// ── binding registration ────────────────────────────────────────────────────
-
-// deno-lint-ignore no-explicit-any
-export function registerProjectBindings(win: any, ws: Workspace): void {
-  win.bind("listProjects", () => listProjects(ws));
-  win.bind("createProject", (id: string) => createProject(ws, id));
-  win.bind("saveScene", (projectId: string, sceneId: string, json: string) => saveScene(ws, projectId, sceneId, json));
-  win.bind("deleteScene", (projectId: string, sceneId: string) => deleteScene(ws, projectId, sceneId));
-  win.bind("writeGameFile", (projectId: string, json: string) => writeGameFile(ws, projectId, json));
-  win.bind("writeProjectManifest", (projectId: string, json: string) => writeProjectManifest(ws, projectId, json));
-  win.bind("getLastSession", () => getLastSession(ws));
-  win.bind("setLastSession", (s: { projectId: string; sceneId: string } | null) => setLastSession(ws, s));
-  win.bind("getPref", (key: string) => getPref(ws, key));
-  win.bind("setPref", (key: string, value: string | null) => setPref(ws, key, value));
-  win.bind("writeAutosave", (meta: { projectId: string | null; sceneId: string | null }, json: string) => writeAutosave(ws, meta, json));
-  win.bind("readAutosave", () => readAutosave(ws));
-  win.bind("clearAutosave", () => clearAutosave(ws));
-  win.bind("writeExportFile", (name: string, text: string) => writeExportFile(ws, name, text));
-}

@@ -21,11 +21,17 @@ Play, truncate-on-write saves).
      (tmp + rename), rotating backups (10/scene, uuid-suffixed against
      same-ms collisions), trash-instead-of-delete, settings.json
      (lastSession + prefs).
-   - `projects.ts` — the bindings: listProjects, createProject, saveScene,
+   - `projects.ts` — the API surface: listProjects, createProject, saveScene,
      deleteScene, writeGameFile, writeProjectManifest, get/setLastSession,
      get/setPref, write/read/clearAutosave, writeExportFile. Primitives only:
      manifest semantics stay in the frontend ProjectStore. Path-safety
      asserts + JSON.parse guard on every write.
+   - **Transport is HTTP, not bindings** (amended during this phase): all app
+     traffic goes over `POST /api/<method>` (JSON args array) dispatched in
+     `main.ts`. The bindings bridge deadlocks intermittently at launch —
+     first call never resolves, which hung the editor boot on readAutosave —
+     while HTTP against the shell's own Deno.serve has been solid in every
+     run. Bindings remain registered as spike diagnostics only.
    - `serve.ts` — `/games/*` + `/assets/*` from the workspace (no-store),
      everything else from dist (disk in dev, VFS compiled).
    - `main.ts` — editor window, reusable runtime window

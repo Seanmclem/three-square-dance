@@ -38,6 +38,25 @@ game** (pj-fixture scene).
       in Finder; FILE Load via file picker works
 - [ ] Commit `public/games/**` after the session (dev workspace writes there)
 
+## Incidents found after the first commit (user report: blank window)
+
+1. **`/assets/*` route shadowed the app's own bundles.** Vite emits hashed
+   js/css chunks under `dist/assets/` (build.assetsDir default) — the same
+   URL prefix as the asset library. Routing all of `/assets/*` to the
+   workspace 404'd `main-*.js` → perfectly blank page, no console error.
+   Fix: workspace-first with dist fallthrough on 404 (`desktop/serve.ts`).
+   Lesson recorded: page-boot must be re-probed after ANY serve-layer change —
+   HTTP 200s on the HTML are not a boot.
+2. **Bindings bridge deadlocks per-launch** (reproduced twice: first call
+   never resolves and setTimeout won't fire → harness stalls). App transport
+   switched to `POST /api/<method>` HTTP routes; spike harness reordered so
+   editor probe + report run before bindings diagnostics.
+
+Post-fix verification: editor boots from the shell server (bundle 200, React
+mounts, 1 canvas, full toolbar), all four route classes green (editor html /
+app bundle / library asset / game scene), 13-step e2e re-run over HTTP
+transport: 0 failures.
+
 ## Notes
 
 - Publish… no longer appears in the PROJ menu (returns as Export in phase D).
