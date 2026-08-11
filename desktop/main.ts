@@ -90,6 +90,12 @@ Deno.serve(async (req: Request) => {
     await Deno.writeTextFile(spikeResultsPath, await req.text());
     return new Response("ok");
   }
+  // Frame-timing telemetry from any page (shell window included) — the only
+  // way to measure the CEF window, which no automation tool can reach.
+  if (pathname === "/perf-report" && req.method === "POST") {
+    await Deno.writeTextFile(`${ws.stateDir}/perf-report.jsonl`, (await req.text()) + "\n", { append: true });
+    return new Response("ok");
+  }
   if (bootPage && pathname === "/") {
     return new Response(await Deno.readTextFile(`${Deno.cwd()}/desktop/${bootPage}.html`), {
       headers: { "content-type": "text/html; charset=utf-8" },

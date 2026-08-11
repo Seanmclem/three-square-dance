@@ -98,6 +98,7 @@ import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migra
 import { seedStartingInventory } from "@/scripting/inventory";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject } from "@/project/ProjectStore";
 import { desktop, detectDesktop, isDesktop } from "@/shared/desktopApi";
+import { startPerfReporter } from "@/dev/perfReporter";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { OpenProjectModal } from "@/ui/OpenProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -517,6 +518,7 @@ export default function App() {
       // storage code runs — desktop() answers null until this completes.
       await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady, detectDesktop()]);
       if (!active) return; // StrictMode first mount: cleanup already fired, bail out
+      if (isDesktop()) startPerfReporter();   // shell-window perf is only observable via self-report
 
       const saved = await readStoredAutosave().catch(() => null);
       let restored = false;
