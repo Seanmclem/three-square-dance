@@ -7,3 +7,4 @@ dist/
 *.app/
 desktop/spike-results.json
 .worldbuilder/
+build/

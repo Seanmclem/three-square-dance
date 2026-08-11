@@ -11,14 +11,17 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 
 ## 0. Local first — develop, save, and play on the dev server
 
-> **The editor automates all of this now (Phase 33 — Projects).** TopBar →
-> **PROJ ▾ → New Project…**, pick `<repo>/public/games` in the folder dialog,
-> and you get the folder layout below with an auto-generated manifest, a shared
-> `game.json` (cross-scene items + state defaults), a scene switcher, a
-> dropdown-driven `load_scene` picker, and a **▶ Play** button that opens the
-> runtime. **Publish…** (⋯ menu) copies the project's JSON to any folder you
-> pick — note it copies *manifests and scenes only*, never `/assets/**` (see
-> §2 "Assets" for the three ways to ship them). The manual steps below remain valid as the
+> **The desktop app automates all of this (Phases 33 + 54–57).** TopBar →
+> **PROJ ▾ → New Project…** (name only — projects live in the workspace games
+> folder automatically) gives you the folder layout below with an
+> auto-generated manifest, a shared `game.json`, a scene switcher, and a
+> **▶ Play** button that opens a native runtime window. **Export game…**
+> (⋯ menu) goes further than the old Publish ever did: it emits a
+> **self-contained static bundle** — runtime shell, scenes, and *only the
+> assets the game references* (pruned manifests included) — into the
+> workspace `exports/` folder. Drop that folder on any host in §4 and it
+> plays; `assetsBase` is already `"./"`, so no asset hosting decisions and
+> no CORS in the common case. The manual steps below remain valid as the
 > by-hand appendix and for understanding what the editor generates.
 
 The dev server already serves everything the runtime needs. The whole loop is:

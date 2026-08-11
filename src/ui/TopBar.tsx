@@ -7,7 +7,6 @@ interface TopBarProps {
   onCameraTopDown: () => void;
   onSave:          () => Promise<void>;
   onLoad:          (json: unknown) => void;
-  onLoadFSA?:      () => Promise<void>;
   onNew?:          () => void;
   onUndo:          () => void;
   onRedo:          () => void;
@@ -17,13 +16,10 @@ interface TopBarProps {
   lastAutosaveAt?: number | null;
   // Projects (Phase 33) — all optional; absent = classic single-scene rendering.
   project?: { name: string; sceneIds: string[]; currentSceneId: string; entryScene: string } | null;
-  projectPendingName?: string | null;
   onProjectNew?:       () => void;
   onProjectOpen?:      () => void;
-  onProjectReopen?:    () => void;
   onProjectClose?:     () => void;
   onProjectPlay?:      () => void;
-  onProjectPublish?:   () => void;
   onProjectExport?:    () => void;
   onSceneSwitch?:      (id: string) => void;
   onSceneAdd?:         () => void;
@@ -84,8 +80,8 @@ function Popover({ open, onClose, children }: { open: boolean; onClose: () => vo
   );
 }
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
-  project, projectPendingName, onProjectNew, onProjectOpen, onProjectReopen, onProjectClose, onProjectPlay, onProjectPublish, onProjectExport,
+export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
+  project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport,
   onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const autosaveLabel = useAutosaveLabel(lastAutosaveAt);
@@ -109,11 +105,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
   };
 
   const handleLoadClick = () => {
-    if (onLoadFSA) {
-      void onLoadFSA();
-    } else {
-      fileRef.current?.click();
-    }
+    fileRef.current?.click();
   };
 
   return (
@@ -137,40 +129,25 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       {/* Projects (Phase 33) */}
       {onProjectNew && !project && (
         <div style={{ position: "relative" }}>
-          {projectPendingName ? (
-            <button
-              onClick={onProjectReopen}
-              title={`Regrant folder access to reopen "${projectPendingName}"`}
-              style={{
-                padding: "4px 10px", border: "1px solid rgba(255,204,102,0.4)",
-                borderRadius: 6, background: "rgba(255,204,102,0.08)", color: "#ffcc66",
-                fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
-                maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}
-            >
-              REOPEN “{projectPendingName}”
-            </button>
-          ) : (
-            <button
-              onClick={() => setProjMenuOpen(o => !o)}
-              style={{
-                padding: "4px 10px", border: "1px solid rgba(255,255,255,0.09)",
-                borderRadius: 6, background: "transparent", color: "#7a7a7a",
-                fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
-              }}
-            >
-              PROJ ▾
-            </button>
-          )}
+          <button
+            onClick={() => setProjMenuOpen(o => !o)}
+            style={{
+              padding: "4px 10px", border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: 6, background: "transparent", color: "#7a7a7a",
+              fontSize: 11, cursor: "pointer", letterSpacing: 1, fontFamily: "monospace",
+            }}
+          >
+            PROJ ▾
+          </button>
           <Popover open={projMenuOpen} onClose={() => setProjMenuOpen(false)}>
             <button
               style={popBtn}
-              title="Name the project and choose its home folder in one dialog"
+              title="Name the project — it lives in the workspace games folder"
               onClick={() => { setProjMenuOpen(false); onProjectNew?.(); }}
             >
               New Project…
             </button>
-            <button style={popBtn} title="Pick a project folder (contains manifest.json)" onClick={() => { setProjMenuOpen(false); onProjectOpen?.(); }}>Open Project…</button>
+            <button style={popBtn} title="Open a project from the workspace" onClick={() => { setProjMenuOpen(false); onProjectOpen?.(); }}>Open Project…</button>
           </Popover>
         </div>
       )}
@@ -236,9 +213,6 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
                   {project.sceneIds.map(id => <option key={id} value={id}>{id}</option>)}
                 </select>
               </div>
-              {onProjectPublish && (
-                <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish(); }}>Publish…</button>
-              )}
               {onProjectExport && (
                 <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectExport(); }}>Export game…</button>
               )}

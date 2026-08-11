@@ -1,7 +1,7 @@
 # 3D World Editor — Full Project Architecture
 > Vite + React + TypeScript + Three.js (no R3F) — physics via Rapier3D
 
-**Version 4.66.0** — last updated 2026-08-10
+**Version 4.70.0** — last updated 2026-08-11
 - v1.0 — Initial architecture, Phases 1–12
 - v1.1 — TypeScript conversion, full type system, tsconfig
 - v1.2 — Rapier physics integrated Phase 3+, sky system, character architecture
@@ -163,6 +163,10 @@
 - v4.33.15 — **A ceiling no longer hides its wall run's node dots and edge lines.** User report: one run "lost its corner node-dots and draggable edge-lines" while the run beside it kept both, and a reload didn't bring them back. Not lost — **relocated to roof height**. `NodeDragger._refresh` builds a nodeId→Y anchor map whose wall and floor passes take the *max*, but whose platform pass did a blind `nodeY.set(id, y)`. A node-backed ceiling (Add ceiling → platform carrying the run's own `nodeIds`) therefore overwrote each corner's wall-base anchor (y 0.12) with the ceiling top (y 3.26), and the platform edge loop likewise drew that run's edges at 3.24 — both then sitting under the ceiling and any dimmed upper floor, invisible. The neighbouring run had no ceiling, so it was unaffected; the trigger was simply the next `_refresh` (any drag, or a reload), which is why it looked drag-induced and survived reloads. Fix: the platform pass anchors only nodes nothing else claimed (`if (!nodeY.has(id))`), so the lowest anchor wins and run corners stay grabbable; platform edge lines derive their Y from the two endpoints' resolved dot heights (`min(dotY) − 0.08`, matching the floor edges' `+0.04` convention) and fall back to the platform top only for platform-only nodes. Dragging those corners still moves the ceiling, since it is the same node. Verified on the user's level: the ceiling's four corners report dots at **0.12** (were 3.26), the whole scene's 54 dots resolve to 0.12/3.12 with none at 3.26, all 40 edge-line vertices sit at 0.04, and the linked level-1 corners correctly stay at 3.12.
 - v4.33.14 — **Walls get flat per-face normals (fixes the lit seam where two floors' runs stack).** Follow-up to v4.33.13: with UVs continuous the brick courses lined up, but a hard lighting band remained at the junction. Diagnosed in-browser by elimination — sun `castShadow = false` left the band untouched (not shadow acne), and the two runs' outer faces measured 7mm apart (not an exposed ledge). Cause: `WallBuilder` calls `computeVertexNormals()` on an **indexed** strip whose 4 vertices per polyline point are shared between the side faces and the top/bottom/cap faces, so every side face's normal is averaged with the caps' — measured `n.y ≈ −0.07…−0.11` on the bottom row and `+0.06…+0.13` on the top row, smearing a fake vertical shading gradient up each wall (and rounding the shading across mitered corners — the soft cube corners and glossy smears in the user's screenshots). Invisible on a lone wall; where two runs stack, the lower run's top row (+0.13) abuts the upper run's bottom row (−0.07) and the discontinuity reads as a lit seam across the facade. Fix: new `withFlatNormals(geo)` helper — `toNonIndexed()` + `computeVertexNormals()` + dispose of the indexed original — applied in **both** solid build paths (`build`, `buildRun`) right before `applyUVOffset`. The editor-only translucent ghost mesh keeps its indexed/smoothed geometry (cosmetically irrelevant at 0.12 opacity). Verified in the live preview: side-face normals now exactly `n.y = 0` on every wall **including the CSG'd door run** (three-bvh-csg re-indexes but preserves them), the seam and the corner smearing are gone, vertex count ~5× on wall meshes only (20→96 simple run, 158→516 the big one) with draw calls unchanged (29dc·4k) and FPS 105→110.
 - v4.33.13 — **Copy-to-floor links corners across floors + walls tile continuously up a stack.** Two user reports about stacked runs. (1) **Vertical UV continuity**: `WallBuilder` emitted V from `0`→`H/tileY` on every run while positioning the mesh at `y = elevation`, so a run copied to level 1 restarted its brick course at its own base — a visible horizontal break mid-facade. V is now world-space like U already was (`elevation/tileY` → `(elevation+H)/tileY`) in **both** build paths (single-wall `build` and merged `buildRun`, incl. the closed-loop wrap-around vertex); walls at elevation 0 are byte-identical, so only stacked runs change. (2) **Linked corners**: new **`WallNode.linkId?: string`** (persisted). `handleCopyRunToFloor` no longer orphans the duplicated nodes — the source node adopts a `linkId` on its first copy and each copy joins that group, so a third-floor copy made *from* the second floor joins the same group (all three stay in sync). `WorldState.updateNode` delegates to a new public **`propagateNodeLink(zoneId, nodeId)`** that writes the position onto every link-mate and emits a **separate `node:updated` per mate** — required because `ZoneManager`'s handler rebuilds by node reference, and a mate's walls live on another floor that the dragged node's own rebuild never touches (fill floors / ghosted ceilings sharing the mate rebuild too, for free). Centralizing it in `updateNode` covers every drag path (NodeDragger corner + edge drags, GizmoManager, panel numeric fields) with one hook; the one bypass — `NodeDragger._syncRectCorner`, which mutates `zone.nodes` directly to collapse rect-floor rebuilds — calls `propagateNodeLink` explicitly. **Why not just share one node between floors:** `groupWallRuns`'s `canMerge` requires the shared node to be degree-2 counting walls across the whole zone regardless of floor, so a genuinely shared corner would read as degree-4 and shatter both runs into unmerged single walls, losing the mitered corners. Linking is therefore a *sync* relation, not identity. **Unlink** (user-chosen: per-run button over a copy-time checkbox): the wall-run Actions block shows `⛓ Corners linked to: G, 1` (levels derived from the walls referencing each link-mate — a node carries no level of its own) plus an "Unlink corners from other floors" button → `WorldState.unlinkNodes` drops `linkId` on that run's nodes only, leaving the other floors linked to each other. Scope is position-only by design: height/material/openings stay per-floor, consistent with copy-to-floor already dropping openings.
+- v4.70.0 — **Phase 57 — self-contained game export (`exportGameBundle`).** Replaces the FSA "Publish…" folder-copy removed in phase 55 with a real export: **`src/export/assetRefs.ts`** (plain TS, imported by both the frontend and the Deno backend) walks every scene + game.json for every reference class — object assetIds, surface/per-face materials, script audio (`play_sound`/`play_music`/footsteps), skybox (`"sky"` = procedural, never collected), decals, item icons + dialogue portraits (raw `<img src>` paths matched back to graphics entries by path), uiElement graphicIds, playerSettings model/locomotion sounds, prefab-library templates — then `resolveAssetFiles` maps ids → concrete files via the manifests (all three `{quality}` texture tiers ship; thumbnails are editor-only and excluded; unknown ids land in a `missing` list, reported never fatal) and returns per-kind manifests **pruned to the referenced entries**. **`desktop/export.ts`** writes `stateDir/exports/<projectId>-bundle/`: `runtime.html` (absolute `"/assets/` script refs rebased to `"./assets/` so the bundle works from any static-host subpath), Vite's hashed chunks (depth-1 files of `dist/assets` only — the SUBDIRS there are the full copied asset library, which is exactly what's being pruned away), a redirecting `index.html`, the game manifest with `assetsBase: "./"`, game.json + scenes, and the referenced asset files copied workspace-first with dist/VFS fallback (same overlay as serving); unmanifested model ids still ship `<id>.glb` (the runtime's `loadGLTF` fallback). **`desktop/deploy.ts`** is a `DeployProvider` seam with an empty registry (user decision: bundle-only first). UI: **"Export game…" in the PROJ ▾ ⋯ menu** (desktop only) → saves, exports, alerts file count / size / missing refs, reveals the folder. Measured on `platfrom-obby`: **68 files / 10.85 MB vs 151 MB full dist**; the bundle was served with a plain `python3 -m http.server` and played in a browser (title screen → in-game, 56 resources, zero failed asset requests). Plan: `plans/phase-57-desktop-export-bundle.md`; acceptance: `test-plans/phase-57-desktop-export-bundle.md`.
+- v4.69.0 — **Phase 56 — asset library off FSA: overlay model, `src/assets/assetLibrary.ts`, zero pickers left in `src/`.** Every asset-management flow (five importer modals + the App.tsx delete/edit/thumbnail/icon/reorigin/bake handlers) still called the File System Access API, absent in the shell's webview — and carried the worst sandbox residue: six session-only directory handles, the `ensureDir` re-grant dance, `needsFolderGrant`/`folderHint` threaded through delete dialogs. **Design change vs. the original plan — overlay, not seeding:** `/assets/*` (and `/games/*`) serve workspace-first with fallthrough to built dist (disk in dev, embedded VFS compiled), so the 132 MB stock library ships inside the binary and is never copied out; imports/edits write real files into `workspace/assets/<kind>/…` shadowing the same URLs; deleting a stock asset = removing its manifest entry (the VFS file becomes unreachable), deleting an import = shell trash. Backend: `desktop/assets.ts` — `writeAssetManifest` (atomic + rotating backup: kills the manifest-truncation failure mode), `deleteAssetFiles` (workspace → trash; VFS-only names silently skipped), and **`POST /api-file/<kind>/<rel…>`** raw-bytes upload (the JSON api can't carry binary; the bindings bridge chokes on Uint8Array — phase-54 finding), per-segment path-safety, subdir rels for texture quality tiers. Frontend: **`src/assets/assetLibrary.ts`** is the single owner of asset-library mutations (`readManifest`/`writeManifest`/`writeAssetFile`/`removeAssetFiles`/`removeEntries`/`updateEntries`/`upsertEntry`/`writeAssetToLibrary`) — absorbs `src/core/assetLibraryWriter.ts` (deleted) and the manifest-splice logic previously duplicated across modals and App handlers. The five importers select via plain `<input type="file">` (`webkitdirectory` for the material source-folder scan) — destination pickers and folder-grant UI deleted; App's six dir-handle states, `ensureDir`, and the grant props removed end-to-end (net −481 lines). Verified: zero `showDirectoryPicker`/`showSaveFilePicker`/`showOpenFilePicker` call sites in `src/`; live-shell curl checks of overlay/upload/delete/traversal-refusal; editor boot probe clean. Plan: `plans/phase-56-desktop-asset-library.md`; acceptance: `test-plans/phase-56-desktop-asset-library.md`.
+- v4.68.0 — **Phase 55 — desktop shell + project persistence: FSA retired, HTTP api transport, workspace with atomic/backup/trash writes.** The editor now runs inside the phase-54 shell and every project flow works there. **Backend (`desktop/`):** `workspace.ts` resolves the workspace (dev: content `<repo>/public` + state `<repo>/.worldbuilder`, gitignored — so the commit-`public/games/**` safety rule continues unchanged; packaged: `~/WorldBuilder` + `~/WorldBuilder/.state`; `WORLDBUILDER_WORKSPACE` overrides) and owns the data-safety primitives — **atomic writes (tmp + rename), rotating backups (10 per key, uuid-suffixed against same-ms collisions), trash-instead-of-delete, settings.json (lastSession + prefs)** — replacing the FSA truncate-on-write failure mode that destroyed a level (v4.29.4). `projects.ts` is primitives-only (listProjects/createProject/saveScene/deleteScene/writeGameFile/writeProjectManifest/autosave trio/writeExportFile; path-safety asserts + `JSON.parse` guard on every write — manifest semantics stay in the frontend ProjectStore). `serve.ts`: `/games/*` + `/assets/*` from the workspace (no-store) with **fallthrough to dist on 404** — load-bearing, see the incident below. `main.ts`: editor window, reusable second native runtime window (`openRuntimeWindow` — `window.open` is a no-op in the webview), `revealPath`, `getAppInfo`, `WORLDBUILDER_BOOT` dev boot-page override. **Transport is HTTP, not bindings** (amended mid-phase): the bindings bridge deadlocks intermittently at launch (first call never resolves → editor boot hung on readAutosave → blank window, reproduced twice), so ALL app traffic goes over **`POST /api/<method>`** (JSON args array) against the shell's own `Deno.serve`; bindings remain registered as spike diagnostics only. **Frontend:** `src/shared/desktopApi.ts` (typed client Proxy + `detectDesktop()`/`desktop()`/`isDesktop()`); **`ProjectStore.ts` rewritten** — same public API, reads via `fetch('/games/<id>/…', no-store)`, writes via the api, session = plain `{projectId, sceneId}` in workspace settings; `fileHandleStore`, `requestProjectPermission`, and the reopen-banner flow **deleted**. App.tsx: autosave to a workspace file (`writeAutosave`/`readAutosave`; localStorage only as the plain-browser fallback), boot restores project by id with no permission dance, ▶ Play calls `openRuntimeWindow` (HTTP-probe deleted), no-project FILE Save writes `stateDir/exports/<name>.json` + reveals it (Load keeps the TopBar file-input). Modals: `NewProjectModal` is name-only (the workspace owns the location); new **`OpenProjectModal`** lists workspace projects via `listProjects`. **Publish… removed from the PROJ menu** (returns as Export, phase 57). **Incident worth remembering:** routing all of `/assets/*` to the workspace 404'd Vite's own hashed chunks (`build.assetsDir` default puts them under `dist/assets/`) → perfectly blank window, no console error; fix is the workspace-first-with-dist-fallthrough rule, and the recorded lesson is that page boot must be re-probed after ANY serve-layer change. Plan: `plans/phase-55-desktop-project-persistence.md`; acceptance: `test-plans/phase-55-desktop-project-persistence.md` (13-step e2e over HTTP transport, 0 failures).
+- v4.67.0 — **Phase 54 — Deno desktop conversion spike: the shell works; CEF verified; binary bindings broken → HTTP for bytes.** De-risking spike for converting the web app into a distributable desktop app via **`deno desktop`** (Deno ≥ 2.9): our code + the Deno runtime + a bundled-Chromium (CEF) webview compile into one binary per platform, deleting the browser-sandbox persistence workarounds wholesale. Shipped `deno.json` tasks (`desktop`, `desktop:hmr`, `compile:mac-arm64`/`mac-x64`/`win-x64`), a minimal `desktop/main.ts` (Deno.serve static handler + one `Deno.BrowserWindow`, spike bindings) and a served `desktop/spike.html` harness that auto-runs the smoke checks. Results (M1 Pro, laufey 0.6.1 / Chromium 149): WebGL2 (ANGLE Metal), WASM, Gamepad + pointer-lock APIs, Web Audio, localStorage-across-relaunch all PASS; `window.open` returns null (confirms the `openRuntimeWindow` design); the real editor boots in the shell (1 canvas, 0 page errors, all six manifests fetched). **Bindings: JSON fine (1 MB string ≈ 28 ms), `Uint8Array` broken** (`TypeError: Cannot convert object to primitive value`; one run froze the bridge) → decision gate (a): JSON over bindings, binary over HTTP `POST` routes — later hardened by phase 55 to HTTP for everything. Gate (b): plain `--include dist` + in-memory VFS (serving ~150 MB/s; no self-extraction) — `WorldBuilder.app` is 421 MB (≈300 MB fixed CEF floor + 113 MB embedded dist incl. the asset library), compiles in 7.3 s, needs `--exclude node_modules --exclude-unused-npm`. Gotchas recorded: bare `deno desktop main.ts` *builds* an app bundle (dev loop is `--hmr`); the implicit window auto-navigates to the serve root (whatever should show first must be served at `/`); compiled-mode paths must fall back to `import.meta.url`; `Object.keys(bindings)` is empty (proxy) — feature-detect by calling. No `src/` changes in this phase. Plan: `plans/phase-54-deno-desktop-spike.md`; results: `test-plans/phase-54-deno-desktop-spike.md`.
 - v4.66.0 — **Filter by kit/pack and author, in every asset browser — facets that appear only when they can actually split the library** (user: "there should also just like implicitly be an option to filter by kit-name, or author. For all asset types that let you add one. we may need to clean up the categories/tags/kits/author ui selection a bit. maybe 2 groups or segmented control"). `Attribution.sourceName` ("content pack / kit name") and `Attribution.author` were **display-only** — written at import, shown in `CreditsModal`, never filterable, even though every asset type carries them (`AssetDef`, `MaterialDef`, `SoundDef`, `SkyboxDef`, `GraphicDef`, `DecalTexDef`). They're now facets, and the "implicitly" is the interesting part: **a facet renders only when it has ≥2 distinct values AND at least one value shared by ≥2 items**, so no panel grows controls that can't filter anything. Concretely, against today's manifests: models gets **Pack** (Platformer Game Kit 107 / Ultimate Furniture 20 / Animated Animal 12) but **not Author** (139 of 142 are Quaternius — the filter would be a no-op); sounds and skyboxes get **Author** (Kenney vs the fixtures) but not Pack (one kit each); materials, graphics and decals get **neither**, so those three panels are visually unchanged. The second clause is what keeps Pack off the materials panel, whose `sourceName` holds a *per-texture* name ("Paving Stones 141", "Concrete 034") rather than a kit — a list of singletons filters nothing, and the rule self-corrects when a real kit is imported instead of needing a data migration (user chose this over editing the two materials' attribution). **New `src/ui/assetFilters.ts`** owns the semantics for all six browsers — `FacetSpec { key, label, multi, prefix, always, order, counts, read }`, `buildFacets` (count → drop blanks → order by count desc or alpha → apply the visibility rule), `matchesFacets` (multi = ANDed, exclusive = membership) and the `useFacetFilters` hook, whose `sel` is **self-healing**: a selected value that no longer exists (the last sound carrying a tag was deleted) is dropped from the effective selection rather than filtering the panel to zero, and an active facet that stops being worth showing can't stay the active strip. **New `src/ui/AssetFilterBar.tsx`** is the presentation for the five simpler panels; **AssetBrowser keeps its own strip** (142 assets and dozens of tags need the recency ordering and `More ▾` popout that the small panels don't) and reads its Pack/Author facets from the same module, so semantics can't drift between the two renderers even though the pixels differ. Pack/Author are **exclusive** (an asset has exactly one of each, so multi-select would mean OR — deliberately not built); tags stay multi-select AND. Filters on facets you can't currently see surface as clearable `Value ✕` chips (v4.48.1's "Category ✕" idea, generalized), and `clear` now resets every facet including the empty-grid "Clear filters" button. Two conventions preserved rather than flattened: the bar takes a **`categorySlot`** so materials/graphics/decals keep `MaterialCategoryPills` (domain ordering + its own popout) — rendered in a plain row, because that popout is absolutely positioned and the chip strip's `overflow: auto` would clip it — and category chips stay **bare and alphabetical** in the sounds/skybox panels (`counts: false`, `order: "alpha"`), since per v4.48.1 the count is part of what distinguishes a tag chip from a category pill. Verified in-browser through real clicks in all six panels: models `Pack → Ultimate Furniture Pack 20` filtered 142 → 20 tiles, ANDing `#prop` correctly yielded "No results." (no furniture item carries that tag — checked against the manifest) and the pack surfaced as `Ultimate Furniture Pack ✕` while the tag strip was showing; sounds `Author → Synthesized fixture 3` returned exactly the 3 fixtures; skybox tags rendered with counts; materials/graphics/decals showed no switcher and their category pills filtered as before; zero console errors, no checker overlay.
 - v4.65.0 — **Sounds panel gains the `Categories | Tags` facet switcher (tag filtering, at parity with models)** (user: "the audio-assets left side menu, doesn't let you toggle to and select tags, like models does for example. but the editor let's you add tags"). Exactly right, and the asymmetry was write-only: `SoundDef.tags` has existed since Phase 36, both the `AudioImporterModal` (`TagInput` + `existingTags` suggestions) and the shared `EditMetadataDialog` (`noun: "sound"`, which passes `tagSuggestions`) write it, and `AudioBrowser` matched tags **only** inside the free-text search — so a tag you had just authored was invisible unless you remembered it and typed it. `AudioBrowser` now carries the same two-facet strip as `AssetBrowser`: a `Categories | Tags` segmented control (`seg()`, active-tag count on the `Tags` segment) with a right-aligned `clear` that resets both, tag chips rendering `#tag count` (frequency-ordered, multi-select **ANDed**), and — in tag mode — the live category surfaced as a clearable `Category ✕` chip so a forgotten category can't read as "the tag filter found nothing". Both filters stay live across the toggle and compose with the search box. **Deliberately simpler than the models panel in one respect:** no `TAG_STRIP_COUNT` cap and no `More ▾` popout — the audio strip already wrapped, so every tag is visible at once and the strip is `maxHeight: 68` + `overflowY: auto` instead, which is less code and less hiding (the models panel's popout exists because its 3-column thumbnail grid can't spare the vertical space). Implementation note: the existing `pill()` helper was generalized into a shared `chip(key, label, active, onClick, title?)` so categories and tags cannot drift apart stylistically, and new inactive chip/segment text is `#c2cadb` rather than the panel's older `#808080`. Verified in-browser on the real 65-sound library through real clicks: `#test 3` → exactly the 3 test sounds, ANDing `#loop 2` → the 2 that carry both, `Tags 2` badge + `clear` appear, adding category `Music` on top narrowed it to the single `Test Music Loop - AI` while showing the `Music ✕` chip, and `clear` restored all 65; no console errors. **Not** yet addressed (user, same session, explicitly deferred): filtering by **kit/pack name or author** from `attribution`, for every asset type that records it, and the facet-UI grouping that would need.
 - v4.64.0 — **`flash_player` — model-agnostic damage feedback (avatar tint in 3rd-person, screen vignette in FPS)** (user: "would there be a simple enough action to make the player model visibly flash for a second or 2, when taking damage… In a way that could apply to a different model if I changed the player model later? And could flash red a bit on screen in first person"). New action **`flash_player`** with `flashColor` (default `#ff0000`) + `flashDuration` (default 1s), emitting **`character:flash`**. **`CharacterController` picks the presentation, because it owns `cameraMode`** — and it must, since `update()` sets `_modelRoot.visible = (cameraMode === "thirdperson")` every frame, so in FPS there is no avatar to tint and a model-only flash would silently do nothing in half the project's camera modes. Third-person → pulse the avatar's emissive toward the color (two pulses, amplitude eased out via `|sin(2πt/dur)| · (1 - t/dur)`, `emissiveIntensity` +2k) and restore on the final frame. FPS → emit `overlay:flash`. **Model-agnostic by construction:** the flash traverses whatever is under `_modelRoot` rather than knowing anything about the asset, so swapping `modelAssetId` needs no edits and the "capsule only" fallback flashes too. **The material-sharing trap:** the avatar comes from `cloneSkinned` (SkeletonUtils.clone), which **shares materials with the source asset** — tinting in place would also tint any NPC/prop using the same model. `_captureFlashMaterials()` therefore clones every avatar material once on the FIRST flash, records each one's resting emissive/intensity, and only ever mutates the copies (disposed in `dispose()`; the source materials are never touched). Materials without an `emissive` (MeshBasic et al.) are skipped rather than having their base color mutated, which would lose the original tint on a model that reuses one material across body parts. **New `src/preview/FlashOverlay.tsx`** rather than a mode on `FadeOverlay`, for two reasons: `overlay:fade-in` makes **both** `InputManager` (`:70`) and `ControlSchemeManager` (`:60`) set `_suppress = true` — correct for respawns/scene transitions where the screen HOLDS opaque while the world changes, but a damage flash must never take the controls away mid-fight — and fade animates to *full* opacity, whereas this peaks at **0.32** as a radial vignette (`zIndex` 199, below fade's 200, so a real respawn fade still covers it; `pointerEvents: none`). Wired in **both** shells (`App.tsx`, `RuntimeApp.tsx`) beside the existing FadeOverlay. Back-to-back hits re-arm with no nonce field: each emit carries a fresh payload object, so the `[flash]` dep differs by identity even when the values match (an earlier `key` counter was removed as provably inert). Verified in-browser on the user's real avatar ("character", 11 MeshStandardMaterials): the flash cloned all 11, pulsed emissive `000000 → e10000 → 000000 → 890000` (the eased second pulse) and restored to `000000`/intensity 1, **with the source-asset materials byte-for-byte untouched**; the FPS branch emitted `overlay:flash` without tinting the model and rendered the vignette at opacity 0.32 with `pointerEvents: none`; changing the color re-armed the overlay. (Hidden-tab note: the fade-out is kicked off by a rAF, which is frozen in a background tab, so the overlay holds at peak until its `setTimeout` clears it — same pattern FadeOverlay already uses.)
@@ -275,6 +279,14 @@
 
 ## Vision
 
+> **Phases 54–57 (v4.67.0+):** the editor now ships as a **Deno desktop
+> application** — `deno desktop` (Deno ≥ 2.9) compiles the app, the Deno
+> runtime, and a bundled-Chromium (CEF) webview into one binary per platform.
+> Plain-browser editing is retired: the vite dev server still renders the
+> editor, but all persistence (projects, autosave, asset management, export)
+> goes through the desktop shell's HTTP api. See the "Desktop Shell (Deno)"
+> section near the end of this doc.
+
 A browser-based 3D world editor for building explorable 3D spaces. The user constructs outdoor terrain, streets, and buildings with a floating editor camera, then enters buildings through zone transitions to place interior walls, floors, platforms, stairs, and props. The world is saved as a JSON scene file and can be previewed with a configurable first-person or third-person camera.
 
 The world is designed from day one to support a full game runtime: playable characters, NPCs, and enemies. This means every wall, floor, platform, and stair built in the editor generates a proper Rapier physics collider alongside its visual mesh — not a raycast approximation added later. The physics world is always live and game-ready.
@@ -296,7 +308,8 @@ The world is designed from day one to support a full game runtime: playable char
 | CSG (wall openings) | three-bvh-csg | Boolean mesh operations for doors/windows |
 | BVH Raycasting | three-mesh-bvh | Fast collision/selection raycasting |
 | Physics (Phase 3+) | @dimforge/rapier3d-compat | WASM — static colliders built with every mesh |
-| Persistence | JSON | Save/load scene files |
+| Desktop shell (Phases 54–57) | `deno desktop` (Deno ≥ 2.9, CEF backend) | `desktop/main.ts` backend + Deno.serve; compiles to a single binary per platform (`deno.json` tasks) |
+| Persistence | JSON via the desktop shell | Workspace files over `POST /api/<method>` — atomic tmp+rename writes, rotating backups, trash (phase 55; FSA retired) |
 
 **Critical rule:** React never touches Three.js objects. Three.js never touches React state. They communicate only through an `EventBus` (custom event emitter). No exceptions.
 
@@ -1066,14 +1079,28 @@ world-editor/
 ├── runtime.html                    ← second Vite entry: the standalone runtime shell (Phase 25)
 ├── vite.config.ts                  ← build.rollupOptions.input = { main, runtime }
 ├── package.json
+├── deno.json                       ← desktop-shell tasks: desktop / desktop:hmr / compile:{mac-arm64,mac-x64,win-x64} (Phases 54–57)
 ├── WORLD_EDITOR_ARCHITECTURE.md
+├── desktop/                        ← Deno backend of the desktop shell (Phases 54–57; not part of the Vite bundle)
+│   ├── main.ts                     ← CEF windows + Deno.serve: POST /api/<method> dispatch, /api-file/<kind>/<rel> binary upload, openRuntimeWindow, revealPath
+│   ├── workspace.ts                ← content/state dir resolution, atomic writes, rotating backups, trash, settings.json (lastSession + prefs)
+│   ├── serve.ts                    ← /games/* + /assets/* workspace-first with fallthrough to dist (disk in dev, VFS compiled)
+│   ├── projects.ts                 ← project/scene/autosave/export write primitives (path-safety + JSON.parse guard)
+│   ├── assets.ts                   ← asset manifest/file writes + trash-aware deletes (VFS overlay rules)
+│   ├── export.ts                   ← exportGameBundle: runtime shell + pruned manifests + referenced assets only (Phase 57)
+│   ├── deploy.ts                   ← DeployProvider seam (empty registry — nothing wired)
+│   └── spike.html                  ← phase-54 smoke harness, kept as a shell-regression tool (/spike.html)
 ├── public/
 │   └── demo/                       ← committed runtime demo: manifest.json + scenes/level_01/02 (Phase 25)
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx
+│   ├── shared/
+│   │   └── desktopApi.ts           ← typed client for the shell's HTTP api (+ detectDesktop/desktop/isDesktop, uploadAssetFile)
 │   ├── project/                    ← Phase 33 — project layer (multi-scene games)
-│   │   └── ProjectStore.ts         ← ALL project file IO: manifest/game.json/scenes CRUD, publishTo, IDB session persistence
+│   │   └── ProjectStore.ts         ← ALL project file IO: manifest/game.json/scenes CRUD — fetch reads + shell-api writes (phase 55; FSA/publishTo/IDB session gone)
+│   ├── export/
+│   │   └── assetRefs.ts            ← asset-reference walker + resolver for game export (Phase 57; plain TS, shared with desktop/export.ts)
 │   ├── runtime/                    ← runtime shell composition root (Phase 25; editor-free)
 │   │   ├── main.tsx                ← createRoot(<RuntimeApp/>)
 │   │   ├── RuntimeApp.tsx          ← the "small App.tsx": engine construction + shell states + overlays
@@ -1155,11 +1182,11 @@ world-editor/
 │   │   ├── DecalBrowser.tsx        ← decal texture picker (Overlay/Surface toggle, category pills)
 │   │   ├── DialogueOverlay.tsx     ← in-game dialogue box (per-node lines + response options; confirm advances/selects, menu:nav highlights — Phase 30)
 │   │   ├── SaveLoadPanel.tsx
+│   │   ├── NewProjectModal.tsx     ← name-only since phase 55 (the workspace owns the project location)
+│   │   ├── OpenProjectModal.tsx    ← lists workspace projects via the shell's listProjects (phase 55; replaced the directory picker)
 │   │   └── PreviewHUD.tsx
 │   ├── assets/
-│   │   ├── textures/
-│   │   ├── models/
-│   │   └── icons/
+│   │   └── assetLibrary.ts         ← single owner of asset-library mutations: manifest read/splice + file upload/trash via the shell api (Phase 56)
 │   └── utils/
 │       ├── math.ts
 │       ├── csg.ts
@@ -3569,9 +3596,12 @@ attribution, no tags: `GraphicDef` has no tags field) and a `DeleteAssetDialog`
 whose usage count scans BOTH reference styles — `ItemDef.icon` stores the
 graphic's **path**, UI elements store the **id** (`graphicId`), so
 `handleRequestGraphicDelete` checks `worldItems` by path and
-`world.uiElements`+`gameUiElements` by id. Confirm writes go through the
-`graphicsDir` grant (`ensureDir`): manifest splice + optional file removal,
-then `assetManager.removeGraphics`/`updateGraphic`). Also exports
+`world.uiElements`+`gameUiElements` by id. Confirm writes go through
+`src/assets/assetLibrary.ts` (phase 56 — the `graphicsDir` FSA grant is gone):
+`removeEntries`/`updateEntries` on the manifest + `removeAssetFiles` for the
+optional file removal (workspace files → shell trash; stock/VFS files are
+manifest-entry-only deletes), then `assetManager.removeGraphics`/`updateGraphic`).
+Also exports
 **`GraphicPickerPopover`** — a searchable checkerboard mini-grid popover used
 by the ITEMS tab's icon Pick button and the UI tab's graphicId fields; all
 tile/preview srcs go through `assetManager.resolveUrl`.
@@ -3585,10 +3615,12 @@ second pack and a `Pack` segment appears on its own.
 ### GraphicsImporterModal.tsx (Phase 48)
 
 AudioImporterModal clone for bulk image import (.png/.jpg/.webp): per-entry
-label edit, one shared Category for the batch, shared AttributionFields, grant
-`public/assets/graphics` (`graphicsDir` in App state, `ensureDir` pattern),
-copy files + dedupe-splice `manifest.json`. Intrinsic `width/height` decoded
-via `createImageBitmap(new Blob([copiedBytes]))` — the copied bytes, not the
+label edit, one shared Category for the batch, shared AttributionFields; file
+selection is a plain `<input type="file">` and the copy + dedupe-splice of
+`manifest.json` go through `src/assets/assetLibrary.ts` (`writeAssetFile` +
+`writeManifest` → the shell's HTTP api; phase 56 — the `graphicsDir` grant and
+`ensureDir` are gone). Intrinsic `width/height` decoded via
+`createImageBitmap(new Blob([copiedBytes]))` — the copied bytes, not the
 source `File`, whose snapshot the write can invalidate.
 
 ### GameGuiOverlay.tsx (Phase 49)
@@ -3683,7 +3715,11 @@ sensitivity + joystick radius + layout, reset-to-defaults.
 
 ### SaveLoadPanel.tsx (in TopBar)
 
-- "Save" button: `bus.emit('scene:save', {})` → WorldSerializer downloads JSON
+- "Save" button → App `handleSave` (phase 55): project open = write-through to
+  the project (scene + game + manifest via the shell api); no project = a
+  standalone JSON written to the workspace `stateDir/exports/<slug>.json` and
+  revealed in the file manager (`writeExportFile` + `revealPath`; plain
+  browser falls back to a blob download — `showSaveFilePicker` is gone)
 - "Load" button: `<input type="file" accept=".json">` hidden, triggered by button click
 - On file selected: `FileReader.readAsText` → `bus.emit('scene:load', { json: parsed })`
 - Bus listens for `scene:loaded` → shows toast "World loaded: [name]"
@@ -3691,6 +3727,15 @@ sensitivity + joystick radius + layout, reset-to-defaults.
 ---
 
 ## WorldSerializer.js / WorldLoader.ts
+
+> **v4.68.0 (Phase 55):** the `autoSave`/`checkAutoSave` localStorage pair shown
+> below is the **plain-browser fallback only**. Under the desktop shell, App.tsx's
+> `storeAutosave`/`readStoredAutosave`/`clearStoredAutosave` route through
+> `desktop().writeAutosave/readAutosave/clearAutosave`, which keep
+> `stateDir/autosave/latest.json` (+ `latest.meta.json` with
+> `{projectId, sceneId, savedAt}`) in the workspace — atomic writes, and the
+> restore prompt / project-adopt logic keys off the meta file instead of a
+> localStorage timestamp.
 
 > **Load-time migrations** (run in both pipelines — App `handleLoadFromJSON` and the
 > runtime's `SceneRouter`): `migrateWallNodes` (legacy start/end walls → node graph),
@@ -3773,7 +3818,7 @@ class WorldLoader {
 }
 ```
 
-Auto-save: `setInterval(() => serializer.autoSave(worldState), 60_000)` started in `App.tsx` after scene loads. On startup, call `loader.checkAutoSave()` and if found within 24h, show restore prompt in React UI.
+Auto-save: a 60s `setInterval` (plus `beforeunload`) in `App.tsx` calls `storeAutosave` — the workspace file via the shell api when `desktop()` answers, else the localStorage pair above. On startup, `readStoredAutosave()`; if found within 24h, show restore prompt in React UI.
 
 ---
 
@@ -5584,7 +5629,7 @@ were backfilled by `scripts/seed-asset-tags.mjs` from data already in the manife
 
 #### Model Importer Modal (`src/ui/ModelImporterModal.tsx`)
 
-Opened by the "+ Import model" button in the AssetBrowser header. Uses File System Access API (`showOpenFilePicker`) — Chrome/Edge only, same as material importer. Shows a browser check on open.
+Opened by the "+ Import model" button in the AssetBrowser header. File selection is a plain `<input type="file">` (native picker in the desktop shell) and all writes go through `src/assets/assetLibrary.ts` — **phase 56 replaced the original File System Access flow** (`showOpenFilePicker`, Chrome/Edge check, destination-folder grant), same migration as the other four importers.
 
 **Three-step flow:**
 
@@ -5607,9 +5652,9 @@ Opened by the "+ Import model" button in the AssetBrowser header. Uses File Syst
   (author/patreon/license only) — v4.49.0
 
 **Step 3 — Import (on confirm):**
-1. Copy `.glb` to `public/assets/models/<id>.glb`
+1. Upload `.glb` bytes to `assets/models/<id>.glb` in the workspace via `assetLibrary.writeAssetFile` (`POST /api-file/models/<id>.glb`; dev workspace = `public/`, so the file still lands in `public/assets/models/`)
 2. Generate thumbnail: `renderModelThumbnail(root)` (`src/editor/thumbnailRenderer.ts`) — a `ThumbnailStage` (256², shared offscreen renderer, hemi+key+fill rig, camera fitted to the model's bounding sphere) rendered once at `DEFAULT_STAGE`, exported as PNG → `public/assets/models/<base>_thumb.png`. After the import loop, `releaseThumbnailRenderer()` frees the shared WebGL context.
-3. Read existing manifest (or create empty), merge new entry, write back
+3. Read the current manifest (`assetLibrary.readManifest`, cache-bypassing; or create empty), merge new entry, write back via `writeManifest` (atomic + rotating backup on the Deno side)
 4. Call `AssetManager.initAssets()` to reload — asset appears in browser immediately
 5. Show success state with "Import another" / "Done" buttons
 
@@ -5623,7 +5668,7 @@ Opened from AssetBrowser Manage mode (📷 with exactly one asset checked). Fixe
 
 - Loads the model via `assetManager.loadModel(asset.id)` into a `ThumbnailStage` (`src/editor/thumbnailRenderer.ts`)
 - Preview is an `<img>` re-rendered per gesture: pointer drag = orbit (yaw/pitch), **shift-drag = pan** (v4.60.4, `0.004/zoom` per px), wheel = zoom; Zoom + Light sliders each paired with a numeric input (v4.60.3 `NumField` — local draft while typing so "0.5" isn't clamped at "0", live-commits clamped to the slider's min/max, snaps display on blur/Enter); a **Move row** (v4.60.4: ◀ ▶ ▲ ▼ nudges ±0.05 + X/Y NumFields, −2…2) drives `StageParams.panX/panY` — frame offset in bounding-radius fractions, applied in `ThumbnailStage.render` as a post-lookAt camera translation; Reset view returns to `DEFAULT_STAGE` (pan included)
-- **Save Thumbnail** → `App.handleSaveThumbnail(asset, dataUrl)`: `ensureDir(modelsDir)` (dir picker on first use) → write `<base>_thumb.png` (reuses the asset's existing thumbnail filename when set) → patch `manifest.json` `thumbnail` → `assetManager.updateAsset` with a `?v=<timestamp>` cache-busted path so the grid refreshes in-session
+- **Save Thumbnail** → `App.handleSaveThumbnail(asset, dataUrl)`: write `<base>_thumb.png` via `assetLibrary.writeAssetFile` (phase 56 — the `ensureDir(modelsDir)` dir-picker grant is gone; reuses the asset's existing thumbnail filename when set) → patch `manifest.json` `thumbnail` through `assetLibrary` → `assetManager.updateAsset` with a `?v=<timestamp>` cache-busted path so the grid refreshes in-session
 - On unmount: `stage.dispose()` + `releaseThumbnailRenderer()`
 
 ---
@@ -5670,7 +5715,7 @@ export type LeftPanelId = 'assets' | 'zones' | 'scripts' | null;
 - The panel width (240px) is a CSS variable `--left-panel-w` so it can be adjusted without hunting through code.
 - `ObjectTool` must listen to `assets:selected` bus event (emitted by `AssetBrowser` on asset click) to enter placement mode, and deactivate when `assets:deselected` is emitted.
 - Thumbnail generation uses a **shared** offscreen renderer (`thumbnailRenderer.ts` singleton) — never the main scene renderer, and never one renderer per model (context exhaustion). Call `releaseThumbnailRenderer()` (dispose + `forceContextLoss`) once a batch/session finishes, not per thumbnail.
-- File System Access API availability check: `if (!('showOpenFilePicker' in window))` → show "Use Chrome or Edge" message, disable the import button.
+- ~~File System Access API availability check~~ — obsolete since phase 56: no FSA call sites remain in `src/`. Asset mutations require the desktop shell (`assetLibrary` throws "Asset management needs the desktop app" in a plain browser); file *selection* is an ordinary `<input type="file">` everywhere.
 
 ### Phase 8 — Zones & Transitions
 
@@ -5954,6 +5999,11 @@ setInterval(() => {
 ```
 
 On startup: if autosave exists and is newer than last explicit save, show restore prompt — "Unsaved work found from [X minutes ago]. Restore?" Restore loads the autosave. Discard deletes it.
+
+> **Phase 55 update:** under the desktop shell the autosave is a **workspace
+> file** (`stateDir/autosave/latest.json` + meta, written via
+> `desktop().writeAutosave`) — the localStorage pair above survives only as the
+> plain-browser fallback. Same cadence and restore flow.
 
 #### GameStateManager.ts (`src/scripting/`)
 
@@ -7995,8 +8045,13 @@ npm install @dimforge/rapier3d-compat
 # 4. Types + checker
 npm install -D @types/three typescript vite-plugin-checker
 
-# 5. Run
+# 5. Run (vite — renders the editor, but persistence needs the desktop shell)
 npm run dev
+
+# 6. Desktop shell (Phases 54–57) — requires Deno ≥ 2.9
+npm run build              # the shell serves dist/ (with /games + /assets overlaid from the workspace)
+deno task desktop:hmr      # dev loop: CEF editor window + Deno backend, HMR
+deno task compile:mac-arm64  # single-binary WorldBuilder app (also mac-x64 / win-x64 / compile:all)
 ```
 
 ### tsconfig.json
@@ -8439,7 +8494,12 @@ A second Vite entry (`runtime.html` → `src/runtime/main.tsx`) that plays world
 without the editor. Full design + phased acceptance record:
 `plans/phase-25-runtime-shell.md` and `test-plans/phase-25-runtime-shell.md`.
 Hosting a game remotely (bundle layout, S3/Netlify/GitHub Pages, CORS):
-**`PUBLISHING_GUIDE.md`**.
+**`PUBLISHING_GUIDE.md`** — largely automated since Phase 57: **"Export game…"**
+(PROJ ▾ ⋯ menu, desktop shell) produces a self-contained static bundle of this
+shell + the project's JSON + only the referenced assets (see the Desktop Shell
+section). In the desktop app, ▶ Play opens `runtime.html` in a second native
+window via the `openRuntimeWindow` api (phase 55 — `window.open` is a no-op in
+the CEF webview).
 
 ### Pieces
 
@@ -8476,8 +8536,10 @@ Hosting a game remotely (bundle layout, S3/Netlify/GitHub Pages, CORS):
   (`load_scene`), a state-gated dialogue in level_02 proving cross-scene state.
 - Future work (see plan doc §13): launcher/library + registry, ref-counted
   asset cache + next-scene preloading, 3D menu scenes. ~~Editor "Export manifest"~~ —
-  **superseded by Phase 33 Projects** (auto-generated manifest + game.json + Publish flow;
-  see `src/project/ProjectStore.ts` and the v4.27.0 changelog entry).
+  **superseded by Phase 33 Projects** (auto-generated manifest + game.json; see
+  `src/project/ProjectStore.ts` and the v4.27.0 changelog entry) **and Phase 57's
+  `exportGameBundle`** (the Phase 33 FSA "Publish…" folder-copy was removed in
+  phase 55 and replaced by the real self-contained export).
 
 ---
 

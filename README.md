@@ -1,6 +1,8 @@
 # Three Square Dance
 
-A browser-based 3D world editor for building explorable spaces — rooms, buildings, dungeons, whatever. You draw walls, lay floors, raise platforms, place stairs, and then walk through it all in first or third person. Physics are live from day one, so what you build is what you'd actually collide with in a game.
+A 3D world editor for building explorable spaces — rooms, buildings, dungeons, whatever. You draw walls, lay floors, raise platforms, place stairs, and then walk through it all in first or third person. Physics are live from day one, so what you build is what you'd actually collide with in a game.
+
+Ships as a **native desktop app** (Deno desktop, bundled-Chromium window) for macOS and Windows: projects and imported assets live in a real workspace folder (`~/WorldBuilder`, dev checkouts use `<repo>/public`) with atomic saves, rotating backups, and trash-instead-of-delete; **Export game…** produces a self-contained static bundle (runtime + only the assets the game references) you can drop on any web host.
 
 Built with Vite + React + Three.js (no R3F), Rapier3D for physics, and `three-bvh-csg` for boolean geometry (wall openings, stair cutouts, etc.).
 
@@ -57,17 +59,26 @@ Built with Vite + React + Three.js (no R3F), Rapier3D for physics, and `three-bv
 
 ## Getting started
 
-**Requirements:** Node 18+
+**Requirements:** Node 18+, Deno 2.9+
 
 ```bash
-# Install dependencies
 npm install
 
-# Start the dev server
-npm run dev
+# Desktop app, dev loop (native window; backend hot-reloads, frontend needs `npm run build`)
+npm run build
+deno task desktop:hmr
+
+# Release binaries (all cross-compiled from one machine, output in build/)
+deno task compile:all        # or compile:mac-arm64 / compile:mac-x64 / compile:win-x64
 ```
 
-Open `http://localhost:5173`. The editor loads with an empty zone ready to build in.
+In dev the workspace is the repo itself: projects live in `public/games/`, state
+(backups, trash, autosave, exports) in `.worldbuilder/`. The compiled app uses
+`~/WorldBuilder` (override with `WORLDBUILDER_WORKSPACE`).
+
+`npm run dev` (Vite on :7373) still renders the editor in a plain browser, but
+saving/importing needs the desktop shell — persistence goes through its local
+server.
 
 **Basic workflow:**
 1. Pick a tool from the toolbar (Wall, Floor, Platform, Stair)
