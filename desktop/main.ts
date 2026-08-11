@@ -122,8 +122,17 @@ const serveOrigin = `http://127.0.0.1:${serveAddress.split(":").pop()}`;
 // deno-lint-ignore no-explicit-any
 const DenoAny = Deno as any;
 
+// Test/probe instances must be visibly distinct from the user's real editor —
+// an unlabeled scratch-workspace window reads as "my assets are missing".
+const wsOverride = Deno.env.get("WORLDBUILDER_WORKSPACE");
+const windowTitle = bootPage
+  ? `World Builder — PROBE (${bootPage})`
+  : wsOverride
+  ? `World Builder — TEST WORKSPACE (${wsOverride.split("/").pop()})`
+  : "World Builder";
+
 const editorWin = new DenoAny.BrowserWindow({
-  title: "World Builder",
+  title: windowTitle,
   width: 1600,
   height: 1000,
 });
