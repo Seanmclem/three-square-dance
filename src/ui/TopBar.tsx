@@ -24,6 +24,7 @@ interface TopBarProps {
   onProjectClose?:     () => void;
   onProjectPlay?:      () => void;
   onProjectPublish?:   () => void;
+  onProjectExport?:    () => void;
   onSceneSwitch?:      (id: string) => void;
   onSceneAdd?:         () => void;
   onSceneDelete?:      (id: string) => void;
@@ -84,7 +85,7 @@ function Popover({ open, onClose, children }: { open: boolean; onClose: () => vo
 }
 
 export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onLoadFSA, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
-  project, projectPendingName, onProjectNew, onProjectOpen, onProjectReopen, onProjectClose, onProjectPlay, onProjectPublish,
+  project, projectPendingName, onProjectNew, onProjectOpen, onProjectReopen, onProjectClose, onProjectPlay, onProjectPublish, onProjectExport,
   onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const autosaveLabel = useAutosaveLabel(lastAutosaveAt);
@@ -237,6 +238,9 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
               </div>
               {onProjectPublish && (
                 <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish(); }}>Publish…</button>
+              )}
+              {onProjectExport && (
+                <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectExport(); }}>Export game…</button>
               )}
               <button
                 style={{ ...popBtn,

@@ -29,6 +29,7 @@ const bootPage = Deno.env.get("WORLDBUILDER_BOOT");
 // array of args; bindings remain registered for spike diagnostics only.
 import * as P from "./projects.ts";
 import * as A from "./assets.ts";
+import { exportGameBundle } from "./export.ts";
 import { getLastSession, getPref, setLastSession, setPref } from "./workspace.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -50,6 +51,7 @@ const apiMethods: Record<string, (...args: any[]) => unknown> = {
   readAutosave: () => P.readAutosave(ws),
   clearAutosave: () => P.clearAutosave(ws),
   writeExportFile: (name: string, text: string) => P.writeExportFile(ws, name, text),
+  exportGameBundle: (opts: { projectId: string; format?: "folder" }) => exportGameBundle(ws, distDir, opts),
   writeAssetManifest: (kind: string, json: string) => A.writeAssetManifest(ws, kind, json),
   deleteAssetFiles: (kind: string, rels: string[]) => A.deleteAssetFiles(ws, kind, rels),
 };

@@ -49,6 +49,9 @@ export interface DesktopApi {
   // single-file export (replaces the browser save-file picker)
   writeExportFile(name: string, text: string): Promise<{ path: string }>;
 
+  // self-contained game export: runtime shell + project JSON + referenced assets
+  exportGameBundle(opts: { projectId: string; format?: "folder" }): Promise<{ outputPath: string; fileCount: number; totalBytes: number; missing: string[] }>;
+
   // asset library (binary file uploads use uploadAssetFile below — the JSON
   // api can't carry bytes)
   writeAssetManifest(kind: AssetKind, json: string): Promise<void>;

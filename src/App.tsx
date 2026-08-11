@@ -97,7 +97,7 @@ import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from 
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
 import { seedStartingInventory } from "@/scripting/inventory";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject } from "@/project/ProjectStore";
-import { desktop, detectDesktop } from "@/shared/desktopApi";
+import { desktop, detectDesktop, isDesktop } from "@/shared/desktopApi";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { OpenProjectModal } from "@/ui/OpenProjectModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
@@ -1461,8 +1461,25 @@ export default function App() {
     else window.open(`/runtime.html?manifest=${encodeURIComponent(url)}`, '_blank');
   }, [handleSave]);
 
-  // Publish (folder-to-folder copy via pickers) is gone with FSA; the export
-  // phase replaces it with a real self-contained bundle (runtime + assets).
+  // Publish (folder-to-folder copy via pickers) is gone with FSA — replaced by
+  // the desktop shell's self-contained bundle export (runtime + referenced assets).
+  const handleProjectExport = useCallback(async (): Promise<void> => {
+    const proj = projectRef.current;
+    const d = desktop();
+    if (!proj || !d) return;
+    await handleSave();   // the export reads from disk — must see the latest
+    try {
+      const r = await d.exportGameBundle({ projectId: proj.store.id });
+      const mb = (r.totalBytes / (1024 * 1024)).toFixed(1);
+      window.alert(
+        `Exported ${r.fileCount} files (${mb} MB) to:\n${r.outputPath}` +
+        (r.missing.length ? `\n\nMissing (referenced but not found):\n${r.missing.join('\n')}` : ''),
+      );
+      void d.revealPath(r.outputPath);
+    } catch (e) {
+      window.alert(`Export failed: ${(e as Error).message}`);
+    }
+  }, [handleSave]);
 
   const handleProjectClose = useCallback(async (): Promise<void> => {
     await closeProject();
@@ -3391,6 +3408,7 @@ export default function App() {
         onProjectOpen={handleProjectOpen}
         onProjectClose={() => void handleProjectClose()}
         onProjectPlay={() => void handleProjectPlay()}
+        onProjectExport={isDesktop() ? () => void handleProjectExport() : undefined}
         onSceneSwitch={id => void handleProjectSceneSwitch(id)}
         onSceneAdd={() => void handleProjectSceneAdd()}
         onSceneDelete={id => void handleProjectSceneDelete(id)}
