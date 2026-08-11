@@ -126,10 +126,10 @@ const DenoAny = Deno as any;
 // an unlabeled scratch-workspace window reads as "my assets are missing".
 const wsOverride = Deno.env.get("WORLDBUILDER_WORKSPACE");
 const windowTitle = bootPage
-  ? `World Builder — PROBE (${bootPage})`
+  ? `SquareDance — PROBE (${bootPage})`
   : wsOverride
-  ? `World Builder — TEST WORKSPACE (${wsOverride.split("/").pop()})`
-  : "World Builder";
+  ? `SquareDance — TEST WORKSPACE (${wsOverride.split("/").pop()})`
+  : "SquareDance";
 
 const editorWin = new DenoAny.BrowserWindow({
   title: windowTitle,
@@ -157,7 +157,7 @@ function openRuntimeWindow(opts: { manifestUrl: string; title?: string }): { url
   const url = `${serveOrigin}/runtime.html?manifest=${encodeURIComponent(opts.manifestUrl)}`;
   if (runtimeWin === null) {
     runtimeWin = new DenoAny.BrowserWindow({
-      title: opts.title ?? "World Builder — Runtime",
+      title: opts.title ?? "SquareDance — Runtime",
       width: 1280,
       height: 800,
     });

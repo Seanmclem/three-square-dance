@@ -55,15 +55,15 @@ resolution — before calling anything done:
 
 ```bash
 npm run build
-deno task compile:mac-arm64        # → build/WorldBuilder-mac-arm64.app (~7s after first run)
-open build/WorldBuilder-mac-arm64.app
+deno task compile:mac-arm64        # → build/SquareDance.app (~7s after first run)
+open build/SquareDance.app
 ```
 
 - Packaged mode uses **`~/WorldBuilder/`** as the workspace (state in
   `~/WorldBuilder/.state/`), NOT the repo — your dev projects won't appear
   unless you copy them into `~/WorldBuilder/games/`.
 - To stage against throwaway data instead:
-  `WORLDBUILDER_WORKSPACE=/tmp/wb-stage build/WorldBuilder-mac-arm64.app/Contents/MacOS/laufey`
+  `WORLDBUILDER_WORKSPACE=/tmp/wb-stage build/SquareDance.app/Contents/MacOS/laufey`
   (the window will title itself "TEST WORKSPACE").
 - The stock asset library needs no copying ever — it ships inside the binary
   and the workspace overlays it (imports/edits shadow stock; deleting stock
@@ -81,9 +81,12 @@ deno task compile:all   # vite build + all three targets, output in build/
 
 | Artifact | Target | Size |
 |---|---|---|
-| `WorldBuilder-mac-arm64.app` | Apple Silicon | ~420 MB |
-| `WorldBuilder-mac-x64.app` | Intel Mac | ~460 MB |
-| `WorldBuilder-win-x64.msi` | Windows 10/11 x64 | ~270 MB |
+| `SquareDance.app` | Apple Silicon | ~420 MB |
+| `SquareDance-intel.app` | Intel Mac | ~460 MB |
+| `SquareDance.msi` | Windows 10/11 x64 | ~270 MB |
+
+All carry the SquareDance icon (`desktop/icon/` — regenerate with the
+overlapping-squares script if the brand changes).
 
 (~300 MB of each is the fixed CEF framework; the rest is the app + the full
 stock asset library.)
