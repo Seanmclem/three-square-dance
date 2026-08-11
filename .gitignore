@@ -6,3 +6,4 @@ dist/
 # deno desktop build artifacts
 *.app/
 desktop/spike-results.json
+.worldbuilder/

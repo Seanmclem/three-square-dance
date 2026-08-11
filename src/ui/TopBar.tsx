@@ -235,7 +235,9 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
                   {project.sceneIds.map(id => <option key={id} value={id}>{id}</option>)}
                 </select>
               </div>
-              <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish?.(); }}>Publish…</button>
+              {onProjectPublish && (
+                <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish(); }}>Publish…</button>
+              )}
               <button
                 style={{ ...popBtn,
                          color: project.currentSceneId === project.entryScene || project.sceneIds.length <= 1 ? "#44444f" : "#cc6666",

@@ -4,25 +4,22 @@ import { slugifyId } from "@/project/ProjectStore";
 interface NewProjectModalProps {
   /** Prefill for the scene-1 id — the slug of the current world's name (App knows it). */
   defaultSceneId: string;
-  onConfirm: (name: string, parentDir: FileSystemDirectoryHandle, startBlank: boolean, sceneId: string) => void;
+  onConfirm: (name: string, startBlank: boolean, sceneId: string) => void;
   onCancel:  () => void;
 }
 
 /**
- * New Project dialog (Phase 33). Name + folder are chosen HERE, from labeled
- * controls — the directory picker runs off its own button click, so the
- * transient-user-activation rule (which broke the old prompt-then-pick flow,
- * v4.27.1) can never bite: every native dialog gets its own fresh gesture.
+ * New Project dialog (Phase 33; folder picker removed in phase 55). The
+ * desktop shell owns the project location — `games/<id>/` in the workspace —
+ * so only a name is needed.
  */
 export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProjectModalProps) {
   const [name, setName] = useState("");
-  const [dir, setDir]   = useState<FileSystemDirectoryHandle | null>(null);
   const [startBlank, setStartBlank] = useState(false);
   const [sceneId, setSceneId] = useState(defaultSceneId);
   const [sceneIdTouched, setSceneIdTouched] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const ready = !!name.trim() && !!dir && !!slugifyId(sceneId.trim());
+  const ready = !!name.trim() && !!slugifyId(sceneId.trim());
 
   const pickStart = (blank: boolean) => {
     setStartBlank(blank);
@@ -31,17 +28,8 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
     if (!sceneIdTouched) setSceneId(blank ? "scene_01" : defaultSceneId);
   };
 
-  const pickFolder = async () => {
-    try {
-      setDir(await window.showDirectoryPicker({ mode: "readwrite" }));
-      setError(null);
-    } catch (e: unknown) {
-      if ((e as DOMException).name !== "AbortError") setError((e as Error).message);
-    }
-  };
-
   const confirm = () => {
-    if (ready) onConfirm(name.trim(), dir!, startBlank, slugifyId(sceneId.trim()));
+    if (ready) onConfirm(name.trim(), startBlank, slugifyId(sceneId.trim()));
   };
 
   return (
@@ -80,34 +68,10 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
 
         <div>
           <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>LOCATION</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              onClick={() => void pickFolder()}
-              style={{
-                padding: "6px 12px", borderRadius: 4, cursor: "pointer",
-                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)",
-                color: "#a0a0b8", fontSize: 11, fontFamily: "monospace", whiteSpace: "nowrap",
-              }}
-            >
-              Choose folder…
-            </button>
-            <span style={{
-              color: dir ? "#80aaff" : "#585870", fontSize: 11, fontFamily: "monospace",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {dir ? `📁 ${dir.name}/` : "not chosen"}
-            </span>
+          <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5 }}>
+            Created as <span style={{ color: "#8090a8" }}>games/{name.trim() ? slugifyId(name.trim()) : "…"}/</span> in
+            your workspace — ▶ Play works immediately.
           </div>
-          <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5, marginTop: 6 }}>
-            {name.trim()
-              ? <>A new folder <span style={{ color: "#8090a8" }}>{slugifyId(name.trim())}/</span> will be created inside the folder you choose{dir ? <> (<span style={{ color: "#8090a8" }}>{dir.name}/{slugifyId(name.trim())}/</span>)</> : null}.</>
-              : <>A new folder named after the project will be created inside the folder you choose.</>}
-            {" "}Pick <span style={{ color: "#8090a8" }}>&lt;repo&gt;/public/games</span> to
-            make ▶ Play work instantly (see PUBLISHING_GUIDE.md).
-          </div>
-          {error && (
-            <div style={{ color: "#cc6666", fontSize: 10, marginTop: 6 }}>{error}</div>
-          )}
         </div>
 
         <div>

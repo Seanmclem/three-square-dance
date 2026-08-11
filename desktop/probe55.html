@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Phase 55 Bindings E2E Probe</title>
+<style>
+  body { background:#14161c; color:#dde3f0; font:14px/1.5 -apple-system, system-ui, sans-serif; margin:0; padding:24px; }
+  h1 { font-size:18px; margin:0 0 12px; }
+  table { border-collapse:collapse; width:100%; max-width:760px; }
+  td, th { text-align:left; padding:6px 12px; border-bottom:1px solid #2a2e3a; }
+  .pass { color:#7ddc8f; } .fail { color:#f2788a; } .info { color:#8fb8f2; }
+  #status { margin-top:12px; color:#c2cadb; }
+</style>
+</head>
+<body>
+<h1>Phase 55 — project persistence over bindings, end to end</h1>
+<p style="color:#c2cadb">Run against a scratch workspace (WORLDBUILDER_WORKSPACE) — creates project
+<code>wb-probe</code> from the pj-fixture scene, saves through bindings, reads back over HTTP,
+then opens the runtime window on the result.</p>
+<table id="results"><tr><th>Step</th><th>Result</th><th>Detail</th></tr></table>
+<div id="status">Running…</div>
+<script>
+(async () => {
+  const rows = [];
+  const table = document.getElementById("results");
+  function add(name, ok, detail) {
+    rows.push({ name, ok, detail: String(detail ?? "") });
+    const tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + name + "</td><td class='" +
+      (ok === true ? "pass'>PASS" : ok === false ? "fail'>FAIL" : "info'>INFO") +
+      "</td><td>" + String(detail ?? "") + "</td>";
+    table.appendChild(tr);
+  }
+  const b = globalThis.bindings;
+  add("bindings present", !!b, typeof b);
+
+  try {
+    // fixture content (read-only from the repo checkout)
+    const scene = await (await fetch("/probe-fixture/scenes/scene_01.json")).json();
+    const game = await (await fetch("/probe-fixture/game.json")).json();
+    add("fixture fetched", !!scene.zones, "scene_01 (" + JSON.stringify(scene).length + " bytes)");
+
+    // 1. create
+    await b.createProject("wb-probe");
+    add("createProject", true, "games/wb-probe/");
+
+    // 2. write scene + game + manifest through bindings
+    const first = await b.saveScene("wb-probe", "scene_01", JSON.stringify(scene, null, 2));
+    add("saveScene (fresh)", first.backup === null, "no backup expected on first write");
+    await b.writeGameFile("wb-probe", JSON.stringify(game, null, 2));
+    const manifest = { manifestVersion: 1, id: "wb-probe", name: "WB Probe", version: "1.0.0",
+                       entryScene: "scene_01", scenes: { scene_01: "scenes/scene_01.json" },
+                       assetsBase: "/", game: "game.json" };
+    await b.writeProjectManifest("wb-probe", JSON.stringify(manifest, null, 2));
+    add("writeGameFile + writeProjectManifest", true, "");
+
+    // 3. read back over HTTP — the exact path the editor and runtime use
+    const readBack = await (await fetch("/games/wb-probe/scenes/scene_01.json", { cache: "no-store" })).json();
+    add("HTTP read-back matches", JSON.stringify(readBack) === JSON.stringify(scene), "");
+    const mBack = await (await fetch("/games/wb-probe/manifest.json", { cache: "no-store" })).json();
+    add("manifest served", mBack.id === "wb-probe" && mBack.entryScene === "scene_01", "");
+
+    // 4. overwrite → rotating backup on the Deno side
+    const second = await b.saveScene("wb-probe", "scene_01", JSON.stringify(scene, null, 2));
+    add("saveScene (overwrite) made backup", typeof second.backup === "string" && second.backup.length > 0, second.backup);
+
+    // 5. listProjects sees it
+    const list = await b.listProjects();
+    add("listProjects", list.some(r => r.id === "wb-probe"), JSON.stringify(list.map(r => r.id)));
+
+    // 6. session + autosave round trips (the boot path)
+    await b.setLastSession({ projectId: "wb-probe", sceneId: "scene_01" });
+    const sess = await b.getLastSession();
+    add("session round trip", sess && sess.projectId === "wb-probe", JSON.stringify(sess));
+    await b.writeAutosave({ projectId: "wb-probe", sceneId: "scene_01" }, JSON.stringify(scene));
+    const auto = await b.readAutosave();
+    add("autosave round trip", auto && auto.meta.projectId === "wb-probe" && auto.json.length > 100, auto ? auto.meta.savedAt : "null");
+    await b.clearAutosave();
+    add("autosave cleared", (await b.readAutosave()) === null, "");
+
+    // 7. runtime window on the game we just wrote (leaves it open to inspect)
+    const win = await b.openRuntimeWindow({ manifestUrl: "/games/wb-probe/manifest.json", title: "WB Probe — Runtime" });
+    add("openRuntimeWindow", typeof win.url === "string", win.url);
+
+    document.getElementById("status").textContent = "Done.";
+  } catch (e) {
+    add("UNCAUGHT", false, e.message + (e.stack ? " | " + String(e.stack).slice(0, 120) : ""));
+    document.getElementById("status").textContent = "Failed: " + e.message;
+  }
+
+  await fetch("/spike-report", { method: "POST", body: JSON.stringify({ probe: "phase55", ranAt: new Date().toISOString(), checks: rows }, null, 2) }).catch(() => {});
+})();
+</script>
+</body>
+</html>
