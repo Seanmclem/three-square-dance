@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { HelpButton } from "@/ui/HelpButton";
+import { isDesktop } from "@/shared/desktopApi";
 
 interface TopBarProps {
   activeFloor:     number;
@@ -265,6 +266,20 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       </button>
       <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.08)" }} />
       <HelpButton />
+      {isDesktop() && (
+        <button
+          title="Reload the editor UI — picks up a fresh build (unsaved changes are autosaved first)"
+          onClick={() => location.reload()}
+          style={{
+            width: 28, height: 28, border: "none", borderRadius: 6,
+            background: "rgba(255,255,255,0.07)", color: "#9090b0",
+            fontSize: 14, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          ↻
+        </button>
+      )}
       <div style={{ flex: 1 }} />
 
       {([
