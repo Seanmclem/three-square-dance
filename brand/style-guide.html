@@ -13,6 +13,8 @@
     --hairline: #E3E7EE;
     --wordmark: "Avenir Next", Avenir, Futura, "Century Gothic", "Trebuchet MS", sans-serif;
     --mono: "SF Mono", Menlo, Consolas, monospace;
+    --mark-back: var(--ink);
+    --mark-front: var(--cobalt);
   }
   /* Deliberately single-theme: a brand guide presents the identity on its own
      white ground, like a printed book. Every surface is painted explicitly. */
@@ -104,12 +106,21 @@
 
 <div class="page">
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="sq-mark">
+      <rect x="41.4" y="18.4" width="40.2" height="40.2" fill="none" stroke="var(--mark-back)" stroke-width="5.8"/>
+      <rect x="18.4" y="41.4" width="40.2" height="40.2" fill="none" stroke="var(--mark-front)" stroke-width="5.8" stroke-opacity="0.9"/>
+    </g>
+  </defs>
+</svg>
+
+
   <!-- ══ COVER ══ -->
   <header class="cover">
     <div class="lockup">
       <svg width="150" height="150" viewBox="0 0 100 100" role="img" aria-label="SquareDance mark">
-        <rect x="43.7" y="16.1" width="40.2" height="40.2" fill="none" stroke="#131A33" stroke-width="5.8"/>
-        <rect x="16.1" y="43.7" width="40.2" height="40.2" fill="none" stroke="#3B67CE" stroke-width="5.8" stroke-opacity="0.9"/>
+        <use href="#sq-mark"/>
       </svg>
       <div class="words">square<br><span class="d">dance</span></div>
     </div>
@@ -125,24 +136,22 @@
     <div class="grid cols-3">
       <div class="card center">
         <svg width="120" height="120" viewBox="0 0 100 100" aria-label="Outline mark">
-          <rect x="43.7" y="16.1" width="40.2" height="40.2" fill="none" stroke="#131A33" stroke-width="5.8"/>
-          <rect x="16.1" y="43.7" width="40.2" height="40.2" fill="none" stroke="#3B67CE" stroke-width="5.8" stroke-opacity="0.9"/>
+          <use href="#sq-mark"/>
         </svg>
         <div class="caption">outline · primary</div>
       </div>
       <div class="card center">
         <svg width="120" height="120" viewBox="0 0 100 100" aria-label="Filled mark">
-          <rect x="41.2" y="14.8" width="44" height="44" rx="2" fill="#131A33"/>
-          <rect x="14.8" y="41.2" width="44" height="44" rx="2" fill="#3B67CE"/>
-          <rect x="41.2" y="41.2" width="17.6" height="17.6" rx="1" fill="#FFFFFF"/>
+          <rect x="39" y="17" width="44" height="44" rx="2" fill="#131A33"/>
+          <rect x="17" y="39" width="44" height="44" rx="2" fill="#3B67CE"/>
+          <rect x="39" y="39" width="22" height="22" rx="1" fill="#FFFFFF"/>
         </svg>
         <div class="caption">filled · small sizes &amp; avatars</div>
       </div>
       <div class="card center">
         <svg width="120" height="120" viewBox="0 0 100 100" aria-label="App icon tile">
           <rect x="4" y="4" width="92" height="92" rx="20" fill="#FFFFFF" stroke="#E3E7EE"/>
-          <rect x="44.7" y="21.3" width="34" height="34" fill="none" stroke="#131A33" stroke-width="5"/>
-          <rect x="21.3" y="44.7" width="34" height="34" fill="none" stroke="#3B67CE" stroke-width="5" stroke-opacity="0.9"/>
+          <g transform="translate(19,19) scale(0.62)"><use href="#sq-mark"/></g>
         </svg>
         <div class="caption">app icon · white tile</div>
       </div>
@@ -150,8 +159,8 @@
     <div style="margin-top:20px" class="card">
       <h3>Construction</h3>
       <p style="margin:0">Each square's stroke is <strong>side ÷ 8</strong>. The front square offsets
-      diagonally by <strong>side × 0.60</strong> down-left, so each corner reaches <strong>40%</strong> of
-      the way into the other square. Clear space around the mark ≥ one stroke width on all sides.
+      diagonally by <strong>side × 0.50</strong> down-left, so each corner lands exactly on the
+      other square's center. The mark is one shared definition — never redraw it. Clear space around the mark ≥ one stroke width on all sides.
       Minimum size: 20&nbsp;px — below that, use the filled mark.</p>
     </div>
   </section>
@@ -163,8 +172,7 @@
       <div class="card center" style="min-height:200px">
         <div style="display:flex;align-items:center;gap:26px">
           <svg width="92" height="92" viewBox="0 0 100 100" aria-hidden="true">
-            <rect x="43.7" y="16.1" width="40.2" height="40.2" fill="none" stroke="#131A33" stroke-width="5.8"/>
-            <rect x="16.1" y="43.7" width="40.2" height="40.2" fill="none" stroke="#3B67CE" stroke-width="5.8" stroke-opacity="0.9"/>
+            <use href="#sq-mark"/>
           </svg>
           <div class="wm" style="font-size:42px;line-height:1.05">square<br><span class="d">dance</span></div>
         </div>
@@ -173,8 +181,7 @@
       <div class="card center" style="min-height:200px">
         <div style="display:flex;align-items:center;gap:22px">
           <svg width="66" height="66" viewBox="0 0 100 100" aria-hidden="true">
-            <rect x="43.7" y="16.1" width="40.2" height="40.2" fill="none" stroke="#131A33" stroke-width="5.8"/>
-            <rect x="16.1" y="43.7" width="40.2" height="40.2" fill="none" stroke="#3B67CE" stroke-width="5.8" stroke-opacity="0.9"/>
+            <use href="#sq-mark"/>
           </svg>
           <div class="wm" style="font-size:38px">square <span class="d">dance</span></div>
         </div>
@@ -223,16 +230,14 @@
     <div style="margin-top:20px" class="grid cols-2">
       <div class="card center">
         <svg width="240" height="86" viewBox="0 0 280 100" aria-label="Teal alternate lockup">
-          <rect x="44.2" y="20.2" width="35.6" height="35.6" fill="none" stroke="#16383F" stroke-width="4.4"/>
-          <rect x="20.2" y="44.2" width="35.6" height="35.6" fill="none" stroke="#3FA096" stroke-width="4.4" stroke-opacity="0.9"/>
+          <g transform="translate(12,12) scale(0.78)"><use href="#sq-mark" style="--mark-back:#16383F; --mark-front:#3FA096"/></g>
           <text x="100" y="66" font-size="30" font-weight="600" letter-spacing="-0.6" fill="#16383F">square <tspan fill="#3FA096">dance</tspan></text>
         </svg>
         <div class="caption">teal family · secondary contexts</div>
       </div>
       <div class="card center">
         <svg width="240" height="86" viewBox="0 0 280 100" aria-label="Cobalt primary lockup">
-          <rect x="44.2" y="20.2" width="35.6" height="35.6" fill="none" stroke="#131A33" stroke-width="4.4"/>
-          <rect x="20.2" y="44.2" width="35.6" height="35.6" fill="none" stroke="#3B67CE" stroke-width="4.4" stroke-opacity="0.9"/>
+          <g transform="translate(12,12) scale(0.78)"><use href="#sq-mark"/></g>
           <text x="100" y="66" font-size="30" font-weight="600" letter-spacing="-0.6" fill="#131A33">square <tspan fill="#3B67CE">dance</tspan></text>
         </svg>
         <div class="caption">cobalt family · primary</div>
@@ -247,8 +252,7 @@
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:48px;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:22px">
           <svg width="76" height="76" viewBox="0 0 100 100" aria-label="Mark on dark">
-            <rect x="43.7" y="16.1" width="40.2" height="40.2" fill="none" stroke="#FFFFFF" stroke-width="5.8"/>
-            <rect x="16.1" y="43.7" width="40.2" height="40.2" fill="none" stroke="#6E8FE0" stroke-width="5.8" stroke-opacity="0.92"/>
+            <use href="#sq-mark" style="--mark-back:#FFFFFF; --mark-front:#6E8FE0"/>
           </svg>
           <span class="wm" style="font-size:34px;color:#FFFFFF">square <span style="color:#8AA5EA">dance</span></span>
         </div>
