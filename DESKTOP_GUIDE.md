@@ -112,6 +112,9 @@ Full detail in **TESTING.md §0**. The short version:
 
 - Automated flows drive a Chrome tab on the shell's origin (full desktop
   mode + extension tooling).
+- The shell window itself is drivable via the computer-use MCP (pixel-level
+  clicks + screenshots) after a one-time rebrand of the cached CEF runtime —
+  setup commands and caveats in TESTING.md §0.
 - The shell self-reports: engine/boot checks via
   `WORLDBUILDER_BOOT=spike`, persistence e2e via `=probe55`, frame timing
   continuously to `<stateDir>/perf-report.jsonl` (how the window's

@@ -31,8 +31,8 @@ old §9 picker-stubbing wholesale — the real flows are directly drivable now.
 window itself is not extension-reachable and `--inspect-renderer` did not open
 a CDP port when tried (laufey 0.6.1) — so window-level behavior (the reused
 native runtime window from ▶ Play, `<input type="file">` native dialogs,
-Finder reveals, packaged-VFS serving) is verified via the built-in probes +
-human eyes:
+Finder reveals, packaged-VFS serving) is verified via **computer-use clicks
+(see below)** plus the built-in probes:
 
 - `WORLDBUILDER_BOOT=spike deno task desktop:hmr` — the harness at `/`
   auto-runs engine checks **and an editor boot probe** (iframe-loads the real
@@ -48,6 +48,28 @@ human eyes:
   `--data-binary @file …/api-file/<kind>/<rel>`.
 - Backend functions unit-test headlessly: `deno run -A <script>` importing
   `desktop/*.ts` directly (see test-plans/phase-55).
+
+**Computer-use CAN drive the shell window** (verified 2026-08-13: click →
+object selected → properties panel populated; screenshots showed the WebGL
+scene correctly). Two setup facts make it work:
+
+1. The computer-use resolver only knows apps in its catalog (built at MCP
+   server start, roughly = /Applications). The dev shell's window app is the
+   cached runtime `~/Library/Caches/deno/laufey/<ver>/cef/<target>/laufey.app`
+   (bundle `com.deno.desktop`), which is NOT in the catalog →
+   `request_access` says `not_installed` and "Allow (0 apps)" grants nothing.
+2. Fix: rebrand the cached runtime to the installed app's identity so one
+   grant covers both the packaged app and the dev window:
+   ```bash
+   APP=~/Library/Caches/deno/laufey/0.6.1/cef/aarch64-apple-darwin/laufey.app
+   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.deno.desktop.squaredance" \
+     -c "Set :CFBundleName SquareDance" "$APP/Contents/Info.plist"
+   codesign -f -s - --deep "$APP"   # re-seal; ad-hoc is fine locally
+   ```
+   Then relaunch the shell and `request_access(["SquareDance"])`. A laufey
+   version bump re-extracts the cache and reverts this — re-apply the two
+   commands. Computer-use is pixel-level (no DOM); for anything a Chrome tab
+   can reach, the extension tools remain faster and more precise.
 
 **Workspace protection replaces the localStorage protocol (§3) as the main
 data-safety concern.** In desktop mode, saves/autosaves/imports write REAL
@@ -128,6 +150,10 @@ in the extension popup, which Claude can't drive.)
 this Mac.** On a Retina / Display P3 setup, the OS compositor screenshot shows
 the canvas as uniformly dark even when the GL drawing buffer has bright content.
 Do not trust computer-use screenshots to verify whether 3D geometry is rendering.
+
+> **Update (2026-08-13):** this dark-canvas failure was observed on Chrome. The
+> desktop shell's **CEF window captures fine** — computer-use screenshots of it
+> showed the full 3D scene correctly. Treat the warning as browser-specific.
 
 ### What to use instead
 
