@@ -30,14 +30,18 @@ save your world **into `public/`**, add a small manifest next to it, open
 
 ### One-time setup (per game)
 
-1. Make a folder in the repo: `public/my-game/scenes/`.
-2. Author your level in the editor (`localhost:7373`) as usual. It needs a
-   **spawn point** (Spawn tool) or the runtime spawns at the origin.
-3. **Save the world directly into that folder**: Ctrl+S → in the file picker,
-   navigate to `<repo>/public/my-game/scenes/` and save as `level_01.json`.
-   (The editor's save output *is* the runtime scene format — nothing to
-   convert.)
-4. Create `public/my-game/manifest.json`:
+1. Make a folder in the repo: `public/games/my-game/scenes/` (`/games/*` is
+   served live by the desktop shell — no build step between edits).
+2. Author your level in the desktop app as usual. It needs a **spawn point**
+   (Spawn tool) or the runtime spawns at the origin.
+3. **Get the scene JSON into that folder**: the editor saves project scenes to
+   `public/games/<projectId>/scenes/` already, so the normal path is just
+   making the folder a real project (PROJ ▾ → New Project…) — the manifest
+   below is then auto-generated too. For a truly hand-built folder, copy a
+   saved scene JSON in. (The old Ctrl+S file picker is gone with the FSA —
+   saves always go through the project.)
+4. Create `public/games/my-game/manifest.json` (skip if it's a project —
+   the editor maintains it):
 
 ```json
 {
@@ -54,16 +58,17 @@ save your world **into `public/`**, add a small manifest next to it, open
    `/assets` — your imported models, materials, and decals all just work,
    exactly as they do in editor preview.
 
-5. Open **`http://localhost:7373/runtime.html?manifest=/my-game/manifest.json`**
-   → Start. That's your game in the real shell: manifest boot, main menu,
-   saves, portals — everything a published copy would do.
+5. Open **`http://127.0.0.1:<shell-port>/runtime.html?manifest=/games/my-game/manifest.json`**
+   (the port is printed at launch; a Vite tab on `:7373` works too for
+   play-only) → Start. That's your game in the real shell: manifest boot,
+   main menu, saves, portals — everything a published copy would do.
 
 ### The iteration loop
 
-- Edit in the editor tab → **Ctrl+S** (after the first save it re-saves
-  in-place, no picker) → switch to the runtime tab → **reload the page** →
-  Start. Files under `public/` are served statically — a browser refresh picks
-  up the new JSON; there's no hot reload for them.
+- Edit in the editor → **Ctrl+S** (saves in place, straight to the project's
+  files) → switch to the runtime tab/window → **reload** → Start. Content is
+  served with `no-store` — a refresh picks up the new JSON; there's no hot
+  reload for it.
 - The editor and runtime tabs coexist fine on the same origin: the runtime
   never touches the editor's autosave, and its own save lives under
   `runtime_gamesave:<manifest.id>`. Tip: while iterating on level layout, use
@@ -73,9 +78,9 @@ save your world **into `public/`**, add a small manifest next to it, open
   the manifest, and wire portals with `load_scene` trigger volumes (see
   HUMAN_TESTING.md's runtime workflow). Scene ids in the volumes must match
   the manifest keys.
-- Committing: `public/my-game/` will ship inside `dist/` on the next build
-  (like `public/demo/` does). Keep personal scratch levels out of git or out
-  of `public/` if you don't want that.
+- Committing: `public/games/my-game/` will ship inside `dist/` on the next
+  build (like `public/demo/` does). Keep personal scratch levels out of git or
+  out of `public/` if you don't want that.
 
 When the game feels done, everything below is just "move that folder
 somewhere public and add one header."
@@ -101,9 +106,11 @@ my-game/
     └── graphics/manifest.json + 2D images (item icons, custom-GUI art)
 ```
 
-> ⚠ **The editor's Publish… button does NOT fill in `assets/`.** It copies
-> manifests and scene JSONs only — the assets tree is yours to provide (three
-> ways, see §2 "Assets").
+> **Export game… produces exactly this layout for you** — including `assets/`
+> pruned to what the game references, plus a copy of the runtime shell so the
+> folder plays at its own URL with no separate shell hosting. The notes below
+> are for building or adjusting a bundle by hand. (The retired FSA-era
+> Publish… button never copied assets; the desktop export does.)
 
 Upload that folder anywhere that serves static files **with CORS enabled**,
 then open:
@@ -179,9 +186,9 @@ Save worlds normally in the editor (Ctrl+S / Save). Requirements per scene:
 
 ### Assets
 
-**Publish… never copies `/assets/**`** — the editor's asset library is shared
-by every game, so the bundle step deliberately leaves it to you. Three ways to
-get assets to the host:
+**Export game… copies the referenced subset of `/assets/**` automatically**
+(pruned manifests included) — hand-built bundles have to solve it themselves.
+Three ways to get assets to the host:
 
 1. **Copy `public/assets/` alongside the bundle** (the layout in "The short
    version") — or prune it to what your scenes actually use.
@@ -192,12 +199,11 @@ get assets to the host:
    own `public/assets/` copy) and drop game folders next to it with
    `"assetsBase": "/"` — nothing extra to copy, no CORS.
 
-> **Maybe-TODO (future editor work):** Publish… could build a self-contained
-> bundle itself — walk the project's scenes + game.json, collect every
-> referenced asset id (models, materials, decals, sounds, skyboxes,
-> graphics), and copy just those files plus pruned manifests into the target.
-> That would remove this whole manual step and ship only what the game uses.
-> Until then, the three options above are the path.
+> **This shipped (phase 57):** Export game… walks the project's scenes +
+> game.json, collects every referenced asset id (models, materials, decals,
+> sounds, skyboxes, graphics), and copies just those files plus pruned
+> manifests into the bundle. The three options above remain for hand-built
+> or shared-tree setups.
 
 What must stay consistent, whichever way you choose:
 
@@ -379,6 +385,6 @@ curl -s -D - -o /dev/null https://your-host/my-game/manifest.json | grep -i acce
 - [ ] Every scene has a spawn point; first zone is the intended entry zone
 - [ ] `manifest.json`: unique stable `id`, `entryScene` ∈ `scenes`, paths match the folder layout
 - [ ] `load_scene` ids in trigger volumes match manifest scene keys
-- [ ] `assets/` copied — Publish… does NOT do this — with all six manifest files (textures, models, decals, audio, skyboxes, graphics); pruned entries removed from manifests too
+- [ ] `assets/` present with all six manifest files (textures, models, decals, audio, skyboxes, graphics) — Export game… does this automatically; hand-built bundles must copy them, with pruned entries removed from manifests too
 - [ ] Host serves `Access-Control-Allow-Origin` (curl check above)
 - [ ] Play it once from the deployed URL: textures non-magenta, portals work, Continue works after a reload
