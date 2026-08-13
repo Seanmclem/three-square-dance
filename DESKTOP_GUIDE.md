@@ -5,6 +5,23 @@ code, the Deno runtime, and a Chromium (CEF) webview. This guide covers the
 three ways to run it — dev, local prod ("staging"), and release — plus where
 files live and how testing works in each. Deeper testing detail: TESTING.md §0.
 
+## Command cheat-sheet
+
+| Command | What it does |
+|---|---|
+| `npm install` | Install dependencies (once) |
+| `npm run build` | Build the frontend into `dist/` — rerun after any `src/**` change, then ↻ in the TopBar |
+| `deno task desktop:hmr` | **Run the app** (dev): opens the editor window; backend (`desktop/*.ts`) hot-reloads on save |
+| `deno task desktop` | Same, without backend hot-reload |
+| `npm run dev` | Vite only (port 7373): UI iteration with HMR, but **nothing can save** — no shell |
+| `deno task compile:mac-arm64` | Compile `build/SquareDance.app` (Apple Silicon) — "staging": run the real packaged artifact |
+| `deno task compile:mac-x64` | Compile `build/SquareDance-intel.app` (Intel Mac) |
+| `deno task compile:win-x64` | Compile `build/SquareDance.msi` (Windows x64) |
+| `deno task compile:all` | Frontend build + all three targets |
+| `WORLDBUILDER_WORKSPACE=/tmp/wb-test deno task desktop:hmr` | Run against a throwaway workspace (window titles itself "TEST WORKSPACE") |
+| `WORLDBUILDER_BOOT=spike deno task desktop:hmr` | Self-test probe: engine + editor-boot checks → `.worldbuilder/spike-results.json` |
+| `WORLDBUILDER_BOOT=probe55 deno task desktop:hmr` | Self-test probe: 13-step project-persistence e2e |
+
 ---
 
 ## 1. Dev loop (day-to-day)
