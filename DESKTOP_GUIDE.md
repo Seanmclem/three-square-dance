@@ -14,10 +14,11 @@ files live and how testing works in each. Deeper testing detail: TESTING.md §0.
 | `deno task desktop:hmr` | **Run the app** (dev): opens the editor window; backend (`desktop/*.ts`) hot-reloads on save |
 | `deno task desktop` | Same, without backend hot-reload |
 | `npm run dev` | Vite only (port 7373): UI iteration with HMR, but **nothing can save** — no shell |
-| `deno task compile:mac-arm64` | Compile `build/SquareDance.app` (Apple Silicon) — "staging": run the real packaged artifact |
+| `deno task compile:mac-arm64` | Compile `build/SquareDance.app` (Apple Silicon) |
 | `deno task compile:mac-x64` | Compile `build/SquareDance-intel.app` (Intel Mac) |
 | `deno task compile:win-x64` | Compile `build/SquareDance.msi` (Windows x64) |
 | `deno task compile:all` | Frontend build + all three targets |
+| `open build/SquareDance.app` | "Staging": run the packaged artifact you just compiled as a pre-release check (§2 checklist) |
 | `WORLDBUILDER_WORKSPACE=/tmp/wb-test deno task desktop:hmr` | Run against a throwaway workspace (window titles itself "TEST WORKSPACE") |
 | `WORLDBUILDER_BOOT=spike deno task desktop:hmr` | Self-test probe: engine + editor-boot checks → `.worldbuilder/spike-results.json` |
 | `WORLDBUILDER_BOOT=probe55 deno task desktop:hmr` | Self-test probe: 13-step project-persistence e2e |
