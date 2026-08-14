@@ -5074,6 +5074,8 @@ function SpawnSettingsView({
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
       {settings.cameraMode === "thirdperson" && numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
         "Height of the camera's aim point above the player (metres). This is CAMERA framing, not the character's size. Higher = the camera sits higher and frames the head/above (character appears lower, seen more from above); lower = aims toward the feet. To resize the character itself, use Character Scale.")}
+      {settings.cameraMode === "thirdperson" && numField("CAMERA ANGLE", "thirdPersonPitch", 1, 0,
+        "How many degrees the camera STARTS tilted down toward the character (0 = level, straight ahead). Raising it lifts the camera up and aims it down, keeping the character and the ground ahead both in view — try 15–25 for a platformer. Players can still look around; this is just the angle after spawns.")}
       {settings.cameraMode === "thirdperson" && numField("CHARACTER SCALE", "characterScale", 0.1, 1,
         "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
       {settings.cameraMode === "fps" && numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,

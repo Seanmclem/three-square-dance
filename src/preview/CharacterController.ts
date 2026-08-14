@@ -172,6 +172,12 @@ export class CharacterController {
 
     this._body = new CharacterBody(effectiveCharacterScale(_settings));
     this._desiredDist = _settings.thirdPersonDistance;
+    // Authored starting tilt: degrees down → negative pitch (looking down raises
+    // the spring-arm camera above the pivot and aims it down at the character).
+    if (_settings.cameraMode === "thirdperson") {
+      const deg = _settings.thirdPersonPitch ?? 0;
+      this._pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, -THREE.MathUtils.degToRad(deg)));
+    }
   }
 
   init(spawnPos: THREE.Vector3, facingDeg: number): void {

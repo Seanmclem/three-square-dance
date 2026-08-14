@@ -598,6 +598,10 @@ export interface PlayerSettings {
   fov:                 number;
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
+  // Starting camera tilt in degrees DOWN toward the character (default 0 = level).
+  // Seeds the orbit pitch on spawn — the camera rises and aims down at the pivot;
+  // players can still look around freely afterwards.
+  thirdPersonPitch?:   number;
   jumpAnimSpeed?:      number;            // playback multiplier for the jump animation (default 1)
   climbSpeed?:         number;            // ladder climb speed m/s (default 2)
   // Character scale is PER CAMERA MODE (mode is a per-world author choice, so
