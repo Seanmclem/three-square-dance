@@ -44,7 +44,8 @@
       "jumpHeight": 3.5,
       "fov": 75,
       "thirdPersonDistance": 4,
-      "thirdPersonHeight": 2,
+      "thirdPersonHeight": 0.8,
+      "thirdPersonPitch": 18,
       "modelAssetId": "character",
       "characterScale": 0.6,
       "jumpAnimSpeed": 1.2
