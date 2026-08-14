@@ -86,6 +86,7 @@ const client = new Proxy({}, {
 }) as DesktopApi;
 
 let _detected: boolean | null = null;
+let _appInfo: { dev?: boolean } | null = null;
 
 /** Resolve whether the desktop shell is serving this page (cached). Call once
  *  early in boot; sync accessors below answer from the cache afterwards. */
@@ -94,6 +95,7 @@ export async function detectDesktop(): Promise<boolean> {
     try {
       const res = await fetch("/api/getAppInfo");
       _detected = res.ok;
+      if (res.ok) _appInfo = await res.json().catch(() => null);
     } catch {
       _detected = false;
     }
@@ -110,4 +112,12 @@ export function desktop(): DesktopApi | null {
 
 export function isDesktop(): boolean {
   return _detected === true;
+}
+
+/** True when the serving shell is a DEV shell (deno task desktop:hmr / desktop:dev).
+ *  The shell serves the production dist, where import.meta.env.DEV is false — this
+ *  flag re-enables the dev tooling (window.__* globals, __test harness) there.
+ *  Packaged builds report dev:false, so end users never get the globals. */
+export function isDesktopDev(): boolean {
+  return _detected === true && _appInfo?.dev === true;
 }

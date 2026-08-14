@@ -97,7 +97,7 @@ import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from 
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
 import { seedStartingInventory } from "@/scripting/inventory";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject } from "@/project/ProjectStore";
-import { desktop, detectDesktop, isDesktop } from "@/shared/desktopApi";
+import { desktop, detectDesktop, isDesktop, isDesktopDev } from "@/shared/desktopApi";
 import { startPerfReporter } from "@/dev/perfReporter";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { OpenProjectModal } from "@/ui/OpenProjectModal";
@@ -409,7 +409,11 @@ export default function App() {
     world.setActiveZone(DEMO_ZONE_ID);
     setZones([...world.zones.values()]);
 
-    if (import.meta.env.DEV) {
+    // Dev tooling (window.__* globals + __test): installed immediately under vite
+    // dev; the shell serves the production dist (DEV false), so there it installs
+    // after detectDesktop resolves, gated on the shell's own dev flag (see the
+    // async IIFE below). Packaged builds (dev:false) never install.
+    const installDevGlobals = () => {
       const g = window as unknown as Record<string, unknown>;
       g.__scene = scene.scene; g.__camera = scene.camera;
       g.__sceneManager = scene;   // activeRenderCamera / cullStats (Phase 28 assertions)
@@ -423,7 +427,8 @@ export default function App() {
       g.__copyPaste = { copySelection, pasteClipboard };
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
-    }
+    };
+    if (import.meta.env.DEV) installDevGlobals();
 
 
     input.init();
@@ -518,6 +523,7 @@ export default function App() {
       // storage code runs — desktop() answers null until this completes.
       await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady, detectDesktop()]);
       if (!active) return; // StrictMode first mount: cleanup already fired, bail out
+      if (!import.meta.env.DEV && isDesktopDev()) installDevGlobals(); // dev shell serves prod dist
       if (isDesktop()) startPerfReporter();   // shell-window perf is only observable via self-report
 
       const saved = await readStoredAutosave().catch(() => null);

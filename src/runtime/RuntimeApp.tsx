@@ -21,6 +21,7 @@ import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { FpsCounter } from "@/ui/FpsCounter";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
 import { FlashOverlay, type FlashRequest } from "@/preview/FlashOverlay";
+import { detectDesktop, isDesktopDev } from "@/shared/desktopApi";
 import { loadManifest, type LoadedManifest } from "./manifest";
 import { SceneRouter } from "./SceneRouter";
 import { writeRuntimeSave, loadRuntimeSave, clearRuntimeSave, type RuntimeSave } from "./saveGame";
@@ -207,7 +208,12 @@ export default function RuntimeApp() {
     };
     window.addEventListener("keydown", onKeyDown);
 
-    if (import.meta.env.DEV) {
+    // Dev tooling: immediate under vite dev; under the dev shell (production
+    // dist, DEV false) it installs after detectDesktop resolves in the IIFE
+    // below. Packaged builds / static hosts (dev:false or no api) never install.
+    let devGlobalsInstalled = false;
+    const installDevGlobals = () => {
+      devGlobalsInstalled = true;
       const g = window as unknown as Record<string, unknown>;
       // Classic globals so TESTING.md recipes work in the runtime tab too.
       g.__scene = scene.scene; g.__camera = scene.camera; g.__renderer = scene.renderer;
@@ -220,7 +226,8 @@ export default function RuntimeApp() {
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.
       void import("@/dev/testHelpers").then(({ installTestHelpers }) =>
         installTestHelpers({ bus, world, scriptEngine, preview, gameState }));
-    }
+    };
+    if (import.meta.env.DEV) installDevGlobals();
 
     // active flag: StrictMode's first-mount IIFE bails after its first await
     // instead of racing the second mount on shared singletons (App.tsx pattern).
@@ -254,8 +261,9 @@ export default function RuntimeApp() {
       const skyboxesReady = assetManager.initSkyboxes({ verifyFiles: false })
         .catch(err => console.error("initSkyboxes failed:", err));
 
-      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady]);
+      await Promise.all([physicsWorld.init(), materialsReady, skyboxesReady, detectDesktop()]);
       if (!active) return;
+      if (!devGlobalsInstalled && isDesktopDev()) installDevGlobals(); // dev shell serves prod dist
 
       if (loaded) {
         const router = new SceneRouter({
@@ -269,7 +277,7 @@ export default function RuntimeApp() {
         setManifest(loaded);
         setHasSave(loadRuntimeSave(loaded.manifest.id) !== null);
         document.title = loaded.manifest.name;
-        if (import.meta.env.DEV) {
+        if (devGlobalsInstalled) {
           const rt = (window as unknown as Record<string, unknown>).__runtime as Record<string, unknown>;
           rt.router = router; rt.manifest = loaded;
         }
@@ -385,7 +393,7 @@ export default function RuntimeApp() {
         />
       )}
 
-      {import.meta.env.DEV && shell === "playing" && <FpsCounter getInfo={getRenderInfo} />}
+      {(import.meta.env.DEV || isDesktopDev()) && shell === "playing" && <FpsCounter getInfo={getRenderInfo} />}
 
       <DialogueOverlay
         dialogue={dialogueState}

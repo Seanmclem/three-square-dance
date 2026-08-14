@@ -45,6 +45,13 @@ export function makeHandler(distDir: string, ws: Workspace): (req: Request) => P
       // (build.assetsDir default) — those exist only in dist, so fall through.
       // Shadowing them here is exactly what blanked the phase-55 window.
     }
-    return serveDir(req, { fsRoot: distDir, quiet: true });
+    const res = await serveDir(req, { fsRoot: distDir, quiet: true });
+    // Hashed chunk filenames are immutable, but the HTML entry points are not —
+    // a heuristically-cached index.html pins an old bundle hash across rebuilds
+    // (stale app after reload). Never let the browser cache the HTML.
+    if (res.headers.get("content-type")?.includes("text/html")) {
+      res.headers.set("cache-control", "no-store");
+    }
+    return res;
   };
 }
