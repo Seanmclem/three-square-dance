@@ -9,36 +9,64 @@ can pick it up cold and run an interactive pass.
 
 ---
 
-## 0. Desktop era (phases 54–58) — read this first
+## 0. Desktop era — the golden path (read this first)
 
-The app is now a **Deno desktop app**: a CEF (bundled-Chromium) window served by
-the shell's own local `Deno.serve`. All persistence goes over that server
-(`POST /api/<method>`, `POST /api-file/<kind>/<rel>`); the File System Access
-API is gone, and plain-browser tabs can render but not save. This changes the
-testing map:
+The app is a **Deno desktop app** (phases 54–58): a CEF (bundled-Chromium)
+window served by the shell's own local `Deno.serve`. All persistence goes over
+that server (`POST /api/<method>`, `POST /api-file/<kind>/<rel>`); the File
+System Access API is gone.
 
-**The golden trick — drive desktop mode from a normal Chrome tab.** The shell's
-server is ordinary HTTP on `127.0.0.1:<port>` (port printed at launch:
-`grep Listening /tmp/shell-run.log`-style, or read `[desktop] editor window up
-at …`). Load that origin in Chrome via the extension and you get the FULL app
-in desktop mode — `detectDesktop()` succeeds against `/api/getAppInfo`, so
-project saves, asset imports, deletes, autosave, and export all work exactly as
-in the shell window, with extension tooling (javascript_tool, console, clicks).
-This replaced the old §9 picker-stubbing wholesale — the real flows are
-directly drivable now.
+### Quick start — a test session, step by step
 
-**BUT: the shell serves the production `dist/` build (2026-08-14).** The
-`window.__*` dev globals and the `__test` harness are gated on
-`import.meta.env.DEV` (`App.tsx:412`, `RuntimeApp.tsx`) and DO NOT EXIST in a
-shell-served page — only `__THREE__` is on `window`. So the globals-based
-recipes in §§2, 3, 8 (geometry probes, `__editorCamera` framing,
-`__world.toJSON()` reads, `__test.spawn*`) only work on the plain-vite `:7373`
-tab; in a shell-origin tab, test via the real UI + DOM reads + curl against
-the api. Flip side: no dev build also means no StrictMode double-mount (the §3
-split-brain class is absent) and no Vite HMR websocket (one cause of the §2
-screenshot hang). If a session needs the harness under the shell, the fix is
-gating the globals on the shell's `getAppInfo.dev` flag instead of
-`import.meta.env.DEV` — proposed, not yet implemented.
+1. **Preflight:** `git status --porcelain -- public/` must be clean — commit
+   anything dirty FIRST (saves/imports write real files there; git is the
+   restore point).
+2. **Is the shell running?** `ps aux | grep -i laufey | grep -v grep` (the CEF
+   process) or check `/tmp/wb-shell.log`. Reuse a running shell; read its port
+   from the log line `Listening on http://127.0.0.1:<port>/`. The port is
+   **dynamic** — never assume.
+3. **If not running, start it detached** (survives the Claude session):
+   `nohup deno task desktop:dev >> /tmp/wb-shell.log 2>&1 < /dev/null &`
+   — NOT via Bash `run_in_background` (the harness can reap it; killed the
+   server mid-day once). `desktop:dev` = shell + `vite build --watch`.
+4. **Connect the Chrome extension** (§1) and open a tab on the shell's origin.
+   Tag it: `document.title = "🤖 CLAUDE TESTING — <Mon DD H:MMam>"`.
+5. **Verify the harness:** `!!window.__world` in `javascript_tool` must be
+   `true` (see "full harness" below). If false → stale bundle (reload the tab;
+   HTML is served no-store since 2026-08-14) or a pre-v4.72 build.
+6. **Work.** Everything in §§2–8 applies in this tab — globals, `__test`,
+   real UI clicks — and saves/imports/exports hit the real backend.
+7. **Frontend edit loop:** save `src/**` → the watcher rebuilds `dist/` (~3s;
+   watch `/tmp/wb-watch.log` for "built in Nms") → reload the tab. No manual
+   build. The watcher does NOT typecheck — run `npm run typecheck` before
+   committing.
+8. **Session end:** delete test entities, `git status public/` (commit real
+   changes, investigate unexpected ones), close the test tab (`tabs_close_mcp`).
+
+### Mode map — where code runs and what's true there
+
+| | Shell window (CEF) | Chrome tab on shell origin | `npm run dev` tab (:7373) | Packaged app |
+|---|---|---|---|---|
+| Build | production `dist/` | production `dist/` | vite dev, true HMR | embedded `dist/` (VFS) |
+| Fresh code | watcher + ↻ reload | watcher + tab reload | instant | recompile |
+| `window.__*` + `__test` | ✅ (dev shell) | ✅ (dev shell) | ✅ | ❌ (`dev:false`) |
+| StrictMode double-mount (§3 split-brain) | ❌ (prod build) | ❌ (prod build) | ⚠️ yes | ❌ |
+| Vite HMR websocket / checker overlay | ❌ | ❌ | ✅ | ❌ |
+| Persistence (saves/imports/export) | ✅ real files | ✅ real files | ❌ none | ✅ real files |
+| Claude can drive via | computer-use (pixel) | **extension (DOM+JS) — preferred** | extension | computer-use |
+
+**The full harness works in shell-served pages (since 2026-08-14 / v4.72).**
+`detectDesktop()` caches `getAppInfo`, and when the shell reports `dev: true`
+(any `deno task desktop:*` run; packaged apps report false) the app installs
+the `window.__*` globals + `__test` after boot (`isDesktopDev()` in
+`src/shared/desktopApi.ts`; install sites `App.tsx` / `RuntimeApp.tsx`). So a
+Chrome tab on the shell origin is the best of both worlds: dev tooling AND
+real persistence — this is the default place to test. Two prod-build
+differences from the old :7373 flow, both favorable: no StrictMode
+double-mount (ignore §3's split-brain warnings in shell tabs — globals are
+single-instance) and no HMR websocket (one cause of the §2 screenshot hang).
+`:7373` remains useful for UI iteration with instant HMR (nothing persists
+there).
 
 **What a Chrome tab cannot cover** (same engine, different window): the CEF
 window itself is not extension-reachable and `--inspect-renderer` did not open
@@ -106,14 +134,13 @@ gitignored). Rules:
    the scene autosave is a workspace file in desktop mode — a test tab and
    the user's shell window share it via the SERVER, not via localStorage.
 
-**Dev loop reality:** the shell serves the built `dist/`, so `src/**` changes
-only appear after a rebuild. `deno task desktop:dev` runs the shell plus
-`vite build --watch`, which rebuilds `dist/` on every save (~3s incremental;
-no typecheck) — then reload the window/tab. Under plain `desktop:hmr` (backend
-hot-reload only), run `npm run build` manually, or start `npm run build:watch`
-alongside. `npm run dev` (vite :7373) still renders the editor with HMR for UI
-iteration, but nothing persists there — it's for layout/visual work, not flow
-testing.
+**Dev loop variants:** `deno task desktop:dev` (quick-start step 3) is the
+default — shell + frontend watcher. Under plain `desktop:hmr` (backend
+hot-reload only), run `npm run build` manually or start `npm run build:watch`
+alongside. Backend (`desktop/*.ts`) changes hot-reload in both. A stale
+bundle after reload should no longer happen (HTML is no-store) — if code
+still looks old, compare the page's `script[src]` hash against
+`dist/index.html`.
 
 ---
 
@@ -220,7 +247,9 @@ console.log({ minY, tris, downVerts });
 `screenshot` (and any extension action that waits for `document_idle`) blocks for
 ~45s and then times out with *"Page still loading (executeScript waited 45000ms
 for document_idle)"*. This app **never reaches `document_idle`** — the RAF render
-loop plus the Vite HMR websocket keep the page perpetually "busy". So do **not**
+loop plus (on :7373) the Vite HMR websocket keep the page perpetually "busy".
+Shell-origin tabs have no HMR socket, so they may fare better — but the RAF
+loop alone can still block idle, so the warning stands everywhere. Do **not**
 rely on screenshots here. When the extension's DOM-aware pipeline does return,
 `gif_creator` / `browser_batch` screenshots show WebGL output correctly, but
 expect the long wait and treat any picture as best-effort.
@@ -230,9 +259,10 @@ Prefer reading state programmatically (Section 2 snippets + DOM text via
 reading **UI chrome** but useless for 3D content (and also can't capture WebGL on
 this Mac, per the note above).
 
-### Dev globals (DEV mode only)
+### Dev globals (vite dev + dev shell)
 
-`App.tsx` exposes these on `window` in development:
+`App.tsx` exposes these on `window` under vite dev AND in dev-shell-served
+pages (`isDesktopDev()` — §0). Absent only in packaged builds:
 
 | Global | Type | What it is |
 |---|---|---|
@@ -249,8 +279,10 @@ this Mac, per the note above).
 
 ### Runtime shell tab (`runtime.html`, Phase 25)
 
-The standalone runtime is a second entry on the same server:
-`localhost:7373/runtime.html?manifest=/demo/manifest.json`. Its DEV globals:
+The standalone runtime is a second entry on the same server — works on both
+origins: `<shell-origin>/runtime.html?manifest=/games/<id>/manifest.json` (the
+▶ Play window loads exactly this) or `localhost:7373/runtime.html?…`. Its
+globals (same vite-dev + dev-shell rule as the editor set):
 the classic set above (`__scene`/`__camera`/`__world`/`__zones`/`__bus`/
 `__scriptEngine`/`__preview`/`__gameState`) **plus**
 `window.__runtime = { bus, world, zones, preview, scriptEngine, gameState,
@@ -276,17 +308,22 @@ import). Useful patterns:
 
 ## 3. Chrome-MCP golden path (read this first)
 
-The reliable, repeatable recipe. Skipping these steps is what makes a session
-sputter — every failure mode below was hit and diagnosed in practice.
+The reliable, repeatable recipe for driving an app tab — these steps apply to
+**both** origins (shell-origin tab, the §0 default, and the vite `:7373` tab).
+Skipping them is what makes a session sputter — every failure mode below was
+hit and diagnosed in practice. Steps marked **[vite]** concern only `:7373`
+tabs; shell tabs run the production build (no StrictMode double-mount, no HMR).
 
-1. **Reuse the running dev server — do NOT start a second one.**
-   The port is pinned to **7373** in `vite.config.ts` (`server.port`, `strictPort`).
-   Check first: `lsof -nP -iTCP:7373 -sTCP:LISTEN` — the `-sTCP:LISTEN` filter matters:
-   bare `lsof -ti:7373` also lists Chrome's network process holding CLIENT sockets to a
-   dead server, which reads as "server up" when it isn't (bit a session on 2026-07-20).
-   If the app is already up, use it. With `strictPort`,
-   a second `npm run dev` while 7373 is taken **fails loudly** (rather than silently
-   bumping to 7374) — so just reuse the running one.
+1. **Reuse the running server — do NOT start a second one.**
+   - **Shell:** port is dynamic; read it from `/tmp/wb-shell.log`
+     (`Listening on http://127.0.0.1:<port>/`) and check the process is alive
+     (§0 quick-start step 2). If down, restart detached (§0 step 3) — the tab
+     recipe is identical after that.
+   - **[vite]** port is pinned to **7373** (`vite.config.ts` `strictPort`).
+     Check `lsof -nP -iTCP:7373 -sTCP:LISTEN` — the `-sTCP:LISTEN` filter
+     matters: bare `lsof -ti:7373` also lists Chrome's CLIENT sockets to a dead
+     server, which reads as "server up" when it isn't (bit a session on
+     2026-07-20). With `strictPort`, a second `npm run dev` fails loudly.
 2. **Reuse the existing World Editor tab; navigate once.** Get tabs with
    `tabs_context_mcp`, find the `localhost:<port>` tab, work in it. Wait for load
    with a **Bash `sleep`**, never an in-page await.
@@ -300,9 +337,12 @@ sputter — every failure mode below was hit and diagnosed in practice.
      the end of the run (`tabs_close_mcp`).
 3. **Drive via the real UI, not internals.** Select / click / type the way a user
    does. Do **not** emit bus events or call handlers on `window.__*` to *drive*
-   state: `busRef = useRef(new EventBus())` + React **StrictMode** double-mount
-   means `window.__world._bus` and the *rendered* App's listeners can be
-   different instances — synthetic emits silently no-op against the live UI.
+   state. **[vite]** the reason is StrictMode double-mount: `busRef =
+   useRef(new EventBus())` means `window.__world._bus` and the *rendered* App's
+   listeners can be different instances — synthetic emits silently no-op
+   against the live UI. Shell tabs have no double-mount, but the real-UI rule
+   still holds (it's what users exercise); the sanctioned internal path is the
+   `WorldState` mutator methods (see "Other lessons" below).
    `window.__*` globals are for **reading**, not driving.
 4. **To select a 3D object, project its world position and click.** There are no
    DOM nodes for 3D objects, and screenshots hang (Section 2), so compute the
@@ -573,11 +613,14 @@ the user's tab had written. Rules:
    but a synthetic multi-field edit in one snippet needs a `focusout` (or a `sleep` > debounce)
    between fields.
 
-### Driving the live *runtime* (preview / game): the StrictMode split-brain
+### Driving the live *runtime* (preview / game): the StrictMode split-brain **[vite only]**
 
 > Learned the hard way in the 2026-07-01 third-person session. This is the §3-step-3
 > warning taken to its worst case, and it specifically bites **runtime** verification
 > (player movement, camera, animation) — not editor/geometry reads.
+> **Shell tabs are immune** (production build, single mount) — there the globals
+> are always the live instance. The "ground truth = DOM canvas + real input
+> events" guidance below is still good practice everywhere.
 
 StrictMode double-mounts the App, so **two** live instances exist and the `window.__*`
 globals can be split across them **inconsistently**: e.g. `__editorCamera` / `__world`
@@ -611,12 +654,13 @@ third-person **spring-arm jamming**: near a wall (e.g. the demo courtyard, spawn
 from brick) the camera pulls to its MIN_DIST and ends up *inside* the avatar, so frame
 avatar shots in open space.
 
-**Dev server may be DOWN.** The golden path says "reuse the running server," but it can
-stop between/among sessions. Check `lsof -nP -iTCP:7373 -sTCP:LISTEN`; if down, start it
-**detached** — `nohup npm run dev >> /tmp/three-world-builder-dev.log 2>&1 < /dev/null &`
-— NOT via Bash `run_in_background`: that creates a session-owned task the harness can
-reap, which killed the server mid-day on 2026-07-20 (the user just saw "localhost died
-again"). A nohup'd server survives the Claude session; its log is the /tmp path above.
+**Server may be DOWN.** The golden path says "reuse the running server," but it can
+stop between/among sessions. For the shell: §0 quick-start steps 2–3 (detached
+`nohup deno task desktop:dev`). For vite: check `lsof -nP -iTCP:7373 -sTCP:LISTEN`;
+if down, `nohup npm run dev >> /tmp/three-world-builder-dev.log 2>&1 < /dev/null &`.
+Either way **detached via nohup**, NOT Bash `run_in_background`: that creates a
+session-owned task the harness can reap, which killed the server mid-day on
+2026-07-20 (the user just saw "localhost died again").
 
 **Hidden tab (rAF frozen)? Manually step the runtime — no visibility needed.** When the
 user is working elsewhere, `document.hidden` stays true, rAF never fires, and repeatedly
@@ -720,11 +764,12 @@ Reload `localhost:7373` before starting. Switch to the Floor tool.
 
 ## 7. Regression checks (every phase)
 
-- `npm run typecheck` → 0 errors.
-- vite-plugin-checker overlay clean (no red banner).
+- `npm run typecheck` → 0 errors. (Run it explicitly — the `desktop:dev`
+  watcher builds without typechecking.)
+- vite-plugin-checker overlay clean (no red banner) — `:7373` tabs only.
 - No browser-console errors on load or interaction.
-- StrictMode double-mount: editor still renders once, no duplicated canvases
-  or leaked listeners after a hot reload.
+- StrictMode double-mount (`:7373` only): editor still renders once, no
+  duplicated canvases or leaked listeners after a hot reload.
 - **Framerate — watch the perf counter** (small readout, top-left of the canvas,
   `src/ui/FpsCounter.tsx`). It shows **avg FPS**, the **worst single-frame time (ms)**
   in each 0.5s window, and **draw calls · triangles** (`renderer.info`) — compare against
