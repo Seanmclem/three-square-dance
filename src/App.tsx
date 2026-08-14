@@ -136,6 +136,17 @@ async function readStoredAutosave(): Promise<{ json: string; ts: number } | null
   return json && ts ? { json, ts: parseInt(ts, 10) } : null;
 }
 
+/** Last-modified time of a project scene file on disk (ms epoch), or null when
+ *  unknowable (no shell, 404, no header). Used to detect external edits. */
+async function sceneFileMtime(projectId: string, sceneId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/games/${projectId}/scenes/${sceneId}.json`, { method: "HEAD", cache: "no-store" });
+    if (!res.ok) return null;
+    const lm = res.headers.get("last-modified");
+    return lm ? Date.parse(lm) : null;
+  } catch { return null; }
+}
+
 function createDemoZone(): ZoneDef {
   return {
     id: DEMO_ZONE_ID,
@@ -527,11 +538,23 @@ export default function App() {
       if (isDesktop()) startPerfReporter();   // shell-window perf is only observable via self-report
 
       const saved = await readStoredAutosave().catch(() => null);
+      // Read the project session up front: the autosave-vs-disk freshness check
+      // needs the scene path, and the project restore below reuses it.
+      const last = await restoreLastProject().catch(() => null);
       let restored = false;
 
       if (saved) {
         const ageMs = Date.now() - saved.ts;
-        if (ageMs < 24 * 60 * 60_000) {
+        // External-edit guard: an autosave OLDER than the scene file on disk is
+        // stale — the file changed after this window last wrote (an edit from
+        // Claude, git, or another machine). Restoring it would shadow the disk
+        // edit on every reload (and a later Save would silently revert it).
+        // A dirty window still wins: beforeunload re-writes the autosave at
+        // reload time, making it newer than any prior file edit.
+        const mtime = last ? await sceneFileMtime(last.projectId, last.sceneId) : null;
+        if (mtime != null && mtime > saved.ts) {
+          console.info("[autosave] scene file on disk is newer than the autosave — loading from disk");
+        } else if (ageMs < 24 * 60 * 60_000) {
           try {
             restoringRef.current = true;
             await handleLoadFromJSON(JSON.parse(saved.json));
@@ -556,7 +579,6 @@ export default function App() {
       // Project restore (Phase 33; phase 55: no permission dance — the shell
       // stores a plain {projectId, sceneId} and paths never go stale).
       try {
-        const last = await restoreLastProject();
         if (last) {
           const store = await ProjectStore.open(last.projectId);
           const sceneId = store.sceneIds.includes(last.sceneId) ? last.sceneId : store.entryScene;
