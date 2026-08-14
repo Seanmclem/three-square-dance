@@ -93,10 +93,14 @@ gitignored). Rules:
    the scene autosave is a workspace file in desktop mode — a test tab and
    the user's shell window share it via the SERVER, not via localStorage.
 
-**Dev loop reality:** frontend changes need `npm run build` (the shell serves
-`dist/`); `deno task desktop:hmr` hot-reloads only the backend. `npm run dev`
-(vite :7373) still renders the editor with HMR for UI iteration, but nothing
-persists there — it's for layout/visual work, not flow testing.
+**Dev loop reality:** the shell serves the built `dist/`, so `src/**` changes
+only appear after a rebuild. `deno task desktop:dev` runs the shell plus
+`vite build --watch`, which rebuilds `dist/` on every save (~3s incremental;
+no typecheck) — then reload the window/tab. Under plain `desktop:hmr` (backend
+hot-reload only), run `npm run build` manually, or start `npm run build:watch`
+alongside. `npm run dev` (vite :7373) still renders the editor with HMR for UI
+iteration, but nothing persists there — it's for layout/visual work, not flow
+testing.
 
 ---
 

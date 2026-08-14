@@ -10,8 +10,10 @@ files live and how testing works in each. Deeper testing detail: TESTING.md §0.
 | Command | What it does |
 |---|---|
 | `npm install` | Install dependencies (once) |
-| `npm run build` | Build the frontend into `dist/` — rerun after any `src/**` change, then ↻ in the TopBar |
-| `deno task desktop:hmr` | **Run the app** (dev): opens the editor window; backend (`desktop/*.ts`) hot-reloads on save |
+| `deno task desktop:dev` | **Run the app** (dev, preferred): `desktop:hmr` + `vite build --watch` in one — `src/**` saves rebuild `dist/` automatically (~3s incremental), then ↻ in the TopBar |
+| `npm run build` | One-shot frontend build into `dist/` (includes `tsc` typecheck, which the watcher skips) |
+| `npm run build:watch` | Just the watcher half of `desktop:dev` — pair with an already-running shell |
+| `deno task desktop:hmr` | Run the app without the frontend watcher; backend (`desktop/*.ts`) hot-reloads on save |
 | `deno task desktop` | Same, without backend hot-reload |
 | `npm run dev` | Vite only (port 7373): UI iteration with HMR, but **nothing can save** — no shell |
 | `deno task compile:mac-arm64` | Compile `build/SquareDance.app` (Apple Silicon) |
@@ -30,16 +32,17 @@ files live and how testing works in each. Deeper testing detail: TESTING.md §0.
 
 ```bash
 npm install            # once
-npm run build          # build the frontend (the shell serves dist/)
-deno task desktop:hmr  # launch the app window
+deno task desktop:dev  # launch the app window + frontend watcher
 ```
 
 - **Backend** changes (`desktop/*.ts`): hot-reload automatically — save the
   file, the shell restarts its module live. Nothing to do.
-- **Frontend** changes (`src/**`): run `npm run build`, then click the **↻**
-  button in the TopBar (next to Help). Unsaved work autosaves through the
-  reload. (When Claude edits frontend code it normally rebuilds and restarts
-  the shell for you — a fresh window = new code.)
+- **Frontend** changes (`src/**`): the watcher rebuilds `dist/` on save
+  (~3s incremental — wait for it); then click the **↻** button in the TopBar
+  (next to Help). Unsaved work autosaves through the reload. No manual
+  `npm run build` needed. Note the watcher is `vite build --watch` only — it
+  does **not** typecheck; run `npm run typecheck` (or rely on the editor)
+  before committing.
 - **Content** (scenes, `game.json`, assets): always live — served with
   `no-store`, so reopening a project or pressing a Play button picks up the
   latest files instantly.
