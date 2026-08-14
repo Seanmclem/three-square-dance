@@ -23,9 +23,22 @@ server is ordinary HTTP on `127.0.0.1:<port>` (port printed at launch:
 at …`). Load that origin in Chrome via the extension and you get the FULL app
 in desktop mode — `detectDesktop()` succeeds against `/api/getAppInfo`, so
 project saves, asset imports, deletes, autosave, and export all work exactly as
-in the shell window, with complete extension tooling (javascript_tool, console,
-clicks). Everything in §§2–8 applies unchanged in such a tab. This replaced the
-old §9 picker-stubbing wholesale — the real flows are directly drivable now.
+in the shell window, with extension tooling (javascript_tool, console, clicks).
+This replaced the old §9 picker-stubbing wholesale — the real flows are
+directly drivable now.
+
+**BUT: the shell serves the production `dist/` build (2026-08-14).** The
+`window.__*` dev globals and the `__test` harness are gated on
+`import.meta.env.DEV` (`App.tsx:412`, `RuntimeApp.tsx`) and DO NOT EXIST in a
+shell-served page — only `__THREE__` is on `window`. So the globals-based
+recipes in §§2, 3, 8 (geometry probes, `__editorCamera` framing,
+`__world.toJSON()` reads, `__test.spawn*`) only work on the plain-vite `:7373`
+tab; in a shell-origin tab, test via the real UI + DOM reads + curl against
+the api. Flip side: no dev build also means no StrictMode double-mount (the §3
+split-brain class is absent) and no Vite HMR websocket (one cause of the §2
+screenshot hang). If a session needs the harness under the shell, the fix is
+gating the globals on the shell's `getAppInfo.dev` flag instead of
+`import.meta.env.DEV` — proposed, not yet implemented.
 
 **What a Chrome tab cannot cover** (same engine, different window): the CEF
 window itself is not extension-reachable and `--inspect-renderer` did not open
