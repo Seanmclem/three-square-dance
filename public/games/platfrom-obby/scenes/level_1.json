@@ -47,7 +47,7 @@
       "thirdPersonHeight": 0.8,
       "thirdPersonPitch": 18,
       "modelAssetId": "character",
-      "characterScale": 0.68,
+      "characterScale": 0.75,
       "jumpAnimSpeed": 1.2
     },
     "stateSchema": {
