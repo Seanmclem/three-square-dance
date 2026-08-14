@@ -43,11 +43,11 @@
       "moveSpeed": 6,
       "jumpHeight": 3.5,
       "fov": 75,
-      "thirdPersonDistance": 4,
+      "thirdPersonDistance": 3.4,
       "thirdPersonHeight": 0.8,
       "thirdPersonPitch": 18,
       "modelAssetId": "character",
-      "characterScale": 0.6,
+      "characterScale": 0.68,
       "jumpAnimSpeed": 1.2
     },
     "stateSchema": {
@@ -11322,9 +11322,9 @@
             "z": 0
           },
           "scale": {
-            "x": 0.5,
-            "y": 0.5,
-            "z": 0.5
+            "x": 0.44,
+            "y": 0.44,
+            "z": 0.44
           },
           "floor": 0,
           "zoneId": "demo",
