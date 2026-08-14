@@ -5,7 +5,8 @@
     "compile:mac-arm64": "deno desktop --backend cef -A --target aarch64-apple-darwin --icon desktop/icon/squaredance.png --include dist --include desktop/spike.html --exclude node_modules --exclude-unused-npm -o build/SquareDance.app desktop/main.ts",
     "compile:mac-x64": "deno desktop --backend cef -A --target x86_64-apple-darwin --icon desktop/icon/squaredance.png --include dist --include desktop/spike.html --exclude node_modules --exclude-unused-npm -o build/SquareDance-intel.app desktop/main.ts",
     "compile:win-x64": "deno desktop --backend cef -A --target x86_64-pc-windows-msvc --icon desktop/icon/squaredance.ico --include dist --include desktop/spike.html --exclude node_modules --exclude-unused-npm -o build/SquareDance.msi desktop/main.ts",
-    "compile:all": "npm run build && deno task compile:mac-arm64 && deno task compile:mac-x64 && deno task compile:win-x64"
+    "compile:all": "npm run build && deno task compile:mac-arm64 && deno task compile:mac-x64 && deno task compile:win-x64",
+    "release": "bash scripts/release.sh"
   },
   "imports": {
     "@std/http": "jsr:@std/http@^1"

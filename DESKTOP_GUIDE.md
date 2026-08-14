@@ -19,6 +19,7 @@ files live and how testing works in each. Deeper testing detail: TESTING.md §0.
 | `deno task compile:win-x64` | Compile `build/SquareDance.msi` (Windows x64) |
 | `deno task compile:all` | Frontend build + all three targets |
 | `open build/SquareDance.app` | "Staging": run the packaged artifact you just compiled as a pre-release check (§2 checklist) |
+| `deno task release vX.Y.Z` | Compile all targets, sign + notarize (once set up), and create a **draft** GitHub release (§3) |
 | `WORLDBUILDER_WORKSPACE=/tmp/wb-test deno task desktop:hmr` | Run against a throwaway workspace (window titles itself "TEST WORKSPACE") |
 | `WORLDBUILDER_BOOT=spike deno task desktop:hmr` | Self-test probe: engine + editor-boot checks → `.worldbuilder/spike-results.json` |
 | `WORLDBUILDER_BOOT=probe55 deno task desktop:hmr` | Self-test probe: 13-step project-persistence e2e |
@@ -94,8 +95,37 @@ open build/SquareDance.app
 ## 3. Release
 
 ```bash
-deno task compile:all   # vite build + all three targets, output in build/
+deno task release v0.1.0   # compile all targets, sign + notarize (if set up),
+                           # zip, and create a DRAFT GitHub release
 ```
+
+The draft release is created on the repo with all three artifacts attached —
+review it on GitHub and press **Publish** yourself. To only build the
+artifacts without releasing: `deno task compile:all`.
+
+**One-time signing setup** (until done, the script warns and ships the mac
+apps ad-hoc signed — they still work via right-click → Open):
+
+1. Install a **Developer ID Application** certificate into your login
+   Keychain: Xcode → Settings → Accounts → your team → Manage Certificates →
+   **+** → Developer ID Application. (Needs the Account Holder role on the
+   Apple Developer account.)
+2. Store notarization credentials (uses an app-specific password from
+   account.apple.com → Sign-In and Security):
+
+   ```bash
+   xcrun notarytool store-credentials squaredance-notary \
+     --apple-id <your-apple-id-email> --team-id <TEAMID>
+   ```
+
+   Find your TEAMID at developer.apple.com → Membership. The command prompts
+   for the app-specific password and stores it in the Keychain.
+
+With both in place, `deno task release` signs every nested binary
+(hardened runtime + `desktop/entitlements.plist` — CEF needs JIT), submits
+both mac apps to Apple's notary service (a few minutes each), staples the
+tickets, and zips with `ditto` (preserves framework symlinks). Recipients
+then get no Gatekeeper friction at all.
 
 | Artifact | Target | Size |
 |---|---|---|
@@ -110,9 +140,11 @@ overlapping-squares script if the brand changes).
 stock asset library.)
 
 **Known release gaps** (tracked in `plans/phase-58-desktop-packaging.md`):
-- Binaries are **ad-hoc signed** — other Macs need right-click → Open the
-  first time (Gatekeeper). Proper signing/notarization is a follow-up.
-- No app icon yet (`--icon` flag is ready when an `.icns` exists).
+- Mac signing/notarization is wired into `deno task release` but **untested
+  until the one-time setup above is done** (no Developer ID cert installed
+  yet). Until then binaries ship ad-hoc signed — right-click → Open.
+- The Windows `.msi` is unsigned (SmartScreen warns) — Windows code signing
+  needs a separate certificate and is not wired.
 - Auto-update (`Deno.autoUpdate()`) not wired.
 - The Intel and Windows artifacts cross-compile fine but haven't had a
   real-hardware smoke test.
