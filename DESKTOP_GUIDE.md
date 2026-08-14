@@ -127,6 +127,16 @@ both mac apps to Apple's notary service (a few minutes each), staples the
 tickets, and zips with `ditto` (preserves framework symlinks). Recipients
 then get no Gatekeeper friction at all.
 
+> ⚠ **The signing/notarization path has never run for real** (written to
+> Apple's current guidance, but no Developer ID cert has been installed to
+> exercise it). Treat the first signed release as a shakedown: run it,
+> and if notarization rejects the bundle the likely culprits are CEF's
+> nested helper apps or a binary the inside-out signing loop missed —
+> `xcrun notarytool log <submission-id> --keychain-profile
+> squaredance-notary` lists the exact offending files. Verify a signed
+> build on a second Mac (or a fresh user account) before publishing the
+> draft.
+
 | Artifact | Target | Size |
 |---|---|---|
 | `SquareDance.app` | Apple Silicon | ~420 MB |
