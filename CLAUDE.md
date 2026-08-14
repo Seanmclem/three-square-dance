@@ -78,6 +78,20 @@ So, whenever work touches the editor's save/load, project, or scene paths — or
 
 Never add `public/games/` to `.gitignore`, and never delete or reset a scene file to "clean up" a working tree. If a scene file's diff looks like content vanished, stop and surface it — do not commit the deletion assuming it was intentional.
 
+## 6. Key Docs — Read Before Starting Related Work
+
+Only `CLAUDE.md` is auto-loaded. Everything else lives in these docs — read the relevant one(s) **before** starting work in that area:
+
+| Working on… | Read first |
+|---|---|
+| Anything touching code/architecture | `WORLD_EDITOR_ARCHITECTURE.md` — the canonical spec (9k+ lines; consult the relevant phase/file sections, don't read it all). Update it with every phase per `PLAN_UPDATE_GUIDE.md`. |
+| Testing in the browser or shell | `TESTING.md` (esp. §0 desktop era + §3 golden path); `HUMAN_TESTING.md` for click-by-click walkthroughs; per-phase checklists in `test-plans/` |
+| Desktop shell / Deno backend (`desktop/`) | `DESKTOP_GUIDE.md` |
+| Releases, packaging, export | `PUBLISHING_GUIDE.md` |
+| Performance / framerate | `PROFILING.md` |
+| A specific feature area | Its guide: `AUDIO.md`, `COLLIDERS_GUIDE.md`, `DIALOGUES_GUIDE.md`, `GAMEPLAY_STATE.md`, `GUI_GUIDE.md`, `HAZARDS_GUIDE.md`, `OBJECT_SCRIPTS_GUIDE.md`, `PREFABS_GUIDE.md`, `STATE_ITEMS_GUIDE.md` |
+| Planning a new phase | Existing plans in `plans/` (match their style); `PLAN_UPDATE_GUIDE.md` for the arch-doc update rule |
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
