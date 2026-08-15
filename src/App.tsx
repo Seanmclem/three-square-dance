@@ -426,6 +426,8 @@ export default function App() {
     // dev; the shell serves the production dist (DEV false), so there it installs
     // after detectDesktop resolves, gated on the shell's own dev flag (see the
     // async IIFE below). Packaged builds (dev:false) never install.
+    // enemyAI is constructed AFTER the sync install call — the ref defers the read.
+    const enemyAIRef: { current: EnemyAI | null } = { current: null };
     const installDevGlobals = () => {
       const g = window as unknown as Record<string, unknown>;
       g.__scene = scene.scene; g.__camera = scene.camera;
@@ -436,6 +438,7 @@ export default function App() {
       g.__objectPlacer = objectPlacer; g.__history = history;
       g.__gameState = gameState;
       g.__movers = movers;
+      g.__enemyAI = enemyAIRef.current;   // Phase 61 (set below; read-only debugging)
       g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
@@ -620,6 +623,10 @@ export default function App() {
     // Enemy AI between movers and the step for the same reason (Phase 61)
     const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
     enemyAI.init();
+    enemyAIRef.current = enemyAI;
+    // vite-DEV installed globals before this line existed — patch it in.
+    const gAny = window as unknown as Record<string, unknown>;
+    if (gAny["__world"]) gAny["__enemyAI"] = enemyAI;
     scene.onUpdate(dt => enemyAI.update(dt));
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));

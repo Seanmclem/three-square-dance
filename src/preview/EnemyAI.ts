@@ -178,10 +178,17 @@ export class EnemyAI {
     rec.p.clipsResolved = true;
   }
 
+  /** Debug/read access for the DEV harness (window.__enemyAI). */
+  get recs(): ReadonlyMap<string, AiRec> { return this._recs; }
+
   update(dt: number): void {
     if (!this._active || this._recs.size === 0) return;
     const player = this._preview.playerPosition;
     if (!player) return;
+    // Clamp like physicsWorld.step does (0.05): a frozen background tab can
+    // hand rAF a multi-second dt — raw, that teleports steering and blows
+    // through attack windows in one frame.
+    dt = Math.min(dt, 0.05);
     this._clock += dt;
 
     for (const rec of this._recs.values()) {
