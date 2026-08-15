@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
@@ -16,6 +16,8 @@ import { HelpTooltip } from "@/ui/HelpTooltip";
 import { ControlsSection } from "@/ui/ControlsSection";
 import { CreditsModal } from "@/ui/CreditsModal";
 import { GENERATORS } from "@/prefab/generators";
+import { gameState } from "@/scripting/GameState";
+import { entKey } from "@/scripting/entityState";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -771,7 +773,7 @@ export function PropertiesPanel({
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
-          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} />
+          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} onObjectUpdate={onObjectUpdate} bus={bus} />
         ) : null}
       </div>
 
@@ -5582,10 +5584,107 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
 // Scripts attached to a placed object — same list as a volume's ENTRY/EXIT
 // section, editing stays in the Scripts panel. The add button presets the
 // trigger from what the object supports.
-function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript }: {
+// ── EntityStateSection (Phase 60) ─────────────────────────────────────────────
+// Per-entity state keys: schema rows (key / type / default / min-max) stored on
+// the entity's `stateSchema`; values live namespaced in the global GameState and
+// are shown here live during preview. The raw `__ent.` keys are never displayed.
+function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus }: {
+  entityId: string;
+  stateSchema?: Record<string, StateSchema>;
+  onObjectUpdate?: (changes: Partial<WorldObject>) => void;
+  bus?: EventBus;
+}) {
+  const [, setRev] = useState(0);
+  useEffect(() => bus?.on("state:changed", () => setRev(r => r + 1)), [bus]);
+  const [newKey, setNewKey] = useState("");
+  const entries = Object.entries(stateSchema ?? {});
+  const write = (schema: Record<string, StateSchema>) =>
+    onObjectUpdate?.({ stateSchema: Object.keys(schema).length ? schema : undefined } as Partial<WorldObject>);
+  const setEntry    = (key: string, s: StateSchema) => write({ ...(stateSchema ?? {}), [key]: s });
+  const removeEntry = (key: string) => { const c = { ...(stateSchema ?? {}) }; delete c[key]; write(c); };
+  const addKey = () => {
+    const k = newKey.trim().replace(/\s+/g, "_");
+    if (!k || stateSchema?.[k]) return;
+    setEntry(k, { type: "number", default: 0 });
+    setNewKey("");
+  };
+  const SEL: React.CSSProperties = { background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c2cadb", fontSize: 10, fontFamily: "monospace", padding: "2px 4px" };
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <div style={LABEL}>STATE (this {entityId.startsWith("vol_") ? "volume" : "object"} only)</div>
+      </div>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginBottom: 6 }}>
+        Keys this entity tracks for itself (health, open, mood…) — every copy and
+        prefab instance gets its own values. Scripts read/write them via the
+        &ldquo;Whose state&rdquo; scope. Live values show while playing.
+      </div>
+      {entries.map(([key, s]) => {
+        const live = gameState.get(entKey(entityId, key));
+        return (
+          <div key={key} style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", marginBottom: 4, padding: "4px 6px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
+            <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace", flex: "1 0 70px", overflow: "hidden", textOverflow: "ellipsis" }} title={key}>{key}</span>
+            {live !== undefined && (
+              <span title="live value (playing)" style={{ color: "#7fd0a0", fontSize: 10, fontFamily: "monospace" }}>▶ {String(live)}</span>
+            )}
+            <select style={SEL} value={s.type}
+              onChange={e => {
+                const type = e.target.value as StateSchema["type"];
+                setEntry(key, { type, default: type === "number" ? 0 : type === "boolean" ? false : "" });
+              }}>
+              <option value="number">number</option>
+              <option value="boolean">boolean</option>
+              <option value="string">string</option>
+            </select>
+            {s.type === "boolean" ? (
+              <select style={SEL} value={String(s.default ?? false)} title="starting value"
+                onChange={e => setEntry(key, { ...s, default: e.target.value === "true" })}>
+                <option value="false">start: false</option>
+                <option value="true">start: true</option>
+              </select>
+            ) : (
+              <input style={{ ...SEL, width: 56 }} type={s.type === "number" ? "number" : "text"}
+                title="starting value" placeholder="start"
+                defaultValue={s.default == null ? "" : String(s.default)}
+                key={key + "-def-" + String(s.default)}
+                onBlur={e => setEntry(key, { ...s, default: s.type === "number" ? (parseFloat(e.target.value) || 0) : e.target.value })}
+                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              />
+            )}
+            {s.type === "number" && (
+              <>
+                <input style={{ ...SEL, width: 44 }} type="number" title="minimum (clamped)" placeholder="min"
+                  defaultValue={s.min ?? ""} key={key + "-min-" + String(s.min)}
+                  onBlur={e => setEntry(key, { ...s, min: e.target.value === "" ? undefined : parseFloat(e.target.value) })}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+                <input style={{ ...SEL, width: 44 }} type="number" title="maximum (clamped)" placeholder="max"
+                  defaultValue={s.max ?? ""} key={key + "-max-" + String(s.max)}
+                  onBlur={e => setEntry(key, { ...s, max: e.target.value === "" ? undefined : parseFloat(e.target.value) })}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+              </>
+            )}
+            <button title="remove key" onClick={() => removeEntry(key)}
+              style={{ background: "none", border: "none", color: "#cc6666", cursor: "pointer", fontSize: 11, padding: "0 2px" }}>×</button>
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", gap: 4 }}>
+        <input style={{ ...SEL, flex: 1 }} placeholder="new key (e.g. health)" value={newKey}
+          onChange={e => setNewKey(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") addKey(); }} />
+        <button onClick={addKey} disabled={!newKey.trim()}
+          style={{ ...SEL, cursor: "pointer", color: newKey.trim() ? "#80aaff" : "#666" }}>+ add</button>
+      </div>
+    </div>
+  );
+}
+
+function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObjectUpdate, bus }: {
   selected: SelectedObjectPayload;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
   onEditScript?: (scriptId: string) => void;
+  onObjectUpdate?: (changes: Partial<WorldObject>) => void;
+  bus?: EventBus;
 }) {
   const obj = selected.data as WorldObject | null;
   if (!obj) return null;
@@ -5639,6 +5738,7 @@ function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript }: {
           on_player_enter / on_player_exit, add a Sensor collider (Colliders screen).
         </div>
       )}
+      <EntityStateSection entityId={obj.id} stateSchema={obj.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus} />
     </div>
   );
 }
@@ -5891,6 +5991,9 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           </div>
         )}
       </div>
+
+      {/* Per-entity state keys (Phase 60) */}
+      <EntityStateSection entityId={vol.id} stateSchema={vol.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus} />
 
       {/* Visual section — optional decorative fill (shows in preview + game) */}
       <div>
