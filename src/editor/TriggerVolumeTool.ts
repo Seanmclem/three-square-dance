@@ -1,6 +1,7 @@
 import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
 import { castObjectBoxes } from "@/editor/objectPicking";
+import { volumeExtents } from "@/world/volumeShape";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
@@ -208,9 +209,10 @@ export class TriggerVolumeTool {
     const target = new THREE.Vector3();
     let best: { vol: TriggerVolume; distance: number } | undefined;
     for (const vol of zone.triggerVolumes) {
+      const ext = volumeExtents(vol);   // shape-aware AABB (sphere/cylinder pick by bounds)
       const box = new THREE.Box3(
-        new THREE.Vector3(vol.position.x - vol.size.x / 2, vol.position.y,                vol.position.z - vol.size.z / 2),
-        new THREE.Vector3(vol.position.x + vol.size.x / 2, vol.position.y + vol.size.y,  vol.position.z + vol.size.z / 2),
+        new THREE.Vector3(vol.position.x - ext.x / 2, vol.position.y,          vol.position.z - ext.z / 2),
+        new THREE.Vector3(vol.position.x + ext.x / 2, vol.position.y + ext.y,  vol.position.z + ext.z / 2),
       );
       const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
       let ray = this._raycaster.ray;

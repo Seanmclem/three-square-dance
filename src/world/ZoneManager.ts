@@ -11,6 +11,7 @@ import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
+import { volumeExtents, volumeGeometry } from "@/world/volumeShape";
 import { fadeMeshes, cancelAllFades } from "@/world/meshFade";
 import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
 import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MAX_SURFACE_DECALS } from "@/world/decals/surfaceDecals";
@@ -2217,10 +2218,11 @@ export class ZoneManager {
   }
 
   private _buildVolumeMesh(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
-    const geo = new THREE.EdgesGeometry(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z));
+    const ext = volumeExtents(vol);
+    const geo = new THREE.EdgesGeometry(volumeGeometry(vol));
     const mat = new THREE.LineBasicMaterial({ color: vol.editorTint?.color ?? "#ffcc00", transparent: true, opacity: 0.9 });
     const wire = new THREE.LineSegments(geo, mat);
-    wire.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    wire.position.set(vol.position.x, vol.position.y + ext.y / 2, vol.position.z);
     wire.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     wire.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false, editorOnly: false, hideInGame: true };
     // Editor-only interior fill (child of the wire, so it rides position/rotation/
@@ -2241,11 +2243,7 @@ export class ZoneManager {
       depthWrite: false,
       side: THREE.FrontSide,
     });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(
-      Math.max(0.05, vol.size.x - 0.04),
-      Math.max(0.05, vol.size.y - 0.04),
-      Math.max(0.05, vol.size.z - 0.04),
-    ), bodyMat);
+    const body = new THREE.Mesh(volumeGeometry(vol, 0.04), bodyMat);
     body.userData = { editorType: "trigger-volume", selectable: false };
     body.visible = !this._inPreview;
     body.renderOrder = 1;
@@ -2255,13 +2253,13 @@ export class ZoneManager {
     // front face (local −Z, what launch_player's relative "direction 0" means).
     // A child of the wire so it rides rotation/mover attachment and disposal;
     // editor-only like the interior fill (hidden in preview via the fills toggle).
-    const aScale = Math.min(1.6, Math.max(0.9, Math.min(vol.size.x, vol.size.y) / 2));
+    const aScale = Math.min(1.6, Math.max(0.9, Math.min(ext.x, ext.y) / 2));
     const arrow = new THREE.Mesh(
       new THREE.ConeGeometry(0.16 * aScale, 0.45 * aScale, 12),
       new THREE.MeshBasicMaterial({ color: vol.editorTint?.color ?? "#ffcc00", transparent: true, opacity: 0.9, depthWrite: false }),
     );
     arrow.rotation.x = -Math.PI / 2;                    // cone +Y → local −Z
-    arrow.position.set(0, 0, -vol.size.z / 2 - 0.3 * aScale);
+    arrow.position.set(0, 0, -ext.z / 2 - 0.3 * aScale);
     arrow.userData = { editorType: "trigger-volume", selectable: false };
     arrow.visible = !this._inPreview;
     arrow.renderOrder = 2;
@@ -2279,9 +2277,10 @@ export class ZoneManager {
   // Optional decorative fill — a sibling of the wireframe (NOT a child), with no
   // `hideInGame` tag so it renders in preview AND game while the wireframe is hidden.
   private _buildVolumeFill(zoneId: string, vol: TriggerVolume, group: THREE.Group): void {
-    const mat  = createVolumeFillMaterial(vol.visual!, vol.size.y);
-    const fill = new THREE.Mesh(new THREE.BoxGeometry(vol.size.x, vol.size.y, vol.size.z), mat);
-    fill.position.set(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+    const ext  = volumeExtents(vol);
+    const mat  = createVolumeFillMaterial(vol.visual!, ext.y);
+    const fill = new THREE.Mesh(volumeGeometry(vol), mat);
+    fill.position.set(vol.position.x, vol.position.y + ext.y / 2, vol.position.z);
     fill.rotation.y = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     fill.userData = { editorId: vol.id, editorType: "trigger-volume", zoneId, selectable: false };
     group.add(fill);

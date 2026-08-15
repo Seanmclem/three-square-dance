@@ -17,7 +17,7 @@ things**. If you already built kill floors by hand out of `store_position` +
 |---|---|---|
 | **Health** | built-in state key (SCRIPTS → STATE tab) | starts at 100, clamped 0–100 unless you change its schema |
 | **Checkpoint marker** | Spawn tool → **+ Checkpoint** mode | an inert, named position+facing flag — does nothing until a script references it |
-| **Trigger volume** | Trigger tool | invisible box; fires `on_player_enter` / `on_player_exit` scripts |
+| **Trigger volume** | Trigger tool | invisible region — box, sphere, cylinder, or capsule (SHAPE in its panel); fires `on_player_enter` / `on_player_exit` scripts |
 | **`respawn_player`** | script action | the whole death sequence: fade out → teleport → optional health refill → fade in |
 | **`store_position`** | script action | saves a pose (position + facing) into a state key |
 

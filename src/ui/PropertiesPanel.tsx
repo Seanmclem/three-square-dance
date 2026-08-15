@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
@@ -5690,6 +5690,11 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
     bus?.emit("trigger:resize-toggle", { enabled: false });
     bus?.emit("gizmo:suspend", { source: "trigger-edit-mode", suspended: false });
   }, [bus]);
+  // Non-box shapes have no face handles — fall back to MOVE so the gizmo isn't
+  // left suspended by a lingering "resize" mode.
+  useEffect(() => {
+    if ((vol?.shape ?? "box") !== "box" && editMode === "resize") setEditMode("move");
+  }, [vol?.shape]); // eslint-disable-line react-hooks/exhaustive-deps
   const [posStr,  setPosStr]  = useState({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
   const [sizeStr, setSizeStr] = useState({ x: String(vol?.size.x ?? 1),     y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
   const { schedule, flush } = useFieldDebounce(300);
@@ -5705,10 +5710,32 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
   if (!vol) return null;
   const scripts = vol.scripts ?? [];
   const vis = vol.visual;
+  const shape = vol.shape ?? "box";
   const setVisual = (v: TriggerVolumeVisual) => onObjectUpdate({ visual: v } as Partial<WorldObject>);
 
   const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ position: { ...vol.position, [axis]: n } } as Partial<WorldObject>); };
-  const commitSize = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0.5) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>); };
+  // Radius fields (size.x on round shapes) allow down to 0.25; box extents/height keep the 0.5 floor.
+  const commitSize = (axis: "x" | "y" | "z", val: string) => {
+    const n = parseFloat(val);
+    const min = shape !== "box" && axis === "x" ? 0.25 : 0.5;
+    if (Number.isFinite(n) && n >= min) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>);
+  };
+
+  // Switching shape converts the size so the volume keeps roughly its footprint:
+  // box → round inscribes the radius in the XZ extents; round → box circumscribes.
+  const setShape = (next: TriggerVolumeShape) => {
+    if (next === shape) return;
+    const changes: { shape: TriggerVolumeShape; size?: Vec3 } = { shape: next };
+    if (shape === "box" && next !== "box") {
+      changes.size = { x: Math.max(0.25, Math.min(vol.size.x, vol.size.z) / 2), y: vol.size.y, z: vol.size.z };
+    } else if (shape !== "box" && next === "box") {
+      const d = vol.size.x * 2;
+      changes.size = { x: d, y: shape === "sphere" ? d : vol.size.y, z: d };
+    } else if (next === "sphere") {
+      changes.size = { ...vol.size };   // radius carries over; height becomes 2r implicitly
+    }
+    onObjectUpdate(changes as Partial<WorldObject>);
+  };
 
   function addScript(type: "on_player_enter" | "on_player_exit"): void {
     if (!onScriptsChange) return;
@@ -5731,14 +5758,32 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
       <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
-        An invisible 3D detection box. Scripts fire when the player walks in or out.
-        Trigger volumes are independent of map zones — they can run any action.
+        An invisible 3D detection region — box, sphere, cylinder, or capsule.
+        Scripts fire when the player walks in or out. Trigger volumes are
+        independent of map zones — they can run any action.
       </div>
       <div>
         <div style={LABEL}>LABEL</div>
         <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>{vol.label}</div>
       </div>
       <div>
+        <div style={LABEL}>SHAPE</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {(["box", "sphere", "cylinder", "capsule"] as const).map(s => (
+            <button key={s} onClick={() => setShape(s)}
+              title={s === "box" ? "Rectangular volume (drag-resizable)" : `${s[0]!.toUpperCase() + s.slice(1)} volume — sized by the radius${s === "sphere" ? "" : " + height"} fields`}
+              style={{
+                flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 9, fontFamily: "monospace",
+                border: "1px solid " + (shape === s ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
+                background: shape === s ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+                color: shape === s ? "#80aaff" : "#c0c0c0", cursor: "pointer",
+              }}>
+              {s.toUpperCase().slice(0, s === "cylinder" ? 3 : s === "capsule" ? 4 : 6)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {shape === "box" && <div>
         <div style={LABEL}>EDIT MODE</div>
         <div style={{ display: "flex", gap: 4 }}>
           {(["move", "resize"] as const).map(m => (
@@ -5754,7 +5799,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
             </button>
           ))}
         </div>
-      </div>
+      </div>}
       <div>
         <div style={LABEL}>POSITION</div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -5774,10 +5819,14 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
       <div>
         <div style={LABEL}>SIZE</div>
         <div style={{ display: "flex", gap: 4 }}>
-          {([["x","W"],["y","H"],["z","D"]] as const).map(([axis, lbl]) => (
+          {(shape === "box"    ? [["x","W"],["y","H"],["z","D"]] as const :
+            shape === "sphere" ? [["x","RADIUS"]] as const :
+                                 [["x","RADIUS"],["y","HEIGHT"]] as const
+          ).map(([axis, lbl]) => (
             <div key={axis} style={{ flex: 1 }}>
               <div style={{ color: "#666", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
-              <input type="number" step={0.5} min={0.5} value={sizeStr[axis]}
+              <input type="number" step={shape !== "box" && axis === "x" ? 0.25 : 0.5}
+                min={shape !== "box" && axis === "x" ? 0.25 : 0.5} value={sizeStr[axis]}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                 onChange={e => { setSizeStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitSize(axis, e.target.value)); }}
                 onBlur={e => flush(() => commitSize(axis, e.target.value))}
@@ -5786,6 +5835,10 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
             </div>
           ))}
         </div>
+        {shape === "capsule" && vol.size.y < vol.size.x * 2 &&
+          <div style={{ color: "#c9a86a", fontSize: 9, marginTop: 3 }}>
+            Height below 2× radius — the capsule rounds up to a sphere of this radius.
+          </div>}
       </div>
       <div>
         <div style={LABEL}>ROTATION (Y°)</div>

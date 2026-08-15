@@ -134,7 +134,10 @@ export class TriggerVolumeResizer implements IEditorModule {
 
   /** Build handles if we should show and they're missing; otherwise reposition or clear. */
   private _sync(): void {
-    if (!this._shouldShow() || !this._selectedVolume()) { this._clearHandles(); return; }
+    const vol = this._selectedVolume();
+    // Face handles are box math — non-box shapes resize via the panel's
+    // numeric RADIUS/HEIGHT fields (matches the collider-editor precedent).
+    if (!this._shouldShow() || !vol || (vol.shape ?? "box") !== "box") { this._clearHandles(); return; }
     if (this._handles.length === 0) this._buildHandles();
     this._positionHandles();
   }

@@ -278,16 +278,27 @@ export class ColliderBuilder {
     vol: TriggerVolume,
     host?: { body: RAPIER.RigidBody; origin: THREE.Vector3; originQuat: THREE.Quaternion },
   ): RAPIER.Collider {
-    const desc  = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2);
+    // Shape (default box). Size encoding matches AttachedCollider: sphere x =
+    // radius; cylinder/capsule x = radius, y = full height. Capsule's cylindrical
+    // half-height is clamped so h < 2r degrades to a sphere-ish capsule, not NaN.
+    let desc: RAPIER.ColliderDesc;
+    switch (vol.shape ?? "box") {
+      case "sphere":   desc = RAPIER.ColliderDesc.ball(vol.size.x); break;
+      case "cylinder": desc = RAPIER.ColliderDesc.cylinder(vol.size.y / 2, vol.size.x); break;
+      case "capsule":  desc = RAPIER.ColliderDesc.capsule(Math.max(0.01, vol.size.y / 2 - vol.size.x), vol.size.x); break;
+      default:         desc = RAPIER.ColliderDesc.cuboid(vol.size.x / 2, vol.size.y / 2, vol.size.z / 2);
+    }
+    // position is XZ center + Y BOTTOM for every shape (sphere height = 2r).
+    const centerY = vol.position.y + (vol.shape === "sphere" ? vol.size.x : vol.size.y / 2);
     const angle = vol.rotation?.y ? vol.rotation.y * Math.PI / 180 : 0;
     if (!host) {
-      desc.setTranslation(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z);
+      desc.setTranslation(vol.position.x, centerY, vol.position.z);
       if (angle) desc.setRotation({ x: 0, y: Math.sin(angle / 2), z: 0, w: Math.cos(angle / 2) });
       return physicsWorld.createSensorCollider(desc);
     }
-    // World center (position is XZ center + Y BOTTOM) → host-body-local frame.
+    // World center → host-body-local frame.
     const invQ  = host.originQuat.clone().invert();
-    const local = new THREE.Vector3(vol.position.x, vol.position.y + vol.size.y / 2, vol.position.z)
+    const local = new THREE.Vector3(vol.position.x, centerY, vol.position.z)
       .sub(host.origin).applyQuaternion(invQ);
     const yawQ  = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     const rel   = invQ.clone().multiply(yawQ);

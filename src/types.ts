@@ -1461,11 +1461,18 @@ export interface UiMenuElement extends UiElementBase {
 export type UiElementDef = UiBarElement | UiCounterElement | UiIconsElement
                          | UiLabelElement | UiImageElement | UiMenuElement;
 
+export type TriggerVolumeShape = "box" | "sphere" | "cylinder" | "capsule";
+
 export interface TriggerVolume {
   id:       string;
   label:    string;
   position: Vec3;
   size:     Vec3;
+  // Sensor + wireframe shape (absent = "box", the classic behavior). Size
+  // encoding matches AttachedCollider: sphere: x = radius (y/z unused);
+  // cylinder/capsule: x = radius, y = full height. position stays the XZ
+  // center + Y BOTTOM for every shape.
+  shape?:   TriggerVolumeShape;
   rotation?: Vec3;   // degrees, Y = yaw — applied to wireframe + sensor (axis-aligned when absent)
   // Mover-enabled platform/shape/object id (same zone) this volume rides (Phase 53).
   // position/size stay the WORLD-SPACE rest pose (tools/panel unchanged); the
