@@ -535,7 +535,12 @@ export class ZoneManager {
         this._dimSuspended = true;
         this._applyDimming();
         if (isGameplayMode(mode)) this._setHideInGameVisible(false);
-        this._applyStartHidden();
+        // Deferred past the rest of the preview:start listener chain: App's
+        // handler (registered AFTER us) resets gameState on New Game or
+        // restores a save on Continue — the Phase-60 despawn-state read must
+        // see those final values, not last run's leftovers. (The runtime is
+        // ordering-safe either way: SceneRouter restores before preview.enter.)
+        queueMicrotask(() => { if (this._inPreview) this._applyStartHidden(); });
       }),
       this._bus.on("preview:stop",  () => {
         this._flickerActive = false;

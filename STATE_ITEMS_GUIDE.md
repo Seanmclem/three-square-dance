@@ -242,6 +242,55 @@ and spend. That loop is the skeleton of most item-driven game design.
 
 ---
 
+## Layer 4 — Per-entity state (Phase 60)
+
+Everything above is **global** — one `health`, one bag, shared by the whole
+game. Entities can also track their **own** values: an enemy's own health, a
+chest's own open/closed, an NPC's own mood — with every copy and every prefab
+instance independent by construction.
+
+**Where to author it:** select the object (SCRIPTS screen) or trigger volume —
+the **STATE (this object only)** section. Add keys exactly like the global
+STATE tab: name, type, starting value, min/max clamp. Live values show there
+while playing.
+
+**How scripts use it:** every state action, condition, and state trigger now
+has a **"Whose state"** scope — `Global` (default, everything works as
+before), `★ this object/volume` (the entity the script rides — survives
+copies and prefab stamping), or a picked entity. Actions can also scope to a
+**group** (writes fan out to every member); conditions and triggers take
+single entities only. The canonical enemy:
+
+- Entity STATE: `health` — number, start 3, min 0.
+- Script on the enemy: `on_state_equals` · whose state **★ this object** ·
+  key `health` · value `0` → action `despawn_object` target **★ this object**.
+- The sword/trap: `adjust_number` · whose state = the enemy (or its group) ·
+  `health` · `−1`.
+
+**Entity inventories:** `give_item` / `take_item` gained a "Whose inventory"
+scope (default **★ the player** — unchanged), and the new **`transfer_item`**
+action MOVES items between two holders atomically: it transfers
+`min(count, what the source has, destination stack space)`, so an empty chest
+gives nothing and duplication is impossible. Give/take remain for genuinely
+creating (quest reward) or destroying (consuming) items. Entity-held items
+never appear in the player's bag.
+
+**Dialogues:** option conditions ("Show if") and option actions can scope to
+**★ this NPC (dialogue owner)** — whichever entity's script launched the
+conversation — so "only offer this once" or "the guard remembers you" is
+per-NPC without inventing global keys.
+
+**Persistence:** entity state rides the save like everything else — and as of
+this phase **despawns persist too**: a killed (despawned) enemy stays gone and
+a script-spawned chest stays present across scene re-entry and Continue. New
+Game resets all of it to the authored defaults. If you WANT respawning
+enemies, author it: e.g. an `on_level_load` script that resets the group's
+`health` and spawns them again.
+
+Under the hood these are ordinary global keys with a hidden per-entity prefix
+(that's why saves/clamps/triggers all just work) — you never see or type the
+prefixed form; the scope picker is the interface.
+
 ## Which one do I want? (cheat sheet)
 
 | I want to… | Use |
