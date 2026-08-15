@@ -156,6 +156,10 @@ const TRIGGER_TYPES: TriggerType[] = [
   "on_game_start",
   "on_health_zero",
   "on_dialogue_end",
+  // Phase 61 — fired by the enemy AI on the owning enemy
+  "on_player_detected",
+  "on_player_lost",
+  "on_enemy_attack",
 ];
 
 // npc_alive/npc_dead removed from authoring (Phase 60) — never implemented;
@@ -192,7 +196,6 @@ const ACTION_TYPES: ActionType[] = [
   "set_state",
   "show_dialogue",
   "show_ui",
-  "spawn_npc",
   "spawn_object",
   "set_footstep",
   "start_mover",
@@ -1009,7 +1012,10 @@ function ScriptEditor({
     script.trigger.type === "on_interact" ||
     script.trigger.type === "on_state_changed" ||
     script.trigger.type === "on_state_equals" ||
-    script.trigger.type === "on_dialogue_end";
+    script.trigger.type === "on_dialogue_end" ||
+    script.trigger.type === "on_player_detected" ||
+    script.trigger.type === "on_player_lost" ||
+    script.trigger.type === "on_enemy_attack";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -1448,14 +1454,15 @@ function TargetPicker({
       </select>
     );
   }
-  if (triggerType === "on_interact") {
+  if (triggerType === "on_interact" || triggerType === "on_player_detected"
+    || triggerType === "on_player_lost" || triggerType === "on_enemy_attack") {
     return (
       <select
         style={S.select}
         value={targetId}
         onChange={(e) => onChange(e.target.value)}
       >
-        <option value="">— pick object —</option>
+        <option value="">{triggerType === "on_interact" ? "— pick object —" : "— pick enemy (AI-enabled object) —"}</option>
         {zoneObjects.map((o) => (
           <option key={o.id} value={o.id}>
             {o.assetId} ({o.id.slice(0, 8)})
@@ -3160,9 +3167,11 @@ function ActionFields({
         </F>
       );
 
+    // spawn_npc: removed from the dropdown in Phase 61 (never implemented);
+    // old data renders this tolerated stub row.
     case "spawn_npc":
       return (
-        <div style={{ color: "#666", fontSize: 10 }}>spawn_npc — Phase 13</div>
+        <div style={{ color: "#98a2b8", fontSize: 10 }}>spawn_npc — not implemented (does nothing)</div>
       );
 
     default:

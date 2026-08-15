@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
-  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, ScriptDef, MoverDef, LightDef,
+  PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, EnemyAIDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
@@ -165,12 +165,13 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio" | "scripts";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio" | "scripts" | "ai";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
   animations: "Animations", colliders: "Colliders", lights: "Lights", sound: "Sound", audio: "Audio",
   scripts: "Scripts",
+  ai: "Enemy AI",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -185,6 +186,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   sound: "SPATIAL EMITTER",
   audio: "MIXER · AMBIENT · MUSIC",
   scripts: "TRIGGERS · ACTIONS",
+  ai: "DETECT · CHASE · ATTACK",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -204,7 +206,7 @@ const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   platform: ["geo", "mat", "sound"],
   stair:    ["geo", "mat"],
   ladder:   ["geo", "mat"],
-  object:   ["geo", "mat", "colliders", "sound", "scripts"],
+  object:   ["geo", "mat", "colliders", "sound", "scripts", "ai"],
   opening:  ["geo"],
   shape:    ["geo", "mat", "sound"],
 };
@@ -295,6 +297,10 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "scripts": {
       const n = (selected.data as { scripts?: ScriptDef[] } | null)?.scripts?.length ?? 0;
       return n === 0 ? "none" : `${n} script${n !== 1 ? "s" : ""}`;
+    }
+    case "ai": {
+      const ai = (selected.data as WorldObject | null)?.ai;
+      return ai?.enabled ? `on · detect ${ai.detectRadius ?? 6}m` : "off";
     }
     case "lights":
     case "audio":
@@ -774,6 +780,8 @@ export function PropertiesPanel({
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
           <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} onObjectUpdate={onObjectUpdate} bus={bus} />
+        ) : currentScreen === "ai" ? (
+          <EnemyAIScreen selected={selected} assets={assets} onObjectUpdate={onObjectUpdate} />
         ) : null}
       </div>
 
@@ -5584,6 +5592,92 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
 // Scripts attached to a placed object — same list as a volume's ENTRY/EXIT
 // section, editing stays in the Scripts panel. The add button presets the
 // trigger from what the object supports.
+// ── EnemyAIScreen (Phase 61) ──────────────────────────────────────────────────
+// Detect → chase/circle → attack, driven by the EnemyAI runtime system.
+// Damage is applied to a GLOBAL state key (the player's health key); enemy
+// death stays authored via the entity's own STATE + scripts (Phase 60).
+function EnemyAIScreen({ selected, assets, onObjectUpdate }: {
+  selected: SelectedObjectPayload;
+  assets: AssetDef[];
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const obj = selected.data as WorldObject | null;
+  if (!obj) return null;
+  const ai = obj.ai;
+  const write = (changes: Partial<EnemyAIDef>) =>
+    onObjectUpdate({ ai: { enabled: ai?.enabled ?? false, ...(ai ?? {}), ...changes } });
+  const clips = assets.find(a => a.id === obj.assetId)?.animations ?? [];
+  const ROW: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 };
+  type NumKey = "detectRadius" | "giveUpRadius" | "attackRange" | "moveSpeed" | "attackDamage"
+    | "attackCooldown" | "damageMoment" | "variation" | "leashRadius";
+  const numRow = (label: string, key: NumKey, dflt: number, step: number, title: string) => (
+    <div style={ROW} title={title}>
+      <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
+      <input type="number" step={step} style={{ ...NUM_INPUT, width: 72 }}
+        key={obj.id + key + String(ai?.[key] ?? "")}
+        defaultValue={ai?.[key] ?? dflt}
+        onBlur={e => { const n = parseFloat(e.target.value); write({ [key]: Number.isFinite(n) ? n : undefined } as Partial<EnemyAIDef>); }}
+        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+    </div>
+  );
+  const clipRow = (label: string, key: "idleClip" | "walkClip" | "attackClip", title: string) => (
+    <div style={ROW} title={title}>
+      <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
+      <select style={{ background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c2cadb", fontSize: 10, fontFamily: "monospace", padding: "2px 4px", width: 140 }}
+        value={ai?.[key] === null ? "__none__" : (ai?.[key] ?? "__auto__")}
+        onChange={e => write({ [key]: e.target.value === "__auto__" ? undefined : e.target.value === "__none__" ? null : e.target.value } as Partial<EnemyAIDef>)}>
+        <option value="__auto__">auto (name match)</option>
+        <option value="__none__">none</option>
+        {clips.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+    </div>
+  );
+  return (
+    <div style={{ padding: "12px 16px" }}>
+      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
+                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 10 }}>
+        The enemy notices the player inside DETECT RADIUS, chases (with some
+        circling), and bites in ATTACK RANGE — subtracting ATTACK DAMAGE from
+        the global DAMAGE KEY. Hook effects with the on_player_detected /
+        on_player_lost / on_enemy_attack triggers on this object&apos;s scripts.
+        Making the enemy killable is authored: give it its own STATE (e.g.
+        health) and a despawn script.
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 10 }}>
+        <input type="checkbox" checked={ai?.enabled ?? false}
+          onChange={e => write({ enabled: e.target.checked })} />
+        <span style={{ fontSize: 11, color: "#c2cadb" }}>Enable enemy AI</span>
+      </label>
+      {ai?.enabled && (
+        <>
+          {numRow("DETECT RADIUS", "detectRadius", 6, 0.5, "Notices the player within this many metres (horizontal; max 3m height difference)")}
+          {numRow("GIVE-UP RADIUS", "giveUpRadius", (ai?.detectRadius ?? 6) * 1.5, 0.5, "Loses the player beyond this (bigger than detect = doesn't flicker at the edge)")}
+          {numRow("ATTACK RANGE", "attackRange", 1.2, 0.1, "Starts a bite within this distance")}
+          {numRow("MOVE SPEED", "moveSpeed", 2.5, 0.25, "Chase speed, metres/second (player walks ~6)")}
+          {numRow("ATTACK DAMAGE", "attackDamage", 1, 1, "Subtracted from DAMAGE KEY when a bite lands")}
+          <div style={ROW} title="The GLOBAL state key a landed bite reduces — the player's health key (this game may use Hearts)">
+            <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>DAMAGE KEY</span>
+            <input list="wb-state-keys" style={{ ...NUM_INPUT, width: 110 }}
+              key={obj.id + "dmgkey" + (ai?.damageKey ?? "")}
+              defaultValue={ai?.damageKey ?? "health"}
+              onBlur={e => write({ damageKey: e.target.value.trim() || undefined })}
+              onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+          </div>
+          {numRow("ATTACK COOLDOWN", "attackCooldown", 1.5, 0.1, "Seconds between bites")}
+          {numRow("DAMAGE MOMENT", "damageMoment", 0.4, 0.05, "Seconds into the attack clip when the hit actually lands (mid-lunge, not wind-up)")}
+          {numRow("VARIATION", "variation", 0.5, 0.1, "0–1: circling approach, jittered attack timing, occasional feints. 0 = straight beeline")}
+          {numRow("LEASH RADIUS", "leashRadius", 12, 1, "Max distance from its placed spot — beyond it, gives up and walks home")}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
+          {clipRow("IDLE CLIP", "idleClip", "Played while standing guard")}
+          {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}
+          {clipRow("ATTACK CLIP", "attackClip", "Played once per bite (auto also matches 'bite')")}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── EntityStateSection (Phase 60) ─────────────────────────────────────────────
 // Per-entity state keys: schema rows (key / type / default / min-max) stored on
 // the entity's `stateSchema`; values live namespaced in the global GameState and
