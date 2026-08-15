@@ -187,7 +187,8 @@ export class ScriptEngine {
    */
   private _ownedScript(s: ScriptDef, ownerId: string): ScriptDef {
     let trig = s.trigger;
-    if (trig.type === "on_interact" || trig.type === "on_player_enter" || trig.type === "on_player_exit") {
+    if (trig.type === "on_interact" || trig.type === "on_player_enter" || trig.type === "on_player_exit"
+      || trig.type === "on_player_detected" || trig.type === "on_player_lost" || trig.type === "on_enemy_attack") {
       trig = { ...trig, targetId: ownerId };
     } else if (trig.targetId === ownerId) {
       trig = { ...trig, targetId: undefined };
@@ -318,7 +319,8 @@ export class ScriptEngine {
     // so owner-relative actions (launch_player's "relative to this volume") can
     // resolve the owner's pose at dispatch time.
     const t = s.trigger;
-    const ownerId = (t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact")
+    const ownerId = (t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact"
+      || t.type === "on_player_detected" || t.type === "on_player_lost" || t.type === "on_enemy_attack")
       ? t.targetId : undefined;
     this.runActions(s.actions, ownerId);
   }

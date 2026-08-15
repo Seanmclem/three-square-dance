@@ -50,6 +50,11 @@ export class PreviewController {
   get isActive(): boolean { return this._controller !== null; }
   get input(): ControlSchemeManager | null { return this._input; }
   get mode(): PreviewMode | null { return this._mode; }
+  /** Live player body position (capsule CENTER), or null outside preview —
+   *  the EnemyAI system's read channel (Phase 61). Returns a fresh Vector3. */
+  get playerPosition(): THREE.Vector3 | null {
+    return this._controller ? this._controller.body.position : null;
+  }
   get occlusionState(): { subMode: "player" | "camera"; cullView: boolean } {
     return { subMode: this._subMode, cullView: this._cullView };
   }

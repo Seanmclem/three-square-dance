@@ -992,6 +992,34 @@ export interface AttachedCollider {
   indices?:   number[];
 }
 
+// ─── Enemy AI (Phase 61) ──────────────────────────────────────────────────────
+
+/**
+ * Per-object enemy AI config (the panel's AI screen). The EnemyAI runtime
+ * system reads this; every field except `enabled` is optional with the
+ * defaults shown. Movement is kinematic: ground-snap ray + a forward wall
+ * probe that STOPS at obstacles (no pathfinding / gap-jumping). Detection is
+ * horizontal distance with a max vertical gap of 3m.
+ */
+export interface EnemyAIDef {
+  enabled:         boolean;
+  detectRadius?:   number;        // acquire the player within this (default 6)
+  giveUpRadius?:   number;        // lose the player beyond this (default 1.5 × detectRadius)
+  attackRange?:    number;        // start a bite within this (default 1.2)
+  moveSpeed?:      number;        // m/s while chasing (default 2.5)
+  attackDamage?:   number;        // subtracted from damageKey on a landed bite (default 1)
+  damageKey?:      string;        // GLOBAL state key the bite adjusts (default "health"; the obby uses "Hearts")
+  attackCooldown?: number;        // seconds between bites (default 1.5)
+  damageMoment?:   number;        // seconds into the attack clip when the hit lands (default 0.4)
+  variation?:      number;        // 0..1 movement variation: orbit drift + timing jitter + feints (default 0.5; 0 = beeline)
+  leashRadius?:    number;        // max distance from the authored post before disengaging (default 12)
+  // Clip mapping — undefined = auto by name match (idle/walk/attack, case-
+  // insensitive substring, same spirit as the player's animClips); null = none.
+  idleClip?:       string | null;
+  walkClip?:       string | null;
+  attackClip?:     string | null;
+}
+
 export interface WorldObject {
   id:         string;
   label?:     string;   // optional human-friendly name; falls back to id
@@ -1008,6 +1036,9 @@ export interface WorldObject {
   // (`__ent.<id>.<key>` — see src/scripting/entityState.ts); this is only the
   // schema. Prefab templates carry it; every instance owns its own values.
   stateSchema?: Record<string, StateSchema>;
+  // Phase 61 — basic enemy AI (detect → chase/circle → attack), driven by the
+  // EnemyAI runtime system; authored in the panel's AI screen.
+  ai?: EnemyAIDef;
   groupIds?:  string[];
   autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
@@ -1180,7 +1211,13 @@ export type TriggerType =
   | 'on_state_equals'   // targetId = state key; fires when it TRANSITIONS to trigger.stateValue
   | 'on_level_load'
   | 'on_game_start'
-  | 'on_dialogue_end';   // targetId = dialogue tree id
+  | 'on_dialogue_end'    // targetId = dialogue tree id
+  // Phase 61 — fired by the EnemyAI system on the OWNING enemy (owner-stamped
+  // like on_interact; "★ this object" works inside). A target-less zone/world
+  // script with these fires for EVERY enemy (wildcard bucket).
+  | 'on_player_detected' // enemy acquired the player (idle/return → chase)
+  | 'on_player_lost'     // gave up (hysteresis radius / leash break)
+  | 'on_enemy_attack';   // a bite LANDED — fires at the damage moment, after the damage write
 
 export type ConditionType =
   | 'has_state'

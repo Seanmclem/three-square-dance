@@ -26,6 +26,11 @@ interface MoverEntry {
   origin:     THREE.Vector3;      // entity rest position (= kinematic body rest pose)
   originQuat: THREE.Quaternion;   // entity rest rotation
   running:    boolean;
+  // Phase 61 — entry exists only as an AI enemy's kinematic HOST (body,
+  // volume riding, rest-pose reset). Never advanced by this system
+  // (running stays false) and immune to mover:set ops; EnemyAI drives it
+  // through entryFor().
+  aiDriven?:  boolean;
   t:          number;             // slide: seconds into the cycle; spin: unused
   progress:   number;             // slide "once": 0..1 along the leg
   dir:        1 | -1;             // slide "once": travel direction
@@ -72,6 +77,7 @@ export class MoverSystem {
     body: RAPIER.RigidBody | null,
     origin: Vec3,
     originQuat?: { x: number; y: number; z: number; w: number },
+    aiDriven = false,
   ): void {
     const oq = originQuat
       ? new THREE.Quaternion(originQuat.x, originQuat.y, originQuat.z, originQuat.w)
@@ -84,13 +90,31 @@ export class MoverSystem {
       body,
       origin:     new THREE.Vector3(origin.x, origin.y, origin.z),
       originQuat: oq,
-      running:    def.autoStart ?? true,
+      running:    aiDriven ? false : (def.autoStart ?? true),
+      aiDriven,
       t: 0, progress: 0, dir: 1, angle: 0,
       prevPos: new THREE.Vector3(origin.x, origin.y, origin.z),
       delta:   new THREE.Vector3(),
     };
     this._entries.set(entityId, entry);
     if (body) this._byHandle.set(body.handle, entry);
+  }
+
+  /**
+   * Phase 61 — the EnemyAI system's handle on an aiDriven host entry: the
+   * kinematic body to pose, the mesh list to move with it (attached volume
+   * visuals ride via the same list), and the rest pose (the enemy's leash
+   * post). Null for non-AI entries — EnemyAI must never drive a real mover.
+   */
+  entryFor(entityId: string): {
+    body: RAPIER.RigidBody | null;
+    meshes: ReadonlyArray<{ obj: THREE.Object3D; pos: THREE.Vector3; quat: THREE.Quaternion }>;
+    origin: THREE.Vector3;
+    originQuat: THREE.Quaternion;
+  } | null {
+    const e = this._entries.get(entityId);
+    if (!e?.aiDriven) return null;
+    return { body: e.body, meshes: e.meshes, origin: e.origin, originQuat: e.originQuat };
   }
 
   unregister(entityId: string): void {
@@ -249,7 +273,7 @@ export class MoverSystem {
 
   private _setOp(targetId: string, op: "start" | "stop" | "toggle"): void {
     const e = this._entries.get(targetId);
-    if (!e) return;
+    if (!e || e.aiDriven) return;   // AI host entries never run as movers (Phase 61)
     if (op === "start") { e.running = true; return; }
     if (op === "stop")  { e.running = false; e.delta.set(0, 0, 0); return; }
     // toggle: a "once" slide heads for the other end (door open/close);

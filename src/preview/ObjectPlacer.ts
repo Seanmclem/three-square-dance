@@ -279,6 +279,33 @@ export class ObjectPlacer {
    * Default: play once, then revert to the auto-play clip / bind pose.
    * `opts.loop`: repeat forever. `opts.hold`: play once and freeze on the final frame.
    */
+  /**
+   * Phase 61 — the EnemyAI system's per-entity animation channel. Crossfades
+   * like the script path but never touches `_previewingId` (the GLOBAL
+   * one-shot preview slot), so many enemies can attack simultaneously without
+   * stealing each other's clips. loop=false plays once and freezes on the
+   * final frame (LoopOnce + clamp) — the AI always follows with walk/idle, so
+   * no revert bookkeeping is needed. Returns false when the object has no
+   * mixer or the clip name is unknown (AI falls back to un-animated movement).
+   */
+  aiPlay(objectId: string, clipName: string, opts?: { loop?: boolean; blend?: number }): boolean {
+    const mixer = this._mixers.get(objectId);
+    const clip  = this._clips.get(objectId)?.get(clipName);
+    if (!mixer || !clip) return false;
+    this._fadeTo(objectId, mixer, clip, { loop: opts?.loop ?? true, duration: opts?.blend ?? BLEND_SEC });
+    return true;
+  }
+
+  /** Clip names available on an object's loaded model (Phase 61 auto-matching). */
+  clipNamesFor(objectId: string): string[] {
+    return [...(this._clips.get(objectId)?.keys() ?? [])];
+  }
+
+  /** Duration (s) of a clip on an object, or null when unknown (Phase 61). */
+  clipDuration(objectId: string, clipName: string): number | null {
+    return this._clips.get(objectId)?.get(clipName)?.duration ?? null;
+  }
+
   previewClip(objectId: string, clipName: string, opts?: { loop?: boolean; hold?: boolean; blend?: number }): void {
     if (this._previewingId) this.stopPreview(this._previewingId);
     const mixer = this._mixers.get(objectId);

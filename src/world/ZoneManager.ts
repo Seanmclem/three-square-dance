@@ -447,7 +447,7 @@ export class ZoneManager {
         }
         // `"colliders" in changes` (not truthiness): clearing the override back to
         // undefined — the object re-tracks the asset default — must also rebuild.
-        if (changes.position || changes.rotation || changes.scale || "colliders" in changes || changes.mover) {
+        if (changes.position || changes.rotation || changes.scale || "colliders" in changes || changes.mover || "ai" in changes) {
           const entry = this._loadedZones.get(zoneId);
           const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
           if (entry && obj) {
@@ -1335,7 +1335,12 @@ export class ZoneManager {
     this._movers.unregister(obj.id);
     let moverBody: RAPIER.RigidBody | undefined;
     const mesh = entry.objectMeshes.get(obj.id);
-    if (obj.mover?.enabled && mesh) {
+    // Phase 61: an AI-enabled enemy gets the same kinematic host as a mover —
+    // solid while moving, attached volumes ride it, rest-pose reset on
+    // preview:stop — registered as a DORMANT (aiDriven) entry the EnemyAI
+    // system drives; a real mover def wins when both are enabled.
+    const aiHost = !obj.mover?.enabled && !!obj.ai?.enabled;
+    if ((obj.mover?.enabled || aiHost) && mesh) {
       if (effective.some(c => !c.isSensor)) {
         const D2R = Math.PI / 180;
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
@@ -1343,7 +1348,11 @@ export class ZoneManager {
         ));
         moverBody = physicsWorld.createKinematicBody(obj.position, { x: q.x, y: q.y, z: q.z, w: q.w });
       }
-      this._movers.register(obj.id, obj.mover, [mesh], moverBody ?? null, obj.position);
+      this._movers.register(
+        obj.id,
+        obj.mover ?? { enabled: false, kind: "slide", axis: "x", autoStart: false },
+        [mesh], moverBody ?? null, obj.position, undefined, aiHost,
+      );
     }
     if (!effective.length) { this._reattachVolumes(obj.id); return; }
     const colliders = ColliderBuilder.registerAttachedColliders(obj, effective, moverBody);

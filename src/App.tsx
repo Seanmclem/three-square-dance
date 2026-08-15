@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { PreviewController } from "@/preview/PreviewController";
+import { EnemyAI } from "@/preview/EnemyAI";
 import { AudioSystem } from "@/audio/AudioSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { assetManager } from "@/core/AssetManager";
@@ -616,6 +617,10 @@ export default function App() {
     // Movers BEFORE the physics step — setNextKinematicTranslation targets must
     // be fresh when the step consumes them (Phase 31)
     scene.onUpdate(dt => movers.update(dt));
+    // Enemy AI between movers and the step for the same reason (Phase 61)
+    const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
+    enemyAI.init();
+    scene.onUpdate(dt => enemyAI.update(dt));
     // Physics step after Three.js render
     scene.onUpdate(dt => physicsWorld.step(dt));
     // Advance object animation mixers every frame (editor + preview)

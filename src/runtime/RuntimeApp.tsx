@@ -9,6 +9,7 @@ import { MoverSystem } from "@/world/MoverSystem";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { PreviewController } from "@/preview/PreviewController";
+import { EnemyAI } from "@/preview/EnemyAI";
 import { AudioSystem } from "@/audio/AudioSystem";
 import { ScriptEngine } from "@/scripting/ScriptEngine";
 import { gameState } from "@/scripting/GameState";
@@ -94,6 +95,10 @@ export default function RuntimeApp() {
 
     // Movers BEFORE the physics step (same ordering as App.tsx — Phase 31)
     scene.onUpdate(dt => movers.update(dt));
+    // Enemy AI between movers and the step (Phase 61)
+    const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
+    enemyAI.init();
+    scene.onUpdate(dt => enemyAI.update(dt));
     scene.onUpdate(dt => physicsWorld.step(dt));
     scene.onUpdate(dt => objectPlacer.update(dt));
     scene.onUpdate(dt => zones.updateVolumeVisuals(dt));
