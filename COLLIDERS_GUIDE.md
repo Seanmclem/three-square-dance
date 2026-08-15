@@ -112,8 +112,10 @@ model.
   across the whole model — Customize and build it from 2–3 thin boxes instead.
 - **Round things**: sphere/capsule are cheaper and smoother to slide along than
   a rotated box.
-- Sphere/capsule are numeric-only for now (no drag handles) — use **Move** +
-  the radius/height fields.
+- Sphere/capsule/cylinder have drag handles too: side handles drag the
+  **radius** (center pinned), end handles drag the **length**; the numeric
+  radius/height fields also work. (An older note here claimed round shapes
+  were numeric-only — long fixed.)
 - Clicking an object selects it even through gaps in the model (between an
   animal's legs, under a table top) — the click counts anywhere inside the
   object's bounding box, unless something else is genuinely in front (v4.4.2).

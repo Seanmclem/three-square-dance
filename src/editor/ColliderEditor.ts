@@ -47,7 +47,9 @@ interface DragState {
  * (explicit colliders[] or the implicit auto-box). Modeled on TriggerVolumeResizer:
  * raycasts ONLY its own handle meshes, coexists with GizmoManager via the shared
  * `gizmo:dragging` mute, and writes through WorldState transactions (undo for free).
- * Box colliders get 6 face handles; sphere/capsule are wireframe-only (panel edits).
+ * All shapes get face handles: box faces resize that dimension (opposite face
+ * pinned); sphere handles drag the radius; capsule/cylinder side handles drag the
+ * radius and end handles the length (see the radius-drag block in _onDragMove).
  */
 export class ColliderEditor implements IEditorModule {
   private _activeTool:   ToolId = "select";

@@ -36,10 +36,16 @@ capsule corridor shouldn't require a host object.
   z extent.
 - **Picking** (TriggerVolumeTool `_findVolumeAt`): the AABB test now uses
   `volumeExtents` — round shapes pick by their bounds (acceptable slop).
-- **Resize handles** (TriggerVolumeResizer): box-only — `_sync` clears handles
-  for other shapes (collider-editor precedent: round shapes are numeric-only).
-  The panel hides the MOVE/RESIZE toggle for non-box and falls back to MOVE so
-  the gizmo isn't left suspended.
+- **Resize handles** (TriggerVolumeResizer): all shapes, ColliderEditor
+  semantics adapted to the Y-bottom convention — box keeps the six
+  opposite-face-pinned handles; round shapes' side handles drag the RADIUS
+  with the XZ center pinned; +Y drags height (on a sphere, the radius — its
+  height IS 2r) with the bottom pinned; −Y drags the bottom with the top
+  pinned, and is hidden on spheres. Handle set rebuilds on shape change
+  (`triggervolume:updated` → `_sync`). *(First shipped box-only citing a
+  stale COLLIDERS_GUIDE note claiming round colliders were numeric-only —
+  user correction; the guide + the stale ColliderEditor header comment are
+  fixed in this phase too.)*
 - **Panel** (TriggerVolumeView): SHAPE row (BOX/SPHERE/CYL/CAPS); SIZE shows
   W/H/D (box), RADIUS (sphere), or RADIUS+HEIGHT (cylinder/capsule); radius
   floor 0.25 (box extents keep 0.5). Switching shape converts size — box→round
@@ -48,7 +54,6 @@ capsule corridor shouldn't require a host object.
 
 ## Out of scope
 
-- Drag-resize handles for round shapes (numeric-only, like colliders).
 - Placement-time shape choice — the tool still drags out a box footprint;
   shape is switched in the panel afterward.
 - Non-yaw rotation (volumes stay yaw-only, all shapes).

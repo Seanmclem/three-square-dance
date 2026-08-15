@@ -1,11 +1,13 @@
 import { isSelectMode } from "@/editor/selectMode";
 import * as THREE from "three";
+import { volumeExtents } from "@/world/volumeShape";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, TriggerVolume, Vec3, ScreenPos } from "@/types";
 
 const GRID = 0.1;   // drag snap — matches StairCutterResizer's fine grid (Alt = free)
 const MIN  = 0.5;   // smallest allowed size along any axis
+const MINR = 0.25;  // smallest radius (round shapes; matches the panel floor)
 const HANDLE = 0.24;
 const GAP  = 0.35;  // push face handles this far OUTSIDE each face — clear of the
                     // volume body and its center move gizmo so they grab unambiguously.
@@ -22,14 +24,19 @@ const AXIS_COLOR: Record<Face, number> = {
 
 function snap(v: number): number { return Math.round(v / GRID) * GRID; }
 
-interface DragOrig { position: Vec3; size: Vec3; theta: number }
+interface DragOrig { position: Vec3; size: Vec3; theta: number; shape: string }
 
 /**
- * Six push/pull face handles (±X, ±Y, ±Z) for the selected trigger volume. Dragging a
- * face grows/shrinks that dimension with the opposite face pinned. Shown only for the
- * selected volume under the Select tool. Raycasts ONLY its own handle meshes (never the
- * scene), so the TransformControls drag-plane and other geometry can't steal the pick.
- * Coexists with GizmoManager's move/rotate gizmo via the shared `gizmo:dragging` mute.
+ * Push/pull face handles for the selected trigger volume. Box: six faces, dragging
+ * grows/shrinks that dimension with the opposite face pinned. Round shapes (Phase 59,
+ * ColliderEditor semantics adapted to the Y-bottom convention): side handles drag the
+ * RADIUS with the XZ center pinned; +Y drags the height (bottom pinned; on a sphere it
+ * drags the radius, since height IS 2r); -Y drags the bottom with the top pinned
+ * (hidden on spheres — bottom-pinned growth keeps them sitting on the ground).
+ * Shown only for the selected volume under the Select tool. Raycasts ONLY its own
+ * handle meshes (never the scene), so the TransformControls drag-plane and other
+ * geometry can't steal the pick. Coexists with GizmoManager's move/rotate gizmo via
+ * the shared `gizmo:dragging` mute.
  */
 export class TriggerVolumeResizer implements IEditorModule {
   private _activeTool:  ToolId = "select";
@@ -79,10 +86,12 @@ export class TriggerVolumeResizer implements IEditorModule {
       this._bus.on("triggervolume:removed", ({ id }) => {
         if (id === this._selectedId) { this._selectedId = null; this._sync(); }
       }),
-      // External change (panel edit, gizmo move/rotate). Reposition; skip mid-drag (we
-      // reposition inline during our own drag).
+      // External change (panel edit, gizmo move/rotate). Full sync — a SHAPE change
+      // needs the handle set rebuilt (sphere drops -y), not just repositioned; for
+      // plain moves _sync degrades to _positionHandles. Skip mid-drag (we reposition
+      // inline during our own drag).
       this._bus.on("triggervolume:updated", ({ id }) => {
-        if (id === this._selectedId && this._state !== "DRAG") this._positionHandles();
+        if (id === this._selectedId && this._state !== "DRAG") this._sync();
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
@@ -133,17 +142,21 @@ export class TriggerVolumeResizer implements IEditorModule {
   }
 
   /** Build handles if we should show and they're missing; otherwise reposition or clear. */
+  private _builtShape: string | null = null;
+
   private _sync(): void {
     const vol = this._selectedVolume();
-    // Face handles are box math — non-box shapes resize via the panel's
-    // numeric RADIUS/HEIGHT fields (matches the collider-editor precedent).
-    if (!this._shouldShow() || !vol || (vol.shape ?? "box") !== "box") { this._clearHandles(); return; }
-    if (this._handles.length === 0) this._buildHandles();
+    if (!this._shouldShow() || !vol) { this._clearHandles(); this._builtShape = null; return; }
+    const shape = vol.shape ?? "box";
+    if (this._builtShape !== shape) { this._clearHandles(); }
+    if (this._handles.length === 0) { this._buildHandles(shape); this._builtShape = shape; }
     this._positionHandles();
   }
 
-  private _buildHandles(): void {
-    for (const face of FACES) {
+  private _buildHandles(shape: string): void {
+    // Sphere: no -Y handle (bottom stays pinned; the other five all drag the radius).
+    const faces = shape === "sphere" ? FACES.filter(f => f !== "-y") : FACES;
+    for (const face of faces) {
       const geo = new THREE.BoxGeometry(HANDLE, HANDLE, HANDLE);
       const mat = new THREE.MeshBasicMaterial({
         color: AXIS_COLOR[face], depthTest: false, depthWrite: false, transparent: true, opacity: 0.6,
@@ -171,7 +184,7 @@ export class TriggerVolumeResizer implements IEditorModule {
   private _positionHandles(): void {
     const vol = this._selectedVolume();
     if (!vol || this._handles.length === 0) return;
-    const p = this._faceCenters(vol.position, vol.size, ((vol.rotation?.y ?? 0) * Math.PI) / 180);
+    const p = this._faceCenters(vol.position, vol.size, ((vol.rotation?.y ?? 0) * Math.PI) / 180, volumeExtents(vol));
     for (const m of this._handles) {
       const c = p[m.userData.faceAxis as Face];
       m.position.set(c.x, c.y, c.z);
@@ -180,14 +193,15 @@ export class TriggerVolumeResizer implements IEditorModule {
 
   // Handle mesh positions — placed a GAP OUTSIDE each face (not on the surface) so they
   // sit in clear space, away from the body and the center gizmo. The resize math reads the
-  // true box geometry, not these, so the outward offset is purely visual/pick placement.
-  private _faceCenters(pos: Vec3, size: Vec3, theta: number): Record<Face, Vec3> {
+  // true volume geometry, not these, so the outward offset is purely visual/pick placement.
+  // Extents are shape-aware (round shapes: 2r wide, sphere: 2r tall).
+  private _faceCenters(pos: Vec3, size: Vec3, theta: number, ext: Vec3): Record<Face, Vec3> {
     const cx = pos.x, cz = pos.z;
-    const baseY = pos.y, topY = pos.y + size.y, midY = pos.y + size.y / 2;
+    const baseY = pos.y, topY = pos.y + ext.y, midY = pos.y + ext.y / 2;
     const cos = Math.cos(theta), sin = Math.sin(theta);
     const eX = { x: cos, z: -sin };   // local +X in world XZ
     const eZ = { x: sin, z: cos };    // local +Z in world XZ
-    const hx = size.x / 2 + GAP, hz = size.z / 2 + GAP;
+    const hx = ext.x / 2 + GAP, hz = ext.z / 2 + GAP;
     return {
       "+x": { x: cx + eX.x * hx, y: midY, z: cz + eX.z * hx },
       "-x": { x: cx - eX.x * hx, y: midY, z: cz - eX.z * hx },
@@ -234,6 +248,7 @@ export class TriggerVolumeResizer implements IEditorModule {
       position: { ...vol.position },
       size:     { ...vol.size },
       theta:    ((vol.rotation?.y ?? 0) * Math.PI) / 180,
+      shape:    vol.shape ?? "box",
     };
     // Set DRAG before emitting so our own gizmo:dragging doesn't mute us (mirrors NodeDragger).
     this._state = "DRAG";
@@ -254,9 +269,12 @@ export class TriggerVolumeResizer implements IEditorModule {
 
     const position = { ...o.position };
     const size     = { ...o.size };
+    const round    = o.shape !== "box";
+    // Round-shape vertical extent: sphere height IS 2r; cylinder/capsule use size.y.
+    const extY     = o.shape === "sphere" ? o.size.x * 2 : o.size.y;
 
     if (face === "+y" || face === "-y") {
-      // Vertical drag: intersect a camera-facing vertical plane through the box center.
+      // Vertical drag: intersect a camera-facing vertical plane through the volume center.
       const camDir = new THREE.Vector3(this._camera.position.x - o.position.x, 0, this._camera.position.z - o.position.z);
       if (camDir.lengthSq() < 1e-6) camDir.set(0, 0, 1);
       camDir.normalize();
@@ -264,13 +282,31 @@ export class TriggerVolumeResizer implements IEditorModule {
       if (!ray.intersectPlane(plane, hit)) return;
       if (face === "+y") {
         const top = this._altDown ? hit.y : snap(hit.y);
-        size.y = Math.max(MIN, top - o.position.y);      // bottom pinned
+        if (o.shape === "sphere") {
+          size.x = Math.max(MINR, (top - o.position.y) / 2);   // bottom pinned; height = 2r
+        } else {
+          size.y = Math.max(MIN, top - o.position.y);          // bottom pinned
+        }
       } else {
-        const topY = o.position.y + o.size.y;            // top pinned
+        const topY = o.position.y + extY;                      // top pinned (no -y handle on spheres)
         const bottom = Math.min(this._altDown ? hit.y : snap(hit.y), topY - MIN);
         position.y = bottom;
         size.y = topY - bottom;
       }
+    } else if (round) {
+      // Side drag on a round shape: RADIUS with the XZ center pinned (ColliderEditor
+      // semantics) — distance from the center along the dragged (rotated) axis.
+      const midY = o.position.y + extY / 2;
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -midY);
+      if (!ray.intersectPlane(plane, hit)) return;
+      const cos = Math.cos(o.theta), sin = Math.sin(o.theta);
+      const which: "x" | "z" = (face === "+x" || face === "-x") ? "x" : "z";
+      const axis = which === "x" ? { x: cos, z: -sin } : { x: sin, z: cos };
+      const faceSign = face[0] === "+" ? 1 : -1;
+      const proj = (hit.x - o.position.x) * axis.x + (hit.z - o.position.z) * axis.z;
+      let r = faceSign * proj;
+      r = Math.max(MINR, this._altDown ? r : snap(r));
+      size.x = r;
     } else {
       // Horizontal drag: intersect the mid-height plane, project onto the rotated axis.
       const midY = o.position.y + o.size.y / 2;

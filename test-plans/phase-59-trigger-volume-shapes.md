@@ -13,7 +13,8 @@ TESTING.md §0), against the platfrom-obby level. All checks passed.
 | 6 | **Sphere sensor fires on enter** | preview; `on_player_enter` → `set_state TestHit=1`; teleport into sphere | ✅ `TestHit` → 1 |
 | 7 | **Sensor is spherical, not the old box** | reset; teleport to (−31.7, −77.7) — inside old box AABB, 2.68 m from center (r=2) | ✅ `TestHit` stays 0 |
 | 8 | Existing box volumes unaffected | shape field absent → box paths byte-identical | ✅ (code default; box wireframes unchanged in level) |
-| 9 | Resize handles box-only | shape guard in `TriggerVolumeResizer._sync` | ✅ handles cleared on round shapes; panel hides RESIZE + falls back to MOVE |
+| 9 | Round-shape drag handles (follow-up, user correction — colliders were never numeric-only) | sphere: 5 handles (no −Y); synthetic bus-driven drag of the +X handle through the production input path | ✅ radius 1.5 → 3.0, XZ center + bottom pinned |
+| 10 | Handle set rebuilds on shape change | sphere→cylinder→sphere via `updateTriggerVolume` | ✅ 5 → 6 → 5 handles; 0 after volume removal |
 
 Not exercised (follow-ups if they matter): mover-attached (`attachTo`) round
 volume riding a platform — same center math as box, but not live-verified;

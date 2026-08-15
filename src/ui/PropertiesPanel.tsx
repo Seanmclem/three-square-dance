@@ -5690,11 +5690,6 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
     bus?.emit("trigger:resize-toggle", { enabled: false });
     bus?.emit("gizmo:suspend", { source: "trigger-edit-mode", suspended: false });
   }, [bus]);
-  // Non-box shapes have no face handles — fall back to MOVE so the gizmo isn't
-  // left suspended by a lingering "resize" mode.
-  useEffect(() => {
-    if ((vol?.shape ?? "box") !== "box" && editMode === "resize") setEditMode("move");
-  }, [vol?.shape]); // eslint-disable-line react-hooks/exhaustive-deps
   const [posStr,  setPosStr]  = useState({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
   const [sizeStr, setSizeStr] = useState({ x: String(vol?.size.x ?? 1),     y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
   const { schedule, flush } = useFieldDebounce(300);
@@ -5771,7 +5766,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         <div style={{ display: "flex", gap: 4 }}>
           {(["box", "sphere", "cylinder", "capsule"] as const).map(s => (
             <button key={s} onClick={() => setShape(s)}
-              title={s === "box" ? "Rectangular volume (drag-resizable)" : `${s[0]!.toUpperCase() + s.slice(1)} volume — sized by the radius${s === "sphere" ? "" : " + height"} fields`}
+              title={s === "box" ? "Rectangular volume" : `${s[0]!.toUpperCase() + s.slice(1)} volume — resize by drag handles (side = radius${s === "sphere" ? "" : ", top/bottom = height"}) or the numeric fields`}
               style={{
                 flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 9, fontFamily: "monospace",
                 border: "1px solid " + (shape === s ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
@@ -5783,7 +5778,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           ))}
         </div>
       </div>
-      {shape === "box" && <div>
+      <div>
         <div style={LABEL}>EDIT MODE</div>
         <div style={{ display: "flex", gap: 4 }}>
           {(["move", "resize"] as const).map(m => (
@@ -5799,7 +5794,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
             </button>
           ))}
         </div>
-      </div>}
+      </div>
       <div>
         <div style={LABEL}>POSITION</div>
         <div style={{ display: "flex", gap: 4 }}>
