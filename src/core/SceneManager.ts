@@ -312,12 +312,18 @@ export class SceneManager {
     this._previewCamera = cam;
     if (this.editorCamera) this.editorCamera.enabled = (cam === null);
     if (this._viewHelperEl) this._viewHelperEl.style.display = cam ? "none" : "";
+    const w = this.renderer.domElement.clientWidth;
+    const h = this.renderer.domElement.clientHeight;
     if (cam === null) {
       // Restore editor camera aspect
-      const w = this.renderer.domElement.clientWidth;
-      const h = this.renderer.domElement.clientHeight;
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
+    } else {
+      // The play camera was constructed from the WINDOW size, but the canvas is
+      // the viewport (editor: window minus toolbar/panel) — stamp the real
+      // canvas aspect or preview renders slightly stretched the whole session.
+      cam.aspect = w / h;
+      cam.updateProjectionMatrix();
     }
   }
 
@@ -429,6 +435,12 @@ export class SceneManager {
     this.renderer.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // The active play camera must track resizes too, or the game stretches
+    // until preview exit (the editor camera alone getting the new aspect).
+    if (this._previewCamera) {
+      this._previewCamera.aspect = w / h;
+      this._previewCamera.updateProjectionMatrix();
+    }
   }
 
   dispose(): void {
