@@ -273,6 +273,33 @@ unconditioned, so lava and regen fight each other and shallow dips heal
 back). **Slow-kill crusher** — put the enter/exit flag scripts on an
 *attached* volume so the drain zone moves with the machine.
 
+## Recipe: a real enemy (Phase 61 — enemy AI)
+
+Enemies that *chase* stopped being a trigger-volume trick: select a placed
+object → **Enemy AI screen** → Enable. It notices the player inside DETECT
+RADIUS (horizontal, max ~3m height difference), chases with some circling
+(MOVEMENT VARIATION — 0 is a beeline), and bites in ATTACK RANGE: the attack
+clip plays and, at DAMAGE MOMENT seconds into the swing, ATTACK DAMAGE is
+subtracted from the global **DAMAGE KEY** (set it to your health key — this
+game uses `Hearts`). It gives up beyond the GIVE-UP radius or its LEASH and
+walks back to its post. No pathfinding: it stops at walls and refuses ledges,
+so it patrols its own platform.
+
+Hook effects with three triggers on the enemy's own scripts:
+`on_player_detected` (alert bark, music sting), `on_player_lost`, and
+`on_enemy_attack` (fires when a bite LANDS — add `flash_player` +
+`launch_player` for hit juice; "★ this object" works inside all three).
+
+- **Killable enemy**: give it its own STATE (`health`, Phase 60), hurt it
+  with your stomp/sword volumes (`adjust_number` on ★ this object), and a
+  script `on_state_equals` ★ this object `health == 0` → `despawn_object`
+  ★ this object. Dead enemies stay dead across Continue; the AI goes dormant
+  while despawned.
+- **Stomp zones ride**: a trigger volume `attachTo` the enemy follows it
+  while it chases (the crab's stomp zone does exactly this).
+- Clips auto-match by name (idle/walk/run/attack/bite) or pick them in the
+  panel. The living example is the crab in platfrom-obby's level_1.
+
 ## The fine print
 
 - **Stored poses are foot-level.** `store_position` saves where the feet are
