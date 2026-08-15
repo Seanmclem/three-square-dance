@@ -158,12 +158,13 @@ const TRIGGER_TYPES: TriggerType[] = [
   "on_dialogue_end",
 ];
 
+// npc_alive/npc_dead removed from authoring (Phase 60) — never implemented;
+// a compare_number scoped to the entity's health covers them. Old data
+// evaluates as a tolerated no-op.
 const CONDITION_TYPES: ConditionType[] = [
   "has_state",
   "compare_number",
   "has_item",
-  "npc_alive",
-  "npc_dead",
 ];
 
 const ACTION_TYPES: ActionType[] = [
@@ -200,6 +201,7 @@ const ACTION_TYPES: ActionType[] = [
   "stop_sound",
   "store_position",
   "take_item",
+  "transfer_item",
   "teleport_player",
   "toggle_light",
   "toggle_mover",
@@ -1097,6 +1099,20 @@ function ScriptEditor({
               />
             </F>
           )}
+          {/* Phase 60 — state triggers can watch an ENTITY's key instead of a
+              global one. Single entities only (no groups). */}
+          {(script.trigger.type === "on_state_changed" || script.trigger.type === "on_state_equals") && (
+            <F style={{ marginTop: 4 }} label="Whose state">
+              <StateScopePicker
+                value={script.trigger.entityId ?? ""}
+                zoneObjects={zoneObjects}
+                triggerVolumes={triggerVolumes}
+                allowSelf={ownerIsEntity && !!selectedObjectId}
+                selfLabel={`★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`}
+                onChange={(id) => setTrigger({ entityId: id || undefined })}
+              />
+            </F>
+          )}
           {needsTarget && ownerIsEntity
             && script.trigger.type !== "on_dialogue_end"
             && script.trigger.type !== "on_state_changed"
@@ -1232,6 +1248,11 @@ function ScriptEditor({
               key={i}
               condition={c}
               worldItems={worldItems}
+              scope={{
+                zoneObjects, triggerVolumes,
+                allowSelf: ownerIsEntity && !!selectedObjectId,
+                selfLabel: `★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`,
+              }}
               onChange={(nc) =>
                 set(
                   "conditions",
@@ -1520,6 +1541,66 @@ function ActionTargetPicker({
   return <TargetCombobox targetId={targetId} opts={opts} onChange={onChange} />;
 }
 
+// ── StateScopePicker (Phase 60) ───────────────────────────────────────────────
+// "Whose state?" — Global (default) / ★ this entity / a specific object or
+// trigger volume (the state-owning entity kinds). Groups only where the write
+// fans out (actions). Writes "" for global — callers map that to undefined.
+// The raw namespaced key is never shown anywhere; this picker IS the scope UI.
+function StateScopePicker({
+  value,
+  zoneObjects,
+  triggerVolumes,
+  groups = [],
+  allowGroups,
+  allowSelf,
+  selfLabel = "★ this entity",
+  globalLabel = "🌐 Global",
+  onChange,
+}: {
+  value: string;
+  zoneObjects: WorldObject[];
+  triggerVolumes: TriggerVolume[];
+  groups?: GroupDef[];
+  allowGroups?: boolean;   // actions fan out per member; conditions/triggers stay single
+  allowSelf?: boolean;     // owned scripts + dialogue options ("self" re-resolves at runtime)
+  selfLabel?: string;
+  globalLabel?: string;
+  onChange: (id: string) => void;
+}) {
+  const noPrefab = <T,>(arr: T[]): T[] => arr.filter((e) => !(e as { prefab?: unknown }).prefab);
+  const short = (id: string) => id.slice(0, 8);
+  const known = value === "" || value === "self"
+    || zoneObjects.some(o => o.id === value)
+    || triggerVolumes.some(v => v.id === value)
+    || groups.some(g => g.id === value);
+  return (
+    <select style={S.select} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{globalLabel}</option>
+      {allowSelf && <option value="self">{selfLabel}</option>}
+      {allowGroups && groups.length > 0 && (
+        <optgroup label="Groups (every member)">
+          {groups.map(g => <option key={g.id} value={g.id}>▦ {g.name}</option>)}
+        </optgroup>
+      )}
+      <optgroup label="Objects">
+        {noPrefab(zoneObjects).map(o => <option key={o.id} value={o.id}>{o.label || o.assetId} ({short(o.id)})</option>)}
+      </optgroup>
+      <optgroup label="Trigger Volumes">
+        {noPrefab(triggerVolumes).map(v => <option key={v.id} value={v.id}>{v.label || "Volume"} ({short(v.id)})</option>)}
+      </optgroup>
+      {!known && <option value={value}>{value} (missing)</option>}
+    </select>
+  );
+}
+
+/** ConditionRow's optional entity-scope context (Phase 60). */
+interface ConditionScope {
+  zoneObjects:    WorldObject[];
+  triggerVolumes: TriggerVolume[];
+  allowSelf:      boolean;
+  selfLabel?:     string;
+}
+
 // ── TargetCombobox ────────────────────────────────────────────────────────────
 // Type-to-filter replacement for the plain target <select>: a level with many
 // entities makes an unfiltered dropdown unusable. Text input filters by label
@@ -1691,11 +1772,14 @@ function PositionSourcePicker({
 function ConditionRow({
   condition,
   worldItems,
+  scope,
   onChange,
   onRemove,
 }: {
   condition: ScriptCondition;
   worldItems: ItemDef[];
+  /** Phase 60 — enables the "whose state" entity picker (single entities only). */
+  scope?: ConditionScope;
   onChange: (c: ScriptCondition) => void;
   onRemove: () => void;
 }) {
@@ -1716,6 +1800,18 @@ function ConditionRow({
           </option>
         ))}
       </select>
+      {scope && (
+        <F label="Whose state" flex="0 0 128px">
+          <StateScopePicker
+            value={condition.entityId ?? ""}
+            zoneObjects={scope.zoneObjects}
+            triggerVolumes={scope.triggerVolumes}
+            allowSelf={scope.allowSelf}
+            selfLabel={scope.selfLabel}
+            onChange={(id) => onChange({ ...condition, entityId: id || undefined })}
+          />
+        </F>
+      )}
       {condition.type === "has_state" && (
         <F label="State key" flex={1}>
           <input
@@ -2047,6 +2143,22 @@ function ActionFields({
       onChange={(id) => set({ targetId: id })}
     />
   );
+  // Phase 60 — "whose state" scope for the state/item actions (targetId doubles
+  // as the entity scope there; groups fan out per member at dispatch).
+  const stateScopePicker = (
+    <F label="Whose state" flex="0 0 128px">
+      <StateScopePicker
+        value={action.targetId ?? ""}
+        zoneObjects={zoneObjects}
+        triggerVolumes={triggerVolumes}
+        groups={groups}
+        allowGroups
+        allowSelf={!!owner}
+        selfLabel={owner ? `★ this ${owner.kind}` : undefined}
+        onChange={(id) => set({ targetId: id || undefined })}
+      />
+    </F>
+  );
   // despawn_object works on every entity type at runtime → offer them all.
   const despawnTargetPicker = (
     <ActionTargetPicker
@@ -2142,7 +2254,20 @@ function ActionFields({
     case "take_item":
       return (
         <>
-          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-end" }}>
+            <F label="Whose inventory" flex="0 0 128px">
+              <StateScopePicker
+                value={action.targetId ?? ""}
+                zoneObjects={zoneObjects}
+                triggerVolumes={triggerVolumes}
+                groups={groups}
+                allowGroups
+                allowSelf={!!owner}
+                selfLabel={owner ? `★ this ${owner.kind}` : undefined}
+                globalLabel="★ the player"
+                onChange={(id) => set({ targetId: id || undefined })}
+              />
+            </F>
             <F label="Item" flex={1}>
               <ItemPicker
                 style={S.select}
@@ -2164,10 +2289,57 @@ function ActionFields({
             </F>
           </div>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
-            Manage items in the ITEMS tab.
+            {action.type === "give_item" ? "Creates items from nothing" : "Destroys items"} — to
+            MOVE items between holders, use transfer_item. Manage items in the ITEMS tab.
           </div>
         </>
       );
+
+    // Phase 60 — atomic conserving move between two inventories: moves
+    // min(count, source balance, destination stack space); an empty source
+    // moves nothing (no duplication possible).
+    case "transfer_item": {
+      const endpointPicker = (field: "fromId" | "toId") => (
+        <StateScopePicker
+          value={action[field] ?? ""}
+          zoneObjects={zoneObjects}
+          triggerVolumes={triggerVolumes}
+          allowSelf={!!owner}
+          selfLabel={owner ? `★ this ${owner.kind}` : undefined}
+          globalLabel="★ the player"
+          onChange={(id) => set({ [field]: id || undefined })}
+        />
+      );
+      return (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-end" }}>
+            <F label="Item" flex={1}>
+              <ItemPicker
+                style={S.select}
+                itemId={action.itemId ?? ""}
+                worldItems={worldItems}
+                onChange={(id) => set({ itemId: id || undefined })}
+              />
+            </F>
+            <F label="Count" flex="0 0 52px">
+              <input
+                type="number"
+                min={1}
+                style={S.field}
+                placeholder="1"
+                title="count"
+                value={action.count ?? ""}
+                onChange={(e) => set({ count: parseInt(e.target.value, 10) || undefined })}
+              />
+            </F>
+          </div>
+          <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+            <F label="From" flex={1}>{endpointPicker("fromId")}</F>
+            <F label="To" flex={1}>{endpointPicker("toId")}</F>
+          </div>
+        </>
+      );
+    }
 
     case "play_sound":
       return (
@@ -2247,7 +2419,8 @@ function ActionFields({
 
     case "set_state":
       return (
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {stateScopePicker}
           <F label="State key" flex={1}>
             <input
               style={S.field}
@@ -2271,7 +2444,8 @@ function ActionFields({
 
     case "adjust_number":
       return (
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {stateScopePicker}
           <F label="State key" flex={1}>
             <input
               style={S.field}
@@ -2296,14 +2470,17 @@ function ActionFields({
 
     case "delete_state":
       return (
-        <F label="State key">
-          <input
-            style={S.field}
-            list="wb-state-keys" placeholder="State key"
-            value={action.stateKey ?? ""}
-            onChange={(e) => set({ stateKey: e.target.value })}
-          />
-        </F>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {stateScopePicker}
+          <F label="State key" flex={1}>
+            <input
+              style={S.field}
+              list="wb-state-keys" placeholder="State key"
+              value={action.stateKey ?? ""}
+              onChange={(e) => set({ stateKey: e.target.value })}
+            />
+          </F>
+        </div>
       );
 
     case "store_position": {
@@ -3882,6 +4059,11 @@ function DialogueOptionRow({
           key={i}
           condition={c}
           worldItems={worldItems}
+          scope={{
+            zoneObjects, triggerVolumes,
+            allowSelf: true,   // "self" = whichever entity launched this dialogue (the NPC)
+            selfLabel: "★ this NPC (dialogue owner)",
+          }}
           onChange={(nc) =>
             set({ conditions: conditions.map((x, j) => (j === i ? nc : x)) })
           }
@@ -4639,6 +4821,10 @@ function UiMenuOptionRow({
           key={i}
           condition={c}
           worldItems={zoneBag.worldItems}
+          scope={{
+            zoneObjects: zoneBag.zoneObjects, triggerVolumes: zoneBag.triggerVolumes,
+            allowSelf: false,   // menus are global HUD — no owning entity
+          }}
           onChange={(nc) => set({ conditions: conditions.map((x, j) => (j === i ? nc : x)) })}
           onRemove={() => set({ conditions: conditions.filter((_, j) => j !== i) })}
         />
