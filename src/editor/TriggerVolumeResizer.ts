@@ -6,8 +6,10 @@ import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, TriggerVolume, Vec3, ScreenPos } from "@/types";
 
 const GRID  = 0.1;  // drag snap — matches StairCutterResizer's fine grid (Alt = free)
-const MIN   = 0.5;  // smallest allowed horizontal size (box W/D)
-const MIN_Y = 0.1;  // smallest height — thin trigger plates (kill floors, pressure strips) are legit
+// Smallest functional extent along any box axis — user-measured (2026-08-15):
+// below ~0.14 the sensor stops reliably registering the player.
+const MIN   = 0.14;
+const MIN_Y = 0.14;
 const MINR  = 0.25; // smallest radius (round shapes; matches the panel floor)
 const HANDLE = 0.24;
 const GAP  = 0.35;  // push face handles this far OUTSIDE each face — clear of the
