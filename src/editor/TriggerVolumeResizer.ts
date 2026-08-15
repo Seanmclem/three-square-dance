@@ -5,9 +5,10 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, TriggerVolume, Vec3, ScreenPos } from "@/types";
 
-const GRID = 0.1;   // drag snap — matches StairCutterResizer's fine grid (Alt = free)
-const MIN  = 0.5;   // smallest allowed size along any axis
-const MINR = 0.25;  // smallest radius (round shapes; matches the panel floor)
+const GRID  = 0.1;  // drag snap — matches StairCutterResizer's fine grid (Alt = free)
+const MIN   = 0.5;  // smallest allowed horizontal size (box W/D)
+const MIN_Y = 0.1;  // smallest height — thin trigger plates (kill floors, pressure strips) are legit
+const MINR  = 0.25; // smallest radius (round shapes; matches the panel floor)
 const HANDLE = 0.24;
 const GAP  = 0.35;  // push face handles this far OUTSIDE each face — clear of the
                     // volume body and its center move gizmo so they grab unambiguously.
@@ -285,11 +286,11 @@ export class TriggerVolumeResizer implements IEditorModule {
         if (o.shape === "sphere") {
           size.x = Math.max(MINR, (top - o.position.y) / 2);   // bottom pinned; height = 2r
         } else {
-          size.y = Math.max(MIN, top - o.position.y);          // bottom pinned
+          size.y = Math.max(MIN_Y, top - o.position.y);        // bottom pinned
         }
       } else {
         const topY = o.position.y + extY;                      // top pinned (no -y handle on spheres)
-        const bottom = Math.min(this._altDown ? hit.y : snap(hit.y), topY - MIN);
+        const bottom = Math.min(this._altDown ? hit.y : snap(hit.y), topY - MIN_Y);
         position.y = bottom;
         size.y = topY - bottom;
       }

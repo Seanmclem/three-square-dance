@@ -5709,10 +5709,11 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
   const setVisual = (v: TriggerVolumeVisual) => onObjectUpdate({ visual: v } as Partial<WorldObject>);
 
   const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ position: { ...vol.position, [axis]: n } } as Partial<WorldObject>); };
-  // Radius fields (size.x on round shapes) allow down to 0.25; box extents/height keep the 0.5 floor.
+  // Floors: radius (size.x on round shapes) 0.25; height 0.1 (thin trigger
+  // plates are legit — matches the resizer's MIN_Y); box W/D keep 0.5.
   const commitSize = (axis: "x" | "y" | "z", val: string) => {
     const n = parseFloat(val);
-    const min = shape !== "box" && axis === "x" ? 0.25 : 0.5;
+    const min = shape !== "box" && axis === "x" ? 0.25 : axis === "y" ? 0.1 : 0.5;
     if (Number.isFinite(n) && n >= min) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>);
   };
 
@@ -5820,8 +5821,8 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           ).map(([axis, lbl]) => (
             <div key={axis} style={{ flex: 1 }}>
               <div style={{ color: "#666", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
-              <input type="number" step={shape !== "box" && axis === "x" ? 0.25 : 0.5}
-                min={shape !== "box" && axis === "x" ? 0.25 : 0.5} value={sizeStr[axis]}
+              <input type="number" step={shape !== "box" && axis === "x" ? 0.25 : axis === "y" ? 0.1 : 0.5}
+                min={shape !== "box" && axis === "x" ? 0.25 : axis === "y" ? 0.1 : 0.5} value={sizeStr[axis]}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
                 onChange={e => { setSizeStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitSize(axis, e.target.value)); }}
                 onBlur={e => flush(() => commitSize(axis, e.target.value))}
