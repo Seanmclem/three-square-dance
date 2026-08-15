@@ -96,6 +96,7 @@ import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } fro
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
 import { seedStartingInventory } from "@/scripting/inventory";
+import { registerEntityStateSchemas } from "@/scripting/entityState";
 import { ProjectStore, uniqueSceneId, slugifyId, persistLastProject, clearLastProject, restoreLastProject } from "@/project/ProjectStore";
 import { desktop, detectDesktop, isDesktop, isDesktopDev } from "@/shared/desktopApi";
 import { startPerfReporter } from "@/dev/perfReporter";
@@ -649,6 +650,7 @@ export default function App() {
             ...(gameSchema ?? {}),
             ...(sceneSchema ?? (gameSchema ? {} : DEFAULT_STATE_SCHEMA)),
           });
+          registerEntityStateSchemas(world);   // Phase 60 — configureSchema cleared the map
         }
         // Continue only when the launch explicitly asked to resume (Continue). New Game
         // and Preview always start fresh — no silent auto-continue. loadGame must run after

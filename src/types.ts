@@ -1003,6 +1003,11 @@ export interface WorldObject {
   zoneId?:    string;
   properties: ObjectProperties;
   scripts?:   ScriptDef[];
+  // Phase 60 — per-entity state keys (defaults + numeric clamp), authored in
+  // the panel's STATE section. Values live namespaced in the global GameState
+  // (`__ent.<id>.<key>` — see src/scripting/entityState.ts); this is only the
+  // schema. Prefab templates carry it; every instance owns its own values.
+  stateSchema?: Record<string, StateSchema>;
   groupIds?:  string[];
   autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
@@ -1220,7 +1225,8 @@ export type ActionType =
   | 'light_off'
   | 'toggle_light'
   | 'give_item'
-  | 'take_item';
+  | 'take_item'
+  | 'transfer_item';
 
 // ─── Generic gameplay state ───────────────────────────────────────────────────
 
@@ -1247,6 +1253,10 @@ export interface ScriptTrigger {
   repeat?:    boolean;
   interval?:  number;
   stateValue?: JsonValue;  // on_state_equals: fire when targetId (a state key) transitions to this value
+  // Phase 60 — entity scope for the state triggers (on_state_changed /
+  // on_state_equals): watch this ENTITY's key instead of the global one.
+  // "self" = the owning entity (resolved at index time); absent = global.
+  entityId?:  string;
 }
 
 export interface ScriptCondition {
@@ -1257,6 +1267,11 @@ export interface ScriptCondition {
   stateValue?: JsonValue;  // compare_number (compared as number)
   itemId?:    string;      // has_item: ItemDef id (inventory key `inv.<id>`)
   count?:     number;      // has_item: owned <compareOp> count (defaults: ">=" 1)
+  // Phase 60 — entity scope: evaluate stateKey / itemId against this ENTITY's
+  // state instead of the global store. "self" = owning entity (index-time
+  // rewrite for entity scripts; eval-time via ownerId for dialogue/menu
+  // surfaces); absent = global. Single entities only — no groups.
+  entityId?:  string;
 }
 
 // ─── Items / inventory (Phase 32) ────────────────────────────────────────────
@@ -1351,7 +1366,11 @@ export interface ScriptAction {
   flashDuration?: number;     // flash_player: seconds the pulse lasts (default 1)
   launchRelative?: boolean;   // @deprecated launch_player — superseded by launchRelativeTo; still READ as a fallback (true = 'entity') so pre-v4.63.3 scenes keep working
   launchRelativeTo?: 'world' | 'entity' | 'player'; // launch_player: what launchDirDeg is measured from — world compass, the owning entity's Y rotation (0 = its front), or the player's facing (180 = always knocked backwards)
-  stateKey?:     string;      // set_state / adjust_number / delete_state / store_position (destination key)
+  // set_state / adjust_number / delete_state / store_position (destination key).
+  // Phase 60: on the three state actions (and give_item/take_item), `targetId`
+  // doubles as the ENTITY SCOPE — absent = global key; "self" = owning entity
+  // (index-time rewrite); an entity or GROUP id fans the write out per member.
+  stateKey?:     string;
   stateValue?:   JsonValue;   // set_state
   numberDelta?:  number;      // adjust_number
   eventId?:      string;
@@ -1360,8 +1379,13 @@ export interface ScriptAction {
   uiElementId?:  string;
   script?:       string;
   sceneId?:      string;      // load_scene: runtime-manifest scene key (not validated in the editor)
-  itemId?:       string;      // give_item / take_item: ItemDef id (inventory key `inv.<id>`)
-  count?:        number;      // give_item / take_item: amount (default 1)
+  itemId?:       string;      // give_item / take_item / transfer_item: ItemDef id (inventory key `inv.<id>`)
+  count?:        number;      // give_item / take_item / transfer_item: amount (default 1)
+  // transfer_item (Phase 60): atomic, conserving move — min(count, source
+  // balance, destination stack space). Endpoints are single scopes: absent =
+  // the player's (global) inventory; "self" = owning entity; else an entity id.
+  fromId?:       string;
+  toId?:         string;
   restoreHealth?: boolean;    // respawn_player: re-seed 'health' to its schema default after the teleport
 }
 
@@ -1481,6 +1505,8 @@ export interface TriggerVolume {
   attachTo?: string;
   zoneId:    string;
   scripts?:  ScriptDef[];
+  // Phase 60 — per-entity state schema (see WorldObject.stateSchema).
+  stateSchema?: Record<string, StateSchema>;
   groupIds?: string[];
   visual?:   TriggerVolumeVisual;   // optional in-world fill; absent/disabled = wireframe only
   // Editor-only shading override for this volume's wireframe + interior fill

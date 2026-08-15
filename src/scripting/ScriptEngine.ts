@@ -7,6 +7,7 @@ import type {
 import { gameState } from "./GameState";
 import { DialogueRunner } from "./DialogueRunner";
 import { invKey, itemRegistry } from "./inventory";
+import { entKey, entInvKey, despawnedKey } from "./entityState";
 import { uiKey, uiRegistry } from "./uiElements";
 
 function isVec3(v: unknown): v is Vec3 {
@@ -32,16 +33,32 @@ function compareNum(a: number, op: CompareOp, b: number): boolean {
  * shared by the engine, DialogueRunner (via checkConditions), and
  * GameGuiOverlay (menu option filtering).
  */
-export function checkScriptConditions(conditions: ScriptCondition[]): boolean {
+export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: string): boolean {
+  // Phase 60 — entity scope: a condition may name an entity whose namespaced
+  // key is read instead of the global one. "self" resolves through ownerId
+  // (index-time rewrite covers entity-owned scripts; the ownerId param covers
+  // dialogue options, where defs are evaluated raw). "self" with no owner
+  // fails closed — same spirit as _resolveTargets' warning.
+  const entity = (c: ScriptCondition): string | null | undefined => {
+    if (!c.entityId) return undefined;                    // global
+    if (c.entityId !== "self") return c.entityId;
+    if (ownerId) return ownerId;
+    console.warn("[ScriptEngine] condition scoped to 'self' outside an entity-owned context — failing");
+    return null;                                          // unresolvable
+  };
   for (const c of conditions) {
+    const eid = entity(c);
+    if (eid === null) return false;
     switch (c.type) {
       case "has_state": {
-        const v = gameState.get(c.stateKey ?? "");
+        const key = c.stateKey ?? "";
+        const v = gameState.get(eid ? entKey(eid, key) : key);
         if (v === undefined || v === null || v === false) return false;
         break;
       }
       case "compare_number": {
-        const v      = Number(gameState.get(c.stateKey ?? "") ?? 0);
+        const key    = c.stateKey ?? "";
+        const v      = Number(gameState.get(eid ? entKey(eid, key) : key) ?? 0);
         const target = Number(c.stateValue ?? 0);
         if (!compareNum(v, c.compareOp ?? "==", target)) return false;
         break;
@@ -49,13 +66,15 @@ export function checkScriptConditions(conditions: ScriptCondition[]): boolean {
       case "has_item": {
         // owned <op> count — op defaults to ">=" ("has at least N"), so
         // pre-existing conditions keep their exact semantics.
-        const owned = Number(gameState.get(invKey(c.itemId ?? "")) ?? 0);
+        const key   = eid ? entInvKey(eid, c.itemId ?? "") : invKey(c.itemId ?? "");
+        const owned = Number(gameState.get(key) ?? 0);
         if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
         break;
       }
       case "npc_alive":
       case "npc_dead":
-        // stub — NPC system Phase 13
+        // Removed from the dropdown in Phase 60 (scoped compare_number covers
+        // them); old data stays a tolerated no-op.
         break;
     }
   }
@@ -173,12 +192,24 @@ export class ScriptEngine {
     } else if (trig.targetId === ownerId) {
       trig = { ...trig, targetId: undefined };
     }
-    const hasSelf = s.actions.some(a => a.targetId === "self");
-    if (trig === s.trigger && !hasSelf) return s;
+    // Phase 60 — entity-scoped state trigger: "self" resolves to the owner here;
+    // _indexScript then folds entityId into the (namespaced) bucket key.
+    if (trig.entityId === "self") trig = { ...trig, entityId: ownerId };
+    const selfAction = (a: ScriptAction) => a.targetId === "self" || a.fromId === "self" || a.toId === "self";
+    const hasSelf     = s.actions.some(selfAction);
+    const hasSelfCond = (s.conditions ?? []).some(c => c.entityId === "self");
+    if (trig === s.trigger && !hasSelf && !hasSelfCond) return s;
+    const resolveAction = (a: ScriptAction): ScriptAction => !selfAction(a) ? a : {
+      ...a,
+      ...(a.targetId === "self" ? { targetId: ownerId } : {}),
+      ...(a.fromId   === "self" ? { fromId:   ownerId } : {}),
+      ...(a.toId     === "self" ? { toId:     ownerId } : {}),
+    };
     return {
       ...s,
       trigger: trig,
-      actions: hasSelf ? s.actions.map(a => a.targetId === "self" ? { ...a, targetId: ownerId } : a) : s.actions,
+      actions:    hasSelf     ? s.actions.map(resolveAction) : s.actions,
+      conditions: hasSelfCond ? s.conditions.map(c => c.entityId === "self" ? { ...c, entityId: ownerId } : c) : s.conditions,
     };
   }
 
@@ -189,7 +220,20 @@ export class ScriptEngine {
   clearIndex(): void { this._index.clear(); }
 
   private _indexScript(s: ScriptDef): void {
-    const key = `${s.trigger.type}:${s.trigger.targetId ?? "*"}`;
+    // Phase 60 — entity-scoped state triggers bucket under the NAMESPACED key,
+    // so the ordinary state:changed → fire path matches them with zero changes
+    // (GameState emits the raw namespaced key). "self" surviving to here means
+    // a non-entity-owned script authored it — it can never fire; warn.
+    let t = s.trigger;
+    if ((t.type === "on_state_changed" || t.type === "on_state_equals") && t.entityId) {
+      if (t.entityId === "self") {
+        console.warn(`[ScriptEngine] state trigger scoped to 'self' on a non-entity script '${s.label ?? s.id}' — never fires`);
+      } else if (t.targetId) {
+        t = { ...t, targetId: entKey(t.entityId, t.targetId) };
+        s = { ...s, trigger: t };
+      }
+    }
+    const key = `${t.type}:${t.targetId ?? "*"}`;
     const bucket = this._index.get(key) ?? [];
     bucket.push(s);
     this._index.set(key, bucket);
@@ -263,8 +307,8 @@ export class ScriptEngine {
   // ─── Condition evaluation ─────────────────────────────────────────────────
 
   /** Public so DialogueRunner can filter option conditions with the same rules. */
-  checkConditions(conditions: ScriptCondition[]): boolean {
-    return checkScriptConditions(conditions);
+  checkConditions(conditions: ScriptCondition[], ownerId?: string): boolean {
+    return checkScriptConditions(conditions, ownerId);
   }
 
   // ─── Action dispatch ──────────────────────────────────────────────────────
@@ -302,6 +346,21 @@ export class ScriptEngine {
       if (d) return d;
     }
     return undefined;
+  }
+
+  /**
+   * Phase 60 — resolve a state action's write keys. No targetId = the bare
+   * global key. A targetId (entity or group; "self" pre-resolved at index time,
+   * or via ownerId on dialogue paths) fans out to each member's namespaced key.
+   */
+  private _scopedStateKeys(action: ScriptAction, ownerId: string | undefined, bare: string): string[] {
+    if (!action.targetId) return [bare];
+    const tid = action.targetId === "self" ? ownerId : action.targetId;
+    if (!tid) {
+      console.warn(`[ScriptEngine] ${action.type} scoped to 'self' outside an entity-owned context — no-op`);
+      return [];
+    }
+    return this._resolveTargets(tid).map(id => entKey(id, bare));
   }
 
   private _dispatch(action: ScriptAction, ownerId?: string): void {
@@ -346,21 +405,29 @@ export class ScriptEngine {
         // Legacy inline `action.dialogue` is migrated to a registry tree by
         // migrateDialogues on load (both pipelines) — no runtime fallback.
         const tree = action.dialogueId ? this.findDialogue(action.dialogueId) : undefined;
-        if (tree) this._runner.start(tree);
+        // Phase 60: the launching entity threads through so option conditions/
+        // actions scoped to "this entity" resolve to the NPC being talked to.
+        if (tree) this._runner.start(tree, ownerId);
         else console.warn(`[ScriptEngine] show_dialogue: dialogue '${action.dialogueId ?? ""}' not found`);
         break;
       }
 
       case "set_state":
-        if (action.stateKey) gameState.set(action.stateKey, action.stateValue ?? null);
+        if (action.stateKey)
+          for (const key of this._scopedStateKeys(action, ownerId, action.stateKey))
+            gameState.set(key, action.stateValue ?? null);
         break;
 
       case "adjust_number":
-        if (action.stateKey) gameState.adjust(action.stateKey, action.numberDelta ?? 0);
+        if (action.stateKey)
+          for (const key of this._scopedStateKeys(action, ownerId, action.stateKey))
+            gameState.adjust(key, action.numberDelta ?? 0);
         break;
 
       case "delete_state":
-        if (action.stateKey) gameState.delete(action.stateKey);
+        if (action.stateKey)
+          for (const key of this._scopedStateKeys(action, ownerId, action.stateKey))
+            gameState.delete(key);
         break;
 
       case "fire_event":
@@ -499,15 +566,20 @@ export class ScriptEngine {
       }
 
       case "despawn_object":
-        for (const id of this._resolveTargets(action.targetId))
+        for (const id of this._resolveTargets(action.targetId)) {
           this._bus.emit("object:despawn", { id, fade: action.fadeDuration });
+          // Phase 60 — persistent: rides the save; ZoneManager re-applies at
+          // zone load (state-wins-when-present over startHidden).
+          gameState.set(despawnedKey(id), true);
+        }
         break;
 
       case "spawn_object":
         // Opposite of despawn: re-show a hidden entity (+ re-enable colliders).
-        // "Hidden by default" = an on_level_load script despawning it first.
-        for (const id of this._resolveTargets(action.targetId))
+        for (const id of this._resolveTargets(action.targetId)) {
           this._bus.emit("object:spawn", { id, fade: action.fadeDuration });
+          gameState.set(despawnedKey(id), false);   // false ≠ absent: overrides startHidden
+        }
         break;
 
       // Phase 31 — scripted geometry motion. MoverSystem is the only listener;
@@ -536,18 +608,48 @@ export class ScriptEngine {
 
       // Phase 32 — items: counts live at gameState `inv.<itemId>`. Clamp inline
       // (registry stackSize / floor 0) — gameState only clamps registered keys.
+      // Phase 60 — a targetId scopes the counter to that entity's inventory
+      // (`__ent.<id>.inv.<itemId>`), fanning out over group members.
       case "give_item":
       case "take_item": {
         if (!action.itemId) break;
-        const key   = invKey(action.itemId);
-        const item  = itemRegistry(this._state).find(i => i.id === action.itemId);
+        const item = itemRegistry(this._state).find(i => i.id === action.itemId);
         if (!item) console.warn(`[ScriptEngine] ${action.type}: item '${action.itemId}' not in registry (operating on raw key)`);
-        const cur   = Number(gameState.get(key) ?? 0);
-        const count = action.count ?? 1;
-        const next  = action.type === "give_item"
-          ? Math.min(cur + count, item?.stackSize ?? Infinity)
-          : Math.max(cur - count, 0);
-        gameState.set(key, next);
+        for (const key of this._scopedStateKeys(action, ownerId, invKey(action.itemId))) {
+          const cur   = Number(gameState.get(key) ?? 0);
+          const count = action.count ?? 1;
+          const next  = action.type === "give_item"
+            ? Math.min(cur + count, item?.stackSize ?? Infinity)
+            : Math.max(cur - count, 0);
+          gameState.set(key, next);
+        }
+        break;
+      }
+
+      // Phase 60 — atomic, conserving item move: min(count, source balance,
+      // destination stack space). Endpoints are single scopes (no groups):
+      // absent = the player's global inventory; else an entity's inventory.
+      case "transfer_item": {
+        if (!action.itemId) break;
+        const item = itemRegistry(this._state).find(i => i.id === action.itemId);
+        const endpoint = (id?: string): string | null => {
+          const eid = id === "self" ? ownerId : id;
+          if (id && !eid) {
+            console.warn("[ScriptEngine] transfer_item 'self' endpoint outside an entity-owned context — no-op");
+            return null;
+          }
+          return eid ? entInvKey(eid, action.itemId!) : invKey(action.itemId!);
+        };
+        const fromKey = endpoint(action.fromId);
+        const toKey   = endpoint(action.toId);
+        if (!fromKey || !toKey || fromKey === toKey) break;
+        const avail = Number(gameState.get(fromKey) ?? 0);
+        const cur   = Number(gameState.get(toKey) ?? 0);
+        const space = (item?.stackSize ?? Infinity) - cur;
+        const move  = Math.max(0, Math.min(action.count ?? 1, avail, space));
+        if (move <= 0) break;
+        gameState.set(fromKey, avail - move);
+        gameState.set(toKey, cur + move);
         break;
       }
 

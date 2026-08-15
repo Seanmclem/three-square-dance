@@ -12,6 +12,8 @@ import { assetManager } from "@/core/AssetManager";
 import { groupWallRuns, buildNodesMap } from "@/utils/wallRuns";
 import { createVolumeFillMaterial } from "@/world/volumeFillMaterial";
 import { volumeExtents, volumeGeometry } from "@/world/volumeShape";
+import { gameState } from "@/scripting/GameState";
+import { despawnedKey } from "@/scripting/entityState";
 import { fadeMeshes, cancelAllFades } from "@/world/meshFade";
 import { buildOverlayDecalMesh, decalProjectorBox, type DecalTextures } from "@/world/decals/DecalBuilder";
 import { makeSurfaceDecalMaterial, updateSurfaceDecalUniforms, slotFromDecal, MAX_SURFACE_DECALS } from "@/world/decals/surfaceDecals";
@@ -1401,15 +1403,24 @@ export class ZoneManager {
    * Runs on preview:start — the runtime router exits/re-enters per scene, so
    * transitions are covered. Routed through the normal despawn event so both
    * mesh owners (ObjectPlacer / this) hide + track it and preview:stop restores.
+   *
+   * Phase 60 — despawn persistence: a saved `__despawned.<id>` state value
+   * OVERRIDES the authored startHidden default (state-wins-when-present), so a
+   * killed enemy stays gone and a script-spawned chest stays spawned across
+   * scene re-entry and Continue. New Game resets the keys → authored defaults.
    */
   private _applyStartHidden(): void {
     for (const zoneId of this._loadedZones.keys()) {
       const zone = this._worldState.zones.get(zoneId);
       if (!zone) continue;
       const lists: { id: string; startHidden?: boolean }[][] =
-        [zone.objects, zone.platforms, zone.shapes ?? []];
+        [zone.objects, zone.platforms, zone.shapes ?? [], zone.triggerVolumes ?? []];
       for (const arr of lists)
-        for (const e of arr) if (e.startHidden) this._bus.emit("object:despawn", { id: e.id });
+        for (const e of arr) {
+          const saved  = gameState.get(despawnedKey(e.id));
+          const hidden = typeof saved === "boolean" ? saved : !!e.startHidden;
+          if (hidden) this._bus.emit("object:despawn", { id: e.id });
+        }
     }
   }
 

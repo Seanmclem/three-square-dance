@@ -12,6 +12,7 @@ import type { ScriptEngine } from "./ScriptEngine";
  */
 export class DialogueRunner {
   private _tree: DialogueTreeDef | null = null;
+  private _ownerId: string | undefined;   // launching entity (Phase 60 — "this entity" in options)
   private _visible: DialogueOption[] = [];
   // Option ids picked earlier in THIS conversation run — looping back to a node
   // re-shows them de-emphasized (still selectable). Reset per conversation.
@@ -42,8 +43,12 @@ export class DialogueRunner {
     this._picked.clear();
   }
 
-  start(tree: DialogueTreeDef): void {
+  start(tree: DialogueTreeDef, ownerId?: string): void {
     this._tree = tree;
+    // Phase 60 — the entity whose script launched this dialogue (the NPC).
+    // Threads into option conditions ("Show if this entity's …") and option
+    // actions ("set this entity's mood"), which otherwise have no owner.
+    this._ownerId = ownerId;
     this._picked.clear();
     this._showNode(tree.startNode);
   }
@@ -60,7 +65,7 @@ export class DialogueRunner {
     }
     // Conditions re-checked on every node display, so an option effect (set flag)
     // immediately gates later options in the same conversation.
-    this._visible = node.options.filter(o => this._engine.checkConditions(o.conditions ?? []));
+    this._visible = node.options.filter(o => this._engine.checkConditions(o.conditions ?? [], this._ownerId));
     this._bus.emit("dialogue:show", {
       speaker:  node.speaker ?? tree.speaker,
       lines:    node.lines.length ? node.lines : [""],
@@ -79,7 +84,7 @@ export class DialogueRunner {
     const opt  = this._visible[index];
     if (!tree || !opt) return;
     this._picked.add(opt.id);
-    this._engine.runActions(opt.actions ?? []);
+    this._engine.runActions(opt.actions ?? [], this._ownerId);
     // An effect may itself show_dialogue → runner restarted on a new tree; don't
     // step the old one. Otherwise advance if the next node exists; a missing/absent
     // next means the overlay saw hasNext:false and closes itself (→ dialogue:closed).
