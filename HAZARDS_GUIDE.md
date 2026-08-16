@@ -299,9 +299,13 @@ Hook effects with three triggers on the enemy's own scripts:
   while it chases (the crab's stomp zone does exactly this).
 - **Goomba rule** — add the `player_falling` condition to the stomp script
   so it only counts when the player LANDS on it: walking into the zone and
-  rising jumps fail; only airborne-and-descending passes (with a short
-  landing grace, so even a paper-thin zone flush with the enemy's back
-  works). Without it, a short enemy can be killed by walking over it.
+  rising jumps fail; only airborne-and-descending passes (plus a short
+  landing grace for edge cases). Without it, a short enemy can be killed by
+  walking over it. **Make the zone extend ~0.3–0.5m ABOVE the enemy's back**
+  — a zone flush with the back only registers razor-perfect landings, and
+  against a moving enemy real jumps miss; a taller zone catches the descent
+  mid-air. It's safe to make tall precisely BECAUSE the falling gate blocks
+  grounded walk-ins.
 - Clips auto-match by name (idle/walk/run/attack/bite) or pick them in the
   panel. The living example is the crab in platfrom-obby's level_1.
 
