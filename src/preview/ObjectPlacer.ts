@@ -94,6 +94,7 @@ export class ObjectPlacer {
         if (mesh) mesh.visible = true;
       }
       this._despawned.clear();
+      this._scriptClip.clear();
     });
   }
 
@@ -289,12 +290,21 @@ export class ObjectPlacer {
    * mixer or the clip name is unknown (AI falls back to un-animated movement).
    */
   aiPlay(objectId: string, clipName: string, opts?: { loop?: boolean; blend?: number }): boolean {
+    // A script-driven clip (play_animation — e.g. a held death pose during a
+    // delayed despawn) outranks AI locomotion until it finishes/stops.
+    if (this._scriptClip.has(objectId)) return false;
     const mixer = this._mixers.get(objectId);
     const clip  = this._clips.get(objectId)?.get(clipName);
     if (!mixer || !clip) return false;
     this._fadeTo(objectId, mixer, clip, { loop: opts?.loop ?? true, duration: opts?.blend ?? BLEND_SEC });
     return true;
   }
+
+  // Object ids with an active script-driven clip (v4.76.5) — see aiPlay.
+  private readonly _scriptClip = new Set<string>();
+
+  /** True while a script-driven clip (play_animation) owns this object's mixer. */
+  hasScriptClip(objectId: string): boolean { return this._scriptClip.has(objectId); }
 
   /** Clip names available on an object's loaded model (Phase 61 auto-matching). */
   clipNamesFor(objectId: string): string[] {
@@ -320,6 +330,7 @@ export class ObjectPlacer {
     }
 
     const loop = opts?.loop ?? false;
+    this._scriptClip.add(objectId);   // outranks AI locomotion until stopPreview (v4.76.5)
     this._fadeTo(objectId, mixer, clip, { loop, duration: opts?.blend ?? BLEND_SEC });
 
     // Only the default case plays once then reverts, and counts as the evictable preview.
@@ -337,6 +348,7 @@ export class ObjectPlacer {
 
   /** Stop a preview and fall back to the object's auto-play clip (or bind pose). */
   stopPreview(objectId: string): void {
+    this._scriptClip.delete(objectId);
     const mixer = this._mixers.get(objectId);
     if (!mixer) return;
     const fin = this._finish.get(objectId);

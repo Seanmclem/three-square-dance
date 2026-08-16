@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type RAPIER from "@dimforge/rapier3d-compat";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { SceneManager } from "@/core/SceneManager";
@@ -54,6 +55,13 @@ export class PreviewController {
    *  the EnemyAI system's read channel (Phase 61). Returns a fresh Vector3. */
   get playerPosition(): THREE.Vector3 | null {
     return this._controller ? this._controller.body.position : null;
+  }
+
+  /** The player's Rapier collider, or null outside preview — the EnemyAI ground
+   *  ray excludes it (the player is never "ground"; standing over an enemy must
+   *  not let it snap up onto the bounced player). */
+  get playerCollider(): RAPIER.Collider | null {
+    return this._controller?.body.collider ?? null;
   }
 
   /** Live player motion for the player_falling condition (null outside preview). */

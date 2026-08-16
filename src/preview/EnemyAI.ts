@@ -205,6 +205,10 @@ export class EnemyAI {
       }
       const entry = this._movers.entryFor(rec.id);
       if (!entry) continue;
+      // A script-driven clip (e.g. the held Death pose during a DELAYED
+      // despawn) freezes the AI: no chasing, no attacks, no clip changes —
+      // the enemy dies where it stands instead of moonwalking through it.
+      if (this._placer.hasScriptClip(rec.id)) continue;
       if (!rec.p.clipsResolved) this._resolveClips(rec);
       if (rec.p.heightY == null) {
         const aabb = this._placer.getLocalAABB(rec.id);
@@ -314,10 +318,13 @@ export class EnemyAI {
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, excludeBody)) return false;
     const step = speed * dt;
     this._cand.set(rec.pos.x + dir.x * step, rec.pos.y, rec.pos.z + dir.z * step);
-    // ground snap at the candidate — no ground = a ledge, refuse the step
+    // Ground snap at the candidate — no ground = a ledge, refuse the step.
+    // The PLAYER's capsule is excluded: a bounced/jumping player overhead must
+    // never read as "ground" (the enemy would snap up and ride the bounce).
     this._groundRay.origin = { x: this._cand.x, y: this._cand.y + GROUND_RAY_UP, z: this._cand.z };
     const groundHit = w.castRay(this._groundRay, GROUND_RAY_LEN, true,
-      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, undefined, excludeBody);
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined,
+      this._preview.playerCollider ?? undefined, excludeBody);
     if (!groundHit) return false;
     this._cand.y = (this._cand.y + GROUND_RAY_UP) - groundHit.timeOfImpact;
     rec.pos.copy(this._cand);
