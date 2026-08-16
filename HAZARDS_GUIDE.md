@@ -305,7 +305,12 @@ Hook effects with three triggers on the enemy's own scripts:
   — a zone flush with the back only registers razor-perfect landings, and
   against a moving enemy real jumps miss; a taller zone catches the descent
   mid-air. It's safe to make tall precisely BECAUSE the falling gate blocks
-  grounded walk-ins.
+  grounded walk-ins. Conditioned enter-scripts are **occupancy-aware**: if
+  the condition fails when you enter (e.g. you jumped from INSIDE the zone,
+  entering while rising), it keeps watching and fires the moment the
+  condition passes — so jumping on an enemy from point-blank works. Bites
+  also whiff while you're on top of an enemy — its lunge only reaches
+  forward.
 - Clips auto-match by name (idle/walk/run/attack/bite) or pick them in the
   panel. The living example is the crab in platfrom-obby's level_1.
 

@@ -85,12 +85,15 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
       case "player_falling": {
         // Airborne AND descending — the goomba-stomp gate. Walking into a
         // stomp zone (grounded) or rising through it (velY > 0) fails.
-        // The 120ms grace covers thin/flush zones whose enter event lands on
-        // the same frame as grounding (the landing clamp zeroes velY there);
-        // the grace only records falls faster than 2.5 m/s, so grounded
-        // walking (incl. downhill micro-falls) never passes.
+        // Both paths require a MEANINGFUL fall (> 2.5 m/s — reached ~0.13s
+        // into any real jump's descent): teleport settle-drops, slope/step
+        // micro-falls, and grounded walking never pass. That matters double
+        // since v4.76.3's per-frame occupancy retry — a hair-trigger
+        // threshold would fire on any single airborne flicker frame inside
+        // the zone. The 120ms grace covers thin/flush zones whose enter
+        // event lands on the same frame as grounding (velY already clamped).
         const m = _playerMotion?.() ?? null;
-        const fallingNow  = !!m && !m.grounded && m.velY < -0.01;
+        const fallingNow  = !!m && !m.grounded && m.velY < -2.5;
         const justLanded  = !!m && m.fellMsAgo <= 120;
         if (!fallingNow && !justLanded) return false;
         break;
@@ -140,8 +143,17 @@ export class ScriptEngine {
       this._unsubscribers.push(() => this._bus.off(event, cb));
     };
 
-    sub("trigger:volume-enter",  ({ volumeId })  => this.fire("on_player_enter", volumeId));
-    sub("trigger:volume-exit",   ({ volumeId })  => this.fire("on_player_exit",  volumeId));
+    // Enter is occupancy-aware (v4.76.3): a script whose conditions FAIL at
+    // entry stays armed and fires the moment they pass while still inside
+    // (per-frame volume-stay) — e.g. player_falling after jumping from within
+    // a tall stomp zone, or has_item after using a key while standing on the
+    // plate. Each script still fires at most once per visit; exit disarms.
+    sub("trigger:volume-enter",  ({ volumeId })  => this._fireEnterOccupancy(volumeId, true));
+    sub("trigger:volume-stay",   ({ volumeId })  => this._fireEnterOccupancy(volumeId, false));
+    sub("trigger:volume-exit",   ({ volumeId })  => {
+      this._enterFired.delete(volumeId);
+      this.fire("on_player_exit", volumeId);
+    });
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
     sub("state:changed",         ({ key, value }) => {
@@ -171,6 +183,7 @@ export class ScriptEngine {
 
   deactivate(): void {
     this._active = false;
+    this._enterFired.clear();
     this._runner.detach();
     for (const unsub of this._unsubscribers) unsub();
     this._unsubscribers = [];
@@ -299,11 +312,33 @@ export class ScriptEngine {
     for (const s of scripts) this._evalAndRun(s);
   }
 
-  /** Evaluate one script's guards and run it (honouring delay/oneShot). Shared by fire() and the timer loop. */
-  private _evalAndRun(s: ScriptDef): void {
-    if (!s.enabled) return;
-    if (this._firedOneShots.has(s.id)) return;
-    if (!this.checkConditions(s.conditions)) return;
+  // volumeId → script ids already fired during the CURRENT occupancy (v4.76.3).
+  private _enterFired = new Map<string, Set<string>>();
+
+  /** Run every on_player_enter script for this volume that hasn't fired during
+   *  the current occupancy — at entry AND on each stay frame, so conditions
+   *  that come true mid-occupancy still fire (once per visit). */
+  private _fireEnterOccupancy(volumeId: string, isEnter: boolean): void {
+    if (!this._active) return;
+    const scripts = [
+      ...(this._index.get(`on_player_enter:${volumeId}`) ?? []),
+      ...(this._index.get("on_player_enter:*") ?? []),
+    ];
+    if (!scripts.length) return;
+    let fired = this._enterFired.get(volumeId);
+    if (isEnter || !fired) { fired = new Set(); this._enterFired.set(volumeId, fired); }
+    for (const s of scripts) {
+      if (fired.has(s.id)) continue;
+      if (this._evalAndRun(s)) fired.add(s.id);
+    }
+  }
+
+  /** Evaluate one script's guards and run it (honouring delay/oneShot). Shared by fire()
+   *  and the timer loop. Returns true when the script actually ran/scheduled. */
+  private _evalAndRun(s: ScriptDef): boolean {
+    if (!s.enabled) return false;
+    if (this._firedOneShots.has(s.id)) return false;
+    if (!this.checkConditions(s.conditions)) return false;
     const run = () => this._runActions(s);
     if (s.trigger.delay && s.trigger.delay > 0) {
       const t = setTimeout(run, s.trigger.delay * 1000);
@@ -312,6 +347,7 @@ export class ScriptEngine {
       run();
     }
     if (s.oneShot) this._firedOneShots.add(s.id);
+    return true;
   }
 
   /** Schedule every indexed `on_timer` script. Repeating timers use setInterval, one-shots use setTimeout. */

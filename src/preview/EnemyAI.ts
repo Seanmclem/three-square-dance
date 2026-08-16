@@ -52,11 +52,13 @@ interface Resolved {
   attackCooldown: number; damageMoment: number; variation: number; leashRadius: number;
   idleClip: string | null; walkClip: string | null; attackClip: string | null;
   clipsResolved: boolean;   // false until the model's clips were available for auto-match
+  heightY: number | null;   // enemy body height (AABB × scale) — bite whiffs above it; null until the model loaded
 }
 
 interface AiRec {
   id:    string;
   def:   EnemyAIDef;
+  scaleY: number;   // authored object scale (for the AABB → world height)
   p:     Resolved;
   state: "idle" | "chase" | "attack" | "return";
   pos:   THREE.Vector3;   // feet/origin (object-position convention)
@@ -69,6 +71,7 @@ interface AiRec {
   damageDone:    boolean;
   orbitDir:      1 | -1;
   orbitPhase:    number;
+  attackNum:     number;   // per-attack counter — seeds the feint roll (see below)
   currentClip:   string | null;
 }
 
@@ -137,6 +140,7 @@ export class EnemyAI {
         const detect = def.detectRadius ?? 6;
         const rec: AiRec = {
           id: obj.id, def,
+          scaleY: obj.scale?.y ?? 1,
           p: {
             detectRadius:  detect,
             giveUpRadius:  def.giveUpRadius ?? detect * 1.5,
@@ -149,6 +153,7 @@ export class EnemyAI {
             variation:     Math.max(0, Math.min(1, def.variation ?? 0.5)),
             leashRadius:   def.leashRadius ?? 12,
             idleClip: null, walkClip: null, attackClip: null, clipsResolved: false,
+            heightY: null,
           },
           state: "idle",
           pos:  entry.origin.clone(),
@@ -157,6 +162,7 @@ export class EnemyAI {
           cooldownUntil: 0, attackAt: 0, attackDur: 0.8, feinting: false, damageDone: true,
           orbitDir: (h & 1) ? 1 : -1,
           orbitPhase: ((h >>> 1) % 628) / 100,
+          attackNum: 0,
           currentClip: null,
         };
         this._resolveClips(rec);
@@ -200,6 +206,10 @@ export class EnemyAI {
       const entry = this._movers.entryFor(rec.id);
       if (!entry) continue;
       if (!rec.p.clipsResolved) this._resolveClips(rec);
+      if (rec.p.heightY == null) {
+        const aabb = this._placer.getLocalAABB(rec.id);
+        if (aabb) rec.p.heightY = aabb.size.y * rec.scaleY;
+      }
 
       const dx = player.x - rec.pos.x, dz = player.z - rec.pos.z;
       const distXZ  = Math.hypot(dx, dz);
@@ -222,8 +232,13 @@ export class EnemyAI {
           rec.state = "attack";
           rec.attackAt = this._clock;
           rec.damageDone = false;
-          rec.feinting = p.variation > 0 &&
-            ((Math.sin(this._clock * 12.9898 + rec.orbitPhase) * 0.5 + 0.5) < FEINT_CHANCE * p.variation);
+          // Feint roll: hash of (enemy phase + attack COUNTER), never the clock —
+          // clock-based sin resonates with the regular attack cadence and can
+          // roll feints many times in a row (caught live: a 4s window where
+          // every bite feinted). The counter decorrelates consecutive attacks.
+          rec.attackNum++;
+          const roll = Math.abs(Math.sin((rec.orbitPhase + rec.attackNum) * 43758.5453)) % 1;
+          rec.feinting = p.variation > 0 && roll < FEINT_CHANCE * p.variation;
           rec.attackDur = (p.attackClip && this._placer.clipDuration(rec.id, p.attackClip)) || 0.8;
           if (p.attackClip) { this._placer.aiPlay(rec.id, p.attackClip, { loop: false, blend: 0.1 }); rec.currentClip = p.attackClip; }
         }
@@ -233,7 +248,10 @@ export class EnemyAI {
         this._turnToward(rec, Math.atan2(dx, dz), dt);
         if (!rec.damageDone && this._clock >= rec.attackAt + p.damageMoment) {
           rec.damageDone = true;
-          if (!rec.feinting && distXZ <= p.attackRange * HIT_RANGE_SLACK && dyOk) {
+          // The bite is a forward lunge — a player ABOVE the enemy's body
+          // (standing/landing on its back mid-stomp) is out of its reach.
+          const overTop = (player.y - rec.pos.y) > (p.heightY ?? 1) + 0.35;
+          if (!rec.feinting && distXZ <= p.attackRange * HIT_RANGE_SLACK && dyOk && !overTop) {
             gameState.adjust(p.damageKey, -p.attackDamage);
             this._engine.fire("on_enemy_attack", rec.id);
           }

@@ -136,6 +136,11 @@ export class PreviewController {
     }
 
     const updateFn = (dt: number) => {
+      // Clamp like physicsWorld.step (0.05): a backgrounded tab's first
+      // resumed frame hands rAF a multi-second dt — raw, the controller's
+      // gravity integration spikes velY (phantom "falls" that trip
+      // player_falling, teleports through geometry on bad days).
+      dt = Math.min(dt, 0.05);
       input.update(dt);        // merge device input BEFORE the controller reads it
       // Camera sub-mode: the character holds still while WASD/mouse drive the
       // editor vantage (KeyboardMouseSource listens on document regardless of

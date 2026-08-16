@@ -63,12 +63,14 @@ export class TriggerSystem {
       if (ladderId) nowLadders.add(ladderId);
     });
 
-    // emit enter for newly-inside volumes
+    // emit enter for newly-inside volumes; a per-frame "stay" for volumes the
+    // player remains in (v4.76.3 — lets conditioned enter-scripts fire the
+    // moment their conditions pass mid-occupancy, e.g. player_falling after
+    // jumping while already inside a tall stomp zone)
     for (const h of nowInside) {
-      if (!this._insideVolumes.has(h)) {
-        const volumeId = this._volumeSensors.get(h)!;
-        this._bus.emit("trigger:volume-enter", { volumeId });
-      }
+      const volumeId = this._volumeSensors.get(h)!;
+      if (!this._insideVolumes.has(h)) this._bus.emit("trigger:volume-enter", { volumeId });
+      else this._bus.emit("trigger:volume-stay", { volumeId });
     }
     // emit exit for volumes we left
     for (const h of this._insideVolumes) {

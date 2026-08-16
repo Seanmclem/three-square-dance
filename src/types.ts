@@ -394,6 +394,7 @@ export interface BusEvents {
   "ui:menu-shown":         { elementId: string };
   "ui:menu-closed":        { elementId: string };
   "trigger:volume-enter":  { volumeId: string };
+  "trigger:volume-stay":   { volumeId: string };   // per-frame while inside (v4.76.3 — mid-occupancy condition retry)
   "trigger:volume-exit":   { volumeId: string };
   "triggervolume:added":   { zoneId: string; volume: TriggerVolume };
   "triggervolume:updated": { zoneId: string; id: string; changes: Partial<TriggerVolume> };
