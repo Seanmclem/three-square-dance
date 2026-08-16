@@ -33,6 +33,17 @@ function compareNum(a: number, op: CompareOp, b: number): boolean {
  * shared by the engine, DialogueRunner (via checkConditions), and
  * GameGuiOverlay (menu option filtering).
  */
+/**
+ * player_falling's live-motion read (Phase 61.1). A module-level provider
+ * because checkScriptConditions is a free function shared by the engine,
+ * dialogues, and GUI menus. Set by both shells to the PreviewController's
+ * playerMotion accessor; null result (not playing) fails the condition closed.
+ */
+let _playerMotion: (() => { grounded: boolean; velY: number; fellMsAgo: number } | null) | null = null;
+export function setPlayerMotionProvider(fn: (() => { grounded: boolean; velY: number; fellMsAgo: number } | null) | null): void {
+  _playerMotion = fn;
+}
+
 export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: string): boolean {
   // Phase 60 — entity scope: a condition may name an entity whose namespaced
   // key is read instead of the global one. "self" resolves through ownerId
@@ -69,6 +80,19 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
         const key   = eid ? entInvKey(eid, c.itemId ?? "") : invKey(c.itemId ?? "");
         const owned = Number(gameState.get(key) ?? 0);
         if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
+        break;
+      }
+      case "player_falling": {
+        // Airborne AND descending — the goomba-stomp gate. Walking into a
+        // stomp zone (grounded) or rising through it (velY > 0) fails.
+        // The 120ms grace covers thin/flush zones whose enter event lands on
+        // the same frame as grounding (the landing clamp zeroes velY there);
+        // the grace only records falls faster than 2.5 m/s, so grounded
+        // walking (incl. downhill micro-falls) never passes.
+        const m = _playerMotion?.() ?? null;
+        const fallingNow  = !!m && !m.grounded && m.velY < -0.01;
+        const justLanded  = !!m && m.fellMsAgo <= 120;
+        if (!fallingNow && !justLanded) return false;
         break;
       }
       case "npc_alive":

@@ -297,6 +297,11 @@ Hook effects with three triggers on the enemy's own scripts:
   while despawned.
 - **Stomp zones ride**: a trigger volume `attachTo` the enemy follows it
   while it chases (the crab's stomp zone does exactly this).
+- **Goomba rule** — add the `player_falling` condition to the stomp script
+  so it only counts when the player LANDS on it: walking into the zone and
+  rising jumps fail; only airborne-and-descending passes (with a short
+  landing grace, so even a paper-thin zone flush with the enemy's back
+  works). Without it, a short enemy can be killed by walking over it.
 - Clips auto-match by name (idle/walk/run/attack/bite) or pick them in the
   panel. The living example is the crab in platfrom-obby's level_1.
 

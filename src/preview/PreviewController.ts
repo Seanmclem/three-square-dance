@@ -55,6 +55,17 @@ export class PreviewController {
   get playerPosition(): THREE.Vector3 | null {
     return this._controller ? this._controller.body.position : null;
   }
+
+  /** Live player motion for the player_falling condition (null outside preview). */
+  get playerMotion(): { grounded: boolean; velY: number; fellMsAgo: number } | null {
+    return this._controller
+      ? {
+          grounded: this._controller.body.isGrounded,
+          velY: this._controller.verticalVelocity,
+          fellMsAgo: this._controller.msSinceFalling,
+        }
+      : null;
+  }
   get occlusionState(): { subMode: "player" | "camera"; cullView: boolean } {
     return { subMode: this._subMode, cullView: this._cullView };
   }

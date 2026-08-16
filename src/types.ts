@@ -1223,6 +1223,7 @@ export type ConditionType =
   | 'has_state'
   | 'compare_number'
   | 'has_item'
+  | 'player_falling'   // airborne AND descending — the goomba-stomp gate (Phase 61.1)
   | 'npc_alive'
   | 'npc_dead';
 

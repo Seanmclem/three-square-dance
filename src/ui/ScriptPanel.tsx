@@ -169,6 +169,7 @@ const CONDITION_TYPES: ConditionType[] = [
   "has_state",
   "compare_number",
   "has_item",
+  "player_falling",
 ];
 
 const ACTION_TYPES: ActionType[] = [
@@ -1807,7 +1808,7 @@ function ConditionRow({
           </option>
         ))}
       </select>
-      {scope && (
+      {scope && condition.type !== "player_falling" && (
         <F label="Whose state" flex="0 0 128px">
           <StateScopePicker
             value={condition.entityId ?? ""}
@@ -1818,6 +1819,12 @@ function ConditionRow({
             onChange={(id) => onChange({ ...condition, entityId: id || undefined })}
           />
         </F>
+      )}
+      {condition.type === "player_falling" && (
+        <div style={{ flex: 1, color: "#98a2b8", fontSize: 10, fontStyle: "italic", paddingBottom: 7 }}>
+          passes only while the player is airborne and moving downward — the
+          goomba-stomp gate (walk-ins and rising jumps fail)
+        </div>
       )}
       {condition.type === "has_state" && (
         <F label="State key" flex={1}>

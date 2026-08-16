@@ -19,6 +19,25 @@ per TESTING.md §3's hidden-tab pattern. All checks passed.
 | 9 | Death dormancy | despawn crab, player adjacent, 2s stepped | ✅ stays idle at post, no damage |
 | 10 | Pose reset on preview exit | exitPreview; mesh position | ✅ byte-exact authored pose (mover reset path) |
 
+## Addendum (same day): `player_falling` — the goomba rule
+
+User report: the crab is short — walking over it entered the stomp zone and
+killed it for free. Added the `player_falling` condition (airborne +
+descending, 120ms landing grace) and gated the crab-stomp script with it.
+
+| # | Check | Method | Result |
+|---|---|---|---|
+| A1 | Condition false while grounded | `checkConditions([{type:"player_falling"}])` standing | ✅ false |
+| A2 | Walk-up doesn't stomp | real KeyW walk into the crab | ✅ crab survives (body-blocks the player; bites instead) |
+| A3 | **Falling stomp kills** | teleport 4m above; real free-fall through the riding stomp zone | ✅ crab despawned, no damage taken |
+| A4 | Grace expires | condition re-checked long after landing | ✅ false |
+
+Found live: the user's 0.13m-thin stomp zone flush with the crab's back
+enters on the SAME frame as grounding (velY already clamped) — pure
+"falling now" semantics never passed. Hence the 120ms landing grace,
+recorded only for falls faster than 2.5 m/s (slope-walking micro-falls
+can't sneak through).
+
 ## Bug found & fixed during verification
 
 **Uncapped dt**: a backgrounded tab's first resumed frame handed the AI a

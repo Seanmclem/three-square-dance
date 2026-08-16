@@ -11,7 +11,7 @@ import { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { PreviewController } from "@/preview/PreviewController";
 import { EnemyAI } from "@/preview/EnemyAI";
 import { AudioSystem } from "@/audio/AudioSystem";
-import { ScriptEngine } from "@/scripting/ScriptEngine";
+import { ScriptEngine, setPlayerMotionProvider } from "@/scripting/ScriptEngine";
 import { gameState } from "@/scripting/GameState";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { DialogueOverlay, type DialogueOverlayProps } from "@/ui/DialogueOverlay";
@@ -98,6 +98,7 @@ export default function RuntimeApp() {
     // Enemy AI between movers and the step (Phase 61)
     const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
     enemyAI.init();
+    setPlayerMotionProvider(() => preview.playerMotion);   // player_falling condition
     scene.onUpdate(dt => enemyAI.update(dt));
     scene.onUpdate(dt => physicsWorld.step(dt));
     scene.onUpdate(dt => objectPlacer.update(dt));

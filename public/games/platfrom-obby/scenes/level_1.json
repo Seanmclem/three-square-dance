@@ -12921,7 +12921,11 @@
               "trigger": {
                 "type": "on_player_enter"
               },
-              "conditions": [],
+              "conditions": [
+                {
+                  "type": "player_falling"
+                }
+              ],
               "actions": [
                 {
                   "type": "launch_player",

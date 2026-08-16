@@ -320,6 +320,12 @@ export class CharacterController {
       if (this._body.isGrounded) this._coyote = COYOTE_SEC;
       else this._coyote = Math.max(0, this._coyote - dt);
 
+      // player_falling grace record — BEFORE the landing clamp zeroes velY. A
+      // thin/flush stomp zone's enter can coincide with the grounding frame,
+      // so the condition also accepts "was falling fast a moment ago". The
+      // -2.5 m/s floor keeps slope-walking micro-falls from counting.
+      if (!this._body.isGrounded && this._velY < -2.5) this._fellAt = performance.now();
+
       if (this._jumpBuffer > 0 && this._coyote > 0) {
         this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
         this._jumpBuffer = 0;
@@ -511,6 +517,12 @@ export class CharacterController {
       );
     }
   }
+
+  /** Vertical velocity m/s (negative = falling) — the player_falling condition's read. */
+  get verticalVelocity(): number { return this._velY; }
+  private _fellAt = -Infinity;
+  /** ms since the player was last falling faster than 2.5 m/s (Infinity = never). */
+  get msSinceFalling(): number { return performance.now() - this._fellAt; }
 
   get body(): CharacterBody { return this._body; }
 
