@@ -198,6 +198,8 @@ export class CharacterController {
       this._velY = 0;
       this._extVelX = this._extVelZ = 0;   // don't carry a launch shove through a warp
       this._clearScriptAnim();             // a warp (e.g. respawn) ends a scripted pose
+      this._snapAnimToIdle();              // …and HARD-resets the pose: no crossfade out of
+                                           // a death pose / fall loop visible after the fade
       this._camY = this._armDist = Number.NaN;   // snap camera smoothing across the warp
       if (facing != null) {                          // set look direction (degrees); undefined = keep current
         this._yaw = THREE.MathUtils.degToRad(facing);
@@ -852,6 +854,33 @@ export class CharacterController {
     this._scriptAnim = null;
     if (this._climbLadder) return;   // the climb branch owns the animation
     this._animPhase = "ground";      // locomotion re-resolves (idle/walk/air) next frame
+  }
+
+  /**
+   * Warp-time animation reset (respawn/teleport): stop every action and start
+   * idle at FULL weight — no crossfade. Blending out of a clamped death pose
+   * or the fall loop takes 0.15s+, which outlives the respawn fade and shows
+   * the avatar "getting up" / still falling after the fade-in. The locomotion
+   * machine takes over normally from idle next frame.
+   */
+  private _snapAnimToIdle(): void {
+    if (!this._mixer) return;
+    this._mixer.stopAllAction();
+    this._currentAction = null;
+    this._currentClipObj = null;
+    this._currentClip = "";
+    this._animPhase = "ground";
+    const clip = this._clipFor("idle");
+    if (!clip) return;
+    const a = this._mixer.clipAction(clip);
+    a.reset();
+    a.setLoop(THREE.LoopRepeat, Infinity);
+    a.timeScale = 1;
+    a.setEffectiveWeight(1);
+    a.play();
+    this._currentAction  = a;
+    this._currentClipObj = clip;
+    this._currentClip    = "idle";
   }
 
   // Locomotion state machine: ground (idle/walk) → jump takeoff → air-idle loop → land → ground.
