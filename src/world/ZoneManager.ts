@@ -1480,6 +1480,17 @@ export class ZoneManager {
    */
   private _setEntityHidden(id: string, hidden: boolean): boolean {
     const visible = !hidden;
+    // Attached trigger volumes die with their host (v4.76.4): a despawned
+    // enemy's stomp/bite zones must not keep firing at the corpse position —
+    // an invisible bounce pad the player "has to walk around". spawn_object
+    // re-arms them. (The sensor going dark also emits a clean volume-exit
+    // for anyone standing inside, via TriggerSystem's diff.)
+    for (const zoneId of this._loadedZones.keys()) {
+      const vols = this._worldState.zones.get(zoneId)?.triggerVolumes?.filter(v => v.attachTo === id) ?? [];
+      for (const vol of vols)
+        for (const c of this._volumeColliders.get(zoneId) ?? [])
+          if (this._volumeSensors.get(c.handle) === vol.id) c.setEnabled(visible);
+    }
     for (const [zoneId, entry] of this._loadedZones) {
       const pe = entry.platformEntries.get(id);
       if (pe) { for (const m of pe.meshes) m.visible = visible; pe.collider.setEnabled(visible); return true; }
@@ -1498,8 +1509,17 @@ export class ZoneManager {
       }
 
       // Object: colliders only — ObjectPlacer owns the mesh hide/show for despawns.
+      // ALSO toggle each collider's parent BODY (v4.76.4): Rapier's character
+      // controller still collides with a setEnabled(false) collider whose body
+      // is live — the despawned crab stayed standable (measured: player
+      // grounded at the ghost's exact top). Object collider bodies are
+      // dedicated (static) or the entity's own mover/AI kinematic body, so
+      // disabling them touches nothing shared.
       const oc = entry.objectColliders.get(id);
-      if (oc) { for (const c of oc) c.setEnabled(visible); return true; }
+      if (oc) {
+        for (const c of oc) { c.setEnabled(visible); c.parent()?.setEnabled(visible); }
+        return true;
+      }
 
       // A wall id may share a merged RunEntry with other walls — despawning one hides the run.
       const re = entry.wallData.get(id);
