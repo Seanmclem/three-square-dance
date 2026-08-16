@@ -228,6 +228,8 @@ export default function RuntimeApp() {
       g.__movers = movers;
       g.__instancing = instancing;
       g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, physicsWorld, router: null, manifest: null };
+      g.__enemyAI = enemyAI;   // Phase 61 harness parity with the editor shell
+      g.__objectPlacer = objectPlacer;
       // Dynamic import: testHelpers statically imports @/editor/bakeShapes —
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.
       void import("@/dev/testHelpers").then(({ installTestHelpers }) =>
