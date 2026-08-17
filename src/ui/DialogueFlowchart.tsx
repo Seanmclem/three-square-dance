@@ -503,7 +503,7 @@ export function DialogueFlowchart({
                 >
                   {n.lines.filter(Boolean).length
                     ? `"${n.lines.filter(Boolean).join(" · ")}"`
-                    : <span style={{ color: "#5a6474", fontStyle: "italic" }}>(no lines)</span>}
+                    : <span style={{ color: "#98a2b8", fontStyle: "italic" }}>(no lines)</span>}
                 </div>
                 {n.options.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: OPT_GAP }}>
@@ -526,7 +526,7 @@ export function DialogueFlowchart({
                       >
                         <span style={{ color: "#5a6474" }}>▸</span>
                         <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {o.text || <span style={{ fontStyle: "italic", color: "#5a6474" }}>(response)</span>}
+                          {o.text || <span style={{ fontStyle: "italic", color: "#98a2b8" }}>(response)</span>}
                         </span>
                         <span
                           style={{

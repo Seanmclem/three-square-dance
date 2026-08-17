@@ -20,7 +20,7 @@ export function CoordinateDisplay({ coords }: CoordinateDisplayProps) {
         return (
           <span key={label} style={{ fontFamily: "monospace", fontSize: 11 }}>
             <span style={{ color }}>{label} </span>
-            <span style={{ color: "#7a7a7a" }}>{value.toFixed(2)}</span>
+            <span style={{ color: "#98a2b8" }}>{value.toFixed(2)}</span>
           </span>
         );
       })}

@@ -68,7 +68,7 @@ export function SkyboxBrowser({ skyboxes, selectedId, onSelect, onImport, onDele
         )}
         <span style={{ fontSize: 8, color: sel && !del ? "#80aaff" : "#909090",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", textAlign: "center" }}>
-          {label}<span style={{ color: "#606060" }}>{sub ? ` · ${sub}` : ""}</span>
+          {label}<span style={{ color: "#98a2b8" }}>{sub ? ` · ${sub}` : ""}</span>
         </span>
       </button>
     );
@@ -136,7 +136,7 @@ export function SkyboxBrowser({ skyboxes, selectedId, onSelect, onImport, onDele
           backgroundSize: "cover", backgroundPosition: "center",
         }, true))}
         {skyboxes.length === 0 && (
-          <div style={{ gridColumn: "1/-1", color: "#505050", fontSize: 10, textAlign: "center", paddingTop: 12 }}>
+          <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 12 }}>
             Import an equirectangular image (JPG/PNG/HDR) to add a skybox.
           </div>
         )}

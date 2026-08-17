@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -30.949880315556445,
-        "y": 2.315917758543068,
-        "z": -94.97126795350565
+        "x": -33.00468642331894,
+        "y": 2.73214756311405,
+        "z": -96.9417384274271
       },
       "radius": 20.895070499337454,
-      "phi": 1.224999999999997,
-      "theta": 18.551519999835406
+      "phi": 1.2699999999999958,
+      "theta": 18.768899999851445
     }
   },
   "world": {
@@ -11369,7 +11369,7 @@
               "id": "col_172f13ec",
               "shape": "box",
               "offset": {
-                "x": -5.960464477539063e-08,
+                "x": -5.960464477539063e-8,
                 "y": 0.751679808832705,
                 "z": 0.01855784778791364
               },
@@ -12806,106 +12806,17 @@
           }
         },
         {
-          "id": "vol_123e5a32",
-          "label": "CrabBiteTrigger",
-          "position": {
-            "x": -34.800861370541206,
-            "y": 8.33952616498961,
-            "z": -80.20080938061746
-          },
-          "size": {
-            "x": 0.7000000000000001,
-            "y": 0.6604738350103894,
-            "z": 1.7000000000000002
-          },
-          "zoneId": "demo",
-          "visual": {
-            "enabled": false,
-            "style": "gradient",
-            "color": "#5a3d8f",
-            "fadeDir": "up",
-            "opacity": 0.8,
-            "fadeHeight": 1,
-            "animate": false
-          },
-          "scripts": [
-            {
-              "id": "scr_f19049fc",
-              "label": "Crab Bite (superseded by AI bite)",
-              "zoneId": "demo",
-              "enabled": false,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_e043c8bb",
-                  "animation": "Jump",
-                  "animationLoop": true
-                },
-                {
-                  "type": "adjust_number",
-                  "stateKey": "Hearts",
-                  "numberDelta": -1
-                },
-                {
-                  "type": "launch_player",
-                  "launchSpeed": 4,
-                  "launchHSpeed": 9,
-                  "launchDirDeg": 0,
-                  "launchRelative": true
-                },
-                {
-                  "type": "flash_player"
-                }
-              ],
-              "oneShot": false
-            },
-            {
-              "id": "scr_dea9f70e",
-              "label": "Crab Stop-Bite (superseded by AI bite)",
-              "zoneId": "demo",
-              "enabled": false,
-              "trigger": {
-                "type": "on_player_exit"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_e043c8bb",
-                  "animation": "__auto__",
-                  "delay": 0
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "editorTint": {
-            "color": "#2b00ff",
-            "opacity": 0.12
-          },
-          "rotation": {
-            "x": 0,
-            "y": -180,
-            "z": 0
-          },
-          "shape": "cylinder"
-        },
-        {
           "id": "vol_50dfd99c",
           "label": "Trigger Volume",
           "position": {
-            "x": -34.82334347747838,
-            "y": 8.96704399199294,
-            "z": -80.41531097548042
+            "x": -34.791999772292414,
+            "y": 8.841675240596508,
+            "z": -80.36531097548043
           },
           "size": {
-            "x": 1.3,
+            "x": 1.2000000000000002,
             "y": 0.5,
-            "z": 1
+            "z": 0.9
           },
           "zoneId": "demo",
           "editorTint": {
@@ -12939,19 +12850,16 @@
                 },
                 {
                   "type": "despawn_object",
-                  "delay": 0.5,
+                  "delay": 1,
                   "targetId": "obj_e043c8bb",
                   "fadeDuration": 1
-                },
-                {
-                  "type": "despawn_object",
-                  "targetId": "vol_123e5a32"
                 }
               ],
               "oneShot": true
             }
           ],
-          "attachTo": "obj_e043c8bb"
+          "attachTo": "obj_e043c8bb",
+          "shape": "box"
         },
         {
           "id": "vol_d8be00e2",

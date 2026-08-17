@@ -40,7 +40,7 @@ export function MainMenu({ manifest, hasSave, onStart, onContinue }: Props) {
             {manifest.description && (
               <div style={{ marginTop: 8, fontSize: 13, color: "#9fb0cc" }}>{manifest.description}</div>
             )}
-            <div style={{ marginTop: 4, fontSize: 11, color: "#5f7090" }}>
+            <div style={{ marginTop: 4, fontSize: 11, color: "#98a2b8" }}>
               {[manifest.author, manifest.version && `v${manifest.version}`].filter(Boolean).join(" · ")}
             </div>
             <div style={{ marginTop: 24 }}>

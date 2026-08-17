@@ -526,7 +526,7 @@ export function PropertiesPanel({
             <div style={{ color: "#c0c0c0", fontSize: 14, fontFamily: "monospace" }}>
               {multiSelected.length} selected
             </div>
-            <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{summary}</div>
+            <div style={{ color: "#98a2b8", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{summary}</div>
           </div>
         </div>
         {/* Whole prefab instance selected (click-on-any-member expands to all):
@@ -542,7 +542,7 @@ export function PropertiesPanel({
           />
         )}
         <div style={{ padding: 16 }}>
-          <div style={{ color: "#646464", fontSize: 11, fontFamily: "monospace", marginBottom: 12, lineHeight: 1.5 }}>
+          <div style={{ color: "#98a2b8", fontSize: 11, fontFamily: "monospace", marginBottom: 12, lineHeight: 1.5 }}>
             {prefabInfo
               ? "Drag the gizmo to move the whole instance. Shift-click a member to select just it."
               : "Drag the gizmo to move all together (translate only). Rotate/scale need a single selection."}
@@ -619,9 +619,9 @@ export function PropertiesPanel({
               )}
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 5, marginTop: 3, fontSize: 10, overflow: "hidden" }}>
-              <span style={{ color: "#646464", letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }}>{headerSubtitle}</span>
+              <span style={{ color: "#98a2b8", letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }}>{headerSubtitle}</span>
               {canRename && (currentLabel || editingLabel) && (
-                <span style={{ color: "#555", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>· {selected.id}</span>
+                <span style={{ color: "#98a2b8", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>· {selected.id}</span>
               )}
             </div>
           </div>
@@ -805,7 +805,7 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
     >
       <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>{label}</span>
       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>{summary}</span>
+        <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{summary}</span>
         <span style={{ color: "#505060", fontSize: 14, lineHeight: 1 }}>›</span>
       </span>
     </button>
@@ -937,7 +937,7 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
                         cursor: isCurrent ? "default" : "pointer",
                         fontFamily: "monospace", fontSize: 11, border: "none",
                         background: isCurrent ? "rgba(46,46,46,0.4)" : "rgba(80,140,255,0.1)",
-                        color: isCurrent ? "#404050" : "#80aaff",
+                        color: isCurrent ? "#98a2b8" : "#80aaff",
                         outline: isCurrent ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(80,140,255,0.3)",
                       }}
                     >{level === 0 ? "G" : String(level)}</button>
@@ -1240,7 +1240,7 @@ function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate, onS
       {open && (
         <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 6, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
           {groups.length === 0 ? (
-            <div style={{ color: "#505060", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5 }}>
+            <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5 }}>
               No groups yet — create one in the Groups panel.
             </div>
           ) : groups.map(g => {
@@ -1361,7 +1361,7 @@ function FloorGeoView({ selected, zones, bus, onObjectUpdate, onFloorNodesUpdate
             />
           ))}
         </div>
-        <div style={{ color: "#404050", fontSize: 9 }}>
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>
           {detach
             ? "This floor's nodes are missing — edits detach it to plain points."
             : "Legacy floor — vertices are not linked to wall nodes."}
@@ -1385,7 +1385,7 @@ function FloorGeoView({ selected, zones, bus, onObjectUpdate, onFloorNodesUpdate
           />
         ))}
         {isRect && (
-          <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
+          <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4 }}>
             Rect corners stay axis-aligned — edit via POSITION/SIZE or drag in the canvas.
           </div>
         )}
@@ -1525,7 +1525,7 @@ function FloorVertexRow({ index, nodeId, x, z, zoneId, sourceId, linked, readOnl
       onMouseLeave={nodeId ? () => { hoveringRef.current = false; bus?.emit("node:link-hover", { zoneId, nodeId: null }); } : undefined}
     >
       <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
-        <span style={{ color: "#646464", fontSize: 9, letterSpacing: 1 }}>V{index}</span>
+        <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1 }}>V{index}</span>
         {linked && <span style={{ color: "#4d8cff", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>LINKED</span>}
       </div>
       <div style={{ display: "flex", gap: 4 }}>
@@ -1713,7 +1713,7 @@ function MoverSection({ entityId, mover, onCommit }: {
     <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
         <input type="checkbox" checked={enabled} onChange={e => commit({ enabled: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-        <span style={{ color: enabled ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>MOTION</span>
+        <span style={{ color: enabled ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>MOTION</span>
       </label>
       {enabled && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
@@ -1768,7 +1768,7 @@ function MoverSection({ entityId, mover, onCommit }: {
             <input type="checkbox" checked={cur.autoStart} onChange={e => commit({ autoStart: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
             <span style={{ color: "#9a9a9a", fontSize: 10 }}>Auto-start (off = wait for script)</span>
           </label>
-          <div style={{ color: "#404050", fontSize: 9 }}>Runs in preview/game only · editor shows the rest pose</div>
+          <div style={{ color: "#98a2b8", fontSize: 9 }}>Runs in preview/game only · editor shows the rest pose</div>
         </div>
       )}
     </div>
@@ -1877,7 +1877,7 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasRail} onChange={e => toggleRail(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+          <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
         </label>
         {hasRail && (
           <div>
@@ -1903,9 +1903,9 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={ghost} onChange={e => toggleGhost(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>GHOST IN EDITOR</span>
+          <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>GHOST IN EDITOR</span>
         </label>
-        <span style={{ color: "#505060", fontSize: 9, paddingLeft: 21 }}>
+        <span style={{ color: "#98a2b8", fontSize: 9, paddingLeft: 21 }}>
           See-through & click-through while editing (for ceilings) — solid in preview / game
         </span>
       </div>
@@ -1918,9 +1918,9 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
             onChange={e => onObjectUpdate({ startHidden: e.target.checked || undefined } as unknown as Partial<WorldObject>)}
             style={{ accentColor: "#4d8cff", cursor: "pointer" }}
           />
-          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>START HIDDEN</span>
+          <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>START HIDDEN</span>
         </label>
-        <span style={{ color: "#505060", fontSize: 9, paddingLeft: 21 }}>
+        <span style={{ color: "#98a2b8", fontSize: 9, paddingLeft: 21 }}>
           Despawned at preview/game start — reveal with spawn_object (secret bridges)
         </span>
       </div>
@@ -2099,7 +2099,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
       {!brush && (
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={resizeOn} onChange={e => toggleResize(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RESIZE HANDLES</span>
+          <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>RESIZE HANDLES</span>
         </label>
       )}
 
@@ -2108,7 +2108,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
         {!brush ? (
           <>
             <button style={SHAPE_ACTION_BTN} onClick={convertToBrush}>Convert to Brush</button>
-            <div style={{ color: "#404050", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
+            <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
               Bakes the {shape.kind}'s corners into an editable convex solid. Params above
               stop applying; drag corners instead.
             </div>
@@ -2119,7 +2119,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
               {shape.mesh!.vertices.length} corners
             </div>
             <button style={SHAPE_ACTION_BTN} onClick={revertToParams}>Revert to {shape.kind} params</button>
-            <div style={{ color: "#404050", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
+            <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
               Drag a corner sphere to reshape (Alt = no snap). Right-click a corner to
               delete it. The solid always stays convex.
             </div>
@@ -2222,11 +2222,11 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
             <button onClick={() => pick(i)}
               style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "6px 8px", background: "none", border: "none", cursor: "pointer" }}>
               <span style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>FACE {i + 1}</span>
-              <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>{f.verts.length} corners · {matLabel}</span>
+              <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{f.verts.length} corners · {matLabel}</span>
             </button>
             {isSel && (
               <div style={{ padding: "4px 8px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ color: "#505060", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
+                <div style={{ color: "#98a2b8", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <select value={f.material ?? "__inherit__"} onChange={e => commitMat(i, e.target.value)}
                     style={{ flex: 1, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
@@ -2246,7 +2246,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
           </div>
         );
       })}
-      <div style={{ color: "#404050", fontSize: 9, lineHeight: 1.4 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>
         Drag the gizmo on the selected face to move it. Press 1/3 for object/vertex modes.
       </div>
     </div>
@@ -2316,7 +2316,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
         </button>
       </div>
       {!isQuad && (
-        <div style={{ color: "#404050", fontSize: 9 }}>Split works on 4-corner faces only.</div>
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split works on 4-corner faces only.</div>
       )}
     </div>
   );
@@ -2355,7 +2355,7 @@ function FaceMaterialsView({ selected, shape, materialList, onObjectUpdate, bus 
   return (
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={LABEL}>PER-FACE MATERIALS</div>
-      <div style={{ color: "#505060", fontSize: 9, marginBottom: 2 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, marginBottom: 2 }}>
         Shape material: <span style={{ color: "#909090" }}>{getMaterialLabel(shape.material, materialList)}</span> (faces set to "(shape material)" inherit it)
         {sel !== null && <> · selected: <span style={{ color: "#80aaff" }}>FACE {sel + 1}</span></>}
       </div>
@@ -2448,7 +2448,7 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
             <button onClick={() => pick(i)}
               style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "5px 8px", background: "none", border: "none", cursor: "pointer" }}>
               <span style={{ color: isSel ? "#7ff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>V{i + 1}</span>
-              <span style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>({v.x}, {v.y}, {v.z})</span>
+              <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>({v.x}, {v.y}, {v.z})</span>
             </button>
             {isSel && (
               <div style={{ display: "flex", gap: 4, padding: "2px 8px 8px" }}>
@@ -2504,7 +2504,7 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={LABEL}>EDGE — click a brush face near an edge</div>
       {!edge || !a || !b ? (
-        <div style={{ color: "#505060", fontSize: 10, lineHeight: 1.5 }}>
+        <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
           Click near a brush edge in the canvas to select it.
         </div>
       ) : (
@@ -2512,7 +2512,7 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
           <span style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace" }}>
             EDGE V{edge[0] + 1} – V{edge[1] + 1}
           </span>
-          <div style={{ color: "#646464", fontSize: 10, fontFamily: "monospace" }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
             ({a.x}, {a.y}, {a.z}) → ({b.x}, {b.y}, {b.z})
           </div>
           <button style={OP_BTN} onClick={doSplit}
@@ -2521,7 +2521,7 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
           </button>
         </div>
       )}
-      <div style={{ color: "#404050", fontSize: 9, lineHeight: 1.4 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>
         Drag the gizmo to move the edge. Press 1/2/3 for object/face/vertex modes.
       </div>
     </div>
@@ -2895,14 +2895,14 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
         <span style={{ color: linked ? "#80aaff" : "#646464", fontSize: 10, userSelect: "none" }}>Link end-Y to step count</span>
       </label>
 
-      <div style={{ color: "#404050", fontSize: 9 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9 }}>
         Rise: {rise.toFixed(2)} m · Step H: {stepH.toFixed(3)} m
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasRailing} onChange={e => toggleRailing(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: hasRailing ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
+          <span style={{ color: hasRailing ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>RAILING</span>
         </label>
         {hasRailing && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
@@ -2974,7 +2974,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
 
       {/* Underside / stringer */}
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ color: "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>UNDERSIDE</div>
+        <div style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>UNDERSIDE</div>
         <div style={{ display: "flex", gap: 4 }}>
           {([["open","Open"],["diagonal","Diagonal"],["closed","To floor"]] as const).map(([m, lbl]) => {
             const isCurrent = m === undersideMode;
@@ -3009,7 +3009,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasLanding} onChange={e => toggleLanding(e.target.checked)} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-          <span style={{ color: hasLanding ? "#9ab" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>LANDING &amp; FLIGHTS</span>
+          <span style={{ color: hasLanding ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>LANDING &amp; FLIGHTS</span>
         </label>
         {hasLanding && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
@@ -3099,7 +3099,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
               </div>
             )}
             {(stair.flights ?? 1) > 1 && (
-              <div style={{ color: "#404050", fontSize: 9 }}>
+              <div style={{ color: "#98a2b8", fontSize: 9 }}>
                 Steps &amp; rise are per flight · Top Y: {(stair.start.y + (stair.flights ?? 1) * rise).toFixed(2)} m · Total rise: {((stair.flights ?? 1) * rise).toFixed(2)} m
               </div>
             )}
@@ -3111,7 +3111,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={hasCutter} onChange={e => toggleCutter(e.target.checked)} style={{ accentColor: "#ffdd00", cursor: "pointer" }} />
-          <span style={{ color: hasCutter ? "#ffdd77" : "#7a7a7a", fontSize: 10, letterSpacing: 1 }}>CUT BOX</span>
+          <span style={{ color: hasCutter ? "#ffdd77" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>CUT BOX</span>
         </label>
         {hasCutter && (
           <>
@@ -3146,7 +3146,7 @@ function StairGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPa
                   </div>
                 ))}
               </div>
-              <div style={{ color: "#404050", fontSize: 9, marginTop: 3 }}>Y offset = half height puts box bottom at stair end</div>
+              <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 3 }}>Y offset = half height puts box bottom at stair end</div>
             </div>
             <div>
               <div style={LABEL}>ROTATION (DEG)</div>
@@ -3522,7 +3522,7 @@ function CollidersScreen({ selected, assets, onObjectUpdate, defaultColliderFor,
     </div>
   );
 
-  const INFO: React.CSSProperties = { color: "#7a7a7a", fontSize: 10, lineHeight: 1.6 };
+  const INFO: React.CSSProperties = { color: "#98a2b8", fontSize: 10, lineHeight: 1.6 };
   const ACTION_BTN: React.CSSProperties = {
     padding: "6px 10px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
     border: "1px solid rgba(80,140,255,0.3)", background: "rgba(80,140,255,0.12)", color: "#80aaff",
@@ -3814,7 +3814,7 @@ function AnimationsScreen({ selected, assets, bus, onPreviewClip, onStopPreview,
       <div>
         <div style={LABEL}>CLIPS</div>
         {clips.length === 0 && (
-          <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>No animations available</div>
+          <div style={{ color: "#98a2b8", fontSize: 10, fontStyle: "italic" }}>No animations available</div>
         )}
         {clips.map(c => {
           const isPreviewing = previewing === c;
@@ -4013,7 +4013,7 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
         {numField("PROMPT RANGE", promptStr, setPromptStr, "promptRange", 0.3)}
         {numField("AUTO-GRAB RANGE", grabStr, setGrabStr, "autoGrabRange", 0.1)}
       </div>
-      <div style={{ color: "#505060", fontSize: 9, lineHeight: 1.5 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
         Top-of-ladder ranges (metres onto the platform): PROMPT RANGE = where "Climb down"
         appears; AUTO-GRAB RANGE = where walking toward the ladder mounts (clamped to
         PROMPT RANGE). The green arrow marks the climbable side.
@@ -4026,7 +4026,7 @@ function LadderGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
         <input type="checkbox" checked={noCol} onChange={e => { setNoCol(e.target.checked); onObjectUpdate({ noCollider: e.target.checked } as unknown as Partial<WorldObject>); }} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
         NO SOLID COLLIDER
       </label>
-      <div style={{ color: "#505060", fontSize: 9, lineHeight: 1.5 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
         For invisible climbables (rock walls, vines): place the ladder flush against the
         visible geometry, check both boxes — the ladder supplies the climb volume, the
         wall supplies the look and collision. Rails stay visible while editing.
@@ -4295,7 +4295,7 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
       </div>
 
       {allOpenings.length === 0 && (
-        <div style={{ color: "#404050", fontSize: 11, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>
           No openings
         </div>
       )}
@@ -4342,7 +4342,7 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
           getNodeLinks={getNodeLinks}
         />
       ))}
-      <div style={{ color: "#404050", fontSize: 9, marginTop: 6 }}>
+      <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 6 }}>
         Right-click a wall in the canvas to insert a vertex (splits the segment).
       </div>
     </div>
@@ -4390,7 +4390,7 @@ function VertScreen({ selected, onObjectUpdate }: {
           onKeyDown={e => { if (e.key === "Enter") flush(() => commitElev((e.target as HTMLInputElement).value)); }}
           style={{ ...NUM_INPUT, width: 80 }}
         />
-        <div style={{ color: "#404050", fontSize: 9, marginTop: 4 }}>
+        <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4 }}>
           Adjust to layer overlapping floors (+0.001 per step)
         </div>
       </div>
@@ -4531,7 +4531,7 @@ function MaterialSection({
         <span style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
           <span style={{ color: "#acc4ee", fontSize: 11, letterSpacing: 1.5, fontWeight: 600 }}>{label}</span>
           {!open && (
-            <span style={{ color: "#707070", fontSize: 10, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ color: "#8b94a8", fontSize: 10, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {currentLabel}
             </span>
           )}
@@ -4563,9 +4563,9 @@ function MaterialSection({
             <>
           <button
             onClick={onAddMaterial}
-            style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#646464", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
+            style={{ padding: "5px 10px", borderRadius: 4, cursor: "pointer", background: "rgba(20,30,45,0.6)", border: "1px dashed rgba(255,255,255,0.1)", color: "#98a2b8", fontSize: 10, fontFamily: "monospace", textAlign: "left" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; e.currentTarget.style.color = "#80aaff"; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#646464"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#98a2b8"; }}
           >
             + add material
           </button>
@@ -4575,7 +4575,7 @@ function MaterialSection({
           <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: "min(52vh, 520px)", overflowY: "auto" }}>
             {pinnedCurrent && (
               <>
-                <div style={{ color: "#646464", fontSize: 9, letterSpacing: 1, padding: "0 2px" }}>
+                <div style={{ color: "#98a2b8", fontSize: 9, letterSpacing: 1, padding: "0 2px" }}>
                   CURRENT · {pinnedCurrent.category ?? "Other"}
                 </div>
                 {renderTile(pinnedCurrent)}
@@ -4619,7 +4619,7 @@ function MaterialSection({
         <input type="checkbox" id="split-tile" checked={splitTile} onChange={toggleSplitTile}
           style={{ cursor: "pointer", accentColor: "#4d8cff", margin: 0 }}
         />
-        <label htmlFor="split-tile" style={{ color: "#646464", fontSize: 10, cursor: "pointer", userSelect: "none" }}>
+        <label htmlFor="split-tile" style={{ color: "#98a2b8", fontSize: 10, cursor: "pointer", userSelect: "none" }}>
           split X / Y
         </label>
       </div>
@@ -4651,7 +4651,7 @@ function MaterialSection({
                 <input type="checkbox" checked={enabled} onChange={() => toggleMap(key)}
                   style={{ accentColor: "#80aaff", cursor: "pointer", flexShrink: 0 }}
                 />
-                <span style={{ color: ov ? "#c0c0c0" : "#7a7a7a", fontSize: 10, fontFamily: "monospace", flex: 1, fontStyle: ov ? "italic" : "normal" }}>
+                <span style={{ color: ov ? "#c0c0c0" : "#8b94a8", fontSize: 10, fontFamily: "monospace", flex: 1, fontStyle: ov ? "italic" : "normal" }}>
                   {mapLabel}{ov ? "*" : ""}
                 </span>
                 {key === "roughness" && (
@@ -4834,7 +4834,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
           <div style={{ ...LABEL }}>ZONE LINK</div>
           {!zonePickerOpen ? (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ flex: 1, fontSize: 10, color: opening.linkedZoneId ? "#80aaff" : "#404050", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ flex: 1, fontSize: 10, color: opening.linkedZoneId ? "#80aaff" : "#98a2b8", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {opening.linkedZoneId
                   ? (zones.find(z => z.id === opening.linkedZoneId)?.name ?? "unknown zone")
                   : "not linked"}
@@ -4869,7 +4869,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
                 >{z.name}</button>
               ))}
               {zones.filter(z => z.id !== activeZoneId).length === 0 && (
-                <div style={{ color: "#404050", fontSize: 10, fontStyle: "italic" }}>No other zones</div>
+                <div style={{ color: "#98a2b8", fontSize: 10, fontStyle: "italic" }}>No other zones</div>
               )}
               <button
                 onClick={() => setZonePickerOpen(false)}
@@ -4929,7 +4929,7 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
       onMouseLeave={() => { hoveringRef.current = false; bus?.emit("wall:segment-hover", { zoneId, wallId: null }); }}
     >
       <div style={{ display: "flex", alignItems: "center", marginBottom: 5 }}>
-        <span style={{ color: "#646464", fontSize: 9, letterSpacing: 1 }}>SEG {index}</span>
+        <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1 }}>SEG {index}</span>
         {wall.hidden && <span style={{ color: "#8a6d3b", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>HIDDEN</span>}
         {linked && <span style={{ color: "#4d8cff", fontSize: 8, letterSpacing: 1, marginLeft: 6 }}>LINKED</span>}
         <span style={{ flex: 1 }} />
@@ -5051,7 +5051,7 @@ function SpawnSettingsView({
           </div>
         </div>
       )}
-      <div style={{ color: "#646464", fontSize: 11, marginBottom: 2 }}>Player settings for this world.</div>
+      <div style={{ color: "#98a2b8", fontSize: 11, marginBottom: 2 }}>Player settings for this world.</div>
 
       <div>
         <div style={{ ...LABEL, marginBottom: 4 }}>CAMERA MODE</div>
@@ -5145,7 +5145,7 @@ function CheckpointView({ selected, onDelete, onObjectUpdate }: {
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         An inert checkpoint marker (position + facing). It does nothing on its own — use a
@@ -5235,7 +5235,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
           onBlur={e => flush(() => commitNum(defKey, e.target.value, min))}
           onKeyDown={e => { if (e.key === "Enter") flush(() => commitNum(defKey, (e.target as HTMLInputElement).value, min)); }}
         />
-        {suffix && <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>{suffix}</span>}
+        {suffix && <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{suffix}</span>}
       </div>
     </div>
   );
@@ -5244,7 +5244,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         {LIGHT_KIND_HELP[light.kind]}
@@ -5310,7 +5310,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
                   }}
                   onBlur={e => flush(() => { const n = parseFloat(e.target.value); if (Number.isFinite(n) && light.flicker) update({ flicker: { ...light.flicker, [dk]: Math.min(max, Math.max(min, n)) } }); })}
                 />
-                <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginTop: 4 }}>
+                <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginTop: 4 }}>
                   {hints.map(h => <div key={h}>{h}</div>)}
                 </div>
               </div>
@@ -5331,7 +5331,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
               onChange={e => update({ staticShadow: e.target.checked })} />
             <span style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>STATIC SHADOWS</span>
           </label>
-          <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
             {light.staticShadow
               ? "Shadow renders once (near-free per frame). Editing geometry refreshes it, but MOVING objects/platforms won't update this light's shadow."
               : "Shadow re-renders every frame — expensive, keep to a few per zone (watch the FPS counter). Turn on STATIC SHADOWS if nothing moves under this light."}
@@ -5414,7 +5414,7 @@ function DecalView({ selected, onDelete, onObjectUpdate, decalTextures }: {
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         A <b>{dec.kind}</b> decal projected onto nearby static geometry from its anchor
@@ -5544,7 +5544,7 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
   return (
     <>
       {scripts.length === 0 && (
-        <div style={{ color: "#444", fontSize: 10, fontStyle: "italic" }}>{emptyHint}</div>
+        <div style={{ color: "#98a2b8", fontSize: 10, fontStyle: "italic" }}>{emptyHint}</div>
       )}
       {scripts.map(s => (
         <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4,
@@ -5580,7 +5580,7 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
         </div>
       ))}
       {scripts.length > 0 && (
-        <div style={{ color: "#444", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
+        <div style={{ color: "#98a2b8", fontSize: 9, fontStyle: "italic", marginTop: 4 }}>
           {onOpen ? "Click a script to edit its actions →" : "Edit actions in the Scripts panel →"}
         </div>
       )}
@@ -5634,7 +5634,7 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate }: {
   );
   return (
     <div style={{ padding: "12px 16px" }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 10 }}>
         The enemy notices the player inside DETECT RADIUS, chases (with some
@@ -5708,7 +5708,7 @@ function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus }: {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
         <div style={LABEL}>STATE (this {entityId.startsWith("vol_") ? "volume" : "object"} only)</div>
       </div>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginBottom: 6 }}>
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginBottom: 6 }}>
         Keys this entity tracks for itself (health, open, mood…) — every copy and
         prefab instance gets its own values. Scripts read/write them via the
         &ldquo;Whose state&rdquo; scope. Live values show while playing.
@@ -5799,7 +5799,7 @@ function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObject
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         Scripts ride this object — copies keep them, and prefabs capture them.
@@ -5946,7 +5946,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
   return (
     <>
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         An invisible 3D detection region — box, sphere, cylinder, or capsule.
@@ -6015,7 +6015,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
                                  [["x","RADIUS"],["y","HEIGHT"]] as const
           ).map(([axis, lbl]) => (
             <div key={axis} style={{ flex: 1 }}>
-              <div style={{ color: "#666", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
+              <div style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>{lbl}</div>
               <input type="number" step={shape !== "box" && axis === "x" ? 0.25 : axis === "y" ? 0.1 : 0.5}
                 min={shape !== "box" && axis === "x" ? 0.25 : 0.14} value={sizeStr[axis]}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
@@ -6293,7 +6293,7 @@ function WorldLightSection({ lighting, onChange }: {
             onBlur={e => flush(() => commit(e.target.value))}
             onKeyDown={e => { if (e.key === "Enter") flush(() => commit((e.target as HTMLInputElement).value)); }}
           />
-          <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
+          <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
         </div>
       </div>
     );
@@ -6314,10 +6314,10 @@ function WorldLightSection({ lighting, onChange }: {
             onBlur={e => flush(() => commitEnv(e.target.value))}
             onKeyDown={e => { if (e.key === "Enter") flush(() => commitEnv((e.target as HTMLInputElement).value)); }}
           />
-          <span style={{ color: "#606070", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
+          <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>intensity</span>
         </div>
       </div>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         The world's base lighting, saved with the scene. Fill/rim lights follow SUN;
         ENVIRONMENT is the reflected sky/image light. Set all three to 0 for a scene
         lit only by placed lights.
@@ -6367,7 +6367,7 @@ function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsCh
         <SoundPicker value={audio?.ambient?.soundId} allowNone
           onChange={id => onChange({ ambient: id ? { soundId: id, volume: audio?.ambient?.volume } : undefined })} />
       </div>
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         Authored per-scene defaults. These play on Preview/Play; players can lower each
         bus in the pause menu. Trigger-volume scripts (play_music / play_sound) change
         audio per room.
@@ -6397,7 +6397,7 @@ function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsCh
               value={playerSettings.footstepDistance ?? ""} placeholder="1.8"
               onChange={e => onPlayerSettingsChange({ footstepDistance: e.target.value === "" ? undefined : Number(e.target.value) })} />
           </div>
-          <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
             The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
             STRIDE LENGTH metres while walking on the ground.
           </div>
@@ -6445,7 +6445,7 @@ function EntitySoundScreen({ selected, onObjectUpdate }: {
           {numRow("maxDistance", "MAX DISTANCE", 20, 1)}
         </>
       )}
-      <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         Plays as a 3D positional loop in Preview/Play, attenuating between REF and MAX
         distance. Rides along if this is a moving platform/shape. Leave empty for silence.
       </div>
@@ -6460,7 +6460,7 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
       <div style={{ ...LABEL, marginBottom: 4 }}>PLACED LIGHTS ({lights.length})</div>
       {lights.length === 0 && (
-        <div style={{ color: "#606070", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
           None yet — pick the Light tool and click in the scene to place one.
         </div>
       )}
@@ -6482,7 +6482,7 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
           <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {l.label || l.id}
           </span>
-          <span style={{ color: "#606070", fontSize: 10, flexShrink: 0 }}>
+          <span style={{ color: "#98a2b8", fontSize: 10, flexShrink: 0 }}>
             {KIND_GLYPH[l.kind]} {l.kind}{l.castShadow ? " · ☑︎sh" : ""}
           </span>
         </button>
@@ -6509,7 +6509,7 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
   const info = TOOL_INFO[activeTool];
   return (
     <>
-      <div style={{ padding: "10px 16px 0", color: "#646464", fontSize: 11 }}>{info.desc}</div>
+      <div style={{ padding: "10px 16px 0", color: "#98a2b8", fontSize: 11 }}>{info.desc}</div>
       <div style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
         <div style={{ padding: "8px 12px", background: "rgba(80,140,255,0.06)", border: "1px solid rgba(80,140,255,0.15)", borderRadius: 6, color: "#909090", fontSize: 11 }}>
           {info.hint}

@@ -38,11 +38,11 @@ export function OpenProjectModal({ onConfirm, onCancel }: OpenProjectModalProps)
 
         <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
           {rows === null && !error && (
-            <div style={{ color: "#585870", fontSize: 11, fontFamily: "monospace" }}>Scanning workspace…</div>
+            <div style={{ color: "#98a2b8", fontSize: 11, fontFamily: "monospace" }}>Scanning workspace…</div>
           )}
           {error && <div style={{ color: "#cc6666", fontSize: 11 }}>{error}</div>}
           {rows?.length === 0 && (
-            <div style={{ color: "#585870", fontSize: 11, lineHeight: 1.6 }}>
+            <div style={{ color: "#98a2b8", fontSize: 11, lineHeight: 1.6 }}>
               No projects in the workspace games folder yet — use New Project….
             </div>
           )}

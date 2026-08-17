@@ -134,7 +134,7 @@ export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps
                     borderRadius: 6,
                     cursor: "pointer",
                     fontSize: 13,
-                    color: active ? "#fff" : picked ? "#5a6474" : "#9ab",
+                    color: active ? "#fff" : picked ? "#7f8ba0" : "#9ab",
                     background: active ? "rgba(128,170,255,0.18)" : "transparent",
                     border: `1px solid ${active ? "rgba(128,170,255,0.5)" : "transparent"}`,
                     opacity: picked && !active ? 0.75 : 1,
@@ -147,10 +147,10 @@ export function DialogueOverlay({ dialogue, bus, onClose }: DialogueOverlayProps
           </div>
         )}
       </div>
-      <div style={{ color: "#555", fontSize: 11, alignSelf: "flex-end", flexShrink: 0 }}>
+      <div style={{ color: "#98a2b8", fontSize: 11, alignSelf: "flex-end", flexShrink: 0 }}>
         {optionsShown ? "▶ E to choose" : hasMore ? "▶ E to continue" : "▶ E to close"}
         {state.lines.length > 1 && (
-          <span style={{ color: "#444", marginLeft: 8 }}>
+          <span style={{ color: "#98a2b8", marginLeft: 8 }}>
             {state.lineIndex + 1}/{state.lines.length}
           </span>
         )}

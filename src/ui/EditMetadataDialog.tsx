@@ -26,9 +26,9 @@ const S = {
   overlay: { position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)" } as React.CSSProperties,
   card: { background: "rgba(28,28,28,0.99)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "20px 24px", width: 360, maxHeight: "85vh", overflowY: "auto", boxShadow: "0 8px 32px rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", gap: 14 } as React.CSSProperties,
   title: { color: "#c0c0c0", fontSize: 13, fontFamily: "monospace", letterSpacing: 1 } as React.CSSProperties,
-  label: { color: "#646464", fontSize: 9, letterSpacing: 1, marginBottom: 3 } as React.CSSProperties,
+  label: { color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 3 } as React.CSSProperties,
   input: { width: "100%", boxSizing: "border-box", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 4, color: "#c0c0c0", fontFamily: "monospace", fontSize: 11, padding: "5px 8px", outline: "none" } as React.CSSProperties,
-  apply: { display: "flex", alignItems: "center", gap: 6, color: "#7a7a7a", fontSize: 9, cursor: "pointer", userSelect: "none" } as React.CSSProperties,
+  apply: { display: "flex", alignItems: "center", gap: 6, color: "#98a2b8", fontSize: 9, cursor: "pointer", userSelect: "none" } as React.CSSProperties,
   row: { display: "flex", gap: 8, justifyContent: "flex-end" } as React.CSSProperties,
   btn: (v: "ghost" | "primary"): React.CSSProperties => ({ padding: "6px 14px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 11, background: v === "primary" ? "rgba(80,140,255,0.2)" : "transparent", border: v === "primary" ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.1)", color: v === "primary" ? "#80aaff" : "#606070" }),
 };
@@ -141,7 +141,7 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagS
               placeholder={bulk ? "Tag to add to all…" : "Add a tag…"}
             />
             {bulk && (
-              <div style={{ color: "#6a7a90", fontSize: 9, marginTop: 4 }}>
+              <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4 }}>
                 Added to each item's existing tags — nothing is removed.
               </div>
             )}

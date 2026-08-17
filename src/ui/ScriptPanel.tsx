@@ -1668,7 +1668,7 @@ function TargetCombobox({
             </div>
           )}
           {filtered.length === 0 && (
-            <div style={{ padding: "5px 8px", fontSize: 11, color: "#5f7090", fontStyle: "italic" }}>no matches</div>
+            <div style={{ padding: "5px 8px", fontSize: 11, color: "#98a2b8", fontStyle: "italic" }}>no matches</div>
           )}
           {filtered.map((o) => {
             const header = o.group !== lastGroup ? (lastGroup = o.group) : null;
@@ -2606,7 +2606,7 @@ function ActionFields({
                 )}
               </select>
             </F>
-            <div style={{ fontSize: 10, color: "#5f7090" }}>
+            <div style={{ fontSize: 10, color: "#98a2b8" }}>
               Runtime only — routes between this project&apos;s scenes. No-op in editor preview.
             </div>
           </div>
@@ -2622,7 +2622,7 @@ function ActionFields({
               onChange={(e) => set({ sceneId: e.target.value })}
             />
           </F>
-          <div style={{ fontSize: 10, color: "#5f7090" }}>
+          <div style={{ fontSize: 10, color: "#98a2b8" }}>
             Runtime only — must match a scene key in the game&apos;s manifest. Not validated here.
           </div>
         </div>
@@ -3793,7 +3793,7 @@ function DialogueNodeCard({
       >
         <span
           title="What the player can say when this page's lines finish"
-          style={{ color: "#7f8ba0", fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}
+          style={{ color: "#8b94a8", fontSize: 10, fontWeight: 600, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}
         >
           Player responses
         </span>
@@ -4090,7 +4090,7 @@ function DialogueOptionRow({
         />
       ))}
       {conditions.length === 0 && (
-        <div style={{ color: "#6b7488", fontSize: 11, padding: "4px 4px 8px" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 4px 8px" }}>
           Always shown
         </div>
       )}
@@ -4141,7 +4141,7 @@ function DialogueOptionRow({
         />
       ))}
       {actions.length === 0 && (
-        <div style={{ color: "#6b7488", fontSize: 11, padding: "4px 4px 8px" }}>
+        <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 4px 8px" }}>
           No effects
         </div>
       )}
@@ -4152,7 +4152,7 @@ function DialogueOptionRow({
       <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 4px 4px" }}>
         <span
-          style={{ color: "#7f8ba0", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}
+          style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}
           title="What happens after this response"
         >
           Then
@@ -4394,7 +4394,7 @@ function ItemRow({
           value={item.startCount ?? ""}
           onChange={(e) => set("startCount", parseInt(e.target.value, 10) || undefined)}
         />
-        <span style={{ color: "#6a7488", fontSize: 10 }}>on New Game</span>
+        <span style={{ color: "#8b94a8", fontSize: 10 }}>on New Game</span>
       </label>
     </div>
   );

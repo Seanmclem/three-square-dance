@@ -52,7 +52,7 @@ const BTN = (active = true): React.CSSProperties => ({
   color: active ? "#80aaff" : "#646464",
 });
 const STEP_LABEL: React.CSSProperties = {
-  color: "#646464", fontSize: 10, letterSpacing: 1,
+  color: "#8b94a8", fontSize: 10, letterSpacing: 1,
 };
 
 export function AudioImporterModal({ existingTags, existingAttributions, existingCategories, onComplete, onClose }: Props) {
@@ -150,7 +150,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
           {phase === "pick" && (
             <>
               <p style={STEP_LABEL}>SELECT FILES</p>
-              <div style={{ fontSize: 10, color: "#7a7a7a", lineHeight: 1.7 }}>
+              <div style={{ fontSize: 10, color: "#98a2b8", lineHeight: 1.7 }}>
                 Supported: <span style={{ color: "#80aaff" }}>.mp3 .wav .ogg .m4a .flac .aac</span>
                 — select multiple files at once. They'll be copied into your project's{" "}
                 <code>assets/audio</code> folder and added to the sound manifest.
@@ -170,7 +170,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
               {/* Set all categories */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
+                  <span style={{ fontSize: 10, color: "#98a2b8", whiteSpace: "nowrap" }}>Set all to</span>
                   <select
                     style={{ ...INPUT, flex: 1, cursor: "pointer" }}
                     defaultValue=""
@@ -209,13 +209,13 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
 
               {/* Tags (optional) — applies to all imported sounds */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Tags (optional — applies to all)</span>
+                <span style={{ fontSize: 10, color: "#98a2b8" }}>Tags (optional — applies to all)</span>
                 <TagInput value={tags} onChange={setTags} suggestions={existingTags} />
               </div>
 
               {/* Attribution (optional) — applies to all imported sounds */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Attribution (optional — applies to all, shown in Credits)</span>
+                <span style={{ fontSize: 10, color: "#98a2b8" }}>Attribution (optional — applies to all, shown in Credits)</span>
                 <AttributionFields value={attribution} onChange={setAttribution} autofillFrom={existingAttributions} />
               </div>
 
@@ -270,7 +270,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
               ))}
 
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
-              {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress || "Importing…"}</div>}
+              {phase === "importing" && <div style={{ color: "#98a2b8", fontSize: 10 }}>{progress || "Importing…"}</div>}
             </>
           )}
 
@@ -280,8 +280,8 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
               <p style={STEP_LABEL}>DONE</p>
               <div style={{ color: "#80cc90", fontSize: 11 }}>✓ &nbsp;{results.length} sound{results.length !== 1 ? "s" : ""} imported.</div>
               {results.map(s => (
-                <div key={s.id} style={{ fontSize: 10, color: "#808080" }}>
-                  {s.label} — <span style={{ color: "#646464" }}>{s.category}</span>
+                <div key={s.id} style={{ fontSize: 10, color: "#98a2b8" }}>
+                  {s.label} — <span style={{ color: "#98a2b8" }}>{s.category}</span>
                 </div>
               ))}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}

@@ -53,7 +53,7 @@ export function GroupPanel({
         padding: "6px 8px 6px 12px", flexShrink: 0,
         borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}>
-        <span style={{ color: "#646464", fontSize: 10, letterSpacing: 1, fontFamily: "monospace" }}>GROUPS</span>
+        <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, fontFamily: "monospace" }}>GROUPS</span>
         <button
           onClick={onAdd}
           style={{
@@ -66,9 +66,9 @@ export function GroupPanel({
 
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {groups.length === 0 ? (
-          <div style={{ padding: "24px 16px", color: "#404050", fontSize: 10, textAlign: "center", fontFamily: "monospace" }}>
+          <div style={{ padding: "24px 16px", color: "#98a2b8", fontSize: 10, textAlign: "center", fontFamily: "monospace" }}>
             No groups yet.<br />
-            <span style={{ color: "#333340" }}>Create one to start tagging objects.</span>
+            <span style={{ color: "#98a2b8" }}>Create one to start tagging objects.</span>
           </div>
         ) : groups.map(g => {
           const isOpen  = expanded.has(g.id);
@@ -113,7 +113,7 @@ export function GroupPanel({
                   </span>
                 )}
 
-                <span style={{ color: "#505060", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
+                <span style={{ color: "#8b94a8", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>
                   {members.length}
                 </span>
 
@@ -150,7 +150,7 @@ export function GroupPanel({
                   </div>
 
                   {members.length === 0 ? (
-                    <div style={{ color: "#404050", fontSize: 10, fontFamily: "monospace" }}>
+                    <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
                       No members. Select objects and click “Add selected”.
                     </div>
                   ) : (
@@ -158,7 +158,7 @@ export function GroupPanel({
                       {members.map(m => (
                         <div key={`${m.ref.type}:${m.ref.id}`}
                           style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 0" }}>
-                          <span style={{ color: "#505060", fontSize: 9, fontFamily: "monospace", width: 30, flexShrink: 0 }}>
+                          <span style={{ color: "#8b94a8", fontSize: 9, fontFamily: "monospace", width: 30, flexShrink: 0 }}>
                             {m.ref.type.slice(0, 4)}
                           </span>
                           <span style={{ flex: 1, color: "#9090a0", fontSize: 10, fontFamily: "monospace",

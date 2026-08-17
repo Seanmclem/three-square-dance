@@ -218,7 +218,7 @@ export function GameGuiOverlay({ bus, world }: Props) {
                 )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {opts.length === 0 && (
-                    <div style={{ color: "#5a6474", fontSize: 12 }}>Nothing available.</div>
+                    <div style={{ color: "#98a2b8", fontSize: 12 }}>Nothing available.</div>
                   )}
                   {opts.map((opt, i) => {
                     const active = isActive && i === selIndex;

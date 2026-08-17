@@ -159,7 +159,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               {label}
             </button>
           ))}
-          <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+          <div style={{ color: "#98a2b8", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
             {spawnMode === "initial" ? "Click in the scene to set the player start." : "Click to drop checkpoint markers."}
           </div>
         </div>
@@ -191,7 +191,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
               </button>
             );
           })}
-          <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+          <div style={{ color: "#98a2b8", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
             {tool.id === "select" ? "Pick a selection mode."
               : activeVariantId === undefined ? "Pick a type to place — Esc closes."
               : activeTool.startsWith("poly-") ? "Click to place vertices; Enter to close." : "Click-drag to paint a region."}
@@ -280,7 +280,7 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
                   </button>
                 );
               })}
-              <div style={{ color: "#606070", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
+              <div style={{ color: "#98a2b8", fontSize: 9, padding: "2px 10px 4px", lineHeight: 1.3 }}>
                 Import &amp; place assets — Esc closes.
               </div>
             </div>

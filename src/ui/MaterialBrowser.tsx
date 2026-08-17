@@ -128,7 +128,7 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
         display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, alignContent: "start",
       }}>
         {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1/-1", color: "#505050", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
+          <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
             {materials.length === 0 ? "No materials yet — import one to get started." : "No results."}
           </div>
         ) : (

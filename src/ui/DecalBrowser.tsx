@@ -66,7 +66,7 @@ export function DecalBrowser({ decals, selectedId, onSelect }: DecalBrowserProps
         }
       />
 
-      <div style={{ padding: "2px 8px 6px", flexShrink: 0, color: "#606070", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
+      <div style={{ padding: "2px 8px 6px", flexShrink: 0, color: "#98a2b8", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
         Pick a decal, then hover a wall/floor and click to stamp. Scroll = size,
         shift+scroll = rotate, Esc = done.
       </div>
@@ -77,7 +77,7 @@ export function DecalBrowser({ decals, selectedId, onSelect }: DecalBrowserProps
         display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, alignContent: "start",
       }}>
         {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1/-1", color: "#505050", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
+          <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
             {decals.length === 0 ? "No decals — add PNGs + manifest.json under public/assets/decals." : "No results."}
           </div>
         ) : (

@@ -110,7 +110,7 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
 
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
         {filtered.length === 0 ? (
-          <div style={{ color: "#505050", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
             {sounds.length === 0 ? "No sounds yet — import one to get started." : "No results."}
           </div>
         ) : filtered.map(s => {
@@ -133,7 +133,7 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
                   color: "#80aaff", fontSize: 10, lineHeight: 1 }}>{playing === s.id ? "⏸" : "▶"}</button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: "#c8c8c8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.label}</div>
-                <div style={{ fontSize: 9, color: "#707070" }}>{s.category}{s.loop ? " · loop" : ""}{s.spatial ? " · spatial" : ""}</div>
+                <div style={{ fontSize: 9, color: "#98a2b8" }}>{s.category}{s.loop ? " · loop" : ""}{s.spatial ? " · spatial" : ""}</div>
               </div>
             </div>
           );

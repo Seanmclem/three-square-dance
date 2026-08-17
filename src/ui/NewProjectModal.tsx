@@ -49,7 +49,7 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
         </div>
 
         <div>
-          <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>NAME</div>
+          <div style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>NAME</div>
           <input
             autoFocus
             type="text"
@@ -67,15 +67,15 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
         </div>
 
         <div>
-          <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>LOCATION</div>
-          <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5 }}>
+          <div style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>LOCATION</div>
+          <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
             Created as <span style={{ color: "#8090a8" }}>games/{name.trim() ? slugifyId(name.trim()) : "…"}/</span> in
             your workspace — ▶ Play works immediately.
           </div>
         </div>
 
         <div>
-          <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>SCENE 1</div>
+          <div style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>SCENE 1</div>
           <div style={{ display: "flex", gap: 6 }}>
             {([
               { blank: false, label: "Current world", hint: "The world you're editing becomes the project's first scene" },
@@ -103,7 +103,7 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
             </div>
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-            <span style={{ color: "#646464", fontSize: 10, letterSpacing: 1, whiteSpace: "nowrap" }}>SCENE 1 ID</span>
+            <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, whiteSpace: "nowrap" }}>SCENE 1 ID</span>
             <input
               type="text"
               value={sceneId}
@@ -117,7 +117,7 @@ export function NewProjectModal({ defaultSceneId, onConfirm, onCancel }: NewProj
               }}
             />
           </div>
-          <div style={{ color: "#585870", fontSize: 10, lineHeight: 1.5, marginTop: 4 }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5, marginTop: 4 }}>
             The scene's permanent id — its filename and what load_scene portals
             reference (renaming later isn't supported yet). Saved as{" "}
             <span style={{ color: "#8090a8" }}>scenes/{slugifyId(sceneId.trim()) || "…"}.json</span>.

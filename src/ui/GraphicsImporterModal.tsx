@@ -144,7 +144,7 @@ export function GraphicsImporterModal({ onComplete, onClose }: Props) {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {entries.map(e => (
                 <div key={e.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
-                  <div style={{ color: "#707070", fontSize: 10 }}>{e.file.name}</div>
+                  <div style={{ color: "#98a2b8", fontSize: 10 }}>{e.file.name}</div>
                   <input value={e.label} onChange={ev => update(e.id, { label: ev.target.value })} placeholder="Label" style={INPUT} />
                 </div>
               ))}

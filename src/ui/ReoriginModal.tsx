@@ -254,12 +254,12 @@ export function ReoriginModal({ asset, placedCount, onCancel, onApply }: Props) 
                   touchAction: "none", userSelect: "none",
                 }}
               >
-                {status === "loading" && <span style={{ fontSize: 10, color: "#646464" }}>Loading model…</span>}
+                {status === "loading" && <span style={{ fontSize: 10, color: "#98a2b8" }}>Loading model…</span>}
                 {status === "ready" && preview && (
                   <img src={preview} alt={asset.label} draggable={false} style={{ width: "100%", height: "100%", pointerEvents: "none" }} />
                 )}
               </div>
-              <div style={{ fontSize: 9, color: "#585858", textAlign: "center", marginTop: -6 }}>
+              <div style={{ fontSize: 9, color: "#98a2b8", textAlign: "center", marginTop: -6 }}>
                 <span style={DOT(COL_ORIGIN)} />origin now &nbsp;·&nbsp; drag to orbit · scroll to zoom
               </div>
             </>

@@ -34,7 +34,7 @@ const BTN = (active = true): React.CSSProperties => ({
   color: active ? "#80aaff" : "#646464",
 });
 const SLIDER_ROW: React.CSSProperties = {
-  display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: "#7a7a7a",
+  display: "flex", alignItems: "center", gap: 8, fontSize: 10, color: "#8b94a8",
 };
 const NUM_INPUT: React.CSSProperties = {
   width: 52, boxSizing: "border-box", flexShrink: 0,
@@ -186,13 +186,13 @@ export function ThumbnailStagerModal({ asset, onCancel, onSave, onSaveIcon }: Pr
               touchAction: "none", userSelect: "none",
             }}
           >
-            {status === "loading" && <span style={{ fontSize: 10, color: "#646464" }}>Loading model…</span>}
+            {status === "loading" && <span style={{ fontSize: 10, color: "#98a2b8" }}>Loading model…</span>}
             {status === "error"   && <span style={{ fontSize: 10, color: "#c06060" }}>Could not load model.</span>}
             {status === "ready" && preview && (
               <img src={preview} alt={asset.label} draggable={false} style={{ width: "100%", height: "100%", pointerEvents: "none" }} />
             )}
           </div>
-          <div style={{ fontSize: 9, color: "#585858", textAlign: "center" }}>
+          <div style={{ fontSize: 9, color: "#98a2b8", textAlign: "center" }}>
             drag to orbit · scroll to zoom · shift-drag to move
           </div>
 

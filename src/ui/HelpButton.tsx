@@ -55,7 +55,7 @@ function ShortcutRow({ keys, action }: ShortcutEntry) {
           }}>{k}</span>
         ))}
       </div>
-      <span style={{ color: "#646464", fontSize: 10 }}>{action}</span>
+      <span style={{ color: "#98a2b8", fontSize: 10 }}>{action}</span>
     </div>
   );
 }

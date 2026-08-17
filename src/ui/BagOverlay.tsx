@@ -90,7 +90,7 @@ function BagListStyle({ items, selectedIndex, onSelect }: BagStyleProps) {
       </div>
       <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
         {items.length === 0 && (
-          <div style={{ color: "#606070", fontSize: 12, textAlign: "center", padding: "12px 0" }}>
+          <div style={{ color: "#98a2b8", fontSize: 12, textAlign: "center", padding: "12px 0" }}>
             Nothing yet.
           </div>
         )}

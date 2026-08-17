@@ -88,7 +88,7 @@ export function CreditsModal({ materials, assets, sounds, onClose }: CreditsModa
 
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
           {grouped.length === 0 && (
-            <div style={{ color: "#646464", fontSize: 11 }}>
+            <div style={{ color: "#98a2b8", fontSize: 11 }}>
               No attributed content yet — imported materials, assets, and sounds with
               attribution (author / pack) will be credited here automatically.
             </div>
@@ -124,7 +124,7 @@ export function CreditsModal({ materials, assets, sounds, onClose }: CreditsModa
                                              borderRadius: 3, padding: "0 4px" }}>{l}</span>
                     ))}
                   </div>
-                  <div style={{ color: "#7a7a7a", fontSize: 10, marginTop: 3 }}>
+                  <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 3 }}>
                     {counts(pack)}
                   </div>
                 </div>

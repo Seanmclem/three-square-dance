@@ -28,7 +28,7 @@ export function BakeDialog({ shapeCount, onConfirm, onCancel }: BakeDialogProps)
       <input type="checkbox" checked={value} onChange={e => set(e.target.checked)} style={{ marginTop: 1 }} />
       <span>
         {label}
-        <span style={{ display: "block", color: "#646464", fontSize: 9.5, lineHeight: 1.35 }}>{hint}</span>
+        <span style={{ display: "block", color: "#98a2b8", fontSize: 9.5, lineHeight: 1.35 }}>{hint}</span>
       </span>
     </label>
   );
@@ -48,12 +48,12 @@ export function BakeDialog({ shapeCount, onConfirm, onCancel }: BakeDialogProps)
         <div style={{ color: "#c0c0c0", fontSize: 13, letterSpacing: 1 }}>
           BAKE {shapeCount} SHAPE{shapeCount === 1 ? "" : "S"} → GLB
         </div>
-        <div style={{ color: "#646464", fontSize: 10, lineHeight: 1.4 }}>
+        <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.4 }}>
           Merges the selection into one model per material. The original shapes are kept.
         </div>
 
         <div>
-          <div style={{ color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>NAME</div>
+          <div style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 6 }}>NAME</div>
           <input
             autoFocus
             type="text"
@@ -68,7 +68,7 @@ export function BakeDialog({ shapeCount, onConfirm, onCancel }: BakeDialogProps)
             }}
           />
           {slug && slug !== name && (
-            <div style={{ color: "#646464", fontSize: 9, marginTop: 3 }}>file: {slug}.glb</div>
+            <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 3 }}>file: {slug}.glb</div>
           )}
         </div>
 

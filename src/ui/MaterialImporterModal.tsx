@@ -63,7 +63,7 @@ const BTN = (active = true): React.CSSProperties => ({
 });
 
 const STEP_LABEL: React.CSSProperties = {
-  color: "#646464", fontSize: 10, letterSpacing: 1, marginBottom: 8,
+  color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 8,
 };
 
 function autoLabel(id: string): string {
@@ -159,7 +159,7 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
             <div style={{ color: "#80aaff", fontSize: 13, letterSpacing: 1 }}>ADD MATERIAL</div>
             <button onClick={onClose} style={{ ...BTN(true), padding: "2px 8px", fontSize: 14 }}>✕</button>
           </div>
-          <div style={{ color: "#646464", fontSize: 10, marginTop: 4 }}>
+          <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
             Compatible with ambientCG texture sets (albedo / normal / roughness / ao / displacement maps).
           </div>
         </div>
@@ -181,7 +181,7 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
               onChange={e => setLabel(e.target.value)}
             />
             {materialId && (
-              <div style={{ color: "#646464", fontSize: 10, marginTop: 4 }}>
+              <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
                 folder: /assets/textures/{materialId.trim().replace(/\s+/g, "_").toLowerCase()}/
               </div>
             )}
@@ -222,7 +222,7 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
                       </span>
                       <span style={{ color: "#909090", width: 80 }}>{key}</span>
                       <span style={{
-                        color: "#646464", fontSize: 10,
+                        color: "#98a2b8", fontSize: 10,
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1,
                       }}>
                         {found ? found.srcName : "—"}

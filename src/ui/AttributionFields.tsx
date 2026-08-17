@@ -9,7 +9,7 @@ const INPUT: React.CSSProperties = {
   borderRadius: 4, color: "#c0c0c0", fontFamily: "monospace", fontSize: 11,
   padding: "5px 8px", outline: "none",
 };
-const LABEL: React.CSSProperties = { color: "#646464", fontSize: 9, letterSpacing: 1, marginBottom: 3 };
+const LABEL: React.CSSProperties = { color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 3 };
 
 /** Controlled attribution form (author / patreon / source / license). Reused by both
  *  import modals and the edit dialog. `disabled` greys all inputs (used by bulk "apply" toggles). */

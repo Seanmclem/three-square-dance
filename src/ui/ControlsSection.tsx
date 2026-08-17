@@ -43,7 +43,7 @@ export function ControlsSection() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
       <div style={{ ...LABEL, fontSize: 10 }}>CONTROLS (THIS DEVICE)</div>
-      <div style={{ color: "#646464", fontSize: 10 }}>
+      <div style={{ color: "#98a2b8", fontSize: 10 }}>
         Saved on this device, not in the world. Applies next time Play starts.
       </div>
       {numField("MOUSE SENSITIVITY", bindings.kbm.lookSensitivity, 0.0005,

@@ -121,7 +121,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         SquareDance{isDirty ? <span style={{ color: "#ffcc66", marginLeft: 2 }}>*</span> : null}
       </span>
       {autosaveLabel && (
-        <span style={{ color: "#3a3a50", fontSize: 10, fontFamily: "monospace", letterSpacing: 0.5 }}>
+        <span style={{ color: "#8b94a8", fontSize: 10, fontFamily: "monospace", letterSpacing: 0.5 }}>
           {autosaveLabel}
         </span>
       )}
@@ -203,7 +203,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
               ⋯
             </button>
             <Popover open={moreMenuOpen} onClose={() => setMoreMenuOpen(false)}>
-              <div style={{ ...popBtn, cursor: "default", color: "#606070", display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ ...popBtn, cursor: "default", color: "#8b94a8", display: "flex", alignItems: "center", gap: 6 }}>
                 Entry scene
                 <select
                   value={project.entryScene}

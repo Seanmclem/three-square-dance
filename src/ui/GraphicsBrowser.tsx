@@ -115,7 +115,7 @@ export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }
         )}
       </div>
 
-      <div style={{ padding: "0 8px 6px", flexShrink: 0, color: "#606070", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
+      <div style={{ padding: "0 8px 6px", flexShrink: 0, color: "#98a2b8", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
         2D images for item icons and custom game UI — hearts, coins, keys, panels.
         PNGs with transparency work best.
       </div>
@@ -125,7 +125,7 @@ export function GraphicsBrowser({ graphics, onImport, onDeleteGraphics, onEdit }
         display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, alignContent: "start",
       }}>
         {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1/-1", color: "#505050", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
+          <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
             {graphics.length === 0 ? "No graphics yet — import PNGs to get started." : "No results."}
           </div>
         ) : (
@@ -207,7 +207,7 @@ export function GraphicPickerPopover({ graphics, onPick, onClose }: GraphicPicke
         display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 4, alignContent: "start",
       }}>
         {filtered.length === 0 ? (
-          <div style={{ gridColumn: "1/-1", color: "#505050", fontSize: 10, textAlign: "center", padding: "14px 0" }}>
+          <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", padding: "14px 0" }}>
             {graphics.length === 0 ? "No graphics — import some via Assets → Graphics." : "No results."}
           </div>
         ) : filtered.map(g => (

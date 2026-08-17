@@ -119,7 +119,7 @@ const BTN = (active = true): React.CSSProperties => ({
   color: active ? "#80aaff" : "#646464",
 });
 const STEP_LABEL: React.CSSProperties = {
-  color: "#646464", fontSize: 10, letterSpacing: 1,
+  color: "#8b94a8", fontSize: 10, letterSpacing: 1,
 };
 
 export function ModelImporterModal({ existingTags, existingAttributions, onComplete, onClose }: Props) {
@@ -287,7 +287,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
           {phase === "pick" && (
             <>
               <p style={STEP_LABEL}>SELECT FILES</p>
-              <div style={{ fontSize: 10, color: "#7a7a7a", lineHeight: 1.7 }}>
+              <div style={{ fontSize: 10, color: "#98a2b8", lineHeight: 1.7 }}>
                 Supported: <span style={{ color: "#80aaff" }}>.glb .gltf .obj</span>
                 — select multiple files at once. Pair <span style={{ color: "#80aaff" }}>.obj + .mtl</span> by selecting both; they're matched by base name.
                 Also select any <span style={{ color: "#80aaff" }}>texture images</span> (.png .jpg …) referenced by the MTL — they'll be copied alongside the model.
@@ -310,7 +310,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
               {/* Set all categories */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 10, color: "#7a7a7a", whiteSpace: "nowrap" }}>Set all to</span>
+                  <span style={{ fontSize: 10, color: "#98a2b8", whiteSpace: "nowrap" }}>Set all to</span>
                   <select
                     style={{ ...INPUT, flex: 1, cursor: "pointer" }}
                     defaultValue=""
@@ -349,13 +349,13 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
 
               {/* Tags (optional) — applies to all imported models */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Tags (optional — applies to all)</span>
+                <span style={{ fontSize: 10, color: "#98a2b8" }}>Tags (optional — applies to all)</span>
                 <TagInput value={tags} onChange={setTags} suggestions={existingTags} />
               </div>
 
               {/* Attribution (optional) — applies to all imported models */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <span style={{ fontSize: 10, color: "#7a7a7a" }}>Attribution (optional — applies to all)</span>
+                <span style={{ fontSize: 10, color: "#98a2b8" }}>Attribution (optional — applies to all)</span>
                 <AttributionFields value={attribution} onChange={setAttribution} autofillFrom={existingAttributions} />
               </div>
 
@@ -423,7 +423,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
               </label>
 
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
-              {phase === "importing" && <div style={{ color: "#808080", fontSize: 10 }}>{progress}</div>}
+              {phase === "importing" && <div style={{ color: "#98a2b8", fontSize: 10 }}>{progress}</div>}
             </>
           )}
 
@@ -433,8 +433,8 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
               <p style={STEP_LABEL}>DONE</p>
               <div style={{ color: "#80cc90", fontSize: 11 }}>✓ &nbsp;{results.length} model{results.length !== 1 ? "s" : ""} imported.</div>
               {results.map(r => (
-                <div key={r.id} style={{ fontSize: 10, color: "#808080" }}>
-                  {r.label} — <span style={{ color: "#646464" }}>{r.path}</span>
+                <div key={r.id} style={{ fontSize: 10, color: "#98a2b8" }}>
+                  {r.label} — <span style={{ color: "#98a2b8" }}>{r.path}</span>
                 </div>
               ))}
               {error && <div style={{ color: "#c06060", fontSize: 10 }}>{error}</div>}
