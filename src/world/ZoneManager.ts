@@ -25,6 +25,9 @@ import type { FloorDef, FloorMeshDef, WallDef, ZoneDef, PlatformDef, StairDef, L
 import { isGameplayMode } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
+/** How far below the world a despawned entity's physics body is parked (m). */
+const PARK_DEPTH = 2000;
+
 // A run is one or more compatible walls merged into a single mesh.
 interface RunEntry {
   mesh:       THREE.Mesh;
@@ -1451,6 +1454,7 @@ export class ZoneManager {
     cancelAllFades();
     for (const id of this._despawnedIds) this._setEntityHidden(id, false);
     this._despawnedIds.clear();
+    this._parkedBodies.clear();   // park bookkeeping is preview-scoped (handles get reused)
   }
 
   /**
@@ -1482,6 +1486,41 @@ export class ZoneManager {
    * Toggle a non-object entity's visibility + collider across all loaded zones (the
    * despawn event carries no zoneId). Returns true if a matching entity was found.
    */
+  /** Saved rest translations of bodies parked underground by _setColliderSolid. */
+  private readonly _parkedBodies = new Map<number, { x: number; y: number; z: number }>();
+
+  /** Hide/show one collider physically. setEnabled alone is NOT enough: Rapier's
+   *  character controller keeps colliding with a collider disabled in place —
+   *  even with its parent body disabled too — until the body's translation
+   *  changes and the stale broadphase proxy is flushed (measured: a despawned
+   *  crab stayed standable at exactly its live rest height, and became
+   *  pass-through the moment its disabled body moved). So hiding also PARKS the
+   *  body far underground; showing restores the saved translation. Safe because
+   *  every collider's parent body is dedicated to one entity (createStaticCollider/
+   *  createSensorCollider mint a body per collider; mover/AI kinematic hosts are
+   *  per-entity), so parking never moves shared geometry. */
+  private _setColliderSolid(c: RAPIER.Collider, visible: boolean): void {
+    c.setEnabled(visible);
+    const body = c.parent();
+    if (!body) return;
+    body.setEnabled(visible);
+    const h = body.handle;
+    if (!visible) {
+      if (this._parkedBodies.has(h)) return;   // already parked (multi-collider body)
+      const t = body.translation();
+      this._parkedBodies.set(h, { x: t.x, y: t.y, z: t.z });
+      body.setTranslation({ x: t.x, y: t.y - PARK_DEPTH, z: t.z }, false);
+    } else {
+      const saved = this._parkedBodies.get(h);
+      this._parkedBodies.delete(h);
+      // Restore only if still down there — a rest-pose reset (_resetAll) may
+      // have already re-posed the body while it was parked.
+      if (saved && body.translation().y < saved.y - PARK_DEPTH / 2) {
+        body.setTranslation(saved, false);
+      }
+    }
+  }
+
   private _setEntityHidden(id: string, hidden: boolean): boolean {
     const visible = !hidden;
     // Attached trigger volumes die with their host (v4.76.4): a despawned
@@ -1493,21 +1532,21 @@ export class ZoneManager {
       const vols = this._worldState.zones.get(zoneId)?.triggerVolumes?.filter(v => v.attachTo === id) ?? [];
       for (const vol of vols)
         for (const c of this._volumeColliders.get(zoneId) ?? [])
-          if (this._volumeSensors.get(c.handle) === vol.id) c.setEnabled(visible);
+          if (this._volumeSensors.get(c.handle) === vol.id) this._setColliderSolid(c, visible);
     }
     for (const [zoneId, entry] of this._loadedZones) {
       const pe = entry.platformEntries.get(id);
-      if (pe) { for (const m of pe.meshes) m.visible = visible; pe.collider.setEnabled(visible); return true; }
+      if (pe) { for (const m of pe.meshes) m.visible = visible; this._setColliderSolid(pe.collider, visible); return true; }
 
       const se = entry.stairEntries.get(id);
-      if (se) { se.group.visible = visible; for (const c of se.colliders) c.setEnabled(visible); return true; }
+      if (se) { se.group.visible = visible; for (const c of se.colliders) this._setColliderSolid(c, visible); return true; }
 
       const she = entry.shapeEntries.get(id);
-      if (she) { for (const m of she.meshes) m.visible = visible; she.collider?.setEnabled(visible); return true; }
+      if (she) { for (const m of she.meshes) m.visible = visible; if (she.collider) this._setColliderSolid(she.collider, visible); return true; }
 
       const fc = entry.floorColliders.get(id);
       if (fc) {
-        fc.setEnabled(visible);
+        this._setColliderSolid(fc, visible);
         entry.floorsGroup.children.forEach(m => { if (m.userData["editorId"] === id) m.visible = visible; });
         return true;
       }
@@ -1521,7 +1560,7 @@ export class ZoneManager {
       // disabling them touches nothing shared.
       const oc = entry.objectColliders.get(id);
       if (oc) {
-        for (const c of oc) { c.setEnabled(visible); c.parent()?.setEnabled(visible); }
+        for (const c of oc) this._setColliderSolid(c, visible);
         return true;
       }
 
@@ -1530,7 +1569,7 @@ export class ZoneManager {
       if (re) {
         re.mesh.visible = visible;
         for (const t of re.trimMeshes) t.visible = visible;
-        for (const c of re.colliders) c.setEnabled(visible);
+        for (const c of re.colliders) this._setColliderSolid(c, visible);
         return true;
       }
 
@@ -1541,7 +1580,7 @@ export class ZoneManager {
       for (const f of this._volumeFills.get(zoneId) ?? [])
         if (f.userData["editorId"] === id) { f.visible = visible; found = true; }
       for (const c of this._volumeColliders.get(zoneId) ?? [])
-        if (this._volumeSensors.get(c.handle) === id) { c.setEnabled(visible); found = true; }
+        if (this._volumeSensors.get(c.handle) === id) { this._setColliderSolid(c, visible); found = true; }
       if (found) return true;
     }
     return false;

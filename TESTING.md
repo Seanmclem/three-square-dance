@@ -677,6 +677,16 @@ yanking Chrome to the front is rude. Instead, drive frames synchronously from
 > (the crab "isn't a mover" — it was, secretly). Also remember an unstepped
 > physics world has EMPTY query structures — every castRay misses (§0 note).
 
+> ⚠️ **`setEnabled(false)` does NOT make a collider intangible to the character
+> controller** (2026-08-18, the standable dead-crab box): with the collider AND
+> its parent body both disabled, the KCC still depenetrated the player up and
+> stood them at exactly the corpse's live rest height — the broadphase proxy of
+> a body disabled *in place* goes stale until its translation changes. The fix
+> (and the test for it) is `ZoneManager._setColliderSolid`: hiding also PARKS
+> the dedicated body `PARK_DEPTH` underground; probe standability with a real
+> controller settle (teleport above + step the full loop), never with enabled
+> flags or rays — those all reported the ghost as gone while it held weight.
+
 ### When static analysis exonerates everyone: trap the live object
 
 The floating-crab hunt (2026-08-18) exhausted clip-data forensics, ray
