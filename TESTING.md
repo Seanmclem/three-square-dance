@@ -667,6 +667,61 @@ user is working elsewhere, `document.hidden` stays true, rAF never fires, and re
 yanking Chrome to the front is rude. Instead, drive frames synchronously from
 `javascript_tool` (works regardless of visibility, and is deterministic — fixed dt):
 
+> ⚠️ **Step ALL the update-loop systems, in the app's order** (2026-08-18 —
+> omitting one hid a bug for a week of sessions): the editor loop is
+> `__movers.update(dt)` → `__enemyAI.update(dt)` → `__physics.step(dt)` →
+> `__objectPlacer.update(dt)` (+ volume visuals/lights, usually skippable) →
+> preview's `input.update(dt)` + `controller.update(dt)` if the player must
+> act. The floating-crab bug lived entirely in MoverSystem and reproduced
+> 3-of-4 live but NEVER in loops that stepped "everything except movers"
+> (the crab "isn't a mover" — it was, secretly). Also remember an unstepped
+> physics world has EMPTY query structures — every castRay misses (§0 note).
+
+### When static analysis exonerates everyone: trap the live object
+
+The floating-crab hunt (2026-08-18) exhausted clip-data forensics, ray
+probes, and code reading — every suspect alibied out — and was solved in ONE
+user reproduction by bugging the victim in the user's own play tab:
+
+```js
+// 1. Property-setter trap: capture the STACK of whoever writes the value.
+const pos = suspectMesh.position;                    // any live object
+let backing = pos.y;
+window.__trap = [];
+Object.defineProperty(pos, "y", {
+  get() { return backing; },
+  set(v) {
+    if (v > THRESHOLD && window.__trap.length < 20)
+      window.__trap.push({ v: +v.toFixed(3),
+        // sample any cross-referencing state HERE (it's synchronous):
+        recY: window.__enemyAI?.recs.get(id)?.pos.y,
+        stack: new Error().stack.split("\n").slice(1, 5).join(" | ") });
+    backing = v;
+  }, configurable: true,
+});
+// 2. Prototype wrap: log calls/args of a private method on ALL instances.
+const P = window.__movers.constructor.prototype;
+const orig = P._applyPose;
+P._applyPose = function (e) { /* record */ return orig.call(this, e); };
+```
+
+Then have the USER reproduce in that tab (title it "🤖 PLAY ME — …"; they
+click in and play with real input — their live run has ingredients synthetic
+loops lack). Gotchas: reset/read the trap between runs (a full ring buffer
+silently records nothing); traps die on page reload; and **minified class
+names collide** — the culprit stack said `Ev._applyPose`, which was
+MoverSystem's, not EnemyAI's (both have `_applyPose`) — confirm with
+`instance.constructor.name` before trusting a frame.
+
+**"An entity moved and nothing should move it" — the suspect list.** Writers
+of an entity mesh's transform, in likelihood order: `MoverSystem._applyPose`
+(entry running? check `[...__movers._entries]` — kind/axis/running/aiDriven;
+a DISABLED-but-present `mover` def on the entity still carries autoStart
+into resets), `EnemyAI._applyPose` (ai-enabled objects), `ObjectPlacer`'s
+`object:updated` handler (script `move_object`), the animation mixer (bones
+only — decode the clip's translation channels vs rest pose before blaming
+it), and `MoverSystem._resetAll` (one-time snap on preview:stop).
+
 > ⚠️ **The un-versioned import below returned a DEAD duplicate module in an *editor* tab
 > too (2026-07-10, phase 31)** — `physicsWorld.initialized` was false and stepping it did
 > nothing (meshes animated, bodies froze). Don't trust `import('/src/...')` from the console:
