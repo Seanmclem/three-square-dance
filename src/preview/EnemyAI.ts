@@ -330,6 +330,23 @@ export class EnemyAI {
       this._preview.playerCollider ?? undefined, excludeBody);
     if (!groundHit) return false;
     this._cand.y = (this._cand.y + GROUND_RAY_UP) - groundHit.timeOfImpact;
+    // Rise tripwire (debug, kept: cheap and this class has a history) — any
+    // upward ground-snap > 0.4m in one step records WHAT the ray hit, on
+    // window.__aiRises + console.warn. The floating-crab reports were
+    // unreproducible synthetically; this catches the culprit collider live.
+    if (this._cand.y - rec.pos.y > 0.4) {
+      const t = groundHit.collider.translation();
+      const evt = {
+        id: rec.id, from: +rec.pos.y.toFixed(2), to: +this._cand.y.toFixed(2),
+        toi: +groundHit.timeOfImpact.toFixed(3), sensor: groundHit.collider.isSensor(),
+        colliderAt: { x: +t.x.toFixed(2), y: +t.y.toFixed(2), z: +t.z.toFixed(2) },
+        handle: groundHit.collider.handle, state: rec.state, clock: +this._clock.toFixed(1),
+      };
+      const g = globalThis as unknown as { __aiRises?: unknown[] };
+      (g.__aiRises ??= []).push(evt);
+      if (g.__aiRises.length > 20) g.__aiRises.shift();
+      console.warn("[EnemyAI] RISE", JSON.stringify(evt));
+    }
     rec.pos.copy(this._cand);
     return true;
   }
