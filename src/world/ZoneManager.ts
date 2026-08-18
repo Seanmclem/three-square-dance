@@ -1350,7 +1350,11 @@ export class ZoneManager {
       }
       this._movers.register(
         obj.id,
-        obj.mover ?? { enabled: false, kind: "slide", axis: "x", autoStart: false },
+        // An aiDriven host entry must get an INERT def — reusing the object's
+        // real-but-disabled mover def leaked its autoStart/axis into the AI
+        // host (the floating-crab bug's other half).
+        aiHost ? { enabled: false, kind: "slide", axis: "x", autoStart: false }
+               : (obj.mover ?? { enabled: false, kind: "slide", axis: "x", autoStart: false }),
         [mesh], moverBody ?? null, obj.position, undefined, aiHost,
       );
     }

@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -33.00468642331894,
+        "x": -34.69023485946284,
         "y": 2.73214756311405,
-        "z": -96.9417384274271
+        "z": -76.0890623716294
       },
-      "radius": 20.895070499337454,
-      "phi": 1.2699999999999958,
-      "theta": 18.768899999851445
+      "radius": 29.34507049933747,
+      "phi": 1.2449999999999977,
+      "theta": 18.49389999985147
     }
   },
   "world": {
@@ -66,9 +66,9 @@
     },
     "defaultSpawn": {
       "position": {
-        "x": -35.196842294603805,
-        "y": 8.375446722273528,
-        "z": -74.2617753977061
+        "x": -35.4414902815789,
+        "y": 7.060922073707651,
+        "z": -67.06510042645496
       },
       "facingDeg": 0
     }
@@ -11397,14 +11397,15 @@
           "ai": {
             "enabled": true,
             "detectRadius": 6,
-            "attackRange": 1.3,
+            "attackRange": 1.5,
             "moveSpeed": 2.2,
             "attackDamage": 1,
             "damageKey": "Hearts",
             "attackCooldown": 1.5,
             "damageMoment": 0.4,
             "variation": 0.6,
-            "leashRadius": 12
+            "leashRadius": 12,
+            "walkClip": "Walk"
           }
         },
         {
@@ -12777,7 +12778,7 @@
           "scripts": [
             {
               "id": "scr_bb7e1c89",
-              "label": "Checkpont 3 trigger, dance",
+              "label": "Checkpont 3 trigger",
               "zoneId": "demo",
               "enabled": true,
               "trigger": {

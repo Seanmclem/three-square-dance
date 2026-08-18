@@ -256,7 +256,12 @@ export class MoverSystem {
   private _resetAll(): void {
     for (const e of this._entries.values()) {
       e.t = 0; e.progress = 0; e.dir = 1; e.angle = 0;
-      e.running = e.def.autoStart ?? true;
+      // aiDriven entries NEVER run as movers — the re-arm here was the
+      // floating-crab bug: an entity with a leftover DISABLED mover def
+      // (autoStart true) got re-armed on every preview exit, and from run 2
+      // on the "mover" bobbed it whenever the AI wasn't writing the mesh
+      // (i.e. during script-anim freezes like the checkpoint Dance).
+      e.running = e.aiDriven ? false : (e.def.autoStart ?? true);
       e.delta.set(0, 0, 0);
       e.prevPos.copy(e.origin);
       for (const m of e.meshes) {
