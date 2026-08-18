@@ -11,6 +11,11 @@ import type { WorldObject, Vec3 } from "@/types";
 /** Default crossfade duration (seconds) when switching animation clips. */
 const BLEND_SEC = 0.3;
 
+// Animation-arbiter levels (Phase 62): who may own an object's mixer.
+const ANIM_AUTOPLAY = 0;
+const ANIM_AI       = 1;
+const ANIM_SCRIPT   = 2;
+
 /**
  * Owns the placed-object domain: builds object meshes (mesh + transform + userData,
  * skeleton-safe clone for skinned/animated GLTFs, fallback box on load failure) and
@@ -94,7 +99,7 @@ export class ObjectPlacer {
         if (mesh) mesh.visible = true;
       }
       this._despawned.clear();
-      this._scriptClip.clear();
+      this._channel.clear();
     });
   }
 
@@ -238,6 +243,7 @@ export class ObjectPlacer {
     this._mixers.delete(objectId);
     this._clips.delete(objectId);
     this._autoPlay.delete(objectId);
+    this._channel.delete(objectId);
     this._finish.delete(objectId);
     this._active.delete(objectId);
     this._meshes.delete(objectId);
@@ -290,21 +296,29 @@ export class ObjectPlacer {
    * mixer or the clip name is unknown (AI falls back to un-animated movement).
    */
   aiPlay(objectId: string, clipName: string, opts?: { loop?: boolean; blend?: number }): boolean {
-    // A script-driven clip (play_animation — e.g. a held death pose during a
-    // delayed despawn) outranks AI locomotion until it finishes/stops.
-    if (this._scriptClip.has(objectId)) return false;
+    // Arbiter: script-driven clips (play_animation — held death pose, the
+    // checkpoint Dance) outrank AI clips until stopPreview drops the level.
+    if (this._level(objectId) > ANIM_AI) return false;
     const mixer = this._mixers.get(objectId);
     const clip  = this._clips.get(objectId)?.get(clipName);
     if (!mixer || !clip) return false;
+    this._channel.set(objectId, { level: ANIM_AI, clip: clipName });
     this._fadeTo(objectId, mixer, clip, { loop: opts?.loop ?? true, duration: opts?.blend ?? BLEND_SEC });
     return true;
   }
 
-  // Object ids with an active script-driven clip (v4.76.5) — see aiPlay.
-  private readonly _scriptClip = new Set<string>();
+  // ── Animation priority arbiter (Phase 62) ─────────────────────────────────
+  // ONE owner per object mixer, by level: autoplay(0) < ai(1) < script(2).
+  // A play request below the current level is refused; ending a level falls
+  // through to the next (stopPreview: script → autoplay; the AI re-issues its
+  // clip on its next frame). Replaces the v4.76.5 _scriptClip flag pile —
+  // the scattered-boolean coordination behind the death-anim override and
+  // post-dance drift bugs.
+  private readonly _channel = new Map<string, { level: number; clip: string | null }>();
+  private _level(objectId: string): number { return this._channel.get(objectId)?.level ?? ANIM_AUTOPLAY; }
 
   /** True while a script-driven clip (play_animation) owns this object's mixer. */
-  hasScriptClip(objectId: string): boolean { return this._scriptClip.has(objectId); }
+  hasScriptClip(objectId: string): boolean { return this._level(objectId) === ANIM_SCRIPT; }
 
   /** Clip names available on an object's loaded model (Phase 61 auto-matching). */
   clipNamesFor(objectId: string): string[] {
@@ -330,7 +344,7 @@ export class ObjectPlacer {
     }
 
     const loop = opts?.loop ?? false;
-    this._scriptClip.add(objectId);   // outranks AI locomotion until stopPreview (v4.76.5)
+    this._channel.set(objectId, { level: ANIM_SCRIPT, clip: clipName });   // outranks AI until stopPreview
     this._fadeTo(objectId, mixer, clip, { loop, duration: opts?.blend ?? BLEND_SEC });
 
     // Only the default case plays once then reverts, and counts as the evictable preview.
@@ -348,7 +362,7 @@ export class ObjectPlacer {
 
   /** Stop a preview and fall back to the object's auto-play clip (or bind pose). */
   stopPreview(objectId: string): void {
-    this._scriptClip.delete(objectId);
+    this._channel.delete(objectId);   // level → autoplay; the AI re-issues on its next frame
     const mixer = this._mixers.get(objectId);
     if (!mixer) return;
     const fin = this._finish.get(objectId);
@@ -371,8 +385,9 @@ export class ObjectPlacer {
   setAutoPlay(objectId: string, clipName: string | null): void {
     this._autoPlay.set(objectId, clipName);
     this._bus.emit("animation:auto-play-changed", { objectId, clipName });
-    // Don't disturb an in-flight preview; stopPreview() restores the new auto-play after.
-    if (this._previewingId === objectId) return;
+    // Arbiter: autoplay is the LOWEST level — never disturb an active script
+    // clip (incl. holds, which the old _previewingId check missed) or AI clip.
+    if (this._level(objectId) > ANIM_AUTOPLAY) return;
     const mixer = this._mixers.get(objectId);
     if (!mixer) return;
     if (clipName) {
