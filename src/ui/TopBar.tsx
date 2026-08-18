@@ -268,7 +268,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       <HelpButton />
       {isDesktop() && (
         <button
-          title="Reload the editor UI — picks up a fresh build (unsaved changes are autosaved first)"
+          title={`Reload the editor UI — picks up a fresh build (unsaved changes are autosaved first). Running build: ${__BUILD_STAMP__}`}
           onClick={() => location.reload()}
           style={{
             width: 28, height: 28, border: "none", borderRadius: 6,

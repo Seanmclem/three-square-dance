@@ -439,6 +439,7 @@ export default function App() {
       g.__gameState = gameState;
       g.__movers = movers;
       g.__physics = physicsWorld;         // raw Rapier world for harness ray/collider probes
+      g.__buildStamp = __BUILD_STAMP__;   // which bundle is this window running?
       g.__enemyAI = enemyAIRef.current;   // Phase 61 (set below; read-only debugging)
       g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
