@@ -7,6 +7,7 @@ import { fadeMeshes, cancelAllFades } from "@/world/meshFade";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldObject, Vec3 } from "@/types";
+import { reportTransformWrite } from "@/world/transformWatchdog";
 
 /** Default crossfade duration (seconds) when switching animation clips. */
 const BLEND_SEC = 0.3;
@@ -424,6 +425,7 @@ export class ObjectPlacer {
   private _applyTransformChanges(objectId: string, changes: Partial<WorldObject>): void {
     const mesh = this._meshes.get(objectId);
     if (!mesh) return;
+    reportTransformWrite(objectId, "ObjectPlacer.object:updated");
     const DEG2RAD = Math.PI / 180;
     if (changes.position) mesh.position.set(changes.position.x, changes.position.y, changes.position.z);
     if (changes.rotation) mesh.rotation.set(changes.rotation.x * DEG2RAD, changes.rotation.y * DEG2RAD, changes.rotation.z * DEG2RAD);

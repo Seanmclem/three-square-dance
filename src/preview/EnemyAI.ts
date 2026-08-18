@@ -3,6 +3,7 @@ import RAPIER from "@dimforge/rapier3d-compat";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { MoverSystem } from "@/world/MoverSystem";
+import { reportTransformWrite } from "@/world/transformWatchdog";
 import type { ObjectPlacer } from "./ObjectPlacer";
 import type { PreviewController } from "./PreviewController";
 import type { ScriptEngine } from "@/scripting/ScriptEngine";
@@ -319,6 +320,7 @@ export class EnemyAI {
    *  included) from rec.pos/yaw — the mover _applyPose idiom: rest transforms
    *  offset about the entity origin. */
   private _applyPose(rec: AiRec, entry: NonNullable<ReturnType<MoverSystem["entryFor"]>>): void {
+    reportTransformWrite(rec.id, "EnemyAI");
     this._quat.setFromAxisAngle(this._up, rec.yaw);
     if (entry.body) {
       entry.body.setNextKinematicTranslation({ x: rec.pos.x, y: rec.pos.y, z: rec.pos.z });

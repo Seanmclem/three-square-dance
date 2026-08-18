@@ -11,6 +11,7 @@ import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { MoverSystem } from "@/world/MoverSystem";
+import { armTransformWatchdog } from "@/world/transformWatchdog";
 import { SelectionManager } from "@/editor/SelectionManager";
 import { isSelectMode } from "@/editor/selectMode";
 import { FloorTool } from "@/editor/FloorTool";
@@ -444,6 +445,7 @@ export default function App() {
       g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
+      armTransformWatchdog();   // Phase 62: warn when two systems co-drive one entity's transform
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
     };
     if (import.meta.env.DEV) installDevGlobals();

@@ -6,6 +6,7 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
 import { MoverSystem } from "@/world/MoverSystem";
+import { armTransformWatchdog } from "@/world/transformWatchdog";
 import { ObjectPlacer } from "@/preview/ObjectPlacer";
 import { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { PreviewController } from "@/preview/PreviewController";
@@ -230,6 +231,7 @@ export default function RuntimeApp() {
       g.__runtime = { bus, world, zones, preview, scriptEngine, gameState, physicsWorld, router: null, manifest: null };
       g.__enemyAI = enemyAI;   // Phase 61 harness parity with the editor shell
       g.__objectPlacer = objectPlacer;
+      armTransformWatchdog();   // Phase 62: warn when two systems co-drive one entity's transform
       // Dynamic import: testHelpers statically imports @/editor/bakeShapes —
       // a lazy DEV-only chunk keeps editor code out of the runtime graph.
       void import("@/dev/testHelpers").then(({ installTestHelpers }) =>

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type RAPIER from "@dimforge/rapier3d-compat";
 import type { EventBus } from "@/core/EventBus";
 import type { MoverDef, Vec3 } from "@/types";
+import { reportTransformWrite } from "@/world/transformWatchdog";
 
 // Scratch objects — update() runs per mover per frame, so no allocations here.
 const _axis     = new THREE.Vector3();
@@ -170,9 +171,10 @@ export class MoverSystem {
    */
   update(dt: number): void {
     if (!this._active || this._entries.size === 0) return;
-    for (const e of this._entries.values()) {
+    for (const [id, e] of this._entries) {
       if (!e.running) continue;
       this._advance(e, dt);
+      reportTransformWrite(id, "MoverSystem");
       this._applyPose(e);
       // Stopped this frame (a "once" slide reached an end): the final pose is
       // applied above; kill the residual delta so a rider stops being carried.
