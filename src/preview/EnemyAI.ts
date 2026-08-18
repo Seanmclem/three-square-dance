@@ -206,9 +206,12 @@ export class EnemyAI {
       const entry = this._movers.entryFor(rec.id);
       if (!entry) continue;
       // A script-driven clip (e.g. the held Death pose during a DELAYED
-      // despawn) freezes the AI: no chasing, no attacks, no clip changes —
-      // the enemy dies where it stands instead of moonwalking through it.
-      if (this._placer.hasScriptClip(rec.id)) continue;
+      // despawn, or a checkpoint's celebratory Dance) freezes the AI: no
+      // chasing, no attacks, no clip changes. currentClip is nulled so
+      // locomotion RE-ISSUES its clip when the interlude ends — stopPreview
+      // reverts the mixer to the auto-play clip, and stale "already playing
+      // Walk" bookkeeping left the enemy drifting in its idle pose.
+      if (this._placer.hasScriptClip(rec.id)) { rec.currentClip = null; continue; }
       if (!rec.p.clipsResolved) this._resolveClips(rec);
       if (rec.p.heightY == null) {
         const aabb = this._placer.getLocalAABB(rec.id);

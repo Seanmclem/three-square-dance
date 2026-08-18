@@ -438,6 +438,7 @@ export default function App() {
       g.__objectPlacer = objectPlacer; g.__history = history;
       g.__gameState = gameState;
       g.__movers = movers;
+      g.__physics = physicsWorld;         // raw Rapier world for harness ray/collider probes
       g.__enemyAI = enemyAIRef.current;   // Phase 61 (set below; read-only debugging)
       g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
