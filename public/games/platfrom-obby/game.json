@@ -250,7 +250,7 @@
       "id": "pfb_aeaf3238",
       "name": "Coin Single",
       "kind": "snapshot",
-      "version": 1,
+      "version": 2,
       "variables": [],
       "template": [
         {
@@ -270,12 +270,12 @@
               "z": 0
             },
             "scale": {
-              "x": 0.8,
-              "y": 0.8,
-              "z": 0.8
+              "x": 0.6,
+              "y": 0.6,
+              "z": 0.6
             },
             "floor": 0,
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
