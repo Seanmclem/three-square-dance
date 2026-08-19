@@ -53,7 +53,7 @@ export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onCle
     <>
       {facets.length > 1 && (
         <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px 4px", flexShrink: 0 }}>
-          <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2 }}>
+          <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2, cursor: "pointer" }}>
             {facets.map(f => {
               const n = sel[f.key]?.length ?? 0;
               return (
@@ -75,7 +75,7 @@ export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onCle
 
       {/* Chips for filters set on the facets you can't currently see. */}
       {elsewhere.length > 0 && (
-        <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4 }}>
+        <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4, cursor: "pointer" }}>
           {elsewhere.flatMap(f => sel[f.key]!.map(v => (
             <button key={`${f.key}:${v}`} onClick={() => onToggle(f.key, v)}
               title={`Clear the ${f.label.toLowerCase()} filter`}
@@ -92,7 +92,7 @@ export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onCle
         <div style={{ padding: "0 8px 4px", flexShrink: 0 }}>{ownSlot}</div>
       ) : (
         <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4,
-          maxHeight: 68, overflowY: "auto" }}>
+          maxHeight: 68, overflowY: "auto", cursor: "pointer" }}>
           {/* Exclusive facets get a leading All; multi-select ones clear by unclicking. */}
           {!active.multi && (
             <button onClick={() => { const cur = sel[active.key]?.[0]; if (cur) onToggle(active.key, cur); }}

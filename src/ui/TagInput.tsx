@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useState } from "react";
 
 const INPUT: React.CSSProperties = {
   width: "100%", boxSizing: "border-box",
@@ -16,6 +16,11 @@ const X: React.CSSProperties = {
   background: "none", border: "none", cursor: "pointer",
   color: "#80aaff", fontSize: 11, lineHeight: 1, padding: "0 1px",
 };
+const SUGGESTION: React.CSSProperties = {
+  background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)",
+  borderRadius: 3, color: "#98a2b8", fontFamily: "monospace", fontSize: 10,
+  padding: "2px 6px", letterSpacing: 0.3, cursor: "pointer",
+};
 
 /** trim → lowercase → spaces to dashes. Keeps `CC0`/`cc 0` from fragmenting the chip strip. */
 export const normalizeTag = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, "-");
@@ -31,7 +36,6 @@ export function TagInput({ value, onChange, suggestions = [], disabled = false, 
   placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
-  const listId = useId();
 
   const commit = (raw: string) => {
     const tag = normalizeTag(raw);
@@ -48,7 +52,11 @@ export function TagInput({ value, onChange, suggestions = [], disabled = false, 
     }
   };
 
+  // In-DOM suggestion chips instead of a <datalist>: the shell's native datalist
+  // popup sets the input value without an event React can hear, so clicking a
+  // suggestion looked dead (user report). Our own chips commit deterministically.
   const unused = suggestions.filter(s => !value.includes(s));
+  const shown  = (draft ? unused.filter(s => s.includes(normalizeTag(draft))) : unused).slice(0, 8);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 5, opacity: disabled ? 0.4 : 1 }}>
@@ -71,20 +79,24 @@ export function TagInput({ value, onChange, suggestions = [], disabled = false, 
         style={INPUT}
         disabled={disabled}
         placeholder={placeholder}
-        list={listId}
         value={draft}
-        onChange={e => {
-          // Picking from the datalist fires change with the full value — commit it straight away.
-          const val = e.target.value;
-          if (unused.includes(val)) commit(val); else setDraft(val);
-        }}
+        onChange={e => setDraft(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => commit(draft)}
       />
-      {unused.length > 0 && (
-        <datalist id={listId}>
-          {unused.map(s => <option key={s} value={s} />)}
-        </datalist>
+      {!disabled && shown.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, cursor: "pointer" }}>
+          {shown.map(s => (
+            <button
+              key={s}
+              style={SUGGESTION}
+              title={`Add ${s}`}
+              // mousedown (not click): commits before the input's blur fires, so a
+              // half-typed draft can't blur-commit as a second, wrong tag.
+              onMouseDown={e => { e.preventDefault(); commit(s); }}
+            >{s}</button>
+          ))}
+        </div>
       )}
     </div>
   );

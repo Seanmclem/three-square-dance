@@ -207,7 +207,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
 
       {/* Facet switcher — says which facet the strip below is showing */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 8px 4px", flexShrink: 0 }}>
-        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2 }}>
+        <div style={{ display: "flex", gap: 2, background: "rgba(255,255,255,0.04)", borderRadius: 4, padding: 2, cursor: "pointer" }}>
           <button
             style={SEG_BTN(mode === "cat")}
             onClick={() => { setFilterMode("cat"); setPopoutOpen(false); }}
@@ -248,7 +248,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
 
       {/* Category strip — fixed, no scroll */}
       <div style={{ position: "relative", flexShrink: 0 }}>
-        <div style={{ display: "flex", gap: 2, padding: "0 8px 4px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 2, padding: "0 8px 4px", flexWrap: "wrap", cursor: "pointer" }}>
           {mode === "cat" ? (
             <>
               {/* All */}
