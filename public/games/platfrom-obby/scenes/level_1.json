@@ -71,6 +71,25 @@
         "z": -67.06510042645496
       },
       "facingDeg": 0
+    },
+    "audio": {
+      "music": {
+        "playlist": {
+          "entries": [
+            {
+              "soundId": "jingles_sax00"
+            },
+            {
+              "silence": 2
+            },
+            {
+              "soundId": "jingles_steel03",
+              "volume": 0.5
+            }
+          ],
+          "loop": true
+        }
+      }
     }
   },
   "terrain": null,

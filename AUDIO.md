@@ -46,6 +46,20 @@ Deselect everything → Properties **Audio** row → pick a **Background Music**
 **Ambient Loop**. Saved per-scene in `WorldConfig.audio`; they start on Preview/Play and
 loop. Across levels, `load_scene` loads the next scene's own `audio` fresh.
 
+### Playlists (Phase 64) — composed clip sequences
+
+Each slot has a **SINGLE ⇄ PLAYLIST** switch. Playlist mode is a script-actions-style
+list: clip rows (sound picker + per-clip volume 0–1) and **SILENCE** rows (a gap of N
+seconds), reordered one step at a time with ▲▼, removed with ✕, extended with
+`+ clip` / `+ silence`. The sequence plays one entry at a time, in authored order, with
+hard cuts — silence entries are the spacing tool. **LOOP** on repeats the whole
+sequence; off plays it once per scene entry and then stays silent until the scene
+reloads. Layer soundscapes by giving music AND ambient each their own playlist (they
+run simultaneously on their own buses). All clips preload at scene start, so nothing
+fetches or decodes mid-gameplay. A script `play_music` / `stop_music` takes the music
+channel over from a running playlist. The demo: platfrom-obby's level_1 background
+music is a 3-entry playlist (sax jingle → 2s silence → steel jingle at 0.5).
+
 ## 3. Positional / spatial audio (attached emitters)
 
 A looping 3D sound anchored to an entity, attenuating with distance. Lives on the three
