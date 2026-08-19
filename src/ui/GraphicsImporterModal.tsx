@@ -120,7 +120,7 @@ export function GraphicsImporterModal({ onComplete, onClose }: Props) {
       <div style={MODAL}>
         <input
           ref={filesInputRef} type="file" multiple style={{ display: "none" }}
-          accept=".png,.jpg,.jpeg,.webp"
+          accept="image/*,.png,.jpg,.jpeg,.webp"
           onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
         />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>

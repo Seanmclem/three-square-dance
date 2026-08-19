@@ -62,6 +62,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
   const [attribution, setAttribution] = useState<Attribution>({});
   const [tags,     setTags]     = useState<string[]>([]);
   const [progress, setProgress] = useState("");
+  const [skipped,  setSkipped]  = useState<string[]>([]);   // picked files that aren't a supported format
   const [results,  setResults]  = useState<SoundDef[]>([]);
   const [error,    setError]    = useState<string | null>(null);
   const filesInputRef = useRef<HTMLInputElement>(null);
@@ -76,7 +77,11 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
 
   function onFilesChosen(list: FileList | null): void {
-    const audio = [...(list ?? [])].filter(f => AUDIO_EXTS.has(getExt(f.name)));
+    const all   = [...(list ?? [])];
+    const audio = all.filter(f => AUDIO_EXTS.has(getExt(f.name)));
+    // The dialog is deliberately wide open (audio/*) — the format check happens
+    // HERE, and skips must be visible: a silent drop reads as a broken button.
+    setSkipped(all.filter(f => !AUDIO_EXTS.has(getExt(f.name))).map(f => f.name));
     if (!audio.length) return;
     setEntries(audio.map(f => ({
       id: crypto.randomUUID(), file: f, label: autoLabel(f.name),
@@ -127,13 +132,20 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
     onComplete(imported);
   }
 
+  const skippedNote = skipped.length > 0 && (
+    <div style={{ fontSize: 10, color: "#e8c14b", lineHeight: 1.6 }}>
+      Skipped {skipped.length} file{skipped.length !== 1 ? "s" : ""} — not a supported
+      audio format: {skipped.slice(0, 4).join(", ")}{skipped.length > 4 ? ", …" : ""}
+    </div>
+  );
+
   return (
     <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={MODAL}>
 
         <input
           ref={filesInputRef} type="file" multiple style={{ display: "none" }}
-          accept=".mp3,.wav,.ogg,.m4a,.flac,.aac"
+          accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac"
           onChange={e => { onFilesChosen(e.currentTarget.files); e.currentTarget.value = ""; }}
         />
 
@@ -156,6 +168,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
                 <code>assets/audio</code> folder and added to the sound manifest.
               </div>
               <button style={BTN()} onClick={() => filesInputRef.current?.click()}>Browse files…</button>
+              {skippedNote}
             </>
           )}
 
@@ -166,6 +179,7 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
                 <p style={STEP_LABEL}>{entries.length} SOUND{entries.length !== 1 ? "S" : ""}</p>
                 <button style={{ ...BTN(), padding: "3px 8px", fontSize: 10 }} onClick={() => setPhase("pick")}>← Change files</button>
               </div>
+              {skippedNote}
 
               {/* Set all categories */}
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
