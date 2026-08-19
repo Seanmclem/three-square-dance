@@ -4,7 +4,7 @@ import type {
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, EnemyAIDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
-  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AttachedSound, AudioMix, SoundDef,
+  DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AudioPlaylist, PlaylistEntry, AttachedSound, AudioMix, SoundDef,
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
@@ -6390,20 +6390,16 @@ function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsCh
       {slider("sfx", "SFX")}
       {slider("ambient", "AMBIENT")}
 
-      <div>
-        <div style={LABEL}>BACKGROUND MUSIC</div>
-        <SoundPicker value={audio?.music?.soundId} allowNone
-          onChange={id => onChange({ music: id ? { soundId: id, volume: audio?.music?.volume, loop: true } : undefined })} />
-      </div>
-      <div>
-        <div style={LABEL}>AMBIENT LOOP</div>
-        <SoundPicker value={audio?.ambient?.soundId} allowNone
-          onChange={id => onChange({ ambient: id ? { soundId: id, volume: audio?.ambient?.volume } : undefined })} />
-      </div>
+      <AudioSlotEditor label="BACKGROUND MUSIC" slot={audio?.music}
+        onSlot={next => onChange({ music: next })} keepLoopTrue />
+      <AudioSlotEditor label="AMBIENT LOOP" slot={audio?.ambient}
+        onSlot={next => onChange({ ambient: next })} />
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         Authored per-scene defaults. These play on Preview/Play; players can lower each
         bus in the pause menu. Trigger-volume scripts (play_music / play_sound) change
-        audio per room.
+        audio per room. PLAYLIST mode composes a sequence of short clips and silence
+        gaps that plays in order with hard cuts — layer soundscapes by giving music
+        AND ambient their own playlists.
       </div>
 
       {playerSettings && onPlayerSettingsChange && (
@@ -6435,6 +6431,125 @@ function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsCh
             STRIDE LENGTH metres while walking on the ground.
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ── AudioSlotEditor (Phase 64) ────────────────────────────────────────────────
+// One scene-audio slot (music or ambient): SINGLE mode = the classic one-track
+// picker; PLAYLIST mode = a script-actions-style composed sequence — clip rows
+// (picker + per-entry volume) and silence rows (gap seconds), ▲▼ one-step
+// reorder, ✕ remove, + clip / + silence, LOOP toggle. Hard cuts by design;
+// silence entries are the spacing tool.
+type AudioSlot = { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist };
+
+function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
+  label:        string;
+  slot?:        AudioSlot;
+  onSlot:       (next: AudioSlot | undefined) => void;
+  keepLoopTrue?: boolean;   // the music slot's single-track mode always loops (existing behavior)
+}) {
+  const pl = slot?.playlist;
+  const MODE_BTN = (active: boolean): React.CSSProperties => ({
+    padding: "2px 8px", fontSize: 9, letterSpacing: 0.5, borderRadius: 3, cursor: "pointer",
+    border: `1px solid ${active ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.1)"}`,
+    background: active ? "rgba(80,140,255,0.2)" : "transparent",
+    color: active ? "#80aaff" : "#8b94a8",
+  });
+  const MINI_BTN: React.CSSProperties = {
+    padding: "1px 5px", fontSize: 10, borderRadius: 3, cursor: "pointer",
+    border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#c2cadb",
+  };
+
+  const writeEntries = (entries: PlaylistEntry[], loop = pl?.loop ?? true) =>
+    onSlot({ playlist: { entries, loop } });
+
+  const toPlaylist = () => onSlot({
+    playlist: {
+      entries: slot?.soundId ? [{ soundId: slot.soundId, ...(slot.volume != null ? { volume: slot.volume } : {}) }] : [],
+      loop: true,
+    },
+  });
+  const toSingle = () => {
+    const first = pl?.entries.find(e => e.soundId);
+    onSlot(first?.soundId
+      ? { soundId: first.soundId, ...(first.volume != null ? { volume: first.volume } : {}), ...(keepLoopTrue ? { loop: true } : {}) }
+      : undefined);
+  };
+
+  const move = (i: number, dir: -1 | 1) => {
+    const entries = [...pl!.entries];
+    const j = i + dir;
+    if (j < 0 || j >= entries.length) return;
+    [entries[i], entries[j]] = [entries[j]!, entries[i]!];
+    writeEntries(entries);
+  };
+  const patch  = (i: number, p: Partial<PlaylistEntry>) =>
+    writeEntries(pl!.entries.map((e, k) => k === i ? { ...e, ...p } : e));
+  const remove = (i: number) => writeEntries(pl!.entries.filter((_, k) => k !== i));
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...LABEL }}>
+        <span>{label}</span>
+        <span style={{ display: "flex", gap: 3, cursor: "pointer" }}>
+          <button style={MODE_BTN(!pl)} onClick={() => { if (pl) toSingle(); }}>SINGLE</button>
+          <button style={MODE_BTN(!!pl)} onClick={() => { if (!pl) toPlaylist(); }}>PLAYLIST</button>
+        </span>
+      </div>
+      {!pl ? (
+        <SoundPicker value={slot?.soundId} allowNone
+          onChange={id => onSlot(id
+            ? { soundId: id, ...(slot?.volume != null ? { volume: slot.volume } : {}), ...(keepLoopTrue ? { loop: true } : {}) }
+            : undefined)} />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {pl.entries.length === 0 && (
+            <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
+              Empty sequence — add clips and silence gaps below.
+            </div>
+          )}
+          {pl.entries.map((e, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ color: "#8b94a8", fontSize: 9, width: 14, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+              {e.silence != null && !e.soundId ? (
+                <>
+                  <span style={{ color: "#98a2b8", fontSize: 10, letterSpacing: 0.5, flexShrink: 0 }}
+                        title="A gap of silence before the next entry">SILENCE</span>
+                  <input type="number" min={0.1} step={0.5} style={{ ...NUM_INPUT, width: 56 }}
+                    value={e.silence}
+                    onChange={ev => patch(i, { silence: Math.max(0.1, Number(ev.target.value) || 0.1) })} />
+                  <span style={{ color: "#8b94a8", fontSize: 9, flex: 1 }}>sec</span>
+                </>
+              ) : (
+                <>
+                  <SoundPicker value={e.soundId} allowNone style={{ flex: 1, minWidth: 0 }}
+                    onChange={id => id ? patch(i, { soundId: id }) : remove(i)} />
+                  <input type="number" min={0} max={1} step={0.1} style={{ ...NUM_INPUT, width: 44 }}
+                    title="Per-clip volume (0–1)"
+                    value={e.volume ?? 1}
+                    onChange={ev => patch(i, { volume: Math.max(0, Math.min(1, Number(ev.target.value) || 0)) })} />
+                </>
+              )}
+              <button style={{ ...MINI_BTN, opacity: i === 0 ? 0.3 : 1 }} title="Move up" onClick={() => move(i, -1)}>▲</button>
+              <button style={{ ...MINI_BTN, opacity: i === pl.entries.length - 1 ? 0.3 : 1 }} title="Move down" onClick={() => move(i, 1)}>▼</button>
+              <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, {}])}>+ clip</button>
+            <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
+            <span style={{ flex: 1 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
+                            color: "#9aa3b5", fontSize: 9, letterSpacing: 0.5 }}
+                   title="Loop the whole composed sequence; off = plays once per scene entry, then silence">
+              <input type="checkbox" checked={pl.loop ?? true}
+                onChange={ev => writeEntries(pl.entries, ev.target.checked)} />
+              LOOP
+            </label>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -199,6 +199,9 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
       collectPlayerSettings(refs, w.playerSettings);
       add(refs.audio, w.audio?.music?.soundId);    // scene music track
       add(refs.audio, w.audio?.ambient?.soundId);  // scene ambient loop
+      // Phase 64: playlist clips — every entry's sound must ship with the export.
+      for (const e of w.audio?.music?.playlist?.entries ?? [])   add(refs.audio, e.soundId);
+      for (const e of w.audio?.ambient?.playlist?.entries ?? []) add(refs.audio, e.soundId);
       collectScripts(refs, w.scripts);             // world-level scripts
       collectItems(refs, w.items);                 // scene item registry (icons)
       collectUiElements(refs, w.uiElements);       // scene GUI registry

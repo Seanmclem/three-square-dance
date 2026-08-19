@@ -662,10 +662,24 @@ export interface AudioMix {
   ambient: number;
 }
 
-/** Scene-level audio: a default ambient loop, a default music track, and the authored mix. */
+// Phase 64 — composed clip sequences. One entry is EITHER a clip (soundId +
+// optional per-entry volume) or a silence gap (seconds). The sequence plays one
+// entry at a time with hard cuts, in authored order, looping as configured.
+export interface PlaylistEntry {
+  soundId?: string;   // clip entry
+  volume?:  number;   // 0..1 per-entry gain (default: SoundDef.volume ?? 1)
+  silence?: number;   // silence entry: gap seconds (soundId absent)
+}
+export interface AudioPlaylist {
+  entries: PlaylistEntry[];
+  loop?:   boolean;   // default true — loop the whole composed sequence
+}
+
+/** Scene-level audio: a default ambient loop, a default music track, and the authored mix.
+ *  Each slot holds EITHER a single track (soundId) OR a composed playlist (Phase 64). */
 export interface WorldAudio {
-  music?:   { soundId: string; volume?: number; loop?: boolean };
-  ambient?: { soundId: string; volume?: number };
+  music?:   { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist };
+  ambient?: { soundId?: string; volume?: number; playlist?: AudioPlaylist };
   mix?:     AudioMix;
 }
 

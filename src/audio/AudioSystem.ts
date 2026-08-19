@@ -3,7 +3,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { SceneManager } from "@/core/SceneManager";
 import { assetManager } from "@/core/AssetManager";
-import type { AudioMix, SoundCategory, Vec3, AttachedSound } from "@/types";
+import type { AudioMix, AudioPlaylist, PlaylistEntry, SoundCategory, Vec3, AttachedSound } from "@/types";
 
 /** Supertype of THREE.Audio<GainNode> and PositionalAudio (Audio<PannerNode>). */
 type AnyAudio = THREE.Audio<AudioNode>;
@@ -27,6 +27,21 @@ interface SoundMeta { bus: Bus; base: number; fade: number }
 
 interface Fade { s: AnyAudio; from: number; to: number; t: number; dur: number; stopAtEnd: boolean }
 
+// Phase 64 — one running composed sequence on the music or ambient channel.
+type PlaylistSlot = "music" | "ambient";
+interface PlaylistState {
+  slot:        PlaylistSlot;
+  entries:     PlaylistEntry[];
+  loop:        boolean;
+  idx:         number;          // current entry (-1 before the first advance)
+  silenceLeft: number;          // >0 while inside a silence entry (dt-counted)
+  sound:       AnyAudio | null; // the live clip (mirrored into _music/_ambient)
+  token:       number;          // generation counter — stale async starts bail
+  done:        boolean;         // loop-off sequence finished (silent until scene reload)
+  failStreak:  number;          // consecutive clip-load failures — a full ring of them parks the sequence
+  json:        string;          // authored JSON, for live re-authoring change detection
+}
+
 /**
  * Audio consumer (Phase 36) — the missing listener for `audio:play` and the new
  * music/ambient/positional events. Constructed in both composition roots (editor
@@ -47,6 +62,10 @@ export class AudioSystem {
   private _musicId: string | null = null;
   private _ambient: AnyAudio | null = null;
   private _ambientId: string | null = null;
+  // Phase 64 — per-channel playlist sequencers (music / ambient). A slot runs
+  // EITHER its single track or its playlist; the sequencer owns the channel's
+  // _music/_ambient ref while active so mixer re-gains keep working.
+  private readonly _playlists = new Map<PlaylistSlot, PlaylistState>();
 
   private readonly _emitters = new Map<string, THREE.PositionalAudio>();  // entityId → emitter
   private readonly _keyed    = new Map<string, AnyAudio>();             // keyed one-shots (audio:stop by key)
@@ -69,8 +88,9 @@ export class AudioSystem {
       _bus.on("preview:stop",  () => this.deactivate()),
       _bus.on("audio:play",    (p) => this._onPlay(p)),
       _bus.on("audio:stop",    (p) => this._onStop(p)),
-      _bus.on("music:play",    (p) => this._playMusic(p.soundId, p.volume, p.loop, p.fade)),
-      _bus.on("music:stop",    (p) => this._stopMusic(p.fade)),
+      // Script-driven music wins the channel: kill a running playlist first.
+      _bus.on("music:play",    (p) => { this._stopPlaylist("music"); this._playMusic(p.soundId, p.volume, p.loop, p.fade); }),
+      _bus.on("music:stop",    (p) => { this._stopPlaylist("music"); this._stopMusic(p.fade); }),
       _bus.on("world:audio",   () => this._reconcileAuthored()),
       _bus.on("audio:player-mix", ({ mix }) => this.setPlayerMix(mix)),
       // Attached emitters live on the movable entity types: object / platform / shape.
@@ -107,8 +127,11 @@ export class AudioSystem {
     this._applyMaster();
 
     // Scene-level ambient + music (fire-and-forget; guarded on _active).
-    if (authored?.ambient?.soundId) this._playAmbient(authored.ambient.soundId, authored.ambient.volume);
-    if (authored?.music?.soundId)   this._playMusic(authored.music.soundId, authored.music.volume, authored.music.loop ?? true);
+    // A slot runs its playlist when one is authored, else its single track.
+    if (authored?.ambient?.playlist?.entries?.length) this._startPlaylist("ambient", authored.ambient.playlist);
+    else if (authored?.ambient?.soundId) this._playAmbient(authored.ambient.soundId, authored.ambient.volume);
+    if (authored?.music?.playlist?.entries?.length) this._startPlaylist("music", authored.music.playlist);
+    else if (authored?.music?.soundId)   this._playMusic(authored.music.soundId, authored.music.volume, authored.music.loop ?? true);
 
     // Attach positional emitters for every placed entity that carries one
     // (object / platform / shape — the movable types).
@@ -128,14 +151,22 @@ export class AudioSystem {
     this._all.clear();
     this._emitters.clear();
     this._keyed.clear();
+    this._playlists.clear();   // scene re-entry restarts sequences from the top
     this._music = this._ambient = null;
     this._musicId = this._ambientId = null;
 
     if (this._camera) { this._camera.remove(this._listener); this._camera = null; }
   }
 
-  /** Drive fades only — sound transforms follow their parent camera/mesh matrices. */
+  /** Drive fades + playlist silence gaps — sound transforms follow their parent matrices. */
   update(dt: number): void {
+    // Playlist tick: only silence gaps need per-frame time — clip advances ride
+    // onEnded, and a clip mid-load is (sound null, silenceLeft 0), untouched here.
+    for (const st of this._playlists.values()) {
+      if (st.done || st.sound || st.silenceLeft <= 0) continue;
+      st.silenceLeft -= dt;
+      if (st.silenceLeft <= 0) { st.silenceLeft = 0; this._advancePlaylist(st); }
+    }
     if (!this._fades.length) return;
     for (let i = this._fades.length - 1; i >= 0; i--) {
       const f = this._fades[i]!;
@@ -165,12 +196,29 @@ export class AudioSystem {
     this._applyMaster();
     for (const s of this._all) this._applyGain(s);
     if (!this._active) return;
+    // Playlist slots reconcile by JSON: changed → restart the sequence; removed →
+    // fall through to the single-track logic below. Slots running a playlist skip
+    // the soundId diff (the sequencer legitimately rotates _musicId/_ambientId).
+    for (const slot of ["music", "ambient"] as const) {
+      const pl = authored?.[slot]?.playlist;
+      const st = this._playlists.get(slot);
+      if (pl?.entries?.length) {
+        if (!st || st.json !== JSON.stringify(pl)) {
+          // Take over the channel: stop the single track if one is playing.
+          if (slot === "music" && this._music)     { this._finish(this._music); }
+          if (slot === "ambient" && this._ambient) { this._finish(this._ambient); }
+          this._startPlaylist(slot, pl);
+        }
+      } else if (st) {
+        this._stopPlaylist(slot);
+      }
+    }
     // Swap scene ambient/music if the authored track changed while playing.
-    if ((authored?.ambient?.soundId ?? null) !== this._ambientId) {
+    if (!this._playlists.has("ambient") && (authored?.ambient?.soundId ?? null) !== this._ambientId) {
       if (this._ambient) { this._finish(this._ambient); this._ambient = null; this._ambientId = null; }
       if (authored?.ambient?.soundId) this._playAmbient(authored.ambient.soundId, authored.ambient.volume);
     }
-    if ((authored?.music?.soundId ?? null) !== this._musicId) {
+    if (!this._playlists.has("music") && (authored?.music?.soundId ?? null) !== this._musicId) {
       if (this._music) { this._finish(this._music); this._music = null; this._musicId = null; }
       if (authored?.music?.soundId) this._playMusic(authored.music.soundId, authored.music.volume, authored.music.loop ?? true);
     }
@@ -248,6 +296,90 @@ export class AudioSystem {
     this._ambientId = soundId;
     void this._makeSound(soundId, false, "ambient", volume ?? assetManager.getSoundDef(soundId)?.volume ?? 1, true, null)
       .then(s => { if (s) this._ambient = s; });
+  }
+
+  // ── Playlists (Phase 64) — composed clip sequences on the music/ambient channel ──
+
+  private _startPlaylist(slot: PlaylistSlot, pl: AudioPlaylist): void {
+    if (!this._active) return;
+    this._stopPlaylist(slot);
+    // Preload every clip buffer up front (permanently cached by AssetManager) —
+    // gameplay never fetches or decodes mid-sequence.
+    for (const e of pl.entries) if (e.soundId) void assetManager.loadSound(e.soundId).catch(() => { /* skipped at play time */ });
+    const st: PlaylistState = {
+      slot, entries: pl.entries, loop: pl.loop ?? true,
+      idx: -1, silenceLeft: 0, sound: null, token: 0, done: false, failStreak: 0,
+      json: JSON.stringify(pl),
+    };
+    this._playlists.set(slot, st);
+    this._advancePlaylist(st);
+  }
+
+  private _stopPlaylist(slot: PlaylistSlot): void {
+    const st = this._playlists.get(slot);
+    if (!st) return;
+    st.token++;                                  // orphan any in-flight clip start
+    if (st.sound) this._finish(st.sound);        // also nulls _music/_ambient
+    this._playlists.delete(slot);
+  }
+
+  /** Move to the next startable entry: enter a silence gap, or start a clip.
+   *  Missing sound defs are skipped synchronously; async load failures re-enter
+   *  here, with a full ring of consecutive failures parking the sequence. */
+  private _advancePlaylist(st: PlaylistState): void {
+    if (!this._active || st.done) return;
+    for (let hops = 0; hops < st.entries.length; hops++) {
+      st.idx++;
+      if (st.idx >= st.entries.length) {
+        if (!st.loop) { st.done = true; return; }   // played once — silent until scene reload
+        st.idx = 0;
+      }
+      const entry = st.entries[st.idx]!;
+      if (entry.silence != null && !entry.soundId) {
+        if (entry.silence <= 0) continue;           // zero-length gap = skip
+        st.silenceLeft = entry.silence;             // update(dt) counts it down
+        return;
+      }
+      if (!entry.soundId) continue;                 // malformed entry
+      const def = assetManager.getSoundDef(entry.soundId);
+      if (!def) {
+        console.warn(`[AudioSystem] playlist (${st.slot}) skipping missing sound "${entry.soundId}"`);
+        continue;
+      }
+      this._startPlaylistClip(st, entry.soundId, entry.volume ?? def.volume ?? 1);
+      return;
+    }
+    // A full pass found nothing playable (all-silence-zero / all-missing): park.
+    st.done = true;
+    console.warn(`[AudioSystem] playlist (${st.slot}) has no playable entries — stopping`);
+  }
+
+  private _startPlaylistClip(st: PlaylistState, soundId: string, volume: number): void {
+    const token = ++st.token;
+    void this._makeSound(soundId, false, st.slot, volume, false, null).then(s => {
+      if (token !== st.token || !this._playlists.has(st.slot)) { if (s) this._finish(s); return; }
+      if (!s) {   // load failed (warned in _makeSound) — skip, but never spin forever
+        if (++st.failStreak >= st.entries.length) {
+          st.done = true;
+          console.warn(`[AudioSystem] playlist (${st.slot}) stopping — every clip failed to load`);
+        } else {
+          this._advancePlaylist(st);
+        }
+        return;
+      }
+      st.failStreak = 0;
+      st.sound = s;
+      if (st.slot === "music") { this._music = s; this._musicId = soundId; }
+      else                     { this._ambient = s; this._ambientId = soundId; }
+      // Replace _makeSound's self-destruct onEnded: finish AND advance.
+      s.onEnded = () => {
+        s.isPlaying = false;
+        this._finish(s);                            // nulls _music/_ambient too
+        if (token !== st.token) return;             // sequence was stopped/replaced
+        st.sound = null;
+        this._advancePlaylist(st);
+      };
+    });
   }
 
   // ── Positional object emitters ───────────────────────────────────────────────
