@@ -44,6 +44,7 @@ import { TriggerVolumeTool } from "@/editor/TriggerVolumeTool";
 import { DecalTool } from "@/editor/DecalTool";
 import { TriggerVolumeResizer } from "@/editor/TriggerVolumeResizer";
 import { ColliderEditor } from "@/editor/ColliderEditor";
+import { AiRangeRings } from "@/editor/AiRangeRings";
 import { WallSplitter } from "@/editor/WallSplitter";
 import { SegmentHighlighter } from "@/editor/SegmentHighlighter";
 import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
@@ -402,6 +403,7 @@ export default function App() {
     const triggerVolumeResizer = new TriggerVolumeResizer(scene.scene, world, bus, scene.camera, canvas);
     const stairCutterResizer = new StairCutterResizer(scene.scene, world, bus, scene.camera, canvas);
     const colliderEditor  = new ColliderEditor(scene.scene, world, bus, scene.camera, canvas, objectPlacer);
+    new AiRangeRings(scene.scene, bus, world);   // Enemy AI screen's SHOW RANGES viewport rings (Phase 63)
     const wallSplitter    = new WallSplitter(scene.scene, scene.camera, canvas, world, bus);
     const segmentHighlighter = new SegmentHighlighter(scene.scene, world, bus);
     const scriptEngine    = new ScriptEngine(bus, world);

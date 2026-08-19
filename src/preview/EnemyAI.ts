@@ -48,6 +48,7 @@ interface Resolved {
   detectRadius: number; giveUpRadius: number; attackRange: number;
   moveSpeed: number; attackDamage: number; damageKey: string;
   attackCooldown: number; damageMoment: number; variation: number; leashRadius: number;
+  freeRoam: boolean;
   idleClip: string | null; walkClip: string | null; attackClip: string | null;
   clipsResolved: boolean;   // false until the model's clips were available for auto-match
   heightY: number | null;   // enemy body height (AABB × scale) — bite whiffs above it; null until the model loaded
@@ -142,6 +143,7 @@ export class EnemyAI {
             damageMoment:  def.damageMoment ?? 0.4,
             variation:     Math.max(0, Math.min(1, def.variation ?? 0.5)),
             leashRadius:   def.leashRadius ?? 12,
+            freeRoam:      def.freeRoam ?? false,
             idleClip: null, walkClip: null, attackClip: null, clipsResolved: false,
             heightY: null,
           },

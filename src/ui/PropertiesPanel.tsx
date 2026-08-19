@@ -781,7 +781,7 @@ export function PropertiesPanel({
         ) : currentScreen === "scripts" ? (
           <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} onObjectUpdate={onObjectUpdate} bus={bus} />
         ) : currentScreen === "ai" ? (
-          <EnemyAIScreen selected={selected} assets={assets} onObjectUpdate={onObjectUpdate} />
+          <EnemyAIScreen selected={selected} assets={assets} onObjectUpdate={onObjectUpdate} bus={bus} />
         ) : null}
       </div>
 
@@ -5596,23 +5596,45 @@ function ScriptListRows({ scripts, emptyHint, onToggle, onDelete, onOpen }: {
 // Detect → chase/circle → attack, driven by the EnemyAI runtime system.
 // Damage is applied to a GLOBAL state key (the player's health key); enemy
 // death stays authored via the entity's own STATE + scripts (Phase 60).
-function EnemyAIScreen({ selected, assets, onObjectUpdate }: {
+function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
   selected: SelectedObjectPayload;
   assets: AssetDef[];
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  bus?: EventBus;
 }) {
   const obj = selected.data as WorldObject | null;
+  const ai = obj?.ai;
+  const [showRanges, setShowRanges] = useState(false);
+  // Viewport rings for the radii being edited (AiRangeRings listens). Re-emits
+  // on every value change so the circles track typing; clears on toggle-off,
+  // deselect, and unmount.
+  const detect = ai?.detectRadius ?? 6;
+  const ranges = {
+    detect,
+    giveUp: ai?.giveUpRadius ?? detect * 1.5,
+    attack: ai?.attackRange ?? 1.2,
+    leash:  ai?.freeRoam ? null : (ai?.leashRadius ?? 12),
+  };
+  const rangesJson = JSON.stringify(ranges);
+  const wantRings = showRanges && !!obj && !!ai?.enabled;
+  useEffect(() => {
+    if (!bus || !wantRings) return;
+    bus.emit("ai:range-preview", { objectId: obj.id, ranges: JSON.parse(rangesJson) });
+    return () => bus.emit("ai:range-preview", { objectId: null });
+  }, [bus, wantRings, obj?.id, rangesJson]);
   if (!obj) return null;
-  const ai = obj.ai;
   const write = (changes: Partial<EnemyAIDef>) =>
     onObjectUpdate({ ai: { enabled: ai?.enabled ?? false, ...(ai ?? {}), ...changes } });
   const clips = assets.find(a => a.id === obj.assetId)?.animations ?? [];
   const ROW: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 };
   type NumKey = "detectRadius" | "giveUpRadius" | "attackRange" | "moveSpeed" | "attackDamage"
     | "attackCooldown" | "damageMoment" | "variation" | "leashRadius";
-  const numRow = (label: string, key: NumKey, dflt: number, step: number, title: string) => (
+  const numRow = (label: string, key: NumKey, dflt: number, step: number, title: string, dot?: string) => (
     <div style={ROW} title={title}>
-      <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
+      <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 5 }}>
+        {dot && showRanges && <span style={{ width: 7, height: 7, borderRadius: "50%", background: dot, flexShrink: 0 }} />}
+        {label}
+      </span>
       <input type="number" step={step} style={{ ...NUM_INPUT, width: 72 }}
         key={obj.id + key + String(ai?.[key] ?? "")}
         defaultValue={ai?.[key] ?? dflt}
@@ -5651,9 +5673,14 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate }: {
       </label>
       {ai?.enabled && (
         <>
-          {numRow("DETECT RADIUS", "detectRadius", 6, 0.5, "Notices the player within this many metres (horizontal; max 3m height difference)")}
-          {numRow("GIVE-UP RADIUS", "giveUpRadius", (ai?.detectRadius ?? 6) * 1.5, 0.5, "Loses the player beyond this (bigger than detect = doesn't flicker at the edge)")}
-          {numRow("ATTACK RANGE", "attackRange", 1.2, 0.1, "Starts a bite within this distance")}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 8 }}
+                 title="Draws the radii below as colored circles around this enemy in the viewport while this screen is open">
+            <input type="checkbox" checked={showRanges} onChange={e => setShowRanges(e.target.checked)} />
+            <span style={{ fontSize: 10, color: "#c2cadb", letterSpacing: 0.5 }}>SHOW RANGES IN VIEWPORT</span>
+          </label>
+          {numRow("DETECT RADIUS", "detectRadius", 6, 0.5, "Notices the player within this many metres (horizontal; max 3m height difference)", "#37d67a")}
+          {numRow("GIVE-UP RADIUS", "giveUpRadius", (ai?.detectRadius ?? 6) * 1.5, 0.5, "Loses the player beyond this (bigger than detect = doesn't flicker at the edge)", "#e8c14b")}
+          {numRow("ATTACK RANGE", "attackRange", 1.2, 0.1, "Starts a bite within this distance", "#ff5d5d")}
           {numRow("MOVE SPEED", "moveSpeed", 2.5, 0.25, "Chase speed, metres/second (player walks ~6)")}
           {numRow("ATTACK DAMAGE", "attackDamage", 1, 1, "Subtracted from DAMAGE KEY when a bite lands")}
           <div style={ROW} title="The GLOBAL state key a landed bite reduces — the player's health key (this game may use Hearts)">
@@ -5667,7 +5694,13 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate }: {
           {numRow("ATTACK COOLDOWN", "attackCooldown", 1.5, 0.1, "Seconds between bites")}
           {numRow("DAMAGE MOMENT", "damageMoment", 0.4, 0.05, "Seconds into the attack clip when the hit actually lands (mid-lunge, not wind-up)")}
           {numRow("VARIATION", "variation", 0.5, 0.1, "0–1: circling approach, jittered attack timing, occasional feints. 0 = straight beeline")}
-          {numRow("LEASH RADIUS", "leashRadius", 12, 1, "Max distance from its placed spot — beyond it, gives up and walks home")}
+          <div style={ROW} title="No leash: chases the player anywhere, and after losing them stays where it is instead of walking back to its placed spot">
+            <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>FREE ROAM</span>
+            <input type="checkbox" checked={ai?.freeRoam ?? false}
+              onChange={e => write({ freeRoam: e.target.checked || undefined })} />
+          </div>
+          {!ai?.freeRoam &&
+            numRow("LEASH RADIUS", "leashRadius", 12, 1, "Max distance from its placed spot — beyond it, gives up and walks home", "#58a6ff")}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
           {clipRow("IDLE CLIP", "idleClip", "Played while standing guard")}
           {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}

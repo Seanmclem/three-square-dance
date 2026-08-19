@@ -27,6 +27,8 @@ export interface BrainParams {
   detectRadius: number; giveUpRadius: number; attackRange: number;
   attackCooldown: number; damageMoment: number; variation: number;
   leashRadius: number;
+  /** No leash, no walk-home: chases anywhere, idles wherever it loses the player. */
+  freeRoam: boolean;
 }
 
 /** Mutable per-enemy decision state (owned by the adapter's rec). */
@@ -95,14 +97,15 @@ export function tick(mem: BrainMem, p: BrainParams, s: BrainSenses): BrainIntent
 
   // ── transitions ──
   if (mem.state === "idle" || mem.state === "return") {
-    if (s.distXZ <= p.detectRadius && s.dyOk && s.fromPost <= p.leashRadius) {
+    if (s.distXZ <= p.detectRadius && s.dyOk && (p.freeRoam || s.fromPost <= p.leashRadius)) {
       mem.state = "chase";
       out.fire = "on_player_detected";
     }
   }
   if (mem.state === "chase") {
-    if (s.distXZ > p.giveUpRadius || !s.dyOk || s.fromPost > p.leashRadius) {
-      mem.state = "return";
+    if (s.distXZ > p.giveUpRadius || !s.dyOk || (!p.freeRoam && s.fromPost > p.leashRadius)) {
+      // Free roamers have no post to walk back to: they stand down in place.
+      mem.state = p.freeRoam ? "idle" : "return";
       out.fire = "on_player_lost";
     } else if (s.distXZ <= p.attackRange && s.clock >= mem.cooldownUntil) {
       mem.state = "attack";

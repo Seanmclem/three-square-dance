@@ -384,6 +384,9 @@ export interface BusEvents {
   // Overlay → DialogueRunner: player picked options[index] of the shown node
   "dialogue:choose":       { index: number };
   "object:despawn":        { id: string; fade?: number };   // fade = seconds to fade out (collider disables at fade end)
+  // Editor-only: PropertiesPanel's Enemy AI screen toggling the viewport range
+  // rings for one object; objectId null clears them. leash null = free roam.
+  "ai:range-preview":      { objectId: string | null; ranges?: { detect: number; giveUp: number; attack: number; leash: number | null } };
   "object:spawn":          { id: string; fade?: number };   // re-show a despawned/hidden entity; fade = seconds to fade in
   "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number; relativeToPlayer?: boolean };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass; relativeToPlayer = CharacterController adds its own look yaw, which only it knows)
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
@@ -1014,6 +1017,7 @@ export interface EnemyAIDef {
   damageMoment?:   number;        // seconds into the attack clip when the hit lands (default 0.4)
   variation?:      number;        // 0..1 movement variation: orbit drift + timing jitter + feints (default 0.5; 0 = beeline)
   leashRadius?:    number;        // max distance from the authored post before disengaging (default 12)
+  freeRoam?:       boolean;       // true = no leash and no walk-home: chases anywhere, idles wherever it loses the player (default false)
   // Clip mapping — undefined = auto by name match (idle/walk/attack, case-
   // insensitive substring, same spirit as the player's animClips); null = none.
   idleClip?:       string | null;

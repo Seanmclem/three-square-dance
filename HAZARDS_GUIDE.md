@@ -282,8 +282,15 @@ RADIUS (horizontal, max ~3m height difference), chases with some circling
 clip plays and, at DAMAGE MOMENT seconds into the swing, ATTACK DAMAGE is
 subtracted from the global **DAMAGE KEY** (set it to your health key — this
 game uses `Hearts`). It gives up beyond the GIVE-UP radius or its LEASH and
-walks back to its post. No pathfinding: it stops at walls and refuses ledges,
-so it patrols its own platform.
+walks back to its post — or turn on **FREE ROAM** (Phase 63) for no leash at
+all: it chases anywhere it can reach and, after losing the player, stands
+down wherever it is instead of walking home. No pathfinding either way: it
+stops at walls and refuses ledges, so it patrols whatever platform it's on.
+
+All the radii are hard to judge as numbers — tick **SHOW RANGES IN
+VIEWPORT** at the top of the screen to see them as colored circles around
+the enemy while you edit: green = detect, yellow = give-up, red = attack,
+blue = leash (hidden on free-roamers).
 
 Hook effects with three triggers on the enemy's own scripts:
 `on_player_detected` (alert bark, music sting), `on_player_lost`, and

@@ -28,6 +28,7 @@ function assert(cond: boolean, msg: string): void {
 const P: BrainParams = {
   detectRadius: 6, giveUpRadius: 9, attackRange: 1.6,
   attackCooldown: 1.2, damageMoment: 0.4, variation: 1, leashRadius: 12,
+  freeRoam: false,
 };
 
 function freshMem(): BrainMem {
@@ -151,6 +152,35 @@ function senses(over: Partial<BrainSenses>): BrainSenses {
     assert(!out.attackLanded, `${name}: bite whiffs`);
     assert(m.damageDone, `${name}: damage window still consumed`);
   }
+}
+
+// ── free roam: no leash, no walk-home ──
+{
+  const FR: BrainParams = { ...P, freeRoam: true };
+  // Detect ignores the leash entirely.
+  let m = freshMem();
+  let out = tick(m, FR, senses({ distXZ: 4, fromPost: 50 }));
+  assert(out.state === "chase" && out.fire === "on_player_detected",
+    "free roam: detects far beyond the leash radius");
+  // Being dragged any distance from the post never breaks the chase.
+  out = tick(m, FR, senses({ distXZ: 4, fromPost: 500 }));
+  assert(out.state === "chase", "free roam: chase survives any distance from post");
+  // Losing the player goes straight to idle in place — no return leg.
+  out = tick(m, FR, senses({ distXZ: 20, fromPost: 500 }));
+  assert(out.state === "idle" && out.fire === "on_player_lost" && out.move === "none",
+    "free roam: player lost → idle where it stands, on_player_lost fired");
+  out = tick(m, FR, senses({ distXZ: 20, fromPost: 500, homeDist: 500 }));
+  assert(out.state === "idle" && out.move === "none",
+    "free roam: never walks home afterwards");
+  // And it re-acquires from that far-flung spot.
+  out = tick(m, FR, senses({ distXZ: 5, fromPost: 500 }));
+  assert(out.state === "chase" && out.fire === "on_player_detected",
+    "free roam: re-detects from wherever it stopped");
+  // Homebound behavior is untouched: same drag past the leash breaks the chase.
+  m = freshMem();
+  tick(m, P, senses({ distXZ: 4 }));
+  out = tick(m, P, senses({ distXZ: 4, fromPost: 50 }));
+  assert(out.state === "return", "homebound (freeRoam off): leash still breaks the chase");
 }
 
 // ── cooldown jitter bounds + variation 0 ──
