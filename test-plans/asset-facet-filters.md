@@ -66,3 +66,22 @@ public/games/` was clean.
 - The visibility rule means **importing content changes which controls exist**. If a
   panel "loses" a segment, the data no longer splits: e.g. delete every sound but
   Kenney's and the Author segment disappears on its own.
+
+## Addendum (2026-08-19) — "(no pack)" bucket
+
+User report: the Pack facet — the original ask's "source/kit" filter — was
+invisible in the Sounds panel. Root cause: the library is 62 sounds from one
+kit ("Digital Audio") + 3 unlabeled fixtures, and `buildFacets` dropped blanks,
+so Pack had one distinct value and auto-hid. Fix: `FacetSpec.blankBucket` —
+unlabeled items form a synthetic "(no pack)" chip, and "one real kit shared by
+≥2 + ≥1 unlabeled item" now counts as a showable split. Verified in-browser:
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| 21 | Sounds: Pack segment visible | Renders alongside Categories/Tags/Author | ✅ `Pack` segment appears |
+| 22 | Sounds: pack chips | `Digital Audio 62` + `(no pack) 3` | ✅ both, count-ordered |
+| 23 | `(no pack)` filters | Exactly the 3 synthesized fixtures | ✅ Test Ambient / Test Blip / Test Music Loop |
+| 24 | `Digital Audio` filters | The 62 Kenney sounds, fixtures gone | ✅ |
+| 25 | Skyboxes | Same rule applies: `Skyboxes 5` + `(no pack) 3` | ✅ Pack segment now shows (was hidden) |
+| 26 | Materials/Graphics/Decals | Unchanged (singleton sourceNames still fail the shared-by-≥2 clause) | ✅ no Pack/Author segments |
+| 27 | Models | Unchanged (Pack via 3 kits, no unlabeled → no synthetic chip) | ✅ Categories/Tags/Pack |

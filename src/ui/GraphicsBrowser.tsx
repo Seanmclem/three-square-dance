@@ -29,7 +29,7 @@ const checkerTile = (path: string): React.CSSProperties => ({
 // GraphicDef has no `tags` field, so there is no tag facet here.
 const FACETS: FacetSpec<GraphicDef>[] = [
   { key: "cat",    label: "Categories", always: true, read: catOf },
-  { key: "pack",   label: "Pack",       read: g => g.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: g => g.attribution?.sourceName },
   { key: "author", label: "Author",     read: g => g.attribution?.author },
 ];
 

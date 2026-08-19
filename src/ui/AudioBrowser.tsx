@@ -15,7 +15,7 @@ const catOf = (s: SoundDef) => s.category ?? "SFX";
 const FACETS: FacetSpec<SoundDef>[] = [
   { key: "cat",    label: "Categories", always: true, order: "alpha", counts: false, read: catOf },
   { key: "tag",    label: "Tags",       multi: true, prefix: "#", read: s => s.tags },
-  { key: "pack",   label: "Pack",       read: s => s.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: s => s.attribution?.sourceName },
   { key: "author", label: "Author",     read: s => s.attribution?.author },
 ];
 

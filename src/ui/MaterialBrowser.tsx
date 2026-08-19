@@ -16,7 +16,7 @@ const catOf = (m: MaterialDef) => m.category ?? "Other";
 // MaterialDef has no `tags` field, so there is no tag facet here.
 const FACETS: FacetSpec<MaterialDef>[] = [
   { key: "cat",    label: "Categories", always: true, read: catOf },
-  { key: "pack",   label: "Pack",       read: m => m.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: m => m.attribution?.sourceName },
   { key: "author", label: "Author",     read: m => m.attribution?.author },
 ];
 

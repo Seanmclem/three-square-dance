@@ -14,6 +14,10 @@ export interface FacetSpec<T> {
   always?: boolean;                                        // exempt from the auto-hide rule (category)
   order?:  "count" | "alpha";                              // default "count" (most-used first)
   counts?: boolean;                                        // default true; category pills stay bare
+  /** Label for a synthetic bucket of items whose `read` yields nothing (e.g. "(no pack)").
+   *  Makes "one real kit + unlabeled items" a showable split — without it, audio's single
+   *  pack plus 3 unattributed fixtures rendered no Pack segment at all. */
+  blankBucket?: string;
   read:    (item: T) => string | string[] | undefined | null;
 }
 
@@ -32,18 +36,25 @@ export function buildFacets<T>(items: T[], specs: FacetSpec<T>[]): Facet[] {
   const out: Facet[] = [];
   for (const s of specs) {
     const counts = new Map<string, number>();
+    let blanks = 0;
     for (const item of items) {
       const raw = s.read(item);
+      let any = false;
       for (const v of Array.isArray(raw) ? raw : [raw]) {
         const t = (v ?? "").trim();
-        if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+        if (t) { counts.set(t, (counts.get(t) ?? 0) + 1); any = true; }
       }
+      if (!any && s.blankBucket) blanks++;
     }
-    const values = [...counts].map(([value, count]) => ({ value, count }))
-      .sort(s.order === "alpha"
-        ? (a, b) => a.value.localeCompare(b.value)
-        : (a, b) => (b.count - a.count) || a.value.localeCompare(b.value));
-    if (s.always || (values.length >= 2 && values.some(v => v.count >= 2)))
+    const values = [...counts].map(([value, count]) => ({ value, count }));
+    // "(no pack)" joins only when it makes the facet worth showing alongside at
+    // least one real shared value — never as the facet's sole reason to exist.
+    const blankSplits = !!s.blankBucket && blanks >= 1 && values.some(v => v.count >= 2);
+    if (blankSplits) values.push({ value: s.blankBucket!, count: blanks });
+    values.sort(s.order === "alpha"
+      ? (a, b) => a.value.localeCompare(b.value)
+      : (a, b) => (b.count - a.count) || a.value.localeCompare(b.value));
+    if (s.always || blankSplits || (values.length >= 2 && values.some(v => v.count >= 2)))
       out.push({
         key: s.key, label: s.label, multi: !!s.multi, prefix: s.prefix ?? "",
         counts: s.counts ?? true, values,
@@ -61,6 +72,7 @@ export function matchesFacets<T>(item: T, specs: FacetSpec<T>[], sel: FacetSel):
     if (!picked?.length) continue;
     const raw = s.read(item);
     const own = (Array.isArray(raw) ? raw : [raw]).map(v => (v ?? "").trim()).filter(Boolean);
+    if (!own.length && s.blankBucket) own.push(s.blankBucket);   // unlabeled items live in the synthetic bucket
     // Multi-select is ANDed (an item must carry every picked tag); exclusive facets hold
     // one value, and an item has exactly one, so membership is the same test.
     const ok = s.multi ? picked.every(p => own.includes(p)) : own.includes(picked[0]!);

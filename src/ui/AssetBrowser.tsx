@@ -8,7 +8,7 @@ import { buildFacets, matchesFacets, type FacetSpec, type FacetSel } from "@/ui/
 // panel's own richer strip: 142 assets and dozens of tags need the `More ▾` popout,
 // which the simpler panels (AssetFilterBar) don't.
 const ATTR_FACETS: FacetSpec<AssetDef>[] = [
-  { key: "pack",   label: "Pack",   read: a => a.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",   read: a => a.attribution?.sourceName },
   { key: "author", label: "Author", read: a => a.attribution?.author },
 ];
 

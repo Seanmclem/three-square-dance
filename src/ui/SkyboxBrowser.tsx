@@ -17,7 +17,7 @@ const catOf = (s: SkyboxDef) => s.category ?? "Other";
 const FACETS: FacetSpec<SkyboxDef>[] = [
   { key: "cat",    label: "Categories", always: true, order: "alpha", counts: false, read: catOf },
   { key: "tag",    label: "Tags",       multi: true, prefix: "#", read: s => s.tags },
-  { key: "pack",   label: "Pack",       read: s => s.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: s => s.attribution?.sourceName },
   { key: "author", label: "Author",     read: s => s.attribution?.author },
 ];
 

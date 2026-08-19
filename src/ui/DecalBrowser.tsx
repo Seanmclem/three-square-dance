@@ -16,7 +16,7 @@ const catOf = (d: DecalTexDef) => d.category ?? "Other";
 // because Overlay/Surface is a hard split above them, not another facet.
 const FACETS: FacetSpec<DecalTexDef>[] = [
   { key: "cat",    label: "Categories", always: true, read: catOf },
-  { key: "pack",   label: "Pack",       read: d => d.attribution?.sourceName },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: d => d.attribution?.sourceName },
   { key: "author", label: "Author",     read: d => d.attribution?.author },
 ];
 
