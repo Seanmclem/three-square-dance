@@ -1178,6 +1178,669 @@
         "sourceName": "Digital Audio",
         "sourceUrl": "https://kenney.nl/assets/digital-audio"
       }
+    },
+    {
+      "id": "jingles_steel16",
+      "label": "jingles STEEL16",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel16.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel15",
+      "label": "jingles STEEL15",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel15.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel14",
+      "label": "jingles STEEL14",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel14.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel13",
+      "label": "jingles STEEL13",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel13.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel12",
+      "label": "jingles STEEL12",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel12.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel11",
+      "label": "jingles STEEL11",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel11.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel10",
+      "label": "jingles STEEL10",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel10.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel09",
+      "label": "jingles STEEL09",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel09.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel08",
+      "label": "jingles STEEL08",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel08.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel07",
+      "label": "jingles STEEL07",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel07.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel06",
+      "label": "jingles STEEL06",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel06.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel05",
+      "label": "jingles STEEL05",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel05.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel04",
+      "label": "jingles STEEL04",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel04.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel03",
+      "label": "jingles STEEL03",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel03.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel02",
+      "label": "jingles STEEL02",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel02.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel01",
+      "label": "jingles STEEL01",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel01.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_steel00",
+      "label": "jingles STEEL00",
+      "category": "Music",
+      "path": "/assets/audio/jingles_steel00.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "steel-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax16",
+      "label": "jingles SAX16",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax16.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax15",
+      "label": "jingles SAX15",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax15.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax14",
+      "label": "jingles SAX14",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax14.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax13",
+      "label": "jingles SAX13",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax13.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax12",
+      "label": "jingles SAX12",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax12.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax11",
+      "label": "jingles SAX11",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax11.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax10",
+      "label": "jingles SAX10",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax10.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax09",
+      "label": "jingles SAX09",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax09.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax08",
+      "label": "jingles SAX08",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax08.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax07",
+      "label": "jingles SAX07",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax07.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax06",
+      "label": "jingles SAX06",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax06.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax05",
+      "label": "jingles SAX05",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax05.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax04",
+      "label": "jingles SAX04",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax04.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax03",
+      "label": "jingles SAX03",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax03.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax02",
+      "label": "jingles SAX02",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax02.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax01",
+      "label": "jingles SAX01",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax01.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
+    },
+    {
+      "id": "jingles_sax00",
+      "label": "jingles SAX00",
+      "category": "Music",
+      "path": "/assets/audio/jingles_sax00.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "sax-jingles"
+      ],
+      "dateAdded": "2026-08-19",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Music Jingles",
+        "sourceUrl": "https://kenney.nl/assets/music-jingles"
+      }
     }
   ]
 }
