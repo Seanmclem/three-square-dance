@@ -178,6 +178,9 @@ export class ZoneManager {
   // Volume interior fills render in the EDITOR only (screen-covering translucent
   // overdraw is measurable GPU cost in play modes); tracked for rebuilds mid-preview.
   private _inPreview = false;
+  // True while a gameplay-mode preview has hideInGame meshes hidden — spawn_object
+  // must not re-show a trigger volume's editor wireframe mid-game.
+  private _hideInGameActive = false;
 
   get doorSensorMap():   ReadonlyMap<number, string> { return this._doorSensors; }
   get volumeSensorMap(): Map<number, string>          { return this._volumeSensors; }
@@ -537,7 +540,7 @@ export class ZoneManager {
         this._ghostsSolid = true;
         this._dimSuspended = true;
         this._applyDimming();
-        if (isGameplayMode(mode)) this._setHideInGameVisible(false);
+        if (isGameplayMode(mode)) { this._hideInGameActive = true; this._setHideInGameVisible(false); }
         // Deferred past the rest of the preview:start listener chain: App's
         // handler (registered AFTER us) resets gameState on New Game or
         // restores a save on Continue — the Phase-60 despawn-state read must
@@ -548,6 +551,7 @@ export class ZoneManager {
       this._bus.on("preview:stop",  () => {
         this._flickerActive = false;
         this._inPreview = false;
+        this._hideInGameActive = false;
         this._setVolumeFillsVisible(true);
         this._restoreDespawned();
         this._restoreLightStates();
@@ -1576,7 +1580,7 @@ export class ZoneManager {
       // Trigger volume: wireframe + optional fill + sensor (disabling the sensor stops triggers).
       let found = false;
       for (const m of this._volumeMeshes.get(zoneId) ?? [])
-        if (m.userData["editorId"] === id) { m.visible = visible; found = true; }
+        if (m.userData["editorId"] === id) { m.visible = visible && !this._hideInGameActive; found = true; }
       for (const f of this._volumeFills.get(zoneId) ?? [])
         if (f.userData["editorId"] === id) { f.visible = visible; found = true; }
       for (const c of this._volumeColliders.get(zoneId) ?? [])

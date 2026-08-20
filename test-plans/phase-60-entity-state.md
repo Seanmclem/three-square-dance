@@ -47,3 +47,20 @@ Cleanup: all `test_*` entities removed (including a duplicate-id goblin the
 artifact produced), `worldeditor_gamesave` restored, workspace autosave purged,
 `git status public/` showed only the USER'S own parallel edits (committed as
 content).
+
+## Regression fix (2026-08-20, v4.79.5)
+
+**`spawn_object` re-showed a trigger volume's yellow editor wireframe in
+gameplay.** The wire is tagged `hideInGame` and hidden on gameplay
+`preview:start`, but `_setEntityHidden(id, false)` (the `object:spawn` path)
+force-set `visible = true` on it — so the platfrom-obby spike cube's
+despawn/spawn hurt-volume cycle flashed a yellow box every interval. Fixed by
+tracking `_hideInGameActive` in ZoneManager and gating only the wireframe show
+on it (the gradient fill is runtime-visible by design and still shows; the
+sensor toggle is untouched).
+
+Verified in a Chrome tab on the dev shell (tab must be foregrounded — a hidden
+tab pauses rAF, so timers/triggers don't run): wire `visible` sampled false
+across 5 s of live spike cycles, hearts still drop standing in the spawned
+volume, spikes-up screenshot shows no box, and `exitPreview` restores wire +
+fill + arrow to visible in the editor.
