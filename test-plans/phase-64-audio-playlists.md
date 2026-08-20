@@ -49,3 +49,25 @@ on platfrom-obby through the real Audio-screen UI plus manual sequencer probes
 
 platfrom-obby level_1 BACKGROUND MUSIC = the 3-entry demo playlist
 (sax00 → 2s silence → steel03 @ 0.5, loop on). Edit or remove freely.
+
+## Addendum (2026-08-19) — clip-advance bug: onEnded must be wired BEFORE play()
+
+User report from real preview gameplay: the 2nd sound after the silence gap
+never played. Root cause: THREE.Audio binds `onEnded` onto the WebAudio buffer
+source AT `play()` time — the sequencer assigned its advance callback to the
+`.onEnded` property AFTER play, so the real clip-end fired _makeSound's
+original self-destruct instead and the sequence stalled with `st.sound`
+pointing at a disposed sound. The original acceptance run masked it by
+invoking `st.sound.onEnded()` (the property — i.e. the override itself)
+instead of the source-bound callback. Fix: `_makeSound` takes an `onDone`
+callback baked into the pre-play onEnded. Re-verified via the REAL wiring
+(`st.sound.source.onended()` — the exact function WebAudio invokes):
+
+| # | Check | Result |
+|---|---|---|
+| A1 | Real clip-end advances into the silence gap | ✅ idx 0 → 1, silenceLeft 2.0 |
+| A2 | Silence ticks into clip 3 | ✅ steel03 playing |
+| A3 | Real clip-end on the last entry wraps (loop on) | ✅ back to sax00 |
+
+Lesson: when a system hands a callback to an engine, verify by firing the
+engine's captured reference, not the property you assigned.

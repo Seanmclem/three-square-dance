@@ -356,7 +356,14 @@ export class AudioSystem {
 
   private _startPlaylistClip(st: PlaylistState, soundId: string, volume: number): void {
     const token = ++st.token;
-    void this._makeSound(soundId, false, st.slot, volume, false, null).then(s => {
+    // The advance callback rides INTO _makeSound so it's wired before play() —
+    // the source captures onEnded at play time; post-play reassignment is inert.
+    const onDone = () => {
+      if (token !== st.token) return;               // sequence was stopped/replaced
+      st.sound = null;
+      this._advancePlaylist(st);
+    };
+    void this._makeSound(soundId, false, st.slot, volume, false, null, false, undefined, onDone).then(s => {
       if (token !== st.token || !this._playlists.has(st.slot)) { if (s) this._finish(s); return; }
       if (!s) {   // load failed (warned in _makeSound) — skip, but never spin forever
         if (++st.failStreak >= st.entries.length) {
@@ -371,14 +378,6 @@ export class AudioSystem {
       st.sound = s;
       if (st.slot === "music") { this._music = s; this._musicId = soundId; }
       else                     { this._ambient = s; this._ambientId = soundId; }
-      // Replace _makeSound's self-destruct onEnded: finish AND advance.
-      s.onEnded = () => {
-        s.isPlaying = false;
-        this._finish(s);                            // nulls _music/_ambient too
-        if (token !== st.token) return;             // sequence was stopped/replaced
-        st.sound = null;
-        this._advancePlaylist(st);
-      };
     });
   }
 
@@ -413,6 +412,7 @@ export class AudioSystem {
     soundId: string, positional: boolean, bus: Bus, base: number, loop: boolean,
     parent: THREE.Object3D | null, startSilent = false,
     dist?: { ref: number; max: number },
+    onDone?: () => void,   // fired when a non-looping sound finishes (AFTER its disposal)
   ): Promise<AnyAudio | null> {
     let buffer: AudioBuffer;
     try {
@@ -438,7 +438,11 @@ export class AudioSystem {
     if (parent) parent.add(sound); else this._scene.scene.add(sound);
     this._all.add(sound);
 
-    if (!loop) sound.onEnded = () => { sound.isPlaying = false; this._finish(sound); };
+    // MUST be assigned before play(): THREE binds onEnded onto the buffer source
+    // AT play() time — reassigning `.onEnded` afterwards never reaches the source
+    // (the playlist's first shipped bug: clip 2 never played because the advance
+    // callback was attached post-play and the original self-destruct ran instead).
+    if (!loop) sound.onEnded = () => { sound.isPlaying = false; this._finish(sound); onDone?.(); };
     sound.play();
     return sound;
   }
