@@ -6455,10 +6455,10 @@ function AudioSlotPage({ kind, audio, onChange }: {
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       {kind === "music" ? (
-        <AudioSlotEditor label="BACKGROUND MUSIC" slot={audio?.music}
+        <AudioSlotEditor slot={audio?.music}
           onSlot={next => onChange({ music: next })} keepLoopTrue />
       ) : (
-        <AudioSlotEditor label="AMBIENT LOOP" slot={audio?.ambient}
+        <AudioSlotEditor slot={audio?.ambient}
           onSlot={next => onChange({ ambient: next })} />
       )}
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
@@ -6514,15 +6514,14 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
 // silence entries are the spacing tool.
 type AudioSlot = { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist };
 
-function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
-  label:        string;
+function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   slot?:        AudioSlot;
   onSlot:       (next: AudioSlot | undefined) => void;
   keepLoopTrue?: boolean;   // the music slot's single-track mode always loops (existing behavior)
 }) {
   const pl = slot?.playlist;
   const MODE_BTN = (active: boolean): React.CSSProperties => ({
-    padding: "2px 8px", fontSize: 9, letterSpacing: 0.5, borderRadius: 3, cursor: "pointer",
+    padding: "3px 10px", fontSize: 9, letterSpacing: 0.5, borderRadius: 3, cursor: "pointer",
     border: `1px solid ${active ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.1)"}`,
     background: active ? "rgba(80,140,255,0.2)" : "transparent",
     color: active ? "#80aaff" : "#8b94a8",
@@ -6561,12 +6560,9 @@ function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", ...LABEL }}>
-        <span>{label}</span>
-        <span style={{ display: "flex", gap: 3, cursor: "pointer" }}>
-          <button style={MODE_BTN(!pl)} onClick={() => { if (pl) toSingle(); }}>SINGLE</button>
-          <button style={MODE_BTN(!!pl)} onClick={() => { if (!pl) toPlaylist(); }}>PLAYLIST</button>
-        </span>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 3, cursor: "pointer", marginBottom: 10 }}>
+        <button style={MODE_BTN(!pl)} onClick={() => { if (pl) toSingle(); }}>SINGLE</button>
+        <button style={MODE_BTN(!!pl)} onClick={() => { if (!pl) toPlaylist(); }}>PLAYLIST</button>
       </div>
       {!pl ? (
         <SoundPicker value={slot?.soundId} allowNone
@@ -6574,7 +6570,7 @@ function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
             ? { soundId: id, ...(slot?.volume != null ? { volume: slot.volume } : {}), ...(keepLoopTrue ? { loop: true } : {}) }
             : undefined)} />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {pl.entries.length === 0 && (
             <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
               Empty sequence — add clips and silence gaps below.
@@ -6589,7 +6585,7 @@ function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
               </>
             );
             const CARD: React.CSSProperties = {
-              display: "flex", flexDirection: "column", gap: 4, padding: "4px 6px",
+              display: "flex", flexDirection: "column", gap: 7, padding: "7px 8px",
               background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 4,
             };
             const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
@@ -6624,7 +6620,7 @@ function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
               </div>
             );
           })}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, {}])}>+ clip</button>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
             <span style={{ flex: 1 }} />
