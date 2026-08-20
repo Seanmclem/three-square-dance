@@ -12,7 +12,8 @@ interface AudioBrowserProps {
 
 const catOf = (s: SoundDef) => s.category ?? "SFX";
 
-const FACETS: FacetSpec<SoundDef>[] = [
+// Shared with SoundPickerModal so the modal filters exactly like this panel.
+export const SOUND_FACETS: FacetSpec<SoundDef>[] = [
   { key: "cat",    label: "Categories", always: true, order: "alpha", counts: false, read: catOf },
   { key: "tag",    label: "Tags",       multi: true, prefix: "#", read: s => s.tags },
   { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: s => s.attribution?.sourceName },
@@ -50,7 +51,7 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
     void a.play().then(() => setPlaying(s.id)).catch(() => setPlaying(null));
   };
 
-  const facetState = useFacetFilters(sounds, FACETS);
+  const facetState = useFacetFilters(sounds, SOUND_FACETS);
 
   // Natural order so "sound12" sorts after "sound9", not next to "sound1".
   const q = search.toLowerCase();

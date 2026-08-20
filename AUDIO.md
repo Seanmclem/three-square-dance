@@ -50,9 +50,13 @@ saved per-scene in `WorldConfig.audio`; they start on Preview/Play and loop. Acr
 ### Playlists (Phase 64) — composed clip sequences
 
 Each slot has a **SINGLE ⇄ PLAYLIST** switch. Playlist mode is a script-actions-style
-list: clip rows (sound picker + per-clip volume 0–1) and **SILENCE** rows (a gap of N
-seconds), reordered one step at a time with ▲▼, removed with ✕, extended with
-`+ clip` / `+ silence`. The sequence plays one entry at a time, in authored order, with
+list: clip rows (per-clip volume 0–1) and **SILENCE** rows (a gap of N seconds),
+reordered one step at a time with ▲▼, removed with ✕, extended with
+`+ clip` / `+ silence`. `+ clip` (and clicking a clip row's sound name) opens a
+**modal sound picker** — the AUDIO panel's search + Categories/Tags/Pack filters over
+a browsable list with ▶ previews — instead of a whole-library dropdown; the modal
+remembers its search/filter state across close/reopen, so adding several clips from
+one filtered view picks up right where you left off. The sequence plays one entry at a time, in authored order, with
 hard cuts — silence entries are the spacing tool. **LOOP** on repeats the whole
 sequence; off plays it once per scene entry and then stays silent until the scene
 reloads. Layer soundscapes by giving music AND ambient each their own playlist (they

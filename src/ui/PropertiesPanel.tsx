@@ -8,6 +8,7 @@ import type {
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
+import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
 import { facesFromCloud, splitFaceQuad, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
@@ -6520,6 +6521,19 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   keepLoopTrue?: boolean;   // the music slot's single-track mode always loops (existing behavior)
 }) {
   const pl = slot?.playlist;
+  // Which playlist row the sound-picker modal is choosing for ("add" = append a new
+  // clip). The modal itself remembers its search/filter state across open/close.
+  const [pickerFor, setPickerFor] = useState<number | "add" | null>(null);
+  const previewRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => { previewRef.current?.pause(); }, []);
+  const previewClip = (soundId: string) => {
+    const def = assetManager.getSoundDef(soundId);
+    if (!def) return;
+    if (!previewRef.current) previewRef.current = new Audio();
+    const a = previewRef.current;
+    a.src = def.path; a.currentTime = 0;
+    void a.play().catch(() => { /* autoplay / decode failure — ignore */ });
+  };
   const MODE_BTN = (active: boolean): React.CSSProperties => ({
     padding: "3px 10px", fontSize: 9, letterSpacing: 0.5, borderRadius: 3, cursor: "pointer",
     border: `1px solid ${active ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.1)"}`,
@@ -6605,8 +6619,18 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               <div key={i} style={CARD}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={IDX}>{i + 1}</span>
-                  <SoundPicker value={e.soundId} allowNone style={{ flex: 1, minWidth: 0 }}
-                    onChange={id => id ? patch(i, { soundId: id }) : remove(i)} />
+                  <button onClick={() => setPickerFor(i)} title="Change clip"
+                    style={{ flex: 1, minWidth: 0, textAlign: "left", padding: "4px 6px", borderRadius: 4,
+                      cursor: "pointer", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.08)",
+                      color: e.soundId ? "#c8c8c8" : "#8b94a8", fontSize: 11, fontFamily: "monospace",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {e.soundId ? (assetManager.getSoundDef(e.soundId)?.label ?? e.soundId) : "Select a sound…"}
+                  </button>
+                  <button onClick={() => e.soundId && previewClip(e.soundId)} title="Preview" disabled={!e.soundId}
+                    style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 4, cursor: e.soundId ? "pointer" : "default",
+                      background: e.soundId ? "rgba(80,140,255,0.15)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${e.soundId ? "rgba(80,140,255,0.3)" : "rgba(255,255,255,0.07)"}`,
+                      color: e.soundId ? "#80aaff" : "#555", fontSize: 10, lineHeight: 1 }}>▶</button>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 18 }}>
                   <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5 }}>VOL</span>
@@ -6621,7 +6645,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
             );
           })}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, {}])}>+ clip</button>
+            <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
             <span style={{ flex: 1 }} />
             <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
@@ -6633,6 +6657,15 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
             </label>
           </div>
         </div>
+      )}
+      {pickerFor !== null && (
+        <SoundPickerModal title={pickerFor === "add" ? "ADD CLIP" : `CLIP ${pickerFor + 1}`}
+          onClose={() => setPickerFor(null)}
+          onPick={id => {
+            if (pickerFor === "add") writeEntries([...(pl?.entries ?? []), { soundId: id }]);
+            else patch(pickerFor, { soundId: id });
+            setPickerFor(null);
+          }} />
       )}
     </div>
   );
