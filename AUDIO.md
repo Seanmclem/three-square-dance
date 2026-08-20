@@ -60,7 +60,10 @@ reordered one step at a time with ▲▼, removed with ✕, extended with
 **modal sound picker** — the AUDIO panel's search + Categories/Tags/Pack filters over
 a browsable list with ▶ previews — instead of a whole-library dropdown; the modal
 remembers its search/filter state across close/reopen, so adding several clips from
-one filtered view picks up right where you left off. The sequence plays one entry at a time, in authored order, with
+one filtered view picks up right where you left off. Every other sound field in the
+editor (single-track music/ambient, character footstep/jump/land, object sound
+emitters, script play_sound / play_music actions) opens the same modal — the field
+shows the current sound's label with ▶ preview and, where clearable, a ✕. The sequence plays one entry at a time, in authored order, with
 hard cuts — silence entries are the spacing tool. **LOOP** on repeats the whole
 sequence; off plays it once per scene entry and then stays silent until the scene
 reloads. Layer soundscapes by giving music AND ambient each their own playlist (they
