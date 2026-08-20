@@ -64,7 +64,11 @@ one filtered view picks up right where you left off. Every other sound field in 
 editor (single-track music/ambient, character footstep/jump/land, object sound
 emitters, script play_sound / play_music actions) opens the same modal — the field
 shows the current sound's label with ▶ preview and, where clearable, a ✕. The sequence plays one entry at a time, in authored order, with
-hard cuts — silence entries are the spacing tool. **LOOP** on repeats the whole
+hard cuts — silence entries are the spacing tool. The **▶ preview** button beside
+`+ clip`/`+ silence` plays the whole composed sequence once right in the panel —
+per-clip volumes and real silence gaps, the playing row highlighted, ⏹ to stop
+(editor-only plain `<audio>`; exported games still play through the runtime
+AudioSystem). **LOOP** on repeats the whole
 sequence; off plays it once per scene entry and then stays silent until the scene
 reloads. Layer soundscapes by giving music AND ambient each their own playlist (they
 run simultaneously on their own buses). All clips preload at scene start, so nothing

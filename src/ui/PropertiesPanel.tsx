@@ -6528,13 +6528,61 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   // clip). The modal itself remembers its search/filter state across open/close.
   const [pickerFor, setPickerFor] = useState<number | "add" | null>(null);
   const previewRef = useRef<HTMLAudioElement | null>(null);
-  useEffect(() => () => { previewRef.current?.pause(); }, []);
+  // Whole-sequence preview (editor-only — plain <audio>, never the runtime
+  // AudioSystem, so nothing here ships in exported games). previewIdx highlights
+  // the playing row; the token invalidates stale onended/timer advances.
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  const seqToken = useRef(0);
+  const seqTimer = useRef<number | null>(null);
+  const stopSeq = () => {
+    seqToken.current++;
+    if (seqTimer.current != null) { clearTimeout(seqTimer.current); seqTimer.current = null; }
+    const a = previewRef.current;
+    if (a) { a.onended = null; a.pause(); }
+    setPreviewIdx(null);
+  };
+  useEffect(() => () => {
+    seqToken.current++;
+    if (seqTimer.current != null) clearTimeout(seqTimer.current);
+    previewRef.current?.pause();
+  }, []);
+  // Plays the composed sequence ONCE, top to bottom, with per-clip volumes and
+  // real silence gaps (LOOP is a runtime behavior — a preview that never ends
+  // would just have to be stopped by hand anyway).
+  const startSeq = () => {
+    stopSeq();
+    const entries = pl?.entries ?? [];
+    if (!entries.length) return;
+    const token = ++seqToken.current;
+    if (!previewRef.current) previewRef.current = new Audio();
+    const step = (i: number) => {
+      if (token !== seqToken.current) return;
+      if (i >= entries.length) { setPreviewIdx(null); return; }
+      const e = entries[i]!;
+      setPreviewIdx(i);
+      if (e.soundId) {
+        const def = assetManager.getSoundDef(e.soundId);
+        if (!def) { step(i + 1); return; }
+        const a = previewRef.current!;
+        a.src = def.path; a.currentTime = 0;
+        a.volume = Math.max(0, Math.min(1, (e.volume ?? 1) * (def.volume ?? 1)));
+        a.onended = () => step(i + 1);
+        void a.play().catch(() => step(i + 1));
+      } else if (e.silence != null) {
+        seqTimer.current = window.setTimeout(() => step(i + 1), Math.max(0.1, e.silence) * 1000);
+      } else {
+        step(i + 1);   // empty entry — nothing to hear
+      }
+    };
+    step(0);
+  };
   const previewClip = (soundId: string) => {
+    stopSeq();   // the row preview shares the <audio> element — take it over cleanly
     const def = assetManager.getSoundDef(soundId);
     if (!def) return;
     if (!previewRef.current) previewRef.current = new Audio();
     const a = previewRef.current;
-    a.src = def.path; a.currentTime = 0;
+    a.src = def.path; a.currentTime = 0; a.volume = 1;
     void a.play().catch(() => { /* autoplay / decode failure — ignore */ });
   };
   const MODE_BTN = (active: boolean): React.CSSProperties => ({
@@ -6548,8 +6596,10 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
     border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#c2cadb",
   };
 
-  const writeEntries = (entries: PlaylistEntry[], loop = pl?.loop ?? true) =>
+  const writeEntries = (entries: PlaylistEntry[], loop = pl?.loop ?? true) => {
+    stopSeq();   // editing the sequence mid-preview would play a stale list
     onSlot({ ...slot, mode: "playlist", playlist: { entries, loop } });
+  };
 
   // Mode flips keep BOTH representations. First flip to a mode with nothing authored
   // seeds it from the other (the single track becomes entry 1 / the first clip becomes
@@ -6563,6 +6613,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
     },
   });
   const toSingle = () => {
+    stopSeq();
     const first = slot?.soundId == null ? slot?.playlist?.entries.find(e => e.soundId) : undefined;
     onSlot({
       ...slot,
@@ -6612,9 +6663,11 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
                 <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
               </>
             );
+            const playingNow = previewIdx === i;
             const CARD: React.CSSProperties = {
               display: "flex", flexDirection: "column", gap: 7, padding: "7px 8px",
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 4,
+              background: playingNow ? "rgba(80,140,255,0.1)" : "rgba(255,255,255,0.03)",
+              border: `1px solid ${playingNow ? "rgba(80,140,255,0.45)" : "rgba(255,255,255,0.06)"}`, borderRadius: 4,
             };
             const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
             return e.silence != null && !e.soundId ? (
@@ -6661,6 +6714,13 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
             <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
+            <button
+              title={previewIdx != null ? "Stop the sequence preview" : "Play the whole composed sequence once, right here in the editor"}
+              style={{ ...MINI_BTN, color: previewIdx != null ? "#cc8866" : "#80aaff",
+                borderColor: previewIdx != null ? "rgba(204,136,102,0.4)" : "rgba(80,140,255,0.35)" }}
+              onClick={() => previewIdx != null ? stopSeq() : startSeq()}>
+              {previewIdx != null ? "⏹ stop" : "▶ preview"}
+            </button>
             <span style={{ flex: 1 }} />
             <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
                             color: "#9aa3b5", fontSize: 9, letterSpacing: 0.5 }}

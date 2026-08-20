@@ -95,3 +95,22 @@ Verified in-browser with real button clicks on the Background Music page:
 The user's collapsed demo playlist (autosave had the 1-entry remnant) was
 restored from the committed scene file — git as the safety net, working as
 intended.
+
+## Feature (2026-08-20, v4.79.9) — whole-sequence preview in the panel
+
+The parked "whole-sequence editor preview" V2 item, shipped: **▶ preview** in
+the playlist controls plays the composed sequence once (per-clip volumes, real
+silence gaps, playing row highlighted, auto-stop), ⏹ stops. Plain editor-side
+`HTMLAudioElement` — `AudioSystem` untouched, and `dist/assets/runtime-*.js`
+verified to contain none of the code, per the constraint that exported games
+carry no editor-preview audio.
+
+Verified in a foreground Chrome tab on the demo playlist: row 1 (sax 0.39s) →
+SILENCE highlighted ~2s → row 3 (steel ~2.5s) → auto-stop, button back to
+▶ preview. Edits/mode-flips/row-▶ during preview all stop it (shared element +
+token guard).
+
+**Environment gotcha for future sessions:** Chrome defers media-element loading
+in hidden tabs — play() never settles and no request is issued (loadstart →
+stalled), which looks exactly like a stuck sequencer. Foreground the tab before
+testing any editor audio (same family as the rAF pause noted in v4.79.5's run).
