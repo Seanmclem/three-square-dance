@@ -42,9 +42,11 @@ Written for humans clicking through the UI; the engine-level details live in
 
 ## 2. Scene ambient + background music
 
-Deselect everything → Properties **Audio** row → pick a **Background Music** track and an
-**Ambient Loop**. Saved per-scene in `WorldConfig.audio`; they start on Preview/Play and
-loop. Across levels, `load_scene` loads the next scene's own `audio` fresh.
+Deselect everything → Properties **Audio** row. The Audio screen is a menu of four
+sub-pages — **Mixer**, **Background Music**, **Ambient**, **Character Sounds** — each row
+showing a live summary (current track / playlist size / bus levels). Music and ambient are
+saved per-scene in `WorldConfig.audio`; they start on Preview/Play and loop. Across levels,
+`load_scene` loads the next scene's own `audio` fresh.
 
 ### Playlists (Phase 64) — composed clip sequences
 

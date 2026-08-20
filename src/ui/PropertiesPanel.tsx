@@ -17,6 +17,7 @@ import { ControlsSection } from "@/ui/ControlsSection";
 import { CreditsModal } from "@/ui/CreditsModal";
 import { GENERATORS } from "@/prefab/generators";
 import { gameState } from "@/scripting/GameState";
+import { assetManager } from "@/core/AssetManager";
 import { entKey } from "@/scripting/entityState";
 
 // Preview swatch size in the material picker rows — tweak to taste.
@@ -165,11 +166,13 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio" | "scripts" | "ai";
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio"
+  | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
   animations: "Animations", colliders: "Colliders", lights: "Lights", sound: "Sound", audio: "Audio",
+  "audio-mixer": "Mixer", "audio-music": "Background Music", "audio-ambient": "Ambient", "audio-character": "Character Sounds",
   scripts: "Scripts",
   ai: "Enemy AI",
 };
@@ -185,6 +188,10 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   lights: "WORLD SUN · AMBIENT · PLACED",
   sound: "SPATIAL EMITTER",
   audio: "MIXER · AMBIENT · MUSIC",
+  "audio-mixer": "MASTER · MUSIC · SFX · AMBIENT",
+  "audio-music": "TRACK OR PLAYLIST",
+  "audio-ambient": "LOOP OR PLAYLIST",
+  "audio-character": "FOOTSTEP · JUMP · LAND",
   scripts: "TRIGGERS · ACTIONS",
   ai: "DETECT · CHASE · ATTACK",
 };
@@ -304,6 +311,10 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     }
     case "lights":
     case "audio":
+    case "audio-mixer":
+    case "audio-music":
+    case "audio-ambient":
+    case "audio-character":
       return "";   // no-selection screens — never listed for a selected object
   }
 }
@@ -591,7 +602,7 @@ export function PropertiesPanel({
             </button>
           )}
         </div>
-        {(selected || currentScreen === "lights" || currentScreen === "audio") && (
+        {(selected || currentScreen === "lights" || currentScreen?.startsWith("audio")) && (
           <div style={{ padding: "0 16px 10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {canRename && editingLabel ? (
@@ -650,9 +661,16 @@ export function PropertiesPanel({
               <LightListSection lights={zoneLights} onSelect={onSelectLight} />
             </>
           ) : currentScreen === "audio" ? (
-            onWorldAudioChange
-              ? <AudioMixerSection audio={worldAudio} onChange={onWorldAudioChange}
-                    playerSettings={playerSettings} onPlayerSettingsChange={onPlayerSettingsChange} />
+            <AudioMenuSection audio={worldAudio} playerSettings={playerSettings} onOpen={push} />
+          ) : currentScreen === "audio-mixer" ? (
+            onWorldAudioChange ? <AudioMixerPage audio={worldAudio} onChange={onWorldAudioChange} /> : null
+          ) : currentScreen === "audio-music" ? (
+            onWorldAudioChange ? <AudioSlotPage kind="music" audio={worldAudio} onChange={onWorldAudioChange} /> : null
+          ) : currentScreen === "audio-ambient" ? (
+            onWorldAudioChange ? <AudioSlotPage kind="ambient" audio={worldAudio} onChange={onWorldAudioChange} /> : null
+          ) : currentScreen === "audio-character" ? (
+            playerSettings && onPlayerSettingsChange
+              ? <CharacterSoundsPage playerSettings={playerSettings} onPlayerSettingsChange={onPlayerSettingsChange} />
               : null
           ) : (
             <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
@@ -6363,14 +6381,48 @@ function WorldLightSection({ lighting, onChange }: {
 // saved with the scene, applied live via world:audio — mirrors WorldLightSection.
 const DEFAULT_AUDIO_MIX: AudioMix = { master: 1, music: 1, sfx: 1, ambient: 1 };
 
-function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsChange }: {
-  audio?:   WorldAudio;
-  onChange: (changes: Partial<WorldAudio>) => void;
-  playerSettings?:         PlayerSettings;
-  onPlayerSettingsChange?: (s: Partial<PlayerSettings>) => void;
+// The Audio screen is a MENU (Phase 64.1, matching the drilldown idiom
+// everywhere else): four rows with live summaries, each opening its own page.
+function AudioMenuSection({ audio, playerSettings, onOpen }: {
+  audio?:          WorldAudio;
+  playerSettings?: PlayerSettings;
+  onOpen:          (s: ScreenId) => void;
 }) {
   const mix = { ...DEFAULT_AUDIO_MIX, ...audio?.mix };
+  const pct = (n: number) => `${Math.round(n * 100)}`;
+  const slotSummary = (slot?: { soundId?: string; playlist?: AudioPlaylist }) => {
+    if (slot?.playlist) {
+      const n = slot.playlist.entries.length;
+      return `playlist · ${n} entr${n === 1 ? "y" : "ies"}`;
+    }
+    if (slot?.soundId) return assetManager.getSoundDef(slot.soundId)?.label ?? slot.soundId;
+    return "none";
+  };
+  const charCount = [playerSettings?.footstepSound, playerSettings?.jumpSound, playerSettings?.landSound]
+    .filter(Boolean).length;
+  return (
+    <>
+      <CategoryRow label="Mixer"
+        summary={`${pct(mix.master)} · ${pct(mix.music)} · ${pct(mix.sfx)} · ${pct(mix.ambient)}%`}
+        onPress={() => onOpen("audio-mixer")} />
+      <CategoryRow label="Background Music" summary={slotSummary(audio?.music)}
+        onPress={() => onOpen("audio-music")} />
+      <CategoryRow label="Ambient" summary={slotSummary(audio?.ambient)}
+        onPress={() => onOpen("audio-ambient")} />
+      {playerSettings && (
+        <CategoryRow label="Character Sounds"
+          summary={charCount ? `${charCount} of 3 set` : "none"}
+          onPress={() => onOpen("audio-character")} />
+      )}
+    </>
+  );
+}
 
+function AudioMixerPage({ audio, onChange }: {
+  audio?:   WorldAudio;
+  onChange: (changes: Partial<WorldAudio>) => void;
+}) {
+  const mix = { ...DEFAULT_AUDIO_MIX, ...audio?.mix };
   const slider = (key: keyof AudioMix, label: string) => (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", ...LABEL }}>
@@ -6381,57 +6433,75 @@ function AudioMixerSection({ audio, onChange, playerSettings, onPlayerSettingsCh
         style={{ width: "100%", accentColor: "#80aaff" }} />
     </div>
   );
-
   return (
-    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-      <div style={{ ...LABEL, marginBottom: 0 }}>MIXER</div>
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       {slider("master", "MASTER")}
       {slider("music", "MUSIC")}
       {slider("sfx", "SFX")}
       {slider("ambient", "AMBIENT")}
-
-      <AudioSlotEditor label="BACKGROUND MUSIC" slot={audio?.music}
-        onSlot={next => onChange({ music: next })} keepLoopTrue />
-      <AudioSlotEditor label="AMBIENT LOOP" slot={audio?.ambient}
-        onSlot={next => onChange({ ambient: next })} />
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
-        Authored per-scene defaults. These play on Preview/Play; players can lower each
-        bus in the pause menu. Trigger-volume scripts (play_music / play_sound) change
-        audio per room. PLAYLIST mode composes a sequence of short clips and silence
-        gaps that plays in order with hard cuts — layer soundscapes by giving music
-        AND ambient their own playlists.
+        Authored per-scene defaults for the four buses. Players can lower each bus
+        in the pause menu (their sliders multiply over these).
       </div>
+    </div>
+  );
+}
 
-      {playerSettings && onPlayerSettingsChange && (
-        <>
-          <div style={{ ...LABEL, marginBottom: 0, marginTop: 4 }}>CHARACTER SOUNDS</div>
-          <div>
-            <div style={LABEL}>FOOTSTEP</div>
-            <SoundPicker value={playerSettings.footstepSound} allowNone
-              onChange={id => onPlayerSettingsChange({ footstepSound: id || undefined })} />
-          </div>
-          <div>
-            <div style={LABEL}>JUMP</div>
-            <SoundPicker value={playerSettings.jumpSound} allowNone
-              onChange={id => onPlayerSettingsChange({ jumpSound: id || undefined })} />
-          </div>
-          <div>
-            <div style={LABEL}>LAND</div>
-            <SoundPicker value={playerSettings.landSound} allowNone
-              onChange={id => onPlayerSettingsChange({ landSound: id || undefined })} />
-          </div>
-          <div>
-            <div style={LABEL}>STRIDE LENGTH (m)</div>
-            <input type="number" min={0.3} step={0.1} style={{ ...NUM_INPUT, width: 80 }}
-              value={playerSettings.footstepDistance ?? ""} placeholder="1.8"
-              onChange={e => onPlayerSettingsChange({ footstepDistance: e.target.value === "" ? undefined : Number(e.target.value) })} />
-          </div>
-          <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
-            The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
-            STRIDE LENGTH metres while walking on the ground.
-          </div>
-        </>
+function AudioSlotPage({ kind, audio, onChange }: {
+  kind:     "music" | "ambient";
+  audio?:   WorldAudio;
+  onChange: (changes: Partial<WorldAudio>) => void;
+}) {
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {kind === "music" ? (
+        <AudioSlotEditor label="BACKGROUND MUSIC" slot={audio?.music}
+          onSlot={next => onChange({ music: next })} keepLoopTrue />
+      ) : (
+        <AudioSlotEditor label="AMBIENT LOOP" slot={audio?.ambient}
+          onSlot={next => onChange({ ambient: next })} />
       )}
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        Plays on Preview/Play. PLAYLIST mode composes a sequence of short clips and
+        silence gaps that plays in order with hard cuts — layer soundscapes by giving
+        music AND ambient their own playlists. Trigger-volume scripts
+        (play_music / play_sound) change audio per room.
+      </div>
+    </div>
+  );
+}
+
+function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
+  playerSettings:         PlayerSettings;
+  onPlayerSettingsChange: (s: Partial<PlayerSettings>) => void;
+}) {
+  return (
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>FOOTSTEP</div>
+        <SoundPicker value={playerSettings.footstepSound} allowNone
+          onChange={id => onPlayerSettingsChange({ footstepSound: id || undefined })} />
+      </div>
+      <div>
+        <div style={LABEL}>JUMP</div>
+        <SoundPicker value={playerSettings.jumpSound} allowNone
+          onChange={id => onPlayerSettingsChange({ jumpSound: id || undefined })} />
+      </div>
+      <div>
+        <div style={LABEL}>LAND</div>
+        <SoundPicker value={playerSettings.landSound} allowNone
+          onChange={id => onPlayerSettingsChange({ landSound: id || undefined })} />
+      </div>
+      <div>
+        <div style={LABEL}>STRIDE LENGTH (m)</div>
+        <input type="number" min={0.3} step={0.1} style={{ ...NUM_INPUT, width: 80 }}
+          value={playerSettings.footstepDistance ?? ""} placeholder="1.8"
+          onChange={e => onPlayerSettingsChange({ footstepDistance: e.target.value === "" ? undefined : Number(e.target.value) })} />
+      </div>
+      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
+        The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
+        STRIDE LENGTH metres while walking on the ground.
+      </div>
     </div>
   );
 }
