@@ -6510,33 +6510,50 @@ function AudioSlotEditor({ label, slot, onSlot, keepLoopTrue }: {
               Empty sequence — add clips and silence gaps below.
             </div>
           )}
-          {pl.entries.map((e, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <span style={{ color: "#8b94a8", fontSize: 9, width: 14, textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
-              {e.silence != null && !e.soundId ? (
-                <>
-                  <span style={{ color: "#98a2b8", fontSize: 10, letterSpacing: 0.5, flexShrink: 0 }}
-                        title="A gap of silence before the next entry">SILENCE</span>
-                  <input type="number" min={0.1} step={0.5} style={{ ...NUM_INPUT, width: 56 }}
-                    value={e.silence}
-                    onChange={ev => patch(i, { silence: Math.max(0.1, Number(ev.target.value) || 0.1) })} />
-                  <span style={{ color: "#8b94a8", fontSize: 9, flex: 1 }}>sec</span>
-                </>
-              ) : (
-                <>
+          {pl.entries.map((e, i) => {
+            const orderBtns = (
+              <>
+                <button style={{ ...MINI_BTN, opacity: i === 0 ? 0.3 : 1 }} title="Move up" onClick={() => move(i, -1)}>▲</button>
+                <button style={{ ...MINI_BTN, opacity: i === pl.entries.length - 1 ? 0.3 : 1 }} title="Move down" onClick={() => move(i, 1)}>▼</button>
+                <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
+              </>
+            );
+            const CARD: React.CSSProperties = {
+              display: "flex", flexDirection: "column", gap: 4, padding: "4px 6px",
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 4,
+            };
+            const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
+            return e.silence != null && !e.soundId ? (
+              <div key={i} style={{ ...CARD, flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <span style={IDX}>{i + 1}</span>
+                <span style={{ color: "#98a2b8", fontSize: 10, letterSpacing: 0.5, flexShrink: 0 }}
+                      title="A gap of silence before the next entry">SILENCE</span>
+                <input type="number" min={0.1} step={0.5} style={{ ...NUM_INPUT, width: 52 }}
+                  value={e.silence}
+                  onChange={ev => patch(i, { silence: Math.max(0.1, Number(ev.target.value) || 0.1) })} />
+                <span style={{ color: "#8b94a8", fontSize: 9 }}>sec</span>
+                <span style={{ flex: 1 }} />
+                {orderBtns}
+              </div>
+            ) : (
+              <div key={i} style={CARD}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={IDX}>{i + 1}</span>
                   <SoundPicker value={e.soundId} allowNone style={{ flex: 1, minWidth: 0 }}
                     onChange={id => id ? patch(i, { soundId: id }) : remove(i)} />
-                  <input type="number" min={0} max={1} step={0.1} style={{ ...NUM_INPUT, width: 44 }}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 18 }}>
+                  <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5 }}>VOL</span>
+                  <input type="number" min={0} max={1} step={0.1} style={{ ...NUM_INPUT, width: 52 }}
                     title="Per-clip volume (0–1)"
                     value={e.volume ?? 1}
                     onChange={ev => patch(i, { volume: Math.max(0, Math.min(1, Number(ev.target.value) || 0)) })} />
-                </>
-              )}
-              <button style={{ ...MINI_BTN, opacity: i === 0 ? 0.3 : 1 }} title="Move up" onClick={() => move(i, -1)}>▲</button>
-              <button style={{ ...MINI_BTN, opacity: i === pl.entries.length - 1 ? 0.3 : 1 }} title="Move down" onClick={() => move(i, 1)}>▼</button>
-              <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
-            </div>
-          ))}
+                  <span style={{ flex: 1 }} />
+                  {orderBtns}
+                </div>
+              </div>
+            );
+          })}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, {}])}>+ clip</button>
             <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
