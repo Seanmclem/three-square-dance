@@ -18,8 +18,7 @@ Written for humans clicking through the UI; the engine-level details live in
 
 - Sounds live in `public/assets/audio/manifest.json` (`SoundDef` entries: id, label,
   category, path, `loop`/`volume`/`spatial` flags, tags), loaded by
-  `AssetManager.initAudio()`. Three synthetic CC0 fixtures ship for testing: `music_test`,
-  `ambient_test`, `blip_test`.
+  `AssetManager.initAudio()`.
 - **SOUNDS panel** (bottom-left toolbar, speaker icon): browse, ▶-preview, and **Manage →
   Edit / Delete**. **+ Import Sound** copies `.mp3` / `.wav` / `.ogg` files into
   `assets/audio` and appends to the manifest. The import metadata step matches the model
