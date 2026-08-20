@@ -676,10 +676,12 @@ export interface AudioPlaylist {
 }
 
 /** Scene-level audio: a default ambient loop, a default music track, and the authored mix.
- *  Each slot holds EITHER a single track (soundId) OR a composed playlist (Phase 64). */
+ *  Each slot can hold BOTH a single track (soundId) and a composed playlist (Phase 64) —
+ *  the editor's SINGLE ⇄ PLAYLIST switch retains the inactive one. `mode` says which
+ *  plays; absent = legacy semantics (the playlist, when it has entries). */
 export interface WorldAudio {
-  music?:   { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist };
-  ambient?: { soundId?: string; volume?: number; playlist?: AudioPlaylist };
+  music?:   { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist; mode?: "single" | "playlist" };
+  ambient?: { soundId?: string; volume?: number; playlist?: AudioPlaylist; mode?: "single" | "playlist" };
   mix?:     AudioMix;
 }
 

@@ -22,6 +22,13 @@ function catToBus(cat: SoundCategory): Bus {
 
 function clamp01(n: number): number { return Math.max(0, Math.min(1, n)); }
 
+/** The playlist a slot should PLAY, or undefined. Both representations can coexist
+ *  (the editor's SINGLE ⇄ PLAYLIST switch retains the inactive one); `mode: "single"`
+ *  parks the playlist, absent mode = legacy playlist-wins-when-present. */
+function activePlaylist(slot?: { playlist?: AudioPlaylist; mode?: "single" | "playlist" }): AudioPlaylist | undefined {
+  return slot?.mode !== "single" && slot?.playlist?.entries?.length ? slot.playlist : undefined;
+}
+
 /** Per-sound bookkeeping stashed on the AnyAudio's userData. */
 interface SoundMeta { bus: Bus; base: number; fade: number }
 
@@ -127,10 +134,12 @@ export class AudioSystem {
     this._applyMaster();
 
     // Scene-level ambient + music (fire-and-forget; guarded on _active).
-    // A slot runs its playlist when one is authored, else its single track.
-    if (authored?.ambient?.playlist?.entries?.length) this._startPlaylist("ambient", authored.ambient.playlist);
+    // A slot runs its playlist when one is authored AND selected, else its single track.
+    const ambientPl = activePlaylist(authored?.ambient);
+    const musicPl   = activePlaylist(authored?.music);
+    if (ambientPl) this._startPlaylist("ambient", ambientPl);
     else if (authored?.ambient?.soundId) this._playAmbient(authored.ambient.soundId, authored.ambient.volume);
-    if (authored?.music?.playlist?.entries?.length) this._startPlaylist("music", authored.music.playlist);
+    if (musicPl) this._startPlaylist("music", musicPl);
     else if (authored?.music?.soundId)   this._playMusic(authored.music.soundId, authored.music.volume, authored.music.loop ?? true);
 
     // Attach positional emitters for every placed entity that carries one
@@ -196,13 +205,13 @@ export class AudioSystem {
     this._applyMaster();
     for (const s of this._all) this._applyGain(s);
     if (!this._active) return;
-    // Playlist slots reconcile by JSON: changed → restart the sequence; removed →
-    // fall through to the single-track logic below. Slots running a playlist skip
-    // the soundId diff (the sequencer legitimately rotates _musicId/_ambientId).
+    // Playlist slots reconcile by JSON: changed → restart the sequence; removed OR
+    // mode-flipped to single → fall through to the single-track logic below. Slots
+    // running a playlist skip the soundId diff (the sequencer rotates _musicId/_ambientId).
     for (const slot of ["music", "ambient"] as const) {
-      const pl = authored?.[slot]?.playlist;
+      const pl = activePlaylist(authored?.[slot]);
       const st = this._playlists.get(slot);
-      if (pl?.entries?.length) {
+      if (pl) {
         if (!st || st.json !== JSON.stringify(pl)) {
           // Take over the channel: stop the single track if one is playing.
           if (slot === "music" && this._music)     { this._finish(this._music); }

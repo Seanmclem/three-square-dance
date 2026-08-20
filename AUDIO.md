@@ -49,7 +49,11 @@ saved per-scene in `WorldConfig.audio`; they start on Preview/Play and loop. Acr
 
 ### Playlists (Phase 64) — composed clip sequences
 
-Each slot has a **SINGLE ⇄ PLAYLIST** switch. Playlist mode is a script-actions-style
+Each slot has a **SINGLE ⇄ PLAYLIST** switch. Both sides are retained
+independently (like 1st/3rd-person camera poses): flipping to SINGLE parks the
+playlist rather than deleting it, and flipping back restores it exactly — only
+the selected mode plays. The first flip into an empty mode seeds it from the
+other (single track → entry 1, first clip → single track). Playlist mode is a script-actions-style
 list: clip rows (per-clip volume 0–1) and **SILENCE** rows (a gap of N seconds),
 reordered one step at a time with ▲▼, removed with ✕, extended with
 `+ clip` / `+ silence`. `+ clip` (and clicking a clip row's sound name) opens a

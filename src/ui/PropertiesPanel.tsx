@@ -6391,8 +6391,8 @@ function AudioMenuSection({ audio, playerSettings, onOpen }: {
 }) {
   const mix = { ...DEFAULT_AUDIO_MIX, ...audio?.mix };
   const pct = (n: number) => `${Math.round(n * 100)}`;
-  const slotSummary = (slot?: { soundId?: string; playlist?: AudioPlaylist }) => {
-    if (slot?.playlist) {
+  const slotSummary = (slot?: { soundId?: string; playlist?: AudioPlaylist; mode?: "single" | "playlist" }) => {
+    if (slot?.playlist && slot.mode !== "single") {
       const n = slot.playlist.entries.length;
       return `playlist · ${n} entr${n === 1 ? "y" : "ies"}`;
     }
@@ -6513,14 +6513,17 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
 // (picker + per-entry volume) and silence rows (gap seconds), ▲▼ one-step
 // reorder, ✕ remove, + clip / + silence, LOOP toggle. Hard cuts by design;
 // silence entries are the spacing tool.
-type AudioSlot = { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist };
+type AudioSlot = { soundId?: string; volume?: number; loop?: boolean; playlist?: AudioPlaylist; mode?: "single" | "playlist" };
 
 function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   slot?:        AudioSlot;
   onSlot:       (next: AudioSlot | undefined) => void;
   keepLoopTrue?: boolean;   // the music slot's single-track mode always loops (existing behavior)
 }) {
-  const pl = slot?.playlist;
+  // The ACTIVE playlist. Both representations coexist on the slot — the mode switch
+  // retains the inactive one (like 1st/3rd-person camera poses) and `mode` picks
+  // which plays; absent mode = legacy playlist-wins-when-present.
+  const pl = slot?.mode !== "single" ? slot?.playlist : undefined;
   // Which playlist row the sound-picker modal is choosing for ("add" = append a new
   // clip). The modal itself remembers its search/filter state across open/close.
   const [pickerFor, setPickerFor] = useState<number | "add" | null>(null);
@@ -6546,19 +6549,27 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   };
 
   const writeEntries = (entries: PlaylistEntry[], loop = pl?.loop ?? true) =>
-    onSlot({ playlist: { entries, loop } });
+    onSlot({ ...slot, mode: "playlist", playlist: { entries, loop } });
 
+  // Mode flips keep BOTH representations. First flip to a mode with nothing authored
+  // seeds it from the other (the single track becomes entry 1 / the first clip becomes
+  // the single track) — after that each side keeps its own state.
   const toPlaylist = () => onSlot({
-    playlist: {
+    ...slot,
+    mode: "playlist",
+    playlist: slot?.playlist ?? {
       entries: slot?.soundId ? [{ soundId: slot.soundId, ...(slot.volume != null ? { volume: slot.volume } : {}) }] : [],
       loop: true,
     },
   });
   const toSingle = () => {
-    const first = pl?.entries.find(e => e.soundId);
-    onSlot(first?.soundId
-      ? { soundId: first.soundId, ...(first.volume != null ? { volume: first.volume } : {}), ...(keepLoopTrue ? { loop: true } : {}) }
-      : undefined);
+    const first = slot?.soundId == null ? slot?.playlist?.entries.find(e => e.soundId) : undefined;
+    onSlot({
+      ...slot,
+      mode: "single",
+      ...(first?.soundId ? { soundId: first.soundId, ...(first.volume != null ? { volume: first.volume } : {}) } : {}),
+      ...(keepLoopTrue ? { loop: true } : {}),
+    });
   };
 
   const move = (i: number, dir: -1 | 1) => {
@@ -6580,9 +6591,12 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
       </div>
       {!pl ? (
         <SoundPicker value={slot?.soundId} allowNone
-          onChange={id => onSlot(id
-            ? { soundId: id, ...(slot?.volume != null ? { volume: slot.volume } : {}), ...(keepLoopTrue ? { loop: true } : {}) }
-            : undefined)} />
+          onChange={id => {
+            const keep = { ...slot, ...(keepLoopTrue ? { loop: true } : {}) };
+            if (id) onSlot({ ...keep, soundId: id });
+            else if (slot?.playlist) onSlot({ ...keep, soundId: undefined });   // keep the retained playlist
+            else onSlot(undefined);
+          }} />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {pl.entries.length === 0 && (

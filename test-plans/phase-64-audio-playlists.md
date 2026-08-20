@@ -71,3 +71,27 @@ callback baked into the pre-play onEnded. Re-verified via the REAL wiring
 
 Lesson: when a system hands a callback to an engine, verify by firing the
 engine's captured reference, not the property you assigned.
+
+## Regression fix (2026-08-20, v4.79.7) — mode flips retain both sides
+
+User report: PLAYLIST → SINGLE "kind of deleted the playlist down to a single
+item. with no going back." It did — the slot held either `soundId` or
+`playlist`, and `toSingle` kept only the first clip. Slots now hold both plus
+`mode: "single" | "playlist"`; flips set the mode and preserve the inactive
+representation (first flip into an empty mode still seeds from the other).
+Runtime picks via `activePlaylist()` at both decision sites; absent mode =
+legacy playlist-wins, so existing scenes are unaffected.
+
+Verified in-browser with real button clicks on the Background Music page:
+
+| Check | Result |
+|---|---|
+| SINGLE flip keeps the 3-entry demo playlist in data, seeds sax00 as the track | ✅ |
+| Single track changed to steel09, then PLAYLIST → SINGLE round-trip | ✅ both sides untouched |
+| Game entry, mode single | ✅ plays steel09, `_playlists` empty |
+| Game entry, mode playlist | ✅ music sequencer running, `_musicId` null (sequencer owns the channel) |
+| Menu summary respects mode | ✅ parked playlist reads as the track label |
+
+The user's collapsed demo playlist (autosave had the 1-entry remnant) was
+restored from the committed scene file — git as the safety net, working as
+intended.
