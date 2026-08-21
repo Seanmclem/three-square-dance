@@ -114,3 +114,18 @@ token guard).
 in hidden tabs — play() never settles and no request is issued (loadstart →
 stalled), which looks exactly like a stuck sequencer. Foreground the tab before
 testing any editor audio (same family as the rAF pause noted in v4.79.5's run).
+
+## Regression fix (2026-08-21, v4.79.10) — gapless panel preview
+
+User report: the panel preview had 1–2s gaps between clips (none in gameplay).
+Cause: the v4.79.9 preview swapped `src` on one `<audio>` element per entry —
+a fetch+decode on every transition. Now `startSeq` preloads every clip via
+`assetManager.loadSound` (gameplay's own buffer cache) and schedules all
+sources up front on an editor-side AudioContext — sample-accurate cuts.
+
+Verified on the reporting user's 5-clip, no-silence pizzi playlist: measured
+row boundaries 0.60/0.61/1.36/0.61/1.21s vs afinfo clip durations
+0.57/0.57/1.32/0.69/1.15s (150ms sampling), total 4.55s vs 4.38s theoretical —
+no gaps. Bonus: buffer loads are plain fetches, so the hidden-tab
+media-element deferral gotcha from v4.79.9 no longer applies to the sequence
+preview (row-highlight timers still throttle in background tabs).

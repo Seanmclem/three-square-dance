@@ -6528,53 +6528,74 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   // clip). The modal itself remembers its search/filter state across open/close.
   const [pickerFor, setPickerFor] = useState<number | "add" | null>(null);
   const previewRef = useRef<HTMLAudioElement | null>(null);
-  // Whole-sequence preview (editor-only — plain <audio>, never the runtime
+  // Whole-sequence preview (editor-only — its own AudioContext, never the runtime
   // AudioSystem, so nothing here ships in exported games). previewIdx highlights
-  // the playing row; the token invalidates stale onended/timer advances.
+  // the playing row; the token invalidates stale timers after a stop/restart.
+  // WebAudio, not <audio> src-swapping: every clip is scheduled up front at its
+  // exact start time from the SAME decoded-buffer cache gameplay preloads
+  // (assetManager.loadSound), so transitions are hard cuts like real playback —
+  // an <audio> element re-fetches+decodes on every src swap (1–2s of dead air
+  // between entries, the v4.79.9 bug).
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
-  const seqToken = useRef(0);
-  const seqTimer = useRef<number | null>(null);
+  const seqToken   = useRef(0);
+  const seqCtx     = useRef<AudioContext | null>(null);
+  const seqTimers  = useRef<number[]>([]);
+  const seqSources = useRef<AudioBufferSourceNode[]>([]);
   const stopSeq = () => {
     seqToken.current++;
-    if (seqTimer.current != null) { clearTimeout(seqTimer.current); seqTimer.current = null; }
-    const a = previewRef.current;
-    if (a) { a.onended = null; a.pause(); }
+    for (const t of seqTimers.current) clearTimeout(t);
+    seqTimers.current = [];
+    for (const s of seqSources.current) { try { s.stop(); } catch { /* not started yet */ } }
+    seqSources.current = [];
+    previewRef.current?.pause();
     setPreviewIdx(null);
   };
   useEffect(() => () => {
     seqToken.current++;
-    if (seqTimer.current != null) clearTimeout(seqTimer.current);
+    for (const t of seqTimers.current) clearTimeout(t);
+    for (const s of seqSources.current) { try { s.stop(); } catch { /* not started yet */ } }
+    void seqCtx.current?.close();
     previewRef.current?.pause();
   }, []);
   // Plays the composed sequence ONCE, top to bottom, with per-clip volumes and
   // real silence gaps (LOOP is a runtime behavior — a preview that never ends
   // would just have to be stopped by hand anyway).
-  const startSeq = () => {
+  const startSeq = async () => {
     stopSeq();
     const entries = pl?.entries ?? [];
     if (!entries.length) return;
     const token = ++seqToken.current;
-    if (!previewRef.current) previewRef.current = new Audio();
-    const step = (i: number) => {
-      if (token !== seqToken.current) return;
-      if (i >= entries.length) { setPreviewIdx(null); return; }
-      const e = entries[i]!;
-      setPreviewIdx(i);
+    setPreviewIdx(0);   // flip the button to ⏹ while buffers decode (first run only — cached after)
+    const ctx = (seqCtx.current ??= new AudioContext());
+    if (ctx.state === "suspended") void ctx.resume();
+    const buffers = await Promise.all(entries.map(e =>
+      e.soundId ? assetManager.loadSound(e.soundId).catch(() => null) : Promise.resolve(null)));
+    if (token !== seqToken.current) return;
+    let t = ctx.currentTime + 0.08;   // tiny lead-in so entry 1 isn't scheduled in the past
+    const base = ctx.currentTime;
+    entries.forEach((e, i) => {
+      seqTimers.current.push(window.setTimeout(() => {
+        if (token === seqToken.current) setPreviewIdx(i);
+      }, (t - base) * 1000));
       if (e.soundId) {
-        const def = assetManager.getSoundDef(e.soundId);
-        if (!def) { step(i + 1); return; }
-        const a = previewRef.current!;
-        a.src = def.path; a.currentTime = 0;
-        a.volume = Math.max(0, Math.min(1, (e.volume ?? 1) * (def.volume ?? 1)));
-        a.onended = () => step(i + 1);
-        void a.play().catch(() => step(i + 1));
+        const buf = buffers[i];
+        if (!buf) return;   // missing/failed sound — contributes no time, like the runtime's skip
+        const def  = assetManager.getSoundDef(e.soundId);
+        const src  = ctx.createBufferSource();
+        const gain = ctx.createGain();
+        src.buffer = buf;
+        gain.gain.value = Math.max(0, Math.min(1, (e.volume ?? 1) * (def?.volume ?? 1)));
+        src.connect(gain).connect(ctx.destination);
+        src.start(t);
+        seqSources.current.push(src);
+        t += buf.duration;
       } else if (e.silence != null) {
-        seqTimer.current = window.setTimeout(() => step(i + 1), Math.max(0.1, e.silence) * 1000);
-      } else {
-        step(i + 1);   // empty entry — nothing to hear
+        t += Math.max(0.1, e.silence);
       }
-    };
-    step(0);
+    });
+    seqTimers.current.push(window.setTimeout(() => {
+      if (token === seqToken.current) stopSeq();
+    }, (t - base) * 1000));
   };
   const previewClip = (soundId: string) => {
     stopSeq();   // the row preview shares the <audio> element — take it over cleanly
