@@ -129,3 +129,23 @@ row boundaries 0.60/0.61/1.36/0.61/1.21s vs afinfo clip durations
 no gaps. Bonus: buffer loads are plain fetches, so the hidden-tab
 media-element deferral gotcha from v4.79.9 no longer applies to the sequence
 preview (row-highlight timers still throttle in background tabs).
+
+## Feature (2026-08-25, v4.79.11) — multi-select `+ clip`
+
+User request: check multiple clips in the ADD CLIPS modal and have them added
+to the playlist in the order checked, on close.
+
+Steps (all through the real UI, level_1 music playlist):
+
+1. Background Music → PLAYLIST → `+ clip` → modal titled ADD CLIPS with an
+   empty check box per row and a disabled `CHECK CLIPS TO ADD` footer button.
+2. Check rows OUT of list order (HIT03, HIT00, HIT05) → badges read 1, 2, 3
+   in pick order; footer reads `ADD 3 CLIPS`.
+3. Uncheck HIT00 → HIT03 stays 1, HIT05 renumbers 3→2, footer `ADD 2 CLIPS`.
+4. Re-check HIT00 (rejoins at 3) and click `ADD 3 CLIPS` → modal closes,
+   playlist rows 4/5/6 are HIT03, HIT05, HIT00 — the check order, one undo step.
+5. ✕ and overlay-click close paths commit the same way (shared `finish()`);
+   with nothing checked every close path is a plain cancel.
+
+Row-replacement (clicking a clip row's name) and all single sound fields still
+use single-pick — one click picks and closes, no check boxes.

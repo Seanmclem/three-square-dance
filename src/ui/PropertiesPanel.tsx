@@ -6753,14 +6753,18 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
           </div>
         </div>
       )}
-      {pickerFor !== null && (
-        <SoundPickerModal title={pickerFor === "add" ? "ADD CLIP" : `CLIP ${pickerFor + 1}`}
+      {pickerFor === "add" && (
+        // Multi-select: check any number of clips; they append in the order checked
+        // when the modal closes.
+        <SoundPickerModal title="ADD CLIPS"
           onClose={() => setPickerFor(null)}
-          onPick={id => {
-            if (pickerFor === "add") writeEntries([...(pl?.entries ?? []), { soundId: id }]);
-            else patch(pickerFor, { soundId: id });
-            setPickerFor(null);
-          }} />
+          onPickMulti={ids =>
+            writeEntries([...(pl?.entries ?? []), ...ids.map(id => ({ soundId: id }))])} />
+      )}
+      {typeof pickerFor === "number" && (
+        <SoundPickerModal title={`CLIP ${pickerFor + 1}`}
+          onClose={() => setPickerFor(null)}
+          onPick={id => { patch(pickerFor, { soundId: id }); setPickerFor(null); }} />
       )}
     </div>
   );

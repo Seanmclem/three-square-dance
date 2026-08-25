@@ -60,7 +60,10 @@ reordered one step at a time with ▲▼, removed with ✕, extended with
 **modal sound picker** — the AUDIO panel's search + Categories/Tags/Pack filters over
 a browsable list with ▶ previews — instead of a whole-library dropdown; the modal
 remembers its search/filter state across close/reopen, so adding several clips from
-one filtered view picks up right where you left off. Every other sound field in the
+one filtered view picks up right where you left off. From `+ clip` the modal is
+**multi-select**: check any number of clips (each shows its pick order number,
+unchecking renumbers the rest) and closing the modal — the ADD N CLIPS button, ✕,
+or clicking outside — appends them all in the order checked. Every other sound field in the
 editor (single-track music/ambient, character footstep/jump/land, object sound
 emitters, script play_sound / play_music actions) opens the same modal — the field
 shows the current sound's label with ▶ preview and, where clearable, a ✕. The sequence plays one entry at a time, in authored order, with
