@@ -177,3 +177,21 @@ Probe gotcha (cost a playlist entry, restored from git): clicking two
 state-coupled buttons in the same synchronous JS tick runs the second
 handler against a stale render. Always `await` ≥50ms between programmatic
 clicks and reads.
+
+## Revision (2026-08-25, v4.79.14) — expand/collapse replaces the fade
+
+User feedback: in a list of identical rows a fade is imperceptible — the
+signal must be neighbours moving.
+
+1. Add (⧉ / + silence / ADD CLIPS / INSERT CLIPS): the new row slot expands
+   down from 0 height over 0.25s, pushing rows below it down.
+2. Delete (✕): the row slot collapses up to 0 over 0.2s — rows below slide up
+   the full distance before the data write; no residual seam (row spacing
+   lives inside the animated wrapper, the list container has no gap).
+3. Verified by seeking the animations (hidden-tab timelines freeze, so
+   sample via `anim.currentTime = t`): grow 0/35/72/87/88 px, shrink
+   88/53/18/4/0 px. Row counts and names net-zero after the probe.
+
+Hidden-tab lore for future probes: CSS animation clocks pin at 0 and page
+timers stretch to ~1s in background tabs — seek the Web Animations API
+instead of sampling wall-clock, or test in the visible desktop shell.

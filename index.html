@@ -13,9 +13,12 @@
       button, button *, [role="button"], [role="button"] *, select, label, summary,
       a, a * { cursor: pointer; }
       button:disabled, button:disabled * { cursor: default; }
-      /* Row appear/disappear flourishes (Properties panel lists). */
-      @keyframes wb-row-in  { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
-      @keyframes wb-row-out { to   { opacity: 0; transform: scale(0.95); } }
+      /* Row appear/disappear (Properties panel lists): expand down / collapse up,
+         so neighbours visibly slide — in a list of identical rows a plain fade
+         reads as nothing happening. Applied to an overflow:hidden wrapper;
+         90px comfortably exceeds the tallest row, so growth ends at true height. */
+      @keyframes wb-row-in  { from { max-height: 0; opacity: 0; } to { max-height: 90px; opacity: 1; } }
+      @keyframes wb-row-out { from { max-height: 90px; opacity: 1; } to { max-height: 0; opacity: 0; } }
     </style>
   </head>
   <body>

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
@@ -6668,10 +6668,10 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
     window.setTimeout(() => setBornIdx([]), 300);
   };
   const remove = (i: number) => {
-    if (dyingIdx != null) return;   // one at a time — the write lands in 150ms
+    if (dyingIdx != null) return;   // one at a time — the write lands in 200ms
     setDyingIdx(i);
     const entries = pl!.entries.filter((_, k) => k !== i);
-    window.setTimeout(() => { setDyingIdx(null); writeEntries(entries); }, 150);
+    window.setTimeout(() => { setDyingIdx(null); writeEntries(entries); }, 200);
   };
   const duplicate = (i: number) => {
     const entries = [...pl!.entries];
@@ -6695,9 +6695,12 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
             else onSlot(undefined);
           }} />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        // No container gap — each row wrapper carries its own spacing (via the insert
+        // strip's margins), so collapsing a wrapper to 0 height closes the space
+        // completely instead of leaving an 8px seam.
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {pl.entries.length === 0 && (
-            <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
+            <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", marginBottom: 4 }}>
               Empty sequence — add clips and silence gaps below.
             </div>
           )}
@@ -6715,8 +6718,6 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               display: "flex", flexDirection: "column", gap: 7, padding: "7px 8px",
               background: playingNow ? "rgba(80,140,255,0.1)" : "rgba(255,255,255,0.03)",
               border: `1px solid ${playingNow ? "rgba(80,140,255,0.45)" : "rgba(255,255,255,0.06)"}`, borderRadius: 4,
-              animation: dyingIdx === i ? "wb-row-out 0.15s ease forwards"
-                       : bornIdx.includes(i) ? "wb-row-in 0.25s ease" : undefined,
             };
             const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
             const card = e.silence != null && !e.soundId ? (
@@ -6760,19 +6761,23 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               </div>
             );
             return (
-              <Fragment key={i}>
+              // The animating unit: card + its insert strip in one overflow-hidden
+              // wrapper, expanding from / collapsing to 0 height so neighbouring rows
+              // visibly slide on add and delete.
+              <div key={i} style={{ display: "flex", flexDirection: "column", overflow: "hidden",
+                animation: dyingIdx === i ? "wb-row-out 0.2s ease forwards"
+                         : bornIdx.includes(i) ? "wb-row-in 0.25s ease" : undefined }}>
                 {card}
-                {/* Insert point below each entry — negative margins tuck the strip into
-                    the column gap so it barely adds height. */}
+                {/* Insert point below each entry — its margins ARE the row spacing. */}
                 <button onClick={() => setPickerFor({ insertAt: i + 1 })}
                   title="Insert clips at this position — opens the picker; checked clips go here in check order"
                   style={{ alignSelf: "center", padding: "0 8px", fontSize: 8, letterSpacing: 0.5,
                     lineHeight: "12px", borderRadius: 6, cursor: "pointer",
                     border: "1px dashed rgba(255,255,255,0.16)", background: "transparent",
-                    color: "#8b94a8", marginTop: -5, marginBottom: -5 }}>
+                    color: "#8b94a8", marginTop: 3, marginBottom: 3 }}>
                   + insert here
                 </button>
-              </Fragment>
+              </div>
             );
           })}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
