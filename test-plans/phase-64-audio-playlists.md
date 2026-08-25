@@ -162,3 +162,18 @@ User request: a duplicate option and an insert-here option on each playlist item
    highUp then highDown and closing put them at rows 3 and 4 — at the insert
    point, in check order (verified via the overlay-click close path).
 3. The strip below the last row appends — same result as `+ clip`.
+
+## Polish (2026-08-25, v4.79.13) — row appear/disappear animation
+
+1. Duplicate (⧉), + silence, ADD CLIPS, and INSERT CLIPS: the new row(s) fade
+   in with a small slide-down (0.25s, `wb-row-in`).
+2. ✕ delete: the row fades/shrinks out (0.15s, `wb-row-out`) and is removed
+   from the data when the animation ends; a second ✕ during that window is
+   ignored.
+3. Verified with `document.getAnimations()`: wb-row-in active after ⧉,
+   wb-row-out active while the row is still in the DOM, count drops after.
+
+Probe gotcha (cost a playlist entry, restored from git): clicking two
+state-coupled buttons in the same synchronous JS tick runs the second
+handler against a stale render. Always `await` ≥50ms between programmatic
+clicks and reads.

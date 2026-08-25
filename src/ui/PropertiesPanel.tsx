@@ -6654,11 +6654,30 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   };
   const patch  = (i: number, p: Partial<PlaylistEntry>) =>
     writeEntries(pl!.entries.map((e, k) => k === i ? { ...e, ...p } : e));
-  const remove = (i: number) => writeEntries(pl!.entries.filter((_, k) => k !== i));
+  // Appear/disappear flourish: rows are keyed by INDEX, so a mount animation can't
+  // find "the new row" (an insert re-renders existing nodes and appends one at the
+  // END). Instead we track which indices just appeared — applying the animation
+  // property fresh replays it — and delay a delete by one animation so the row can
+  // fade out before the data write removes it.
+  const [bornIdx,  setBornIdx]  = useState<number[]>([]);
+  const [dyingIdx, setDyingIdx] = useState<number | null>(null);
+  const flashIn = (idxs: number[]) => {
+    setBornIdx(idxs);
+    // Clear afterwards so a later add at the same index re-applies the property
+    // (an unchanged animation value never replays).
+    window.setTimeout(() => setBornIdx([]), 300);
+  };
+  const remove = (i: number) => {
+    if (dyingIdx != null) return;   // one at a time — the write lands in 150ms
+    setDyingIdx(i);
+    const entries = pl!.entries.filter((_, k) => k !== i);
+    window.setTimeout(() => { setDyingIdx(null); writeEntries(entries); }, 150);
+  };
   const duplicate = (i: number) => {
     const entries = [...pl!.entries];
     entries.splice(i, 0, { ...entries[i]! });   // the copy lands directly above the row
     writeEntries(entries);
+    flashIn([i]);
   };
 
   return (
@@ -6696,6 +6715,8 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               display: "flex", flexDirection: "column", gap: 7, padding: "7px 8px",
               background: playingNow ? "rgba(80,140,255,0.1)" : "rgba(255,255,255,0.03)",
               border: `1px solid ${playingNow ? "rgba(80,140,255,0.45)" : "rgba(255,255,255,0.06)"}`, borderRadius: 4,
+              animation: dyingIdx === i ? "wb-row-out 0.15s ease forwards"
+                       : bornIdx.includes(i) ? "wb-row-in 0.25s ease" : undefined,
             };
             const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
             const card = e.silence != null && !e.soundId ? (
@@ -6756,7 +6777,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
           })}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
             <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
-            <button style={MINI_BTN} onClick={() => writeEntries([...pl.entries, { silence: 2 }])}>+ silence</button>
+            <button style={MINI_BTN} onClick={() => { writeEntries([...pl.entries, { silence: 2 }]); flashIn([pl.entries.length]); }}>+ silence</button>
             <button
               title={previewIdx != null ? "Stop the sequence preview" : "Play the whole composed sequence once, right here in the editor"}
               style={{ ...MINI_BTN, color: previewIdx != null ? "#cc8866" : "#80aaff",
@@ -6785,6 +6806,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
             const at = pickerFor === "add" ? entries.length : pickerFor.insertAt;
             entries.splice(at, 0, ...ids.map(id => ({ soundId: id })));
             writeEntries(entries);
+            flashIn(ids.map((_, k) => at + k));
           }} />
       )}
       {typeof pickerFor === "number" && (
