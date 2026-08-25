@@ -6675,9 +6675,13 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   };
   const duplicate = (i: number) => {
     const entries = [...pl!.entries];
-    entries.splice(i, 0, { ...entries[i]! });   // the copy lands directly above the row
+    // The copy goes BELOW the row and that slot animates. With identical adjacent
+    // entries above/below is the same data — but animating the clicked row's own
+    // index looks like the card ABOVE the copy expanded, which reads as the wrong
+    // row moving.
+    entries.splice(i + 1, 0, { ...entries[i]! });
     writeEntries(entries);
-    flashIn([i]);
+    flashIn([i + 1]);
   };
 
   return (
@@ -6709,7 +6713,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               <>
                 <button style={{ ...MINI_BTN, opacity: i === 0 ? 0.3 : 1 }} title="Move up" onClick={() => move(i, -1)}>▲</button>
                 <button style={{ ...MINI_BTN, opacity: i === pl.entries.length - 1 ? 0.3 : 1 }} title="Move down" onClick={() => move(i, 1)}>▼</button>
-                <button style={MINI_BTN} title="Duplicate — the copy is added right above this entry" onClick={() => duplicate(i)}>⧉</button>
+                <button style={MINI_BTN} title="Duplicate — the copy is added right below this entry" onClick={() => duplicate(i)}>⧉</button>
                 <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
               </>
             );

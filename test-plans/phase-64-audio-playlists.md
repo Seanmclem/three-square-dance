@@ -195,3 +195,11 @@ signal must be neighbours moving.
 Hidden-tab lore for future probes: CSS animation clocks pin at 0 and page
 timers stretch to ~1s in background tabs — seek the Web Animations API
 instead of sampling wall-clock, or test in the visible desktop shell.
+
+## Tweak (2026-08-25, v4.79.15) — duplicate grows in BELOW the clicked row
+
+⧉ now splices the copy at i+1 and animates that slot: the clicked card stays
+put and the duplicate expands beneath it. (Before, the slot at the clicked
+index animated, which with identical rows read as "the card above expanded".)
+Check: click ⧉ on any row → the row itself doesn't move; a twin grows in
+directly below it.
