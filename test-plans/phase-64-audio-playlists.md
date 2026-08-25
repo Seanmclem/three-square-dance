@@ -203,3 +203,10 @@ put and the duplicate expands beneath it. (Before, the slot at the clicked
 index animated, which with identical rows read as "the card above expanded".)
 Check: click ⧉ on any row → the row itself doesn't move; a twin grows in
 directly below it.
+
+## Tweak (2026-08-25, v4.79.16) — toolbar at the top
+
+The `+ clip / + silence / ▶ preview / LOOP` row now sits above the entry
+list, directly under the SINGLE/PLAYLIST switch. `+ clip` / `+ silence`
+still append at the end; positional adds remain the `+ insert here` strips.
+Verified via screenshot against the live shell.

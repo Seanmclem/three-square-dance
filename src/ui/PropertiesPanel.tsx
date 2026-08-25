@@ -6703,9 +6703,28 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
         // strip's margins), so collapsing a wrapper to 0 height closes the space
         // completely instead of leaving an 8px seam.
         <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
+            <button style={MINI_BTN} onClick={() => { writeEntries([...pl.entries, { silence: 2 }]); flashIn([pl.entries.length]); }}>+ silence</button>
+            <button
+              title={previewIdx != null ? "Stop the sequence preview" : "Play the whole composed sequence once, right here in the editor"}
+              style={{ ...MINI_BTN, color: previewIdx != null ? "#cc8866" : "#80aaff",
+                borderColor: previewIdx != null ? "rgba(204,136,102,0.4)" : "rgba(80,140,255,0.35)" }}
+              onClick={() => previewIdx != null ? stopSeq() : startSeq()}>
+              {previewIdx != null ? "⏹ stop" : "▶ preview"}
+            </button>
+            <span style={{ flex: 1 }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
+                            color: "#9aa3b5", fontSize: 9, letterSpacing: 0.5 }}
+                   title="Loop the whole composed sequence; off = plays once per scene entry, then silence">
+              <input type="checkbox" checked={pl.loop ?? true}
+                onChange={ev => writeEntries(pl.entries, ev.target.checked)} />
+              LOOP
+            </label>
+          </div>
           {pl.entries.length === 0 && (
             <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", marginBottom: 4 }}>
-              Empty sequence — add clips and silence gaps below.
+              Empty sequence — add clips and silence gaps with the buttons above.
             </div>
           )}
           {pl.entries.map((e, i) => {
@@ -6784,25 +6803,6 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               </div>
             );
           })}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-            <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
-            <button style={MINI_BTN} onClick={() => { writeEntries([...pl.entries, { silence: 2 }]); flashIn([pl.entries.length]); }}>+ silence</button>
-            <button
-              title={previewIdx != null ? "Stop the sequence preview" : "Play the whole composed sequence once, right here in the editor"}
-              style={{ ...MINI_BTN, color: previewIdx != null ? "#cc8866" : "#80aaff",
-                borderColor: previewIdx != null ? "rgba(204,136,102,0.4)" : "rgba(80,140,255,0.35)" }}
-              onClick={() => previewIdx != null ? stopSeq() : startSeq()}>
-              {previewIdx != null ? "⏹ stop" : "▶ preview"}
-            </button>
-            <span style={{ flex: 1 }} />
-            <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer",
-                            color: "#9aa3b5", fontSize: 9, letterSpacing: 0.5 }}
-                   title="Loop the whole composed sequence; off = plays once per scene entry, then silence">
-              <input type="checkbox" checked={pl.loop ?? true}
-                onChange={ev => writeEntries(pl.entries, ev.target.checked)} />
-              LOOP
-            </label>
-          </div>
         </div>
       )}
       {(pickerFor === "add" || (typeof pickerFor === "object" && pickerFor !== null)) && (
