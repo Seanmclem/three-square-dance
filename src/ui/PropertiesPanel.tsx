@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
@@ -6524,9 +6524,10 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   // retains the inactive one (like 1st/3rd-person camera poses) and `mode` picks
   // which plays; absent mode = legacy playlist-wins-when-present.
   const pl = slot?.mode !== "single" ? slot?.playlist : undefined;
-  // Which playlist row the sound-picker modal is choosing for ("add" = append a new
-  // clip). The modal itself remembers its search/filter state across open/close.
-  const [pickerFor, setPickerFor] = useState<number | "add" | null>(null);
+  // Which playlist row the sound-picker modal is choosing for ("add" = append at the
+  // end, { insertAt } = splice in at that index via a row's "+ insert here" strip).
+  // The modal itself remembers its search/filter state across open/close.
+  const [pickerFor, setPickerFor] = useState<number | "add" | { insertAt: number } | null>(null);
   const previewRef = useRef<HTMLAudioElement | null>(null);
   // Whole-sequence preview (editor-only — its own AudioContext, never the runtime
   // AudioSystem, so nothing here ships in exported games). previewIdx highlights
@@ -6654,6 +6655,11 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
   const patch  = (i: number, p: Partial<PlaylistEntry>) =>
     writeEntries(pl!.entries.map((e, k) => k === i ? { ...e, ...p } : e));
   const remove = (i: number) => writeEntries(pl!.entries.filter((_, k) => k !== i));
+  const duplicate = (i: number) => {
+    const entries = [...pl!.entries];
+    entries.splice(i, 0, { ...entries[i]! });   // the copy lands directly above the row
+    writeEntries(entries);
+  };
 
   return (
     <div>
@@ -6681,6 +6687,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               <>
                 <button style={{ ...MINI_BTN, opacity: i === 0 ? 0.3 : 1 }} title="Move up" onClick={() => move(i, -1)}>▲</button>
                 <button style={{ ...MINI_BTN, opacity: i === pl.entries.length - 1 ? 0.3 : 1 }} title="Move down" onClick={() => move(i, 1)}>▼</button>
+                <button style={MINI_BTN} title="Duplicate — the copy is added right above this entry" onClick={() => duplicate(i)}>⧉</button>
                 <button style={{ ...MINI_BTN, color: "#8a5a5a" }} title="Remove entry" onClick={() => remove(i)}>✕</button>
               </>
             );
@@ -6691,8 +6698,8 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
               border: `1px solid ${playingNow ? "rgba(80,140,255,0.45)" : "rgba(255,255,255,0.06)"}`, borderRadius: 4,
             };
             const IDX: React.CSSProperties = { color: "#8b94a8", fontSize: 9, width: 12, textAlign: "right", flexShrink: 0 };
-            return e.silence != null && !e.soundId ? (
-              <div key={i} style={{ ...CARD, flexDirection: "row", alignItems: "center", gap: 6 }}>
+            const card = e.silence != null && !e.soundId ? (
+              <div style={{ ...CARD, flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <span style={IDX}>{i + 1}</span>
                 <span style={{ color: "#98a2b8", fontSize: 10, letterSpacing: 0.5, flexShrink: 0 }}
                       title="A gap of silence before the next entry">SILENCE</span>
@@ -6704,7 +6711,7 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
                 {orderBtns}
               </div>
             ) : (
-              <div key={i} style={CARD}>
+              <div style={CARD}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={IDX}>{i + 1}</span>
                   <button onClick={() => setPickerFor(i)} title="Change clip"
@@ -6731,6 +6738,21 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
                 </div>
               </div>
             );
+            return (
+              <Fragment key={i}>
+                {card}
+                {/* Insert point below each entry — negative margins tuck the strip into
+                    the column gap so it barely adds height. */}
+                <button onClick={() => setPickerFor({ insertAt: i + 1 })}
+                  title="Insert clips at this position — opens the picker; checked clips go here in check order"
+                  style={{ alignSelf: "center", padding: "0 8px", fontSize: 8, letterSpacing: 0.5,
+                    lineHeight: "12px", borderRadius: 6, cursor: "pointer",
+                    border: "1px dashed rgba(255,255,255,0.16)", background: "transparent",
+                    color: "#8b94a8", marginTop: -5, marginBottom: -5 }}>
+                  + insert here
+                </button>
+              </Fragment>
+            );
           })}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
             <button style={MINI_BTN} onClick={() => setPickerFor("add")}>+ clip</button>
@@ -6753,13 +6775,17 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
           </div>
         </div>
       )}
-      {pickerFor === "add" && (
-        // Multi-select: check any number of clips; they append in the order checked
-        // when the modal closes.
-        <SoundPickerModal title="ADD CLIPS"
+      {(pickerFor === "add" || (typeof pickerFor === "object" && pickerFor !== null)) && (
+        // Multi-select: check any number of clips; they land in the order checked when
+        // the modal closes — appended ("add") or spliced in at insertAt ("+ insert here").
+        <SoundPickerModal title={pickerFor === "add" ? "ADD CLIPS" : "INSERT CLIPS"}
           onClose={() => setPickerFor(null)}
-          onPickMulti={ids =>
-            writeEntries([...(pl?.entries ?? []), ...ids.map(id => ({ soundId: id }))])} />
+          onPickMulti={ids => {
+            const entries = [...(pl?.entries ?? [])];
+            const at = pickerFor === "add" ? entries.length : pickerFor.insertAt;
+            entries.splice(at, 0, ...ids.map(id => ({ soundId: id })));
+            writeEntries(entries);
+          }} />
       )}
       {typeof pickerFor === "number" && (
         <SoundPickerModal title={`CLIP ${pickerFor + 1}`}

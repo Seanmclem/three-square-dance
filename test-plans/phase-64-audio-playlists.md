@@ -149,3 +149,16 @@ Steps (all through the real UI, level_1 music playlist):
 
 Row-replacement (clicking a clip row's name) and all single sound fields still
 use single-pick — one click picks and closes, no check boxes.
+
+## Feature (2026-08-25, v4.79.12) — row duplicate + insert-at-position
+
+User request: a duplicate option and an insert-here option on each playlist item.
+
+1. Playlist row button cluster is now ▲ ▼ ⧉ ✕ (silence rows included). ⧉ on
+   row 1 → an identical copy appears directly above (rows 1+2 match, rest shift
+   down). One undo step.
+2. A slim dashed `+ insert here` strip sits below every row. Clicking the one
+   below row 2 opens the multi-select picker titled INSERT CLIPS; checking
+   highUp then highDown and closing put them at rows 3 and 4 — at the insert
+   point, in check order (verified via the overlay-click close path).
+3. The strip below the last row appends — same result as `+ clip`.

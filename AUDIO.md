@@ -55,8 +55,10 @@ playlist rather than deleting it, and flipping back restores it exactly — only
 the selected mode plays. The first flip into an empty mode seeds it from the
 other (single track → entry 1, first clip → single track). Playlist mode is a script-actions-style
 list: clip rows (per-clip volume 0–1) and **SILENCE** rows (a gap of N seconds),
-reordered one step at a time with ▲▼, removed with ✕, extended with
-`+ clip` / `+ silence`. `+ clip` (and clicking a clip row's sound name) opens a
+reordered one step at a time with ▲▼, duplicated with ⧉ (the copy lands right
+above the row), removed with ✕, extended with `+ clip` / `+ silence`, and a slim
+**+ insert here** strip below every row opens the same picker and splices the
+checked clips in at that position. `+ clip` (and clicking a clip row's sound name) opens a
 **modal sound picker** — the AUDIO panel's search + Categories/Tags/Pack filters over
 a browsable list with ▶ previews — instead of a whole-library dropdown; the modal
 remembers its search/filter state across close/reopen, so adding several clips from
