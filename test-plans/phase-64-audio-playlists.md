@@ -210,3 +210,10 @@ The `+ clip / + silence / ▶ preview / LOOP` row now sits above the entry
 list, directly under the SINGLE/PLAYLIST switch. `+ clip` / `+ silence`
 still append at the end; positional adds remain the `+ insert here` strips.
 Verified via screenshot against the live shell.
+
+## Tweak (2026-08-25, v4.79.17) — insert silence between rows
+
+The strip below each entry is now two buttons: `+ insert here` (multi-select
+clip picker, as before) and `+ silence` (inserts a 2s SILENCE row right there,
+no modal — adjust the seconds on the row afterwards). Both grow the new slot
+in below the row.

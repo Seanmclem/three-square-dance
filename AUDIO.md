@@ -57,8 +57,9 @@ other (single track → entry 1, first clip → single track). Playlist mode is 
 list: clip rows (per-clip volume 0–1) and **SILENCE** rows (a gap of N seconds),
 reordered one step at a time with ▲▼, duplicated with ⧉ (the copy grows in right
 below the row), removed with ✕, extended with `+ clip` / `+ silence`, and a slim
-**+ insert here** strip below every row opens the same picker and splices the
-checked clips in at that position. `+ clip` (and clicking a clip row's sound name) opens a
+strip below every row with **+ insert here** (opens the same picker and splices
+the checked clips in at that position) and **+ silence** (drops a 2s gap right
+there — tweak the seconds on the row). `+ clip` (and clicking a clip row's sound name) opens a
 **modal sound picker** — the AUDIO panel's search + Categories/Tags/Pack filters over
 a browsable list with ▶ previews — instead of a whole-library dropdown; the modal
 remembers its search/filter state across close/reopen, so adding several clips from

@@ -6617,6 +6617,12 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
     padding: "1px 5px", fontSize: 10, borderRadius: 3, cursor: "pointer",
     border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#c2cadb",
   };
+  // The slim between-rows insert buttons.
+  const STRIP_BTN: React.CSSProperties = {
+    padding: "0 8px", fontSize: 8, letterSpacing: 0.5, lineHeight: "12px", borderRadius: 6,
+    cursor: "pointer", border: "1px dashed rgba(255,255,255,0.16)", background: "transparent",
+    color: "#8b94a8",
+  };
 
   const writeEntries = (entries: PlaylistEntry[], loop = pl?.loop ?? true) => {
     stopSeq();   // editing the sequence mid-preview would play a stale list
@@ -6792,14 +6798,19 @@ function AudioSlotEditor({ slot, onSlot, keepLoopTrue }: {
                          : bornIdx.includes(i) ? "wb-row-in 0.25s ease" : undefined }}>
                 {card}
                 {/* Insert point below each entry — its margins ARE the row spacing. */}
-                <button onClick={() => setPickerFor({ insertAt: i + 1 })}
-                  title="Insert clips at this position — opens the picker; checked clips go here in check order"
-                  style={{ alignSelf: "center", padding: "0 8px", fontSize: 8, letterSpacing: 0.5,
-                    lineHeight: "12px", borderRadius: 6, cursor: "pointer",
-                    border: "1px dashed rgba(255,255,255,0.16)", background: "transparent",
-                    color: "#8b94a8", marginTop: 3, marginBottom: 3 }}>
-                  + insert here
-                </button>
+                <div style={{ alignSelf: "center", display: "flex", gap: 4, marginTop: 3, marginBottom: 3 }}>
+                  <button onClick={() => setPickerFor({ insertAt: i + 1 })}
+                    title="Insert clips at this position — opens the picker; checked clips go here in check order"
+                    style={STRIP_BTN}>+ insert here</button>
+                  <button onClick={() => {
+                      const entries = [...pl.entries];
+                      entries.splice(i + 1, 0, { silence: 2 });
+                      writeEntries(entries);
+                      flashIn([i + 1]);
+                    }}
+                    title="Insert a 2s silence gap at this position"
+                    style={STRIP_BTN}>+ silence</button>
+                </div>
               </div>
             );
           })}
