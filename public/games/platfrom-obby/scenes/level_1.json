@@ -86,13 +86,16 @@
               "soundId": "jingles_pizzi05"
             },
             {
-              "soundId": "jingles_pizzi06"
+              "soundId": "jingles_pizzi04"
+            },
+            {
+              "soundId": "jingles_pizzi05"
             },
             {
               "soundId": "jingles_pizzi07"
             },
             {
-              "soundId": "jingles_pizzi08"
+              "soundId": "jingles_pizzi13"
             },
             {
               "soundId": "jingles_pizzi02"
@@ -101,21 +104,24 @@
               "soundId": "jingles_pizzi01"
             },
             {
-              "soundId": "jingles_pizzi09"
+              "soundId": "jingles_pizzi02"
             },
             {
               "soundId": "jingles_pizzi10"
             },
             {
               "soundId": "jingles_pizzi11"
-            },
-            {
-              "soundId": "jingles_pizzi12"
             }
           ],
           "loop": true
         },
         "mode": "playlist"
+      },
+      "mix": {
+        "master": 1,
+        "music": 0.5,
+        "sfx": 1,
+        "ambient": 1
       }
     }
   },
