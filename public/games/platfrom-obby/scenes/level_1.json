@@ -81,44 +81,7 @@
     "audio": {
       "music": {
         "playlist": {
-          "entries": [
-            {
-              "soundId": "jingles_pizzi03"
-            },
-            {
-              "soundId": "jingles_pizzi04"
-            },
-            {
-              "soundId": "jingles_pizzi05"
-            },
-            {
-              "soundId": "jingles_pizzi04"
-            },
-            {
-              "soundId": "jingles_pizzi05"
-            },
-            {
-              "soundId": "jingles_pizzi07"
-            },
-            {
-              "soundId": "jingles_pizzi13"
-            },
-            {
-              "soundId": "jingles_pizzi02"
-            },
-            {
-              "soundId": "jingles_pizzi01"
-            },
-            {
-              "soundId": "jingles_pizzi02"
-            },
-            {
-              "soundId": "jingles_pizzi10"
-            },
-            {
-              "soundId": "jingles_pizzi11"
-            }
-          ],
+          "entries": [],
           "loop": true
         },
         "mode": "playlist"
