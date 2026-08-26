@@ -2861,6 +2861,3626 @@
         "sourceName": "Music Jingles",
         "sourceUrl": "https://kenney.nl/assets/music-jingles"
       }
+    },
+    {
+      "id": "knifeslice2",
+      "label": "knifeSlice2",
+      "category": "SFX",
+      "path": "/assets/audio/knifeslice2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "metalpot3",
+      "label": "metalPot3",
+      "category": "SFX",
+      "path": "/assets/audio/metalpot3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "metalpot2",
+      "label": "metalPot2",
+      "category": "SFX",
+      "path": "/assets/audio/metalpot2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "metalpot1",
+      "label": "metalPot1",
+      "category": "SFX",
+      "path": "/assets/audio/metalpot1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "metallatch",
+      "label": "metalLatch",
+      "category": "SFX",
+      "path": "/assets/audio/metallatch.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "metalclick",
+      "label": "metalClick",
+      "category": "SFX",
+      "path": "/assets/audio/metalclick.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "knifeslice",
+      "label": "knifeSlice",
+      "category": "SFX",
+      "path": "/assets/audio/knifeslice.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "handlesmallleather2",
+      "label": "handleSmallLeather2",
+      "category": "SFX",
+      "path": "/assets/audio/handlesmallleather2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "handlesmallleather",
+      "label": "handleSmallLeather",
+      "category": "SFX",
+      "path": "/assets/audio/handlesmallleather.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "handlecoins2",
+      "label": "handleCoins2",
+      "category": "SFX",
+      "path": "/assets/audio/handlecoins2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "handlecoins",
+      "label": "handleCoins",
+      "category": "SFX",
+      "path": "/assets/audio/handlecoins.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep09",
+      "label": "footstep09",
+      "category": "SFX",
+      "path": "/assets/audio/footstep09.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep08",
+      "label": "footstep08",
+      "category": "SFX",
+      "path": "/assets/audio/footstep08.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep07",
+      "label": "footstep07",
+      "category": "SFX",
+      "path": "/assets/audio/footstep07.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep06",
+      "label": "footstep06",
+      "category": "SFX",
+      "path": "/assets/audio/footstep06.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep05",
+      "label": "footstep05",
+      "category": "SFX",
+      "path": "/assets/audio/footstep05.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep04",
+      "label": "footstep04",
+      "category": "SFX",
+      "path": "/assets/audio/footstep04.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep03",
+      "label": "footstep03",
+      "category": "SFX",
+      "path": "/assets/audio/footstep03.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep02",
+      "label": "footstep02",
+      "category": "SFX",
+      "path": "/assets/audio/footstep02.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep01",
+      "label": "footstep01",
+      "category": "SFX",
+      "path": "/assets/audio/footstep01.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "footstep00",
+      "label": "footstep00",
+      "category": "SFX",
+      "path": "/assets/audio/footstep00.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "dropleather",
+      "label": "dropLeather",
+      "category": "SFX",
+      "path": "/assets/audio/dropleather.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "drawknife3",
+      "label": "drawKnife3",
+      "category": "SFX",
+      "path": "/assets/audio/drawknife3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "drawknife2",
+      "label": "drawKnife2",
+      "category": "SFX",
+      "path": "/assets/audio/drawknife2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "drawknife1",
+      "label": "drawKnife1",
+      "category": "SFX",
+      "path": "/assets/audio/drawknife1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "dooropen_2",
+      "label": "doorOpen 2",
+      "category": "SFX",
+      "path": "/assets/audio/dooropen_2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "dooropen_1",
+      "label": "doorOpen 1",
+      "category": "SFX",
+      "path": "/assets/audio/dooropen_1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "doorclose_4",
+      "label": "doorClose 4",
+      "category": "SFX",
+      "path": "/assets/audio/doorclose_4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "doorclose_3",
+      "label": "doorClose 3",
+      "category": "SFX",
+      "path": "/assets/audio/doorclose_3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "doorclose_2",
+      "label": "doorClose 2",
+      "category": "SFX",
+      "path": "/assets/audio/doorclose_2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "doorclose_1",
+      "label": "doorClose 1",
+      "category": "SFX",
+      "path": "/assets/audio/doorclose_1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "creak3",
+      "label": "creak3",
+      "category": "SFX",
+      "path": "/assets/audio/creak3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "creak2",
+      "label": "creak2",
+      "category": "SFX",
+      "path": "/assets/audio/creak2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "creak1",
+      "label": "creak1",
+      "category": "SFX",
+      "path": "/assets/audio/creak1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "clothbelt2",
+      "label": "clothBelt2",
+      "category": "SFX",
+      "path": "/assets/audio/clothbelt2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "clothbelt",
+      "label": "clothBelt",
+      "category": "SFX",
+      "path": "/assets/audio/clothbelt.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "cloth4",
+      "label": "cloth4",
+      "category": "SFX",
+      "path": "/assets/audio/cloth4.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "cloth3",
+      "label": "cloth3",
+      "category": "SFX",
+      "path": "/assets/audio/cloth3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "cloth2",
+      "label": "cloth2",
+      "category": "SFX",
+      "path": "/assets/audio/cloth2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "cloth1",
+      "label": "cloth1",
+      "category": "SFX",
+      "path": "/assets/audio/cloth1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "chop",
+      "label": "chop",
+      "category": "SFX",
+      "path": "/assets/audio/chop.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookplace3",
+      "label": "bookPlace3",
+      "category": "SFX",
+      "path": "/assets/audio/bookplace3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookplace2",
+      "label": "bookPlace2",
+      "category": "SFX",
+      "path": "/assets/audio/bookplace2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookplace1",
+      "label": "bookPlace1",
+      "category": "SFX",
+      "path": "/assets/audio/bookplace1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookopen",
+      "label": "bookOpen",
+      "category": "SFX",
+      "path": "/assets/audio/bookopen.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookflip3",
+      "label": "bookFlip3",
+      "category": "SFX",
+      "path": "/assets/audio/bookflip3.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookflip2",
+      "label": "bookFlip2",
+      "category": "SFX",
+      "path": "/assets/audio/bookflip2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookflip1",
+      "label": "bookFlip1",
+      "category": "SFX",
+      "path": "/assets/audio/bookflip1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "bookclose",
+      "label": "bookClose",
+      "category": "SFX",
+      "path": "/assets/audio/bookclose.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "belthandle2",
+      "label": "beltHandle2",
+      "category": "SFX",
+      "path": "/assets/audio/belthandle2.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "belthandle1",
+      "label": "beltHandle1",
+      "category": "SFX",
+      "path": "/assets/audio/belthandle1.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "rpg-audio"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "RPG Audio",
+        "sourceUrl": "https://kenney.nl/assets/rpg-audio"
+      }
+    },
+    {
+      "id": "impactwood_medium_004",
+      "label": "impactWood medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_medium_003",
+      "label": "impactWood medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_medium_002",
+      "label": "impactWood medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_medium_001",
+      "label": "impactWood medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_medium_000",
+      "label": "impactWood medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_light_004",
+      "label": "impactWood light 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_light_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_light_003",
+      "label": "impactWood light 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_light_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_light_002",
+      "label": "impactWood light 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_light_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_light_001",
+      "label": "impactWood light 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_light_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_light_000",
+      "label": "impactWood light 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_light_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_heavy_004",
+      "label": "impactWood heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_heavy_003",
+      "label": "impactWood heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_heavy_002",
+      "label": "impactWood heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_heavy_001",
+      "label": "impactWood heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactwood_heavy_000",
+      "label": "impactWood heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactwood_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impacttin_medium_004",
+      "label": "impactTin medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impacttin_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impacttin_medium_003",
+      "label": "impactTin medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impacttin_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impacttin_medium_002",
+      "label": "impactTin medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impacttin_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impacttin_medium_001",
+      "label": "impactTin medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impacttin_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impacttin_medium_000",
+      "label": "impactTin medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impacttin_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_medium_004",
+      "label": "impactSoft medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_medium_003",
+      "label": "impactSoft medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_medium_002",
+      "label": "impactSoft medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_medium_001",
+      "label": "impactSoft medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_medium_000",
+      "label": "impactSoft medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_heavy_004",
+      "label": "impactSoft heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_heavy_003",
+      "label": "impactSoft heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_heavy_002",
+      "label": "impactSoft heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_heavy_001",
+      "label": "impactSoft heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactsoft_heavy_000",
+      "label": "impactSoft heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactsoft_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_medium_004",
+      "label": "impactPunch medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_medium_003",
+      "label": "impactPunch medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_medium_002",
+      "label": "impactPunch medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_medium_001",
+      "label": "impactPunch medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_medium_000",
+      "label": "impactPunch medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_heavy_004",
+      "label": "impactPunch heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_heavy_003",
+      "label": "impactPunch heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_heavy_002",
+      "label": "impactPunch heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_heavy_001",
+      "label": "impactPunch heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactpunch_heavy_000",
+      "label": "impactPunch heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactpunch_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_medium_004",
+      "label": "impactPlate medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_medium_003",
+      "label": "impactPlate medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_medium_002",
+      "label": "impactPlate medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_medium_001",
+      "label": "impactPlate medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_medium_000",
+      "label": "impactPlate medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_light_004",
+      "label": "impactPlate light 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_light_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_light_003",
+      "label": "impactPlate light 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_light_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_light_002",
+      "label": "impactPlate light 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_light_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_light_001",
+      "label": "impactPlate light 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_light_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_light_000",
+      "label": "impactPlate light 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_light_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_heavy_004",
+      "label": "impactPlate heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_heavy_003",
+      "label": "impactPlate heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_heavy_002",
+      "label": "impactPlate heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_heavy_001",
+      "label": "impactPlate heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplate_heavy_000",
+      "label": "impactPlate heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactplate_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplank_medium_004",
+      "label": "impactPlank medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactplank_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplank_medium_003",
+      "label": "impactPlank medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactplank_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplank_medium_002",
+      "label": "impactPlank medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactplank_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplank_medium_001",
+      "label": "impactPlank medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactplank_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactplank_medium_000",
+      "label": "impactPlank medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactplank_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmining_004",
+      "label": "impactMining 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactmining_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmining_003",
+      "label": "impactMining 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactmining_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmining_002",
+      "label": "impactMining 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactmining_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmining_001",
+      "label": "impactMining 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactmining_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmining_000",
+      "label": "impactMining 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactmining_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_medium_004",
+      "label": "impactMetal medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_medium_003",
+      "label": "impactMetal medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_medium_002",
+      "label": "impactMetal medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_medium_001",
+      "label": "impactMetal medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_medium_000",
+      "label": "impactMetal medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_light_004",
+      "label": "impactMetal light 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_light_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_light_003",
+      "label": "impactMetal light 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_light_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_light_002",
+      "label": "impactMetal light 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_light_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_light_001",
+      "label": "impactMetal light 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_light_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_light_000",
+      "label": "impactMetal light 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_light_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_heavy_004",
+      "label": "impactMetal heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_heavy_003",
+      "label": "impactMetal heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_heavy_002",
+      "label": "impactMetal heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_heavy_001",
+      "label": "impactMetal heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactmetal_heavy_000",
+      "label": "impactMetal heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactmetal_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_medium_004",
+      "label": "impactGlass medium 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_medium_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_medium_003",
+      "label": "impactGlass medium 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_medium_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_medium_002",
+      "label": "impactGlass medium 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_medium_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_medium_001",
+      "label": "impactGlass medium 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_medium_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_medium_000",
+      "label": "impactGlass medium 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_medium_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_light_004",
+      "label": "impactGlass light 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_light_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_light_003",
+      "label": "impactGlass light 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_light_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_light_002",
+      "label": "impactGlass light 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_light_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_light_001",
+      "label": "impactGlass light 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_light_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_light_000",
+      "label": "impactGlass light 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_light_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_heavy_004",
+      "label": "impactGlass heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_heavy_003",
+      "label": "impactGlass heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_heavy_002",
+      "label": "impactGlass heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_heavy_001",
+      "label": "impactGlass heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactglass_heavy_000",
+      "label": "impactGlass heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactglass_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactgeneric_light_004",
+      "label": "impactGeneric light 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactgeneric_light_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactgeneric_light_003",
+      "label": "impactGeneric light 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactgeneric_light_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactgeneric_light_002",
+      "label": "impactGeneric light 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactgeneric_light_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactgeneric_light_001",
+      "label": "impactGeneric light 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactgeneric_light_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactgeneric_light_000",
+      "label": "impactGeneric light 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactgeneric_light_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactbell_heavy_004",
+      "label": "impactBell heavy 004",
+      "category": "SFX",
+      "path": "/assets/audio/impactbell_heavy_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactbell_heavy_003",
+      "label": "impactBell heavy 003",
+      "category": "SFX",
+      "path": "/assets/audio/impactbell_heavy_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactbell_heavy_002",
+      "label": "impactBell heavy 002",
+      "category": "SFX",
+      "path": "/assets/audio/impactbell_heavy_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactbell_heavy_001",
+      "label": "impactBell heavy 001",
+      "category": "SFX",
+      "path": "/assets/audio/impactbell_heavy_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "impactbell_heavy_000",
+      "label": "impactBell heavy 000",
+      "category": "SFX",
+      "path": "/assets/audio/impactbell_heavy_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_wood_004",
+      "label": "footstep wood 004",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_wood_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_wood_003",
+      "label": "footstep wood 003",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_wood_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_wood_002",
+      "label": "footstep wood 002",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_wood_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_wood_001",
+      "label": "footstep wood 001",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_wood_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_wood_000",
+      "label": "footstep wood 000",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_wood_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_snow_004",
+      "label": "footstep snow 004",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_snow_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_snow_003",
+      "label": "footstep snow 003",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_snow_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_snow_002",
+      "label": "footstep snow 002",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_snow_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_snow_001",
+      "label": "footstep snow 001",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_snow_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_snow_000",
+      "label": "footstep snow 000",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_snow_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_grass_004",
+      "label": "footstep grass 004",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_grass_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_grass_003",
+      "label": "footstep grass 003",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_grass_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_grass_002",
+      "label": "footstep grass 002",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_grass_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_grass_001",
+      "label": "footstep grass 001",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_grass_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_grass_000",
+      "label": "footstep grass 000",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_grass_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_concrete_004",
+      "label": "footstep concrete 004",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_concrete_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_concrete_003",
+      "label": "footstep concrete 003",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_concrete_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_concrete_002",
+      "label": "footstep concrete 002",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_concrete_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_concrete_001",
+      "label": "footstep concrete 001",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_concrete_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_concrete_000",
+      "label": "footstep concrete 000",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_concrete_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_carpet_004",
+      "label": "footstep carpet 004",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_carpet_004.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_carpet_003",
+      "label": "footstep carpet 003",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_carpet_003.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_carpet_002",
+      "label": "footstep carpet 002",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_carpet_002.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_carpet_001",
+      "label": "footstep carpet 001",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_carpet_001.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
+    },
+    {
+      "id": "footstep_carpet_000",
+      "label": "footstep carpet 000",
+      "category": "SFX",
+      "path": "/assets/audio/footstep_carpet_000.ogg",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "kenney",
+        "impact-sounds"
+      ],
+      "dateAdded": "2026-08-26",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Impact Sounds",
+        "sourceUrl": "https://kenney.nl/assets/impact-sounds"
+      }
     }
   ]
 }
