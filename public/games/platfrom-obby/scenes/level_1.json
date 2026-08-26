@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -28.005778919435713,
+        "x": -23.924027786523325,
         "y": 2.73214756311405,
-        "z": -49.75954322573655
+        "z": -64.6536406156163
       },
       "radius": 29.245070499337473,
-      "phi": 0.970000000000004,
-      "theta": 16.109999999881627
+      "phi": 1.000000000000004,
+      "theta": 17.64999999988162
     }
   },
   "world": {
@@ -48,7 +48,13 @@
       "thirdPersonPitch": 18,
       "modelAssetId": "character",
       "characterScale": 0.9,
-      "jumpAnimSpeed": 1.2
+      "jumpAnimSpeed": 1.2,
+      "footstepDistance": 2,
+      "footstepSound": "footstep_carpet_000",
+      "jumpSound": "phasejump1",
+      "animClips": {
+        "walk": "Run"
+      }
     },
     "stateSchema": {
       "Hearts": {
@@ -9567,7 +9573,7 @@
               "id": "col_172f13ec",
               "shape": "box",
               "offset": {
-                "x": -5.960464477539063e-8,
+                "x": -5.960464477539063e-08,
                 "y": 0.751679808832705,
                 "z": 0.01855784778791364
               },
