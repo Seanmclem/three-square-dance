@@ -159,3 +159,12 @@ Verified in-browser by clicking the spawn flag and walking all four pages.
 The spawn drilldown also lists **Character Sounds** (`N of 3 set`) between
 Character and Controls, opening the same page as root → Audio → Character
 Sounds (shared component). Both routes edit the same PlayerSettings.
+
+### v4.79.21 — ▶ preview honors VOL
+
+Every SoundPicker ▶ now plays through WebAudio with runtime gain semantics:
+the field's VOL overrides the clip's manifest volume (empty = manifest
+volume), capped at 4 — so boosts above 1 are audible, which an <audio>
+element can't do. Character sound rows and the entity emitter pass their
+VOL in. Probe: JUMP VOL 2 → preview gain node 2; FOOTSTEP VOL empty →
+gain 0.1 (footstep_carpet_000's own manifest volume — the runtime value).

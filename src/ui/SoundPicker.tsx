@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { assetManager } from "@/core/AssetManager";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 
@@ -6,31 +6,63 @@ interface SoundPickerProps {
   value:      string | undefined;
   onChange:   (soundId: string) => void;
   allowNone?: boolean;   // show a ✕ clear button (reports onChange(""))
+  // Gain the ▶ preview plays at — pass the field's authored VOL so the preview
+  // sounds like the runtime will. Same semantics as AudioSystem._onPlay: this
+  // OVERRIDES the SoundDef's own volume (absent = def volume), capped at 4.
+  previewVolume?: number;
   style?:     React.CSSProperties;
+}
+
+// One shared editor-preview output (module-level: browsers cap live AudioContexts,
+// and one-at-a-time preview is the right behavior anyway). WebAudio, not <audio>,
+// because an <audio> element can't apply gain above 1 — boosted VOLs would lie.
+let previewCtx: AudioContext | null = null;
+let previewSrc: AudioBufferSourceNode | null = null;
+let previewToken = 0;
+
+function stopPreview(): void {
+  previewToken++;
+  try { previewSrc?.stop(); } catch { /* not started */ }
+  previewSrc = null;
+}
+
+async function playPreview(soundId: string, volume: number | undefined): Promise<void> {
+  stopPreview();
+  const token = previewToken;
+  const def = assetManager.getSoundDef(soundId);
+  if (!def) return;
+  let buf: AudioBuffer;
+  try { buf = await assetManager.loadSound(soundId); } catch { return; }
+  if (token !== previewToken) return;   // another preview/stop won meanwhile
+  const ctx = (previewCtx ??= new AudioContext());
+  if (ctx.state === "suspended") void ctx.resume();
+  const src  = ctx.createBufferSource();
+  const gain = ctx.createGain();
+  src.buffer = buf;
+  gain.gain.value = Math.max(0, Math.min(4, volume ?? def.volume ?? 1));
+  src.connect(gain).connect(ctx.destination);
+  src.start();
+  previewSrc = src;
 }
 
 /**
  * A sound-asset field (Phase 36; modal since v4.79.8): a button showing the current
  * sound's label that opens `SoundPickerModal` (search + facet filters + browsable
- * list — the whole-library <select> didn't scale), a ▶ preview through a throwaway
- * <audio> element (editor preview only — the runtime AudioSystem handles in-game
- * playback), and, with `allowNone`, a ✕ clear. The modal remembers its filter state
- * across open/close, shared by every picker.
+ * list — the whole-library <select> didn't scale), a ▶ preview through the shared
+ * WebAudio path above (editor preview only — the runtime AudioSystem handles in-game
+ * playback; pass `previewVolume` so the preview matches the field's authored VOL),
+ * and, with `allowNone`, a ✕ clear. The modal remembers its filter state across
+ * open/close, shared by every picker.
  */
-export function SoundPicker({ value, onChange, allowNone, style }: SoundPickerProps) {
+export function SoundPicker({ value, onChange, allowNone, previewVolume, style }: SoundPickerProps) {
   const [open, setOpen] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const label = value ? (assetManager.getSoundDef(value)?.label ?? value) : undefined;
 
+  // Stop the shared preview when this field unmounts (e.g. navigating away mid-play).
+  useEffect(() => () => stopPreview(), []);
+
   const preview = () => {
-    if (!value) return;
-    const def = assetManager.getSoundDef(value);
-    if (!def) return;
-    if (!audioRef.current) audioRef.current = new Audio();
-    const a = audioRef.current;
-    a.src = def.path;
-    a.currentTime = 0;
-    void a.play().catch(() => { /* autoplay / decode failure — ignore */ });
+    if (value) void playPreview(value, previewVolume);
   };
 
   const SIDE_BTN = (enabled: boolean, tint: "blue" | "grey"): React.CSSProperties => ({

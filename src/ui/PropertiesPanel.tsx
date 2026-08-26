@@ -6568,6 +6568,7 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
       <div style={LABEL}>{label}</div>
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <SoundPicker value={playerSettings[soundKey]} allowNone style={{ flex: 1, minWidth: 0 }}
+          previewVolume={playerSettings[volKey]}
           onChange={id => onPlayerSettingsChange({ [soundKey]: id || undefined })} />
         <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5 }}>VOL</span>
         <input type="number" min={0} step={0.1} style={{ ...NUM_INPUT, width: 52 }}
@@ -6953,7 +6954,7 @@ function EntitySoundScreen({ selected, onObjectUpdate }: {
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
         <div style={LABEL}>SOUND</div>
-        <SoundPicker value={snd?.soundId} allowNone
+        <SoundPicker value={snd?.soundId} allowNone previewVolume={snd?.volume}
           onChange={id => onObjectUpdate({ sound: id ? { ...snd, soundId: id } : undefined })} />
       </div>
       {snd?.soundId && (
