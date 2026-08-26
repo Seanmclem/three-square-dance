@@ -217,3 +217,16 @@ The strip below each entry is now two buttons: `+ insert here` (multi-select
 clip picker, as before) and `+ silence` (inserts a 2s SILENCE row right there,
 no modal — adjust the seconds on the row afterwards). Both grow the new slot
 in below the row.
+
+## Feature (2026-08-26, v4.79.18) — volume boost >1 + character sound VOL
+
+1. Attached emitter (object/platform/shape → Sound): VOLUME above 1 now
+   actually boosts (was silently clamped to 1). Final gain caps at 4.
+2. Character Sounds: FOOTSTEP / JUMP / LAND each gained a VOL field
+   (empty = 1; >1 boosts, cap 4), passed through audio:play.
+3. Probed on the live shell via _onPlay + setVolume capture: base 3 →
+   1.5 applied (× the scene's 0.5 MUSIC mix), base 9 → 4 (cap), base 1 → 0.5.
+
+Probe gotcha: THREE's getVolume() reads the setTargetAtTime ramp, which is
+frozen while the AudioContext is suspended (hidden tab) — it reports 1
+no matter what was set. Capture the setVolume argument instead.

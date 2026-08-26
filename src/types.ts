@@ -627,6 +627,10 @@ export interface PlayerSettings {
   landSound?:          string;             // on landing
   footstepSound?:      string;             // every footstepDistance metres while grounded + moving
   footstepDistance?:   number;             // stride length in metres (default 1.8)
+  // Per-sound gain (default 1; >1 boosts, runtime-capped at 4).
+  jumpVolume?:         number;
+  landVolume?:         number;
+  footstepVolume?:     number;
 }
 
 export interface WorldConfig {
@@ -1078,7 +1082,7 @@ export interface WorldObject {
  */
 export interface AttachedSound {
   soundId:      string;
-  volume?:      number;   // 0..1 base gain (default 1)
+  volume?:      number;   // base gain (default 1; >1 boosts, runtime-capped at 4)
   loop?:        boolean;  // default true for an ambient emitter
   refDistance?: number;   // PositionalAudio reference distance (default 1)
   maxDistance?: number;   // PositionalAudio max distance (default 20)

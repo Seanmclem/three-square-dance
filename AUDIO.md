@@ -92,6 +92,10 @@ ref distance / max distance.
 
 - The emitter is parented to the entity's mesh, so **a sound on a moving platform/shape
   rides its mover** (an engine hum on a lift, a whoosh on a spinning hazard).
+- **VOLUME can exceed 1** (since v4.79.18): 1 plays the clip at its own level, higher
+  values boost it — useful when a quiet source clip plus distance attenuation leaves an
+  emitter too faint. The runtime caps the final gain at 4. (Before, anything above 1 was
+  silently clamped to 1 — the field accepted the number but did nothing.)
 - Static geometry (walls, floors, stairs) has no sound field — use a trigger + `play_sound`
   there instead.
 
@@ -99,7 +103,9 @@ ref distance / max distance.
 
 The player makes its own noise. Deselect everything → Properties **Audio** row →
 **CHARACTER SOUNDS**: pick a **Footstep**, **Jump**, and/or **Land** sound, and a **Stride
-Length** (metres between footsteps, default 1.8). Stored in `PlayerSettings`.
+Length** (metres between footsteps, default 1.8). Stored in `PlayerSettings`. Each sound
+has its own **VOL** field (since v4.79.18): 1 = the clip's own level, higher boosts
+(runtime-capped at 4), empty = 1.
 
 - Footsteps fire every stride-length of *actual* horizontal travel while grounded + moving
   (nothing in the air, standing still, or pushed against a wall).

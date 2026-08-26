@@ -332,7 +332,7 @@ export class CharacterController {
         this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
         this._jumpBuffer = 0;
         this._coyote = 0;
-        this._emitSound(this._settings.jumpSound);   // jump takeoff
+        this._emitSound(this._settings.jumpSound, this._settings.jumpVolume);   // jump takeoff
       } else if (this._body.isGrounded && this._velY <= 0) {
         this._velY = 0;
       } else {
@@ -396,7 +396,7 @@ export class CharacterController {
     // model. Gate on air TIME (> COYOTE) so brief grounded-flicker while walking on the
     // ground-stick doesn't count as a landing.
     if (this._body.isGrounded) {
-      if (this._airTime > COYOTE_SEC) this._emitSound(this._settings.landSound);
+      if (this._airTime > COYOTE_SEC) this._emitSound(this._settings.landSound, this._settings.landVolume);
       this._airTime = 0;
     } else {
       this._airTime += dt;
@@ -411,7 +411,7 @@ export class CharacterController {
       this._stepAccum += Math.sqrt(dx * dx + dz * dz);
       if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
         this._stepAccum = 0;
-        this._emitSound(footstep);
+        this._emitSound(footstep, this._settings.footstepVolume);
       }
     } else {
       this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant
@@ -928,8 +928,8 @@ export class CharacterController {
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
 
   /** Fire a locomotion one-shot (jump/land/footstep) — a non-positional SFX-bus sound. */
-  private _emitSound(id?: string): void {
-    if (id) this._bus.emit("audio:play", { id });
+  private _emitSound(id?: string, volume?: number): void {
+    if (id) this._bus.emit("audio:play", { id, volume });
   }
 
   private _enterJump(): void {

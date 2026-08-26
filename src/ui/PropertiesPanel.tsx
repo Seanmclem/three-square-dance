@@ -6476,23 +6476,29 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
   playerSettings:         PlayerSettings;
   onPlayerSettingsChange: (s: Partial<PlayerSettings>) => void;
 }) {
+  // One character-sound row: picker + a VOL gain field (1 = the clip's own level,
+  // above 1 boosts — runtime caps at 4).
+  const soundRow = (label: string, soundKey: "footstepSound" | "jumpSound" | "landSound",
+                    volKey: "footstepVolume" | "jumpVolume" | "landVolume") => (
+    <div>
+      <div style={LABEL}>{label}</div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <SoundPicker value={playerSettings[soundKey]} allowNone style={{ flex: 1, minWidth: 0 }}
+          onChange={id => onPlayerSettingsChange({ [soundKey]: id || undefined })} />
+        <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5 }}>VOL</span>
+        <input type="number" min={0} step={0.1} style={{ ...NUM_INPUT, width: 52 }}
+          title="Gain — 1 = the clip's own volume, higher boosts (up to 4)"
+          value={playerSettings[volKey] ?? ""} placeholder="1"
+          onChange={e => onPlayerSettingsChange({ [volKey]: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })} />
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      <div>
-        <div style={LABEL}>FOOTSTEP</div>
-        <SoundPicker value={playerSettings.footstepSound} allowNone
-          onChange={id => onPlayerSettingsChange({ footstepSound: id || undefined })} />
-      </div>
-      <div>
-        <div style={LABEL}>JUMP</div>
-        <SoundPicker value={playerSettings.jumpSound} allowNone
-          onChange={id => onPlayerSettingsChange({ jumpSound: id || undefined })} />
-      </div>
-      <div>
-        <div style={LABEL}>LAND</div>
-        <SoundPicker value={playerSettings.landSound} allowNone
-          onChange={id => onPlayerSettingsChange({ landSound: id || undefined })} />
-      </div>
+      {soundRow("FOOTSTEP", "footstepSound", "footstepVolume")}
+      {soundRow("JUMP", "jumpSound", "jumpVolume")}
+      {soundRow("LAND", "landSound", "landVolume")}
       <div>
         <div style={LABEL}>STRIDE LENGTH (m)</div>
         <input type="number" min={0.3} step={0.1} style={{ ...NUM_INPUT, width: 80 }}
@@ -6501,7 +6507,8 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
       </div>
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
-        STRIDE LENGTH metres while walking on the ground.
+        STRIDE LENGTH metres while walking on the ground. VOL 1 plays the clip at its
+        own level; higher values boost it (up to 4).
       </div>
     </div>
   );
@@ -6871,7 +6878,7 @@ function EntitySoundScreen({ selected, onObjectUpdate }: {
             <input type="checkbox" checked={snd.loop ?? true} onChange={e => patch({ loop: e.target.checked })} />
             loop
           </label>
-          {numRow("volume", "VOLUME (0..1)", 1, 0.1)}
+          {numRow("volume", "VOLUME (1 = clip level · higher boosts, max 4)", 1, 0.1)}
           {numRow("refDistance", "REF DISTANCE", 1, 0.5)}
           {numRow("maxDistance", "MAX DISTANCE", 20, 1)}
         </>
