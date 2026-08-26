@@ -237,12 +237,22 @@ export class AudioSystem {
     this._listener.setMasterVolume(clamp01(this._authoredMix.master * this._playerMix.master));
   }
 
-  private _applyGain(s: AnyAudio): void {
+  private _applyGain(s: AnyAudio, immediate = false): void {
     const m = s.userData.audio as SoundMeta;
     // Base gain may exceed 1 (authored boost — e.g. a quiet source clip on a spatial
     // emitter that distance-attenuation makes quieter still); WebAudio applies >1
     // gain fine. Capped at 4 so a typo can't blast ears; mixes/fade stay 0..1.
-    s.setVolume(Math.max(0, Math.min(4, m.base * m.fade * this._authoredMix[m.bus] * this._playerMix[m.bus])));
+    const v = Math.max(0, Math.min(4, m.base * m.fade * this._authoredMix[m.bus] * this._playerMix[m.bus]));
+    if (immediate) {
+      // A fresh gain node starts at 1 and THREE's setVolume only RAMPS toward the
+      // target (setTargetAtTime, ~30ms to converge) — a short percussive one-shot
+      // plays its whole attack transient before the ramp lands, so a footstep at
+      // VOL 0.1 sounded nearly full volume. New sounds set the param directly;
+      // later changes (fades, mixer slides) keep the smooth ramp.
+      s.gain.gain.value = v;
+    } else {
+      s.setVolume(v);
+    }
   }
 
   // ── Event handlers ───────────────────────────────────────────────────────────
@@ -445,7 +455,7 @@ export class AudioSystem {
     }
     sound.userData.audio = { bus, base, fade: startSilent ? 0 : 1 } as SoundMeta;
     sound.userData.soundId = soundId;
-    this._applyGain(sound);
+    this._applyGain(sound, true);   // direct set — no creation ramp from gain 1 (see _applyGain)
 
     if (parent) parent.add(sound); else this._scene.scene.add(sound);
     this._all.add(sound);

@@ -168,3 +168,11 @@ volume), capped at 4 — so boosts above 1 are audible, which an <audio>
 element can't do. Character sound rows and the entity emitter pass their
 VOL in. Probe: JUMP VOL 2 → preview gain node 2; FOOTSTEP VOL empty →
 gain 0.1 (footstep_carpet_000's own manifest volume — the runtime value).
+
+### v4.79.23 — one-shots start at their authored gain
+
+THREE setVolume ramps from gain 1 (~30-50ms) — short one-shots played their
+attack transient at near-full volume, so VOL felt ignored in gameplay while
+the panel preview (direct gain set) was honest. New sounds now set
+gain.gain.value directly at creation; fades/mixer keep the ramp. Probe:
+_onPlay at 0.1/0.5/default reads gain 0.1/0.5/1 immediately.
