@@ -153,3 +153,9 @@ idiom), each with a live summary and ← Back:
 4. **Controls** — the device-local sensitivity/touch block.
 
 Verified in-browser by clicking the spawn flag and walking all four pages.
+
+### v4.79.20 — Character Sounds row in the spawn menu
+
+The spawn drilldown also lists **Character Sounds** (`N of 3 set`) between
+Character and Controls, opening the same page as root → Audio → Character
+Sounds (shared component). Both routes edit the same PlayerSettings.

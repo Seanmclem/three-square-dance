@@ -102,7 +102,8 @@ ref distance / max distance.
 ## 4. Character locomotion sounds (footsteps / jump / land)
 
 The player makes its own noise. Deselect everything → Properties **Audio** row →
-**CHARACTER SOUNDS**: pick a **Footstep**, **Jump**, and/or **Land** sound, and a **Stride
+**CHARACTER SOUNDS** — or select the spawn flag → **Character Sounds** (the same
+page, reachable from both places): pick a **Footstep**, **Jump**, and/or **Land** sound, and a **Stride
 Length** (metres between footsteps, default 1.8). Stored in `PlayerSettings`. Each sound
 has its own **VOL** field (since v4.79.18): 1 = the clip's own level, higher boosts
 (runtime-capped at 4), empty = 1.

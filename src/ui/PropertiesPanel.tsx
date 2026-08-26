@@ -169,7 +169,7 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
-  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-controls";
+  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-sounds" | "spawn-controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
@@ -177,7 +177,8 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
   "audio-mixer": "Mixer", "audio-music": "Background Music", "audio-ambient": "Ambient", "audio-character": "Character Sounds",
   scripts: "Scripts",
   ai: "Enemy AI",
-  "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character", "spawn-controls": "Controls",
+  "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character",
+  "spawn-sounds": "Character Sounds", "spawn-controls": "Controls",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -200,6 +201,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   "spawn-movement": "SPEED · JUMP · CLIMB",
   "spawn-camera": "MODE · FOV · DISTANCE · ANGLE",
   "spawn-character": "MODEL · SCALE · ANIMATIONS",
+  "spawn-sounds": "FOOTSTEP · JUMP · LAND",
   "spawn-controls": "THIS DEVICE · SENSITIVITY",
 };
 
@@ -325,6 +327,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "spawn-movement":
     case "spawn-camera":
     case "spawn-character":
+    case "spawn-sounds":
     case "spawn-controls":
       return "";   // non-object screens — never listed for a selected object (spawn rows build their own summaries)
   }
@@ -5168,6 +5171,12 @@ function SpawnSettingsView({
     </div>
   );
 
+  // The SAME page the root Audio menu opens (audio-character) — one component,
+  // two entry points, so the two routes can't drift.
+  if (screen === "spawn-sounds") return (
+    <CharacterSoundsPage playerSettings={settings} onPlayerSettingsChange={onChange} />
+  );
+
   if (screen === "spawn-controls") return (
     <div style={{ padding: "14px 16px" }}>
       <ControlsSection />
@@ -5199,6 +5208,12 @@ function SpawnSettingsView({
       <CategoryRow label="Character"
         summary={modelLabel}
         onPress={() => onOpen("spawn-character")} />
+      <CategoryRow label="Character Sounds"
+        summary={(() => {
+          const n = [settings.footstepSound, settings.jumpSound, settings.landSound].filter(Boolean).length;
+          return n ? `${n} of 3 set` : "none";
+        })()}
+        onPress={() => onOpen("spawn-sounds")} />
       <CategoryRow label="Controls"
         summary="this device"
         onPress={() => onOpen("spawn-controls")} />
