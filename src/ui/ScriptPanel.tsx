@@ -2359,17 +2359,17 @@ function ActionFields({
       return (
         <>
           <F label="Sound">
-            <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} />
+            <SoundPicker value={action.sound} previewVolume={action.volume} onChange={(id) => set({ sound: id })} />
           </F>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
             <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
               <input type="checkbox" checked={action.loop ?? false} onChange={(e) => set({ loop: e.target.checked || undefined })} />
               loop
             </label>
-            <F label="Volume 0–1" flex="0 0 64px">
-              <input type="number" min={0} max={1} step={0.1} style={S.field}
-                placeholder="vol" title="volume 0..1"
-                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            <F label="Volume" flex="0 0 64px">
+              <input type="number" min={0} step={0.1} style={S.field}
+                placeholder="1" title="1 = the clip's own level, higher boosts (up to 4)"
+                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })} />
             </F>
           </div>
           <div style={{ color: "#8b94a8", fontSize: 11, padding: "6px 0 2px" }}>Play at (optional — spatial):</div>
@@ -2388,17 +2388,17 @@ function ActionFields({
       return (
         <>
           <F label="Music">
-            <SoundPicker value={action.music} onChange={(id) => set({ music: id })} />
+            <SoundPicker value={action.music} previewVolume={action.volume} onChange={(id) => set({ music: id })} />
           </F>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
             <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
               <input type="checkbox" checked={action.loop ?? true} onChange={(e) => set({ loop: e.target.checked })} />
               loop
             </label>
-            <F label="Volume 0–1" flex="0 0 64px">
-              <input type="number" min={0} max={1} step={0.1} style={S.field}
-                placeholder="vol" title="volume 0..1"
-                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Number(e.target.value) })} />
+            <F label="Volume" flex="0 0 64px">
+              <input type="number" min={0} step={0.1} style={S.field}
+                placeholder="1" title="1 = the clip's own level, higher boosts (up to 4)"
+                value={action.volume ?? ""} onChange={(e) => set({ volume: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })} />
             </F>
             <F label="Fade (s)" flex="0 0 64px">
               <input type="number" min={0} step={0.5} style={S.field}
