@@ -54,7 +54,11 @@
       "jumpSound": "phasejump1",
       "animClips": {
         "walk": "Run"
-      }
+      },
+      "footstepVolume": 0.1,
+      "jumpVolume": 0.1,
+      "landSound": "footstep_grass_001",
+      "landVolume": 0.1
     },
     "stateSchema": {
       "Hearts": {
@@ -9536,7 +9540,7 @@
               "id": "col_172f13ec",
               "shape": "box",
               "offset": {
-                "x": -5.960464477539063e-08,
+                "x": -5.960464477539063e-8,
                 "y": 0.751679808832705,
                 "z": 0.01855784778791364
               },
