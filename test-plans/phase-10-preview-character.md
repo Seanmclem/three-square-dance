@@ -136,3 +136,20 @@ Requires: an object with `interactable: true` and an `interactLabel`.
 | 42 | Scene save/load still works after preview |
 | 43 | No memory leaks: enter/exit preview 5× in a row, check `renderer.info` — triangle count stable |
 | 44 | No console errors on load, enter, or exit |
+
+## Addendum (2026-08-26, v4.79.19) — spawn settings are a drilldown menu
+
+Selecting the spawn flag now shows POSITION plus four menu rows (audio-menu
+idiom), each with a live summary and ← Back:
+
+1. **Movement** — move / jump / climb speed. Shared: identical in FPS and
+   3rd person (blurb says so).
+2. **Camera** — the FPS ⇄ 3rd Person switch (moved off the root) above BOTH
+   framing groups, always editable; the playing mode's group carries an
+   ACTIVE badge. FPS: FOV, eye height. 3rd: distance, height, angle.
+3. **Character** — model select, both scale fields side by side, jump anim
+   speed, and the six animation slots (shown whenever the model has clips,
+   even in FPS mode; they play on the 3rd-person avatar).
+4. **Controls** — the device-local sensitivity/touch block.
+
+Verified in-browser by clicking the spawn flag and walking all four pages.

@@ -168,7 +168,8 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 // ── Screen config ─────────────────────────────────────────────────────────────
 
 type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio"
-  | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai";
+  | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
+  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
@@ -176,6 +177,7 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
   "audio-mixer": "Mixer", "audio-music": "Background Music", "audio-ambient": "Ambient", "audio-character": "Character Sounds",
   scripts: "Scripts",
   ai: "Enemy AI",
+  "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character", "spawn-controls": "Controls",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -195,6 +197,10 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   "audio-character": "FOOTSTEP · JUMP · LAND",
   scripts: "TRIGGERS · ACTIONS",
   ai: "DETECT · CHASE · ATTACK",
+  "spawn-movement": "SPEED · JUMP · CLIMB",
+  "spawn-camera": "MODE · FOV · DISTANCE · ANGLE",
+  "spawn-character": "MODEL · SCALE · ANIMATIONS",
+  "spawn-controls": "THIS DEVICE · SENSITIVITY",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -316,7 +322,11 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "audio-music":
     case "audio-ambient":
     case "audio-character":
-      return "";   // no-selection screens — never listed for a selected object
+    case "spawn-movement":
+    case "spawn-camera":
+    case "spawn-character":
+    case "spawn-controls":
+      return "";   // non-object screens — never listed for a selected object (spawn rows build their own summaries)
   }
 }
 
@@ -500,8 +510,8 @@ export function PropertiesPanel({
   // Committed label (if any). The root header shows it in place of the id;
   // the id then appears underneath so it's never lost.
   const currentLabel   = ((selected?.data as { label?: string } | null)?.label ?? "").trim();
-  const headerTitle    = !selected ? (currentScreen ? SCREEN_LABELS[currentScreen] : "") : selected.id === "__spawn__" ? "Spawn Point" : isRoot ? (currentLabel || selected.id) : SCREEN_LABELS[currentScreen!];
-  const headerSubtitle = !selected ? (currentScreen ? SCREEN_SUBTITLES[currentScreen] : "") : selected.id === "__spawn__" ? "player settings" : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
+  const headerTitle    = !selected ? (currentScreen ? SCREEN_LABELS[currentScreen] : "") : selected.id === "__spawn__" ? (isRoot ? "Spawn Point" : SCREEN_LABELS[currentScreen!]) : isRoot ? (currentLabel || selected.id) : SCREEN_LABELS[currentScreen!];
+  const headerSubtitle = !selected ? (currentScreen ? SCREEN_SUBTITLES[currentScreen] : "") : selected.id === "__spawn__" ? (isRoot ? "player settings" : SCREEN_SUBTITLES[currentScreen!]) : isRoot ? objectTypeLabel(selected) : getSubtitle(currentScreen!, selected.type);
 
   const canRename = !!selected && isRoot && selected.id !== "__spawn__"
     && ["object", "wall", "floor", "platform", "stair", "trigger-volume", "checkpoint", "decal", "shape", "light"].includes(selected.type as string);
@@ -646,6 +656,7 @@ export function PropertiesPanel({
           <SpawnSettingsView
             settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange}
             position={selected.position} onPositionChange={onSpawnPositionChange}
+            screen={currentScreen} onOpen={push}
           />
         ) : !selected ? (
           currentScreen === "lights" ? (
@@ -4984,8 +4995,9 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
 // ── SpawnSettingsView ─────────────────────────────────────────────────────────
 
 function SpawnSettingsView({
-  settings, assets, onChange, position, onPositionChange,
-}: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void; position?: Vec3; onPositionChange?: (pos: Vec3) => void }) {
+  settings, assets, onChange, position, onPositionChange, screen, onOpen,
+}: { settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void; position?: Vec3; onPositionChange?: (pos: Vec3) => void;
+     screen: ScreenId | null; onOpen: (s: ScreenId) => void }) {
   const numField = (label: string, key: keyof PlayerSettings, step = 0.1, fallback?: number, help?: string) => (
     <div key={key}>
       <div style={{ ...LABEL, marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
@@ -5060,57 +5072,73 @@ function SpawnSettingsView({
     </div>
   );
 
-  return (
-    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-      {position && (
-        <div>
-          <div style={{ ...LABEL, marginBottom: 4 }}>POSITION</div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {posField("x")}{posField("y")}{posField("z")}
-          </div>
-        </div>
-      )}
-      <div style={{ color: "#98a2b8", fontSize: 11, marginBottom: 2 }}>Player settings for this world.</div>
-
-      <div>
-        <div style={{ ...LABEL, marginBottom: 4 }}>CAMERA MODE</div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["fps", "thirdperson"] as const).map(mode => (
-            <button
-              key={mode}
-              onClick={() => onChange({ cameraMode: mode })}
-              style={{
-                flex: 1, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
-                fontSize: 10, fontFamily: "monospace",
-                background: settings.cameraMode === mode ? "rgba(80,140,255,0.25)" : "rgba(40,40,40,0.9)",
-                border: `1px solid ${settings.cameraMode === mode ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.1)"}`,
-                color: settings.cameraMode === mode ? "#80aaff" : "#9090a0",
-              }}
-            >{mode === "fps" ? "FPS" : "3rd Person"}</button>
-          ))}
-        </div>
+  const PAGE: React.CSSProperties = { padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 };
+  const BLURB: React.CSSProperties = { color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 };
+  const is3rd = settings.cameraMode === "thirdperson";
+  // Small section header inside the Camera page; the badge marks which mode plays.
+  const groupHead = (label: string, active: boolean) => (
+    <div style={{ ...LABEL, fontSize: 10, marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+      <span>{label}</span>
+      {active && <span style={{ color: "#80aaff", fontSize: 8, letterSpacing: 1,
+        border: "1px solid rgba(80,140,255,0.35)", borderRadius: 3, padding: "1px 4px" }}>ACTIVE</span>}
+    </div>
+  );
+  const modeToggle = (
+    <div>
+      <div style={{ ...LABEL, marginBottom: 4 }}>CAMERA MODE</div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {(["fps", "thirdperson"] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => onChange({ cameraMode: mode })}
+            style={{
+              flex: 1, padding: "4px 8px", borderRadius: 4, cursor: "pointer",
+              fontSize: 10, fontFamily: "monospace",
+              background: settings.cameraMode === mode ? "rgba(80,140,255,0.25)" : "rgba(40,40,40,0.9)",
+              border: `1px solid ${settings.cameraMode === mode ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+              color: settings.cameraMode === mode ? "#80aaff" : "#9090a0",
+            }}
+          >{mode === "fps" ? "FPS" : "3rd Person"}</button>
+        ))}
       </div>
+    </div>
+  );
 
+  if (screen === "spawn-movement") return (
+    <div style={PAGE}>
       {numField("MOVE SPEED", "moveSpeed", 0.5)}
       {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
       {numField("CLIMB SPEED", "climbSpeed", 0.5, 2,
         "Vertical speed on ladders (metres/second). W climbs up, S climbs down, jump lets go.")}
-      {settings.cameraMode === "fps" && numField("FOV", "fov", 1)}
-      {settings.cameraMode === "fps" && numField("FPS EYE HEIGHT", "fpsEyeHeight", 0.1,
+      <div style={BLURB}>
+        Movement is shared — these apply identically in FPS and 3rd person.
+      </div>
+    </div>
+  );
+
+  if (screen === "spawn-camera") return (
+    <div style={PAGE}>
+      {modeToggle}
+      {groupHead("FPS", !is3rd)}
+      {numField("FOV", "fov", 1)}
+      {numField("FPS EYE HEIGHT", "fpsEyeHeight", 0.1,
         +(1.8 * (settings.fpsCharacterScale ?? 1) - 0.1).toFixed(2),   // live derived default (tracks FPS Character Scale while unset)
         "Camera height above the character's feet (metres). While unset it tracks FPS Character Scale (shown value); once set it is absolute. Camera only — does not change the collision size.")}
-      {settings.cameraMode === "thirdperson" && numField("CAMERA DISTANCE", "thirdPersonDistance", 0.5, undefined,
+      {groupHead("THIRD PERSON", is3rd)}
+      {numField("CAMERA DISTANCE", "thirdPersonDistance", 0.5, undefined,
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
-      {settings.cameraMode === "thirdperson" && numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
+      {numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
         "Height of the camera's aim point above the player (metres). This is CAMERA framing, not the character's size. Higher = the camera sits higher and frames the head/above (character appears lower, seen more from above); lower = aims toward the feet. To resize the character itself, use Character Scale.")}
-      {settings.cameraMode === "thirdperson" && numField("CAMERA ANGLE", "thirdPersonPitch", 1, 0,
+      {numField("CAMERA ANGLE", "thirdPersonPitch", 1, 0,
         "How many degrees the camera STARTS tilted down toward the character (0 = level, straight ahead). Raising it lifts the camera up and aims it down, keeping the character and the ground ahead both in view — try 15–25 for a platformer. Players can still look around; this is just the angle after spawns.")}
-      {settings.cameraMode === "thirdperson" && numField("CHARACTER SCALE", "characterScale", 0.1, 1,
-        "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
-      {settings.cameraMode === "fps" && numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,
-        "FPS collision-capsule size (and default eye height). Independent of the third-person Character Scale — a small third-person avatar keeps a normal FPS viewpoint. Default 1.")}
-      {settings.cameraMode === "thirdperson" && numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1)}
+      <div style={BLURB}>
+        Both groups are saved with the world; CAMERA MODE picks which one plays.
+      </div>
+    </div>
+  );
 
+  if (screen === "spawn-character") return (
+    <div style={PAGE}>
       <div>
         <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER MODEL</div>
         <select
@@ -5124,16 +5152,57 @@ function SpawnSettingsView({
           ))}
         </select>
       </div>
-
-      {settings.cameraMode === "thirdperson" && modelClips.length > 0 && (
+      {numField("CHARACTER SCALE (3RD PERSON)", "characterScale", 0.1, 1,
+        "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
+      {numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,
+        "FPS collision-capsule size (and default eye height). Independent of the third-person Character Scale — a small third-person avatar keeps a normal FPS viewpoint. Default 1.")}
+      {numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1,
+        "Playback speed of the jump animation (3rd person — FPS shows no avatar).")}
+      {modelClips.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
           {animSlots.map(({ slot, label }) => animField(slot, label))}
+          <div style={BLURB}>Animations play on the 3rd-person avatar (FPS hides the model).</div>
         </div>
       )}
+    </div>
+  );
 
+  if (screen === "spawn-controls") return (
+    <div style={{ padding: "14px 16px" }}>
       <ControlsSection />
     </div>
+  );
+
+  // Root: position + a menu of grouped sub-pages (the audio-menu idiom) with live summaries.
+  const fmt = (v: unknown) => v == null ? "—" : String(v);
+  const modelLabel = assets.find(a => a.id === settings.modelAssetId)?.label ?? "capsule only";
+  return (
+    <>
+      <div style={{ padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 10 }}>
+        {position && (
+          <div>
+            <div style={{ ...LABEL, marginBottom: 4 }}>POSITION</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {posField("x")}{posField("y")}{posField("z")}
+            </div>
+          </div>
+        )}
+        <div style={{ color: "#98a2b8", fontSize: 11 }}>Player settings for this world.</div>
+      </div>
+      <CategoryRow label="Movement"
+        summary={`speed ${fmt(settings.moveSpeed)} · jump ${fmt(settings.jumpHeight)}`}
+        onPress={() => onOpen("spawn-movement")} />
+      <CategoryRow label="Camera"
+        summary={is3rd ? `3rd person · ${fmt(settings.thirdPersonDistance)}m back` : `FPS · fov ${fmt(settings.fov)}`}
+        onPress={() => onOpen("spawn-camera")} />
+      <CategoryRow label="Character"
+        summary={modelLabel}
+        onPress={() => onOpen("spawn-character")} />
+      <CategoryRow label="Controls"
+        summary="this device"
+        onPress={() => onOpen("spawn-controls")} />
+    </>
   );
 }
 
