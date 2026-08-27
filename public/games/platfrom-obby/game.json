@@ -626,7 +626,7 @@
       "id": "pfb_76b82ec0",
       "name": "Spike Step 3",
       "kind": "snapshot",
-      "version": 1,
+      "version": 2,
       "variables": [],
       "template": [
         {
@@ -651,7 +651,7 @@
               "z": 1
             },
             "floor": 0,
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
@@ -707,6 +707,10 @@
                     "sound": "impactmining_004",
                     "targetId": "self",
                     "volume": 2
+                  },
+                  {
+                    "type": "set_state",
+                    "targetId": "vol_d8be00e2"
                   }
                 ],
                 "oneShot": false
@@ -731,7 +735,7 @@
               "y": 0.5,
               "z": 2
             },
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "scripts": [
               {
                 "id": "scr_158e8b64",
@@ -761,7 +765,13 @@
                 ],
                 "oneShot": false
               }
-            ]
+            ],
+            "stateSchema": {
+              "spikes-up": {
+                "type": "boolean",
+                "default": false
+              }
+            }
           }
         }
       ],
