@@ -452,6 +452,11 @@ export function ScriptPanel({
       for (const opt of n.options) harvestRefs(opt.conditions, opt.actions);
   for (const el of uiElements)
     if ((el.kind === "bar" || el.kind === "counter") && el.stateKey) scriptKeys.push(el.stateKey);
+  // key -> registered type (scene entries override the project's game entries);
+  // lets the set_state Value field specialize (boolean -> true/false/toggle).
+  const stateKeyTypes: Record<string, StateSchema["type"]> = Object.fromEntries(
+    [...Object.entries(gameStateSchema ?? {}), ...Object.entries(stateSchema)].map(([k, v]) => [k, v.type]));
+
   const knownStateKeys = [...new Set([
     ...Object.keys(gameStateSchema ?? {}),
     ...Object.keys(stateSchema),
@@ -606,6 +611,7 @@ export function ScriptPanel({
         })()
       ) : editing ? (
         <ScriptEditor
+          stateKeyTypes={stateKeyTypes}
           script={editing}
           help={tabHelp}
           triggerVolumes={triggerVolumes}
@@ -952,6 +958,7 @@ function ScriptList({
 
 function ScriptEditor({
   script,
+  stateKeyTypes,
   triggerVolumes,
   zoneObjects,
   zonePlatforms,
@@ -994,6 +1001,7 @@ function ScriptEditor({
   playerModelAssetId?: string;
   ownerIsEntity: boolean;
   selectedObjectId: string | null;
+  stateKeyTypes?: Record<string, StateSchema["type"]>;
   help?: string;
   onBack: () => void;
   onChange: (s: ScriptDef) => void;
@@ -1313,6 +1321,7 @@ function ScriptEditor({
             <ActionRow
               key={i}
               action={a}
+              stateKeyTypes={stateKeyTypes}
               zoneObjects={zoneObjects}
               zonePlatforms={zonePlatforms}
               zoneShapes={zoneShapes}
@@ -2052,6 +2061,7 @@ function ItemPicker({
 
 function ActionRow({
   action,
+  stateKeyTypes,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2090,6 +2100,7 @@ function ActionRow({
   projectSceneIds?: string[];
   playerModelAssetId?: string;
   owner?: { id: string; kind: "object" | "volume" };
+  stateKeyTypes?: Record<string, StateSchema["type"]>;
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -2147,6 +2158,7 @@ function ActionRow({
         </button>
       </div>
       <ActionFields
+        stateKeyTypes={stateKeyTypes}
         action={action}
         zoneObjects={zoneObjects}
         zonePlatforms={zonePlatforms}
@@ -2173,6 +2185,7 @@ function ActionRow({
 
 function ActionFields({
   action,
+  stateKeyTypes,
   zoneObjects,
   zonePlatforms,
   zoneShapes,
@@ -2210,6 +2223,7 @@ function ActionFields({
   projectSceneIds?: string[];
   playerModelAssetId?: string;
   owner?: { id: string; kind: "object" | "volume" };
+  stateKeyTypes?: Record<string, StateSchema["type"]>;
   onChange: (a: ScriptAction) => void;
 }) {
   function set(changes: Partial<ScriptAction>): void {
@@ -2244,6 +2258,16 @@ function ActionFields({
   // Scope-aware key suggestions for set_state / adjust_number: an entity scope
   // suggests THAT entity's registered state keys instead of the global list.
   const scopedStateKeys = entityStateKeys(action.targetId, owner?.id, zoneObjects, triggerVolumes);
+  // The current key's registered type (entity schema for entity scopes, else the
+  // merged scene/game schema) — boolean keys get a true/false/toggle picker.
+  const resolvedKeyType = (() => {
+    const rid = action.targetId === "self" ? owner?.id : action.targetId;
+    if (rid) {
+      const ent = zoneObjects.find(o => o.id === rid) ?? triggerVolumes.find(v => v.id === rid);
+      return (ent as { stateSchema?: Record<string, StateSchema> } | undefined)?.stateSchema?.[action.stateKey ?? ""]?.type;
+    }
+    return stateKeyTypes?.[action.stateKey ?? ""];
+  })();
 
   const stateScopePicker = (
     <F label="Whose state" flex="0 0 128px">
@@ -2532,14 +2556,28 @@ function ActionFields({
             />
           </F>
           <F label="Value" flex={1}>
-            <input
-              style={S.field}
-              placeholder="true / 100 / text"
-              value={action.stateValue == null ? "" : String(action.stateValue)}
-              onChange={(e) =>
-                set({ stateValue: coerceStateValue(e.target.value) })
-              }
-            />
+            {resolvedKeyType === "boolean" ? (
+              <select style={S.select}
+                value={action.stateValue === true ? "true" : action.stateValue === false ? "false"
+                     : action.stateValue === "__toggle__" ? "__toggle__" : ""}
+                onChange={(e) => set({ stateValue: e.target.value === "true" ? true
+                  : e.target.value === "false" ? false
+                  : e.target.value === "__toggle__" ? "__toggle__" : undefined })}>
+                <option value="">— pick —</option>
+                <option value="true">true</option>
+                <option value="false">false</option>
+                <option value="__toggle__">toggle (flip current)</option>
+              </select>
+            ) : (
+              <input
+                style={S.field}
+                placeholder="true / 100 / text"
+                value={action.stateValue == null ? "" : String(action.stateValue)}
+                onChange={(e) =>
+                  set({ stateValue: coerceStateValue(e.target.value) })
+                }
+              />
+            )}
           </F>
         </div>
       );

@@ -210,7 +210,11 @@ transition to that exact value (§4); `on_health_zero` — health reached 0.
 
 **Actions:**
 
-- `set_state` — `set(stateKey, stateValue)`
+- `set_state` — `set(stateKey, stateValue)`. When the key is REGISTERED as a
+  boolean (entity or global schema), the editor's Value field becomes a
+  true / false / **toggle** picker; toggle stores the `"__toggle__"` sentinel,
+  which the engine resolves per target as `!current` at run time (each entity
+  in a group scope flips its own value independently).
 - `adjust_number` — `adjust(stateKey, numberDelta)`
 - `delete_state` — `delete(stateKey)`
 - `give_item` / `take_item` — add/remove `count` of `itemId` at key `inv.<itemId>`; give clamps to the item's `stackSize`, take floors at 0 (Phase 32)

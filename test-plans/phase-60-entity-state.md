@@ -87,3 +87,12 @@ custom suggestion popup instead of the native datalist: click/focus opens
 the list, typing filters, and near the bottom of the screen it opens ABOVE
 the input (verified: bottom condition row → list upward). The Whose-state /
 action-target comboboxes flip the same way.
+
+### v4.79.35 — boolean Value picker with toggle
+
+set_state on a key registered as boolean (entity or global schema) renders
+the Value as a select: true / false / toggle (flip current). Toggle stores
+the "__toggle__" sentinel; the engine flips the current value per resolved
+key at run time. Non-boolean/unregistered keys keep the free-text field.
+Verified on the spike script: picking spikes-up (a boolean on the sibling
+trigger) switched Value to the picker.

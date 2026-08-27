@@ -477,7 +477,10 @@ export class ScriptEngine {
       case "set_state":
         if (action.stateKey)
           for (const key of this._scopedStateKeys(action, ownerId, action.stateKey))
-            gameState.set(key, action.stateValue ?? null);
+            // "__toggle__" sentinel (boolean keys' third option in the editor):
+            // flip the CURRENT value per resolved key — each entity in a group
+            // scope toggles its own state independently.
+            gameState.set(key, action.stateValue === "__toggle__" ? !gameState.get(key) : (action.stateValue ?? null));
         break;
 
       case "adjust_number":
