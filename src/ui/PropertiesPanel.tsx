@@ -656,9 +656,11 @@ export function PropertiesPanel({
                 prefab instance" is never a surprise (creating a prefab from a selection
                 makes that selection the first instance). Snapshot names link to edit. */}
             {prefabInfo && isRoot && (
-              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, fontSize: 10, overflow: "hidden" }}>
+              // No overflow:hidden here — it would clip the ⋯ dropdown (absolute child).
+              // Long names still ellipsize via their own overflow styles + minWidth 0.
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, fontSize: 10, minWidth: 0 }}>
                 {prefabInfo.prefab === null ? (
-                  <span style={{ color: "#e0a050", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "#e0a050", fontFamily: "monospace", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     ⚠ Prefab · {prefabInfo.record.prefabId} · definition missing
                   </span>
                 ) : prefabInfo.prefab.kind === "snapshot" ? (
@@ -673,7 +675,7 @@ export function PropertiesPanel({
                     </button>
                   </>
                 ) : (
-                  <span style={{ color: "#7fb069", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span style={{ color: "#7fb069", fontFamily: "monospace", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     ƒ {prefabInfo.prefab.name}
                   </span>
                 )}
