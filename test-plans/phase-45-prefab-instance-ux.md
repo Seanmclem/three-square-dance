@@ -45,3 +45,21 @@
 - [x] `npm run typecheck` → 0 errors; no console errors during the flow.
 - [ ] Non-prefab object selection unchanged (no Prefab section, gizmo normal).
 - [x] Autosave snapshot-restore protocol left the user's autosave byte-identical.
+
+## Addendum (2026-08-27, v4.79.25) — membership line, pruning, delete-review dialog
+
+1. **Membership header line**: select any single member of a placed instance →
+   under the name, `⬡ {prefab name} ✎` (snapshot; clicking enters prefab edit),
+   `ƒ {name}` (generator), or `⚠ … definition missing` (orphan). Verified via a
+   scratch prefab: header link read "Prefab 9 ✎".
+2. **Last-member pruning**: delete all of an instance's pieces (any path — Delete
+   key multi-select, single delete, script-detach prompt) → the prefabInstances
+   record goes with the last piece, in the same transaction. One ↩ undo restores
+   pieces AND record together (verified: 0/0 after delete, 2 members + 1 record
+   after one undo click).
+3. **Delete-review dialog**: the library × is never disabled. Count > 0 → dialog
+   lists instances (zone · origin · pieces) with Go to (selects members, camera
+   glides) and per-row Delete (one undo step each; rows refresh in place, incl.
+   on undo while open). Ghost records show amber "empty record (leftover)",
+   Delete only. "Delete prefab" unlocks at 0 rows. Verified end-to-end with the
+   scratch prefab and read-only against the real Spike Step 2 (1 live + 1 ghost).

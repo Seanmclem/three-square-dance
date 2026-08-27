@@ -441,6 +441,7 @@ interface PropertiesPanelProps {
   // null when the instance's definition is missing from the library (orphan) —
   // the section degrades to Unlink / Delete instance.
   prefabInfo?:              { prefab: PrefabDef | null; record: PrefabInstanceRecord } | null;
+  onEditPrefab?:            (prefabId: string) => void;   // header prefab-name link (snapshot kind only)
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
@@ -470,7 +471,7 @@ export function PropertiesPanel({
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
-  prefabInfo, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
+  prefabInfo, onEditPrefab, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
@@ -649,6 +650,33 @@ export function PropertiesPanel({
                 <span style={{ color: "#98a2b8", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>· {selected.id}</span>
               )}
             </div>
+            {/* Prefab membership — right under the name, so "this entity IS a placed
+                prefab instance" is never a surprise (creating a prefab from a selection
+                makes that selection the first instance). Snapshot names link to edit. */}
+            {prefabInfo && isRoot && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, fontSize: 10, overflow: "hidden" }}>
+                {prefabInfo.prefab === null ? (
+                  <span style={{ color: "#e0a050", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    ⚠ Prefab · {prefabInfo.record.prefabId} · definition missing
+                  </span>
+                ) : prefabInfo.prefab.kind === "snapshot" ? (
+                  <>
+                    <span style={{ color: "#80aaff", flexShrink: 0 }}>⬡</span>
+                    <button onClick={() => onEditPrefab?.(prefabInfo.prefab!.id)}
+                      title="Edit prefab — saving updates every placed instance"
+                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer",
+                        color: "#4a9eff", fontSize: 10, fontFamily: "monospace", minWidth: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {prefabInfo.prefab.name} ✎
+                    </button>
+                  </>
+                ) : (
+                  <span style={{ color: "#7fb069", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    ƒ {prefabInfo.prefab.name}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

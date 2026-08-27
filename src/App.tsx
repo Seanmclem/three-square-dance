@@ -74,6 +74,7 @@ import { AudioImporterModal } from "@/ui/AudioImporterModal";
 import { GraphicsImporterModal } from "@/ui/GraphicsImporterModal";
 import { SkyboxImporterModal } from "@/ui/SkyboxImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
+import { PrefabInstancesDialog, type PrefabInstanceRow } from "@/ui/PrefabInstancesDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
@@ -260,6 +261,8 @@ export default function App() {
   const [worldUiElements, setWorldUiElements]  = useState<UiElementDef[]>([]);
   const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
+  // Non-null = the "can't delete prefab yet" dialog is open, listing its instances.
+  const [prefabDeleteBlocked, setPrefabDeleteBlocked] = useState<{ prefabId: string; rows: PrefabInstanceRow[] } | null>(null);
   // Isolated prefab edit mode (Phase 47). The ref gates autosave/save/play
   // synchronously (state is for rendering the bar + disabling UI).
   const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
@@ -1699,6 +1702,41 @@ export default function App() {
     pasteClip(clip);
   }, [pasteClip]);
 
+  // Prefab-instance stamps of the entities about to be removed, read BEFORE removal
+  // (refs carry no data). zoneId → instanceIds, since records are per-zone.
+  const collectInstanceStamps = (world: WorldState, refs: SelectedRef[]): Map<string, Set<string>> => {
+    const stamps = new Map<string, Set<string>>();
+    for (const ref of refs) {
+      const zone = world.zones.get(ref.zoneId);
+      if (!zone) continue;
+      const ent =
+        ref.type === "object"         ? zone.objects.find(e => e.id === ref.id) :
+        ref.type === "trigger-volume" ? zone.triggerVolumes?.find(e => e.id === ref.id) :
+        ref.type === "shape"          ? zone.shapes?.find(e => e.id === ref.id) :
+        ref.type === "stair"          ? zone.stairs?.find(e => e.id === ref.id) :
+        ref.type === "ladder"         ? zone.ladders?.find(e => e.id === ref.id) : undefined;
+      const instId = (ent as { prefab?: { instanceId?: string } } | undefined)?.prefab?.instanceId;
+      if (!instId) continue;
+      if (!stamps.has(ref.zoneId)) stamps.set(ref.zoneId, new Set());
+      stamps.get(ref.zoneId)!.add(instId);
+    }
+    return stamps;
+  };
+
+  // After removal, still inside the SAME transaction (records are journaled, so one
+  // undo restores members + record atomically): an instance whose last member just
+  // died takes its record with it — otherwise a ghost record keeps counting toward
+  // the prefab's instance badge forever and blocks deleting the prefab.
+  const pruneEmptyInstances = (world: WorldState, stamps: Map<string, Set<string>>): void => {
+    for (const [zoneId, instanceIds] of stamps) {
+      for (const instanceId of instanceIds) {
+        if (collectInstanceMembers(world, zoneId, instanceId).size === 0) {
+          world.removePrefabInstance(zoneId, instanceId);
+        }
+      }
+    }
+  };
+
   // Delete an arbitrary ref set in one transaction (no per-entity script prompt).
   // Shared by multi-select delete and group "Delete all members".
   const deleteRefs = useCallback((refs: SelectedRef[]): void => {
@@ -1707,6 +1745,7 @@ export default function App() {
     const zoneId = refs[0].zoneId;
     const nodesToRemove = new Set<string>();
     world.transaction(`delete ${refs.length} item${refs.length > 1 ? "s" : ""}`, () => {
+      const stamps = collectInstanceStamps(world, refs);
       for (const ref of refs) {
         const zone = world.zones.get(ref.zoneId);
         switch (ref.type) {
@@ -1731,6 +1770,7 @@ export default function App() {
         }
       }
       for (const nid of nodesToRemove) world.removeNode(zoneId, nid);
+      pruneEmptyInstances(world, stamps);
     });
     syncHistory();
     setSelected(null);
@@ -2106,6 +2146,10 @@ export default function App() {
     const { type, id, zoneId } = selected;
 
     worldRef.current?.beginTransaction(`delete ${type}`);
+    // Read the prefab stamp before removal; prune the record before commit if this
+    // was the instance's last member. (The script-prompt early-returns abort the
+    // transaction and defer to handleDeleteConfirm, which prunes on its own.)
+    const stamps = collectInstanceStamps(world, [{ id, type, zoneId } as SelectedRef]);
     if (type === "wall") {
       const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
       const nodeIds = new Set(walls.flatMap(w => [w.startNodeId, w.endNodeId]));
@@ -2150,6 +2194,7 @@ export default function App() {
       if (!wall) { worldRef.current?.abortTransaction(); return; }
       world.updateWall(zoneId, wallId, { openings: wall.openings.filter(o => o.id !== id) });
     }
+    pruneEmptyInstances(world, stamps);
     worldRef.current?.commitTransaction();
     syncHistory();
     setSelected(null);
@@ -3006,10 +3051,66 @@ export default function App() {
     applyPrefabs(prefabs.map(p => p.id === prefabId ? { ...p, name } : p));
   };
 
+  // Rows for the "can't delete yet" dialog. Computed only on open / row-delete /
+  // prefab-instance events — never per frame or per render.
+  const buildPrefabInstanceRows = (prefabId: string): PrefabInstanceRow[] => {
+    const world = worldRef.current;
+    if (!world) return [];
+    const rows: PrefabInstanceRow[] = [];
+    for (const zone of world.zones.values()) {
+      for (const rec of zone.prefabInstances ?? []) {
+        if (rec.prefabId !== prefabId) continue;
+        rows.push({
+          recordId: rec.id, zoneId: zone.id, zoneName: zone.name, origin: rec.origin,
+          memberCount: collectInstanceMembers(world, zone.id, rec.id).size,
+        });
+      }
+    }
+    return rows;
+  };
+
   const handlePrefabDelete = (prefabId: string): void => {
-    if ((prefabInstanceCounts.get(prefabId) ?? 0) > 0) return;  // panel disables, belt-and-braces
+    // Instances (including leftover empty records) block deletion — but instead of
+    // a dead button, the × opens a dialog that lists them with Go to / Delete.
+    if ((prefabInstanceCounts.get(prefabId) ?? 0) > 0) {
+      setPrefabDeleteBlocked({ prefabId, rows: buildPrefabInstanceRows(prefabId) });
+      return;
+    }
     applyPrefabs(prefabs.filter(p => p.id !== prefabId));
   };
+
+  const handleInstanceGoTo = (row: PrefabInstanceRow): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    // Selection resolves meshes in the ACTIVE zone — activate the row's zone first.
+    if (world.activeZoneId !== row.zoneId) world.setActiveZone(row.zoneId);
+    setActiveTool("select");
+    busRef.current.emit("tool:select", { tool: "select" });
+    const refs: SelectedRef[] = [...collectInstanceMembers(world, row.zoneId, row.recordId).values()]
+      .map(m => ({ id: m.id, type: m.type, zoneId: row.zoneId } as SelectedRef));
+    busRef.current.emit("selection:set", { refs });
+    // targetFocus only — the orbit loop glides there (setting focus too would snap).
+    sceneRef.current?.editorCamera?.targetFocus.set(
+      row.origin.position.x, row.origin.position.y, row.origin.position.z);
+    setPrefabDeleteBlocked(null);
+  };
+
+  const handleInstanceRowDelete = (row: PrefabInstanceRow): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    const wasSelected = selected?.zoneId === row.zoneId
+      && (selected.data as { prefab?: { instanceId?: string } } | null)?.prefab?.instanceId === row.recordId;
+    deleteInstance(world, row.zoneId, row.recordId);   // own transaction — one undo step
+    syncHistory();
+    if (wasSelected) { setSelected(null); busRef.current.emit("object:deselected", {}); }
+    setPrefabDeleteBlocked(prev => prev && { ...prev, rows: buildPrefabInstanceRows(prev.prefabId) });
+  };
+
+  // Keep the dialog's rows honest while it sits open (undo/redo re-adds or removes
+  // instances) — event-driven via prefabTick, so still zero per-frame work.
+  useEffect(() => {
+    setPrefabDeleteBlocked(prev => prev && { ...prev, rows: buildPrefabInstanceRows(prev.prefabId) });
+  }, [prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const prefabInstanceCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -3298,8 +3399,12 @@ export default function App() {
         zone.scripts = [...(zone.scripts ?? []), ...scripts];
         setZoneScripts([...(zone.scripts)]);
       }
+      // prompt.type is the state-local "volume"/"object" pair, not a SelectedRef type.
+      const stamps = collectInstanceStamps(world,
+        [{ id, type: type === "volume" ? "trigger-volume" : "object", zoneId } as SelectedRef]);
       if (type === "volume") world.removeTriggerVolume(zoneId, id);
       else world.removeObject(zoneId, id);
+      pruneEmptyInstances(world, stamps);
     });
     syncHistory();
     setSelected(null);
@@ -3530,6 +3635,7 @@ export default function App() {
         onSaveCollidersToAsset={(objectId, assetId, colliders) => void handleSaveCollidersToAsset(objectId, assetId, colliders)}
         hullPointsFor={objectId => objectPlacerRef.current?.getLocalHullPoints(objectId) ?? null}
         prefabInfo={selPrefabInfo}
+        onEditPrefab={handleEditPrefab}
         onPrefabVariablesChange={handlePrefabVariablesChange}
         onPrefabOriginChange={handlePrefabOriginChange}
         onPrefabReexpand={handlePrefabReexpand}
@@ -3841,6 +3947,20 @@ SquareDance
           onDeleteAll={() => handleDeleteConfirm(false)}
           onKeepScripts={() => handleDeleteConfirm(true)}
           onCancel={() => setDeletePrompt(null)}
+        />
+      )}
+      {prefabDeleteBlocked && (
+        <PrefabInstancesDialog
+          prefabName={prefabs.find(p => p.id === prefabDeleteBlocked.prefabId)?.name ?? prefabDeleteBlocked.prefabId}
+          rows={prefabDeleteBlocked.rows}
+          onGoTo={handleInstanceGoTo}
+          onDeleteRow={handleInstanceRowDelete}
+          onDeletePrefab={() => {
+            if ((prefabInstanceCounts.get(prefabDeleteBlocked.prefabId) ?? 0) > 0) return;  // belt-and-braces
+            applyPrefabs(prefabs.filter(p => p.id !== prefabDeleteBlocked.prefabId));
+            setPrefabDeleteBlocked(null);
+          }}
+          onClose={() => setPrefabDeleteBlocked(null)}
         />
       )}
       <DialogueOverlay

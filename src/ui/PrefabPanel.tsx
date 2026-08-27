@@ -150,10 +150,9 @@ export function PrefabPanel({
 
                 <button
                   onClick={() => onDelete(p.id)}
-                  disabled={count > 0}
-                  title={count > 0 ? `${count} placed instance(s) — unlink or delete them first` : "Delete prefab"}
-                  style={{ background: "none", border: "none", color: count > 0 ? "#3a3a44" : "#b06060", fontSize: 13,
-                           cursor: count > 0 ? "default" : "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
+                  title={count > 0 ? `${count} placed instance(s) — click to review them` : "Delete prefab"}
+                  style={{ background: "none", border: "none", color: count > 0 ? "#8a5555" : "#b06060", fontSize: 13,
+                           cursor: "pointer", padding: "0 2px", lineHeight: 1, flexShrink: 0 }}
                 >×</button>
               </div>
             </div>

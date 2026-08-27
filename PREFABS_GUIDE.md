@@ -51,7 +51,9 @@ targets the door). Multi-select all its parts — shift-click, or put them in a
 group and use the Groups panel's **Select** — then press **⬡ Create Prefab**
 in the properties panel. The selection is captured as the template and replaced,
 in place, by the prefab's first linked instance (one undo step). Rename it in
-the Prefabs panel.
+the Prefabs panel. **The original build IS an instance now** — its pieces show a
+prefab line in their properties header (below), and it counts toward the
+library's instance badge.
 
 What can be captured: objects, trigger volumes, shapes, stairs, ladders.
 Walls, floors, and platforms are skipped (they're corner-node-based; a console
@@ -92,6 +94,11 @@ gizmo moves it all, and the properties panel shows the **Prefab section**:
   sculpt freely.
 - **Delete instance**: removes every piece and the link.
 
+**Every member wears its membership** (v4.79.25): select any single piece and
+the properties header shows a prefab line right under the name — `⬡ {name}` for
+snapshot prefabs (click it to jump into prefab editing), `ƒ {name}` for
+generators, `⚠ … definition missing` for orphans.
+
 **Shift-click** a piece to select *just it* — the escape hatch for tweaking a
 single piece. Know the rule: piece-level tweaks are **not** part of the recipe
 or the instance's settings, so they're overwritten the next time the pieces
@@ -128,6 +135,18 @@ mode.
 
 Instances themselves live in the scene file as ordinary entities plus a small
 `prefabInstances` record per zone — scenes are always playable stand-alone.
+
+## Deleting a prefab
+
+The library ×'s rule is simple: a prefab with **zero placed instances** deletes
+immediately; one with instances opens a review dialog (v4.79.25) listing every
+instance — zone, position, piece count — with **Go to** (selects the instance
+and glides the camera to it) and **Delete** per row (each row-delete is one undo
+step). Once the list is empty the dialog's **Delete prefab** button unlocks.
+Rows shown as **empty record (leftover)** are ghost bookkeeping from before
+v4.79.25 — instances whose pieces were deleted one by one; just Delete them.
+Since v4.79.25 that can't happen anymore: deleting an instance's **last piece**
+removes its record too (in the same undo step as the piece).
 
 ## Orphans (⚠ definition missing)
 
