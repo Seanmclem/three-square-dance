@@ -11426,6 +11426,9 @@
                   "sound": "impactmining_004",
                   "targetId": "self",
                   "volume": 2
+                },
+                {
+                  "type": "set_state"
                 }
               ],
               "oneShot": false
@@ -13245,8 +13248,7 @@
                 {
                   "type": "adjust_number",
                   "stateKey": "Hearts",
-                  "numberDelta": -1,
-                  "delay": 4
+                  "numberDelta": -1
                 },
                 {
                   "type": "launch_player",
@@ -13266,6 +13268,12 @@
             "prefabId": "pfb_76b82ec0",
             "instanceId": "pfi_aaed9392",
             "memberKey": "vol_d8be00e2"
+          },
+          "stateSchema": {
+            "has-popped": {
+              "type": "boolean",
+              "default": false
+            }
           }
         },
         {
