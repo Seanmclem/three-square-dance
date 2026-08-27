@@ -88,3 +88,10 @@ whole). Verified on the chest instance: 1 piece → "⛶ all 4" → "4 selected"
    undoability). Cancel is a no-op.
 3. Verified: cancel path on a real chest instance left it intact; confirm path
    on a scratch prefab deleted member + record, prefab then deletable.
+
+### v4.79.29 — Select-all + Edit prefab in the Prefab section
+
+The section's button row now leads with "⛶ Select all N" (single-piece view,
+multi-piece instances only) and amber "Edit prefab" (snapshot prefabs).
+The whole-instance multi view shows Edit but no redundant select-all.
+Screenshot-verified in both views.

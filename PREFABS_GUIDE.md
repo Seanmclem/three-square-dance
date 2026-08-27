@@ -93,6 +93,9 @@ gizmo moves it all, and the properties panel shows the **Prefab section**:
   updates stop affecting them forever. Do this when you want a one-off you can
   sculpt freely.
 - **Delete instance**: removes every piece and the link.
+- **⛶ Select all N** (single-piece view) and **Edit prefab** (snapshot kind)
+  sit at the front of the same button row (v4.79.29) — the section offers the
+  full set of instance actions wherever it appears.
 
 **Every member wears its membership** (v4.79.25): select any single piece and
 the properties header shows a prefab line right under the name — `⬡ {name}` for

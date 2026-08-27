@@ -567,6 +567,7 @@ export function PropertiesPanel({
             onReexpand={onPrefabReexpand}
             onUnlink={onPrefabUnlink}
             onDeleteInstance={onPrefabDeleteInstance}
+            onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
           />
         )}
         <div style={{ padding: 16 }}>
@@ -798,6 +799,8 @@ export function PropertiesPanel({
                 onReexpand={onPrefabReexpand}
                 onUnlink={onPrefabUnlink}
                 onDeleteInstance={onPrefabDeleteInstance}
+                onSelectAll={onSelectInstance}
+                onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
               />
             ) : null}
           />
@@ -825,6 +828,8 @@ export function PropertiesPanel({
                 onReexpand={onPrefabReexpand}
                 onUnlink={onPrefabUnlink}
                 onDeleteInstance={onPrefabDeleteInstance}
+                onSelectAll={onSelectInstance}
+                onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
               />
             )}
             <GroupsAccordion
@@ -1177,13 +1182,15 @@ function PrefabVarField({ def, value, onCommit }: {
   );
 }
 
-function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance }: {
-  info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord };
+function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance, onSelectAll, onEdit }: {
+  info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord; memberCount?: number };
   onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onReexpand?:        () => void;
   onUnlink?:          () => void;
   onDeleteInstance?:  () => void;
+  onSelectAll?:       () => void;   // select every piece (passed only where the selection ISN'T already the whole instance)
+  onEdit?:            () => void;   // enter prefab edit (snapshot kind only)
 }) {
   const [open, setOpen] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -1271,6 +1278,14 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
           </div>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {onSelectAll && (info.memberCount ?? 0) > 1 && (
+              <PrefabBtn label={`⛶ Select all ${info.memberCount}`}
+                title="Select every piece of this instance — move them together with one gizmo" onClick={onSelectAll} />
+            )}
+            {onEdit && prefab.kind === "snapshot" && (
+              <PrefabBtn label="Edit prefab" amber
+                title="Edit the prefab in isolation — saving updates every placed instance" onClick={onEdit} />
+            )}
             <PrefabBtn label="Reset from prefab" title="Rebuild all pieces from the prefab. Settings and position keep their values; hand-edits to individual pieces are discarded" onClick={onReexpand} />
             <PrefabBtn label="Unlink" title="Detach into plain, independent objects — prefab updates stop affecting them" onClick={onUnlink} />
             <PrefabBtn label="Delete instance" title="Remove every piece and the prefab link" onClick={onDeleteInstance} danger />
@@ -1303,7 +1318,7 @@ function OriginNumField({ label, value, onCommit }: { label: string; value: numb
   );
 }
 
-function PrefabBtn({ label, title, onClick, danger }: { label: string; title: string; onClick?: () => void; danger?: boolean }) {
+function PrefabBtn({ label, title, onClick, danger, amber }: { label: string; title: string; onClick?: () => void; danger?: boolean; amber?: boolean }) {
   return (
     <button
       onClick={onClick}
@@ -1311,9 +1326,9 @@ function PrefabBtn({ label, title, onClick, danger }: { label: string; title: st
       disabled={!onClick}
       style={{
         background: "transparent",
-        border: `1px solid ${danger ? "rgba(180,90,90,0.3)" : "rgba(80,140,255,0.25)"}`,
+        border: `1px solid ${danger ? "rgba(180,90,90,0.3)" : amber ? "rgba(240,192,96,0.3)" : "rgba(80,140,255,0.25)"}`,
         borderRadius: 3, cursor: "pointer",
-        color: danger ? "#c98080" : "#9db8e8",
+        color: danger ? "#c98080" : amber ? "#f0c060" : "#9db8e8",
         fontSize: 9, padding: "3px 8px", fontFamily: "monospace", letterSpacing: 0.3,
       }}
     >{label}</button>
