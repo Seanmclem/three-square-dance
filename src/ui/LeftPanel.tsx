@@ -27,6 +27,7 @@ interface LeftPanelProps {
   onEditMaterials:  (ids: string[]) => void;
   sounds:           SoundDef[];
   onSoundImport:    () => void;
+  onSoundRecord?:   () => void;
   onDeleteSounds:   (ids: string[]) => void;
   onEditSounds:     (ids: string[]) => void;
   skyboxes:         SkyboxDef[];
@@ -104,7 +105,7 @@ interface LeftPanelProps {
 export function LeftPanel({
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onReoriginAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
-  sounds, onSoundImport, onDeleteSounds, onEditSounds,
+  sounds, onSoundImport, onSoundRecord, onDeleteSounds, onEditSounds,
   skyboxes, selectedSkybox, onSkyboxSelect, onSkyboxImport, onDeleteSkyboxes, onEditSkyboxes,
   graphics, onGraphicsImport, onDeleteGraphics, onEditGraphics, playerModelAssetId,
   groups, hiddenGroupIds, onGroupAdd, onGroupRemove, onGroupRename, onGroupToggleVisibility,
@@ -209,6 +210,7 @@ export function LeftPanel({
               <AudioBrowser
                 sounds={sounds}
                 onImport={onSoundImport}
+                onRecord={onSoundRecord}
                 onDeleteSounds={onDeleteSounds}
                 onEdit={onEditSounds}
               />

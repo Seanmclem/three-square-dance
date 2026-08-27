@@ -82,3 +82,17 @@ places audio changes are:
 - **Within a level** — trigger volumes + scripts (`play_music` / `play_sound` /
   `stop_music`) and per-object `sound` emitters. That's the whole toolkit; there are no
   sub-zones to crossfade between.
+
+## Addendum (2026-08-27, v4.79.32) — microphone recorder
+
+1. AUDIO panel → ● Record (beside + Import Sound) → RECORD SOUND modal.
+2. ● Record starts immediately (elapsed ticking); ■ Stop decodes the take.
+3. ▶ Play previews exactly the saved range; TRIM START/END shave seconds off
+   either end (duration line shows "X.Xs (of Y.Ys)"); ● Re-record replaces the
+   take; NAME sets the file/label slug.
+4. Import → hands a 16-bit WAV into the normal IMPORT SOUNDS metadata step —
+   category/tags/attribution, manifest write, library reload.
+5. Verified headless with stubbed capture (synthesized 1s sine): trim 0.2/0.3 →
+   the imported /assets/audio file decodes to exactly 0.5s; Manage → Delete
+   removes manifest entry + file. Real mic capture/permission needs a human
+   check (CEF may prompt for the microphone).

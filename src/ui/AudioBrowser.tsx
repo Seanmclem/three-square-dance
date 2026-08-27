@@ -6,6 +6,7 @@ import { useFacetFilters, type FacetSpec } from "@/ui/assetFilters";
 interface AudioBrowserProps {
   sounds:         SoundDef[];
   onImport:       () => void;
+  onRecord?:      () => void;   // opens the microphone recorder modal
   onDeleteSounds: (ids: string[]) => void;
   onEdit:         (ids: string[]) => void;
 }
@@ -20,7 +21,7 @@ export const SOUND_FACETS: FacetSpec<SoundDef>[] = [
   { key: "author", label: "Author",     read: s => s.attribution?.author },
 ];
 
-export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: AudioBrowserProps) {
+export function AudioBrowser({ sounds, onImport, onRecord, onDeleteSounds, onEdit }: AudioBrowserProps) {
   const [search,  setSearch]  = useState("");
   const [manage,  setManage]  = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -80,6 +81,12 @@ export function AudioBrowser({ sounds, onImport, onDeleteSounds, onEdit }: Audio
             <button onClick={onImport} style={{ flex: 1, padding: "5px 0", background: "rgba(80,140,255,0.12)",
               border: "1px solid rgba(80,140,255,0.25)", borderRadius: 4, cursor: "pointer",
               color: "#80aaff", fontSize: 10, letterSpacing: 0.5 }}>+ Import Sound</button>
+            {onRecord && (
+              <button onClick={onRecord} title="Record a new sound with the microphone"
+                style={{ flexShrink: 0, padding: "5px 10px", background: "rgba(200,60,60,0.12)",
+                  border: "1px solid rgba(200,60,60,0.3)", borderRadius: 4, cursor: "pointer",
+                  color: "#cc6666", fontSize: 10, letterSpacing: 0.5 }}>● Record</button>
+            )}
             {sounds.length > 0 && (
               <button onClick={() => setManage(true)} style={{ flexShrink: 0, padding: "5px 10px",
                 background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",

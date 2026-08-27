@@ -71,6 +71,7 @@ import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
 import { AudioImporterModal } from "@/ui/AudioImporterModal";
+import { SoundRecorderModal } from "@/ui/SoundRecorderModal";
 import { GraphicsImporterModal } from "@/ui/GraphicsImporterModal";
 import { SkyboxImporterModal } from "@/ui/SkyboxImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
@@ -210,6 +211,9 @@ export default function App() {
   >(null);
   const [sounds,          setSounds]           = useState<SoundDef[]>([]);
   const [audioImporterOpen, setAudioImporterOpen] = useState(false);
+  const [soundRecorderOpen, setSoundRecorderOpen] = useState(false);
+  // A recording handed to the importer — pre-fills its file list, straight to metadata.
+  const [recordedFiles, setRecordedFiles] = useState<File[] | null>(null);
   const [pendingSoundEdit, setPendingSoundEdit] = useState<PendingEdit | null>(null);
   const [skyboxes,        setSkyboxes]         = useState<SkyboxDef[]>([]);
   const [skyboxImporterOpen, setSkyboxImporterOpen] = useState(false);
@@ -3497,6 +3501,7 @@ export default function App() {
         onEditMaterials={handleRequestMaterialEdit}
         sounds={sounds}
         onSoundImport={() => setAudioImporterOpen(true)}
+        onSoundRecord={() => setSoundRecorderOpen(true)}
         onDeleteSounds={handleDeleteSounds}
         onEditSounds={handleRequestSoundEdit}
         skyboxes={skyboxes}
@@ -3844,8 +3849,20 @@ SquareDance
           existingTags={[...new Set(sounds.flatMap(s => s.tags ?? []))].sort()}
           existingAttributions={[...sounds, ...assets].flatMap(s => s.attribution ? [s.attribution] : [])}
           existingCategories={[...new Set(sounds.map(s => s.category ?? "SFX"))]}
-          onComplete={() => { setAudioImporterOpen(false); handleSoundsReload(); }}
-          onClose={() => setAudioImporterOpen(false)}
+          initialFiles={recordedFiles ?? undefined}
+          onComplete={() => { setAudioImporterOpen(false); setRecordedFiles(null); handleSoundsReload(); }}
+          onClose={() => { setAudioImporterOpen(false); setRecordedFiles(null); }}
+        />
+      )}
+
+      {soundRecorderOpen && (
+        <SoundRecorderModal
+          onRecorded={file => {
+            setSoundRecorderOpen(false);
+            setRecordedFiles([file]);
+            setAudioImporterOpen(true);   // lands directly in the metadata step
+          }}
+          onClose={() => setSoundRecorderOpen(false)}
         />
       )}
 

@@ -20,7 +20,10 @@ Written for humans clicking through the UI; the engine-level details live in
   category, path, `loop`/`volume`/`spatial` flags, tags), loaded by
   `AssetManager.initAudio()`.
 - **SOUNDS panel** (bottom-left toolbar, speaker icon): browse, ▶-preview, and **Manage →
-  Edit / Delete**. **+ Import Sound** copies `.mp3` / `.wav` / `.ogg` files into
+  Edit / Delete**. **● Record** (v4.79.32) opens a microphone recorder: record, ▶ play back
+  (trim-aware), **● Re-record** to replace the take, trim seconds off the start/end, name
+  it, then **Import →** hands the recording to the normal import flow below as a `.wav` —
+  same metadata step, same manifest. **+ Import Sound** copies `.mp3` / `.wav` / `.ogg` files into
   `assets/audio` and appends to the manifest. The import metadata step matches the model
   importer: a **Set all to** category row (including **New category…**), per-sound category
   dropdowns with their own **New…** option, a **Tags** field applied to the whole batch,

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { SoundDef, SoundCategory, SoundManifest, Attribution } from "@/types";
 import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
@@ -8,6 +8,7 @@ interface Props {
   existingTags:  string[];   // suggestions — the manifest isn't read until the import step
   existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
   existingCategories:   string[];       // categories already in the sound library (incl. custom ones)
+  initialFiles?: File[];     // pre-supplied files (the sound recorder) — skips the pick phase
   onComplete:    (sounds: SoundDef[]) => void;
   onClose:       () => void;
 }
@@ -55,7 +56,7 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#8b94a8", fontSize: 10, letterSpacing: 1,
 };
 
-export function AudioImporterModal({ existingTags, existingAttributions, existingCategories, onComplete, onClose }: Props) {
+export function AudioImporterModal({ existingTags, existingAttributions, existingCategories, initialFiles, onComplete, onClose }: Props) {
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SoundEntry[]>([]);
   const [bulkNewCat,  setBulkNewCat]  = useState<string | null>(null);
@@ -76,7 +77,12 @@ export function AudioImporterModal({ existingTags, existingAttributions, existin
   const update = (id: string, patch: Partial<SoundEntry>) =>
     setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e));
 
-  function onFilesChosen(list: FileList | null): void {
+  // Recorder handoff: land straight in the metadata phase with the given file(s).
+  useEffect(() => {
+    if (initialFiles?.length) onFilesChosen(initialFiles);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  function onFilesChosen(list: FileList | File[] | null): void {
     const all   = [...(list ?? [])];
     const audio = all.filter(f => AUDIO_EXTS.has(getExt(f.name)));
     // The dialog is deliberately wide open (audio/*) — the format check happens
