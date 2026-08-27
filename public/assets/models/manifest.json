@@ -484,7 +484,7 @@
     {
       "id": "character",
       "label": "Character",
-      "category": "Other",
+      "category": "Characters",
       "path": "/assets/models/character.gltf",
       "collidable": true,
       "colliderType": "box",
@@ -515,7 +515,13 @@
         "Yes",
         "Climb"
       ],
-      "thumbnail": "/assets/models/character_thumb.png"
+      "thumbnail": "/assets/models/character_thumb.png",
+      "attribution": {
+        "sourceName": "Platformer Game Kit",
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternuis",
+        "license": "CC0"
+      }
     },
     {
       "id": "donkey",

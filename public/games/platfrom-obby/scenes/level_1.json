@@ -8,11 +8,11 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -23.924027786523325,
+        "x": -19.143078330542018,
         "y": 2.73214756311405,
-        "z": -64.6536406156163
+        "z": -85.9787547811378
       },
-      "radius": 29.245070499337473,
+      "radius": 28.895070499337468,
       "phi": 1.000000000000004,
       "theta": 17.64999999988162
     }
@@ -9418,6 +9418,19 @@
                   "type": "spawn_object",
                   "delay": 0,
                   "targetId": "vol_d8be00e2"
+                },
+                {
+                  "type": "play_sound",
+                  "delay": 2,
+                  "sound": "impactmining_003",
+                  "targetId": "self",
+                  "volume": 2
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "impactmining_004",
+                  "targetId": "self",
+                  "volume": 2
                 }
               ],
               "oneShot": false
@@ -12879,6 +12892,12 @@
                   "delay": 1,
                   "targetId": "obj_e043c8bb",
                   "fadeDuration": 1
+                },
+                {
+                  "type": "play_sound",
+                  "targetId": "",
+                  "sound": "pepsound1",
+                  "volume": 2
                 }
               ],
               "oneShot": true
