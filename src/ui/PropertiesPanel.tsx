@@ -311,8 +311,12 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       return snd?.soundId ? snd.soundId : "none";
     }
     case "scripts": {
-      const n = (selected.data as { scripts?: ScriptDef[] } | null)?.scripts?.length ?? 0;
-      return n === 0 ? "none" : `${n} script${n !== 1 ? "s" : ""}`;
+      const d = selected.data as { scripts?: ScriptDef[]; stateSchema?: Record<string, unknown> } | null;
+      const n = d?.scripts?.length ?? 0;
+      const k = Object.keys(d?.stateSchema ?? {}).length;   // the STATE section lives on this screen
+      const parts = [n === 0 ? "none" : `${n} script${n !== 1 ? "s" : ""}`];
+      if (k) parts.push(`${k} state key${k !== 1 ? "s" : ""}`);
+      return parts.join(" · ");
     }
     case "ai": {
       const ai = (selected.data as WorldObject | null)?.ai;

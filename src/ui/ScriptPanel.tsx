@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, useId, Fragment } from "react";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
@@ -1102,6 +1102,8 @@ function ScriptEditor({
                 triggerVolumes={triggerVolumes}
                 zoneObjects={zoneObjects}
                 zoneDialogues={zoneDialogues}
+                stateKeySuggestions={entityStateKeys(script.trigger.entityId,
+                  ownerIsEntity ? selectedObjectId ?? undefined : undefined, zoneObjects, triggerVolumes)}
                 onChange={(id) => setTrigger({ targetId: id })}
               />
             </F>
@@ -1116,6 +1118,7 @@ function ScriptEditor({
                 triggerVolumes={triggerVolumes}
                 allowSelf={ownerIsEntity && !!selectedObjectId}
                 selfLabel={`★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`}
+                ownerId={ownerIsEntity ? selectedObjectId ?? undefined : undefined}
                 onChange={(id) => setTrigger({ entityId: id || undefined })}
               />
             </F>
@@ -1259,6 +1262,7 @@ function ScriptEditor({
                 zoneObjects, triggerVolumes,
                 allowSelf: ownerIsEntity && !!selectedObjectId,
                 selfLabel: `★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`,
+                ownerId: ownerIsEntity ? selectedObjectId ?? undefined : undefined,
               }}
               onChange={(nc) =>
                 set(
@@ -1411,6 +1415,7 @@ function TargetPicker({
   triggerVolumes,
   zoneObjects,
   zoneDialogues,
+  stateKeySuggestions,
   onChange,
 }: {
   triggerType: TriggerType;
@@ -1418,8 +1423,10 @@ function TargetPicker({
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
   zoneDialogues: DialogueTreeDef[];
+  stateKeySuggestions?: string[];   // entity-scoped keys for the state-trigger key input
   onChange: (id: string) => void;
 }) {
+  const scopedListId = useId();
   if (triggerType === "on_dialogue_end") {
     return (
       <select
@@ -1473,9 +1480,12 @@ function TargetPicker({
     );
   }
   // on_state_changed / on_state_equals: the target is the state key to watch
+  const scoped = (stateKeySuggestions?.length ?? 0) > 0;
   return (
+    <>
+    {scoped && <datalist id={scopedListId}>{stateKeySuggestions!.map(k => <option key={k} value={k} />)}</datalist>}
     <input
-      list="wb-state-keys"
+      list={scoped ? scopedListId : "wb-state-keys"}
       style={S.field}
       placeholder={
         triggerType === "on_state_changed" || triggerType === "on_state_equals"
@@ -1485,6 +1495,7 @@ function TargetPicker({
       value={targetId}
       onChange={(e) => onChange(e.target.value)}
     />
+    </>
   );
 }
 
@@ -1563,6 +1574,7 @@ function StateScopePicker({
   allowSelf,
   selfLabel = "★ this entity",
   globalLabel = "🌐 Global",
+  ownerId,
   onChange,
 }: {
   value: string;
@@ -1573,32 +1585,44 @@ function StateScopePicker({
   allowSelf?: boolean;     // owned scripts + dialogue options ("self" re-resolves at runtime)
   selfLabel?: string;
   globalLabel?: string;
+  ownerId?: string;        // the owning entity — its prefab SIBLINGS become targetable
   onChange: (id: string) => void;
 }) {
-  const noPrefab = <T,>(arr: T[]): T[] => arr.filter((e) => !(e as { prefab?: unknown }).prefab);
+  // Prefab members are hidden — EXCEPT siblings of the owner's own instance:
+  // member ids survive re-expansion (existingIds preserves them) and prefab
+  // capture remaps intra-prefab references, so same-instance targeting is
+  // stable. Other instances' members stay hidden (their ids aren't yours).
+  const ownerInst = ownerId
+    ? (zoneObjects.find(o => o.id === ownerId)?.prefab?.instanceId
+       ?? triggerVolumes.find(v => v.id === ownerId)?.prefab?.instanceId)
+    : undefined;
+  const visible = <T extends { prefab?: { instanceId: string } }>(arr: T[]): T[] =>
+    arr.filter(e => !e.prefab || (ownerInst != null && e.prefab.instanceId === ownerInst));
+  const mark = (e: { prefab?: unknown }, text: string) => (e.prefab ? `⬡ ${text}` : text);
   const short = (id: string) => id.slice(0, 8);
-  const known = value === "" || value === "self"
-    || zoneObjects.some(o => o.id === value)
-    || triggerVolumes.some(v => v.id === value)
-    || groups.some(g => g.id === value);
-  return (
-    <select style={S.select} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{globalLabel}</option>
-      {allowSelf && <option value="self">{selfLabel}</option>}
-      {allowGroups && groups.length > 0 && (
-        <optgroup label="Groups (every member)">
-          {groups.map(g => <option key={g.id} value={g.id}>▦ {g.name}</option>)}
-        </optgroup>
-      )}
-      <optgroup label="Objects">
-        {noPrefab(zoneObjects).map(o => <option key={o.id} value={o.id}>{o.label || o.assetId} ({short(o.id)})</option>)}
-      </optgroup>
-      <optgroup label="Trigger Volumes">
-        {noPrefab(triggerVolumes).map(v => <option key={v.id} value={v.id}>{v.label || "Volume"} ({short(v.id)})</option>)}
-      </optgroup>
-      {!known && <option value={value}>{value} (missing)</option>}
-    </select>
-  );
+  // Type-to-filter combobox (same widget as action targets) — every "Whose
+  // state" list is searchable, which matters once entity lists get long.
+  const opts: TargetOpt[] = [
+    { id: "", text: globalLabel, group: "Scope" },
+    ...(allowSelf ? [{ id: "self", text: selfLabel, group: "Scope" }] : []),
+    ...(allowGroups ? groups.map(g => ({ id: g.id, text: `▦ ${g.name}`, group: "Groups (every member)" })) : []),
+    ...visible(zoneObjects).map(o => ({ id: o.id, text: mark(o, `${o.label || o.assetId} (${short(o.id)})`), group: "Objects" })),
+    ...visible(triggerVolumes).map(v => ({ id: v.id, text: mark(v, `${v.label || "Volume"} (${short(v.id)})`), group: "Trigger Volumes" })),
+  ];
+  if (!opts.some(o => o.id === value)) opts.push({ id: value, text: `${value} (missing)`, group: "Missing" });
+  return <TargetCombobox targetId={value} opts={opts} onChange={onChange} />;
+}
+
+/** Registered per-entity state keys for a "Whose state" target ("self" resolves
+ *  through ownerId) — feeds scope-aware key suggestions next to the pickers. */
+function entityStateKeys(
+  targetId: string | undefined, ownerId: string | undefined,
+  zoneObjects: WorldObject[], triggerVolumes: TriggerVolume[],
+): string[] {
+  const rid = targetId === "self" ? ownerId : targetId;
+  if (!rid) return [];
+  const ent = zoneObjects.find(o => o.id === rid) ?? triggerVolumes.find(v => v.id === rid);
+  return Object.keys((ent as { stateSchema?: Record<string, unknown> } | undefined)?.stateSchema ?? {});
 }
 
 /** ConditionRow's optional entity-scope context (Phase 60). */
@@ -1607,6 +1631,7 @@ interface ConditionScope {
   triggerVolumes: TriggerVolume[];
   allowSelf:      boolean;
   selfLabel?:     string;
+  ownerId?:       string;   // owning entity — enables prefab-sibling targets + scoped key suggestions
 }
 
 // ── TargetCombobox ────────────────────────────────────────────────────────────
@@ -1791,6 +1816,11 @@ function ConditionRow({
   onChange: (c: ScriptCondition) => void;
   onRemove: () => void;
 }) {
+  // Scope-aware key suggestions: an entity scope suggests THAT entity's
+  // registered state keys instead of the global list.
+  const entKeys = scope ? entityStateKeys(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
+  const keyListId = useId();
+  const keyList = entKeys.length ? keyListId : "wb-state-keys";
   return (
     <div
       style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "flex-end" }}
@@ -1816,6 +1846,7 @@ function ConditionRow({
             triggerVolumes={scope.triggerVolumes}
             allowSelf={scope.allowSelf}
             selfLabel={scope.selfLabel}
+            ownerId={scope.ownerId}
             onChange={(id) => onChange({ ...condition, entityId: id || undefined })}
           />
         </F>
@@ -1826,11 +1857,14 @@ function ConditionRow({
           goomba-stomp gate (walk-ins and rising jumps fail)
         </div>
       )}
+      {entKeys.length > 0 && (
+        <datalist id={keyListId}>{entKeys.map(k => <option key={k} value={k} />)}</datalist>
+      )}
       {condition.type === "has_state" && (
         <F label="State key" flex={1}>
           <input
             style={S.field}
-            list="wb-state-keys" placeholder="state key"
+            list={keyList} placeholder="state key"
             value={condition.stateKey ?? ""}
             onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
           />
@@ -1841,7 +1875,7 @@ function ConditionRow({
           <F label="State key" flex={1}>
             <input
               style={S.field}
-              list="wb-state-keys" placeholder="state key"
+              list={keyList} placeholder="state key"
               value={condition.stateKey ?? ""}
               onChange={(e) =>
                 onChange({ ...condition, stateKey: e.target.value })
@@ -2159,6 +2193,11 @@ function ActionFields({
   );
   // Phase 60 — "whose state" scope for the state/item actions (targetId doubles
   // as the entity scope there; groups fan out per member at dispatch).
+  // Scope-aware key suggestions for set_state / adjust_number: an entity scope
+  // suggests THAT entity's registered state keys instead of the global list.
+  const scopedStateKeys = entityStateKeys(action.targetId, owner?.id, zoneObjects, triggerVolumes);
+  const scopedKeyListId = useId();
+
   const stateScopePicker = (
     <F label="Whose state" flex="0 0 128px">
       <StateScopePicker
@@ -2169,6 +2208,7 @@ function ActionFields({
         allowGroups
         allowSelf={!!owner}
         selfLabel={owner ? `★ this ${owner.kind}` : undefined}
+        ownerId={owner?.id}
         onChange={(id) => set({ targetId: id || undefined })}
       />
     </F>
@@ -2279,6 +2319,7 @@ function ActionFields({
                 allowSelf={!!owner}
                 selfLabel={owner ? `★ this ${owner.kind}` : undefined}
                 globalLabel="★ the player"
+                ownerId={owner?.id}
                 onChange={(id) => set({ targetId: id || undefined })}
               />
             </F>
@@ -2321,6 +2362,7 @@ function ActionFields({
           allowSelf={!!owner}
           selfLabel={owner ? `★ this ${owner.kind}` : undefined}
           globalLabel="★ the player"
+          ownerId={owner?.id}
           onChange={(id) => set({ [field]: id || undefined })}
         />
       );
@@ -2435,10 +2477,13 @@ function ActionFields({
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
+          {scopedStateKeys.length > 0 && (
+            <datalist id={scopedKeyListId}>{scopedStateKeys.map(k => <option key={k} value={k} />)}</datalist>
+          )}
           <F label="State key" flex={1}>
             <input
               style={S.field}
-              list="wb-state-keys" placeholder="State key"
+              list={scopedStateKeys.length ? scopedKeyListId : "wb-state-keys"} placeholder="State key"
               value={action.stateKey ?? ""}
               onChange={(e) => set({ stateKey: e.target.value })}
             />
@@ -2460,10 +2505,13 @@ function ActionFields({
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
+          {scopedStateKeys.length > 0 && (
+            <datalist id={scopedKeyListId}>{scopedStateKeys.map(k => <option key={k} value={k} />)}</datalist>
+          )}
           <F label="State key" flex={1}>
             <input
               style={S.field}
-              list="wb-state-keys" placeholder="State key (e.g. health)"
+              list={scopedStateKeys.length ? scopedKeyListId : "wb-state-keys"} placeholder="State key (e.g. health)"
               value={action.stateKey ?? ""}
               onChange={(e) => set({ stateKey: e.target.value })}
             />

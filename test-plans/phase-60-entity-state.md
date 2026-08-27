@@ -64,3 +64,18 @@ tab pauses rAF, so timers/triggers don't run): wire `visible` sampled false
 across 5 s of live spike cycles, hearts still drop standing in the spawned
 volume, spikes-up screenshot shows no box, and `exitPreview` restores wire +
 fill + arrow to visible in the editor.
+
+## Addendum (2026-08-27, v4.79.33) — sibling targeting, scoped keys, searchable scope
+
+1. Where object local state lives: the STATE section at the bottom of the
+   object's Scripts drilldown (volumes show it inline). The Scripts row
+   summary now shows "N state keys" so it's findable.
+2. On a prefab member's script, "Whose state" lists the instance's OWN
+   siblings (⬡-prefixed) — e.g. the spikes object can target its trigger.
+   Other instances' members stay hidden. Same for inventory scopes,
+   conditions, and the on_state_changed trigger.
+3. Picking an entity scope switches the State-key suggestions to that
+   entity's registered keys (verified: spring1 with a `bounces` key →
+   suggestions exactly ["bounces"]).
+4. Every "Whose state" is a type-to-filter combobox now (same widget as
+   action targets) — typing filters the grouped list live.
