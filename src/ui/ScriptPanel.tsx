@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useId, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
@@ -1426,7 +1426,7 @@ function TargetPicker({
   stateKeySuggestions?: string[];   // entity-scoped keys for the state-trigger key input
   onChange: (id: string) => void;
 }) {
-  const scopedListId = useId();
+
   if (triggerType === "on_dialogue_end") {
     return (
       <select
@@ -1480,22 +1480,17 @@ function TargetPicker({
     );
   }
   // on_state_changed / on_state_equals: the target is the state key to watch
-  const scoped = (stateKeySuggestions?.length ?? 0) > 0;
   return (
-    <>
-    {scoped && <datalist id={scopedListId}>{stateKeySuggestions!.map(k => <option key={k} value={k} />)}</datalist>}
-    <input
-      list={scoped ? scopedListId : "wb-state-keys"}
-      style={S.field}
+    <KeySuggestInput
+      value={targetId}
+      suggestions={stateKeySuggestions?.length ? stateKeySuggestions : undefined}
       placeholder={
         triggerType === "on_state_changed" || triggerType === "on_state_equals"
           ? "State key (e.g. health)"
           : "Target ID"
       }
-      value={targetId}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={onChange}
     />
-    </>
   );
 }
 
@@ -1653,6 +1648,14 @@ function TargetCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [flipUp, setFlipUp] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  // Open upward when the space below can't fit the list — panels reach the
+  // bottom of the screen and a downward popup would be clipped/offscreen.
+  const measureFlip = () => {
+    const r = wrapRef.current?.getBoundingClientRect();
+    if (r) setFlipUp(window.innerHeight - r.bottom < 230);
+  };
   const current = opts.find((o) => o.id === targetId);
   const display = open ? query : current?.text ?? (targetId ? `${targetId} (custom)` : "");
   const q = query.trim().toLowerCase();
@@ -1662,12 +1665,12 @@ function TargetCombobox({
   const pick = (id: string) => { onChange(id); setOpen(false); setQuery(""); };
   let lastGroup = "";
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={wrapRef} style={{ position: "relative" }}>
       <input
         style={S.field}
         placeholder="— pick target (type to filter) —"
         value={display}
-        onFocus={() => { setOpen(true); setQuery(""); }}
+        onFocus={() => { measureFlip(); setOpen(true); setQuery(""); }}
         onBlur={() => setOpen(false)}
         onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
         onKeyDown={(e) => {
@@ -1678,8 +1681,9 @@ function TargetCombobox({
       {open && (
         <div
           style={{
-            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
-            maxHeight: 220, overflowY: "auto", marginTop: 2,
+            position: "absolute", left: 0, right: 0, zIndex: 20,
+            ...(flipUp ? { bottom: "100%", marginBottom: 2 } : { top: "100%", marginTop: 2 }),
+            maxHeight: 220, overflowY: "auto",
             background: "rgba(24,26,33,0.98)", border: "1px solid rgba(255,255,255,0.15)",
             borderRadius: 4, boxShadow: "0 6px 16px rgba(0,0,0,0.5)",
           }}
@@ -1715,6 +1719,59 @@ function TargetCombobox({
               </Fragment>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── KeySuggestInput ───────────────────────────────────────────────────────────
+// State-key field with a CUSTOM suggestion popup (replaces native <datalist>,
+// whose browser-positioned dropdown can't flip and rendered offscreen when a
+// row sits near the bottom of the panel). Typing filters; near the bottom the
+// list opens ABOVE the input. No `suggestions` prop = the global key list
+// (read from the #wb-state-keys datalist, so deep fields need no threading).
+function KeySuggestInput({ value, suggestions, placeholder, onChange }: {
+  value: string;
+  suggestions?: string[];
+  placeholder?: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const all = suggestions?.length
+    ? suggestions
+    : [...((document.getElementById("wb-state-keys") as HTMLDataListElement | null)?.options ?? [])].map(o => o.value);
+  const q = value.trim().toLowerCase();
+  const filtered = q ? all.filter(k => k.toLowerCase().includes(q)) : all;
+  const openAt = () => {
+    const r = wrapRef.current?.getBoundingClientRect();
+    if (r) setFlipUp(window.innerHeight - r.bottom < 190);
+    setOpen(true);
+  };
+  return (
+    <div ref={wrapRef} style={{ position: "relative", width: "100%", minWidth: 90 }}>
+      <input style={S.field} placeholder={placeholder} value={value}
+        onFocus={openAt}
+        onBlur={() => setOpen(false)}
+        onChange={e => { onChange(e.target.value); openAt(); }}
+        onKeyDown={e => { if (e.key === "Escape" || e.key === "Enter") { setOpen(false); (e.target as HTMLInputElement).blur(); } }} />
+      {open && filtered.length > 0 && (
+        <div style={{ position: "absolute", left: 0, right: 0, zIndex: 20,
+          ...(flipUp ? { bottom: "100%", marginBottom: 2 } : { top: "100%", marginTop: 2 }),
+          maxHeight: 180, overflowY: "auto",
+          background: "rgba(24,26,33,0.98)", border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 4, boxShadow: "0 6px 16px rgba(0,0,0,0.5)" }}>
+          {filtered.map(k => (
+            <div key={k}
+              style={{ padding: "4px 8px", fontSize: 11, fontFamily: "monospace", cursor: "pointer", color: "#d4d8e2" }}
+              onMouseDown={e => { e.preventDefault(); onChange(k); setOpen(false); }}
+              onMouseEnter={e => { (e.target as HTMLElement).style.background = "rgba(255,255,255,0.08)"; }}
+              onMouseLeave={e => { (e.target as HTMLElement).style.background = "transparent"; }}>
+              {k}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1819,8 +1876,6 @@ function ConditionRow({
   // Scope-aware key suggestions: an entity scope suggests THAT entity's
   // registered state keys instead of the global list.
   const entKeys = scope ? entityStateKeys(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
-  const keyListId = useId();
-  const keyList = entKeys.length ? keyListId : "wb-state-keys";
   return (
     <div
       style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "flex-end" }}
@@ -1857,29 +1912,22 @@ function ConditionRow({
           goomba-stomp gate (walk-ins and rising jumps fail)
         </div>
       )}
-      {entKeys.length > 0 && (
-        <datalist id={keyListId}>{entKeys.map(k => <option key={k} value={k} />)}</datalist>
-      )}
       {condition.type === "has_state" && (
         <F label="State key" flex={1}>
-          <input
-            style={S.field}
-            list={keyList} placeholder="state key"
+          <KeySuggestInput placeholder="state key"
             value={condition.stateKey ?? ""}
-            onChange={(e) => onChange({ ...condition, stateKey: e.target.value })}
+            suggestions={entKeys.length ? entKeys : undefined}
+            onChange={(v) => onChange({ ...condition, stateKey: v })}
           />
         </F>
       )}
       {condition.type === "compare_number" && (
         <>
           <F label="State key" flex={1}>
-            <input
-              style={S.field}
-              list={keyList} placeholder="state key"
+            <KeySuggestInput placeholder="state key"
               value={condition.stateKey ?? ""}
-              onChange={(e) =>
-                onChange({ ...condition, stateKey: e.target.value })
-              }
+              suggestions={entKeys.length ? entKeys : undefined}
+              onChange={(v) => onChange({ ...condition, stateKey: v })}
             />
           </F>
           <select
@@ -2196,7 +2244,6 @@ function ActionFields({
   // Scope-aware key suggestions for set_state / adjust_number: an entity scope
   // suggests THAT entity's registered state keys instead of the global list.
   const scopedStateKeys = entityStateKeys(action.targetId, owner?.id, zoneObjects, triggerVolumes);
-  const scopedKeyListId = useId();
 
   const stateScopePicker = (
     <F label="Whose state" flex="0 0 128px">
@@ -2477,15 +2524,11 @@ function ActionFields({
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
-          {scopedStateKeys.length > 0 && (
-            <datalist id={scopedKeyListId}>{scopedStateKeys.map(k => <option key={k} value={k} />)}</datalist>
-          )}
           <F label="State key" flex={1}>
-            <input
-              style={S.field}
-              list={scopedStateKeys.length ? scopedKeyListId : "wb-state-keys"} placeholder="State key"
+            <KeySuggestInput placeholder="State key"
               value={action.stateKey ?? ""}
-              onChange={(e) => set({ stateKey: e.target.value })}
+              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              onChange={(v) => set({ stateKey: v })}
             />
           </F>
           <F label="Value" flex={1}>
@@ -2505,15 +2548,11 @@ function ActionFields({
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
-          {scopedStateKeys.length > 0 && (
-            <datalist id={scopedKeyListId}>{scopedStateKeys.map(k => <option key={k} value={k} />)}</datalist>
-          )}
           <F label="State key" flex={1}>
-            <input
-              style={S.field}
-              list={scopedStateKeys.length ? scopedKeyListId : "wb-state-keys"} placeholder="State key (e.g. health)"
+            <KeySuggestInput placeholder="State key (e.g. health)"
               value={action.stateKey ?? ""}
-              onChange={(e) => set({ stateKey: e.target.value })}
+              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              onChange={(v) => set({ stateKey: v })}
             />
           </F>
           <F label="± Change" flex="0 0 72px">
@@ -2535,11 +2574,10 @@ function ActionFields({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
           <F label="State key" flex={1}>
-            <input
-              style={S.field}
-              list="wb-state-keys" placeholder="State key"
+            <KeySuggestInput placeholder="State key"
               value={action.stateKey ?? ""}
-              onChange={(e) => set({ stateKey: e.target.value })}
+              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              onChange={(v) => set({ stateKey: v })}
             />
           </F>
         </div>
@@ -2550,11 +2588,10 @@ function ActionFields({
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <F label="Save to state key">
-            <input
-              style={S.field}
-              list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+            <KeySuggestInput
+              placeholder={"State key (e.g. checkpoint)"}
               value={action.stateKey ?? ""}
-              onChange={(e) => set({ stateKey: e.target.value })}
+              onChange={(v) => set({ stateKey: v })}
             />
           </F>
           <select
@@ -2900,11 +2937,10 @@ function ActionFields({
           </select>
           {fromKey ? (
             <F label="State key">
-              <input
-                style={S.field}
-                list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+              <KeySuggestInput
+                placeholder={"State key (e.g. checkpoint)"}
                 value={action.positionKey ?? ""}
-                onChange={(e) => set({ positionKey: e.target.value })}
+                onChange={(v) => set({ positionKey: v })}
               />
             </F>
           ) : (
@@ -2959,11 +2995,10 @@ function ActionFields({
           )}
           {action.facingSource === "key" && (
             <F label="Facing state key">
-              <input
-                style={S.field}
-                list="wb-state-keys" placeholder="a number key, or a stored pose"
+              <KeySuggestInput
+                placeholder={"a number key, or a stored pose"}
                 value={action.facingKey ?? ""}
-                onChange={(e) => set({ facingKey: e.target.value })}
+                onChange={(v) => set({ facingKey: v })}
               />
             </F>
           )}
@@ -3054,11 +3089,10 @@ function ActionFields({
           </select>
           {dest === "key" && (
             <F label="State key">
-              <input
-                style={S.field}
-                list="wb-state-keys" placeholder="State key (e.g. checkpoint)"
+              <KeySuggestInput
+                placeholder={"State key (e.g. checkpoint)"}
                 value={action.positionKey ?? ""}
-                onChange={(e) => set({ positionKey: e.target.value })}
+                onChange={(v) => set({ positionKey: v })}
               />
             </F>
           )}
@@ -4666,12 +4700,10 @@ function UiElementRow({
         <>
           <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
             <F label="State key" flex={1}>
-              <input
-                style={S.field}
-                placeholder="e.g. health"
-                list="wb-state-keys"
+              <KeySuggestInput
+                placeholder={"e.g. health"}
                 value={element.stateKey}
-                onChange={(e) => set({ stateKey: e.target.value })}
+                onChange={(v) => set({ stateKey: v })}
               />
             </F>
             {numField("Full at", element.max, "100", "value at which the bar is full", (n) => set({ max: n }))}
@@ -4699,12 +4731,10 @@ function UiElementRow({
         <>
           <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
             <F label="State key" flex={1}>
-              <input
-                style={S.field}
-                placeholder="e.g. coins"
-                list="wb-state-keys"
+              <KeySuggestInput
+                placeholder={"e.g. coins"}
                 value={element.stateKey}
-                onChange={(e) => set({ stateKey: e.target.value })}
+                onChange={(v) => set({ stateKey: v })}
               />
             </F>
             <F label="Prefix" flex="0 0 48px">
@@ -4728,12 +4758,10 @@ function UiElementRow({
         <>
           <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
             <F label="State key" flex={1}>
-              <input
-                style={S.field}
-                placeholder="e.g. health"
-                list="wb-state-keys"
+              <KeySuggestInput
+                placeholder={"e.g. health"}
                 value={element.stateKey}
-                onChange={(e) => set({ stateKey: e.target.value })}
+                onChange={(v) => set({ stateKey: v })}
               />
             </F>
             {numField("Icons", element.count, "3", "how many icons to draw", (n) => set({ count: n }), 44)}

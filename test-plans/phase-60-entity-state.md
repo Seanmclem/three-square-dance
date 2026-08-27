@@ -79,3 +79,11 @@ fill + arrow to visible in the editor.
    suggestions exactly ["bounces"]).
 4. Every "Whose state" is a type-to-filter combobox now (same widget as
    action targets) — typing filters the grouped list live.
+
+### v4.79.34 — flip-aware key suggestion popup
+
+All State-key fields (actions, conditions, triggers, UI bindings) use a
+custom suggestion popup instead of the native datalist: click/focus opens
+the list, typing filters, and near the bottom of the screen it opens ABOVE
+the input (verified: bottom condition row → list upward). The Whose-state /
+action-target comboboxes flip the same way.
