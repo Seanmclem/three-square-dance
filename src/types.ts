@@ -1332,6 +1332,7 @@ export interface ScriptTrigger {
 
 export interface ScriptCondition {
   type:       ConditionType;
+  not?:       boolean;     // "unless" — the condition must FAIL for the guard to pass
   npcId?:     string;
   stateKey?:  string;      // has_state / compare_number
   compareOp?: CompareOp;   // compare_number / has_item (has_item default ">=")
@@ -1411,6 +1412,7 @@ export interface DialogueTreeDef {
 export interface ScriptAction {
   type:          ActionType;
   delay?:        number;     // seconds after the script's actions start before THIS action runs (0/absent = immediate)
+  conditions?:   ScriptCondition[];   // per-action guard, evaluated AFTER the delay — all must pass or the action is skipped
   targetId?:     string;
   animation?:    string;
   animationLoop?: boolean;   // play_animation: loop the clip forever

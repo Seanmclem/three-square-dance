@@ -106,6 +106,17 @@ both are gone:
   saves) is by script id — so collecting coin A marked coin B as spent.
   Copies now get fresh script ids.
 
+## Per-action conditions ("only if")
+
+Every action row has an **if** button (v4.79.37): it adds a guard condition to
+JUST that action — same condition types and "Whose state" scoping as the
+script-level conditions, stacked with AND. A guarded action is checked **after
+its delay**, reading the world at the moment it would run, and silently skipped
+if the guard fails. Each condition also has an **unless** toggle that inverts
+it — so "else" is simply a second action with the mirrored condition, and
+"unless the player is falling" finally has a spelling. Script-level conditions
+still gate the whole script; action guards refine within it.
+
 ## The fine print
 
 - **"self" only means something on an entity's own script.** In a zone-level

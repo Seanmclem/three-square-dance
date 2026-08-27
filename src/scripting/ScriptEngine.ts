@@ -57,30 +57,26 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
     console.warn("[ScriptEngine] condition scoped to 'self' outside an entity-owned context — failing");
     return null;                                          // unresolvable
   };
-  for (const c of conditions) {
-    const eid = entity(c);
-    if (eid === null) return false;
+  // One condition's raw verdict, before the optional `not` inversion.
+  const passes = (c: ScriptCondition, eid: string | undefined): boolean => {
     switch (c.type) {
       case "has_state": {
         const key = c.stateKey ?? "";
         const v = gameState.get(eid ? entKey(eid, key) : key);
-        if (v === undefined || v === null || v === false) return false;
-        break;
+        return !(v === undefined || v === null || v === false);
       }
       case "compare_number": {
         const key    = c.stateKey ?? "";
         const v      = Number(gameState.get(eid ? entKey(eid, key) : key) ?? 0);
         const target = Number(c.stateValue ?? 0);
-        if (!compareNum(v, c.compareOp ?? "==", target)) return false;
-        break;
+        return compareNum(v, c.compareOp ?? "==", target);
       }
       case "has_item": {
         // owned <op> count — op defaults to ">=" ("has at least N"), so
         // pre-existing conditions keep their exact semantics.
         const key   = eid ? entInvKey(eid, c.itemId ?? "") : invKey(c.itemId ?? "");
         const owned = Number(gameState.get(key) ?? 0);
-        if (!compareNum(owned, c.compareOp ?? ">=", c.count ?? 1)) return false;
-        break;
+        return compareNum(owned, c.compareOp ?? ">=", c.count ?? 1);
       }
       case "player_falling": {
         // Airborne AND descending — the goomba-stomp gate. Walking into a
@@ -95,15 +91,21 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
         const m = _playerMotion?.() ?? null;
         const fallingNow  = !!m && !m.grounded && m.velY < -2.5;
         const justLanded  = !!m && m.fellMsAgo <= 120;
-        if (!fallingNow && !justLanded) return false;
-        break;
+        return fallingNow || justLanded;
       }
       case "npc_alive":
       case "npc_dead":
         // Removed from the dropdown in Phase 60 (scoped compare_number covers
-        // them); old data stays a tolerated no-op.
-        break;
+        // them); old data stays a tolerated no-op (always passes).
+        return true;
     }
+    return true;
+  };
+  for (const c of conditions) {
+    const eid = entity(c);
+    if (eid === null) return false;   // unresolvable "self" fails closed, `not` or not
+    // `not` = "unless": the condition must FAIL for the guard to pass.
+    if (passes(c, eid) === !!c.not) return false;
   }
   return true;
 }
@@ -426,6 +428,9 @@ export class ScriptEngine {
   }
 
   private _dispatch(action: ScriptAction, ownerId?: string): void {
+    // Per-action guard, evaluated HERE — i.e. after the action's delay — so a
+    // delayed action reads the world as it is when it actually fires.
+    if (action.conditions?.length && !checkScriptConditions(action.conditions, ownerId)) return;
     switch (action.type) {
       case "play_sound": {
         // Positional when targeting an entity/group — resolve each target's pose;

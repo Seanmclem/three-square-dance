@@ -96,3 +96,16 @@ the "__toggle__" sentinel; the engine flips the current value per resolved
 key at run time. Non-boolean/unregistered keys keep the free-text field.
 Verified on the spike script: picking spikes-up (a boolean on the sibling
 trigger) switched Value to the picker.
+
+### v4.79.37 — per-action conditions + unless
+
+1. Each action row's "if" button adds a guard condition (same types/scoping
+   as script conditions, AND-stacked, amber "ONLY IF" block). Guards are
+   evaluated AFTER the action's delay; a failing guard silently skips just
+   that action.
+2. Every condition (script-level, action-level, dialogue, menus) gains an
+   "unless" toggle that inverts it — "else" is a mirrored second action.
+3. Prefab capture remaps condition entityIds at both levels (also fixes the
+   pre-existing script-guard entityId gap).
+4. Verified via the real dispatch path: blocked-when-false, ran-when-true,
+   and both unless polarities.

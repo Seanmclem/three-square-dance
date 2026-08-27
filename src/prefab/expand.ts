@@ -82,9 +82,9 @@ function toWorld(local: Vec3, origin: PrefabInstanceRecord["origin"]): Vec3 {
 // ── Script reference remapping ───────────────────────────────────────────────
 
 /** Clone scripts with fresh ids, retargeted zone, and every intra-prefab entity
- *  reference (trigger.targetId / actions[].targetId / conditions[].npcId)
- *  remapped through idMap. Ids not in the map (external entities, groups) pass
- *  through untouched. */
+ *  reference (trigger.targetId, actions[].targetId, condition entityId/npcId at
+ *  BOTH levels — script guards and per-action guards) remapped through idMap.
+ *  Ids not in the map (external entities, groups, "self") pass through untouched. */
 export function remapScripts(scripts: ScriptDef[] | undefined, idMap: Map<string, string>, zoneId: string): ScriptDef[] | undefined {
   if (!scripts) return undefined;
   const remap = (id: string | undefined): string | undefined =>
@@ -94,8 +94,11 @@ export function remapScripts(scripts: ScriptDef[] | undefined, idMap: Map<string
     c.id = `script_${uuid8()}`;
     c.zoneId = zoneId;
     c.trigger.targetId = remap(c.trigger.targetId);
-    for (const a of c.actions)    a.targetId = remap(a.targetId);
-    for (const cd of c.conditions) cd.npcId  = remap(cd.npcId);
+    for (const a of c.actions) {
+      a.targetId = remap(a.targetId);
+      for (const cd of a.conditions ?? []) { cd.npcId = remap(cd.npcId); cd.entityId = remap(cd.entityId); }
+    }
+    for (const cd of c.conditions) { cd.npcId = remap(cd.npcId); cd.entityId = remap(cd.entityId); }
     return c;
   });
 }

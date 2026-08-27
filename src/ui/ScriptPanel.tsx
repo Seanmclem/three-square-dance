@@ -1932,6 +1932,13 @@ function ConditionRow({
           />
         </F>
       )}
+      <label title='"unless" — invert: this condition must FAIL for the guard to pass'
+        style={{ display: "flex", alignItems: "center", gap: 3, color: condition.not ? "#e8c14b" : "#808090",
+                 fontSize: 10, paddingBottom: 7, cursor: "pointer", flexShrink: 0 }}>
+        <input type="checkbox" checked={condition.not ?? false}
+          onChange={(e) => onChange({ ...condition, not: e.target.checked || undefined })} />
+        unless
+      </label>
       {condition.type === "player_falling" && (
         <div style={{ flex: 1, color: "#98a2b8", fontSize: 10, fontStyle: "italic", paddingBottom: 7 }}>
           passes only while the player is airborne and moving downward — the
@@ -2168,12 +2175,40 @@ function ActionRow({
           />
         </F>
         <button
+          style={{ ...S.btn(), padding: "6px 6px", color: (action.conditions?.length ?? 0) > 0 ? "#e8c14b" : "#8b94a8" }}
+          title="Guard this action with conditions — it only runs (after its delay) if they all pass"
+          onClick={() => onChange({ ...action, conditions: [...(action.conditions ?? []), { type: "has_state" } as ScriptCondition] })}
+        >
+          if
+        </button>
+        <button
           style={{ ...S.btn(), padding: "6px 6px", color: "#cc6666" }}
           onClick={onRemove}
         >
           ×
         </button>
       </div>
+      {(action.conditions?.length ?? 0) > 0 && (
+        <div style={{ margin: "2px 0 6px", padding: "4px 6px 1px", borderLeft: "2px solid rgba(232,193,75,0.4)" }}>
+          <div style={{ ...S.fieldLabel, marginBottom: 3 }}>
+            ONLY IF (all must pass — checked after the delay; "unless" inverts one)
+          </div>
+          {action.conditions!.map((c, i) => (
+            <ConditionRow
+              key={i}
+              condition={c}
+              worldItems={worldItems}
+              scope={{ zoneObjects, triggerVolumes, allowSelf: !!owner,
+                selfLabel: owner ? `★ this ${owner.kind}` : undefined, ownerId: owner?.id }}
+              onChange={(nc) => onChange({ ...action, conditions: action.conditions!.map((x, j) => (j === i ? nc : x)) })}
+              onRemove={() => {
+                const rest = action.conditions!.filter((_, j) => j !== i);
+                onChange({ ...action, conditions: rest.length ? rest : undefined });
+              }}
+            />
+          ))}
+        </div>
+      )}
       <ActionFields
         stateKeyTypes={stateKeyTypes}
         action={action}
