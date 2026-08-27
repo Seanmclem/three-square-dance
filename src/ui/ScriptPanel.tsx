@@ -1504,7 +1504,7 @@ function TargetPicker({
   return (
     <KeySuggestInput
       value={targetId}
-      suggestions={stateKeySuggestions?.length ? stateKeySuggestions : undefined}
+      suggestions={stateKeySuggestions}
       placeholder={
         triggerType === "on_state_changed" || triggerType === "on_state_equals"
           ? "State key (e.g. health)"
@@ -1645,12 +1645,16 @@ function resolveStateEntities(
 }
 
 /** Registered per-entity state keys for a "Whose state" target ("self" resolves
- *  through ownerId; a group unions its members' keys) — feeds the scope-aware
- *  key suggestions next to the pickers. */
+ *  through ownerId; a group unions its members' keys). Returns UNDEFINED for the
+ *  global scope (callers fall back to the global key list) and a possibly-EMPTY
+ *  array for an entity scope — an entity's suggestions are exactly its own keys,
+ *  never the global list (global "Hearts" on "★ this object" was a lie). */
 function entityStateKeys(
   targetId: string | undefined, ownerId: string | undefined,
   zoneObjects: WorldObject[], triggerVolumes: TriggerVolume[],
-): string[] {
+): string[] | undefined {
+  const rid = targetId === "self" ? ownerId : targetId;
+  if (!rid) return undefined;   // global scope
   const keys = new Set<string>();
   for (const e of resolveStateEntities(targetId, ownerId, zoneObjects, triggerVolumes)) {
     for (const k of Object.keys(e.stateSchema ?? {})) keys.add(k);
@@ -1779,7 +1783,9 @@ function KeySuggestInput({ value, suggestions, placeholder, onChange }: {
   const [open, setOpen] = useState(false);
   const [flipUp, setFlipUp] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const all = suggestions?.length
+  // undefined = global scope (read the global list); an ARRAY — even empty — is
+  // the scope's exact key set and never falls back.
+  const all = suggestions !== undefined
     ? suggestions
     : [...((document.getElementById("wb-state-keys") as HTMLDataListElement | null)?.options ?? [])].map(o => o.value);
   const q = value.trim().toLowerCase();
@@ -1914,7 +1920,7 @@ function ConditionRow({
 }) {
   // Scope-aware key suggestions: an entity scope suggests THAT entity's
   // registered state keys instead of the global list.
-  const entKeys = scope ? entityStateKeys(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
+  const entKeys = scope ? entityStateKeys(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : undefined;
   return (
     <div
       style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "flex-end" }}
@@ -1962,7 +1968,7 @@ function ConditionRow({
         <F label="State key" flex={1}>
           <KeySuggestInput placeholder="state key"
             value={condition.stateKey ?? ""}
-            suggestions={entKeys.length ? entKeys : undefined}
+            suggestions={entKeys}
             onChange={(v) => onChange({ ...condition, stateKey: v })}
           />
         </F>
@@ -1978,7 +1984,7 @@ function ConditionRow({
             <F label="State key" flex={1}>
               <KeySuggestInput placeholder="state key"
                 value={condition.stateKey ?? ""}
-                suggestions={entKeys.length ? entKeys : undefined}
+                suggestions={entKeys}
                 onChange={(v) => onChange({ ...condition, stateKey: v })}
               />
             </F>
@@ -2007,7 +2013,7 @@ function ConditionRow({
           <F label="State key" flex={1}>
             <KeySuggestInput placeholder="state key"
               value={condition.stateKey ?? ""}
-              suggestions={entKeys.length ? entKeys : undefined}
+              suggestions={entKeys}
               onChange={(v) => onChange({ ...condition, stateKey: v })}
             />
           </F>
@@ -2653,7 +2659,7 @@ function ActionFields({
           <F label="State key" flex={1}>
             <KeySuggestInput placeholder="State key"
               value={action.stateKey ?? ""}
-              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              suggestions={scopedStateKeys}
               onChange={(v) => set({ stateKey: v })}
             />
           </F>
@@ -2697,7 +2703,7 @@ function ActionFields({
           <F label="State key" flex={1}>
             <KeySuggestInput placeholder="State key (e.g. health)"
               value={action.stateKey ?? ""}
-              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              suggestions={scopedStateKeys}
               onChange={(v) => set({ stateKey: v })}
             />
           </F>
@@ -2722,7 +2728,7 @@ function ActionFields({
           <F label="State key" flex={1}>
             <KeySuggestInput placeholder="State key"
               value={action.stateKey ?? ""}
-              suggestions={scopedStateKeys.length ? scopedStateKeys : undefined}
+              suggestions={scopedStateKeys}
               onChange={(v) => set({ stateKey: v })}
             />
           </F>

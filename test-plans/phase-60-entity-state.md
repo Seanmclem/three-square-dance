@@ -122,3 +122,10 @@ trigger) switched Value to the picker.
    "state equals value", "number compare (< > =)").
 4. Runtime verified via real dispatch: boolean and string equality both
    polarities + unless inversion.
+
+### v4.79.39 — scope-exact key suggestions
+
+An entity/group "Whose state" scope suggests EXACTLY that scope's registered
+keys — an entity with none shows no suggestions (previously it leaked the
+global list). Only the Global scope reads the global key list. Verified on
+the spike script: cube scope → nothing; sibling volume scope → spikes-up.
