@@ -753,6 +753,102 @@
         }
       ],
       "dateAdded": "2026-08-10"
+    },
+    {
+      "id": "pfb_aa26b0b3",
+      "name": "Spike Step 2",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_ddf6247e",
+          "type": "object",
+          "def": {
+            "id": "obj_ddf6247e",
+            "assetId": "hazard_spiketrap",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "scripts": [
+              {
+                "id": "scr_cec4e81d",
+                "label": "spike pop intervals",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_timer",
+                  "interval": 4,
+                  "repeat": true
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "targetId": "self",
+                    "animation": "SpikeTrap_Up",
+                    "animationLoop": false,
+                    "animationHold": true,
+                    "delay": 0
+                  },
+                  {
+                    "type": "play_animation",
+                    "delay": 2,
+                    "targetId": "self",
+                    "animation": "SpikeTrap_Down"
+                  },
+                  {
+                    "type": "despawn_object",
+                    "delay": 2,
+                    "targetId": "vol_d8be00e2"
+                  },
+                  {
+                    "type": "spawn_object",
+                    "delay": 0,
+                    "targetId": "vol_d8be00e2"
+                  },
+                  {
+                    "type": "play_sound",
+                    "delay": 2,
+                    "sound": "impactmining_003",
+                    "targetId": "self",
+                    "volume": 2
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "impactmining_004",
+                    "targetId": "self",
+                    "volume": 2
+                  }
+                ],
+                "oneShot": false
+              }
+            ],
+            "label": "spike cube 1"
+          }
+        }
+      ],
+      "dateAdded": "2026-08-27"
     }
   ],
   "uiElements": [
