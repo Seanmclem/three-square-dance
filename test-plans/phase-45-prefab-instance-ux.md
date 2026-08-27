@@ -70,3 +70,10 @@ Records with zero members (created before v4.79.25) are removed by the
 scene-load sweep (syncPrefabInstances) with a console info line. Verified:
 reloading dropped Spike Step 2 from 2 records to 1 — the badge now matches
 reality without touching the modal.
+
+### v4.79.27 — "⛶ all N" select-whole-instance
+
+Shift-click a single piece of a multi-piece instance → the header's prefab
+line shows "⛶ all N" → clicking selects every member (whole-instance multi
+view, one gizmo). Hidden for 1-member instances and in the multi view (already
+whole). Verified on the chest instance: 1 piece → "⛶ all 4" → "4 selected".

@@ -3161,9 +3161,23 @@ export default function App() {
     // prefab === null → orphaned instance (def missing from the library, e.g. a
     // game.json that predates the immediate-write fix). The section renders a
     // degraded view: Unlink / Delete instance still work, variables don't.
-    return { prefab: prefabs.find(p => p.id === record.prefabId) ?? null, record };
+    // memberCount feeds the header's "all N" select-whole-instance affordance
+    // (runs once per selection change, never per frame).
+    const memberCount = collectInstanceMembers(worldRef.current!, selected.zoneId, record.id).size;
+    return { prefab: prefabs.find(p => p.id === record.prefabId) ?? null, record, memberCount };
     // prefabTick keeps the record view fresh after variable/origin commits.
   }, [selected, multiSelected, prefabs, prefabTick]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Header "all N" affordance: re-select the ENTIRE instance from a single-piece
+  // selection (the reverse of shift-click) so one gizmo moves object + trigger + rest.
+  const handleSelectInstanceMembers = (): void => {
+    const world = worldRef.current;
+    if (!world || !selected || !selPrefabInfo) return;
+    const refs: SelectedRef[] = [...collectInstanceMembers(world, selected.zoneId, selPrefabInfo.record.id).values()]
+      .map(m => ({ id: m.id, type: m.type, zoneId: selected.zoneId } as SelectedRef));
+    if (refs.length === 0) return;
+    busRef.current.emit("selection:set", { refs });
+  };
 
   // Mirror the instance-selection context for the memoized undo/redo handlers.
   useEffect(() => {
@@ -3648,6 +3662,7 @@ export default function App() {
         hullPointsFor={objectId => objectPlacerRef.current?.getLocalHullPoints(objectId) ?? null}
         prefabInfo={selPrefabInfo}
         onEditPrefab={handleEditPrefab}
+        onSelectInstance={handleSelectInstanceMembers}
         onPrefabVariablesChange={handlePrefabVariablesChange}
         onPrefabOriginChange={handlePrefabOriginChange}
         onPrefabReexpand={handlePrefabReexpand}

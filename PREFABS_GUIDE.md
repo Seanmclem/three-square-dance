@@ -97,7 +97,9 @@ gizmo moves it all, and the properties panel shows the **Prefab section**:
 **Every member wears its membership** (v4.79.25): select any single piece and
 the properties header shows a prefab line right under the name — `⬡ {name}` for
 snapshot prefabs (click it to jump into prefab editing), `ƒ {name}` for
-generators, `⚠ … definition missing` for orphans.
+generators, `⚠ … definition missing` for orphans. Next to the name, **⛶ all N**
+(v4.79.27) re-selects the entire instance — the way back from a shift-clicked
+single piece to moving object + trigger + everything with one gizmo.
 
 **Shift-click** a piece to select *just it* — the escape hatch for tweaking a
 single piece. Know the rule: piece-level tweaks are **not** part of the recipe

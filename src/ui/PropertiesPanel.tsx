@@ -440,8 +440,9 @@ interface PropertiesPanelProps {
   // prefab instance — renders the Prefab section on the root screen. prefab is
   // null when the instance's definition is missing from the library (orphan) —
   // the section degrades to Unlink / Delete instance.
-  prefabInfo?:              { prefab: PrefabDef | null; record: PrefabInstanceRecord } | null;
+  prefabInfo?:              { prefab: PrefabDef | null; record: PrefabInstanceRecord; memberCount?: number } | null;
   onEditPrefab?:            (prefabId: string) => void;   // header prefab-name link (snapshot kind only)
+  onSelectInstance?:        () => void;                   // header "all N" — select the whole instance
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
@@ -471,7 +472,7 @@ export function PropertiesPanel({
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
-  prefabInfo, onEditPrefab, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
+  prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
@@ -674,6 +675,19 @@ export function PropertiesPanel({
                   <span style={{ color: "#7fb069", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     ƒ {prefabInfo.prefab.name}
                   </span>
+                )}
+                {/* This header only renders for a SINGLE selected piece, so "all N"
+                    is the way back to whole-instance selection (one gizmo moves
+                    object + trigger + everything, like a plain viewport click). */}
+                {(prefabInfo.memberCount ?? 0) > 1 && onSelectInstance && (
+                  <button onClick={onSelectInstance}
+                    title={`Select all ${prefabInfo.memberCount} pieces of this instance — move them together with one gizmo`}
+                    style={{ flexShrink: 0, padding: "0 6px", fontSize: 9, letterSpacing: 0.5,
+                      lineHeight: "14px", borderRadius: 3, cursor: "pointer",
+                      background: "rgba(80,140,255,0.12)", border: "1px solid rgba(80,140,255,0.3)",
+                      color: "#80aaff", fontFamily: "monospace" }}>
+                    ⛶ all {prefabInfo.memberCount}
+                  </button>
                 )}
               </div>
             )}
