@@ -76,6 +76,11 @@ export class AudioSystem {
 
   private readonly _emitters = new Map<string, THREE.PositionalAudio>();  // entityId → emitter
   private readonly _keyed    = new Map<string, AnyAudio>();             // keyed one-shots (audio:stop by key)
+  // Keyed-sound generation counter: a stop (or re-play) bumps the key's generation,
+  // and an async _makeSound registration only lands if its captured generation is
+  // still current — otherwise the freshly loaded sound is disposed immediately.
+  // Fixes the stop-vs-first-load race that could orphan a looping walk sound.
+  private readonly _keyGen   = new Map<string, number>();
   private readonly _all      = new Set<AnyAudio>();                     // every live sound, for re-gain
   private readonly _fades:   Fade[] = [];
 
@@ -160,6 +165,7 @@ export class AudioSystem {
     this._all.clear();
     this._emitters.clear();
     this._keyed.clear();
+    this._keyGen.clear();
     this._playlists.clear();   // scene re-entry restarts sequences from the top
     this._music = this._ambient = null;
     this._musicId = this._ambientId = null;
@@ -263,15 +269,21 @@ export class AudioSystem {
     const bus = catToBus(def?.category ?? "SFX");
     const base = p.volume ?? def?.volume ?? 1;
     const loop = p.loop ?? def?.loop ?? false;
+    const gen = p.key ? (this._keyGen.get(p.key) ?? 0) + 1 : 0;
+    if (p.key) this._keyGen.set(p.key, gen);
+    const registerKeyed = (s2: AnyAudio | null): void => {
+      if (!s2) return;
+      if (!p.key) return;
+      if (this._keyGen.get(p.key) !== gen) { this._finish(s2); return; }   // stopped/replaced while loading
+      this._keyed.set(p.key, s2);
+    };
 
     // entityId: parent the positional sound to the entity's MESH so it follows a
     // moving source (enemy AI sounds) — same falloff as attached emitters.
     if (p.entityId) {
       const mesh = this._findEntityMesh(p.entityId);
       if (mesh) {
-        void this._makeSound(p.id, true, bus, base, loop, mesh, false, { ref: 1, max: 20 }).then(s => {
-          if (s && p.key) this._keyed.set(p.key, s);
-        });
+        void this._makeSound(p.id, true, bus, base, loop, mesh, false, { ref: 1, max: 20 }).then(registerKeyed);
         return;
       }
       // mesh not built (yet) — fall through to position / non-positional
@@ -286,18 +298,17 @@ export class AudioSystem {
       // which is ~1/distance: already 4× quieter at the 3rd-person camera's ~4m,
       // so positional play_sound actions sounded far quieter than emitters or the
       // editor preview at the same authored volume.
-      void this._makeSound(p.id, true, bus, base, loop, holder, false, { ref: 1, max: 20 }).then(s => {
-        if (s && p.key) this._keyed.set(p.key, s);
-      });
+      void this._makeSound(p.id, true, bus, base, loop, holder, false, { ref: 1, max: 20 }).then(registerKeyed);
     } else {
-      void this._makeSound(p.id, false, bus, base, loop, null).then(s => {
-        if (s && p.key) this._keyed.set(p.key, s);
-      });
+      void this._makeSound(p.id, false, bus, base, loop, null).then(registerKeyed);
     }
   }
 
   private _onStop(p: { id?: string; key?: string }): void {
     if (p.key) {
+      // Bump the generation FIRST — an in-flight load of this key must die on
+      // arrival even if it hasn't registered yet.
+      this._keyGen.set(p.key, (this._keyGen.get(p.key) ?? 0) + 1);
       const s = this._keyed.get(p.key);
       if (s) { this._keyed.delete(p.key); this._finish(s); }
       return;

@@ -1617,16 +1617,33 @@ function StateScopePicker({
   return <TargetCombobox targetId={value} opts={opts} onChange={onChange} />;
 }
 
+/** The entities a "Whose state" target resolves to: the entity itself, or — for
+ *  a group id — every member entity (group scopes fan out per member). */
+function resolveStateEntities(
+  targetId: string | undefined, ownerId: string | undefined,
+  zoneObjects: WorldObject[], triggerVolumes: TriggerVolume[],
+): Array<{ stateSchema?: Record<string, StateSchema> }> {
+  const rid = targetId === "self" ? ownerId : targetId;
+  if (!rid) return [];
+  const direct = zoneObjects.find(o => o.id === rid) ?? triggerVolumes.find(v => v.id === rid);
+  if (direct) return [direct];
+  const members = [...zoneObjects, ...triggerVolumes]
+    .filter(e => ((e as { groupIds?: string[] }).groupIds ?? []).includes(rid));
+  return members;
+}
+
 /** Registered per-entity state keys for a "Whose state" target ("self" resolves
- *  through ownerId) — feeds scope-aware key suggestions next to the pickers. */
+ *  through ownerId; a group unions its members' keys) — feeds the scope-aware
+ *  key suggestions next to the pickers. */
 function entityStateKeys(
   targetId: string | undefined, ownerId: string | undefined,
   zoneObjects: WorldObject[], triggerVolumes: TriggerVolume[],
 ): string[] {
-  const rid = targetId === "self" ? ownerId : targetId;
-  if (!rid) return [];
-  const ent = zoneObjects.find(o => o.id === rid) ?? triggerVolumes.find(v => v.id === rid);
-  return Object.keys((ent as { stateSchema?: Record<string, unknown> } | undefined)?.stateSchema ?? {});
+  const keys = new Set<string>();
+  for (const e of resolveStateEntities(targetId, ownerId, zoneObjects, triggerVolumes)) {
+    for (const k of Object.keys(e.stateSchema ?? {})) keys.add(k);
+  }
+  return [...keys];
 }
 
 /** ConditionRow's optional entity-scope context (Phase 60). */
@@ -2261,12 +2278,14 @@ function ActionFields({
   // The current key's registered type (entity schema for entity scopes, else the
   // merged scene/game schema) — boolean keys get a true/false/toggle picker.
   const resolvedKeyType = (() => {
-    const rid = action.targetId === "self" ? owner?.id : action.targetId;
-    if (rid) {
-      const ent = zoneObjects.find(o => o.id === rid) ?? triggerVolumes.find(v => v.id === rid);
-      return (ent as { stateSchema?: Record<string, StateSchema> } | undefined)?.stateSchema?.[action.stateKey ?? ""]?.type;
+    const targets = resolveStateEntities(action.targetId, owner?.id, zoneObjects, triggerVolumes);
+    for (const e of targets) {
+      const t = e.stateSchema?.[action.stateKey ?? ""]?.type;
+      if (t) return t;   // group scope: first member schema carrying the key wins
     }
-    return stateKeyTypes?.[action.stateKey ?? ""];
+    // Entity scopes never fall back to the global schema (entity keys are their own
+    // namespace); only the global scope reads the merged scene/game map.
+    return targets.length ? undefined : stateKeyTypes?.[action.stateKey ?? ""];
   })();
 
   const stateScopePicker = (
@@ -2559,11 +2578,17 @@ function ActionFields({
             {resolvedKeyType === "boolean" ? (
               <select style={S.select}
                 value={action.stateValue === true ? "true" : action.stateValue === false ? "false"
-                     : action.stateValue === "__toggle__" ? "__toggle__" : ""}
+                     : action.stateValue === "__toggle__" ? "__toggle__"
+                     : action.stateValue != null ? "__legacy__" : ""}
                 onChange={(e) => set({ stateValue: e.target.value === "true" ? true
                   : e.target.value === "false" ? false
                   : e.target.value === "__toggle__" ? "__toggle__" : undefined })}>
                 <option value="">— pick —</option>
+                {/* A value typed before the key was registered boolean: surface it
+                    (still what the action sets) instead of a lying "— pick —". */}
+                {action.stateValue != null && typeof action.stateValue !== "boolean" && action.stateValue !== "__toggle__" && (
+                  <option value="__legacy__" disabled>{String(action.stateValue)} (not a boolean — pick below)</option>
+                )}
                 <option value="true">true</option>
                 <option value="false">false</option>
                 <option value="__toggle__">toggle (flip current)</option>

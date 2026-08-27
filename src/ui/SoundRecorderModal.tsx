@@ -98,7 +98,9 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
   };
+  const deadRef = useRef(false);
   useEffect(() => () => {   // unmount: stop everything
+    deadRef.current = true;   // onstop fires async after this — it must not decode or mint a context
     if (timerRef.current != null) clearInterval(timerRef.current);
     try { recRef.current?.stop(); } catch { /* not recording */ }
     releaseMic();
@@ -123,6 +125,7 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
     rec.ondataavailable = e => { if (e.data.size) chunksRef.current.push(e.data); };
     rec.onstop = async () => {
       releaseMic();
+      if (deadRef.current) return;   // modal closed mid-recording
       if (timerRef.current != null) { clearInterval(timerRef.current); timerRef.current = null; }
       try {
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
@@ -214,15 +217,21 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
             </div>
 
             <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
+              {/* defaultValue + onBlur (house number-field pattern): a CONTROLLED
+                  number input rewrites the DOM mid-typing and eats the "." in "0.5". */}
               <div>
                 <div style={{ ...LABEL, marginBottom: 3 }}>TRIM START (s)</div>
-                <input type="number" min={0} step={0.1} style={NUM} value={trimStart}
-                  onChange={e => { stopPlayback(); setTrimStart(Math.max(0, Number(e.target.value) || 0)); }} />
+                <input type="number" min={0} step={0.1} style={NUM}
+                  key={"ts" + trimStart} defaultValue={trimStart || ""}
+                  onBlur={e => { stopPlayback(); setTrimStart(Math.max(0, parseFloat(e.target.value) || 0)); }}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 3 }}>TRIM END (s)</div>
-                <input type="number" min={0} step={0.1} style={NUM} value={trimEnd}
-                  onChange={e => { stopPlayback(); setTrimEnd(Math.max(0, Number(e.target.value) || 0)); }} />
+                <input type="number" min={0} step={0.1} style={NUM}
+                  key={"te" + trimEnd} defaultValue={trimEnd || ""}
+                  onBlur={e => { stopPlayback(); setTrimEnd(Math.max(0, parseFloat(e.target.value) || 0)); }}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ ...LABEL, marginBottom: 3 }}>NAME</div>
