@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -19.143078330542018,
+        "x": -31.442665920034244,
         "y": 2.73214756311405,
-        "z": -85.9787547811378
+        "z": -84.6621646355115
       },
       "radius": 28.895070499337468,
-      "phi": 1.000000000000004,
-      "theta": 17.64999999988162
+      "phi": 0.9700000000000005,
+      "theta": 18.42999999988163
     }
   },
   "world": {
@@ -77,8 +77,8 @@
     "defaultSpawn": {
       "position": {
         "x": -35.4414902815789,
-        "y": 7.060922073707651,
-        "z": -67.06510042645496
+        "y": 8.24948291449006,
+        "z": -63.31390547536981
       },
       "facingDeg": 0
     },
@@ -9357,88 +9357,6 @@
           }
         },
         {
-          "id": "obj_ddf6247e",
-          "assetId": "hazard_spiketrap",
-          "position": {
-            "x": -35.01266455731116,
-            "y": 6.970343860100478,
-            "z": -58.6955993400691
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "scripts": [
-            {
-              "id": "scr_cec4e81d",
-              "label": "spike pop intervals",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_timer",
-                "interval": 4,
-                "repeat": true
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "self",
-                  "animation": "SpikeTrap_Up",
-                  "animationLoop": false,
-                  "animationHold": true,
-                  "delay": 0
-                },
-                {
-                  "type": "play_animation",
-                  "delay": 2,
-                  "targetId": "self",
-                  "animation": "SpikeTrap_Down"
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 2,
-                  "targetId": "vol_d8be00e2"
-                },
-                {
-                  "type": "spawn_object",
-                  "delay": 0,
-                  "targetId": "vol_d8be00e2"
-                },
-                {
-                  "type": "play_sound",
-                  "delay": 2,
-                  "sound": "impactmining_003",
-                  "targetId": "self",
-                  "volume": 2
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_004",
-                  "targetId": "self",
-                  "volume": 2
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "label": "spike cube 1"
-        },
-        {
           "id": "obj_59bc2c20",
           "assetId": "platform_grass_single",
           "position": {
@@ -12105,6 +12023,180 @@
             "instanceId": "pfi_035b369f",
             "memberKey": "tile_3_5_L1"
           }
+        },
+        {
+          "id": "obj_3e5a90a7",
+          "assetId": "hazard_spiketrap",
+          "position": {
+            "x": -35.01266455731116,
+            "y": 6.970343860100478,
+            "z": -58.6434661884347
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "scripts": [
+            {
+              "id": "script_61868041",
+              "label": "spike pop intervals",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_timer",
+                "interval": 4,
+                "repeat": true
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Up",
+                  "animationLoop": false,
+                  "animationHold": true,
+                  "delay": 0
+                },
+                {
+                  "type": "play_animation",
+                  "delay": 2,
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Down"
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 2,
+                  "targetId": "vol_da03ef3d"
+                },
+                {
+                  "type": "spawn_object",
+                  "delay": 0,
+                  "targetId": "vol_da03ef3d"
+                },
+                {
+                  "type": "play_sound",
+                  "delay": 2,
+                  "sound": "impactmining_003",
+                  "targetId": "self",
+                  "volume": 2
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "impactmining_004",
+                  "targetId": "self",
+                  "volume": 2
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "label": "spike cube 1",
+          "prefab": {
+            "prefabId": "pfb_76b82ec0",
+            "instanceId": "pfi_d34c12ad",
+            "memberKey": "obj_77ceb6af"
+          }
+        },
+        {
+          "id": "obj_5daa2945",
+          "assetId": "hazard_spiketrap",
+          "position": {
+            "x": -35.02716377027508,
+            "y": 7.039584523910544,
+            "z": -68.04779967003455
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "scripts": [
+            {
+              "id": "script_a2028f85",
+              "label": "spike pop intervals",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_timer",
+                "interval": 4,
+                "repeat": true
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Up",
+                  "animationLoop": false,
+                  "animationHold": true,
+                  "delay": 0
+                },
+                {
+                  "type": "play_animation",
+                  "delay": 2,
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Down"
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 2,
+                  "targetId": "vol_80c94968"
+                },
+                {
+                  "type": "spawn_object",
+                  "delay": 0,
+                  "targetId": "vol_80c94968"
+                },
+                {
+                  "type": "play_sound",
+                  "delay": 2,
+                  "sound": "impactmining_003",
+                  "targetId": "self",
+                  "volume": 2
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "impactmining_004",
+                  "targetId": "self",
+                  "volume": 2
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "label": "spike cube 1",
+          "prefab": {
+            "prefabId": "pfb_76b82ec0",
+            "instanceId": "pfi_aaed9392",
+            "memberKey": "obj_77ceb6af"
+          }
         }
       ],
       "prefabInstances": [
@@ -12160,58 +12252,6 @@
               "x": -40.98546594385466,
               "y": 9.874838355622726,
               "z": -28.56678531831541
-            },
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "pfi_30a2f445",
-          "prefabId": "pfb_c1006ccb",
-          "version": 2,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": -39.497944673742424,
-              "y": 7.421320336224979,
-              "z": -21.49963505257046
-            },
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "pfi_e6438e3d",
-          "prefabId": "pfb_a15c07b6",
-          "version": 1,
-          "variables": {
-            "width": 3,
-            "depth": 3,
-            "height": 2,
-            "tileSet": "dirt"
-          },
-          "origin": {
-            "position": {
-              "x": -40.96558397469059,
-              "y": 9.639029954628725,
-              "z": -39.620987148552096
-            },
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "pfi_a5a19c1f",
-          "prefabId": "pfb_a15c07b6",
-          "version": 1,
-          "variables": {
-            "width": 4,
-            "depth": 4,
-            "height": 3,
-            "tileSet": "dirt"
-          },
-          "origin": {
-            "position": {
-              "x": -32.27808203763483,
-              "y": 7.7019515491365445,
-              "z": -41.67212008447807
             },
             "rotationY": 0
           }
@@ -12358,20 +12398,6 @@
           }
         },
         {
-          "id": "pfi_277e6d85",
-          "prefabId": "pfb_07e2acef",
-          "version": 6,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": -11.962547555048415,
-              "y": 9.392836500518918,
-              "z": -47.51759087630869
-            },
-            "rotationY": 0
-          }
-        },
-        {
           "id": "pfi_f6761db7",
           "prefabId": "pfb_07e2acef",
           "version": 6,
@@ -12400,6 +12426,34 @@
               "x": -34.92001817906488,
               "y": 7.346407107121243,
               "z": -77.01438649956901
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_d34c12ad",
+          "prefabId": "pfb_76b82ec0",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -35.00633227865558,
+              "y": 6.970343860100478,
+              "z": -58.595666518400144
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_aaed9392",
+          "prefabId": "pfb_76b82ec0",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -35.0208314916195,
+              "y": 7.039584523910544,
+              "z": -68
             },
             "rotationY": 0
           }
@@ -12897,7 +12951,7 @@
                   "type": "play_sound",
                   "targetId": "",
                   "sound": "pepsound1",
-                  "volume": 2
+                  "volume": 1
                 }
               ],
               "oneShot": true
@@ -12907,12 +12961,12 @@
           "shape": "box"
         },
         {
-          "id": "vol_d8be00e2",
+          "id": "vol_da03ef3d",
           "label": "hurt spikes",
           "position": {
             "x": -35,
             "y": 7.501219535967445,
-            "z": -58.599999999999994
+            "z": -58.547866848365594
           },
           "size": {
             "x": 2,
@@ -12922,7 +12976,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "scr_158e8b64",
+              "id": "script_616ed56e",
               "label": "Hurt spikes",
               "zoneId": "demo",
               "enabled": true,
@@ -12949,7 +13003,62 @@
               ],
               "oneShot": false
             }
-          ]
+          ],
+          "prefab": {
+            "prefabId": "pfb_76b82ec0",
+            "instanceId": "pfi_d34c12ad",
+            "memberKey": "vol_d8be00e2"
+          }
+        },
+        {
+          "id": "vol_80c94968",
+          "label": "hurt spikes",
+          "position": {
+            "x": -35.01449921296392,
+            "y": 7.570460199777512,
+            "z": -67.95220032996545
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_d340f08d",
+              "label": "Hurt spikes",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "Hearts",
+                  "numberDelta": -1
+                },
+                {
+                  "type": "launch_player",
+                  "launchRelativeTo": "player",
+                  "launchSpeed": 7.4,
+                  "launchHSpeed": 7.4,
+                  "launchDirDeg": -180
+                },
+                {
+                  "type": "flash_player"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_76b82ec0",
+            "instanceId": "pfi_aaed9392",
+            "memberKey": "vol_d8be00e2"
+          }
         }
       ],
       "scripts": [
