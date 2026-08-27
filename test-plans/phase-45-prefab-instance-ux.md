@@ -63,3 +63,10 @@
    on undo while open). Ghost records show amber "empty record (leftover)",
    Delete only. "Delete prefab" unlocks at 0 rows. Verified end-to-end with the
    scratch prefab and read-only against the real Spike Step 2 (1 live + 1 ghost).
+
+### v4.79.26 — legacy ghosts swept on load
+
+Records with zero members (created before v4.79.25) are removed by the
+scene-load sweep (syncPrefabInstances) with a console info line. Verified:
+reloading dropped Spike Step 2 from 2 records to 1 — the badge now matches
+reality without touching the modal.

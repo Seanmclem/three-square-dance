@@ -1192,6 +1192,18 @@ export default function App() {
     if (!world || restoringRef.current) return;
     for (const zone of world.zones.values()) {
       for (const rec of [...(zone.prefabInstances ?? [])]) {
+        // Ghost sweep: a record whose members are ALL gone is dead weight — it
+        // inflates the library's instance badge and blocks prefab deletion.
+        // Live deletion prunes these since v4.79.25; this catches records that
+        // predate the fix. Safe here: entities and records load from the same
+        // scene parse, so an empty member set means genuinely deleted, not
+        // not-yet-loaded (and restoringRef above guards the boot window).
+        if (collectInstanceMembers(world, zone.id, rec.id).size === 0) {
+          world.removePrefabInstance(zone.id, rec.id);
+          setIsDirty(true);
+          console.info(`[prefabs] swept empty instance record ${rec.id} (${rec.prefabId}) — members all deleted`);
+          continue;
+        }
         let def = world.prefabLibrary?.find(p => p.id === rec.prefabId);
         if (!def) {
           // Subset match, not exact: generators gain variables over time (e.g.

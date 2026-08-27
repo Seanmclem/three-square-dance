@@ -143,10 +143,10 @@ immediately; one with instances opens a review dialog (v4.79.25) listing every
 instance — zone, position, piece count — with **Go to** (selects the instance
 and glides the camera to it) and **Delete** per row (each row-delete is one undo
 step). Once the list is empty the dialog's **Delete prefab** button unlocks.
-Rows shown as **empty record (leftover)** are ghost bookkeeping from before
-v4.79.25 — instances whose pieces were deleted one by one; just Delete them.
-Since v4.79.25 that can't happen anymore: deleting an instance's **last piece**
-removes its record too (in the same undo step as the piece).
+Rows shown as **empty record (leftover)** are ghost bookkeeping — instances
+whose pieces were all deleted; just Delete them (rare: since v4.79.25 deleting
+an instance's **last piece** removes its record too, in the same undo step, and
+any pre-existing ghosts are swept automatically on scene load).
 
 ## Orphans (⚠ definition missing)
 
