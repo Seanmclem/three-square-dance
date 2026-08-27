@@ -6481,6 +6481,22 @@
         "sourceName": "Impact Sounds",
         "sourceUrl": "https://kenney.nl/assets/impact-sounds"
       }
+    },
+    {
+      "id": "detect_rawr",
+      "label": "detect rawr",
+      "category": "Enemy",
+      "path": "/assets/audio/detect_rawr.wav",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "self-record"
+      ],
+      "dateAdded": "2026-08-27",
+      "attribution": {
+        "author": "Seanmclem",
+        "license": "CC0"
+      }
     }
   ]
 }
