@@ -210,6 +210,11 @@ transition to that exact value (§4); `on_health_zero` — health reached 0.
 
 **Actions:**
 
+- Condition `state_equals` (v4.79.38) — passes when the key's CURRENT value
+  equals the authored one: booleans and strings included (the gap `has_state`'s
+  truthy check and `compare_number`'s numeric coercion left). Objects compare
+  JSON-deep, same as the `on_state_equals` trigger. Combine with **unless**
+  for "not equals".
 - `set_state` — `set(stateKey, stateValue)`. When the key is REGISTERED as a
   boolean (entity or global schema), the editor's Value field becomes a
   true / false / **toggle** picker; toggle stores the `"__toggle__"` sentinel,

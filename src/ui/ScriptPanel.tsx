@@ -167,10 +167,21 @@ const TRIGGER_TYPES: TriggerType[] = [
 // evaluates as a tolerated no-op.
 const CONDITION_TYPES: ConditionType[] = [
   "has_state",
+  "state_equals",
   "compare_number",
   "has_item",
   "player_falling",
 ];
+
+// Human labels for the dropdown — the raw type strings undersold what they do
+// ("has_state" reads as the only state check; it's really just truthy).
+const CONDITION_LABELS: Partial<Record<ConditionType, string>> = {
+  has_state:      "state is set / true",
+  state_equals:   "state equals value",
+  compare_number: "number compare (< > =)",
+  has_item:       "has item",
+  player_falling: "player falling",
+};
 
 const ACTION_TYPES: ActionType[] = [
   "adjust_number",
@@ -1271,6 +1282,7 @@ function ScriptEditor({
                 allowSelf: ownerIsEntity && !!selectedObjectId,
                 selfLabel: `★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`,
                 ownerId: ownerIsEntity ? selectedObjectId ?? undefined : undefined,
+                stateKeyTypes,
               }}
               onChange={(nc) =>
                 set(
@@ -1653,6 +1665,7 @@ interface ConditionScope {
   allowSelf:      boolean;
   selfLabel?:     string;
   ownerId?:       string;   // owning entity — enables prefab-sibling targets + scoped key suggestions
+  stateKeyTypes?: Record<string, StateSchema["type"]>;   // merged scene/game schema (boolean value pickers)
 }
 
 // ── TargetCombobox ────────────────────────────────────────────────────────────
@@ -1915,7 +1928,7 @@ function ConditionRow({
       >
         {CONDITION_TYPES.map((t) => (
           <option key={t} value={t}>
-            {t}
+            {CONDITION_LABELS[t] ?? t}
           </option>
         ))}
       </select>
@@ -1954,6 +1967,41 @@ function ConditionRow({
           />
         </F>
       )}
+      {condition.type === "state_equals" && (() => {
+        // Boolean-registered keys get a true/false picker (entity schema first,
+        // else the merged global schema when the scope is global).
+        const targets = scope ? resolveStateEntities(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
+        let keyType = targets.map(e => e.stateSchema?.[condition.stateKey ?? ""]?.type).find(Boolean);
+        if (!keyType && !targets.length) keyType = scope?.stateKeyTypes?.[condition.stateKey ?? ""];
+        return (
+          <>
+            <F label="State key" flex={1}>
+              <KeySuggestInput placeholder="state key"
+                value={condition.stateKey ?? ""}
+                suggestions={entKeys.length ? entKeys : undefined}
+                onChange={(v) => onChange({ ...condition, stateKey: v })}
+              />
+            </F>
+            <F label="Equals" flex={1}>
+              {keyType === "boolean" ? (
+                <select style={S.select}
+                  value={condition.stateValue === true ? "true" : condition.stateValue === false ? "false" : ""}
+                  onChange={(e) => onChange({ ...condition,
+                    stateValue: e.target.value === "true" ? true : e.target.value === "false" ? false : undefined })}>
+                  <option value="">— pick —</option>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input style={S.field} placeholder="true / 3 / text"
+                  value={condition.stateValue == null ? "" : String(condition.stateValue)}
+                  onChange={(e) => onChange({ ...condition, stateValue: coerceStateValue(e.target.value) })}
+                />
+              )}
+            </F>
+          </>
+        );
+      })()}
       {condition.type === "compare_number" && (
         <>
           <F label="State key" flex={1}>
@@ -2199,7 +2247,7 @@ function ActionRow({
               condition={c}
               worldItems={worldItems}
               scope={{ zoneObjects, triggerVolumes, allowSelf: !!owner,
-                selfLabel: owner ? `★ this ${owner.kind}` : undefined, ownerId: owner?.id }}
+                selfLabel: owner ? `★ this ${owner.kind}` : undefined, ownerId: owner?.id, stateKeyTypes }}
               onChange={(nc) => onChange({ ...action, conditions: action.conditions!.map((x, j) => (j === i ? nc : x)) })}
               onRemove={() => {
                 const rest = action.conditions!.filter((_, j) => j !== i);

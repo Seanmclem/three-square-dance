@@ -1254,6 +1254,7 @@ export type TriggerType =
 
 export type ConditionType =
   | 'has_state'
+  | 'state_equals'     // state's value === the authored value (booleans/strings/numbers; objects deep-equal)
   | 'compare_number'
   | 'has_item'
   | 'player_falling'   // airborne AND descending — the goomba-stomp gate (Phase 61.1)

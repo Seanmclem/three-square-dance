@@ -44,6 +44,15 @@ export function setPlayerMotionProvider(fn: (() => { grounded: boolean; velY: nu
   _playerMotion = fn;
 }
 
+/** Equality used by BOTH the on_state_equals trigger and the state_equals
+ *  condition: strict for primitives, JSON-deep for objects. */
+function jsonEquals(a: JsonValue | undefined, b: JsonValue): boolean {
+  if (a === b) return true;
+  if (typeof a === "object" && typeof b === "object" && a !== null && b !== null)
+    return JSON.stringify(a) === JSON.stringify(b);
+  return false;
+}
+
 export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: string): boolean {
   // Phase 60 — entity scope: a condition may name an entity whose namespaced
   // key is read instead of the global one. "self" resolves through ownerId
@@ -64,6 +73,10 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
         const key = c.stateKey ?? "";
         const v = gameState.get(eid ? entKey(eid, key) : key);
         return !(v === undefined || v === null || v === false);
+      }
+      case "state_equals": {
+        const key = c.stateKey ?? "";
+        return jsonEquals(gameState.get(eid ? entKey(eid, key) : key), c.stateValue ?? null);
       }
       case "compare_number": {
         const key    = c.stateKey ?? "";
@@ -292,14 +305,8 @@ export class ScriptEngine {
     if (!this._active) return;
     const bucket = this._index.get(`on_state_equals:${key}`);
     if (!bucket) return;
-    const equal = (a: JsonValue | undefined, b: JsonValue): boolean => {
-      if (a === b) return true;
-      if (typeof a === "object" && typeof b === "object" && a !== null && b !== null)
-        return JSON.stringify(a) === JSON.stringify(b);
-      return false;
-    };
     for (const s of bucket) {
-      if (equal(s.trigger.stateValue, value)) this._evalAndRun(s);
+      if (jsonEquals(s.trigger.stateValue, value)) this._evalAndRun(s);
     }
   }
 

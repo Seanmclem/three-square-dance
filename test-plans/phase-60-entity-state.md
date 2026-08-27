@@ -109,3 +109,16 @@ trigger) switched Value to the picker.
    pre-existing script-guard entityId gap).
 4. Verified via the real dispatch path: blocked-when-false, ran-when-true,
    and both unless polarities.
+
+### v4.79.38 — state_equals condition + readable dropdown labels
+
+1. New condition "state equals value": passes when the key's current value
+   equals the authored one — booleans and strings included (has_state is
+   truthy-only; compare_number coerces to numbers). Objects deep-compare,
+   matching the on_state_equals trigger. unless = not-equals.
+2. Boolean-registered keys render a true/false picker for the Equals field
+   (entity schema first, merged global schema for global scope).
+3. The condition dropdown shows plain-language labels ("state is set / true",
+   "state equals value", "number compare (< > =)").
+4. Runtime verified via real dispatch: boolean and string equality both
+   polarities + unless inversion.
