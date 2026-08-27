@@ -95,3 +95,10 @@ The section's button row now leads with "⛶ Select all N" (single-piece view,
 multi-piece instances only) and amber "Edit prefab" (snapshot prefabs).
 The whole-instance multi view shows Edit but no redundant select-all.
 Screenshot-verified in both views.
+
+### v4.79.30 — Prefab section top + collapsed in single views
+
+Object and trigger-volume single-selection lists show the Prefab accordion
+first (above Geometry / the volume blurb), collapsed by default (keyed per
+instance). The selected-all view keeps it at top and expanded. Screenshot-
+verified in all three views.

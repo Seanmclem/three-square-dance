@@ -793,7 +793,9 @@ export function PropertiesPanel({
             zone={zones?.find(z => z.id === selected.zoneId)}
             prefabSection={prefabInfo ? (
               <PrefabSection
+                key={prefabInfo.record.id}
                 info={prefabInfo}
+                defaultOpen={false}
                 onVariablesChange={onPrefabVariablesChange}
                 onOriginChange={onPrefabOriginChange}
                 onReexpand={onPrefabReexpand}
@@ -812,17 +814,13 @@ export function PropertiesPanel({
           <DecalView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} decalTextures={decalTextures} />
         ) : isRoot ? (
           <>
-            {screens.map(s => (
-              <CategoryRow
-                key={s}
-                label={SCREEN_LABELS[s]}
-                summary={summaryFor(s, selected, materialList, assets)}
-                onPress={() => push(s)}
-              />
-            ))}
+            {/* Prefab membership first (collapsed) — the "this is part of something
+                bigger" context belongs above the entity's own category rows. */}
             {prefabInfo && (
               <PrefabSection
+                key={prefabInfo.record.id}
                 info={prefabInfo}
+                defaultOpen={false}
                 onVariablesChange={onPrefabVariablesChange}
                 onOriginChange={onPrefabOriginChange}
                 onReexpand={onPrefabReexpand}
@@ -832,6 +830,14 @@ export function PropertiesPanel({
                 onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
               />
             )}
+            {screens.map(s => (
+              <CategoryRow
+                key={s}
+                label={SCREEN_LABELS[s]}
+                summary={summaryFor(s, selected, materialList, assets)}
+                onPress={() => push(s)}
+              />
+            ))}
             <GroupsAccordion
               open={groupsOpen}
               onToggle={() => setGroupsOpen(v => !v)}
@@ -1182,7 +1188,7 @@ function PrefabVarField({ def, value, onCommit }: {
   );
 }
 
-function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance, onSelectAll, onEdit }: {
+function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance, onSelectAll, onEdit, defaultOpen = true }: {
   info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord; memberCount?: number };
   onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
@@ -1191,8 +1197,9 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
   onDeleteInstance?:  () => void;
   onSelectAll?:       () => void;   // select every piece (passed only where the selection ISN'T already the whole instance)
   onEdit?:            () => void;   // enter prefab edit (snapshot kind only)
+  defaultOpen?:       boolean;      // single-entity views start collapsed; the whole-instance view starts open
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   const [hovered, setHovered] = useState(false);
   const { prefab, record } = info;
   // Generator prefabs render the REGISTRY's variable schema, not the def's
@@ -6178,6 +6185,8 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
 
   return (
     <>
+    {/* Prefab membership first (collapsed) — same top placement as the object root view. */}
+    {prefabSection}
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
                     padding: "6px 8px", background: "rgba(255,255,255,0.03)",
@@ -6448,7 +6457,6 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         >Delete Volume</button>
       )}
     </div>
-    {prefabSection}
     <GroupsAccordion
       open={groupsOpen}
       onToggle={onToggleGroups}

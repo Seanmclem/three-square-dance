@@ -107,6 +107,10 @@ single piece to moving object + trigger + everything with one gizmo — and a
 Delete instance). All three ask for confirmation from either entry point;
 they're still one-step undoable afterwards.
 
+When a **single piece** is selected, the Prefab section sits at the top of its
+properties list, collapsed (v4.79.30) — expand it for the full action row; the
+whole-instance view keeps it expanded.
+
 **Shift-click** a piece to select *just it* — the escape hatch for tweaking a
 single piece. Know the rule: piece-level tweaks are **not** part of the recipe
 or the instance's settings, so they're overwritten the next time the pieces
