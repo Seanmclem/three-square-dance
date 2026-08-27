@@ -626,7 +626,7 @@
       "id": "pfb_76b82ec0",
       "name": "Spike Step 3",
       "kind": "snapshot",
-      "version": 2,
+      "version": 3,
       "variables": [],
       "template": [
         {
@@ -710,7 +710,10 @@
                   },
                   {
                     "type": "set_state",
-                    "targetId": "vol_d8be00e2"
+                    "targetId": "vol_d8be00e2",
+                    "stateKey": "spikes-up",
+                    "stateValue": "__toggle__",
+                    "delay": 2
                   }
                 ],
                 "oneShot": false
