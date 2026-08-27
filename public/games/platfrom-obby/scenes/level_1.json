@@ -12413,7 +12413,14 @@
                   "delay": 2,
                   "sound": "impactmining_003",
                   "targetId": "self",
-                  "volume": 2
+                  "volume": 2,
+                  "conditions": [
+                    {
+                      "type": "has_state",
+                      "entityId": "self",
+                      "stateKey": "spikes-up"
+                    }
+                  ]
                 },
                 {
                   "type": "play_sound",
