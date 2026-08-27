@@ -268,7 +268,12 @@ export class AudioSystem {
       const holder = new THREE.Object3D();
       holder.position.set(p.position.x, p.position.y, p.position.z);
       this._scene.scene.add(holder);
-      void this._makeSound(p.id, true, bus, base, loop, holder).then(s => {
+      // Same falloff as attached emitters (linear, full volume inside 1m, silent at
+      // 20m). Without this, THREE's PannerNode defaults apply — the INVERSE model,
+      // which is ~1/distance: already 4× quieter at the 3rd-person camera's ~4m,
+      // so positional play_sound actions sounded far quieter than emitters or the
+      // editor preview at the same authored volume.
+      void this._makeSound(p.id, true, bus, base, loop, holder, false, { ref: 1, max: 20 }).then(s => {
         if (s && p.key) this._keyed.set(p.key, s);
       });
     } else {

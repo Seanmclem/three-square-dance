@@ -98,6 +98,12 @@ ref distance / max distance.
   silently clamped to 1 — the field accepted the number but did nothing.)
 - Static geometry (walls, floors, stairs) has no sound field — use a trigger + `play_sound`
   there instead.
+- A script `play_sound` with a target / "Play at" position uses the SAME falloff as
+  emitters (linear, full inside 1m, silent at 20m; since v4.79.24 — before, it fell to
+  WebAudio's inverse model, which made positional one-shots far quieter than everything
+  else at the same volume). Remember the LISTENER is the camera: in 3rd person even a
+  sound at the player's feet is a few metres from the ear, so positional sounds are
+  always somewhat quieter than the editor ▶ preview, which plays flat at full volume.
 
 ## 4. Character locomotion sounds (footsteps / jump / land)
 

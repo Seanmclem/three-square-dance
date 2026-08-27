@@ -230,3 +230,12 @@ in below the row.
 Probe gotcha: THREE's getVolume() reads the setTargetAtTime ramp, which is
 frozen while the AudioContext is suspended (hidden tab) — it reports 1
 no matter what was set. Capture the setVolume argument instead.
+
+## Fix (2026-08-26, v4.79.24) — positional play_sound falloff
+
+Script play_sound with a target/"Play at" now uses the emitter falloff
+(linear, ref 1 → max 20) instead of WebAudio's inverse default (~1/d, which
+made positional one-shots ~4× quieter at the 3rd-person camera's distance).
+Probe: panner reads linear/1/20 on a positional one-shot. Residual gap vs
+the flat editor ▶ preview is the camera-as-listener distance — documented
+in AUDIO.md §3.
