@@ -186,3 +186,27 @@ Full detail in **TESTING.md §0**. The short version:
 - The api is curl-able (`POST /api/<method>` with a JSON array of args).
 - Data safety is structural: atomic writes, 10-deep rotating backups
   (`<stateDir>/backups/`), trash instead of delete (`<stateDir>/trash/`).
+
+## 5. Microphone in the shell (sound recorder) — TCC patch
+
+Clicking **● Record** (v4.79.32) in the desktop shell requests the microphone.
+The stock laufey.app (deno desktop 0.6.1) ships **without**
+`NSMicrophoneUsageDescription`, so the instant macOS grants the permission it
+SIGABRTs the whole app (TCC kill — confirmed in
+`~/Library/Logs/DiagnosticReports/laufey-2026-08-27-152936.ips`).
+
+The local fix (applied 2026-08-27; **reapply after any deno/laufey upgrade** —
+it lives in a cache the upgrade overwrites):
+
+```sh
+APP="$HOME/Library/Caches/deno/laufey/<version>/cef/aarch64-apple-darwin/laufey.app"
+plutil -insert NSMicrophoneUsageDescription \
+  -string "The world editor uses the microphone to record custom sound effects for your game." \
+  "$APP/Contents/Info.plist"
+codesign --force -s - "$APP"     # re-seal the ad-hoc signature (don't leave backups inside the bundle)
+```
+
+Symptom of a reverted patch: Record → permission/device picker → allow →
+immediate app crash. Recording in a Chrome tab pointed at the shell's port is
+unaffected either way (Chrome has its own mic permission handling). Worth
+filing upstream against deno desktop.
