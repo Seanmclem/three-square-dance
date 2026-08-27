@@ -482,12 +482,13 @@ export function PropertiesPanel({
   const [groupsOpen, setGroupsOpen]   = useState(false);
   const [labelDraft, setLabelDraft]   = useState("");
   const [editingLabel, setEditingLabel] = useState(false);
+  const [prefabMenuOpen, setPrefabMenuOpen] = useState(false);   // header ⋯ instance-actions menu
   const [showCredits, setShowCredits] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setStack([]); setActionsOpen(true); setGroupsOpen(false);
-    setEditingLabel(false);
+    setEditingLabel(false); setPrefabMenuOpen(false);
     setLabelDraft((selected?.data as { label?: string } | null)?.label ?? "");
   }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -689,6 +690,43 @@ export function PropertiesPanel({
                     ⛶ all {prefabInfo.memberCount}
                   </button>
                 )}
+                {/* ⋯ menu: the Prefab section's instance actions, reachable from the
+                    header too. Each action confirms (App wraps the handlers). */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <button onClick={() => setPrefabMenuOpen(v => !v)} title="Instance actions"
+                    style={{ padding: "0 5px", fontSize: 9, lineHeight: "14px", borderRadius: 3,
+                      cursor: "pointer", background: prefabMenuOpen ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.12)", color: "#8b94a8", fontFamily: "monospace" }}>
+                    ⋯
+                  </button>
+                  {prefabMenuOpen && (
+                    <>
+                      <div style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                        onClick={() => setPrefabMenuOpen(false)} />
+                      <div style={{ position: "absolute", right: 0, top: 18, zIndex: 41, width: 150,
+                        background: "rgba(28,28,28,0.99)", border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.5)", padding: 3,
+                        display: "flex", flexDirection: "column" }}>
+                        {([
+                          ...(prefabInfo.prefab !== null
+                            ? [["Reset from prefab", onPrefabReexpand, "#c2cadb"] as const] : []),
+                          ["Unlink", onPrefabUnlink, "#c2cadb"] as const,
+                          ["Delete instance", onPrefabDeleteInstance, "#cc6666"] as const,
+                        ]).map(([label, fn, color]) => (
+                          <button key={label}
+                            onClick={() => { setPrefabMenuOpen(false); fn?.(); }}
+                            style={{ textAlign: "left", padding: "5px 8px", borderRadius: 3,
+                              cursor: "pointer", background: "none", border: "none",
+                              color, fontSize: 10, fontFamily: "monospace" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "none"; }}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>

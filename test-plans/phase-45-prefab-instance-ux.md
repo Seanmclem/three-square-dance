@@ -77,3 +77,14 @@ Shift-click a single piece of a multi-piece instance → the header's prefab
 line shows "⛶ all N" → clicking selects every member (whole-instance multi
 view, one gizmo). Hidden for 1-member instances and in the multi view (already
 whole). Verified on the chest instance: 1 piece → "⛶ all 4" → "4 selected".
+
+### v4.79.28 — header ⋯ menu + confirmations
+
+1. Single-piece selection → header shows ⋯ after the prefab name (and ⛶ when
+   multi-piece); it lists Reset from prefab / Unlink / Delete instance
+   (Reset hidden for orphans). Click-outside closes.
+2. Every route to those three actions — the ⋯ menu AND the Prefab section's
+   buttons — opens a confirm dialog first (action-specific copy, notes
+   undoability). Cancel is a no-op.
+3. Verified: cancel path on a real chest instance left it intact; confirm path
+   on a scratch prefab deleted member + record, prefab then deletable.

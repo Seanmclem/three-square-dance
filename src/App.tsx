@@ -75,6 +75,7 @@ import { GraphicsImporterModal } from "@/ui/GraphicsImporterModal";
 import { SkyboxImporterModal } from "@/ui/SkyboxImporterModal";
 import { ScriptDetachDialog } from "@/ui/ScriptDetachDialog";
 import { PrefabInstancesDialog, type PrefabInstanceRow } from "@/ui/PrefabInstancesDialog";
+import { ConfirmDialog } from "@/ui/ConfirmDialog";
 import { DeleteAssetDialog } from "@/ui/DeleteAssetDialog";
 import { EditMetadataDialog, type EditPatch } from "@/ui/EditMetadataDialog";
 import { ThumbnailStagerModal } from "@/ui/ThumbnailStagerModal";
@@ -263,6 +264,9 @@ export default function App() {
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
   // Non-null = the "can't delete prefab yet" dialog is open, listing its instances.
   const [prefabDeleteBlocked, setPrefabDeleteBlocked] = useState<{ prefabId: string; rows: PrefabInstanceRow[] } | null>(null);
+  // Pending confirmation for a destructive instance action (both the Prefab-section
+  // buttons and the header ⋯ menu route through this).
+  const [prefabConfirm, setPrefabConfirm] = useState<"reset" | "unlink" | "delete" | null>(null);
   // Isolated prefab edit mode (Phase 47). The ref gates autosave/save/play
   // synchronously (state is for rendering the bar + disabling UI).
   const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
@@ -3665,9 +3669,9 @@ export default function App() {
         onSelectInstance={handleSelectInstanceMembers}
         onPrefabVariablesChange={handlePrefabVariablesChange}
         onPrefabOriginChange={handlePrefabOriginChange}
-        onPrefabReexpand={handlePrefabReexpand}
-        onPrefabUnlink={handlePrefabUnlink}
-        onPrefabDeleteInstance={handlePrefabDeleteInstance}
+        onPrefabReexpand={() => setPrefabConfirm("reset")}
+        onPrefabUnlink={() => setPrefabConfirm("unlink")}
+        onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
         onCreatePrefab={handleCreatePrefab}
       />
       <CoordinateDisplay coords={coords} />
@@ -3974,6 +3978,26 @@ SquareDance
           onDeleteAll={() => handleDeleteConfirm(false)}
           onKeepScripts={() => handleDeleteConfirm(true)}
           onCancel={() => setDeletePrompt(null)}
+        />
+      )}
+      {prefabConfirm && (
+        <ConfirmDialog
+          title={prefabConfirm === "reset" ? "RESET FROM PREFAB"
+               : prefabConfirm === "unlink" ? "UNLINK INSTANCE" : "DELETE INSTANCE"}
+          body={prefabConfirm === "reset"
+              ? "Rebuild every piece from the prefab recipe? Hand-edits to individual pieces are discarded — instance settings and position are kept. (Undoable.)"
+              : prefabConfirm === "unlink"
+              ? "Detach the pieces into plain, independent entities? Prefab updates will stop affecting them. (Undoable.)"
+              : "Delete every piece of this instance? (Undoable.)"}
+          confirmLabel={prefabConfirm === "reset" ? "Reset" : prefabConfirm === "unlink" ? "Unlink" : "Delete instance"}
+          onCancel={() => setPrefabConfirm(null)}
+          onConfirm={() => {
+            const kind = prefabConfirm;
+            setPrefabConfirm(null);
+            if (kind === "reset") handlePrefabReexpand();
+            else if (kind === "unlink") handlePrefabUnlink();
+            else handlePrefabDeleteInstance();
+          }}
         />
       )}
       {prefabDeleteBlocked && (

@@ -99,7 +99,10 @@ the properties header shows a prefab line right under the name — `⬡ {name}` 
 snapshot prefabs (click it to jump into prefab editing), `ƒ {name}` for
 generators, `⚠ … definition missing` for orphans. Next to the name, **⛶ all N**
 (v4.79.27) re-selects the entire instance — the way back from a shift-clicked
-single piece to moving object + trigger + everything with one gizmo.
+single piece to moving object + trigger + everything with one gizmo — and a
+**⋯ menu** (v4.79.28) with the instance actions (Reset from prefab / Unlink /
+Delete instance). All three ask for confirmation from either entry point;
+they're still one-step undoable afterwards.
 
 **Shift-click** a piece to select *just it* — the escape hatch for tweaking a
 single piece. Know the rule: piece-level tweaks are **not** part of the recipe
