@@ -58,3 +58,19 @@ and blows through attack windows in one frame. `EnemyAI.update` now clamps to
 Cleanup: gamesave restored, workspace autosave purged, no world-data
 mutations (AI is runtime-only); the scene diff is the authored crab wiring,
 committed as content+example.
+
+## Addendum (2026-08-27, v4.79.31) — enemy sounds
+
+1. Enemy AI screen → SOUNDS: ON DETECT / WHILE WALKING / ON ATTACK, each a
+   sound picker + VOL (empty = clip level, >1 boosts, cap 4). ▶ previews at
+   the VOL. Empty slots silent.
+2. Runtime: detect plays once on the idle/return→chase edge; attack plays per
+   bite start; walk is a keyed loop that runs only while the enemy actually
+   moves (0.3s stillness, a bite, death/despawn, or preview stop ends it).
+   All three are positional and parented to the enemy mesh (follow the chase).
+3. Headless-verified on the crab via __enemyAI.update() pumping: detect + attack
+   one-shots fired at the right moments; entityId parenting = crab mesh with
+   linear/1/20 falloff. Walk loop can't trigger headless (no physics step →
+   ground ray misses → ledge rule refuses movement) — listen in real gameplay.
+4. Prefab: ai config is part of the object def — snapshot capture carries the
+   sounds; export ships the referenced clips (assetRefs).

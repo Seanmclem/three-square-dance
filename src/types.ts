@@ -359,7 +359,7 @@ export interface BusEvents {
   "leftpanel:close":       Record<string, never>;
   // Audio (Phase 36) — consumed by AudioSystem. `id` is a SoundDef id; a positional
   // one-shot passes `position`. `key` lets a looped emit be stopped later by audio:stop.
-  "audio:play":            { id: string; position?: Vec3; volume?: number; loop?: boolean; key?: string };
+  "audio:play":            { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string };
   "audio:stop":            { id?: string; key?: string };   // no id/key ⇒ stop all one-shots
   "music:play":            { soundId: string; volume?: number; loop?: boolean; fade?: number };
   "music:stop":            { fade?: number };
@@ -1043,6 +1043,14 @@ export interface EnemyAIDef {
   idleClip?:       string | null;
   walkClip?:       string | null;
   attackClip?:     string | null;
+  // Optional sounds (all spatial, following the enemy). Volumes override the
+  // clip's manifest default (1 = clip level; >1 boosts, runtime-capped at 4).
+  detectSound?:    string;        // once, on acquiring the player (alert/growl)
+  detectVolume?:   number;
+  walkSound?:      string;        // loops while actually moving (chase / walk home)
+  walkVolume?:     number;
+  attackSound?:    string;        // each bite start
+  attackVolume?:   number;
 }
 
 export interface WorldObject {

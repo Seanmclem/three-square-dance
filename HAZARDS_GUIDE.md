@@ -320,6 +320,12 @@ Hook effects with three triggers on the enemy's own scripts:
   forward.
 - Clips auto-match by name (idle/walk/run/attack/bite) or pick them in the
   panel. The living example is the crab in platfrom-obby's level_1.
+- **Sounds** (v4.79.31): the Enemy AI screen's SOUNDS group gives three
+  optional slots — **ON DETECT** (once, when it notices the player),
+  **WHILE WALKING** (loops only while it's actually moving), **ON ATTACK**
+  (each bite). All are 3D sounds that follow the enemy; each has the standard
+  sound picker + VOL (1 = clip level, boost up to 4). They're part of the
+  enemy's AI config, so capturing the enemy in a prefab carries them along.
 
 ## The fine print
 

@@ -257,12 +257,25 @@ export class AudioSystem {
 
   // ── Event handlers ───────────────────────────────────────────────────────────
 
-  private _onPlay(p: { id: string; position?: Vec3; volume?: number; loop?: boolean; key?: string }): void {
+  private _onPlay(p: { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string }): void {
     if (!this._active || !p.id) return;
     const def = assetManager.getSoundDef(p.id);
     const bus = catToBus(def?.category ?? "SFX");
     const base = p.volume ?? def?.volume ?? 1;
     const loop = p.loop ?? def?.loop ?? false;
+
+    // entityId: parent the positional sound to the entity's MESH so it follows a
+    // moving source (enemy AI sounds) — same falloff as attached emitters.
+    if (p.entityId) {
+      const mesh = this._findEntityMesh(p.entityId);
+      if (mesh) {
+        void this._makeSound(p.id, true, bus, base, loop, mesh, false, { ref: 1, max: 20 }).then(s => {
+          if (s && p.key) this._keyed.set(p.key, s);
+        });
+        return;
+      }
+      // mesh not built (yet) — fall through to position / non-positional
+    }
 
     if (p.position) {
       const holder = new THREE.Object3D();

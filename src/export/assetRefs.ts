@@ -107,6 +107,9 @@ function collectObject(refs: AssetRefs, o: WorldObject): void {
   add(refs.models, o.assetId);               // placed model
   add(refs.textures, o.material);            // per-object material override (change_material target state)
   collectAttachedSound(refs, o.sound);
+  add(refs.audio, o.ai?.detectSound);        // enemy AI sound slots
+  add(refs.audio, o.ai?.walkSound);
+  add(refs.audio, o.ai?.attackSound);
   collectScripts(refs, o.scripts);
 }
 

@@ -52,6 +52,9 @@ interface Resolved {
   idleClip: string | null; walkClip: string | null; attackClip: string | null;
   clipsResolved: boolean;   // false until the model's clips were available for auto-match
   heightY: number | null;   // enemy body height (AABB × scale) — bite whiffs above it; null until the model loaded
+  detectSound?: string; detectVolume?: number;   // optional sounds — all spatial, following the enemy mesh
+  walkSound?:   string; walkVolume?:   number;
+  attackSound?: string; attackVolume?: number;
 }
 
 /** Adapter record: the brain's memory (state/attack/feint bookkeeping —
@@ -65,6 +68,8 @@ interface AiRec extends BrainMem {
   yaw:   number;          // world yaw, radians
   post:  THREE.Vector3;   // authored rest position (leash anchor)
   currentClip:   string | null;
+  walkSoundOn:   boolean;  // the keyed walk loop is currently playing
+  walkQuietSec:  number;   // consecutive not-moving time (hysteresis before stopping the loop)
 }
 
 function hash(id: string): number {
@@ -146,6 +151,9 @@ export class EnemyAI {
             freeRoam:      def.freeRoam ?? false,
             idleClip: null, walkClip: null, attackClip: null, clipsResolved: false,
             heightY: null,
+            detectSound: def.detectSound, detectVolume: def.detectVolume,
+            walkSound:   def.walkSound,   walkVolume:   def.walkVolume,
+            attackSound: def.attackSound, attackVolume: def.attackVolume,
           },
           state: "idle",
           pos:  entry.origin.clone(),
@@ -156,6 +164,7 @@ export class EnemyAI {
           orbitPhase: ((h >>> 1) % 628) / 100,
           attackNum: 0,
           currentClip: null,
+          walkSoundOn: false, walkQuietSec: 0,
         };
         this._resolveClips(rec);
         this._recs.set(obj.id, rec);
@@ -193,6 +202,7 @@ export class EnemyAI {
       // Dormant while despawned (killed) — Phase 60 despawn state.
       if (gameState.get(despawnedKey(rec.id)) === true) {
         if (rec.state !== "idle") { rec.state = "idle"; rec.currentClip = null; }
+        this._stopWalkSound(rec);
         continue;
       }
       const entry = this._movers.entryFor(rec.id);
@@ -222,12 +232,21 @@ export class EnemyAI {
         clock:    this._clock,
         attackClipDur: p.attackClip ? this._placer.clipDuration(rec.id, p.attackClip) : null,
       };
+      const prevState = rec.state;
       const intent = tick(rec, p, senses);
+
+      // Detection sound: the moment the enemy acquires the player (idle/return → chase).
+      if (p.detectSound && rec.state === "chase" && (prevState === "idle" || prevState === "return")) {
+        this._bus.emit("audio:play", { id: p.detectSound, entityId: rec.id, volume: p.detectVolume });
+      }
 
       if (intent.fire) this._engine.fire(intent.fire, rec.id);
       if (intent.attackStart && p.attackClip) {
         this._placer.aiPlay(rec.id, p.attackClip, { loop: false, blend: 0.1 });
         rec.currentClip = p.attackClip;
+      }
+      if (intent.attackStart && p.attackSound) {
+        this._bus.emit("audio:play", { id: p.attackSound, entityId: rec.id, volume: p.attackVolume });
       }
       if (intent.attackLanded) {
         gameState.adjust(p.damageKey, -p.attackDamage);
@@ -236,6 +255,7 @@ export class EnemyAI {
 
       if (intent.state === "attack") {
         // face the player throughout the bite; no locomotion
+        this._stopWalkSound(rec);
         this._turnToward(rec, Math.atan2(dx, dz), dt);
         this._applyPose(rec, entry);
         continue;
@@ -255,6 +275,23 @@ export class EnemyAI {
         this._turnToward(rec, Math.atan2(dx, dz), dt);
       }
 
+      // ── walk sound: a keyed spatial loop parented to the enemy mesh, on while
+      // actually moving; 0.3s of stillness stops it (hysteresis — brief probe
+      // stalls at walls/ledges shouldn't stutter the loop) ──
+      if (p.walkSound) {
+        if (moved) {
+          rec.walkQuietSec = 0;
+          if (!rec.walkSoundOn) {
+            this._bus.emit("audio:play", { id: p.walkSound, entityId: rec.id, loop: true,
+              key: `ai_walk_${rec.id}`, volume: p.walkVolume });
+            rec.walkSoundOn = true;
+          }
+        } else if (rec.walkSoundOn) {
+          rec.walkQuietSec += dt;
+          if (rec.walkQuietSec > 0.3) this._stopWalkSound(rec);
+        }
+      }
+
       // ── animation by state ──
       const want = intent.state === "idle" ? p.idleClip : (moved || intent.state !== "chase" ? p.walkClip : p.idleClip);
       if (want && want !== rec.currentClip) {
@@ -263,6 +300,13 @@ export class EnemyAI {
 
       this._applyPose(rec, entry);
     }
+  }
+
+  private _stopWalkSound(rec: AiRec): void {
+    if (!rec.walkSoundOn) return;
+    this._bus.emit("audio:stop", { key: `ai_walk_${rec.id}` });
+    rec.walkSoundOn = false;
+    rec.walkQuietSec = 0;
   }
 
   // Preallocated rays (CharacterController idiom — no per-frame allocation).

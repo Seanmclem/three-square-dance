@@ -5849,6 +5849,27 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
         onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
     </div>
   );
+  // Sound slot row: the house SoundPicker + VOL pair (character-sounds idiom) —
+  // preview honors the VOL, empty VOL = the clip's own level.
+  const soundRow = (label: string, soundKey: "detectSound" | "walkSound" | "attackSound",
+                    volKey: "detectVolume" | "walkVolume" | "attackVolume", title: string) => (
+    <div style={{ marginBottom: 6 }} title={title}>
+      <div style={{ color: "#9aa3b5", fontSize: 9, letterSpacing: 0.5, marginBottom: 3 }}>{label}</div>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <SoundPicker value={ai?.[soundKey]} allowNone style={{ flex: 1, minWidth: 0 }}
+          previewVolume={ai?.[volKey]}
+          onChange={id => write({ [soundKey]: id || undefined } as Partial<EnemyAIDef>)} />
+        <span style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5 }}>VOL</span>
+        <input type="number" min={0} step={0.1} style={{ ...NUM_INPUT, width: 52 }}
+          title="Gain — 1 = the clip's own volume, higher boosts (up to 4)"
+          key={obj.id + volKey + String(ai?.[volKey] ?? "")}
+          defaultValue={ai?.[volKey] ?? ""} placeholder="1"
+          onBlur={e => { const n = parseFloat(e.target.value);
+            write({ [volKey]: Number.isFinite(n) ? Math.max(0, n) : undefined } as Partial<EnemyAIDef>); }}
+          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+      </div>
+    </div>
+  );
   const clipRow = (label: string, key: "idleClip" | "walkClip" | "attackClip", title: string) => (
     <div style={ROW} title={title}>
       <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>{label}</span>
@@ -5912,6 +5933,18 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
           {clipRow("IDLE CLIP", "idleClip", "Played while standing guard")}
           {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}
           {clipRow("ATTACK CLIP", "attackClip", "Played once per bite (auto also matches 'bite')")}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
+          <div style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, marginBottom: 6 }}>SOUNDS</div>
+          {soundRow("ON DETECT", "detectSound", "detectVolume",
+            "Plays once when the enemy notices the player (alert / growl)")}
+          {soundRow("WHILE WALKING", "walkSound", "walkVolume",
+            "Loops while the enemy is actually moving (chasing or walking home); stops when it stands still")}
+          {soundRow("ON ATTACK", "attackSound", "attackVolume",
+            "Plays at the start of every bite")}
+          <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.4 }}>
+            All three are 3D sounds that follow the enemy. VOL 1 plays the clip at its
+            own level; higher boosts (up to 4). Empty slots are silent.
+          </div>
         </>
       )}
     </div>

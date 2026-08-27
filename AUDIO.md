@@ -105,6 +105,17 @@ ref distance / max distance.
   sound at the player's feet is a few metres from the ear, so positional sounds are
   always somewhat quieter than the editor ▶ preview, which plays flat at full volume.
 
+## 3b. Enemy AI sounds (detect / walk / attack)
+
+An AI-enabled enemy (object → Enemy AI screen → SOUNDS) has three optional
+slots: **ON DETECT** plays once the moment it acquires the player, **WHILE
+WALKING** loops only while it's actually moving (stops when it stands still,
+bites, or dies), **ON ATTACK** plays at each bite start. All three are 3D
+sounds parented to the enemy's mesh — they follow it as it chases — with the
+emitter falloff (full inside 1m, silent at 20m) and the standard VOL semantics
+(empty = clip level, >1 boosts, cap 4). Stored in the enemy's `ai` config, so
+prefabs carry them. Exported games ship the referenced clips automatically.
+
 ## 4. Character locomotion sounds (footsteps / jump / land)
 
 The player makes its own noise. Deselect everything → Properties **Audio** row →
