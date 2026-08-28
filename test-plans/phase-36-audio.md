@@ -103,3 +103,16 @@ Type a TRIM START/END value and click ▶ Play **immediately, without
 tabbing/clicking away first** — the preview must play the trimmed range and
 the duration readout must already show it while typing. Decimals still type
 cleanly ("0.5" keeps its dot). Import → the saved WAV uses the on-screen trim.
+
+### v4.79.41 — multi-take recorder
+
+1. ● Record → ■ Stop twice: two "Take N" rows, newest picked (●), each with
+   duration, ▶, ✕. "● Record another" stays available.
+2. Trim the picked take, then pick the other row: the TRIM fields swap to that
+   take's own values; switch back — the first take's trim was remembered.
+3. ▶ on a non-picked row previews that take (its trim applied) without moving
+   the pick; the row's button shows ⏹ while playing.
+4. ✕ the picked take → the pick falls to a remaining take; deleting the last
+   take returns to the empty "Ready" state.
+5. NAME + Import → the importer receives the PICKED take trimmed (check the
+   duration in the preview/HUD). Import is disabled mid-recording.

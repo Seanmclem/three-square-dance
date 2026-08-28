@@ -12,7 +12,7 @@ const OVERLAY: React.CSSProperties = {
 };
 const CARD: React.CSSProperties = {
   background: "rgba(28,28,28,0.99)", border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 8, padding: "20px 24px", width: 360,
+  borderRadius: 8, padding: "20px 24px", width: 380,
   boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
   display: "flex", flexDirection: "column", gap: 14,
   color: "#c2cadb", fontFamily: "monospace",
@@ -67,38 +67,49 @@ function bufferToWav(buf: AudioBuffer, startSec: number, endSec: number): Blob {
   return new Blob([ab], { type: "audio/wav" });
 }
 
+/** One recorded take. Trim fields are STRING state on text inputs
+ *  (inputMode=decimal): commits on every keystroke so ▶ always plays the
+ *  current trim, and typing "0.5" survives (a controlled type=number reports
+ *  "" mid-decimal and eats the dot). Numeric values are derived per render. */
+interface Take {
+  id: number;
+  buf: AudioBuffer;
+  trimStartStr: string;
+  trimEndStr: string;
+}
+const takeTrims = (t: Take) => {
+  const trimStart = Math.max(0, parseFloat(t.trimStartStr) || 0);
+  const trimEnd   = Math.max(0, parseFloat(t.trimEndStr) || 0);
+  return { trimStart, trimEnd, trimmedDur: Math.max(0, t.buf.duration - trimStart - trimEnd) };
+};
+
 /**
- * Record a sound with the microphone, preview it (trim-aware), trim silence off
- * either end, and hand the result to the normal audio import pipeline (metadata
- * step + manifest write) as a .wav file. Editor-only.
+ * Record sounds with the microphone — as many takes as you like. Each take is
+ * previewable (trim-aware) with its own trim; pick one and hand it to the
+ * normal audio import pipeline (metadata step + manifest write) as a .wav
+ * file. Editor-only.
  */
 export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalProps) {
-  const [phase, setPhase] = useState<"idle" | "recording" | "recorded">("idle");
+  const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [name, setName] = useState("recording");
-  // Trim fields are STRING state on text inputs (inputMode=decimal): commits on
-  // every keystroke so ▶ always plays the current trim (blur-commit made Play
-  // read stale values), and typing "0.5" survives (a controlled type=number
-  // reports "" mid-decimal and eats the dot — the original v4.79.36 bug).
-  const [trimStartStr, setTrimStartStr] = useState("0");
-  const [trimEndStr, setTrimEndStr] = useState("0");
-  const trimStart = Math.max(0, parseFloat(trimStartStr) || 0);
-  const trimEnd   = Math.max(0, parseFloat(trimEndStr) || 0);
-  const [playing, setPlaying] = useState(false);
+  const [takes, setTakes] = useState<Take[]>([]);
+  const [selId, setSelId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
 
   const recRef    = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const bufRef    = useRef<AudioBuffer | null>(null);
   const ctxRef    = useRef<AudioContext | null>(null);
   const srcRef    = useRef<AudioBufferSourceNode | null>(null);
   const timerRef  = useRef<number | null>(null);
+  const nextIdRef = useRef(1);
 
   const stopPlayback = () => {
     try { srcRef.current?.stop(); } catch { /* not started */ }
     srcRef.current = null;
-    setPlaying(false);
+    setPlayingId(null);
   };
   const releaseMic = () => {
     streamRef.current?.getTracks().forEach(t => t.stop());
@@ -133,49 +144,62 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
       releaseMic();
       if (deadRef.current) return;   // modal closed mid-recording
       if (timerRef.current != null) { clearInterval(timerRef.current); timerRef.current = null; }
+      setRecording(false);
       try {
         const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
         const ctx = (ctxRef.current ??= new AudioContext());
-        bufRef.current = await ctx.decodeAudioData(await blob.arrayBuffer());
-        setTrimStartStr("0"); setTrimEndStr("0");
-        setPhase("recorded");
+        const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
+        const id = nextIdRef.current++;
+        setTakes(t => [...t, { id, buf, trimStartStr: "0", trimEndStr: "0" }]);
+        setSelId(id);   // newest take starts picked
       } catch {
         setError("Recording could not be decoded — try again.");
-        setPhase("idle");
       }
     };
     rec.start();
     setElapsed(0);
     const t0 = performance.now();
     timerRef.current = window.setInterval(() => setElapsed((performance.now() - t0) / 1000), 100);
-    setPhase("recording");
+    setRecording(true);
   };
 
   const stopRecording = () => { try { recRef.current?.stop(); } catch { /* not recording */ } };
 
-  const dur = bufRef.current?.duration ?? 0;
-  const trimmedDur = Math.max(0, dur - trimStart - trimEnd);
-
-  const playPreview = () => {
-    const buf = bufRef.current;
-    if (!buf || trimmedDur <= 0) return;
+  const playTake = (take: Take) => {
+    const { trimStart, trimmedDur } = takeTrims(take);
+    if (trimmedDur <= 0) return;
     stopPlayback();
     const ctx = (ctxRef.current ??= new AudioContext());
     if (ctx.state === "suspended") void ctx.resume();
     const src = ctx.createBufferSource();
-    src.buffer = buf;
+    src.buffer = take.buf;
     src.connect(ctx.destination);
-    src.onended = () => setPlaying(false);
-    src.start(0, trimStart, trimmedDur);   // preview exactly what will be saved
+    src.onended = () => setPlayingId(p => (p === take.id ? null : p));
+    src.start(0, trimStart, trimmedDur);   // preview exactly what would be saved
     srcRef.current = src;
-    setPlaying(true);
+    setPlayingId(take.id);
   };
 
-  const save = () => {
-    const buf = bufRef.current;
-    if (!buf || trimmedDur <= 0) return;
+  const patchTake = (id: number, patch: Partial<Take>) => {
     stopPlayback();
-    const wav = bufferToWav(buf, trimStart, trimEnd);
+    setTakes(t => t.map(x => (x.id === id ? { ...x, ...patch } : x)));
+  };
+  const deleteTake = (id: number) => {
+    stopPlayback();
+    setTakes(t => {
+      const rest = t.filter(x => x.id !== id);
+      if (selId === id) setSelId(rest.length ? rest[rest.length - 1]!.id : null);
+      return rest;
+    });
+  };
+
+  const selected = takes.find(t => t.id === selId) ?? null;
+  const selTrims = selected ? takeTrims(selected) : null;
+
+  const save = () => {
+    if (!selected || !selTrims || selTrims.trimmedDur <= 0) return;
+    stopPlayback();
+    const wav = bufferToWav(selected.buf, selTrims.trimStart, selTrims.trimEnd);
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "recording";
     onRecorded(new File([wav], `${slug}.wav`, { type: "audio/wav" }));
   };
@@ -189,49 +213,73 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
 
         {error && <div style={{ color: "#cc6666", fontSize: 11, lineHeight: 1.4 }}>{error}</div>}
 
-        {phase !== "recorded" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {phase === "recording" ? (
-              <>
-                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#e05555", flexShrink: 0 }} />
-                <span style={{ fontSize: 12 }}>{fmt(elapsed)}</span>
-                <span style={{ flex: 1 }} />
-                <button style={BTN("danger")} onClick={stopRecording}>■ Stop</button>
-              </>
-            ) : (
-              <>
-                <span style={{ color: "#8b94a8", fontSize: 11 }}>Ready — recording starts immediately.</span>
-                <span style={{ flex: 1 }} />
-                <button style={BTN("record")} onClick={() => void startRecording()}>● Record</button>
-              </>
-            )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {recording ? (
+            <>
+              <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#e05555", flexShrink: 0 }} />
+              <span style={{ fontSize: 12 }}>{fmt(elapsed)}</span>
+              <span style={{ flex: 1 }} />
+              <button style={BTN("danger")} onClick={stopRecording}>■ Stop</button>
+            </>
+          ) : (
+            <>
+              <span style={{ color: "#8b94a8", fontSize: 11 }}>
+                {takes.length === 0 ? "Ready — recording starts immediately." : `${takes.length} take${takes.length > 1 ? "s" : ""} — pick one to import.`}
+              </span>
+              <span style={{ flex: 1 }} />
+              <button style={BTN("record")} onClick={() => void startRecording()}>
+                {takes.length === 0 ? "● Record" : "● Record another"}
+              </button>
+            </>
+          )}
+        </div>
+
+        {takes.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+            {takes.map(t => {
+              const { trimStart, trimEnd, trimmedDur } = takeTrims(t);
+              const picked = t.id === selId;
+              return (
+                <div key={t.id}
+                  onClick={() => { if (!picked) { stopPlayback(); setSelId(t.id); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "5px 8px",
+                    borderRadius: 4, cursor: picked ? "default" : "pointer",
+                    background: picked ? "rgba(80,140,255,0.10)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${picked ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.07)"}`,
+                  }}>
+                  <span style={{ fontSize: 11, color: picked ? "#80aaff" : "#666e80", width: 12 }}>{picked ? "●" : "○"}</span>
+                  <span style={{ fontSize: 11, color: picked ? "#dde3f0" : "#98a2b8" }}>Take {t.id}</span>
+                  <span style={{ fontSize: 10, color: "#8a92a6" }}>
+                    {fmt(trimmedDur)}{trimStart || trimEnd ? ` (of ${fmt(t.buf.duration)})` : ""}
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <button style={{ ...BTN("ghost"), padding: "2px 8px" }} disabled={trimmedDur <= 0}
+                    title={playingId === t.id ? "Stop" : "Preview this take (trim applied)"}
+                    onClick={e => { e.stopPropagation(); playingId === t.id ? stopPlayback() : playTake(t); }}>
+                    {playingId === t.id ? "⏹" : "▶"}
+                  </button>
+                  <button style={{ ...BTN("ghost"), padding: "2px 8px", color: "#cc6666" }}
+                    title="Delete this take"
+                    onClick={e => { e.stopPropagation(); deleteTake(t.id); }}>✕</button>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {phase === "recorded" && bufRef.current && (
+        {selected && selTrims && (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button style={BTN("primary")} onClick={() => playing ? stopPlayback() : playPreview()}>
-                {playing ? "⏹ Stop" : "▶ Play"}
-              </button>
-              <span style={{ fontSize: 11, color: "#98a2b8" }}>
-                {fmt(trimmedDur)}{trimStart || trimEnd ? ` (of ${fmt(dur)})` : ""}
-              </span>
-              <span style={{ flex: 1 }} />
-              <button style={BTN("record")} title="Discard this take and record a new one"
-                onClick={() => void startRecording()}>● Re-record</button>
-            </div>
-
             <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
               <div>
                 <div style={{ ...LABEL, marginBottom: 3 }}>TRIM START (s)</div>
-                <input inputMode="decimal" style={NUM} value={trimStartStr}
-                  onChange={e => { setTrimStartStr(e.target.value); stopPlayback(); }} />
+                <input inputMode="decimal" style={NUM} value={selected.trimStartStr}
+                  onChange={e => patchTake(selected.id, { trimStartStr: e.target.value })} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 3 }}>TRIM END (s)</div>
-                <input inputMode="decimal" style={NUM} value={trimEndStr}
-                  onChange={e => { setTrimEndStr(e.target.value); stopPlayback(); }} />
+                <input inputMode="decimal" style={NUM} value={selected.trimEndStr}
+                  onChange={e => patchTake(selected.id, { trimEndStr: e.target.value })} />
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ ...LABEL, marginBottom: 3 }}>NAME</div>
@@ -239,21 +287,21 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
                   onChange={e => setName(e.target.value)} />
               </div>
             </div>
-            {trimmedDur <= 0 && (
+            {selTrims.trimmedDur <= 0 && (
               <div style={{ color: "#ccaa44", fontSize: 10 }}>⚠ Trim exceeds the recording length.</div>
             )}
             <div style={{ color: "#8a92a6", fontSize: 9, lineHeight: 1.4 }}>
-              ▶ Play previews exactly what will be saved. Import opens the normal
-              sound-import step (category, tags, attribution) with this recording
-              as a .wav file.
+              Trim edits the picked take (each take remembers its own). ▶ previews
+              exactly what would be saved. Import sends the picked take to the
+              normal sound-import step (category, tags, attribution) as a .wav.
             </div>
           </>
         )}
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button style={BTN("ghost")} onClick={onClose}>Cancel</button>
-          <button style={BTN("primary", phase === "recorded" && trimmedDur > 0)}
-            disabled={phase !== "recorded" || trimmedDur <= 0}
+          <button style={BTN("primary", !!selTrims && selTrims.trimmedDur > 0 && !recording)}
+            disabled={!selTrims || selTrims.trimmedDur <= 0 || recording}
             onClick={save}>Import →</button>
         </div>
       </div>
