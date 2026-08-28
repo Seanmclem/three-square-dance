@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
@@ -128,24 +128,34 @@ export function LeftPanel({
   );
   const [resizing, setResizing] = useState(false);
 
+  // The drag is tracked on WINDOW while resizing, and ends on ANY pointerup /
+  // pointercancel / window blur (v4.79.48). It used to rely on pointer capture
+  // delivering pointerup to the 6px handle — a release outside the shell
+  // window (or a cancelled pointer) never arrived, `resizing` stuck at true,
+  // and the handle then followed every hover across the panel ("it keeps
+  // collapsing when I only move the mouse over it").
   function onResizeDown(e: React.PointerEvent<HTMLDivElement>): void {
     e.preventDefault();
-    (e.target as HTMLDivElement).setPointerCapture(e.pointerId);
     setResizing(true);
   }
-  function onResizeMove(e: React.PointerEvent<HTMLDivElement>): void {
+  useEffect(() => {
     if (!resizing) return;
-    setWidth(Math.min(600, Math.max(280, e.clientX - 64)));
-  }
-  function onResizeUp(e: React.PointerEvent<HTMLDivElement>): void {
-    if (!resizing) return;
-    (e.target as HTMLDivElement).releasePointerCapture(e.pointerId);
-    setResizing(false);
-    setWidth((w) => {
-      localStorage.setItem("wb_leftpanel_w", String(w));
-      return w;
-    });
-  }
+    const move = (e: PointerEvent) => setWidth(Math.min(600, Math.max(280, e.clientX - 64)));
+    const end = () => {
+      setResizing(false);
+      setWidth((w) => { localStorage.setItem("wb_leftpanel_w", String(w)); return w; });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end, true);
+    window.addEventListener("pointercancel", end, true);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end, true);
+      window.removeEventListener("pointercancel", end, true);
+      window.removeEventListener("blur", end);
+    };
+  }, [resizing]);
 
   return (
     <div id="wb-leftpanel" style={{
@@ -314,8 +324,6 @@ export function LeftPanel({
           <div
             title="Drag to resize the panel"
             onPointerDown={onResizeDown}
-            onPointerMove={onResizeMove}
-            onPointerUp={onResizeUp}
             style={{
               position: "absolute",
               right: 0,

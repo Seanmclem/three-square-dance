@@ -21,3 +21,10 @@
 7. Open a pre-existing script that had a per-action ONLY IF: it shows as a one-branch block;
    any edit saves the new shape; an unedited one stays byte-identical on disk.
 8. Delete the script; the scene file is unchanged from before the test.
+
+### v4.79.48 — resize handle + set_state VALUE line
+
+Drag the left panel's right edge, release with the mouse OUTSIDE the app
+window (or over the 3D view), then move back over the panel: it must NOT keep
+resizing. The width persists across reloads. A `set_state` action shows WHOSE
+STATE + STATE KEY on one line and VALUE full-width below, nothing clipped.

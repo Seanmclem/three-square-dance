@@ -2835,7 +2835,7 @@ function ActionFields({
               onChange={(v) => set({ stateKey: v })}
             />
           </F>
-          <F label="Value" flex={1}>
+          <F label="Value" flex="1 1 100%">
             {resolvedKeyType === "boolean" ? (
               <select style={S.select}
                 value={action.stateValue === true ? "true" : action.stateValue === false ? "false"
