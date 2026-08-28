@@ -12,7 +12,7 @@ const OVERLAY: React.CSSProperties = {
 };
 const CARD: React.CSSProperties = {
   background: "rgba(28,28,28,0.99)", border: "1px solid rgba(255,255,255,0.1)",
-  borderRadius: 8, padding: "20px 24px", width: 380,
+  borderRadius: 8, padding: "20px 24px", width: 420,
   boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
   display: "flex", flexDirection: "column", gap: 14,
   color: "#c2cadb", fontFamily: "monospace",
@@ -74,8 +74,23 @@ function bufferToWav(buf: AudioBuffer, startSec: number, endSec: number): Blob {
 interface Take {
   id: number;
   buf: AudioBuffer;
+  peaks: number[];       // 0..1 envelope, PEAK_N buckets — the row's waveform
   trimStartStr: string;
   trimEndStr: string;
+}
+const PEAK_N = 64;
+function computePeaks(buf: AudioBuffer): number[] {
+  const d = buf.getChannelData(0);
+  const per = Math.max(1, Math.floor(d.length / PEAK_N));
+  const out: number[] = [];
+  let max = 0;
+  for (let b = 0; b < PEAK_N; b++) {
+    let m = 0;
+    const from = b * per, to = Math.min(d.length, from + per);
+    for (let i = from; i < to; i += 4) { const a = Math.abs(d[i]!); if (a > m) m = a; }
+    out.push(m); if (m > max) max = m;
+  }
+  return max > 0 ? out.map(v => v / max) : out;   // normalize so quiet takes still read
 }
 const takeTrims = (t: Take) => {
   const trimStart = Math.max(0, parseFloat(t.trimStartStr) || 0);
@@ -150,7 +165,7 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
         const ctx = (ctxRef.current ??= new AudioContext());
         const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
         const id = nextIdRef.current++;
-        setTakes(t => [...t, { id, buf, trimStartStr: "0", trimEndStr: "0" }]);
+        setTakes(t => [...t, { id, buf, peaks: computePeaks(buf), trimStartStr: "0", trimEndStr: "0" }]);
         setSelId(id);   // newest take starts picked
       } catch {
         setError("Recording could not be decoded — try again.");
@@ -235,33 +250,58 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
         </div>
 
         {takes.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 180, overflowY: "auto" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 260, overflowY: "auto" }}>
             {takes.map(t => {
               const { trimStart, trimEnd, trimmedDur } = takeTrims(t);
               const picked = t.id === selId;
+              const dur = t.buf.duration;
+              const cutL = dur > 0 ? Math.min(1, trimStart / dur) : 0;   // trimmed fractions, shaded on the waveform
+              const cutR = dur > 0 ? Math.min(1, trimEnd / dur) : 0;
+              const W = 120, H = 18;
               return (
                 <div key={t.id}
                   onClick={() => { if (!picked) { stopPlayback(); setSelId(t.id); } }}
                   style={{
-                    display: "flex", alignItems: "center", gap: 8, padding: "5px 8px",
+                    display: "flex", flexDirection: "column", gap: 4, padding: "5px 8px",
                     borderRadius: 4, cursor: picked ? "default" : "pointer",
                     background: picked ? "rgba(80,140,255,0.10)" : "rgba(255,255,255,0.03)",
                     border: `1px solid ${picked ? "rgba(80,140,255,0.35)" : "rgba(255,255,255,0.07)"}`,
                   }}>
-                  <span style={{ fontSize: 11, color: picked ? "#80aaff" : "#666e80", width: 12 }}>{picked ? "●" : "○"}</span>
-                  <span style={{ fontSize: 11, color: picked ? "#dde3f0" : "#98a2b8" }}>Take {t.id}</span>
-                  <span style={{ fontSize: 10, color: "#8a92a6" }}>
-                    {fmt(trimmedDur)}{trimStart || trimEnd ? ` (of ${fmt(t.buf.duration)})` : ""}
-                  </span>
-                  <span style={{ flex: 1 }} />
-                  <button style={{ ...BTN("ghost"), padding: "2px 8px" }} disabled={trimmedDur <= 0}
-                    title={playingId === t.id ? "Stop" : "Preview this take (trim applied)"}
-                    onClick={e => { e.stopPropagation(); playingId === t.id ? stopPlayback() : playTake(t); }}>
-                    {playingId === t.id ? "⏹" : "▶"}
-                  </button>
-                  <button style={{ ...BTN("ghost"), padding: "2px 8px", color: "#cc6666" }}
-                    title="Delete this take"
-                    onClick={e => { e.stopPropagation(); deleteTake(t.id); }}>✕</button>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: picked ? "#80aaff" : "#666e80", width: 12 }}>{picked ? "●" : "○"}</span>
+                    <span style={{ fontSize: 11, color: picked ? "#dde3f0" : "#98a2b8", whiteSpace: "nowrap" }}>Take {t.id}</span>
+                    <svg width={W} height={H} style={{ flexShrink: 0, background: "rgba(0,0,0,0.25)", borderRadius: 2 }}
+                      aria-label="waveform">
+                      {t.peaks.map((v, i) => {
+                        const h = Math.max(1, v * (H - 2));
+                        return <rect key={i} x={(i * W) / PEAK_N} y={(H - h) / 2} width={Math.max(1, W / PEAK_N - 0.5)} height={h}
+                          fill={picked ? "#80aaff" : "#8b94a8"} />;
+                      })}
+                      {cutL > 0 && <rect x={0} y={0} width={cutL * W} height={H} fill="rgba(20,20,20,0.8)" />}
+                      {cutR > 0 && <rect x={W - cutR * W} y={0} width={cutR * W} height={H} fill="rgba(20,20,20,0.8)" />}
+                    </svg>
+                    <span style={{ fontSize: 10, color: "#8a92a6", whiteSpace: "nowrap" }}>
+                      {fmt(trimmedDur)}{trimStart || trimEnd ? ` (of ${fmt(dur)})` : ""}
+                    </span>
+                    <span style={{ flex: 1 }} />
+                    <button style={{ ...BTN("ghost"), padding: "2px 8px" }} disabled={trimmedDur <= 0}
+                      title={playingId === t.id ? "Stop" : "Preview this take (trim applied)"}
+                      onClick={e => { e.stopPropagation(); playingId === t.id ? stopPlayback() : playTake(t); }}>
+                      {playingId === t.id ? "⏹" : "▶"}
+                    </button>
+                    <button style={{ ...BTN("ghost"), padding: "2px 8px", color: "#cc6666" }}
+                      title="Delete this take"
+                      onClick={e => { e.stopPropagation(); deleteTake(t.id); }}>✕</button>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 20 }}>
+                    <span style={LABEL}>TRIM START (s)</span>
+                    <input inputMode="decimal" style={{ ...NUM, width: 48 }} value={t.trimStartStr}
+                      onChange={e => patchTake(t.id, { trimStartStr: e.target.value })} />
+                    <span style={{ ...LABEL, marginLeft: 6 }}>END (s)</span>
+                    <input inputMode="decimal" style={{ ...NUM, width: 48 }} value={t.trimEndStr}
+                      onChange={e => patchTake(t.id, { trimEndStr: e.target.value })} />
+                    {trimmedDur <= 0 && <span style={{ color: "#ccaa44", fontSize: 10, marginLeft: 6 }}>⚠ trim exceeds length</span>}
+                  </div>
                 </div>
               );
             })}
@@ -270,29 +310,14 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
 
         {selected && selTrims && (
           <>
-            <div style={{ display: "flex", gap: 12, alignItems: "flex-end" }}>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 3 }}>TRIM START (s)</div>
-                <input inputMode="decimal" style={NUM} value={selected.trimStartStr}
-                  onChange={e => patchTake(selected.id, { trimStartStr: e.target.value })} />
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 3 }}>TRIM END (s)</div>
-                <input inputMode="decimal" style={NUM} value={selected.trimEndStr}
-                  onChange={e => patchTake(selected.id, { trimEndStr: e.target.value })} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ ...LABEL, marginBottom: 3 }}>NAME</div>
-                <input style={{ ...NUM, width: "100%" }} value={name}
-                  onChange={e => setName(e.target.value)} />
-              </div>
+            <div>
+              <div style={{ ...LABEL, marginBottom: 3 }}>NAME</div>
+              <input style={{ ...NUM, width: "100%" }} value={name}
+                onChange={e => setName(e.target.value)} />
             </div>
-            {selTrims.trimmedDur <= 0 && (
-              <div style={{ color: "#ccaa44", fontSize: 10 }}>⚠ Trim exceeds the recording length.</div>
-            )}
             <div style={{ color: "#8a92a6", fontSize: 9, lineHeight: 1.4 }}>
-              Trim edits the picked take (each take remembers its own). ▶ previews
-              exactly what would be saved. Import sends the picked take to the
+              Each take has its own trim; ▶ previews that take exactly as it would be
+              saved (shaded = trimmed off). Import sends the picked (●) take to the
               normal sound-import step (category, tags, attribution) as a .wav.
             </div>
           </>

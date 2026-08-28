@@ -116,3 +116,11 @@ cleanly ("0.5" keeps its dot). Import → the saved WAV uses the on-screen trim.
    take returns to the empty "Ready" state.
 5. NAME + Import → the importer receives the PICKED take trimmed (check the
    duration in the preview/HUD). Import is disabled mid-recording.
+
+### v4.79.42 — per-row trim + waveform
+
+Record two clearly different takes (e.g. a word vs. a clap): each row shows a
+different waveform. Each row has its own TRIM START/END; typing a trim shades
+that portion of ITS waveform only and updates ITS duration. ▶ on each row plays
+that row's audio. If two real takes ever sound identical, compare the
+waveforms — identical pictures mean the capture repeated, not the player.
