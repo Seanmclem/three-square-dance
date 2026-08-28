@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 interface ScriptDetachDialogProps {
   scriptCount:   number;
   entityLabel:   string;   // "trigger volume" | "object"
@@ -42,6 +43,7 @@ const S = {
 export function ScriptDetachDialog({
   scriptCount, entityLabel, onDeleteAll, onKeepScripts, onCancel,
 }: ScriptDetachDialogProps) {
+  useEscapeClose(onCancel);
   const plural = scriptCount === 1 ? "script" : "scripts";
   return (
     <div style={S.overlay}>

@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useEffect, useState, useRef } from "react";
 import type { SoundDef, SoundCategory, SoundManifest, Attribution } from "@/types";
 import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
@@ -57,6 +58,7 @@ const STEP_LABEL: React.CSSProperties = {
 };
 
 export function AudioImporterModal({ existingTags, existingAttributions, existingCategories, initialFiles, onComplete, onClose }: Props) {
+  useEscapeClose(onClose);
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SoundEntry[]>([]);
   const [bulkNewCat,  setBulkNewCat]  = useState<string | null>(null);

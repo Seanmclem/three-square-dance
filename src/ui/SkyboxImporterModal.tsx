@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import type { SkyboxDef, SkyboxCategory, SkyboxManifest, Attribution } from "@/types";
 import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
@@ -47,6 +48,7 @@ const BTN = (active = true): React.CSSProperties => ({
 });
 
 export function SkyboxImporterModal({ onComplete, onClose }: Props) {
+  useEscapeClose(onClose);
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<SkyboxEntry[]>([]);
   const [progress, setProgress] = useState("");

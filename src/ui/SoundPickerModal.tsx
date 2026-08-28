@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState, useEffect, useRef } from "react";
 import type { SoundDef } from "@/types";
 import { assetManager } from "@/core/AssetManager";
@@ -53,6 +54,7 @@ export function SoundPickerModal({ title, onPick, onPickMulti, onClose }: SoundP
     if (multi && picked.length) onPickMulti!(picked);
     onClose();
   };
+  useEscapeClose(finish);
   const rowClick = (id: string) => {
     if (!multi) { onPick?.(id); return; }
     setPicked(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);

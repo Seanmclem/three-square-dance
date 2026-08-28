@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState } from "react";
 import type { Attribution } from "@/types";
 import { AttributionFields } from "@/ui/AttributionFields";
@@ -36,6 +37,7 @@ const S = {
 const NEW = "__new__";
 
 export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagSuggestions, onCancel, onSave }: EditMetadataDialogProps) {
+  useEscapeClose(onCancel);
   const bulk = items.length > 1;
 
   const [label,    setLabel]    = useState(initial.label);

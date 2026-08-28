@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useEffect, useRef, useState } from "react";
 
 interface SoundRecorderModalProps {
@@ -137,6 +138,7 @@ const takeTrims = (t: Take) => {
  * file. Editor-only.
  */
 export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalProps) {
+  useEscapeClose(onClose);
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);

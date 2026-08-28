@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import { materialImporter } from "@/editor/MaterialImporter";
 import type { DetectedMaps, ImportResult } from "@/editor/MaterialImporter";
@@ -71,6 +72,7 @@ function autoLabel(id: string): string {
 }
 
 export function MaterialImporterModal({ onComplete, onClose }: Props) {
+  useEscapeClose(onClose);
   const [materialId,   setMaterialId]   = useState("");
   const [label,        setLabel]        = useState("");
   const [category,     setCategory]     = useState<MaterialCategory>("Other");

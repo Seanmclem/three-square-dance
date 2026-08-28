@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState } from "react";
 
 interface DeleteAssetDialogProps {
@@ -42,6 +43,7 @@ export function DeleteAssetDialog({
   noun = "model", usageNoun = "placed object",
   usageEffect = "They will show as placeholder boxes until reassigned or removed.",
 }: DeleteAssetDialogProps) {
+  useEscapeClose(onCancel);
   const [deleteFiles, setDeleteFiles] = useState(false);
   const many   = labels.length !== 1;
   const sample = labels.slice(0, 6);

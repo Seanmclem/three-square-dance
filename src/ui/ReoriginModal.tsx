@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { AssetDef, Vec3 } from "@/types";
@@ -121,6 +122,7 @@ function styleMarkers(rig: MarkerRig, mode: Mode): void {
 }
 
 export function ReoriginModal({ asset, placedCount, onCancel, onApply }: Props) {
+  useEscapeClose(onCancel);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [bounds, setBounds] = useState<{ min: Vec3; center: Vec3 } | null>(null);
   const [mode,   setMode]   = useState<Mode>("base");

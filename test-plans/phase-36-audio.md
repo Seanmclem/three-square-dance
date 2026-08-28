@@ -136,3 +136,10 @@ modals; the in-game bag overlay still closes on click-anywhere by design.
 On a take row, click ▲ three times quickly → TRIM START reads 0.3 (not 0.1);
 ▼ → 0.2. Type "0.45" — it stays as typed and the duration updates. With the
 field focused, ArrowUp/ArrowDown step by 0.1. ▼ never goes below 0.
+
+### v4.79.45 — Esc closes modals
+
+Open the recorder (or any importer/dialog) and press Esc: it closes, and the
+editor does NOT also react (no tool disarm / preview exit). With nothing open,
+Esc behaves as before. Stack a confirm dialog over the prefab-instances dialog:
+Esc closes only the confirm.

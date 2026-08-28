@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import type { GraphicDef, GraphicsManifest, Attribution } from "@/types";
 import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
@@ -44,6 +45,7 @@ const BTN = (active = true): React.CSSProperties => ({
 });
 
 export function GraphicsImporterModal({ onComplete, onClose }: Props) {
+  useEscapeClose(onClose);
   const [phase,    setPhase]    = useState<Phase>("pick");
   const [entries,  setEntries]  = useState<GraphicEntry[]>([]);
   const [progress, setProgress] = useState("");

@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import { LoadingManager } from "three";
 import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
@@ -123,6 +124,7 @@ const STEP_LABEL: React.CSSProperties = {
 };
 
 export function ModelImporterModal({ existingTags, existingAttributions, onComplete, onClose }: Props) {
+  useEscapeClose(onClose);
   const [phase,      setPhase]      = useState<Phase>("pick");
   const [entries,    setEntries]    = useState<ModelEntry[]>([]);
   const [collidable,    setCollidable]    = useState(true);

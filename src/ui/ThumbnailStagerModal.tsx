@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import { useEffect, useRef, useState } from "react";
 import type { AssetDef } from "@/types";
 import { assetManager } from "@/core/AssetManager";
@@ -68,6 +69,7 @@ function NumField({ value, min, max, step, disabled, onCommit, width }: {
 }
 
 export function ThumbnailStagerModal({ asset, onCancel, onSave, onSaveIcon }: Props) {
+  useEscapeClose(onCancel);
   const [status,  setStatus]  = useState<"loading" | "ready" | "error">("loading");
   const [preview, setPreview] = useState<string | null>(null);
   const [params,  setParams]  = useState<StageParams>(DEFAULT_STAGE);

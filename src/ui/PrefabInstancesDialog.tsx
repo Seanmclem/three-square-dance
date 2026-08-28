@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 import type { Vec3 } from "@/types";
 
 export interface PrefabInstanceRow {
@@ -59,6 +60,7 @@ const S = {
 export function PrefabInstancesDialog({
   prefabName, rows, onGoTo, onDeleteRow, onDeletePrefab, onClose,
 }: PrefabInstancesDialogProps) {
+  useEscapeClose(onClose);
   const fmt = (n: number): string => String(Math.round(n * 10) / 10);
   return (
     <div style={S.overlay}>

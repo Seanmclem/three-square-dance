@@ -1,3 +1,4 @@
+import { useEscapeClose } from "./useEscapeClose";
 interface ConfirmDialogProps {
   title:        string;
   body:         string;
@@ -32,6 +33,7 @@ const S = {
 
 /** Generic small confirm (ScriptDetachDialog chrome). Backdrop click cancels. */
 export function ConfirmDialog({ title, body, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
+  useEscapeClose(onCancel);
   return (
     <div style={S.overlay}>
       <div style={S.card}>
