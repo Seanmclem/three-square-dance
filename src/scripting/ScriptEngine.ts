@@ -123,6 +123,30 @@ export function checkScriptConditions(conditions: ScriptCondition[], ownerId?: s
   return true;
 }
 
+/**
+ * Phase 65 — if-blocks. Choose each block's branch ONCE (first branch whose
+ * conditions pass; else the `else` branch if present; else nothing) and return
+ * the actions to dispatch: untagged actions always, tagged ones only when their
+ * block picked their branch. A tag pointing at a missing block is treated as
+ * untagged (lenient — unwrap semantics). Pure; shared with the editor's preview.
+ */
+export function selectBlockActions(s: Pick<ScriptDef, "actions" | "blocks">, ownerId?: string): ScriptAction[] {
+  if (!s.blocks?.length) return s.actions;
+  const chosen = new Map<string, number>();
+  for (const b of s.blocks) {
+    let pick = b.else ? -1 : Number.NaN;   // NaN never equals a branch index → nothing runs
+    for (let i = 0; i < b.branches.length; i++) {
+      if (checkScriptConditions(b.branches[i]!.conditions, ownerId)) { pick = i; break; }
+    }
+    chosen.set(b.id, pick);
+  }
+  return s.actions.filter(a => {
+    if (!a.block) return true;
+    const pick = chosen.get(a.block.id);
+    return pick === undefined ? true : pick === a.block.branch;
+  });
+}
+
 export class ScriptEngine {
   private _active       = false;
   // index: `${triggerType}:${targetId}` → scripts[]
@@ -251,7 +275,9 @@ export class ScriptEngine {
     const selfAction = (a: ScriptAction) => a.targetId === "self" || a.fromId === "self" || a.toId === "self";
     const hasSelf     = s.actions.some(selfAction);
     const hasSelfCond = (s.conditions ?? []).some(c => c.entityId === "self");
-    if (trig === s.trigger && !hasSelf && !hasSelfCond) return s;
+    const hasSelfBlock = (s.blocks ?? []).some(b => b.branches.some(br => br.conditions.some(c => c.entityId === "self")));
+    if (trig === s.trigger && !hasSelf && !hasSelfCond && !hasSelfBlock) return s;
+    const resolveCond = (c: ScriptCondition): ScriptCondition => c.entityId === "self" ? { ...c, entityId: ownerId } : c;
     const resolveAction = (a: ScriptAction): ScriptAction => !selfAction(a) ? a : {
       ...a,
       ...(a.targetId === "self" ? { targetId: ownerId } : {}),
@@ -262,7 +288,8 @@ export class ScriptEngine {
       ...s,
       trigger: trig,
       actions:    hasSelf     ? s.actions.map(resolveAction) : s.actions,
-      conditions: hasSelfCond ? s.conditions.map(c => c.entityId === "self" ? { ...c, entityId: ownerId } : c) : s.conditions,
+      conditions: hasSelfCond ? s.conditions.map(resolveCond) : s.conditions,
+      blocks:     hasSelfBlock ? s.blocks!.map(b => ({ ...b, branches: b.branches.map(br => ({ conditions: br.conditions.map(resolveCond) })) })) : s.blocks,
     };
   }
 
@@ -391,7 +418,9 @@ export class ScriptEngine {
     const ownerId = (t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact"
       || t.type === "on_player_detected" || t.type === "on_player_lost" || t.type === "on_enemy_attack")
       ? t.targetId : undefined;
-    this.runActions(s.actions, ownerId);
+    // Phase 65 — if-blocks pick their branch here: after the trigger delay,
+    // before per-action delays.
+    this.runActions(selectBlockActions(s, ownerId), ownerId);
   }
 
   /** Public so DialogueRunner can dispatch a chosen option's effects (no owner there). */

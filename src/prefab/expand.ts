@@ -112,6 +112,9 @@ export function remapScripts(scripts: ScriptDef[] | undefined, idMap: Map<string
       for (const cd of a.conditions ?? []) { cd.npcId = remap(cd.npcId); cd.entityId = remap(cd.entityId); }
     }
     for (const cd of c.conditions) { cd.npcId = remap(cd.npcId); cd.entityId = remap(cd.entityId); }
+    for (const b of c.blocks ?? [])   // Phase 65 — if-block branch conditions
+      for (const br of b.branches)
+        for (const cd of br.conditions) { cd.npcId = remap(cd.npcId); cd.entityId = remap(cd.entityId); }
     return c;
   });
 }

@@ -1413,7 +1413,8 @@ export interface DialogueTreeDef {
 export interface ScriptAction {
   type:          ActionType;
   delay?:        number;     // seconds after the script's actions start before THIS action runs (0/absent = immediate)
-  conditions?:   ScriptCondition[];   // per-action guard, evaluated AFTER the delay — all must pass or the action is skipped
+  conditions?:   ScriptCondition[];   // LEGACY per-action guard (pre-Phase 65), evaluated AFTER the delay — still honoured; the editor migrates it into a block
+  block?:        { id: string; branch: number };   // Phase 65 — this action belongs to ScriptDef.blocks[id], branch index (-1 = else)
   targetId?:     string;
   animation?:    string;
   animationLoop?: boolean;   // play_animation: loop the clip forever
@@ -1463,6 +1464,19 @@ export interface ScriptAction {
   restoreHealth?: boolean;    // respawn_player: re-seed 'health' to its schema default after the teleport
 }
 
+// Phase 65 — if-blocks. Actions stay a FLAT array (every consumer keeps working);
+// a block is a per-script row, and an action opts in via its `block` tag. A
+// block is evaluated ONCE when the script's actions start: the first branch
+// whose conditions pass wins ([0] = if, [1..] = else if), otherwise the else
+// branch (actions tagged branch -1) if `else` is set, otherwise nothing.
+// "unless" is the per-condition `not` flag inside any branch. One level only.
+export interface ScriptBranch  { conditions: ScriptCondition[] }
+export interface ScriptIfBlock {
+  id:       string;          // blk_<uuid8>, unique within the script
+  branches: ScriptBranch[];
+  else?:    boolean;
+}
+
 export interface ScriptDef {
   id:         string;
   label:      string;
@@ -1471,6 +1485,7 @@ export interface ScriptDef {
   trigger:    ScriptTrigger;
   conditions: ScriptCondition[];
   actions:    ScriptAction[];
+  blocks?:    ScriptIfBlock[];   // Phase 65
   oneShot:    boolean;
 }
 

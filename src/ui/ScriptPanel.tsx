@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
+  ScriptIfBlock,
   ScriptTrigger,
   ScriptAction,
   ScriptCondition,
@@ -232,6 +233,25 @@ function coerceStateValue(raw: string): JsonValue {
   return raw;
 }
 
+const newBlockId = (): string => `blk_${crypto.randomUUID().slice(0, 8)}`;
+
+/** Phase 65 — legacy per-action ONLY IF guards become one-branch if-blocks
+ *  (no else) tagged onto their action. Pure; returns the SAME object when
+ *  there is nothing to migrate, so untouched scripts stay byte-identical —
+ *  the new shape persists on the first edit. */
+function migrateActionGuards(script: ScriptDef): ScriptDef {
+  if (!script.actions.some(a => a.conditions?.length)) return script;
+  const blocks = [...(script.blocks ?? [])];
+  const actions = script.actions.map(a => {
+    if (!a.conditions?.length) return a;
+    const id = newBlockId();
+    blocks.push({ id, branches: [{ conditions: a.conditions }] });
+    const { conditions: _legacy, ...rest } = a;
+    return { ...rest, block: { id, branch: 0 } } as ScriptAction;
+  });
+  return { ...script, actions, blocks };
+}
+
 function blankScript(zoneId: string): ScriptDef {
   return {
     id: `scr_${crypto.randomUUID().slice(0, 8)}`,
@@ -444,15 +464,20 @@ export function ScriptPanel({
   // bindings, plus each item's counter shown by its label — so nobody has to
   // remember the inv.<id> convention.
   const scriptKeys: string[] = [];
-  const harvestRefs = (conditions?: ScriptCondition[], actions?: ScriptAction[]) => {
+  const harvestRefs = (conditions?: ScriptCondition[], actions?: ScriptAction[], blocks?: ScriptIfBlock[]) => {
     for (const c of conditions ?? []) if (c.stateKey) scriptKeys.push(c.stateKey);
-    for (const a of actions ?? [])
+    for (const a of actions ?? []) {
       for (const k of [a.stateKey, a.positionKey, a.facingKey]) if (k) scriptKeys.push(k);
+      for (const c of a.conditions ?? []) if (c.stateKey) scriptKeys.push(c.stateKey);   // legacy per-action guards
+    }
+    for (const b of blocks ?? [])   // Phase 65 — if-block branch conditions
+      for (const br of b.branches)
+        for (const c of br.conditions) if (c.stateKey) scriptKeys.push(c.stateKey);
   };
   const harvest = (scripts?: ScriptDef[]) => {
     for (const s of scripts ?? []) {
       if (s.trigger.type === "on_state_equals" && s.trigger.targetId) scriptKeys.push(s.trigger.targetId);
-      harvestRefs(s.conditions, s.actions);
+      harvestRefs(s.conditions, s.actions, s.blocks);
     }
   };
   harvest(zoneScripts);
@@ -944,6 +969,7 @@ function ScriptList({
                 {s.conditions.length > 0
                   ? ` · ${s.conditions.length} cond`
                   : ""}
+                {(s.blocks?.length ?? 0) > 0 ? ` · ${s.blocks!.length} if` : ""}
                 {` · ${s.actions.length} action${s.actions.length !== 1 ? "s" : ""}`}
               </div>
             </div>
@@ -1018,6 +1044,9 @@ function ScriptEditor({
   onChange: (s: ScriptDef) => void;
   onDelete: () => void;
 }) {
+  // Phase 65 — legacy per-action guards are shown (and, on first edit, saved)
+  // as if-blocks. Identity when there is nothing to migrate.
+  script = migrateActionGuards(script);
   function set<K extends keyof ScriptDef>(key: K, val: ScriptDef[K]): void {
     onChange({ ...script, [key]: val });
   }
@@ -1307,18 +1336,21 @@ function ScriptEditor({
 
         <div style={S.divider} />
 
-        {/* Actions */}
+        {/* Actions — plain rows and if-block cards (Phase 65), grouped in order of first appearance */}
         <div style={{ padding: "0 12px 8px" }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              gap: 4,
             }}
           >
             <span style={S.sectionLabel as React.CSSProperties}>Actions</span>
+            <span style={{ flex: 1 }} />
             <button
               style={{ ...S.btn(), fontSize: 10 }}
+              title="Add a top-level action (always runs)"
               onClick={() =>
                 set("actions", [
                   ...script.actions,
@@ -1328,50 +1360,113 @@ function ScriptEditor({
             >
               + Add
             </button>
+            <button
+              style={{ ...S.btn(), fontSize: 10, color: "#e8c14b" }}
+              title="Add an if-block: actions inside run only when its conditions pass; add else if / else branches"
+              onClick={() =>
+                set("blocks", [
+                  ...(script.blocks ?? []),
+                  { id: newBlockId(), branches: [{ conditions: [{ type: "has_state" } as ScriptCondition] }] },
+                ])
+              }
+            >
+              + If
+            </button>
           </div>
-          {script.actions.map((a, i) => (
-            <ActionRow
-              key={i}
-              action={a}
-              stateKeyTypes={stateKeyTypes}
-              zoneObjects={zoneObjects}
-              zonePlatforms={zonePlatforms}
-              zoneShapes={zoneShapes}
-              zoneLights={zoneLights}
-              zoneStairs={zoneStairs}
-              zoneWalls={zoneWalls}
-              zoneFloors={zoneFloors}
-              zoneCheckpoints={zoneCheckpoints}
-              triggerVolumes={triggerVolumes}
-              groups={groups}
-              assets={assets}
-              zoneDialogues={zoneDialogues}
-              worldItems={worldItems}
-              uiElements={uiElements}
-              projectSceneIds={projectSceneIds}
-              playerModelAssetId={playerModelAssetId}
-              owner={ownerIsEntity && selectedObjectId
-                ? { id: selectedObjectId, kind: selectedObjectId.startsWith("vol_") ? "volume" : "object" }
-                : undefined}
-              onChange={(na) =>
-                set(
-                  "actions",
-                  script.actions.map((x, j) => (j === i ? na : x)),
-                )
+          {(() => {
+            const blocks = script.blocks ?? [];
+            const condScope = {
+              zoneObjects, triggerVolumes,
+              allowSelf: ownerIsEntity && !!selectedObjectId,
+              selfLabel: `★ this ${selectedObjectId?.startsWith("vol_") ? "volume" : "object"}`,
+              ownerId: ownerIsEntity ? selectedObjectId ?? undefined : undefined,
+              stateKeyTypes,
+            };
+            const owner = ownerIsEntity && selectedObjectId
+              ? { id: selectedObjectId, kind: (selectedObjectId.startsWith("vol_") ? "volume" : "object") as "object" | "volume" }
+              : undefined;
+            const patchAction = (i: number, na: ScriptAction) => set("actions", script.actions.map((x, j) => (j === i ? na : x)));
+            const renderAction = (i: number) => {
+              const a = script.actions[i]!;
+              return (
+                <ActionRow
+                  key={i}
+                  action={a}
+                  blocks={blocks}
+                  stateKeyTypes={stateKeyTypes}
+                  zoneObjects={zoneObjects}
+                  zonePlatforms={zonePlatforms}
+                  zoneShapes={zoneShapes}
+                  zoneLights={zoneLights}
+                  zoneStairs={zoneStairs}
+                  zoneWalls={zoneWalls}
+                  zoneFloors={zoneFloors}
+                  zoneCheckpoints={zoneCheckpoints}
+                  triggerVolumes={triggerVolumes}
+                  groups={groups}
+                  assets={assets}
+                  zoneDialogues={zoneDialogues}
+                  worldItems={worldItems}
+                  uiElements={uiElements}
+                  projectSceneIds={projectSceneIds}
+                  playerModelAssetId={playerModelAssetId}
+                  owner={owner}
+                  onChange={(na) => patchAction(i, na)}
+                  onRemove={() => set("actions", script.actions.filter((_, j) => j !== i))}
+                  onWrap={a.block ? undefined : () => {
+                    // Wrap this action in a fresh if-block with one blank condition.
+                    const id = newBlockId();
+                    onChange({
+                      ...script,
+                      blocks: [...blocks, { id, branches: [{ conditions: [{ type: "has_state" } as ScriptCondition] }] }],
+                      actions: script.actions.map((x, j) => (j === i ? { ...x, block: { id, branch: 0 } } : x)),
+                    });
+                  }}
+                  onMove={(tag) => {
+                    const { block: _old, ...rest } = a;
+                    patchAction(i, tag ? { ...rest, block: tag } : (rest as ScriptAction));
+                  }}
+                />
+              );
+            };
+            // Groups in order of first appearance; blocks with no actions yet come last.
+            const rows: Array<{ kind: "action"; index: number } | { kind: "block"; block: ScriptIfBlock }> = [];
+            const seen = new Set<string>();
+            script.actions.forEach((a, i) => {
+              const blk = a.block ? blocks.find(b => b.id === a.block!.id) : undefined;
+              if (blk) {
+                if (!seen.has(blk.id)) { seen.add(blk.id); rows.push({ kind: "block", block: blk }); }
+              } else {
+                rows.push({ kind: "action", index: i });
               }
-              onRemove={() =>
-                set(
-                  "actions",
-                  script.actions.filter((_, j) => j !== i),
-                )
-              }
-            />
-          ))}
-          {script.actions.length === 0 && (
-            <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
-              (none)
-            </div>
-          )}
+            });
+            for (const blk of blocks) if (!seen.has(blk.id)) { seen.add(blk.id); rows.push({ kind: "block", block: blk }); }
+            if (rows.length === 0) {
+              return <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>(none)</div>;
+            }
+            return rows.map(g => g.kind === "action" ? renderAction(g.index) : (
+              <IfBlockCard
+                key={g.block.id}
+                block={g.block}
+                number={blocks.indexOf(g.block) + 1}
+                worldItems={worldItems}
+                scope={condScope}
+                renderActions={(branch) => script.actions.map((a, i) =>
+                  a.block?.id === g.block.id && a.block.branch === branch ? renderAction(i) : null)}
+                onChange={(nb) => set("blocks", blocks.map(b => (b.id === nb.id ? nb : b)))}
+                onAddAction={(branch) => set("actions", [...script.actions, { type: "set_state", block: { id: g.block.id, branch } } as ScriptAction])}
+                onUnwrap={() => onChange({
+                  ...script,
+                  blocks: blocks.filter(b => b.id !== g.block.id),
+                  actions: script.actions.map(a => {
+                    if (a.block?.id !== g.block.id) return a;
+                    const { block: _b, ...rest } = a;
+                    return rest as ScriptAction;
+                  }),
+                })}
+              />
+            ));
+          })()}
         </div>
 
         <div style={S.divider} />
@@ -2137,6 +2232,75 @@ function ItemPicker({
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
 
+/** Phase 65 — one if-block: IF / ELSE IF … / ELSE branches, each with the
+ *  same ConditionRows as script-level conditions and that branch's actions.
+ *  Dumb: the editor supplies the rendered action rows per branch. */
+function IfBlockCard({ block, number, worldItems, scope, renderActions, onChange, onAddAction, onUnwrap }: {
+  block: ScriptIfBlock;
+  number: number;
+  worldItems: ItemDef[];
+  scope: ConditionScope;
+  renderActions: (branch: number) => React.ReactNode;
+  onChange: (b: ScriptIfBlock) => void;
+  onAddAction: (branch: number) => void;
+  onUnwrap: () => void;
+}) {
+  const setBranch = (i: number, conditions: ScriptCondition[]) =>
+    onChange({ ...block, branches: block.branches.map((br, j) => (j === i ? { conditions } : br)) });
+  const branchRows = (label: string, branch: number, conditions: ScriptCondition[] | null, onRemoveBranch?: () => void) => (
+    <div key={branch} style={{ marginTop: branch === 0 ? 0 : 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+        <span style={{ color: "#e8c14b", fontSize: 10, fontFamily: "monospace", letterSpacing: 1 }}>{label}</span>
+        {conditions && (
+          <button style={{ ...S.btn(), fontSize: 10, padding: "2px 6px" }} title="Add a condition to this branch (all must pass; 'unless' inverts one)"
+            onClick={() => setBranch(branch, [...conditions, { type: "has_state" } as ScriptCondition])}>+ condition</button>
+        )}
+        <span style={{ flex: 1 }} />
+        {onRemoveBranch && (
+          <button style={{ ...S.btn(), fontSize: 10, padding: "2px 6px", color: "#cc6666" }}
+            title="Remove this branch — its actions move to the top level" onClick={onRemoveBranch}>× branch</button>
+        )}
+      </div>
+      {conditions && conditions.map((c, i) => (
+        <ConditionRow
+          key={i}
+          condition={c}
+          worldItems={worldItems}
+          scope={scope}
+          onChange={(nc) => setBranch(branch, conditions.map((x, j) => (j === i ? nc : x)))}
+          onRemove={() => setBranch(branch, conditions.filter((_, j) => j !== i))}
+        />
+      ))}
+      {conditions && conditions.length === 0 && (
+        <div style={{ color: "#ccaa44", fontSize: 10, padding: "2px 0 4px" }}>⚠ no conditions — this branch always passes</div>
+      )}
+      <div style={{ paddingLeft: 5, borderLeft: "2px solid rgba(232,193,75,0.35)" }}>
+        {renderActions(branch)}
+        <button style={{ ...S.btn(), fontSize: 10, marginBottom: 4 }} title="Add an action to this branch"
+          onClick={() => onAddAction(branch)}>+ action here</button>
+      </div>
+    </div>
+  );
+  return (
+    <div style={{ background: "rgba(232,193,75,0.05)", border: "1px solid rgba(232,193,75,0.3)", borderRadius: 4, padding: "6px 8px", marginBottom: 6 }}>
+      {block.branches.map((br, i) => branchRows(i === 0 ? `IF #${number}` : `ELSE IF #${number}.${i}`, i, br.conditions,
+        i === 0 ? undefined : () => onChange({ ...block, branches: block.branches.filter((_, j) => j !== i) })))}
+      {block.else && branchRows(`ELSE #${number}`, -1, null, () => onChange({ ...block, else: false }))}
+      <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+        <button style={{ ...S.btn(), fontSize: 10 }} title="Add an else-if branch (checked only when the branches above fail)"
+          onClick={() => onChange({ ...block, branches: [...block.branches, { conditions: [{ type: "has_state" } as ScriptCondition] }] })}>+ else if</button>
+        {!block.else && (
+          <button style={{ ...S.btn(), fontSize: 10 }} title="Add an else branch (runs when every branch above fails)"
+            onClick={() => onChange({ ...block, else: true })}>+ else</button>
+        )}
+        <span style={{ flex: 1 }} />
+        <button style={{ ...S.btn(), fontSize: 10, color: "#8b94a8" }} title="Remove the block — its actions become top-level (nothing is deleted)"
+          onClick={onUnwrap}>unwrap</button>
+      </div>
+    </div>
+  );
+}
+
 function ActionRow({
   action,
   stateKeyTypes,
@@ -2157,6 +2321,9 @@ function ActionRow({
   projectSceneIds,
   playerModelAssetId,
   owner,
+  blocks,
+  onWrap,
+  onMove,
   onChange,
   onRemove,
 }: {
@@ -2179,6 +2346,9 @@ function ActionRow({
   playerModelAssetId?: string;
   owner?: { id: string; kind: "object" | "volume" };
   stateKeyTypes?: Record<string, StateSchema["type"]>;
+  blocks?: ScriptIfBlock[];                               // Phase 65 — destinations for "move to"
+  onWrap?: () => void;                                     // wrap this (top-level) action in a new if-block
+  onMove?: (tag: { id: string; branch: number } | undefined) => void;
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
@@ -2228,13 +2398,36 @@ function ActionRow({
             onChange={(e) => onChange({ ...action, delay: e.target.value === "" ? undefined : Number(e.target.value) })}
           />
         </F>
-        <button
-          style={{ ...S.btn(), padding: "6px 6px", color: (action.conditions?.length ?? 0) > 0 ? "#e8c14b" : "#8b94a8" }}
-          title="Guard this action with conditions — it only runs (after its delay) if they all pass"
-          onClick={() => onChange({ ...action, conditions: [...(action.conditions ?? []), { type: "has_state" } as ScriptCondition] })}
-        >
-          if
-        </button>
+        {onWrap && (
+          <button
+            style={{ ...S.btn(), padding: "6px 6px", color: "#e8c14b" }}
+            title="Wrap this action in an if-block — add more actions, else if, or else to it"
+            onClick={onWrap}
+          >
+            if
+          </button>
+        )}
+        {onMove && blocks && blocks.length > 0 && (
+          <select
+            style={{ ...S.select, flex: "0 0 auto", width: 58, fontSize: 9, padding: "6px 2px" }}
+            title="Move this action to the top level or into an if-block branch"
+            value={action.block ? `${action.block.id}:${action.block.branch}` : ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) { onMove(undefined); return; }
+              const idx = v.lastIndexOf(":");
+              onMove({ id: v.slice(0, idx), branch: Number(v.slice(idx + 1)) });
+            }}
+          >
+            <option value="">top level</option>
+            {blocks.map((b, k) => [
+              ...b.branches.map((_, j) => (
+                <option key={`${b.id}:${j}`} value={`${b.id}:${j}`}>{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</option>
+              )),
+              ...(b.else ? [<option key={`${b.id}:-1`} value={`${b.id}:-1`}>{`ELSE #${k + 1}`}</option>] : []),
+            ])}
+          </select>
+        )}
         <button
           style={{ ...S.btn(), padding: "6px 6px", color: "#cc6666" }}
           onClick={onRemove}
@@ -2242,27 +2435,6 @@ function ActionRow({
           ×
         </button>
       </div>
-      {(action.conditions?.length ?? 0) > 0 && (
-        <div style={{ margin: "2px 0 6px", padding: "4px 6px 1px", borderLeft: "2px solid rgba(232,193,75,0.4)" }}>
-          <div style={{ ...S.fieldLabel, marginBottom: 3 }}>
-            ONLY IF (all must pass — checked after the delay; "unless" inverts one)
-          </div>
-          {action.conditions!.map((c, i) => (
-            <ConditionRow
-              key={i}
-              condition={c}
-              worldItems={worldItems}
-              scope={{ zoneObjects, triggerVolumes, allowSelf: !!owner,
-                selfLabel: owner ? `★ this ${owner.kind}` : undefined, ownerId: owner?.id, stateKeyTypes }}
-              onChange={(nc) => onChange({ ...action, conditions: action.conditions!.map((x, j) => (j === i ? nc : x)) })}
-              onRemove={() => {
-                const rest = action.conditions!.filter((_, j) => j !== i);
-                onChange({ ...action, conditions: rest.length ? rest : undefined });
-              }}
-            />
-          ))}
-        </div>
-      )}
       <ActionFields
         stateKeyTypes={stateKeyTypes}
         action={action}

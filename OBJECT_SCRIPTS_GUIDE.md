@@ -106,16 +106,35 @@ both are gone:
   saves) is by script id — so collecting coin A marked coin B as spent.
   Copies now get fresh script ids.
 
-## Per-action conditions ("only if")
+## If-blocks — actions that share a condition, with else / else if
 
-Every action row has an **if** button (v4.79.37): it adds a guard condition to
-JUST that action — same condition types and "Whose state" scoping as the
-script-level conditions, stacked with AND. A guarded action is checked **after
-its delay**, reading the world at the moment it would run, and silently skipped
-if the guard fails. Each condition also has an **unless** toggle that inverts
-it — so "else" is simply a second action with the mirrored condition, and
-"unless the player is falling" finally has a spelling. Script-level conditions
-still gate the whole script; action guards refine within it.
+Actions in a script run in parallel, and any of them can sit inside an
+**if-block** (v4.79.47). A block holds as many actions as you like under ONE
+set of conditions, so "if spikes are up: play the sound AND hurt the player"
+is one block, not the same guard written twice:
+
+- **+ If** (next to + Add) starts an empty block; the **if** button on a
+  top-level action wraps that action in a new block. **+ action here** adds
+  into a branch; the **move to** picker on any action relocates it (top
+  level, IF #1, ELSE IF #1.1, ELSE #1 …).
+- **+ else if** adds another branch, checked only when the branches above
+  failed; **+ else** adds the catch-all. The first passing branch wins — the
+  others never run. **× branch** / **unwrap** never delete actions; they drop
+  to the top level.
+- Conditions inside a branch are the same rows as the script's own
+  conditions: every type, "Whose state" scoping (★ this object, a specific
+  entity, global), and the **unless** toggle that inverts one condition.
+  A branch with no conditions always passes (the editor warns).
+- A block is decided **once, when the script's actions start** — after the
+  trigger's delay, before any action's own delay. Actions inside keep their
+  per-action delays; the branch choice doesn't change if state flips while
+  a delayed action is waiting. Script-level conditions still gate the whole
+  script; blocks refine within it.
+
+The older per-action **ONLY IF** guard (v4.79.37, checked after the action's
+delay) is shown as a one-branch block when you open such a script and is
+saved in the new shape on your first edit; unedited scripts keep running
+exactly as before.
 
 ## The fine print
 
