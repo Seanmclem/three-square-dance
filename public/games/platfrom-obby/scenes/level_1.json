@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -32.116108211300094,
+        "x": -27.723277245356066,
         "y": 2.73214756311405,
-        "z": -71.9697665013924
+        "z": -91.49392002919599
       },
       "radius": 27.027258797145656,
-      "phi": 0.9350000000000006,
-      "theta": 17.92941999991914
+      "phi": 1.1799999999999995,
+      "theta": 18.11941999991913
     }
   },
   "world": {
@@ -78,7 +78,7 @@
       "position": {
         "x": -35.4414902815789,
         "y": 8.24948291449006,
-        "z": -63.31390547536981
+        "z": -47.12150940579632
       },
       "facingDeg": 0
     },
@@ -9031,74 +9031,6 @@
           }
         },
         {
-          "id": "obj_caed087d",
-          "assetId": "bouncer",
-          "position": {
-            "x": -43.60785968555745,
-            "y": 5.3266664773186045,
-            "z": -46.06383754964562
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "label": "spring1",
-          "autoPlayAnimation": "Bouncer_Idle",
-          "prefab": {
-            "prefabId": "pfb_b9f347f5",
-            "instanceId": "pfi_8d0fd25b",
-            "memberKey": "obj_9184ee36"
-          }
-        },
-        {
-          "id": "obj_0c8f1262",
-          "assetId": "bouncer",
-          "position": {
-            "x": -43.48304091368374,
-            "y": 5.329351663210538,
-            "z": -48.47292038084125
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.7,
-            "y": 0.7,
-            "z": 0.7
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "label": "spring1",
-          "autoPlayAnimation": "Bouncer_Idle",
-          "prefab": {
-            "prefabId": "pfb_b9f347f5",
-            "instanceId": "pfi_dab4f59e",
-            "memberKey": "obj_9184ee36"
-          }
-        },
-        {
           "id": "obj_8bb98556",
           "assetId": "chest",
           "position": {
@@ -12134,7 +12066,8 @@
             "detectSound": "detect_rawr",
             "detectVolume": 0.5,
             "walkSound": "footstep_grass_001",
-            "walkVolume": 0.5
+            "walkVolume": 0.5,
+            "attackSound": "crab_bite_1"
           },
           "prefab": {
             "prefabId": "pfb_ac09927f",
@@ -12532,6 +12465,74 @@
             "instanceId": "pfi_35ce2e91",
             "memberKey": "obj_5daa2945"
           }
+        },
+        {
+          "id": "obj_caed087d",
+          "assetId": "bouncer",
+          "position": {
+            "x": -43.60785968555745,
+            "y": 5.1976986319821545,
+            "z": -46.06383754964562
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "spring1",
+          "autoPlayAnimation": "Bouncer_Idle",
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_8d0fd25b",
+            "memberKey": "obj_9184ee36"
+          }
+        },
+        {
+          "id": "obj_0c8f1262",
+          "assetId": "bouncer",
+          "position": {
+            "x": -43.48304091368374,
+            "y": 5.329351663210538,
+            "z": -48.47292038084125
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.7,
+            "y": 0.7,
+            "z": 0.7
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "spring1",
+          "autoPlayAnimation": "Bouncer_Idle",
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_dab4f59e",
+            "memberKey": "obj_9184ee36"
+          }
         }
       ],
       "prefabInstances": [
@@ -12707,7 +12708,7 @@
         {
           "id": "pfi_8d0fd25b",
           "prefabId": "pfb_b9f347f5",
-          "version": 1,
+          "version": 2,
           "variables": {},
           "origin": {
             "position": {
@@ -12721,7 +12722,7 @@
         {
           "id": "pfi_dab4f59e",
           "prefabId": "pfb_b9f347f5",
-          "version": 1,
+          "version": 2,
           "variables": {},
           "origin": {
             "position": {
@@ -12939,94 +12940,6 @@
               "oneShot": true
             }
           ]
-        },
-        {
-          "id": "vol_4b2ee12e",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -43.641777858189975,
-            "y": 6.569127204954961,
-            "z": -46.11799678796311
-          },
-          "size": {
-            "x": 1.3,
-            "y": 0.5,
-            "z": 1.3
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "script_960f2e65",
-              "label": "spring1 bounce",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_caed087d",
-                  "animation": "Bouncer_Bounce"
-                },
-                {
-                  "type": "launch_player",
-                  "launchSpeed": 20
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_b9f347f5",
-            "instanceId": "pfi_8d0fd25b",
-            "memberKey": "vol_41fa1fe1"
-          }
-        },
-        {
-          "id": "vol_4e129c72",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -43.51695908631626,
-            "y": 6.638618154439161,
-            "z": -48.52707961915874
-          },
-          "size": {
-            "x": 1.3,
-            "y": 0.5,
-            "z": 1.3
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "script_efff2166",
-              "label": "spring1 bounce",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_0c8f1262",
-                  "animation": "Bouncer_Bounce"
-                },
-                {
-                  "type": "launch_player",
-                  "launchSpeed": 20
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_b9f347f5",
-            "instanceId": "pfi_dab4f59e",
-            "memberKey": "vol_41fa1fe1"
-          }
         },
         {
           "id": "vol_f9d97563",
@@ -13586,6 +13499,106 @@
             "prefabId": "pfb_5e81e6ab",
             "instanceId": "pfi_35ce2e91",
             "memberKey": "vol_80c94968"
+          }
+        },
+        {
+          "id": "vol_4b2ee12e",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -43.641777858189975,
+            "y": 6.569127204954961,
+            "z": -46.11799678796311
+          },
+          "size": {
+            "x": 1.3,
+            "y": 0.5,
+            "z": 1.3
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_d4eecc41",
+              "label": "spring1 bounce",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_caed087d",
+                  "animation": "Bouncer_Bounce"
+                },
+                {
+                  "type": "launch_player",
+                  "launchSpeed": 20
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "metalpot2",
+                  "volume": 0.5,
+                  "targetId": "obj_caed087d"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_8d0fd25b",
+            "memberKey": "vol_41fa1fe1"
+          }
+        },
+        {
+          "id": "vol_4e129c72",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -43.51695908631626,
+            "y": 6.700780236183345,
+            "z": -48.52707961915874
+          },
+          "size": {
+            "x": 1.3,
+            "y": 0.5,
+            "z": 1.3
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_ab21901a",
+              "label": "spring1 bounce",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_0c8f1262",
+                  "animation": "Bouncer_Bounce"
+                },
+                {
+                  "type": "launch_player",
+                  "launchSpeed": 20
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "metalpot2",
+                  "volume": 0.5,
+                  "targetId": "obj_0c8f1262"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_b9f347f5",
+            "instanceId": "pfi_dab4f59e",
+            "memberKey": "vol_41fa1fe1"
           }
         }
       ],

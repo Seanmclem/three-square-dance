@@ -6497,6 +6497,22 @@
         "author": "Seanmclem",
         "license": "CC0"
       }
+    },
+    {
+      "id": "crab_bite_1",
+      "label": "crab bite 1",
+      "category": "Enemy",
+      "path": "/assets/audio/crab_bite_1.wav",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "self-record"
+      ],
+      "dateAdded": "2026-08-28",
+      "attribution": {
+        "author": "Olivia",
+        "license": "CC0"
+      }
     }
   ]
 }

@@ -540,52 +540,9 @@
       "id": "pfb_b9f347f5",
       "name": "Spring Jumper",
       "kind": "snapshot",
-      "version": 1,
+      "version": 2,
       "variables": [],
       "template": [
-        {
-          "memberKey": "vol_41fa1fe1",
-          "type": "trigger-volume",
-          "def": {
-            "id": "vol_41fa1fe1",
-            "label": "Trigger Volume",
-            "position": {
-              "x": -0.01695908631626253,
-              "y": 1.3714285729728068,
-              "z": -0.027079619158740798
-            },
-            "size": {
-              "x": 1.3,
-              "y": 0.5,
-              "z": 1.3
-            },
-            "zoneId": "demo",
-            "scripts": [
-              {
-                "id": "scr_689aac0e",
-                "label": "spring1 bounce",
-                "zoneId": "demo",
-                "enabled": true,
-                "trigger": {
-                  "type": "on_player_enter"
-                },
-                "conditions": [],
-                "actions": [
-                  {
-                    "type": "play_animation",
-                    "targetId": "obj_9184ee36",
-                    "animation": "Bouncer_Bounce"
-                  },
-                  {
-                    "type": "launch_player",
-                    "launchSpeed": 20
-                  }
-                ],
-                "oneShot": false
-              }
-            ]
-          }
-        },
         {
           "memberKey": "obj_9184ee36",
           "type": "object",
@@ -608,7 +565,7 @@
               "z": 0.7
             },
             "floor": 0,
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
@@ -618,131 +575,28 @@
             "label": "spring1",
             "autoPlayAnimation": "Bouncer_Idle"
           }
-        }
-      ],
-      "dateAdded": "2026-08-02"
-    },
-    {
-      "id": "pfb_76b82ec0",
-      "name": "Spike Step 3",
-      "kind": "snapshot",
-      "version": 3,
-      "variables": [],
-      "template": [
-        {
-          "memberKey": "obj_77ceb6af",
-          "type": "object",
-          "def": {
-            "id": "obj_77ceb6af",
-            "assetId": "hazard_spiketrap",
-            "position": {
-              "x": -0.006332278655584389,
-              "y": 0,
-              "z": -0.047799670034557096
-            },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "floor": 0,
-            "zoneId": "__prefab_edit__",
-            "properties": {
-              "interactable": false,
-              "npcSpawn": false,
-              "lootTableId": null,
-              "triggerEventId": null
-            },
-            "scripts": [
-              {
-                "id": "script_464f02a2",
-                "label": "spike pop intervals",
-                "zoneId": "demo",
-                "enabled": true,
-                "trigger": {
-                  "type": "on_timer",
-                  "interval": 4,
-                  "repeat": true
-                },
-                "conditions": [],
-                "actions": [
-                  {
-                    "type": "play_animation",
-                    "targetId": "self",
-                    "animation": "SpikeTrap_Up",
-                    "animationLoop": false,
-                    "animationHold": true,
-                    "delay": 0
-                  },
-                  {
-                    "type": "play_animation",
-                    "delay": 2,
-                    "targetId": "self",
-                    "animation": "SpikeTrap_Down"
-                  },
-                  {
-                    "type": "despawn_object",
-                    "delay": 2,
-                    "targetId": "vol_d8be00e2"
-                  },
-                  {
-                    "type": "spawn_object",
-                    "delay": 0,
-                    "targetId": "vol_d8be00e2"
-                  },
-                  {
-                    "type": "play_sound",
-                    "delay": 2,
-                    "sound": "impactmining_003",
-                    "targetId": "self",
-                    "volume": 2
-                  },
-                  {
-                    "type": "play_sound",
-                    "sound": "impactmining_004",
-                    "targetId": "self",
-                    "volume": 2
-                  },
-                  {
-                    "type": "set_state",
-                    "targetId": "vol_d8be00e2",
-                    "stateKey": "spikes-up",
-                    "stateValue": "__toggle__",
-                    "delay": 2
-                  }
-                ],
-                "oneShot": false
-              }
-            ],
-            "label": "spike cube 1"
-          }
         },
         {
-          "memberKey": "vol_d8be00e2",
+          "memberKey": "vol_41fa1fe1",
           "type": "trigger-volume",
           "def": {
-            "id": "vol_d8be00e2",
-            "label": "hurt spikes",
+            "id": "vol_41fa1fe1",
+            "label": "Trigger Volume",
             "position": {
-              "x": 0.006332278655577284,
-              "y": 0.5308756758669677,
-              "z": 0.04779967003454999
+              "x": -0.01695908631626253,
+              "y": 1.3714285729728068,
+              "z": -0.027079619158740798
             },
             "size": {
-              "x": 2,
+              "x": 1.3,
               "y": 0.5,
-              "z": 2
+              "z": 1.3
             },
             "zoneId": "__prefab_edit__",
             "scripts": [
               {
-                "id": "scr_158e8b64",
-                "label": "Hurt spikes",
+                "id": "scr_689aac0e",
+                "label": "spring1 bounce",
                 "zoneId": "demo",
                 "enabled": true,
                 "trigger": {
@@ -751,40 +605,34 @@
                 "conditions": [],
                 "actions": [
                   {
-                    "type": "adjust_number",
-                    "stateKey": "Hearts",
-                    "numberDelta": -1
+                    "type": "play_animation",
+                    "targetId": "obj_9184ee36",
+                    "animation": "Bouncer_Bounce"
                   },
                   {
                     "type": "launch_player",
-                    "launchRelativeTo": "player",
-                    "launchSpeed": 7.4,
-                    "launchHSpeed": 7.4,
-                    "launchDirDeg": -180
+                    "launchSpeed": 20
                   },
                   {
-                    "type": "flash_player"
+                    "type": "play_sound",
+                    "sound": "metalpot2",
+                    "volume": 0.5,
+                    "targetId": "obj_9184ee36"
                   }
                 ],
                 "oneShot": false
               }
-            ],
-            "stateSchema": {
-              "spikes-up": {
-                "type": "boolean",
-                "default": false
-              }
-            }
+            ]
           }
         }
       ],
-      "dateAdded": "2026-08-27"
+      "dateAdded": "2026-08-02"
     },
     {
       "id": "pfb_ac09927f",
       "name": "Crab 1",
       "kind": "snapshot",
-      "version": 1,
+      "version": 2,
       "variables": [],
       "template": [
         {
@@ -809,7 +657,7 @@
               "z": 0.5
             },
             "floor": 0,
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
@@ -891,7 +739,9 @@
               "detectSound": "detect_rawr",
               "detectVolume": 0.5,
               "walkSound": "footstep_grass_001",
-              "walkVolume": 0.5
+              "walkVolume": 0.5,
+              "attackSound": "crab_bite_1",
+              "attackVolume": 0.8
             }
           }
         },
@@ -911,7 +761,7 @@
               "y": 0.5,
               "z": 0.9
             },
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "editorTint": {
               "color": "#ff0000",
               "opacity": 0.12
