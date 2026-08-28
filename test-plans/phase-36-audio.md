@@ -96,3 +96,10 @@ places audio changes are:
    the imported /assets/audio file decodes to exactly 0.5s; Manage → Delete
    removes manifest entry + file. Real mic capture/permission needs a human
    check (CEF may prompt for the microphone).
+
+### v4.79.40 — recorder trim commits per keystroke
+
+Type a TRIM START/END value and click ▶ Play **immediately, without
+tabbing/clicking away first** — the preview must play the trimmed range and
+the duration readout must already show it while typing. Decimals still type
+cleanly ("0.5" keeps its dot). Import → the saved WAV uses the on-screen trim.
