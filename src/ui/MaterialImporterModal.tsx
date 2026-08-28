@@ -144,7 +144,7 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
   const canImport = !!(detectedMaps && materialId.trim());
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
 
         <input

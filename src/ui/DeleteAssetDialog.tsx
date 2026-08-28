@@ -49,7 +49,7 @@ export function DeleteAssetDialog({
   const these  = many ? `these ${noun}s` : `this ${noun}`;
 
   return (
-    <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={S.overlay}>
       <div style={S.card}>
         <div style={S.title}>DELETE {many ? `${labels.length} ${noun.toUpperCase()}S` : noun.toUpperCase()}</div>
         <div style={S.body}>

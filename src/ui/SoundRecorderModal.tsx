@@ -222,7 +222,7 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
   const fmt = (s: number) => `${s.toFixed(1)}s`;
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={OVERLAY}>
       <div style={CARD}>
         <div style={{ color: "#c0c0c0", fontSize: 13, letterSpacing: 1 }}>RECORD SOUND</div>
 

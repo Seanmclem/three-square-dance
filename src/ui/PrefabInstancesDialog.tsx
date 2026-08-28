@@ -61,7 +61,7 @@ export function PrefabInstancesDialog({
 }: PrefabInstancesDialogProps) {
   const fmt = (n: number): string => String(Math.round(n * 10) / 10);
   return (
-    <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={S.overlay}>
       <div style={S.card}>
         <div style={S.title}>DELETE PREFAB · {prefabName.toUpperCase()}</div>
         {rows.length > 0 ? (

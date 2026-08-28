@@ -150,7 +150,7 @@ export function ThumbnailStagerModal({ asset, onCancel, onSave, onSaveIcon }: Pr
   };
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
 
         {/* Header */}

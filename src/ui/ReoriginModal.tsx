@@ -216,7 +216,7 @@ export function ReoriginModal({ asset, placedCount, onCancel, onApply }: Props) 
   const noop = delta ? isNoop(delta) : false;
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
 
         {/* Header */}

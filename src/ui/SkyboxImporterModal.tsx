@@ -110,7 +110,7 @@ export function SkyboxImporterModal({ onComplete, onClose }: Props) {
   }
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
         <input
           ref={filesInputRef} type="file" multiple style={{ display: "none" }}

@@ -33,7 +33,7 @@ const S = {
 /** Generic small confirm (ScriptDetachDialog chrome). Backdrop click cancels. */
 export function ConfirmDialog({ title, body, confirmLabel, onConfirm, onCancel }: ConfirmDialogProps) {
   return (
-    <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={S.overlay}>
       <div style={S.card}>
         <div style={S.title}>{title}</div>
         <div style={S.body}>{body}</div>

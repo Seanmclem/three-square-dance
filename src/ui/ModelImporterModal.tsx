@@ -260,7 +260,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
   }
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
 
         <input

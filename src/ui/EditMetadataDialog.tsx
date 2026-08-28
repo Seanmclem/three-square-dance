@@ -88,7 +88,7 @@ export function EditMetadataDialog({ items, noun, categoryOptions, initial, tagS
   } : undefined;
 
   return (
-    <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={S.overlay}>
       <div style={S.card}>
         <div style={S.title}>EDIT {bulk ? `${items.length} ${noun.toUpperCase()}S` : noun.toUpperCase()}</div>
         {bulk && <div style={{ color: "#909090", fontSize: 11, fontFamily: "monospace" }}>

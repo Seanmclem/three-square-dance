@@ -124,3 +124,9 @@ different waveform. Each row has its own TRIM START/END; typing a trim shades
 that portion of ITS waveform only and updates ITS duration. ▶ on each row plays
 that row's audio. If two real takes ever sound identical, compare the
 waveforms — identical pictures mean the capture repeated, not the player.
+
+### v4.79.43 — backdrop click no longer closes editor modals
+
+With the recorder (or any importer/dialog) open, click the dimmed area outside
+the card: it stays open. Cancel / ✕ still close it. Applies to all 14 editor
+modals; the in-game bag overlay still closes on click-anywhere by design.

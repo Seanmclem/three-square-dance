@@ -98,7 +98,7 @@ export function SoundPickerModal({ title, onPick, onPickMulti, onClose }: SoundP
   };
 
   return (
-    <div style={OVERLAY} onClick={e => { if (e.target === e.currentTarget) finish(); }}>
+    <div style={OVERLAY}>
       <div style={MODAL}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
           padding: "12px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.07)", flexShrink: 0 }}>

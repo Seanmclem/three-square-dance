@@ -44,7 +44,7 @@ export function ScriptDetachDialog({
 }: ScriptDetachDialogProps) {
   const plural = scriptCount === 1 ? "script" : "scripts";
   return (
-    <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+    <div style={S.overlay}>
       <div style={S.card}>
         <div style={S.title}>DELETE {entityLabel.toUpperCase()}</div>
         <div style={S.body}>
