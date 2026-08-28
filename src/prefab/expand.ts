@@ -79,6 +79,19 @@ function toWorld(local: Vec3, origin: PrefabInstanceRecord["origin"]): Vec3 {
   };
 }
 
+/** Inverse of toWorld: translate by −origin, then un-rotate by −yaw. */
+function toLocal(world: Vec3, origin: PrefabInstanceRecord["origin"]): Vec3 {
+  const t = origin.rotationY * DEG;
+  const cos = Math.cos(t), sin = Math.sin(t);
+  const dx = world.x - origin.position.x, dz = world.z - origin.position.z;
+  const tidy = (n: number): number => Math.round(n * 1e6) / 1e6;   // 90° yaws leave 1e-16 noise otherwise
+  return {
+    x: tidy(dx * cos - dz * sin),
+    y: tidy(world.y - origin.position.y),
+    z: tidy(dx * sin + dz * cos),
+  };
+}
+
 // ── Script reference remapping ───────────────────────────────────────────────
 
 /** Clone scripts with fresh ids, retargeted zone, and every intra-prefab entity
@@ -390,5 +403,102 @@ export function captureSnapshotPrefab(
     origin:   { position: { x: px, y: py, z: pz }, rotationY: 0 },
     captured: picked.map(p => ({ type: p.type, id: p.id })),
     skipped,
+  };
+}
+
+/**
+ * The opposite of Reset from prefab (v4.79.46): recapture a SNAPSHOT prefab's
+ * template from one placed instance's current members. Each stamped member is
+ * cloned, moved back into template space (inverse of the instance origin —
+ * position and yaw), stripped of its stamp, and keyed by its EXISTING memberKey
+ * so `reexpandInstance` keeps entity ids on every other instance. Intra-instance
+ * script targets / attachTo hosts are remapped world id → memberKey (the
+ * template id convention materializeMembers remaps back through); external
+ * refs pass through. Template order follows the old template (stable diffs);
+ * members deleted from the instance are dropped and reported. Pure — does not
+ * touch the world; the caller persists the def and propagates.
+ */
+export function captureInstanceToPrefab(
+  world: WorldState, zoneId: string, prefab: PrefabDef, instanceId: string,
+): { prefab: PrefabDef; removedKeys: string[]; memberCount: number } | null {
+  if (prefab.kind !== "snapshot") return null;
+  const zone = world.zones.get(zoneId);
+  const record = zone?.prefabInstances?.find(r => r.id === instanceId);
+  if (!zone || !record) return null;
+  const members = collectInstanceMembers(world, zoneId, instanceId);
+  if (members.size === 0) return null;
+
+  const lookup = (type: EditorObjectType, id: string): unknown => {
+    switch (type) {
+      case "object":         return zone.objects.find(e => e.id === id);
+      case "trigger-volume": return zone.triggerVolumes?.find(e => e.id === id);
+      case "shape":          return zone.shapes?.find(e => e.id === id);
+      case "stair":          return zone.stairs.find(e => e.id === id);
+      case "ladder":         return zone.ladders?.find(e => e.id === id);
+      default:               return undefined;
+    }
+  };
+
+  // world id → memberKey (template id) for intra-instance references.
+  const idMap = new Map<string, string>();
+  for (const [key, e] of members) idMap.set(e.id, key);
+
+  const byKey = new Map<string, PrefabTemplateEntity>();
+  for (const [key, e] of members) {
+    const src = lookup(e.type, e.id);
+    if (!src) continue;
+    const def = structuredClone(src) as { id: string; prefab?: unknown };
+    delete def.prefab;
+    def.id = key;
+    switch (e.type) {
+      case "object": {
+        const o = def as unknown as WorldObject;
+        o.position = toLocal(o.position, record.origin);
+        o.rotation = { ...o.rotation, y: o.rotation.y - record.origin.rotationY };
+        o.scripts = remapScripts(o.scripts, idMap, zoneId);
+        break;
+      }
+      case "trigger-volume": {
+        const v = def as unknown as TriggerVolume;
+        v.position = toLocal(v.position, record.origin);
+        if (record.origin.rotationY !== 0 || v.rotation) {
+          v.rotation = { x: v.rotation?.x ?? 0, y: (v.rotation?.y ?? 0) - record.origin.rotationY, z: v.rotation?.z ?? 0 };
+        }
+        if (v.attachTo) v.attachTo = idMap.get(v.attachTo) ?? v.attachTo;
+        v.scripts = remapScripts(v.scripts, idMap, zoneId);
+        break;
+      }
+      case "shape": {
+        const sh = def as unknown as ShapeDef;
+        sh.position = toLocal(sh.position, record.origin);
+        sh.rotation = { ...sh.rotation, y: sh.rotation.y - record.origin.rotationY };
+        break;
+      }
+      case "stair": {
+        const st = def as unknown as StairDef;
+        st.start = toLocal(st.start, record.origin);
+        st.end   = toLocal(st.end,   record.origin);
+        break;
+      }
+      case "ladder": {
+        const l = def as unknown as LadderDef;
+        l.position  = toLocal(l.position, record.origin);
+        l.rotationY = l.rotationY - record.origin.rotationY;
+        break;
+      }
+    }
+    byKey.set(key, { memberKey: key, type: e.type, def });
+  }
+
+  const oldKeys = (prefab.template ?? []).map(t => t.memberKey);
+  const template: PrefabTemplateEntity[] = [];
+  for (const key of oldKeys) { const t = byKey.get(key); if (t) { template.push(t); byKey.delete(key); } }
+  for (const t of byKey.values()) template.push(t);   // keys the old template didn't have (hand-authored json)
+  const removedKeys = oldKeys.filter(k => !members.has(k));
+
+  return {
+    prefab: { ...prefab, template, version: prefab.version + 1 },
+    removedKeys,
+    memberCount: template.length,
   };
 }

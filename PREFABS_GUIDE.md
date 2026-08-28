@@ -86,6 +86,14 @@ gizmo moves it all, and the properties panel shows the **Prefab section**:
   *yours per copy* and **never reset** — not by prefab edits, not by Reset.
 - **Position** (X/Y/Z/ROT°): moves the whole instance; equivalent to dragging
   the gizmo.
+- **Save to prefab** (v4.79.46, snapshot prefabs only): the reverse of Reset.
+  This copy's pieces — as you've moved, re-tuned, or deleted them — become the
+  prefab's recipe (version +1), and every other placed copy rebuilds to match
+  (their own hand-edits are discarded; their settings and positions are kept).
+  Pieces you deleted here are removed from every copy; the confirm says how
+  many. Things you placed *next to* the copy aren't members and don't come
+  along — capture a new prefab for that. Rebuilding the copies is one undo
+  step; the recipe change itself isn't undoable (same as Edit prefab → Save).
 - **Reset from prefab**: rebuilds every piece from the recipe. Settings and
   position are kept; the only thing it discards is hand-edits to individual
   pieces. If you never shift-click into an instance's guts, it's a no-op.
@@ -103,7 +111,7 @@ snapshot prefabs (click it to jump into prefab editing), `ƒ {name}` for
 generators, `⚠ … definition missing` for orphans. Next to the name, **⛶ all N**
 (v4.79.27) re-selects the entire instance — the way back from a shift-clicked
 single piece to moving object + trigger + everything with one gizmo — and a
-**⋯ menu** (v4.79.28) with the instance actions (Reset from prefab / Unlink /
+**⋯ menu** (v4.79.28) with the instance actions (Reset from prefab / Save to prefab / Unlink /
 Delete instance). All three ask for confirmation from either entry point;
 they're still one-step undoable afterwards.
 

@@ -41,3 +41,18 @@
 - [x] Cleanup left only the user's entities; autosave restored byte-identical.
 - [ ] Normal (non-edit-mode) autosave still works after a session (gate
       releases).
+
+### v4.79.46 — Save to prefab
+
+1. Place two copies of a snapshot prefab; rotate one copy 90° when placing (R).
+2. On the rotated copy: move one piece, rename it, delete another piece.
+3. Header ⋯ → **Save to prefab** (also in the Prefab section, amber). The
+   confirm names the prefab, v(n) → v(n+1), the piece count, "the 1 other
+   placed instance", and "1 piece you deleted here will be removed…".
+4. Confirm: the OTHER copy's matching piece moves the same amount relative to
+   its own origin (rotation accounted for), takes the rename, and its deleted
+   piece disappears — with the same entity ids as before (selection/groups
+   intact). The source copy doesn't visibly change. Selection survives.
+5. Cmd+Z: both copies' pieces revert (the library stays on the new version);
+   Cmd+Shift+Z re-applies.
+6. A generator (ƒ) instance shows no Save to prefab entry.

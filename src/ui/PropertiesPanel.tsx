@@ -452,6 +452,7 @@ interface PropertiesPanelProps {
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onPrefabReexpand?:        () => void;
+  onPrefabPushToPrefab?:    () => void;   // Save to prefab — snapshot kind only (v4.79.46)
   onPrefabUnlink?:          () => void;
   onPrefabDeleteInstance?:  () => void;
   // Global editor overlay toggles (EDITOR section, nothing-selected view).
@@ -476,7 +477,7 @@ export function PropertiesPanel({
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
-  prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabUnlink, onPrefabDeleteInstance,
+  prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabPushToPrefab, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
@@ -569,6 +570,7 @@ export function PropertiesPanel({
             onVariablesChange={onPrefabVariablesChange}
             onOriginChange={onPrefabOriginChange}
             onReexpand={onPrefabReexpand}
+            onPushToPrefab={onPrefabPushToPrefab}
             onUnlink={onPrefabUnlink}
             onDeleteInstance={onPrefabDeleteInstance}
             onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
@@ -717,6 +719,8 @@ export function PropertiesPanel({
                         {([
                           ...(prefabInfo.prefab !== null
                             ? [["Reset from prefab", onPrefabReexpand, "#c2cadb"] as const] : []),
+                          ...(prefabInfo.prefab?.kind === "snapshot" && onPrefabPushToPrefab
+                            ? [["Save to prefab", onPrefabPushToPrefab, "#e0a050"] as const] : []),
                           ["Unlink", onPrefabUnlink, "#c2cadb"] as const,
                           ["Delete instance", onPrefabDeleteInstance, "#cc6666"] as const,
                         ]).map(([label, fn, color]) => (
@@ -803,6 +807,7 @@ export function PropertiesPanel({
                 onVariablesChange={onPrefabVariablesChange}
                 onOriginChange={onPrefabOriginChange}
                 onReexpand={onPrefabReexpand}
+                onPushToPrefab={onPrefabPushToPrefab}
                 onUnlink={onPrefabUnlink}
                 onDeleteInstance={onPrefabDeleteInstance}
                 onSelectAll={onSelectInstance}
@@ -828,6 +833,7 @@ export function PropertiesPanel({
                 onVariablesChange={onPrefabVariablesChange}
                 onOriginChange={onPrefabOriginChange}
                 onReexpand={onPrefabReexpand}
+                onPushToPrefab={onPrefabPushToPrefab}
                 onUnlink={onPrefabUnlink}
                 onDeleteInstance={onPrefabDeleteInstance}
                 onSelectAll={onSelectInstance}
@@ -1192,11 +1198,12 @@ function PrefabVarField({ def, value, onCommit }: {
   );
 }
 
-function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onUnlink, onDeleteInstance, onSelectAll, onEdit, defaultOpen = true }: {
+function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onPushToPrefab, onUnlink, onDeleteInstance, onSelectAll, onEdit, defaultOpen = true }: {
   info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord; memberCount?: number };
   onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onReexpand?:        () => void;
+  onPushToPrefab?:    () => void;   // Save to prefab — the reverse of Reset (snapshot kind only)
   onUnlink?:          () => void;
   onDeleteInstance?:  () => void;
   onSelectAll?:       () => void;   // select every piece (passed only where the selection ISN'T already the whole instance)
@@ -1298,13 +1305,18 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
                 title="Edit the prefab in isolation — saving updates every placed instance" onClick={onEdit} />
             )}
             <PrefabBtn label="Reset from prefab" title="Rebuild all pieces from the prefab. Settings and position keep their values; hand-edits to individual pieces are discarded" onClick={onReexpand} />
+            {onPushToPrefab && prefab.kind === "snapshot" && (
+              <PrefabBtn label="Save to prefab" amber
+                title="The reverse of Reset: overwrite the prefab with this instance's pieces — every other placed instance updates to match" onClick={onPushToPrefab} />
+            )}
             <PrefabBtn label="Unlink" title="Detach into plain, independent objects — prefab updates stop affecting them" onClick={onUnlink} />
             <PrefabBtn label="Delete instance" title="Remove every piece and the prefab link" onClick={onDeleteInstance} danger />
           </div>
           <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.5 }}>
             The settings and position above are saved per placed copy and never reset.
             Only hand-edits to individual pieces (shift-click) are overwritten when the
-            pieces rebuild — Unlink first if you want to keep those.
+            pieces rebuild — Unlink first if you want to keep those, or Save to prefab
+            to make them the recipe for every copy.
           </div>
         </div>
       )}

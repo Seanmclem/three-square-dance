@@ -31,7 +31,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
-import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
+import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, captureInstanceToPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
 import { PrefabEditSession } from "@/prefab/PrefabEditSession";
 import { PrefabEditBar } from "@/ui/PrefabEditBar";
 import { NodeDragger } from "@/editor/NodeDragger";
@@ -270,7 +270,7 @@ export default function App() {
   const [prefabDeleteBlocked, setPrefabDeleteBlocked] = useState<{ prefabId: string; rows: PrefabInstanceRow[] } | null>(null);
   // Pending confirmation for a destructive instance action (both the Prefab-section
   // buttons and the header ⋯ menu route through this).
-  const [prefabConfirm, setPrefabConfirm] = useState<"reset" | "unlink" | "delete" | null>(null);
+  const [prefabConfirm, setPrefabConfirm] = useState<"reset" | "unlink" | "delete" | "push" | null>(null);
   // Isolated prefab edit mode (Phase 47). The ref gates autosave/save/play
   // synchronously (state is for rendering the bar + disabling UI).
   const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
@@ -3295,6 +3295,30 @@ export default function App() {
     refreshSelectionAfterReexpand();
   };
 
+  /** Save to prefab (v4.79.46) — the opposite of Reset: this instance's pieces
+   *  become the prefab's template (version+1), persisted like an edit-session
+   *  save, then EVERY placed instance re-expands in one undoable transaction
+   *  (this one included — content no-op, brings its version stamp current).
+   *  The definition write itself is not in the undo journal (same as Edit
+   *  prefab → Save). */
+  const handlePrefabPushToPrefab = (): void => {
+    const world = worldRef.current;
+    const info = selPrefabInfo;
+    if (!world || !info?.prefab || !selected) return;
+    const result = captureInstanceToPrefab(world, selected.zoneId, info.prefab, info.record.id);
+    if (!result) return;
+    const updated = result.prefab;
+    applyPrefabs(prefabs.map(p => p.id === updated.id ? updated : p));
+    const instances = findInstances(world, updated.id);
+    withInstanceReselect(selected.zoneId, info.record.id, selected.id, () => {
+      world.transaction(`save instance to prefab ${updated.name}`, () => {
+        for (const { zoneId, record } of instances) reexpandInstance(world, zoneId, updated, record.id);
+      });
+    });
+    syncHistory();
+    setPrefabTick(t => t + 1);
+  };
+
   // ── Isolated prefab edit mode (Phase 47) ───────────────────────────────────
 
   const handleEditPrefab = (prefabId: string): void => {
@@ -3675,6 +3699,7 @@ export default function App() {
         onPrefabVariablesChange={handlePrefabVariablesChange}
         onPrefabOriginChange={handlePrefabOriginChange}
         onPrefabReexpand={() => setPrefabConfirm("reset")}
+        onPrefabPushToPrefab={() => setPrefabConfirm("push")}
         onPrefabUnlink={() => setPrefabConfirm("unlink")}
         onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
         onCreatePrefab={handleCreatePrefab}
@@ -3997,26 +4022,42 @@ SquareDance
           onCancel={() => setDeletePrompt(null)}
         />
       )}
-      {prefabConfirm && (
+      {prefabConfirm && (() => {
+        // Save-to-prefab body carries live counts: a dry run of the capture
+        // (pure) for removed pieces, and the other-instance count.
+        const push = prefabConfirm === "push" && worldRef.current && selPrefabInfo?.prefab && selected
+          ? captureInstanceToPrefab(worldRef.current, selected.zoneId, selPrefabInfo.prefab, selPrefabInfo.record.id) : null;
+        const others = push && worldRef.current ? findInstances(worldRef.current, push.prefab.id).length - 1 : 0;
+        const pushBody = push
+          ? `Overwrite prefab "${push.prefab.name}" (v${push.prefab.version - 1} → v${push.prefab.version}) with this instance's ${push.memberCount} piece${push.memberCount === 1 ? "" : "s"}, `
+            + `and update ${others === 0 ? "no other placed instances" : others === 1 ? "the 1 other placed instance" : `all ${others} other placed instances`} to match?`
+            + (push.removedKeys.length ? ` ${push.removedKeys.length} piece${push.removedKeys.length === 1 ? "" : "s"} you deleted here will be removed from the prefab and from every instance.` : "")
+            + " Hand-edits on other instances are discarded. Re-expanding the instances is undoable; the prefab definition change is not."
+          : "This instance can't be saved back (generator prefab, or no pieces).";
+        return (
         <ConfirmDialog
           title={prefabConfirm === "reset" ? "RESET FROM PREFAB"
+               : prefabConfirm === "push" ? "SAVE TO PREFAB"
                : prefabConfirm === "unlink" ? "UNLINK INSTANCE" : "DELETE INSTANCE"}
           body={prefabConfirm === "reset"
               ? "Rebuild every piece from the prefab recipe? Hand-edits to individual pieces are discarded — instance settings and position are kept. (Undoable.)"
+              : prefabConfirm === "push" ? pushBody
               : prefabConfirm === "unlink"
               ? "Detach the pieces into plain, independent entities? Prefab updates will stop affecting them. (Undoable.)"
               : "Delete every piece of this instance? (Undoable.)"}
-          confirmLabel={prefabConfirm === "reset" ? "Reset" : prefabConfirm === "unlink" ? "Unlink" : "Delete instance"}
+          confirmLabel={prefabConfirm === "reset" ? "Reset" : prefabConfirm === "push" ? "Save to prefab" : prefabConfirm === "unlink" ? "Unlink" : "Delete instance"}
           onCancel={() => setPrefabConfirm(null)}
           onConfirm={() => {
             const kind = prefabConfirm;
             setPrefabConfirm(null);
             if (kind === "reset") handlePrefabReexpand();
+            else if (kind === "push") handlePrefabPushToPrefab();
             else if (kind === "unlink") handlePrefabUnlink();
             else handlePrefabDeleteInstance();
           }}
         />
-      )}
+        );
+      })()}
       {prefabDeleteBlocked && (
         <PrefabInstancesDialog
           prefabName={prefabs.find(p => p.id === prefabDeleteBlocked.prefabId)?.name ?? prefabDeleteBlocked.prefabId}
