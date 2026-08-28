@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -27.64911207636673,
+        "x": -32.116108211300094,
         "y": 2.73214756311405,
-        "z": -82.44687508385152
+        "z": -71.9697665013924
       },
-      "radius": 28.895070499337468,
-      "phi": 1.125000000000001,
-      "theta": 18.219999999881598
+      "radius": 27.027258797145656,
+      "phi": 0.9350000000000006,
+      "theta": 17.92941999991914
     }
   },
   "world": {
@@ -12252,101 +12252,7 @@
           }
         },
         {
-          "id": "obj_3e5a90a7",
-          "assetId": "hazard_spiketrap",
-          "position": {
-            "x": -35.01266455731116,
-            "y": 6.970343860100478,
-            "z": -58.6434661884347
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "scripts": [
-            {
-              "id": "script_3acbf3d6",
-              "label": "spike pop intervals",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_timer",
-                "interval": 4,
-                "repeat": true
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "self",
-                  "animation": "SpikeTrap_Up",
-                  "animationLoop": false,
-                  "animationHold": true,
-                  "delay": 0
-                },
-                {
-                  "type": "play_animation",
-                  "delay": 2,
-                  "targetId": "self",
-                  "animation": "SpikeTrap_Down"
-                },
-                {
-                  "type": "despawn_object",
-                  "delay": 2,
-                  "targetId": "vol_da03ef3d"
-                },
-                {
-                  "type": "spawn_object",
-                  "delay": 0,
-                  "targetId": "vol_da03ef3d"
-                },
-                {
-                  "type": "play_sound",
-                  "delay": 2,
-                  "sound": "impactmining_003",
-                  "targetId": "self",
-                  "volume": 2
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_004",
-                  "targetId": "self",
-                  "volume": 2
-                },
-                {
-                  "type": "set_state",
-                  "targetId": "vol_da03ef3d",
-                  "stateKey": "spikes-up",
-                  "stateValue": "__toggle__",
-                  "delay": 2
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "label": "spike cube 1",
-          "prefab": {
-            "prefabId": "pfb_76b82ec0",
-            "instanceId": "pfi_d34c12ad",
-            "memberKey": "obj_77ceb6af"
-          }
-        },
-        {
-          "id": "obj_5daa2945",
+          "id": "obj_549c6a17",
           "assetId": "hazard_spiketrap",
           "position": {
             "x": -35.02716377027508,
@@ -12373,13 +12279,13 @@
           },
           "scripts": [
             {
-              "id": "script_3ea812cb",
+              "id": "script_4c735658",
               "label": "spike pop intervals",
               "zoneId": "demo",
               "enabled": true,
               "trigger": {
                 "type": "on_timer",
-                "interval": 4,
+                "interval": 2,
                 "repeat": true
               },
               "conditions": [],
@@ -12390,35 +12296,67 @@
                   "animation": "SpikeTrap_Up",
                   "animationLoop": false,
                   "animationHold": true,
-                  "delay": 0
+                  "delay": 0,
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_11875031",
+                      "stateKey": "spikes-up",
+                      "stateValue": false
+                    }
+                  ]
                 },
                 {
                   "type": "play_animation",
-                  "delay": 2,
+                  "delay": 0,
                   "targetId": "self",
-                  "animation": "SpikeTrap_Down"
+                  "animation": "SpikeTrap_Down",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_11875031",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
                 },
                 {
                   "type": "despawn_object",
-                  "delay": 2,
-                  "targetId": "vol_80c94968"
+                  "delay": 0,
+                  "targetId": "vol_11875031",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_11875031",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
                 },
                 {
                   "type": "spawn_object",
                   "delay": 0,
-                  "targetId": "vol_80c94968"
+                  "targetId": "vol_11875031",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_11875031",
+                      "stateKey": "spikes-up",
+                      "stateValue": false
+                    }
+                  ]
                 },
                 {
                   "type": "play_sound",
-                  "delay": 2,
                   "sound": "impactmining_003",
                   "targetId": "self",
                   "volume": 2,
                   "conditions": [
                     {
-                      "type": "has_state",
-                      "entityId": "self",
-                      "stateKey": "spikes-up"
+                      "type": "state_equals",
+                      "stateKey": "spikes-up",
+                      "entityId": "vol_11875031",
+                      "stateValue": false
                     }
                   ]
                 },
@@ -12426,14 +12364,22 @@
                   "type": "play_sound",
                   "sound": "impactmining_004",
                   "targetId": "self",
-                  "volume": 2
+                  "volume": 2,
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_11875031",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
                 },
                 {
                   "type": "set_state",
-                  "targetId": "vol_80c94968",
+                  "targetId": "vol_11875031",
                   "stateKey": "spikes-up",
                   "stateValue": "__toggle__",
-                  "delay": 2
+                  "delay": 1
                 }
               ],
               "oneShot": false
@@ -12441,9 +12387,150 @@
           ],
           "label": "spike cube 1",
           "prefab": {
-            "prefabId": "pfb_76b82ec0",
-            "instanceId": "pfi_aaed9392",
-            "memberKey": "obj_77ceb6af"
+            "prefabId": "pfb_5e81e6ab",
+            "instanceId": "pfi_84888613",
+            "memberKey": "obj_5daa2945"
+          }
+        },
+        {
+          "id": "obj_3e4593ab",
+          "assetId": "hazard_spiketrap",
+          "position": {
+            "x": -35.115095399719564,
+            "y": 6.970343860100476,
+            "z": -58.61415037430124
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "scripts": [
+            {
+              "id": "script_4383a0d7",
+              "label": "spike pop intervals",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_timer",
+                "interval": 2,
+                "repeat": true
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_animation",
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Up",
+                  "animationLoop": false,
+                  "animationHold": true,
+                  "delay": 0,
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_9cb88562",
+                      "stateKey": "spikes-up",
+                      "stateValue": false
+                    }
+                  ]
+                },
+                {
+                  "type": "play_animation",
+                  "delay": 0,
+                  "targetId": "self",
+                  "animation": "SpikeTrap_Down",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_9cb88562",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
+                },
+                {
+                  "type": "despawn_object",
+                  "delay": 0,
+                  "targetId": "vol_9cb88562",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_9cb88562",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
+                },
+                {
+                  "type": "spawn_object",
+                  "delay": 0,
+                  "targetId": "vol_9cb88562",
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_9cb88562",
+                      "stateKey": "spikes-up",
+                      "stateValue": false
+                    }
+                  ]
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "impactmining_003",
+                  "targetId": "self",
+                  "volume": 2,
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "stateKey": "spikes-up",
+                      "entityId": "vol_9cb88562",
+                      "stateValue": false
+                    }
+                  ]
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "impactmining_004",
+                  "targetId": "self",
+                  "volume": 2,
+                  "conditions": [
+                    {
+                      "type": "state_equals",
+                      "entityId": "vol_9cb88562",
+                      "stateKey": "spikes-up",
+                      "stateValue": true
+                    }
+                  ]
+                },
+                {
+                  "type": "set_state",
+                  "targetId": "vol_9cb88562",
+                  "stateKey": "spikes-up",
+                  "stateValue": "__toggle__",
+                  "delay": 1
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "label": "spike cube 1",
+          "prefab": {
+            "prefabId": "pfb_5e81e6ab",
+            "instanceId": "pfi_35ce2e91",
+            "memberKey": "obj_5daa2945"
           }
         }
       ],
@@ -12679,34 +12766,6 @@
           }
         },
         {
-          "id": "pfi_d34c12ad",
-          "prefabId": "pfb_76b82ec0",
-          "version": 3,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": -35.00633227865558,
-              "y": 6.970343860100478,
-              "z": -58.595666518400144
-            },
-            "rotationY": 0
-          }
-        },
-        {
-          "id": "pfi_aaed9392",
-          "prefabId": "pfb_76b82ec0",
-          "version": 3,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": -35.0208314916195,
-              "y": 7.039584523910544,
-              "z": -68
-            },
-            "rotationY": 0
-          }
-        },
-        {
           "id": "pfi_a1f1699f",
           "prefabId": "pfb_ac09927f",
           "version": 1,
@@ -12744,6 +12803,34 @@
               "x": -32,
               "y": 8.34236340881039,
               "z": -80
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_84888613",
+          "prefabId": "pfb_5e81e6ab",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -35.020831491619504,
+              "y": 7.039584523910544,
+              "z": -68
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_35ce2e91",
+          "prefabId": "pfb_5e81e6ab",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -35.10876312106399,
+              "y": 6.970343860100476,
+              "z": -58.56635070426669
             },
             "rotationY": 0
           }
@@ -13390,63 +13477,7 @@
           }
         },
         {
-          "id": "vol_da03ef3d",
-          "label": "hurt spikes",
-          "position": {
-            "x": -35,
-            "y": 7.501219535967445,
-            "z": -58.547866848365594
-          },
-          "size": {
-            "x": 2,
-            "y": 0.5,
-            "z": 2
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "script_e707b0da",
-              "label": "Hurt spikes",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "adjust_number",
-                  "stateKey": "Hearts",
-                  "numberDelta": -1
-                },
-                {
-                  "type": "launch_player",
-                  "launchRelativeTo": "player",
-                  "launchSpeed": 7.4,
-                  "launchHSpeed": 7.4,
-                  "launchDirDeg": -180
-                },
-                {
-                  "type": "flash_player"
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "stateSchema": {
-            "spikes-up": {
-              "type": "boolean",
-              "default": false
-            }
-          },
-          "prefab": {
-            "prefabId": "pfb_76b82ec0",
-            "instanceId": "pfi_d34c12ad",
-            "memberKey": "vol_d8be00e2"
-          }
-        },
-        {
-          "id": "vol_80c94968",
+          "id": "vol_11875031",
           "label": "hurt spikes",
           "position": {
             "x": -35.01449921296392,
@@ -13461,7 +13492,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_b5e64125",
+              "id": "script_65d5c5ce",
               "label": "Hurt spikes",
               "zoneId": "demo",
               "enabled": true,
@@ -13496,9 +13527,65 @@
             }
           },
           "prefab": {
-            "prefabId": "pfb_76b82ec0",
-            "instanceId": "pfi_aaed9392",
-            "memberKey": "vol_d8be00e2"
+            "prefabId": "pfb_5e81e6ab",
+            "instanceId": "pfi_84888613",
+            "memberKey": "vol_80c94968"
+          }
+        },
+        {
+          "id": "vol_9cb88562",
+          "label": "hurt spikes",
+          "position": {
+            "x": -35.1024308424084,
+            "y": 7.501219535967444,
+            "z": -58.51855103423214
+          },
+          "size": {
+            "x": 2,
+            "y": 0.5,
+            "z": 2
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_ea93c525",
+              "label": "Hurt spikes",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "Hearts",
+                  "numberDelta": -1
+                },
+                {
+                  "type": "launch_player",
+                  "launchRelativeTo": "player",
+                  "launchSpeed": 7.4,
+                  "launchHSpeed": 7.4,
+                  "launchDirDeg": -180
+                },
+                {
+                  "type": "flash_player"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "stateSchema": {
+            "spikes-up": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "prefab": {
+            "prefabId": "pfb_5e81e6ab",
+            "instanceId": "pfi_35ce2e91",
+            "memberKey": "vol_80c94968"
           }
         }
       ],

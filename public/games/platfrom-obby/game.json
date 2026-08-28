@@ -963,6 +963,211 @@
         }
       ],
       "dateAdded": "2026-08-27"
+    },
+    {
+      "id": "pfb_5e81e6ab",
+      "name": "Spike Step 4",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_5daa2945",
+          "type": "object",
+          "def": {
+            "id": "obj_5daa2945",
+            "assetId": "hazard_spiketrap",
+            "position": {
+              "x": -0.006332278655577284,
+              "y": 0,
+              "z": -0.04779967003454999
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "demo",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "scripts": [
+              {
+                "id": "script_3ea812cb",
+                "label": "spike pop intervals",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_timer",
+                  "interval": 2,
+                  "repeat": true
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "play_animation",
+                    "targetId": "self",
+                    "animation": "SpikeTrap_Up",
+                    "animationLoop": false,
+                    "animationHold": true,
+                    "delay": 0,
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "entityId": "vol_80c94968",
+                        "stateKey": "spikes-up",
+                        "stateValue": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "play_animation",
+                    "delay": 0,
+                    "targetId": "self",
+                    "animation": "SpikeTrap_Down",
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "entityId": "vol_80c94968",
+                        "stateKey": "spikes-up",
+                        "stateValue": true
+                      }
+                    ]
+                  },
+                  {
+                    "type": "despawn_object",
+                    "delay": 0,
+                    "targetId": "vol_80c94968",
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "entityId": "vol_80c94968",
+                        "stateKey": "spikes-up",
+                        "stateValue": true
+                      }
+                    ]
+                  },
+                  {
+                    "type": "spawn_object",
+                    "delay": 0,
+                    "targetId": "vol_80c94968",
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "entityId": "vol_80c94968",
+                        "stateKey": "spikes-up",
+                        "stateValue": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "impactmining_003",
+                    "targetId": "self",
+                    "volume": 2,
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "stateKey": "spikes-up",
+                        "entityId": "vol_80c94968",
+                        "stateValue": false
+                      }
+                    ]
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "impactmining_004",
+                    "targetId": "self",
+                    "volume": 2,
+                    "conditions": [
+                      {
+                        "type": "state_equals",
+                        "entityId": "vol_80c94968",
+                        "stateKey": "spikes-up",
+                        "stateValue": true
+                      }
+                    ]
+                  },
+                  {
+                    "type": "set_state",
+                    "targetId": "vol_80c94968",
+                    "stateKey": "spikes-up",
+                    "stateValue": "__toggle__",
+                    "delay": 1
+                  }
+                ],
+                "oneShot": false
+              }
+            ],
+            "label": "spike cube 1"
+          }
+        },
+        {
+          "memberKey": "vol_80c94968",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_80c94968",
+            "label": "hurt spikes",
+            "position": {
+              "x": 0.006332278655584389,
+              "y": 0.5308756758669677,
+              "z": 0.04779967003454999
+            },
+            "size": {
+              "x": 2,
+              "y": 0.5,
+              "z": 2
+            },
+            "zoneId": "demo",
+            "scripts": [
+              {
+                "id": "script_b5e64125",
+                "label": "Hurt spikes",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "adjust_number",
+                    "stateKey": "Hearts",
+                    "numberDelta": -1
+                  },
+                  {
+                    "type": "launch_player",
+                    "launchRelativeTo": "player",
+                    "launchSpeed": 7.4,
+                    "launchHSpeed": 7.4,
+                    "launchDirDeg": -180
+                  },
+                  {
+                    "type": "flash_player"
+                  }
+                ],
+                "oneShot": false
+              }
+            ],
+            "stateSchema": {
+              "spikes-up": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-08-28"
     }
   ],
   "uiElements": [
