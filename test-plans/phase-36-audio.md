@@ -130,3 +130,9 @@ waveforms — identical pictures mean the capture repeated, not the player.
 With the recorder (or any importer/dialog) open, click the dimmed area outside
 the card: it stays open. Cancel / ✕ still close it. Applies to all 14 editor
 modals; the in-game bag overlay still closes on click-anywhere by design.
+
+### v4.79.44 — trim steppers
+
+On a take row, click ▲ three times quickly → TRIM START reads 0.3 (not 0.1);
+▼ → 0.2. Type "0.45" — it stays as typed and the duration updates. With the
+field focused, ArrowUp/ArrowDown step by 0.1. ▼ never goes below 0.

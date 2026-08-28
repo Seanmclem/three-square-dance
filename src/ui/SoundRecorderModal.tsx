@@ -92,6 +92,38 @@ function computePeaks(buf: AudioBuffer): number[] {
   }
   return max > 0 ? out.map(v => v / max) : out;   // normalize so quiet takes still read
 }
+/** Trim second-field: plain text input (typing/decimals untouched) plus ▲/▼
+ *  buttons and ArrowUp/Down keys stepping the PARSED value by 0.1s. A native
+ *  type=number spinner would bring back the mid-decimal "" bug. */
+type StrUpdate = string | ((prev: string) => string);
+function TrimField({ value, onChange }: { value: string; onChange: (v: StrUpdate) => void }) {
+  // Functional update: rapid clicks / a held arrow key step from the LATEST
+  // value, not the one captured at render.
+  const step = (dir: 1 | -1) => onChange(prev => {
+    const n = Math.max(0, (parseFloat(prev) || 0) + dir * 0.1);
+    return (Math.round(n * 10) / 10).toString();
+  });
+  const arrow: React.CSSProperties = {
+    width: 16, height: 11, padding: 0, lineHeight: "10px", fontSize: 8, cursor: "pointer",
+    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#98a2b8",
+  };
+  return (
+    <span style={{ display: "inline-flex", alignItems: "stretch", gap: 1 }}>
+      <input inputMode="decimal" style={{ ...NUM, width: 48 }} value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === "ArrowUp")   { e.preventDefault(); step(1); }
+          if (e.key === "ArrowDown") { e.preventDefault(); step(-1); }
+        }} />
+      <span style={{ display: "inline-flex", flexDirection: "column", gap: 1 }}>
+        <button style={{ ...arrow, borderRadius: "3px 3px 0 0" }} title="+0.1s" tabIndex={-1}
+          onClick={e => { e.stopPropagation(); step(1); }}>▲</button>
+        <button style={{ ...arrow, borderRadius: "0 0 3px 3px" }} title="−0.1s" tabIndex={-1}
+          onClick={e => { e.stopPropagation(); step(-1); }}>▼</button>
+      </span>
+    </span>
+  );
+}
 const takeTrims = (t: Take) => {
   const trimStart = Math.max(0, parseFloat(t.trimStartStr) || 0);
   const trimEnd   = Math.max(0, parseFloat(t.trimEndStr) || 0);
@@ -195,9 +227,9 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
     setPlayingId(take.id);
   };
 
-  const patchTake = (id: number, patch: Partial<Take>) => {
+  const patchTrim = (id: number, key: "trimStartStr" | "trimEndStr", v: StrUpdate) => {
     stopPlayback();
-    setTakes(t => t.map(x => (x.id === id ? { ...x, ...patch } : x)));
+    setTakes(t => t.map(x => (x.id === id ? { ...x, [key]: typeof v === "function" ? v(x[key]) : v } : x)));
   };
   const deleteTake = (id: number) => {
     stopPlayback();
@@ -295,11 +327,9 @@ export function SoundRecorderModal({ onRecorded, onClose }: SoundRecorderModalPr
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 20 }}>
                     <span style={LABEL}>TRIM START (s)</span>
-                    <input inputMode="decimal" style={{ ...NUM, width: 48 }} value={t.trimStartStr}
-                      onChange={e => patchTake(t.id, { trimStartStr: e.target.value })} />
+                    <TrimField value={t.trimStartStr} onChange={v => patchTrim(t.id, "trimStartStr", v)} />
                     <span style={{ ...LABEL, marginLeft: 6 }}>END (s)</span>
-                    <input inputMode="decimal" style={{ ...NUM, width: 48 }} value={t.trimEndStr}
-                      onChange={e => patchTake(t.id, { trimEndStr: e.target.value })} />
+                    <TrimField value={t.trimEndStr} onChange={v => patchTrim(t.id, "trimEndStr", v)} />
                     {trimmedDur <= 0 && <span style={{ color: "#ccaa44", fontSize: 10, marginLeft: 6 }}>⚠ trim exceeds length</span>}
                   </div>
                 </div>
