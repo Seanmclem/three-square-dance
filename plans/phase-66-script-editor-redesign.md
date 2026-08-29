@@ -1,5 +1,11 @@
 # Phase 66 — Script editor redesign (brief for mockups)
 
+> **Decision (2026-08-29):** direction **E · Cards** with the **properties
+> panel** field style, chosen from the interactive prototype. Shipped as
+> v4.79.49 (see the arch-doc changelog for what was built). Follow-ups from
+> the review: condition rows ordered Whose state → State key → Condition;
+> popups stay open when their scrollbar is dragged; "delete block".
+
 > User ask (2026-08-28): "that whole UI is so nasty. needs redone." Written as
 > a self-contained brief: someone (or a Claude) with NO repo access should be
 > able to read this and produce mockups. Part A describes exactly what exists

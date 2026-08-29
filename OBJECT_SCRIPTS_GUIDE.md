@@ -106,6 +106,31 @@ both are gone:
   saves) is by script id — so collecting coin A marked coin B as spent.
   Copies now get fresh script ids.
 
+## The editor, since v4.79.49 (cards)
+
+A script reads top to bottom:
+
+- **The trigger card** — what fires the script, as a sentence ("every 2s",
+  "when the player enters hurt spikes"), with its settings as chips: click
+  *timer repeats every 2s* / *runs each time it fires* to toggle them; click
+  *no delay*, ⋯, or the title for the full trigger form. The script's name is
+  the editable title above the card.
+- **only when …** — script-level conditions as sentences; click one to edit
+  it, *+ condition* adds one.
+- **Action cards** — one per action: an icon for the family, the thing it acts
+  on as the title (`SpikeTrap_Up`, `coin_pickup`, `hurt spikes › spikes-up`),
+  the verb and parameters underneath. Click a card for its properties (one
+  open at a time); ⋯ for wrap-in-if, move to a branch, duplicate, delete.
+  The *+ action* / *+ if-block* dashed cards at the end add more.
+- **If-blocks** are grouped cards — an amber IF strip with the condition
+  sentence (click it to edit; *+ and* adds another), the branch's cards under
+  it, ELSE IF / ELSE strips, and a footer for *+ else if*, *+ else*, *unwrap*
+  (actions drop to the top level) and *delete block* (actions go too).
+
+Every form is a list of property rows — label on the left, control on the
+right — with switches for on/off settings and sliders for volumes and
+seconds. Nothing about what scripts can do changed; only how they read.
+
 ## If-blocks — actions that share a condition, with else / else if
 
 Actions in a script run in parallel, and any of them can sit inside an

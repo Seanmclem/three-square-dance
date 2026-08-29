@@ -93,10 +93,10 @@ const S = {
   }),
   field: {
     width: "100%",
-    background: "rgba(46,46,46,0.9)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: 4,
-    color: "#d4d8e2",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 6,
+    color: "#dde3f0",
     fontSize: 12,
     padding: "6px 8px",
     fontFamily: "monospace",
@@ -117,26 +117,28 @@ const S = {
   }),
   select: {
     width: "100%",
-    background: "rgba(46,46,46,0.9)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: 4,
-    color: "#d4d8e2",
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.06)",
+    borderRadius: 6,
+    color: "#dde3f0",
     fontSize: 12,
     padding: "6px 6px",
     outline: "none",
   } as const,
   sectionLabel: {
     color: "#8b94a8",
-    fontSize: 10,
+    fontSize: 11,
+    fontWeight: 600,
     letterSpacing: 1,
     padding: "8px 12px 4px",
     textTransform: "uppercase",
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
   } as const,
+  // Phase 66 — field labels read as sentence-case prose beside their control.
   fieldLabel: {
-    color: "#8b94a8",
-    fontSize: 9,
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+    color: "#98a2b8",
+    fontSize: 12,
+    fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
   } as const,
   divider: {
     borderTop: "1px solid rgba(255,255,255,0.05)",
@@ -1047,6 +1049,9 @@ function ScriptEditor({
   // Phase 65 — legacy per-action guards are shown (and, on first edit, saved)
   // as if-blocks. Identity when there is nothing to migrate.
   script = migrateActionGuards(script);
+  // Phase 66 — the trigger form hides behind the hero card; one action card open at a time.
+  const [trigOpen, setTrigOpen] = useState(false);
+  const [openAction, setOpenAction] = useState<number | null>(null);
   function set<K extends keyof ScriptDef>(key: K, val: ScriptDef[K]): void {
     onChange({ ...script, [key]: val });
   }
@@ -1082,52 +1087,94 @@ function ScriptEditor({
         <button style={{ ...S.btn(), padding: "3px 8px" }} onClick={onBack}>
           ←
         </button>
-        <span
-          style={{
-            color: "#c0c0c0",
-            fontSize: 12,
-            flex: 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {script.label || "Script"}
-        </span>
+        <input value={script.label} placeholder="Script name" title="Script name — click to rename"
+          onChange={(e) => set("label", e.target.value)}
+          style={{ flex: 1, minWidth: 0, background: "transparent", border: "1px solid transparent", borderRadius: 6,
+            color: "#dde3f0", fontSize: 13, fontWeight: 600, fontFamily: SANS, padding: "3px 6px", outline: "none" }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(80,140,255,0.5)"; }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = "transparent"; }} />
         {help && <HelpTooltip side="below" align="right" text={help} />}
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {/* Label */}
-        <div style={{ padding: "8px 12px" }}>
-          <div style={S.sectionLabel as React.CSSProperties}>Label</div>
-          <input
-            style={S.field}
-            value={script.label}
-            onChange={(e) => set("label", e.target.value)}
-          />
-        </div>
+        {/* Phase 66 — trigger hero card: what fires this script, with its
+            settings as chips; click the title for the full form. */}
+        {(() => {
+          const t = script.trigger;
+          const ownerKind = selectedObjectId?.startsWith("vol_") ? "volume" : "object";
+          const ctx: NameCtx = { zoneObjects, triggerVolumes, zoneDialogues,
+            owner: ownerIsEntity && selectedObjectId ? { id: selectedObjectId, kind: ownerKind } : undefined };
+          const scopeKey = (t.entityId ? `${nameOf(t.entityId, ctx)} › ` : "") + (t.targetId || "?");
+          const title =
+            t.type === "on_timer" ? `every ${t.interval ?? 5}s`
+            : t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact"
+              ? `${TRIGGER_LABELS[t.type]} ${ownerIsEntity ? `★ this ${ownerKind}` : nameOf(t.targetId, ctx) || "…"}`
+            : t.type === "on_state_changed" ? `when ${scopeKey} changes`
+            : t.type === "on_state_equals" ? `when ${scopeKey} becomes ${fmtVal(t.stateValue)}`
+            : t.type === "on_dialogue_end" ? `when "${zoneDialogues.find(d => d.id === t.targetId)?.label ?? t.targetId ?? "…"}" ends`
+            : TRIGGER_LABELS[t.type];
+          const icon = t.type === "on_timer" ? "clock"
+            : t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact" ? "enter"
+            : t.type === "on_state_changed" || t.type === "on_state_equals" || t.type === "on_health_zero" ? "state"
+            : t.type === "on_dialogue_end" ? "dialogue"
+            : t.type === "on_player_detected" || t.type === "on_player_lost" || t.type === "on_enemy_attack" ? "player" : "play";
+          return (
+            <div style={{ margin: "10px 12px 6px", padding: 12, borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start",
+              background: "linear-gradient(180deg, rgba(80,140,255,0.14), rgba(80,140,255,0.05))", border: "1px solid rgba(80,140,255,0.25)" }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(80,140,255,0.2)", color: "#80aaff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Ic name={icon} size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div onClick={() => setTrigOpen(o => !o)} title="Click to edit the trigger"
+                  style={{ color: trigOpen ? "#80aaff" : "#dde3f0", fontSize: 15, fontWeight: 600, fontFamily: SANS, cursor: "pointer", lineHeight: 1.3 }}>
+                  {title}
+                </div>
+                {ownerIsEntity && selectedObjectId && (
+                  <div style={{ color: "#8b94a8", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>on ★ {nameOf(selectedObjectId, ctx)}</div>
+                )}
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 6 }}>
+                  {t.type === "on_timer" && (
+                    <span style={CHIP(!!t.repeat)} title="Does the timer keep firing? Click to toggle"
+                      onClick={() => setTrigger({ repeat: t.repeat ? undefined : true })}>
+                      {t.repeat ? `timer repeats every ${t.interval ?? 5}s` : "timer fires once"}
+                    </span>
+                  )}
+                  <span style={CHIP(trigOpen)} title="Click to edit the trigger" onClick={() => setTrigOpen(o => !o)}>
+                    {t.delay ? `after a ${t.delay}s delay` : "no delay"}
+                  </span>
+                  <span style={CHIP(script.oneShot)} title="One-shot: the script runs once, ever. Click to toggle"
+                    onClick={() => set("oneShot", !script.oneShot)}>
+                    {script.oneShot ? "one-shot · runs once, ever" : "runs each time it fires"}
+                  </span>
+                  <span style={CHIP(false)} title="Edit trigger type / target / interval" onClick={() => setTrigOpen(o => !o)}>⋯</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
-        {/* Trigger */}
-        <div style={{ padding: "0 12px 8px" }}>
-          <div style={S.sectionLabel as React.CSSProperties}>Trigger</div>
-          <select
-            style={{ ...S.select, marginBottom: 4 }}
-            value={script.trigger.type}
-            onChange={(e) =>
-              setTrigger({
-                type: e.target.value as TriggerType,
-                targetId: undefined,
-                stateValue: undefined,
-              })
-            }
-          >
-            {TRIGGER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+        {/* Trigger form (Phase 66: shown when the hero is open) */}
+        {trigOpen && (
+        <div style={{ margin: "0 12px 8px", padding: "0 10px 6px", borderRadius: 8, background: "rgba(80,140,255,0.06)", outline: "1px solid rgba(80,140,255,0.3)" }}>
+          <F label="Trigger">
+            <select
+              style={S.select}
+              value={script.trigger.type}
+              onChange={(e) =>
+                setTrigger({
+                  type: e.target.value as TriggerType,
+                  targetId: undefined,
+                  stateValue: undefined,
+                })
+              }
+            >
+              {TRIGGER_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {TRIGGER_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </F>
 
           {/* State triggers' target is a state KEY, never "this entity" — the
               picker must render even on entity-owned scripts (else the key is
@@ -1212,14 +1259,13 @@ function ScriptEditor({
               {/* The engine always supported repeat (setInterval vs setTimeout) —
                   this checkbox was just never authorable. Damage-over-time
                   (HAZARDS_GUIDE lava recipe) depends on it. */}
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#98a2b8", cursor: "pointer", padding: "4px 0" }}>
+              <F label="Repeat every interval (off = fire once)">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="wb-switch"
                   checked={script.trigger.repeat ?? false}
                   onChange={(e) => setTrigger({ repeat: e.target.checked || undefined })}
                 />
-                Repeat every interval (off = fire once)
-              </label>
+              </F>
             </>
           )}
 
@@ -1234,74 +1280,27 @@ function ScriptEditor({
             </F>
           )}
 
-          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <label
-              style={{
-                color: "#888",
-                fontSize: 11,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={script.oneShot}
-                onChange={(e) => set("oneShot", e.target.checked)}
-              />
-              One-shot
-            </label>
-            <div style={{ flex: 1 }} />
-            <label
-              style={{
-                color: "#888",
-                fontSize: 11,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              Delay (s)
-              <input
-                type="number"
-                style={{ ...S.field, width: 52 }}
-                value={script.trigger.delay ?? ""}
-                placeholder="0"
-                onChange={(e) =>
-                  setTrigger({ delay: parseFloat(e.target.value) || undefined })
-                }
-              />
-            </label>
-          </div>
+          <F label="Delay before the actions start">
+            <RangeField value={script.trigger.delay} min={0} max={10} step={0.1} unit="s"
+              onChange={(v) => setTrigger({ delay: v && v > 0 ? v : undefined })} />
+          </F>
+          <F label="One-shot (runs once, ever)" style={{ borderBottom: "none" }}>
+            <input
+              type="checkbox" className="wb-switch"
+              checked={script.oneShot}
+              onChange={(e) => set("oneShot", e.target.checked)}
+            />
+          </F>
         </div>
+        )}
 
-        <div style={S.divider} />
-
-        {/* Conditions */}
-        <div style={{ padding: "0 12px 8px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span style={S.sectionLabel as React.CSSProperties}>
-              Conditions
-            </span>
-            <button
-              style={{ ...S.btn(), fontSize: 10 }}
-              onClick={() =>
-                set("conditions", [
-                  ...script.conditions,
-                  { type: "has_state" } as ScriptCondition,
-                ])
-              }
-            >
-              + Add
-            </button>
-          </div>
+        {/* Conditions — Phase 66: an "only when …" sentence line */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 8px", padding: "2px 14px 8px" }}>
+          <span style={{ color: "#8b94a8", fontSize: 11, fontFamily: SANS }}>only when</span>
+          {script.conditions.length === 0 && <span style={{ color: "#8b94a8", fontSize: 12, fontFamily: "monospace" }}>— always</span>}
           {script.conditions.map((c, i) => (
+            <Fragment key={i}>
+            {i > 0 && <span style={{ color: "#8b94a8", fontSize: 11, fontFamily: SANS }}>and</span>}
             <ConditionRow
               key={i}
               condition={c}
@@ -1326,53 +1325,15 @@ function ScriptEditor({
                 )
               }
             />
+            </Fragment>
           ))}
-          {script.conditions.length === 0 && (
-            <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>
-              (none)
-            </div>
-          )}
+          <button style={LINK_BTN} title="Add a script-level condition (gates the whole script)"
+            onClick={() => set("conditions", [...script.conditions, { type: "has_state" } as ScriptCondition])}>+ condition</button>
         </div>
 
-        <div style={S.divider} />
-
-        {/* Actions — plain rows and if-block cards (Phase 65), grouped in order of first appearance */}
-        <div style={{ padding: "0 12px 8px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <span style={S.sectionLabel as React.CSSProperties}>Actions</span>
-            <span style={{ flex: 1 }} />
-            <button
-              style={{ ...S.btn(), fontSize: 10 }}
-              title="Add a top-level action (always runs)"
-              onClick={() =>
-                set("actions", [
-                  ...script.actions,
-                  { type: "set_state" } as ScriptAction,
-                ])
-              }
-            >
-              + Add
-            </button>
-            <button
-              style={{ ...S.btn(), fontSize: 10, color: "#e8c14b" }}
-              title="Add an if-block: actions inside run only when its conditions pass; add else if / else branches"
-              onClick={() =>
-                set("blocks", [
-                  ...(script.blocks ?? []),
-                  { id: newBlockId(), branches: [{ conditions: [{ type: "has_state" } as ScriptCondition] }] },
-                ])
-              }
-            >
-              + If
-            </button>
-          </div>
+        {/* Actions — cards; if-blocks are grouped cards (Phase 65 / 66) */}
+        <div style={{ padding: "0 12px 10px" }}>
+          <div style={{ ...S.sectionLabel, padding: "6px 0 6px" }}>Actions</div>
           {(() => {
             const blocks = script.blocks ?? [];
             const condScope = {
@@ -1393,6 +1354,13 @@ function ScriptEditor({
                   key={i}
                   action={a}
                   blocks={blocks}
+                  open={openAction === i}
+                  onToggle={() => setOpenAction(openAction === i ? null : i)}
+                  onDuplicate={() => {
+                    const copy = structuredClone(a);
+                    set("actions", [...script.actions.slice(0, i + 1), copy, ...script.actions.slice(i + 1)]);
+                    setOpenAction(i + 1);
+                  }}
                   stateKeyTypes={stateKeyTypes}
                   zoneObjects={zoneObjects}
                   zonePlatforms={zonePlatforms}
@@ -1412,7 +1380,7 @@ function ScriptEditor({
                   playerModelAssetId={playerModelAssetId}
                   owner={owner}
                   onChange={(na) => patchAction(i, na)}
-                  onRemove={() => set("actions", script.actions.filter((_, j) => j !== i))}
+                  onRemove={() => { set("actions", script.actions.filter((_, j) => j !== i)); setOpenAction(null); }}
                   onWrap={a.block ? undefined : () => {
                     // Wrap this action in a fresh if-block with one blank condition.
                     const id = newBlockId();
@@ -1441,10 +1409,22 @@ function ScriptEditor({
               }
             });
             for (const blk of blocks) if (!seen.has(blk.id)) { seen.add(blk.id); rows.push({ kind: "block", block: blk }); }
+            const addCards = (
+              <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                <button style={ADD_CARD} title="Add a top-level action (always runs)"
+                  onClick={() => { set("actions", [...script.actions, { type: "set_state" } as ScriptAction]); setOpenAction(script.actions.length); }}>
+                  <Ic name="plus" size={12} /> action
+                </button>
+                <button style={{ ...ADD_CARD, color: "#e8c14b" }} title="Add an if-block: actions inside run only when its conditions pass; add else if / else branches"
+                  onClick={() => set("blocks", [...(script.blocks ?? []), { id: newBlockId(), branches: [{ conditions: [{ type: "has_state" } as ScriptCondition] }] }])}>
+                  <Ic name="branch" size={12} /> if-block
+                </button>
+              </div>
+            );
             if (rows.length === 0) {
-              return <div style={{ color: "#98a2b8", fontSize: 11, padding: "4px 0" }}>(none)</div>;
+              return <>{addCards}</>;
             }
-            return rows.map(g => g.kind === "action" ? renderAction(g.index) : (
+            return <>{rows.map(g => g.kind === "action" ? renderAction(g.index) : (
               <IfBlockCard
                 key={g.block.id}
                 block={g.block}
@@ -1454,7 +1434,7 @@ function ScriptEditor({
                 renderActions={(branch) => script.actions.map((a, i) =>
                   a.block?.id === g.block.id && a.block.branch === branch ? renderAction(i) : null)}
                 onChange={(nb) => set("blocks", blocks.map(b => (b.id === nb.id ? nb : b)))}
-                onAddAction={(branch) => set("actions", [...script.actions, { type: "set_state", block: { id: g.block.id, branch } } as ScriptAction])}
+                onAddAction={(branch) => { set("actions", [...script.actions, { type: "set_state", block: { id: g.block.id, branch } } as ScriptAction]); setOpenAction(script.actions.length); }}
                 onUnwrap={() => onChange({
                   ...script,
                   blocks: blocks.filter(b => b.id !== g.block.id),
@@ -1464,8 +1444,13 @@ function ScriptEditor({
                     return rest as ScriptAction;
                   }),
                 })}
+                onDelete={() => { setOpenAction(null); onChange({
+                  ...script,
+                  blocks: blocks.filter(b => b.id !== g.block.id),
+                  actions: script.actions.filter(a => a.block?.id !== g.block.id),
+                }); }}
               />
-            ));
+            ))}{addCards}</>;
           })()}
         </div>
 
@@ -1496,9 +1481,14 @@ function ScriptEditor({
 // ── Labeled field wrapper ─────────────────────────────────────────────────────
 // A tiny caption above a field so its meaning survives once a value replaces
 // the placeholder (a filled "checkpoint" input says nothing on its own).
+/** Phase 66 — a property row: label on the left, control on the right, hairline
+ *  under it. Every form in the panel (all 37 action types, conditions, the
+ *  trigger) is built from these, so this one component is the "properties
+ *  panel" look. `flex` is accepted for source compatibility and ignored — a
+ *  row is always full width. */
 function F({
   label,
-  flex,
+  flex: _flex,
   style,
   children,
 }: {
@@ -1510,16 +1500,37 @@ function F({
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        ...(flex !== undefined ? { flex, minWidth: 0 } : {}),
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(150px, 60%)",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        minHeight: 36,
+        padding: "2px 0",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
         ...style,
       }}
     >
       <span style={S.fieldLabel}>{label}</span>
-      {children}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 6, minWidth: 0 }}>{children}</div>
     </div>
+  );
+}
+
+/** Phase 66 — a number that also has a slider (volume, blend, fade, delay). */
+function RangeField({ value, min, max, step, unit, onChange }: {
+  value: number | undefined; min: number; max: number; step: number; unit?: string;
+  onChange: (v: number | undefined) => void;
+}) {
+  return (
+    <>
+      <input type="range" className="wb-range" min={min} max={max} step={step} value={value ?? min}
+        onChange={(e) => onChange(parseFloat(e.target.value))} />
+      <input type="number" min={min} step={step} style={{ ...S.field, width: 58, textAlign: "right" }}
+        value={value ?? ""} placeholder="0"
+        onChange={(e) => onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))} />
+      {unit && <span style={{ color: "#8b94a8", fontSize: 11 }}>{unit}</span>}
+    </>
   );
 }
 
@@ -1818,6 +1829,9 @@ function TargetCombobox({
       />
       {open && (
         <div
+          // Keep the input focused for ANY mouse-down inside the popup — including
+          // its scrollbar — otherwise the input blurs and the list closes mid-scroll.
+          onMouseDown={(e) => e.preventDefault()}
           style={{
             position: "absolute", left: 0, right: 0, zIndex: 20,
             ...(flipUp ? { bottom: "100%", marginBottom: 2 } : { top: "100%", marginTop: 2 }),
@@ -1898,7 +1912,7 @@ function KeySuggestInput({ value, suggestions, placeholder, onChange }: {
         onChange={e => { onChange(e.target.value); openAt(); }}
         onKeyDown={e => { if (e.key === "Escape" || e.key === "Enter") { setOpen(false); (e.target as HTMLInputElement).blur(); } }} />
       {open && filtered.length > 0 && (
-        <div style={{ position: "absolute", left: 0, right: 0, zIndex: 20,
+        <div onMouseDown={(e) => e.preventDefault()} style={{ position: "absolute", left: 0, right: 0, zIndex: 20,
           ...(flipUp ? { bottom: "100%", marginBottom: 2 } : { top: "100%", marginTop: 2 }),
           maxHeight: 180, overflowY: "auto",
           background: "rgba(24,26,33,0.98)", border: "1px solid rgba(255,255,255,0.15)",
@@ -1999,6 +2013,179 @@ function PositionSourcePicker({
 
 // ── ConditionRow ──────────────────────────────────────────────────────────────
 
+
+// ── Phase 66 — cards vocabulary ───────────────────────────────────────────────
+const SANS = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+const ACTION_LABELS: Record<ActionType, string> = {
+  play_sound: "play sound", stop_sound: "stop sound", play_music: "play music", stop_music: "stop music",
+  set_footstep: "set footstep sound", show_dialogue: "show dialogue", move_object: "move", play_animation: "play animation",
+  spawn_npc: "spawn NPC", despawn_object: "despawn", spawn_object: "spawn", change_material: "change material",
+  open_door: "open door", close_door: "close door", set_state: "set state", adjust_number: "adjust number",
+  delete_state: "delete state", store_position: "store position", fire_event: "fire event", fade_screen: "fade screen",
+  teleport_player: "teleport player", launch_player: "launch player", respawn_player: "respawn player",
+  show_ui: "show UI", hide_ui: "hide UI", run_script: "run script", load_scene: "load scene",
+  start_mover: "start mover", stop_mover: "stop mover", toggle_mover: "toggle mover", flash_player: "flash player",
+  light_on: "light on", light_off: "light off", toggle_light: "toggle light",
+  give_item: "give item", take_item: "take item", transfer_item: "transfer item",
+};
+const TRIGGER_LABELS: Record<TriggerType, string> = {
+  on_player_enter: "when the player enters", on_player_exit: "when the player leaves", on_interact: "when the player interacts with",
+  on_timer: "every N seconds", on_state_changed: "when a state changes", on_state_equals: "when a state becomes a value",
+  on_level_load: "when the level loads", on_game_start: "on game start", on_health_zero: "when health reaches 0",
+  on_dialogue_end: "when a dialogue ends", on_player_detected: "when this enemy spots the player",
+  on_player_lost: "when this enemy loses the player", on_enemy_attack: "when this enemy attacks",
+};
+
+/** Small stroke icons, one style, so cards read at a glance. */
+function Ic({ name, size = 16 }: { name: string; size?: number }) {
+  const p = { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (name) {
+    case "clock":   return <svg {...p}><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></svg>;
+    case "enter":   return <svg {...p}><path d="M3 8h7M7 4.5 10.5 8 7 11.5" /><path d="M12.5 3v10" /></svg>;
+    case "play":    return <svg {...p}><path d="M5 3.5v9l7-4.5z" /></svg>;
+    case "sound":   return <svg {...p}><path d="M3 6.5v3h2.5L9 12V4L5.5 6.5z" /><path d="M11 6a3 3 0 0 1 0 4" /></svg>;
+    case "despawn": return <svg {...p}><rect x="3" y="3" width="10" height="10" rx="2" /><path d="M6 6l4 4M10 6l-4 4" /></svg>;
+    case "spawn":   return <svg {...p}><rect x="3" y="3" width="10" height="10" rx="2" /><path d="M8 5.5v5M5.5 8h5" /></svg>;
+    case "state":   return <svg {...p}><rect x="2" y="5" width="12" height="6" rx="3" /><circle cx="10" cy="8" r="1.8" fill="currentColor" stroke="none" /></svg>;
+    case "branch":  return <svg {...p}><path d="M8 2v4M8 6l-4 4M8 6l4 4M4 10v4M12 10v4" /></svg>;
+    case "plus":    return <svg {...p}><path d="M8 3.5v9M3.5 8h9" /></svg>;
+    case "dots":    return <svg {...p}><circle cx="4" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.2" fill="currentColor" stroke="none" /></svg>;
+    case "player":  return <svg {...p}><circle cx="8" cy="5" r="2.5" /><path d="M3.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" /></svg>;
+    case "item":    return <svg {...p}><path d="M3 6h10l-1 7.5H4z" /><path d="M6 6V4.5a2 2 0 0 1 4 0V6" /></svg>;
+    case "flow":    return <svg {...p}><path d="M2.5 8h6M8.5 8l-2.5-2.5M8.5 8 6 10.5" /><rect x="10" y="4" width="3.5" height="8" rx="1" /></svg>;
+    case "light":   return <svg {...p}><path d="M5.5 10.5a4 4 0 1 1 5 0v1.5h-5z" /><path d="M6.5 14h3" /></svg>;
+    case "move":    return <svg {...p}><path d="M8 2v12M2 8h12M8 2 6 4M8 2l2 2M8 14l-2-2M8 14l2-2M2 8l2-2M2 8l2 2M14 8l-2-2M14 8l-2 2" /></svg>;
+    case "door":    return <svg {...p}><rect x="3.5" y="2.5" width="9" height="11" rx="1" /><circle cx="10" cy="8" r="0.9" fill="currentColor" stroke="none" /></svg>;
+    case "mover":   return <svg {...p}><path d="M2.5 8h11M10.5 5l3 3-3 3" /><rect x="2.5" y="11.5" width="11" height="2" rx="1" /></svg>;
+    case "material":return <svg {...p}><circle cx="8" cy="8" r="6" /><path d="M8 2a6 6 0 0 1 0 12" fill="currentColor" stroke="none" opacity="0.5" /></svg>;
+    case "dialogue":return <svg {...p}><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" /></svg>;
+    default:        return <svg {...p}><circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" /></svg>;
+  }
+}
+
+function actionFamily(type: ActionType): { icon: string; tint: string } {
+  switch (type) {
+    case "play_sound": case "stop_sound": case "play_music": case "stop_music": case "set_footstep": return { icon: "sound", tint: "#44cc88" };
+    case "set_state": case "adjust_number": case "delete_state": case "store_position": case "fire_event": return { icon: "state", tint: "#e8c14b" };
+    case "teleport_player": case "launch_player": case "respawn_player": case "flash_player": case "fade_screen": return { icon: "player", tint: "#c48cff" };
+    case "give_item": case "take_item": case "transfer_item": return { icon: "item", tint: "#e0a050" };
+    case "show_dialogue": return { icon: "dialogue", tint: "#80aaff" };
+    case "show_ui": case "hide_ui": case "run_script": case "load_scene": return { icon: "flow", tint: "#80aaff" };
+    case "play_animation": return { icon: "play", tint: "#80aaff" };
+    case "despawn_object": return { icon: "despawn", tint: "#cc6666" };
+    case "spawn_object": case "spawn_npc": return { icon: "spawn", tint: "#44cc88" };
+    case "light_on": case "light_off": case "toggle_light": return { icon: "light", tint: "#e8c14b" };
+    case "start_mover": case "stop_mover": case "toggle_mover": return { icon: "mover", tint: "#80aaff" };
+    case "open_door": case "close_door": return { icon: "door", tint: "#80aaff" };
+    case "move_object": return { icon: "move", tint: "#80aaff" };
+    case "change_material": return { icon: "material", tint: "#80aaff" };
+    default: return { icon: "dot", tint: "#8b94a8" };
+  }
+}
+
+interface NameCtx {
+  zoneObjects: WorldObject[]; triggerVolumes: TriggerVolume[]; groups?: GroupDef[]; zoneLights?: LightDef[];
+  zoneDialogues?: DialogueTreeDef[]; worldItems?: ItemDef[]; uiElements?: UiElementDef[];
+  owner?: { id: string; kind: "object" | "volume" };
+}
+const nameOf = (id: string | undefined, ctx: NameCtx): string => {
+  if (!id) return "";
+  if (id === "self") return ctx.owner ? `★ this ${ctx.owner.kind}` : "★ this";
+  if (id === "player" || id === "__player__") return "the player";
+  const g = ctx.groups?.find(x => x.id === id); if (g) return `⊞ ${g.name}`;
+  const o = ctx.zoneObjects.find(x => x.id === id); if (o) return o.label || id;
+  const v = ctx.triggerVolumes.find(x => x.id === id); if (v) return v.label || id;
+  const l = ctx.zoneLights?.find(x => x.id === id); if (l) return l.label || id;
+  return id;
+};
+const soundName = (id: string | undefined): string => (id ? (assetManager.getSoundDef(id)?.label ?? id) : "");
+const fmtVec = (v: { x: number; y: number; z: number } | undefined): string => v ? `${v.x} · ${v.y} · ${v.z}` : "";
+const fmtVal = (v: unknown): string => v === "__toggle__" ? "toggle" : v == null ? "?" : typeof v === "string" ? v : JSON.stringify(v);
+
+/** Card title/subtitle for an action, with ids resolved to names. */
+function describeAction(a: ScriptAction, ctx: NameCtx): { title: string; sub: string } {
+  const verb = ACTION_LABELS[a.type] ?? a.type;
+  const tgt = nameOf(a.targetId, ctx);
+  const scopeKey = (a.targetId ? `${tgt} › ` : "") + (a.stateKey ?? "?");
+  let noun = ""; const tail: string[] = [];
+  switch (a.type) {
+    case "play_sound": noun = soundName(a.sound); if (a.volume != null) tail.push(`vol ${a.volume}`); if (tgt) tail.push(`at ${tgt}`); else if (a.position) tail.push(`at ${fmtVec(a.position)}`); if (a.loop) tail.push("loop"); break;
+    case "stop_sound": case "set_footstep": noun = soundName(a.sound); break;
+    case "play_music": noun = soundName(a.music ?? a.sound); if (a.volume != null) tail.push(`vol ${a.volume}`); if (a.loop === false) tail.push("no loop"); if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
+    case "stop_music": noun = "music"; if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
+    case "show_dialogue": noun = ctx.zoneDialogues?.find(d => d.id === a.dialogueId)?.label ?? a.dialogueId ?? ""; break;
+    case "move_object": noun = tgt; if (a.position) tail.push(`to ${fmtVec(a.position)}`); break;
+    case "play_animation": noun = a.animation ?? ""; if (tgt) tail.push(`on ${tgt}`); if (a.animationHold) tail.push("hold at end"); if (a.animationLoop) tail.push("loop"); break;
+    case "despawn_object": case "spawn_object": noun = tgt; if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
+    case "change_material": noun = tgt; if (a.material) tail.push(a.material); break;
+    case "set_state": noun = scopeKey; tail.push(`→ ${fmtVal(a.stateValue)}`); break;
+    case "adjust_number": noun = scopeKey; if (a.numberDelta != null) tail.push(`${a.numberDelta >= 0 ? "+" : ""}${a.numberDelta}`); break;
+    case "delete_state": noun = scopeKey; break;
+    case "store_position": noun = a.positionKey ?? a.stateKey ?? ""; if (a.posSource === "object") tail.push(`of ${tgt}`); else if (a.posSource === "coords") tail.push(fmtVec(a.position)); else tail.push("of the player"); break;
+    case "fire_event": noun = a.eventId ?? ""; break;
+    case "fade_screen": noun = a.fadeColor ?? "black"; if (a.fadeDuration != null) tail.push(`${a.fadeDuration}s`); break;
+    case "teleport_player": noun = a.positionKey ? `saved "${a.positionKey}"` : fmtVec(a.position); break;
+    case "launch_player": noun = `${a.launchSpeed ?? 0} m/s up`; if (a.launchHSpeed) tail.push(`${a.launchHSpeed} m/s forward`); if (a.launchDirDeg != null) tail.push(`${a.launchDirDeg}°`); break;
+    case "respawn_player": noun = a.positionKey ? `at "${a.positionKey}"` : "at the checkpoint"; if (a.restoreHealth) tail.push("restore health"); break;
+    case "flash_player": noun = a.flashColor ?? ""; if (a.flashDuration != null) tail.push(`${a.flashDuration}s`); break;
+    case "show_ui": case "hide_ui": noun = ctx.uiElements?.find(u => u.id === a.uiElementId)?.label ?? a.uiElementId ?? ""; break;
+    case "run_script": noun = a.script ?? ""; break;
+    case "load_scene": noun = a.sceneId ?? ""; break;
+    case "give_item": case "take_item": case "transfer_item": {
+      const item = ctx.worldItems?.find(i => i.id === a.itemId)?.label ?? a.itemId ?? "";
+      noun = `${a.count ?? 1}× ${item}`;
+      if (a.type === "transfer_item") tail.push(`${nameOf(a.fromId, ctx) || "?"} → ${nameOf(a.toId, ctx) || "?"}`); else if (tgt) tail.push(tgt);
+      break;
+    }
+    default: noun = tgt;
+  }
+  if (a.delay) tail.push(`after ${a.delay}s`);
+  const sub = [noun ? verb : "", ...tail].filter(Boolean).join(" · ");
+  return { title: noun || verb, sub };
+}
+
+/** One condition as a sentence. */
+function describeCondition(c: ScriptCondition, ctx: NameCtx, worldItems: ItemDef[]): string {
+  const not = c.not ? "unless " : "";
+  const scope = c.entityId ? `${nameOf(c.entityId, ctx)} › ` : "";
+  const key = c.stateKey || "?";
+  switch (c.type) {
+    case "player_falling": return `${not}player is falling`;
+    case "has_item": return `${not}has ${c.compareOp && c.compareOp !== ">=" ? c.compareOp + " " : ""}${c.count ?? 1}× ${worldItems.find(i => i.id === c.itemId)?.label ?? c.itemId ?? "?"}`;
+    case "state_equals": return `${not}${scope}${key} = ${fmtVal(c.stateValue)}`;
+    case "compare_number": return `${not}${scope}${key} ${c.compareOp ?? ">="} ${c.stateValue ?? "?"}`;
+    default: return `${not}${scope}${key} is set`;
+  }
+}
+
+const LINK_BTN: React.CSSProperties = { background: "none", border: "none", color: "#8b94a8", fontSize: 11, fontFamily: SANS, cursor: "pointer", padding: "2px 4px", opacity: 0.8 };
+const ADD_CARD: React.CSSProperties = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: 8, borderRadius: 8,
+  border: "1px dashed rgba(255,255,255,0.16)", background: "none", color: "#98a2b8", fontSize: 12, fontFamily: SANS, cursor: "pointer" };
+const CHIP = (on: boolean): React.CSSProperties => ({
+  display: "inline-flex", alignItems: "center", fontSize: 10, padding: "2px 8px", borderRadius: 10, cursor: "pointer", fontFamily: SANS,
+  border: `1px solid ${on ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.14)"}`, color: on ? "#80aaff" : "#98a2b8",
+  background: on ? "rgba(80,140,255,0.1)" : "rgba(255,255,255,0.03)",
+});
+
+/** ⋯ menu shared by action cards. */
+function CardMenu({ items, onClose }: { items: Array<{ label: string; onClick: () => void; danger?: boolean; heading?: boolean }>; onClose: () => void }) {
+  return (
+    <>
+      <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={(e) => { e.stopPropagation(); onClose(); }} />
+      <div className="wb-menu" onClick={(e) => e.stopPropagation()}
+        style={{ position: "absolute", right: 6, top: 30, zIndex: 41, minWidth: 190, background: "rgba(28,28,28,0.99)",
+          border: "1px solid rgba(255,255,255,0.12)", borderRadius: 6, boxShadow: "0 6px 20px rgba(0,0,0,0.5)", padding: 3, display: "flex", flexDirection: "column" }}>
+        {items.map((it, i) => it.heading
+          ? <div key={i} style={{ ...S.fieldLabel, fontSize: 10, padding: "5px 8px 2px", color: "#6f7890" }}>{it.label}</div>
+          : <button key={i} onClick={() => { onClose(); it.onClick(); }}
+              style={{ textAlign: "left", background: "none", border: "none", padding: "6px 8px", borderRadius: 4, cursor: "pointer",
+                color: it.danger ? "#cc6666" : "#c2cadb", fontSize: 11, fontFamily: SANS }}>{it.label}</button>)}
+      </div>
+    </>
+  );
+}
+
 function ConditionRow({
   condition,
   worldItems,
@@ -2013,77 +2200,62 @@ function ConditionRow({
   onChange: (c: ScriptCondition) => void;
   onRemove: () => void;
 }) {
-  // Scope-aware key suggestions: an entity scope suggests THAT entity's
-  // registered state keys instead of the global list.
+  // Phase 66 — a condition reads as a sentence; click it for its property rows.
+  // A freshly added (blank) condition opens straight away.
+  const blank = !condition.stateKey && !condition.itemId && condition.type === "has_state";
+  const [open, setOpen] = useState(blank);
   const entKeys = scope ? entityStateKeys(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : undefined;
+  const ctx: NameCtx = { zoneObjects: scope?.zoneObjects ?? [], triggerVolumes: scope?.triggerVolumes ?? [],
+    owner: scope?.ownerId ? { id: scope.ownerId, kind: scope.ownerId.startsWith("vol_") ? "volume" : "object" } : undefined };
+  const text = describeCondition(condition, ctx, worldItems);
+  const keyType = (() => {
+    const targets = scope ? resolveStateEntities(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
+    const t = targets.map(e => e.stateSchema?.[condition.stateKey ?? ""]?.type).find(Boolean);
+    return t ?? (!targets.length ? scope?.stateKeyTypes?.[condition.stateKey ?? ""] : undefined);
+  })();
   return (
-    <div
-      style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4, alignItems: "flex-end" }}
-    >
-      <select
-        style={{ ...S.select, flex: "0 0 120px" }}
-        value={condition.type}
-        onChange={(e) =>
-          onChange({ ...condition, type: e.target.value as ConditionType })
-        }
-      >
-        {CONDITION_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {CONDITION_LABELS[t] ?? t}
-          </option>
-        ))}
-      </select>
-      {scope && condition.type !== "player_falling" && (
-        <F label="Whose state" flex="0 0 128px">
-          <StateScopePicker
-            value={condition.entityId ?? ""}
-            zoneObjects={scope.zoneObjects}
-            triggerVolumes={scope.triggerVolumes}
-            allowSelf={scope.allowSelf}
-            selfLabel={scope.selfLabel}
-            ownerId={scope.ownerId}
-            onChange={(id) => onChange({ ...condition, entityId: id || undefined })}
-          />
-        </F>
-      )}
-      <label title='"unless" — invert: this condition must FAIL for the guard to pass'
-        style={{ display: "flex", alignItems: "center", gap: 3, color: condition.not ? "#e8c14b" : "#808090",
-                 fontSize: 10, paddingBottom: 7, cursor: "pointer", flexShrink: 0 }}>
-        <input type="checkbox" checked={condition.not ?? false}
-          onChange={(e) => onChange({ ...condition, not: e.target.checked || undefined })} />
-        unless
-      </label>
-      {condition.type === "player_falling" && (
-        <div style={{ flex: 1, color: "#98a2b8", fontSize: 10, fontStyle: "italic", paddingBottom: 7 }}>
-          passes only while the player is airborne and moving downward — the
-          goomba-stomp gate (walk-ins and rising jumps fail)
-        </div>
-      )}
-      {condition.type === "has_state" && (
-        <F label="State key" flex={1}>
-          <KeySuggestInput placeholder="state key"
-            value={condition.stateKey ?? ""}
-            suggestions={entKeys}
-            onChange={(v) => onChange({ ...condition, stateKey: v })}
-          />
-        </F>
-      )}
-      {condition.type === "state_equals" && (() => {
-        // Boolean-registered keys get a true/false picker (entity schema first,
-        // else the merged global schema when the scope is global).
-        const targets = scope ? resolveStateEntities(condition.entityId, scope.ownerId, scope.zoneObjects, scope.triggerVolumes) : [];
-        let keyType = targets.map(e => e.stateSchema?.[condition.stateKey ?? ""]?.type).find(Boolean);
-        if (!keyType && !targets.length) keyType = scope?.stateKeyTypes?.[condition.stateKey ?? ""];
-        return (
-          <>
-            <F label="State key" flex={1}>
-              <KeySuggestInput placeholder="state key"
-                value={condition.stateKey ?? ""}
-                suggestions={entKeys}
-                onChange={(v) => onChange({ ...condition, stateKey: v })}
+    <>
+      <span onClick={() => setOpen(o => !o)} title={open ? "Close" : "Edit this condition"}
+        style={{ cursor: "pointer", fontFamily: "monospace", fontSize: 12, color: open ? "#80aaff" : "#dde3f0",
+          borderBottom: `1px dotted ${open ? "#80aaff" : "rgba(221,227,240,0.35)"}`, lineHeight: 1.6 }}>
+        {text}
+      </span>
+      {open && (
+        <div onClick={(e) => e.stopPropagation()}
+          style={{ flexBasis: "100%", width: "100%", margin: "4px 0 6px", padding: "0 10px 6px", borderRadius: 8,
+            background: "rgba(80,140,255,0.06)", outline: "1px solid rgba(80,140,255,0.3)" }}>
+          {scope && condition.type !== "player_falling" && condition.type !== "has_item" && (
+            <F label="Whose state">
+              <StateScopePicker
+                value={condition.entityId ?? ""}
+                zoneObjects={scope.zoneObjects}
+                triggerVolumes={scope.triggerVolumes}
+                allowSelf={scope.allowSelf}
+                selfLabel={scope.selfLabel}
+                ownerId={scope.ownerId}
+                onChange={(id) => onChange({ ...condition, entityId: id || undefined })}
               />
             </F>
-            <F label="Equals" flex={1}>
+          )}
+          {condition.type === "player_falling" && (
+            <div style={{ color: "#98a2b8", fontSize: 11, fontFamily: SANS, padding: "8px 0" }}>
+              Passes only while the player is airborne and moving downward — the goomba-stomp gate (walk-ins and rising jumps fail).
+            </div>
+          )}
+          {(condition.type === "has_state" || condition.type === "state_equals" || condition.type === "compare_number") && (
+            <F label="State key">
+              <KeySuggestInput placeholder="state key" value={condition.stateKey ?? ""} suggestions={entKeys}
+                onChange={(v) => onChange({ ...condition, stateKey: v })} />
+            </F>
+          )}
+          <F label="Condition">
+            <select style={S.select} value={condition.type}
+              onChange={(e) => onChange({ ...condition, type: e.target.value as ConditionType })}>
+              {CONDITION_TYPES.map((t) => <option key={t} value={t}>{CONDITION_LABELS[t] ?? t}</option>)}
+            </select>
+          </F>
+          {condition.type === "state_equals" && (
+            <F label="Equals">
               {keyType === "boolean" ? (
                 <select style={S.select}
                   value={condition.stateValue === true ? "true" : condition.stateValue === false ? "false" : ""}
@@ -2096,103 +2268,50 @@ function ConditionRow({
               ) : (
                 <input style={S.field} placeholder="true / 3 / text"
                   value={condition.stateValue == null ? "" : String(condition.stateValue)}
-                  onChange={(e) => onChange({ ...condition, stateValue: coerceStateValue(e.target.value) })}
-                />
+                  onChange={(e) => onChange({ ...condition, stateValue: coerceStateValue(e.target.value) })} />
               )}
             </F>
-          </>
-        );
-      })()}
-      {condition.type === "compare_number" && (
-        <>
-          <F label="State key" flex={1}>
-            <KeySuggestInput placeholder="state key"
-              value={condition.stateKey ?? ""}
-              suggestions={entKeys}
-              onChange={(v) => onChange({ ...condition, stateKey: v })}
-            />
+          )}
+          {condition.type === "compare_number" && (
+            <F label="Compare">
+              <select style={{ ...S.select, width: 64 }} value={condition.compareOp ?? ">="}
+                onChange={(e) => onChange({ ...condition, compareOp: e.target.value as CompareOp })}>
+                {COMPARE_OPS.map((op) => <option key={op} value={op}>{op}</option>)}
+              </select>
+              <input type="number" style={{ ...S.field, width: 80 }} placeholder="value"
+                value={typeof condition.stateValue === "number" ? condition.stateValue : ""}
+                onChange={(e) => onChange({ ...condition, stateValue: parseFloat(e.target.value) || 0 })} />
+            </F>
+          )}
+          {condition.type === "has_item" && (
+            <>
+              <F label="Item">
+                <ItemPicker style={S.select} itemId={condition.itemId ?? ""} worldItems={worldItems}
+                  onChange={(id) => onChange({ ...condition, itemId: id || undefined })} />
+              </F>
+              <F label="Owned count">
+                <select style={{ ...S.select, width: 64 }} title="owned count comparison (default: at least)"
+                  value={condition.compareOp ?? ">="}
+                  onChange={(e) => onChange({ ...condition, compareOp: e.target.value as CompareOp })}>
+                  {COMPARE_OPS.map((op) => <option key={op} value={op}>{op}</option>)}
+                </select>
+                <input type="number" min={0} style={{ ...S.field, width: 64 }} placeholder="1"
+                  value={condition.count ?? ""}
+                  onChange={(e) => onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })} />
+              </F>
+            </>
+          )}
+          <F label="Unless (invert)">
+            <input type="checkbox" className="wb-switch" checked={condition.not ?? false}
+              onChange={(e) => onChange({ ...condition, not: e.target.checked || undefined })} />
           </F>
-          <select
-            style={{ ...S.select, flex: "0 0 56px" }}
-            value={condition.compareOp ?? ">="}
-            onChange={(e) =>
-              onChange({ ...condition, compareOp: e.target.value as CompareOp })
-            }
-          >
-            {COMPARE_OPS.map((op) => (
-              <option key={op} value={op}>
-                {op}
-              </option>
-            ))}
-          </select>
-          <F label="Value" flex="0 0 64px">
-            <input
-              type="number"
-              style={S.field}
-              placeholder="value"
-              value={
-                typeof condition.stateValue === "number"
-                  ? condition.stateValue
-                  : ""
-              }
-              onChange={(e) =>
-                onChange({
-                  ...condition,
-                  stateValue: parseFloat(e.target.value) || 0,
-                })
-              }
-            />
-          </F>
-        </>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, paddingTop: 6 }}>
+            <button style={{ ...S.btn(), color: "#cc6666" }} onClick={onRemove}>remove condition</button>
+            <button style={S.btn()} onClick={() => setOpen(false)}>done</button>
+          </div>
+        </div>
       )}
-      {condition.type === "has_item" && (
-        <>
-          {/* four controls don't fit one 280px row — item picker gets line 2 */}
-          <div style={{ flexBasis: "100%", height: 0 }} />
-          <F label="Item" flex={1}>
-            <ItemPicker
-              style={S.select}
-              itemId={condition.itemId ?? ""}
-              worldItems={worldItems}
-              onChange={(id) => onChange({ ...condition, itemId: id || undefined })}
-            />
-          </F>
-          <select
-            style={{ ...S.select, flex: "0 0 56px" }}
-            title="owned count comparison (default: at least)"
-            value={condition.compareOp ?? ">="}
-            onChange={(e) =>
-              onChange({ ...condition, compareOp: e.target.value as CompareOp })
-            }
-          >
-            {COMPARE_OPS.map((op) => (
-              <option key={op} value={op}>
-                {op}
-              </option>
-            ))}
-          </select>
-          <F label="Count" flex="0 0 52px">
-            <input
-              type="number"
-              min={0}
-              style={S.field}
-              placeholder="1"
-              title="count to compare the owned amount against"
-              value={condition.count ?? ""}
-              onChange={(e) =>
-                onChange({ ...condition, count: parseInt(e.target.value, 10) || undefined })
-              }
-            />
-          </F>
-        </>
-      )}
-      <button
-        style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }}
-        onClick={onRemove}
-      >
-        ×
-      </button>
-    </div>
+    </>
   );
 }
 
@@ -2232,10 +2351,10 @@ function ItemPicker({
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
 
-/** Phase 65 — one if-block: IF / ELSE IF … / ELSE branches, each with the
- *  same ConditionRows as script-level conditions and that branch's actions.
- *  Dumb: the editor supplies the rendered action rows per branch. */
-function IfBlockCard({ block, number, worldItems, scope, renderActions, onChange, onAddAction, onUnwrap }: {
+/** Phase 65/66 — one if-block as a grouped card: a header strip per branch
+ *  (IF / ELSE IF / ELSE with its condition sentences), that branch's action
+ *  cards beneath it, and a quiet footer for else-if / else / unwrap. */
+function IfBlockCard({ block, number: _number, worldItems, scope, renderActions, onChange, onAddAction, onUnwrap, onDelete }: {
   block: ScriptIfBlock;
   number: number;
   worldItems: ItemDef[];
@@ -2244,58 +2363,59 @@ function IfBlockCard({ block, number, worldItems, scope, renderActions, onChange
   onChange: (b: ScriptIfBlock) => void;
   onAddAction: (branch: number) => void;
   onUnwrap: () => void;
+  onDelete: () => void;   // remove the block AND every action inside it
 }) {
   const setBranch = (i: number, conditions: ScriptCondition[]) =>
     onChange({ ...block, branches: block.branches.map((br, j) => (j === i ? { conditions } : br)) });
-  const branchRows = (label: string, branch: number, conditions: ScriptCondition[] | null, onRemoveBranch?: () => void) => (
-    <div key={branch} style={{ marginTop: branch === 0 ? 0 : 6 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-        <span style={{ color: "#e8c14b", fontSize: 10, fontFamily: "monospace", letterSpacing: 1 }}>{label}</span>
-        {conditions && (
-          <button style={{ ...S.btn(), fontSize: 10, padding: "2px 6px" }} title="Add a condition to this branch (all must pass; 'unless' inverts one)"
-            onClick={() => setBranch(branch, [...conditions, { type: "has_state" } as ScriptCondition])}>+ condition</button>
-        )}
+  const head = (label: string, branch: number, conditions: ScriptCondition[] | null, onRemoveBranch?: () => void) => {
+    const isElse = branch === -1;
+    return (
+      <div key={"h" + branch}
+        style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 8px", padding: "8px 10px",
+          background: isElse ? "rgba(255,255,255,0.04)" : "rgba(232,193,75,0.08)",
+          borderTop: branch === 0 ? "none" : `1px solid ${isElse ? "rgba(255,255,255,0.08)" : "rgba(232,193,75,0.2)"}`,
+          borderBottom: `1px solid ${isElse ? "rgba(255,255,255,0.08)" : "rgba(232,193,75,0.2)"}` }}>
+        <span style={{ color: isElse ? "#8b94a8" : "#e8c14b", display: "flex" }}><Ic name="branch" size={14} /></span>
+        <span style={{ fontFamily: SANS, fontSize: 10, fontWeight: 700, letterSpacing: 1, color: isElse ? "#8b94a8" : "#e8c14b" }}>{label}</span>
+        {conditions && conditions.map((c, i) => (
+          <Fragment key={i}>
+            {i > 0 && <span style={{ color: "#8b94a8", fontSize: 11, fontFamily: SANS }}>and</span>}
+            <ConditionRow condition={c} worldItems={worldItems} scope={scope}
+              onChange={(nc) => setBranch(branch, conditions.map((x, j) => (j === i ? nc : x)))}
+              onRemove={() => setBranch(branch, conditions.filter((_, j) => j !== i))} />
+          </Fragment>
+        ))}
+        {conditions && conditions.length === 0 && <span style={{ color: "#ccaa44", fontSize: 10, fontFamily: SANS }}>⚠ no conditions — always passes</span>}
+        {conditions && <button style={LINK_BTN} title="Add a condition (all must pass)"
+          onClick={() => setBranch(branch, [...conditions, { type: "has_state" } as ScriptCondition])}>+ and</button>}
         <span style={{ flex: 1 }} />
-        {onRemoveBranch && (
-          <button style={{ ...S.btn(), fontSize: 10, padding: "2px 6px", color: "#cc6666" }}
-            title="Remove this branch — its actions move to the top level" onClick={onRemoveBranch}>× branch</button>
-        )}
+        {onRemoveBranch && <button style={LINK_BTN} title="Remove this branch — its actions move to the top level" onClick={onRemoveBranch}>×</button>}
       </div>
-      {conditions && conditions.map((c, i) => (
-        <ConditionRow
-          key={i}
-          condition={c}
-          worldItems={worldItems}
-          scope={scope}
-          onChange={(nc) => setBranch(branch, conditions.map((x, j) => (j === i ? nc : x)))}
-          onRemove={() => setBranch(branch, conditions.filter((_, j) => j !== i))}
-        />
-      ))}
-      {conditions && conditions.length === 0 && (
-        <div style={{ color: "#ccaa44", fontSize: 10, padding: "2px 0 4px" }}>⚠ no conditions — this branch always passes</div>
-      )}
-      <div style={{ paddingLeft: 5, borderLeft: "2px solid rgba(232,193,75,0.35)" }}>
-        {renderActions(branch)}
-        <button style={{ ...S.btn(), fontSize: 10, marginBottom: 4 }} title="Add an action to this branch"
-          onClick={() => onAddAction(branch)}>+ action here</button>
-      </div>
+    );
+  };
+  const body = (branch: number) => (
+    <div key={"b" + branch} style={{ padding: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+      {renderActions(branch)}
+      <button style={ADD_CARD} onClick={() => onAddAction(branch)}><Ic name="plus" size={12} /> action</button>
     </div>
   );
   return (
-    <div style={{ background: "rgba(232,193,75,0.05)", border: "1px solid rgba(232,193,75,0.3)", borderRadius: 4, padding: "6px 8px", marginBottom: 6 }}>
-      {block.branches.map((br, i) => branchRows(i === 0 ? `IF #${number}` : `ELSE IF #${number}.${i}`, i, br.conditions,
-        i === 0 ? undefined : () => onChange({ ...block, branches: block.branches.filter((_, j) => j !== i) })))}
-      {block.else && branchRows(`ELSE #${number}`, -1, null, () => onChange({ ...block, else: false }))}
-      <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
-        <button style={{ ...S.btn(), fontSize: 10 }} title="Add an else-if branch (checked only when the branches above fail)"
+    <div style={{ margin: "0 0 6px", borderRadius: 10, border: "1px solid rgba(232,193,75,0.3)", overflow: "hidden" }}>
+      {block.branches.map((br, i) => (
+        <div key={i}>
+          {head(i === 0 ? "IF" : "ELSE IF", i, br.conditions, i === 0 ? undefined : () => onChange({ ...block, branches: block.branches.filter((_, j) => j !== i) }))}
+          {body(i)}
+        </div>
+      ))}
+      {block.else && <div>{head("ELSE", -1, null, () => onChange({ ...block, else: false }))}{body(-1)}</div>}
+      <div style={{ display: "flex", gap: 8, padding: "4px 10px 8px", background: "rgba(255,255,255,0.02)" }}>
+        <button style={LINK_BTN} title="Add an else-if branch (checked only when the branches above fail)"
           onClick={() => onChange({ ...block, branches: [...block.branches, { conditions: [{ type: "has_state" } as ScriptCondition] }] })}>+ else if</button>
-        {!block.else && (
-          <button style={{ ...S.btn(), fontSize: 10 }} title="Add an else branch (runs when every branch above fails)"
-            onClick={() => onChange({ ...block, else: true })}>+ else</button>
-        )}
+        {!block.else && <button style={LINK_BTN} title="Add an else branch (runs when every branch above fails)"
+          onClick={() => onChange({ ...block, else: true })}>+ else</button>}
         <span style={{ flex: 1 }} />
-        <button style={{ ...S.btn(), fontSize: 10, color: "#8b94a8" }} title="Remove the block — its actions become top-level (nothing is deleted)"
-          onClick={onUnwrap}>unwrap</button>
+        <button style={LINK_BTN} title="Remove the block — its actions become top-level (nothing is deleted)" onClick={onUnwrap}>unwrap</button>
+        <button style={{ ...LINK_BTN, color: "#cc6666" }} title="Delete the block and every action inside it" onClick={onDelete}>delete block</button>
       </div>
     </div>
   );
@@ -2322,8 +2442,11 @@ function ActionRow({
   playerModelAssetId,
   owner,
   blocks,
+  open: openProp,
+  onToggle,
   onWrap,
   onMove,
+  onDuplicate,
   onChange,
   onRemove,
 }: {
@@ -2347,116 +2470,99 @@ function ActionRow({
   owner?: { id: string; kind: "object" | "volume" };
   stateKeyTypes?: Record<string, StateSchema["type"]>;
   blocks?: ScriptIfBlock[];                               // Phase 65 — destinations for "move to"
+  open?: boolean;                                          // Phase 66 — controlled open state (editor keeps one card open)
+  onToggle?: () => void;
   onWrap?: () => void;                                     // wrap this (top-level) action in a new if-block
   onMove?: (tag: { id: string; branch: number } | undefined) => void;
+  onDuplicate?: () => void;
   onChange: (a: ScriptAction) => void;
   onRemove: () => void;
 }) {
+  // Phase 66 — the action is a card: icon tile, title (the thing), subtitle
+  // (verb · parameters), ⋯ menu; click to open its property rows.
+  const [selfOpen, setSelfOpen] = useState(false);
+  const open = openProp ?? selfOpen;
+  const toggle = onToggle ?? (() => setSelfOpen(o => !o));
+  const [menu, setMenu] = useState(false);
+  const fam = actionFamily(action.type);
+  const d = describeAction(action, { zoneObjects, triggerVolumes, groups, zoneLights, zoneDialogues, worldItems, uiElements, owner });
+  const condText = (conds: ScriptCondition[]) => conds.map(c => describeCondition(c, { zoneObjects, triggerVolumes, owner }, worldItems)).join(" and ") || "(always)";
+  const menuItems: Array<{ label: string; onClick: () => void; danger?: boolean; heading?: boolean }> = [];
+  if (onWrap) menuItems.push({ label: "Wrap in an if-block", onClick: onWrap });
+  if (onMove && blocks && blocks.length) {
+    menuItems.push({ label: "Move to", onClick: () => {}, heading: true });
+    if (action.block) menuItems.push({ label: "top level", onClick: () => onMove(undefined) });
+    blocks.forEach((b) => {
+      b.branches.forEach((br, j) => {
+        if (action.block?.id === b.id && action.block.branch === j) return;
+        menuItems.push({ label: `${j === 0 ? "if" : "else if"} ${condText(br.conditions)}`, onClick: () => onMove({ id: b.id, branch: j }) });
+      });
+      if (b.else && !(action.block?.id === b.id && action.block.branch === -1))
+        menuItems.push({ label: `else (of if ${condText(b.branches[0]?.conditions ?? [])})`, onClick: () => onMove({ id: b.id, branch: -1 }) });
+    });
+  }
+  if (onDuplicate) menuItems.push({ label: "Duplicate", onClick: onDuplicate });
+  menuItems.push({ label: "Delete", onClick: onRemove, danger: true });
   return (
-    <div
-      style={{
-        background: "rgba(255,255,255,0.03)",
-        borderRadius: 4,
-        padding: "6px 8px",
-        marginBottom: 6,
-        border: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          alignItems: "flex-end",
-          marginBottom: 4,
-        }}
-      >
-        <select
-          style={{ ...S.select, flex: 1 }}
-          value={action.type}
-          onChange={(e) => {
-            const type = e.target.value as ActionType;
-            onChange({ type, delay: action.delay,
-              // New launch actions on entity-owned scripts start owner-relative
-              // (direction 0 = the owner's front) — saved worlds are untouched,
-              // absent still means world-compass.
-              ...(type === "launch_player" && owner ? { launchRelativeTo: "entity" as const } : {}) });
-          }}
-        >
-          {[...ACTION_TYPES].sort().map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <F label="Delay (s)" flex="0 0 52px">
-          <input
-            type="number" min={0} step={0.1}
-            style={S.field}
-            placeholder="0"
-            title="Seconds after the trigger before this action runs — sequence effects within one script"
-            value={action.delay ?? ""}
-            onChange={(e) => onChange({ ...action, delay: e.target.value === "" ? undefined : Number(e.target.value) })}
-          />
-        </F>
-        {onWrap && (
-          <button
-            style={{ ...S.btn(), padding: "6px 6px", color: "#e8c14b" }}
-            title="Wrap this action in an if-block — add more actions, else if, or else to it"
-            onClick={onWrap}
-          >
-            if
-          </button>
-        )}
-        {onMove && blocks && blocks.length > 0 && (
-          <select
-            style={{ ...S.select, flex: "0 0 auto", width: 58, fontSize: 9, padding: "6px 2px" }}
-            title="Move this action to the top level or into an if-block branch"
-            value={action.block ? `${action.block.id}:${action.block.branch}` : ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (!v) { onMove(undefined); return; }
-              const idx = v.lastIndexOf(":");
-              onMove({ id: v.slice(0, idx), branch: Number(v.slice(idx + 1)) });
-            }}
-          >
-            <option value="">top level</option>
-            {blocks.map((b, k) => [
-              ...b.branches.map((_, j) => (
-                <option key={`${b.id}:${j}`} value={`${b.id}:${j}`}>{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</option>
-              )),
-              ...(b.else ? [<option key={`${b.id}:-1`} value={`${b.id}:-1`}>{`ELSE #${k + 1}`}</option>] : []),
-            ])}
-          </select>
-        )}
-        <button
-          style={{ ...S.btn(), padding: "6px 6px", color: "#cc6666" }}
-          onClick={onRemove}
-        >
-          ×
+    <div style={{ marginBottom: 6 }}>
+      <div onClick={toggle} title={open ? "Close" : "Edit this action"}
+        style={{ position: "relative", display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+          background: open ? "rgba(80,140,255,0.08)" : "rgba(255,255,255,0.04)",
+          border: `1px solid ${open ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.07)"}` }}>
+        <div style={{ width: 30, height: 30, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          background: fam.tint + "22", color: fam.tint }}><Ic name={fam.icon} /></div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ color: "#dde3f0", fontWeight: 600, fontSize: 13, fontFamily: SANS, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
+          {d.sub && <div style={{ color: "#8b94a8", fontSize: 11, fontFamily: "monospace", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.sub}</div>}
+        </div>
+        <button title="More…" onClick={(e) => { e.stopPropagation(); setMenu(m => !m); }}
+          style={{ background: "none", border: "none", color: "#8b94a8", cursor: "pointer", padding: "2px 4px", borderRadius: 4, display: "flex" }}>
+          <Ic name="dots" />
         </button>
+        {menu && <CardMenu items={menuItems} onClose={() => setMenu(false)} />}
       </div>
-      <ActionFields
-        stateKeyTypes={stateKeyTypes}
-        action={action}
-        zoneObjects={zoneObjects}
-        zonePlatforms={zonePlatforms}
-        zoneShapes={zoneShapes}
-        zoneLights={zoneLights}
-        zoneStairs={zoneStairs}
-        zoneWalls={zoneWalls}
-        zoneFloors={zoneFloors}
-        zoneCheckpoints={zoneCheckpoints}
-        triggerVolumes={triggerVolumes}
-        groups={groups}
-        assets={assets}
-        zoneDialogues={zoneDialogues}
-        worldItems={worldItems}
-        uiElements={uiElements}
-        projectSceneIds={projectSceneIds}
-        playerModelAssetId={playerModelAssetId}
-        owner={owner}
-        onChange={onChange}
-      />
+      {open && (
+        <div style={{ padding: "2px 10px 6px" }} onClick={(e) => e.stopPropagation()}>
+          <F label="Action">
+            <select style={S.select} value={action.type}
+              onChange={(e) => {
+                const type = e.target.value as ActionType;
+                onChange({ type, delay: action.delay, block: action.block,
+                  ...(type === "launch_player" && owner ? { launchRelativeTo: "entity" as const } : {}) });
+              }}>
+              {[...ACTION_TYPES].sort((a, b) => ACTION_LABELS[a].localeCompare(ACTION_LABELS[b])).map((t) => (
+                <option key={t} value={t}>{ACTION_LABELS[t]}</option>
+              ))}
+            </select>
+          </F>
+          <ActionFields
+            stateKeyTypes={stateKeyTypes}
+            action={action}
+            zoneObjects={zoneObjects}
+            zonePlatforms={zonePlatforms}
+            zoneShapes={zoneShapes}
+            zoneLights={zoneLights}
+            zoneStairs={zoneStairs}
+            zoneWalls={zoneWalls}
+            zoneFloors={zoneFloors}
+            zoneCheckpoints={zoneCheckpoints}
+            triggerVolumes={triggerVolumes}
+            groups={groups}
+            assets={assets}
+            zoneDialogues={zoneDialogues}
+            worldItems={worldItems}
+            uiElements={uiElements}
+            projectSceneIds={projectSceneIds}
+            playerModelAssetId={playerModelAssetId}
+            owner={owner}
+            onChange={onChange}
+          />
+          <F label="After (s)" style={{ borderBottom: "none" }}>
+            <RangeField value={action.delay} min={0} max={10} step={0.1} unit="s"
+              onChange={(v) => onChange({ ...action, delay: v && v > 0 ? v : undefined })} />
+          </F>
+        </div>
+      )}
     </div>
   );
 }
@@ -2756,7 +2862,7 @@ function ActionFields({
           </F>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
             <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
-              <input type="checkbox" checked={action.loop ?? false} onChange={(e) => set({ loop: e.target.checked || undefined })} />
+              <input type="checkbox" className="wb-switch" checked={action.loop ?? false} onChange={(e) => set({ loop: e.target.checked || undefined })} />
               loop
             </label>
             <F label="Volume" flex="0 0 64px">
@@ -2785,7 +2891,7 @@ function ActionFields({
           </F>
           <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginTop: 4 }}>
             <label style={{ color: "#808090", fontSize: 10, display: "flex", alignItems: "center", gap: 3, paddingBottom: 7 }}>
-              <input type="checkbox" checked={action.loop ?? true} onChange={(e) => set({ loop: e.target.checked })} />
+              <input type="checkbox" className="wb-switch" checked={action.loop ?? true} onChange={(e) => set({ loop: e.target.checked })} />
               loop
             </label>
             <F label="Volume" flex="0 0 64px">
@@ -3162,64 +3268,23 @@ function ActionFields({
           {/* Loop/hold/blend don't apply to the resting-clip sentinel (it always
               crossfades to the auto-play loop) — hide the row to say so. */}
           {action.animation !== "__auto__" && (
-          <div style={{ display: "flex", gap: 12, marginTop: 2 }}>
-            <label
-              style={{
-                color: "#888",
-                fontSize: 11,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <input
-                type="checkbox"
+          <>
+            <F label="Loop">
+              <input type="checkbox" className="wb-switch"
                 checked={action.animationLoop ?? false}
-                onChange={(e) => set({ animationLoop: e.target.checked })}
-              />
-              Loop
-            </label>
-            <label
-              style={{
-                color: action.animationLoop ? "#555" : "#888",
-                fontSize: 11,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <input
-                type="checkbox"
+                onChange={(e) => set({ animationLoop: e.target.checked })} />
+            </F>
+            <F label="Hold at end" style={action.animationLoop ? { opacity: 0.45 } : undefined}>
+              <input type="checkbox" className="wb-switch"
                 disabled={action.animationLoop ?? false}
                 checked={action.animationHold ?? false}
-                onChange={(e) => set({ animationHold: e.target.checked })}
-              />
-              Hold at end
-            </label>
-            <div style={{ flex: 1 }} />
-            <label
-              style={{
-                color: "#888",
-                fontSize: 11,
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              Blend (s)
-              <input
-                type="number"
-                style={{ ...S.field, width: 52 }}
-                placeholder="0.3"
-                value={action.animationBlend ?? ""}
-                onChange={(e) =>
-                  set({
-                    animationBlend: parseFloat(e.target.value) || undefined,
-                  })
-                }
-              />
-            </label>
-          </div>
+                onChange={(e) => set({ animationHold: e.target.checked })} />
+            </F>
+            <F label="Blend (s)">
+              <RangeField value={action.animationBlend} min={0} max={2} step={0.05} unit="s"
+                onChange={(v) => set({ animationBlend: v && v > 0 ? v : undefined })} />
+            </F>
+          </>
           )}
         </div>
       );
@@ -3457,7 +3522,7 @@ function ActionFields({
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#98a2b8", cursor: "pointer" }}>
             <input
-              type="checkbox"
+              type="checkbox" className="wb-switch"
               checked={action.restoreHealth ?? false}
               onChange={(e) => set({ restoreHealth: e.target.checked || undefined })}
             />
@@ -5002,7 +5067,7 @@ function UiElementRow({
         {numField("Y offset", element.offsetY, "16", "offset from the anchored edge (px)", (n) => set({ offsetY: n }))}
         <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Shown without needing a show_ui action">
           <input
-            type="checkbox"
+            type="checkbox" className="wb-switch"
             checked={!!element.startVisible}
             onChange={(e) => set({ startVisible: e.target.checked || undefined })}
           />
@@ -5011,7 +5076,7 @@ function UiElementRow({
         {element.kind !== "menu" && (
           <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Translucent grey box behind the element — keeps it readable on bright skies">
             <input
-              type="checkbox"
+              type="checkbox" className="wb-switch"
               checked={!!element.backdrop}
               onChange={(e) => set({ backdrop: e.target.checked || undefined })}
             />
@@ -5214,7 +5279,7 @@ function UiMenuOptionRow({
         </F>
         <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Hide the menu after this option is picked">
           <input
-            type="checkbox"
+            type="checkbox" className="wb-switch"
             checked={option.closeOnPick !== false}
             onChange={(e) => set({ closeOnPick: e.target.checked ? undefined : false })}
           />

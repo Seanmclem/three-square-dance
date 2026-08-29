@@ -19,6 +19,13 @@
          90px comfortably exceeds the tallest row, so growth ends at true height. */
       @keyframes wb-row-in  { from { max-height: 0; opacity: 0; } to { max-height: 90px; opacity: 1; } }
       @keyframes wb-row-out { from { max-height: 90px; opacity: 1; } to { max-height: 0; opacity: 0; } }
+      /* Script editor controls (Phase 66) */
+      .wb-switch { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; flex-shrink: 0; transition: background .15s; outline: none; }
+      .wb-switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.4); transition: left .15s; }
+      .wb-switch:checked { background: #3b82f6; } .wb-switch:checked::before { left: 16px; }
+      .wb-range { -webkit-appearance: none; appearance: none; width: 90px; height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; outline: none; margin: 0; }
+      .wb-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #80aaff; cursor: pointer; border: 2px solid #1c1c1c; }
+      .wb-menu button:hover { background: rgba(255,255,255,0.06); color: #dde3f0; }
     </style>
   </head>
   <body>
