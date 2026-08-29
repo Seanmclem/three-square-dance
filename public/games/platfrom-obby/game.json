@@ -818,7 +818,7 @@
       "id": "pfb_5e81e6ab",
       "name": "Spike Step 4",
       "kind": "snapshot",
-      "version": 2,
+      "version": 5,
       "variables": [],
       "template": [
         {
@@ -886,51 +886,6 @@
                     }
                   },
                   {
-                    "type": "despawn_object",
-                    "delay": 0,
-                    "targetId": "vol_80c94968",
-                    "block": {
-                      "id": "blk_282578e5",
-                      "branch": 0
-                    }
-                  },
-                  {
-                    "type": "spawn_object",
-                    "delay": 0,
-                    "targetId": "vol_80c94968",
-                    "block": {
-                      "id": "blk_3e63ced1",
-                      "branch": 0
-                    }
-                  },
-                  {
-                    "type": "play_sound",
-                    "sound": "impactmining_003",
-                    "targetId": "self",
-                    "volume": 2,
-                    "block": {
-                      "id": "blk_6f67b30a",
-                      "branch": 0
-                    }
-                  },
-                  {
-                    "type": "play_sound",
-                    "sound": "impactmining_004",
-                    "targetId": "self",
-                    "volume": 2,
-                    "block": {
-                      "id": "blk_2958ced9",
-                      "branch": 0
-                    }
-                  },
-                  {
-                    "type": "set_state",
-                    "targetId": "vol_80c94968",
-                    "stateKey": "spikes-up",
-                    "stateValue": "__toggle__",
-                    "delay": 1
-                  },
-                  {
                     "type": "spawn_object",
                     "block": {
                       "id": "blk_57efd055",
@@ -955,6 +910,34 @@
                       "branch": 0
                     },
                     "targetId": "vol_80c94968"
+                  },
+                  {
+                    "type": "play_sound",
+                    "block": {
+                      "id": "blk_57efd055",
+                      "branch": 0
+                    },
+                    "sound": "impactmining_003",
+                    "targetId": "self"
+                  },
+                  {
+                    "type": "set_state",
+                    "block": {
+                      "id": "blk_50c5b3ba",
+                      "branch": 0
+                    },
+                    "targetId": "self",
+                    "stateKey": "spikes-out",
+                    "stateValue": false
+                  },
+                  {
+                    "type": "play_sound",
+                    "block": {
+                      "id": "blk_50c5b3ba",
+                      "branch": 0
+                    },
+                    "sound": "impactmining_004",
+                    "targetId": "self"
                   }
                 ],
                 "oneShot": false,
@@ -983,59 +966,6 @@
                             "type": "state_equals",
                             "entityId": "self",
                             "stateKey": "spikes-out",
-                            "stateValue": true
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "id": "blk_282578e5",
-                    "branches": [
-                      {
-                        "conditions": []
-                      }
-                    ]
-                  },
-                  {
-                    "id": "blk_3e63ced1",
-                    "branches": [
-                      {
-                        "conditions": [
-                          {
-                            "type": "state_equals",
-                            "entityId": "vol_80c94968",
-                            "stateKey": "spikes-up",
-                            "stateValue": false
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "id": "blk_6f67b30a",
-                    "branches": [
-                      {
-                        "conditions": [
-                          {
-                            "type": "state_equals",
-                            "stateKey": "spikes-up",
-                            "entityId": "vol_80c94968",
-                            "stateValue": false
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "id": "blk_2958ced9",
-                    "branches": [
-                      {
-                        "conditions": [
-                          {
-                            "type": "state_equals",
-                            "entityId": "vol_80c94968",
-                            "stateKey": "spikes-up",
                             "stateValue": true
                           }
                         ]
@@ -1100,13 +1030,7 @@
                 ],
                 "oneShot": false
               }
-            ],
-            "stateSchema": {
-              "spikes-up": {
-                "type": "boolean",
-                "default": false
-              }
-            }
+            ]
           }
         }
       ],
