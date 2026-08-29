@@ -269,6 +269,16 @@ every 2s  (repeating)
 
 ---
 
+## Interactive prototype
+
+`plans/mockups/script-editor-prototype.html` — open it in a browser (React +
+JSX via CDN, no build). A / B / C side by side or one at a time, over a live
+data model shaped like the real ScriptDef (flat actions + blocks + tags):
+click any sentence to edit it with real fields (edits rewrite the sentence),
+hover a row for if · ⇄ move · ⧉ · ×, collapse branches, add / remove
+conditions and branches, unwrap, switch scripts in C. "verbs" toggles
+monospace vs proportional for the verb words.
+
 ## Part C — for the mockups
 
 ### C1. Screens to produce
