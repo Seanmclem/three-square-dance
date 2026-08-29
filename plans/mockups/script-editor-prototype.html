@@ -617,7 +617,7 @@ const Footer = () => <div className="footer"><button className="btn primary" sty
 
 // ═══ A ═══
 function PanelA() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null));
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1"));
   return (<Chrome width={320} title={script.label}>
     <TodayHead script={script} setScript={setScript} />
     <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
@@ -629,7 +629,7 @@ function PanelA() {
 }
 // ═══ B ═══
 function PanelB() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const [collapsed, setCollapsed] = useState({});
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1")); const [collapsed, setCollapsed] = useState({});
   return (<Chrome width={320} title={script.label}>
     <TriggerHead script={script} setScript={setScript} ops={ops} />
     <ScriptConds script={script} setScript={setScript} ops={ops} />
@@ -639,7 +639,7 @@ function PanelB() {
 // ═══ C ═══
 function PanelC() {
   const [scripts, setScripts] = useState(() => ({ spikes: SPIKES(), coin: COIN() })); const [cur, setCur] = useState("spikes");
-  const openState = useState(null); const [collapsed, setCollapsed] = useState({});
+  const openState = useState("a1"); const [collapsed, setCollapsed] = useState({});
   const script = scripts[cur]; const setScript = (v) => setScripts(all => ({ ...all, [cur]: typeof v === "function" ? v(all[cur]) : v }));
   const ops = useScriptOps(script, setScript, openState);
   const summary = (s) => `${triggerText(s.trigger, s.owner)} → ${s.actions.length} action${s.actions.length === 1 ? "" : "s"}${s.blocks.length ? ` in ${s.blocks.reduce((n, b) => n + b.branches.length + (b.else ? 1 : 0), 0)} branches` : ""}`;
@@ -659,7 +659,7 @@ function PanelC() {
 }
 // ═══ D · Prose ═══
 function PanelD() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null));
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1"));
   const t = script.trigger;
   const Chip = ({ k, children, cls }) => <span className={"pc " + (cls || "") + (ops.isOpen(k) ? " on" : "")} onClick={() => ops.toggleOpen(k)}>{children}</span>;
   const ActionChip = ({ a }) => { const s = sentence(a); return <Chip k={a.id}>{s.verb} {s.noun}{a.delay ? <span className="dim"> after {a.delay}s</span> : null}</Chip>; };
@@ -705,7 +705,7 @@ function CardAction({ a, ops, mono }) {
   </div>);
 }
 function PanelE() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1")); const t = script.trigger;
   const condHead = (b, j, word, cls) => {
     const br = b.branches[j];
     return (<div className={"gh " + (cls || "")}>
@@ -760,7 +760,7 @@ function FlowNode({ a, ops, small }) {
   </div>);
 }
 function PanelF() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1")); const t = script.trigger;
   const lane = (b, j, cls, label) => (
     <div className={"lane " + cls}><div className="lh">{label}</div>
       {script.actions.filter(ops.inBranch(b, j)).map(a => <FlowNode key={a.id} a={a} ops={ops} small />)}
@@ -814,7 +814,7 @@ function GridRow({ a, ops, n, indent }) {
   </tr>);
 }
 function PanelG() {
-  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState("a1")); const t = script.trigger;
   let n = 0;
   const groupRow = (b, j, word, cls) => { const br = j >= 0 ? b.branches[j] : null; return (
     <tr className={"g " + (cls || "")} key={"g" + j}><td colSpan={6}>
@@ -879,8 +879,8 @@ function App() {
       </div>
       <div className="topbar" style={{ paddingTop: 6 }}>
         <span className="lbl">Field style</span>
-        {FIELD_STYLES.map(([k, l]) => <button key={k} className={"btn" + (fs === k ? " primary" : "")} onClick={() => setFs(k)}>{l}</button>)}
-        <span className="dim" style={{ fontSize: 11, fontFamily: "system-ui" }}>— applies to every editor (action, condition, trigger) in every option</span>
+        {FIELD_STYLES.map(([k, l]) => <button key={k} className={"btn" + (fs === k ? " primary" : "")} onClick={() => { setFs(k); setKey(x => x + 1); }}>{l}</button>)}
+        <span className="dim" style={{ fontSize: 11, fontFamily: "system-ui" }}>— restyles the form that opens when you click an action, a condition, or the trigger (one is opened for you)</span>
       </div>
       <div className="stage" key={key}>
         {OPTIONS.filter(([k]) => view === "all" || view === k).map(([k, l, note, P]) => <div className="opt" key={k}><div className="note">{note}</div><P /></div>)}
