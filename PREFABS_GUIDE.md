@@ -111,7 +111,7 @@ snapshot prefabs (click it to jump into prefab editing), `ƒ {name}` for
 generators, `⚠ … definition missing` for orphans. Next to the name, **⛶ all N**
 (v4.79.27) re-selects the entire instance — the way back from a shift-clicked
 single piece to moving object + trigger + everything with one gizmo — and a
-**⋯ menu** (v4.79.28) with the instance actions (Reset from prefab / Save to prefab / Unlink /
+**⋯ menu** (v4.79.28) with every instance action (Edit prefab / Select all / Reset from prefab / Save to prefab / Unlink /
 Delete instance). All three ask for confirmation from either entry point;
 they're still one-step undoable afterwards.
 

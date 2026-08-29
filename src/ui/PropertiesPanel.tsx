@@ -717,6 +717,12 @@ export function PropertiesPanel({
                         borderRadius: 4, boxShadow: "0 6px 20px rgba(0,0,0,0.5)", padding: 3,
                         display: "flex", flexDirection: "column" }}>
                         {([
+                          // Every instance action lives here too (v4.79.49): the pencil and
+                          // "all N" are shortcuts, the menu is the complete list.
+                          ...(prefabInfo.prefab?.kind === "snapshot" && onEditPrefab
+                            ? [["Edit prefab", () => onEditPrefab(prefabInfo.prefab!.id), "#e0a050"] as const] : []),
+                          ...((prefabInfo.memberCount ?? 0) > 1 && onSelectInstance
+                            ? [[`Select all ${prefabInfo.memberCount} pieces`, onSelectInstance, "#80aaff"] as const] : []),
                           ...(prefabInfo.prefab !== null
                             ? [["Reset from prefab", onPrefabReexpand, "#c2cadb"] as const] : []),
                           ...(prefabInfo.prefab?.kind === "snapshot" && onPrefabPushToPrefab
