@@ -47,6 +47,42 @@
   .footer { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: auto; }
   .topbar { display: flex; gap: 6px; align-items: center; padding: 12px 24px 0; flex-wrap: wrap; }
   .topbar .lbl { font-size: 11px; letter-spacing: 1px; }
+  /* field styles (switchable from the top bar) */
+  .edit.rows { display: flex; flex-direction: column; gap: 0; padding: 2px 12px 8px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .frow { display: flex; align-items: center; gap: 10px; min-height: 36px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .frow:last-child { border-bottom: none; }
+  .frow .fl { color: #98a2b8; font-size: 12px; flex: 1; }
+  .frow .fc { display: flex; align-items: center; gap: 6px; }
+  .selx { position: relative; display: inline-flex; align-items: center; }
+  .selx select { appearance: none; -webkit-appearance: none; background: transparent; border: none; color: var(--text); font: inherit; font-size: 13px; padding: 4px 18px 4px 6px; cursor: pointer; text-align: right; direction: rtl; border-radius: 6px; max-width: 170px; }
+  .selx select option { direction: ltr; }
+  .selx select:hover { background: rgba(255,255,255,0.06); } .selx select:focus { outline: none; background: rgba(80,140,255,0.1); }
+  .selx .chev { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; display: flex; }
+  input.num { width: 68px; text-align: right; background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; color: var(--text); font: inherit; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  input.num:focus { border-color: rgba(80,140,255,0.5); background: rgba(80,140,255,0.08); outline: none; }
+  input.txt { width: 150px; text-align: right; background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 6px; padding: 5px 8px; color: var(--text); font: inherit; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  input.txt:focus { border-color: rgba(80,140,255,0.5); background: rgba(80,140,255,0.08); outline: none; }
+  .unit { color: var(--muted); font-size: 11px; }
+  .sw { width: 34px; height: 20px; border-radius: 10px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; transition: background .15s; flex-shrink: 0; }
+  .sw.on { background: #3b82f6; } .sw .k { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,0.4); } .sw.on .k { left: 16px; }
+  .edit.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 10px 10px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .fchip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); font-size: 12px; color: #98a2b8; position: relative; }
+  .fchip:hover { border-color: rgba(255,255,255,0.2); }
+  .fchip b { color: var(--text); font-weight: 600; font-family: ui-monospace, Menlo, monospace; }
+  .fchip .ov { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .fchip.tg { cursor: pointer; } .fchip.tg.on { background: rgba(80,140,255,0.16); border-color: rgba(80,140,255,0.4); color: var(--blue); } .fchip.tg.on b { color: var(--blue); }
+  .fchip input.inl { background: transparent; border: none; color: var(--text); font: inherit; font-family: ui-monospace, Menlo, monospace; font-weight: 600; outline: none; border-bottom: 1px dotted rgba(255,255,255,0.35); padding: 0; }
+  .fchip input.inl:focus { border-bottom-color: var(--blue); }
+  .edit.props { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 10px 10px; align-items: center; padding: 8px 12px 10px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .edit.props .pi { color: var(--muted); display: flex; }
+  .edit.props .pl { color: #98a2b8; font-size: 12px; }
+  .edit.props .pctl { justify-self: end; display: flex; align-items: center; gap: 8px; }
+  .rng { -webkit-appearance: none; appearance: none; width: 96px; height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; outline: none; }
+  .rng::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #1a1a1a; }
+  .pv { font-family: ui-monospace, Menlo, monospace; color: var(--text); min-width: 38px; text-align: right; font-size: 12px; }
+  .edit.rows .f, .edit.chips .f, .edit.props .f { display: contents; }
+  .edit.rows .btn.danger, .edit.chips .btn.danger, .edit.props .btn.danger { margin-top: 6px; }
+  .edit.props .btn.danger { grid-column: 1 / -1; justify-self: end; }
   /* editable prose cue + trigger chips */
   .ed { cursor: pointer; border-bottom: 1px dotted rgba(221,227,240,0.35); }
   .ed:hover { border-bottom-color: var(--blue); color: var(--text); }
@@ -259,40 +295,75 @@ function Icon({ name, size = 16 }) {
     case "plus": return <svg {...p}><path d="M8 3.5v9M3.5 8h9" /></svg>;
     case "dots": return <svg {...p}><circle cx="4" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.2" fill="currentColor" stroke="none" /></svg>;
     case "filter": return <svg {...p}><path d="M2.5 3.5h11l-4.5 5v4l-2-1v-3z" /></svg>;
+    case "lines": return <svg {...p}><path d="M3 5h10M3 8h7M3 11h9" /></svg>;
+    case "list": return <svg {...p}><path d="M5 4.5h8M5 8h8M5 11.5h8" /><circle cx="2.8" cy="4.5" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.8" cy="8" r="0.9" fill="currentColor" stroke="none" /><circle cx="2.8" cy="11.5" r="0.9" fill="currentColor" stroke="none" /></svg>;
+    case "sliders": return <svg {...p}><path d="M2.5 5h11M2.5 11h11" /><circle cx="6" cy="5" r="1.7" fill="#1a1a1a" /><circle cx="10" cy="11" r="1.7" fill="#1a1a1a" /></svg>;
+    case "toggle": return <svg {...p}><rect x="2" y="5" width="12" height="6" rx="3" /><circle cx="10" cy="8" r="1.8" fill="currentColor" stroke="none" /></svg>;
     default: return null;
   }
 }
 
 // ═══ shared editors ═══
+const FieldStyle = React.createContext("boxed");
+const RANGES = { volume: [0, 4, 0.1], blend: [0, 2, 0.05], delay: [0, 5, 0.1], fade: [0, 3, 0.1], interval: [0.5, 30, 0.5] };
+const Chev = () => <span className="chev"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2.5 4l2.5 2.5L7.5 4" /></svg></span>;
 function Field({ def, value, onChange }) {
-  const [key, label, kind, options] = def;
+  const style = React.useContext(FieldStyle);
+  const [key, label, kind, options, labels] = def;
+  const lab = (o) => (labels && labels[o]) || o;
+  const num = (e) => onChange(e.target.value === "" ? "" : Number(e.target.value));
+  const range = RANGES[key];
+  if (style === "rows") return (
+    <div className="frow"><span className="fl">{label}</span><span className="fc">
+      {kind === "toggle" && <span className={"sw" + (value ? " on" : "")} onClick={() => onChange(!value)}><span className="k"></span></span>}
+      {kind === "select" && <span className="selx"><select value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{lab(o)}</option>)}</select><Chev /></span>}
+      {kind === "number" && <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><input className="num" value={value ?? ""} inputMode="decimal" onChange={num} />{/s\)/.test(label) && <span className="unit">s</span>}</span>}
+      {kind === "text" && <input className="txt" value={value ?? ""} onChange={e => onChange(e.target.value)} />}
+    </span></div>);
+  if (style === "chips") {
+    if (kind === "toggle") return <span className={"fchip tg" + (value ? " on" : "")} onClick={() => onChange(!value)}>{label} <b>{value ? "on" : "off"}</b></span>;
+    if (kind === "select") return <span className="fchip">{label} <b>{lab(value)}</b> <span className="dim">▾</span><select className="ov" value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{lab(o)}</option>)}</select></span>;
+    return <span className="fchip">{label} <input className="inl" value={value ?? ""} size={Math.max(3, String(value ?? "").length + 1)} inputMode={kind === "number" ? "decimal" : undefined} onChange={kind === "number" ? num : e => onChange(e.target.value)} /></span>;
+  }
+  if (style === "props") {
+    const icon = kind === "toggle" ? "toggle" : kind === "select" ? "list" : kind === "number" ? "sliders" : "lines";
+    return (<React.Fragment>
+      <span className="pi"><Icon name={icon} size={14} /></span><span className="pl">{label}</span><span className="pctl">
+        {kind === "toggle" && <span className={"sw" + (value ? " on" : "")} onClick={() => onChange(!value)}><span className="k"></span></span>}
+        {kind === "select" && <span className="selx"><select value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{lab(o)}</option>)}</select><Chev /></span>}
+        {kind === "number" && range && <React.Fragment><input type="range" className="rng" min={range[0]} max={range[1]} step={range[2]} value={value === "" ? range[0] : value} onChange={num} /><span className="pv">{value}{/s\)/.test(label) ? "s" : ""}</span></React.Fragment>}
+        {kind === "number" && !range && <input className="num" value={value ?? ""} inputMode="decimal" onChange={num} />}
+        {kind === "text" && <input className="txt" value={value ?? ""} onChange={e => onChange(e.target.value)} />}
+      </span>
+    </React.Fragment>);
+  }
+  // boxed (today's look)
   if (kind === "toggle") return (
     <div className="f"><span className="lbl">{label}</span>
       <div className="toggle" onClick={() => onChange(!value)}><span className={"box" + (value ? " on" : "")}></span>{value ? "on" : "off"}</div></div>);
   if (kind === "select") return (
     <div className="f"><span className="lbl">{label}</span>
-      <select className="field" value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{o}</option>)}</select></div>);
+      <select className="field" value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o} value={o}>{lab(o)}</option>)}</select></div>);
   return (
     <div className="f"><span className="lbl">{label}</span>
       <input className="field" value={value ?? ""} inputMode={kind === "number" ? "decimal" : undefined}
         onChange={e => onChange(kind === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)} /></div>);
 }
+const useEditClass = (cols3) => { const st = React.useContext(FieldStyle); return st === "boxed" ? "edit" + (cols3 ? " cols3" : "") : "edit " + st; };
 function ActionEditor({ a, onChange, cols3, className }) {
-  const spec = ACTIONS[a.type];
+  const spec = ACTIONS[a.type]; const cls = useEditClass(cols3);
   return (
-    <div className={"edit" + (cols3 ? " cols3" : "") + (className ? " " + className : "")} onClick={e => e.stopPropagation()}>
-      <div className="f"><span className="lbl">Action</span>
-        <select className="field" value={a.type} onChange={e => onChange({ id: a.id, type: e.target.value, block: a.block, delay: a.delay, ...NEW_ACTION[e.target.value] })}>
-          {ACTION_TYPES.map(t => <option key={t} value={t}>{ACTIONS[t].verb}  ({t})</option>)}</select></div>
+    <div className={cls + (className ? " " + className : "")} onClick={e => e.stopPropagation()}>
+      <Field def={["type","Action","select",ACTION_TYPES,Object.fromEntries(ACTION_TYPES.map(t => [t, ACTIONS[t].verb]))]} value={a.type} onChange={v => onChange({ id: a.id, type: v, block: a.block, delay: a.delay, ...NEW_ACTION[v] })} />
       {spec.fields.map(def => <Field key={def[0]} def={def} value={a[def[0]]} onChange={v => onChange({ ...a, [def[0]]: v })} />)}
     </div>
   );
 }
 function CondEditor({ c, onChange, onDelete, cols3, style }) {
+  const cls = useEditClass(cols3);
   return (
-    <div className={"edit cond" + (cols3 ? " cols3" : "")} style={style} onClick={e => e.stopPropagation()}>
-      <div className="f"><span className="lbl">Condition</span>
-        <select className="field" value={c.type} onChange={e => onChange({ ...c, type: e.target.value })}>{Object.entries(COND_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+    <div className={cls + " cond"} style={style} onClick={e => e.stopPropagation()}>
+      <Field def={["type","Condition","select",Object.keys(COND_TYPES),COND_TYPES]} value={c.type} onChange={v => onChange({ ...c, type: v })} />
       {c.type !== "player_falling" && c.type !== "has_item" && <Field def={["scope","Whose state","select",SCOPES]} value={c.scope} onChange={v => onChange({ ...c, scope: v })} />}
       {c.type !== "player_falling" && <Field def={["key", c.type === "has_item" ? "Item" : "State key", "text"]} value={c.key} onChange={v => onChange({ ...c, key: v })} />}
       {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") &&
@@ -303,12 +374,11 @@ function CondEditor({ c, onChange, onDelete, cols3, style }) {
   );
 }
 function TriggerEditor({ script, setScript, cols3, style }) {
-  const t = script.trigger;
+  const t = script.trigger; const cls = useEditClass(cols3);
   const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
   return (
-    <div className={"edit cond" + (cols3 ? " cols3" : "")} style={style} onClick={e => e.stopPropagation()}>
-      <div className="f"><span className="lbl">Trigger</span>
-        <select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.entries(TRIGGERS).map(([k, v]) => <option key={k} value={k}>{v}  ({k})</option>)}</select></div>
+    <div className={cls + " cond"} style={style} onClick={e => e.stopPropagation()}>
+      <Field def={["type","Trigger","select",Object.keys(TRIGGERS),TRIGGERS]} value={t.type} onChange={v => set({ type: v })} />
       {t.type === "on_timer" && <Field def={["interval","Interval (s)","number"]} value={t.interval} onChange={v => set({ interval: v })} />}
       {t.type === "on_timer" && <Field def={["repeat","Repeat","toggle"]} value={t.repeat} onChange={v => set({ repeat: v })} />}
       <Field def={["delay","Delay (s)","number"]} value={t.delay} onChange={v => set({ delay: v })} />
@@ -728,7 +798,7 @@ function PanelF() {
 function Cell({ value, onChange, options, width }) {
   const [ed, setEd] = useState(false);
   if (!ed) return <td className="cell" style={{ width }} onClick={() => setEd(true)}>{String(value ?? "")}</td>;
-  if (options) return <td style={{ width }}><select autoFocus className="cellin" value={value} onBlur={() => setEd(false)} onChange={e => { onChange(e.target.value); setEd(false); }}>{options.map(o => <option key={o} value={o}>{o}</option>)}</select></td>;
+  if (options) return <td style={{ width }}><select autoFocus className="cellin" value={value} onBlur={() => setEd(false)} onChange={e => { onChange(e.target.value); setEd(false); }}>{options.map(o => <option key={o} value={o}>{lab(o)}</option>)}</select></td>;
   return <td style={{ width }}><input autoFocus className="cellin" defaultValue={value ?? ""} onBlur={e => { onChange(e.target.value); setEd(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEd(false); }} /></td>;
 }
 function GridRow({ a, ops, n, indent }) {
@@ -794,9 +864,11 @@ const OPTIONS = [
   ["f", "F · Flow", <span><b>F · Flow.</b> Shortcuts-style timeline: trigger node → decision diamond → <i>yes</i> / <i>no</i> lanes side by side → the steps that always run. Click a node to edit it in a popover.</span>, PanelF],
   ["g", "G · Grid", <span><b>G · Grid.</b> Dense and data-first: one row per action, grouped under IF / ELSE header rows; click a cell to edit in place, ⋯ for the row menu, the full field set opens below for the selected row.</span>, PanelG],
 ];
+const FIELD_STYLES = [["boxed", "boxed (today)"], ["rows", "settings rows"], ["chips", "inline chips"], ["props", "properties panel"]];
 function App() {
-  const [view, setView] = useState("all"); const [key, setKey] = useState(0);
+  const [view, setView] = useState("e"); const [key, setKey] = useState(0); const [fs, setFs] = useState("rows");
   return (
+    <FieldStyle.Provider value={fs}>
     <div>
       <div className="topbar">
         <span className="lbl">Script editor prototype</span>
@@ -805,10 +877,16 @@ function App() {
         <span style={{ flex: 1 }}></span>
         <button className="btn" onClick={() => setKey(k => k + 1)}>reset data</button>
       </div>
+      <div className="topbar" style={{ paddingTop: 6 }}>
+        <span className="lbl">Field style</span>
+        {FIELD_STYLES.map(([k, l]) => <button key={k} className={"btn" + (fs === k ? " primary" : "")} onClick={() => setFs(k)}>{l}</button>)}
+        <span className="dim" style={{ fontSize: 11, fontFamily: "system-ui" }}>— applies to every editor (action, condition, trigger) in every option</span>
+      </div>
       <div className="stage" key={key}>
         {OPTIONS.filter(([k]) => view === "all" || view === k).map(([k, l, note, P]) => <div className="opt" key={k}><div className="note">{note}</div><P /></div>)}
       </div>
-    </div>);
+    </div>
+    </FieldStyle.Provider>);
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
