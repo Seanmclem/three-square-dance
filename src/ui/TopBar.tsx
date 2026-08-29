@@ -287,14 +287,6 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
         )}
       </div>
 
-      {/* Save state */}
-      <span title={isDirty ? "Unsaved changes — Save (⌘S) writes the scene" : (savedLabel ?? "nothing saved yet")}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6, color: isDirty ? "#e8c14b" : "#8b94a8", fontSize: 10, letterSpacing: 0.5, whiteSpace: "nowrap", marginLeft: 4 }}>
-        <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-          background: isDirty ? "#e8c14b" : "#50c878", boxShadow: `0 0 6px ${isDirty ? "rgba(232,193,75,0.5)" : "rgba(80,200,120,0.5)"}` }} />
-        {isDirty ? "unsaved changes" : (savedLabel ?? "")}
-      </span>
-
       <div style={{ flex: 1 }} />
 
       {/* Floor menu */}
@@ -334,6 +326,18 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       {SEP}
 
       <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleFileChange} />
+      {/* Save state pill (option B's) beside the Save button — clicking it saves too */}
+      <span onClick={() => void onSave()}
+        title={isDirty ? "Unsaved changes — click (or ⌘S) to save" : (savedLabel ?? "nothing saved yet")}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 26, padding: "0 10px", borderRadius: 13, cursor: "pointer",
+          fontFamily: SANS, fontSize: 11, whiteSpace: "nowrap",
+          border: `1px solid ${isDirty ? "rgba(232,193,75,0.4)" : "rgba(255,255,255,0.1)"}`,
+          background: isDirty ? "rgba(232,193,75,0.08)" : "transparent",
+          color: isDirty ? "#e8c14b" : "#8b94a8" }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+          background: isDirty ? "#e8c14b" : "#50c878", boxShadow: `0 0 6px ${isDirty ? "rgba(232,193,75,0.5)" : "rgba(80,200,120,0.5)"}` }} />
+        {isDirty ? "Unsaved" : (savedLabel ?? "not saved")}
+      </span>
       <button onClick={() => void onSave()} title={isDirty ? "Save — unsaved changes (⌘S)" : "Save (⌘S)"} style={ibStyle({ amber: !!isDirty })}>
         <Ic name="save" /> Save
       </button>
