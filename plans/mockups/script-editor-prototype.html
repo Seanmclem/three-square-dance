@@ -358,7 +358,9 @@ function SentenceRows({ script, setScript, ops }) {
         <div className="card" key={b.id}>
           {b.branches.map((br, j) => (
             <div key={j}>
-              <div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</span><BranchConds b={b} j={j} ops={ops} /></div>
+              <div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</span>
+                <button className="btn" style={{ padding: "2px 6px", fontSize: 10 }} onClick={() => ops.patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions: [...x.conditions, { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] } : x) })}>+ condition</button></div>
+              <TodayConds conditions={br.conditions} onChange={conditions => ops.patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions } : x) })} />
               <div className="branch" style={{ marginLeft: 4 }}><Rows script={script} ops={ops} filter={inBranch(b, j)} /><button className="add" onClick={() => ops.add({ id: b.id, branch: j })}>+ action here</button></div>
             </div>
           ))}
@@ -373,10 +375,6 @@ function SentenceRows({ script, setScript, ops }) {
         </div>
       ))}
       <Rows script={script} ops={ops} filter={a => !a.block} />
-      <div style={{ display: "flex", gap: 4, padding: "6px 8px 0" }}>
-        <button className="add" onClick={() => ops.add()}>+ action</button>
-        <button className="add amber" onClick={ops.addBlock}>+ if</button>
-      </div>
     </div>
   );
 }
@@ -404,15 +402,58 @@ function ScriptConds({ script, setScript, ops, cols3 }) {
   );
 }
 
+// A keeps today's sections verbatim (field stacks + section labels); only action rows change.
+function TodayHead({ script, setScript }) {
+  const t = script.trigger;
+  const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 12px" }}>
+      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Label</span><input className="field" value={script.label} onChange={e => setScript({ ...script, label: e.target.value })} /></div>
+      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Trigger</span>
+        <select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.keys(TRIGGERS).map(k => <option key={k} value={k}>{k}</option>)}</select></div>
+      {t.type === "on_timer" && <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Interval (seconds)</span><input className="field" value={t.interval} onChange={e => set({ interval: Number(e.target.value) })} /></div>}
+      {t.type === "on_timer" && <div className="toggle" onClick={() => set({ repeat: !t.repeat })}><span className={"box" + (t.repeat ? " on" : "")}></span>Repeat every interval (off = fire once)</div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="toggle" onClick={() => set({ oneShot: !t.oneShot })}><span className={"box" + (t.oneShot ? " on" : "")}></span>One-shot</div>
+        <span style={{ flex: 1 }}></span><span className="dim">Delay (s)</span><input className="field" style={{ width: 56 }} value={t.delay} onChange={e => set({ delay: Number(e.target.value) })} />
+      </div>
+    </div>
+  );
+}
+function TodayCondRow({ c, onChange, onDelete }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
+      <select className="field" style={{ flex: "0 0 120px" }} value={c.type} onChange={e => onChange({ ...c, type: e.target.value })}>{Object.entries(COND_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 90 }}><span className="lbl">Whose state</span><select className="field" value={c.scope} onChange={e => onChange({ ...c, scope: e.target.value })}>{SCOPES.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+      <div className="toggle" style={{ padding: "6px 0" }} onClick={() => onChange({ ...c, not: !c.not })}><span className={"box" + (c.not ? " on" : "")}></span><span className="dim">unless</span></div>
+      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 90 }}><span className="lbl">State key</span><input className="field" value={c.key} onChange={e => onChange({ ...c, key: e.target.value })} /></div>
+      {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") && <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: "0 0 90px" }}><span className="lbl">Equals</span><input className="field" value={c.value} onChange={e => onChange({ ...c, value: e.target.value })} /></div>}
+      <button className="btn danger" style={{ padding: "6px 6px" }} onClick={onDelete}>×</button>
+    </div>
+  );
+}
+function TodayConds({ conditions, onChange, label }) {
+  const blank = { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false };
+  return (
+    <div style={{ padding: "0 12px 4px" }}>
+      {label && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 4px" }}><span className="sec">Conditions</span><button className="btn" onClick={() => onChange([...conditions, blank])}>+ Add</button></div>}
+      {conditions.map((c, i) => <TodayCondRow key={i} c={c} onChange={nc => onChange(conditions.map((x, k) => k === i ? nc : x))} onDelete={() => onChange(conditions.filter((_, k) => k !== i))} />)}
+      {conditions.length === 0 && label && <div className="dim" style={{ fontSize: 11, padding: "4px 0" }}>(none)</div>}
+    </div>
+  );
+}
+
 function PanelA({ prose }) {
   const [script, setScript] = useState(SPIKES);
   const openState = useState(null);
   const ops = useScriptOps(script, setScript, openState);
   return (
     <Chrome width={320} title={script.label} prose={prose}>
-      <TriggerHead script={script} setScript={setScript} open={ops.isOpen("trig")} onOpen={() => ops.toggleOpen("trig")} />
-      <ScriptConds script={script} setScript={setScript} ops={ops} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px 0" }}><span className="sec">Actions</span></div>
+      <TodayHead script={script} setScript={setScript} />
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
+      <TodayConds label conditions={script.conditions} onChange={conditions => setScript({ ...script, conditions })} />
+      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px 0" }}><span className="sec">Actions</span><div style={{ display: "flex", gap: 4 }}><button className="btn" onClick={() => ops.add()}>+ Add</button><button className="btn amber" onClick={ops.addBlock}>+ If</button></div></div>
       <SentenceRows script={script} setScript={setScript} ops={ops} />
       <div className="footer"><button className="btn primary" style={{ flex: 1 }}>Disable</button><button className="btn danger">Delete</button></div>
     </Chrome>
@@ -476,8 +517,8 @@ function App() {
         <button className="btn" onClick={() => setKey(k => k + 1)}>reset data</button>
       </div>
       <div className="stage" key={key}>
-        {show("a") && <div><div className="note"><b className="blue">A · Sentence rows.</b> Actions are one line each; click a row to edit it inline (real fields — edits rewrite the sentence). Hover a row for if · ⇄ · ⧉ · ×. The if-block cards are today's structure.</div><PanelA prose={prose} /></div>}
-        {show("b") && <div><div className="note"><b className="blue">B · Outline.</b> A plus structure: the trigger is the heading (click to edit), IF / ELSE are slim rules — click the word to collapse, click the condition to edit, "+ and" adds a condition. Branches indent; no nested cards.</div><PanelB prose={prose} /></div>}
+        {show("a") && <div><div className="note"><b className="blue">A · Sentence rows.</b> The conservative step: today's panel exactly — LABEL / TRIGGER field stacks, the CONDITIONS section, numbered amber IF cards with their buttons — and ONLY the action rows change: one sentence each, click to edit inline, hover for if · ⇄ · ⧉ · ×.</div><PanelA prose={prose} /></div>}
+        {show("b") && <div><div className="note"><b className="blue">B · Outline.</b> The full rethink — same compact rows, but the whole panel reads top-down as an outline: the trigger is the heading (click to edit), IF / ELSE are slim rules — click the word to collapse, click the condition to edit, "+ and" adds a condition. Branches indent; no nested cards.</div><PanelB prose={prose} /></div>}
         {show("c") && <div><div className="note"><b className="blue">C · Wide pane.</b> 520px with the script list beside the editor; click a list row to switch. Same outline; fields open in three columns.</div><PanelC prose={prose} /></div>}
       </div>
     </div>
