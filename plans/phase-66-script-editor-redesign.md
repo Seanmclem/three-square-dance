@@ -272,7 +272,8 @@ every 2s  (repeating)
 ## Interactive prototype
 
 `plans/mockups/script-editor-prototype.html` — open it in a browser (React +
-JSX via CDN, no build). A / B / C side by side or one at a time, over a live
+JSX via CDN, no build). Seven directions (A–G: sentence rows, outline, wide
+pane, prose, cards, flow, grid) side by side or one at a time, over a live
 data model shaped like the real ScriptDef (flat actions + blocks + tags):
 click any sentence to edit it with real fields (edits rewrite the sentence),
 hover a row for if · ⇄ move · ⧉ · ×, collapse branches, add / remove

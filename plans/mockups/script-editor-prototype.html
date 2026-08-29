@@ -2,94 +2,182 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Script editor prototype — A / B / C</title>
+<title>Script editor prototype — A…G</title>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  body { margin: 0; background: #0f1115; color: #c2cadb; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
-  .stage { display: flex; gap: 24px; padding: 24px; align-items: flex-start; }
-  .panel { background: rgba(28,28,28,0.97); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; display: flex; flex-direction: column; min-height: 720px; }
+  :root { --bg: #0f1115; --panel: rgba(28,28,28,0.97); --line: rgba(255,255,255,0.08); --text: #dde3f0; --text2: #c2cadb; --muted: #8b94a8; --blue: #80aaff; --amber: #e8c14b; --red: #cc6666; --green: #44cc88; }
+  body { margin: 0; background: var(--bg); color: var(--text2); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  * { box-sizing: border-box; }
+  .stage { display: flex; flex-wrap: wrap; gap: 28px; padding: 24px; align-items: flex-start; }
+  .opt { display: flex; flex-direction: column; }
+  .note { color: var(--muted); font-size: 11px; line-height: 1.5; max-width: 340px; padding: 0 0 8px; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .note b { color: var(--blue); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; min-height: 720px; position: relative; }
   .ph { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px; }
-  .ph .t { color: #dde3f0; font-size: 13px; letter-spacing: 1px; }
+  .ph .t { color: var(--text); font-size: 13px; letter-spacing: 1px; }
   .tabs { display: flex; padding: 0 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-  .tab { padding: 6px 8px; font-size: 11px; color: #8b94a8; border-bottom: 2px solid transparent; }
-  .tab.on { color: #dde3f0; border-bottom-color: #80aaff; }
+  .tab { padding: 6px 8px; font-size: 11px; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tab.on { color: var(--text); border-bottom-color: var(--blue); }
   .back { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
   .back .b { width: 36px; height: 26px; border-radius: 4px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; justify-content: center; color: #c0c0c0; }
-  .back .name { color: #dde3f0; flex: 1; }
+  .back .name { color: var(--text); flex: 1; }
   .btn { padding: 4px 8px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: #c0c0c0; font-size: 11px; cursor: pointer; font-family: inherit; }
-  .btn:hover { background: rgba(255,255,255,0.12); color: #dde3f0; }
-  .btn.amber { color: #e8c14b; } .btn.danger { color: #cc6666; } .btn.primary { background: rgba(80,140,255,0.25); padding: 6px 12px; }
-  .field, select.field, input.field { background: rgba(46,46,46,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4d8e2; font-size: 12px; padding: 6px 8px; font-family: inherit; width: 100%; box-sizing: border-box; outline: none; }
+  .btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+  .btn.amber { color: var(--amber); } .btn.danger { color: var(--red); } .btn.primary { background: rgba(80,140,255,0.25); padding: 6px 12px; }
+  .field, select.field, input.field { background: rgba(46,46,46,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4d8e2; font-size: 12px; padding: 6px 8px; font-family: inherit; width: 100%; outline: none; }
   input.field:focus, select.field:focus { border-color: rgba(80,140,255,0.5); }
-  .lbl { color: #8b94a8; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
-  .sec { color: #8b94a8; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
-  .dim { color: #8b94a8; } .amber { color: #e8c14b; } .blue { color: #80aaff; }
-  .prose .verb, .prose .when { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
-
-  .head { padding: 10px 12px 2px; }
-  .when { color: #dde3f0; font-size: 14px; }
-  .sub { color: #8b94a8; font-size: 11px; margin-top: 2px; }
-  .ed { cursor: pointer; border-bottom: 1px dotted rgba(221,227,240,0.35); }
-  .ed:hover { border-bottom-color: #80aaff; color: #dde3f0; }
-  .ed.on { color: #80aaff; border-bottom-color: #80aaff; }
-
-  .row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 6px; padding: 6px 8px; border-radius: 4px; cursor: pointer; box-sizing: border-box; }
-  .row:hover { background: rgba(255,255,255,0.04); }
-  .row.open { background: rgba(80,140,255,0.08); outline: 1px solid rgba(80,140,255,0.3); }
-  .row .verb { color: #98a2b8; white-space: nowrap; }
-  .row .noun { color: #dde3f0; }
-  .row .tail { color: #8b94a8; font-size: 11px; margin-left: auto; }
-  .row .ctl { display: none; gap: 2px; margin-left: 4px; }
-  .row:hover .ctl, .row.open .ctl { display: flex; }
-  .ctl button { background: none; border: none; padding: 0 4px; color: #8b94a8; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; }
-  .ctl button:hover { background: rgba(255,255,255,0.08); color: #dde3f0; }
-  .ctl .x:hover { color: #cc6666; } .ctl .if { color: #e8c14b; }
-  .edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; padding: 6px 8px 10px; }
-  .edit.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .edit .f { display: flex; flex-direction: column; gap: 3px; }
-  .edit .f.wide { grid-column: 1 / -1; }
-  .edit.cond { margin: 2px 8px 6px; background: rgba(80,140,255,0.06); outline: 1px solid rgba(80,140,255,0.3); border-radius: 4px; }
+  .lbl { color: var(--muted); font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .sec { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .dim { color: var(--muted); } .amber { color: var(--amber); } .blue { color: var(--blue); }
+  .sans { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .mono { font-family: ui-monospace, Menlo, monospace; }
   .toggle { display: flex; align-items: center; gap: 6px; padding: 6px 0; cursor: pointer; color: #d4d8e2; }
   .toggle .box { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.2); background: rgba(46,46,46,0.9); }
   .toggle .box.on { background: #3b6fe0; border-color: #3b6fe0; }
-
+  .edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; padding: 6px 8px 10px; }
+  .edit.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .edit .f { display: flex; flex-direction: column; gap: 3px; }
+  .edit.cond { margin: 2px 8px 6px; background: rgba(80,140,255,0.06); outline: 1px solid rgba(80,140,255,0.3); border-radius: 4px; }
+  .menu { position: absolute; z-index: 5; background: rgba(28,28,28,0.99); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px; display: flex; flex-direction: column; min-width: 200px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .menu button { text-align: left; background: none; border: none; color: var(--text2); padding: 6px 8px; font-size: 11px; cursor: pointer; border-radius: 4px; font-family: inherit; }
+  .menu button:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+  .menu .sep { height: 1px; background: rgba(255,255,255,0.08); margin: 3px 0; }
+  .footer { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: auto; }
+  .topbar { display: flex; gap: 6px; align-items: center; padding: 12px 24px 0; flex-wrap: wrap; }
+  .topbar .lbl { font-size: 11px; letter-spacing: 1px; }
+  /* editable prose cue + trigger chips */
+  .ed { cursor: pointer; border-bottom: 1px dotted rgba(221,227,240,0.35); }
+  .ed:hover { border-bottom-color: var(--blue); color: var(--text); }
+  .ed.on { color: var(--blue); border-bottom-color: var(--blue); }
+  .chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); color: var(--muted); cursor: pointer; background: rgba(255,255,255,0.03); }
+  .chip:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
+  .chip.on { color: var(--blue); border-color: rgba(80,140,255,0.5); background: rgba(80,140,255,0.1); }
+  .chip.amber { color: var(--amber); border-color: rgba(232,193,75,0.4); }
+  /* A/B/C rows + outline */
+  .head { padding: 10px 12px 2px; }
+  .when { color: var(--text); font-size: 14px; }
+  .row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 6px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+  .row:hover { background: rgba(255,255,255,0.04); }
+  .row.open { background: rgba(80,140,255,0.08); outline: 1px solid rgba(80,140,255,0.3); }
+  .row .verb { color: #98a2b8; white-space: nowrap; }
+  .row .noun { color: var(--text); }
+  .row .tail { color: var(--muted); font-size: 11px; margin-left: auto; }
+  .row .ctl { display: none; gap: 2px; margin-left: 4px; }
+  .row:hover .ctl, .row.open .ctl { display: flex; }
+  .ctl button { background: none; border: none; padding: 0 4px; color: var(--muted); font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; }
+  .ctl button:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .ctl .x:hover { color: var(--red); } .ctl .if { color: var(--amber); }
   .brule { display: flex; align-items: baseline; gap: 8px; padding: 8px 8px 4px; flex-wrap: wrap; }
-  .brule .tri, .brule .w { color: #e8c14b; cursor: pointer; }
+  .brule .tri, .brule .w { color: var(--amber); cursor: pointer; }
   .brule .tri { width: 10px; font-size: 10px; }
   .brule .w { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
   .brule .tri:hover, .brule .w:hover { color: #f3d97a; }
-  .brule .c { color: #dde3f0; }
-  .brule .n { color: #8b94a8; font-size: 11px; margin-left: auto; }
+  .brule .n { color: var(--muted); font-size: 11px; margin-left: auto; }
   .branch { border-left: 1px solid rgba(232,193,75,0.25); margin-left: 12px; padding-left: 4px; }
   .card { margin: 4px 0; background: rgba(232,193,75,0.05); border: 1px solid rgba(232,193,75,0.3); border-radius: 4px; padding: 4px 6px 6px; }
-  .add { color: #8b94a8; font-size: 11px; padding: 4px 8px; opacity: 0.6; cursor: pointer; background: none; border: none; font-family: inherit; }
-  .add:hover { opacity: 1; color: #dde3f0; } .add.amber { color: #e8c14b; }
+  .add { color: var(--muted); font-size: 11px; padding: 4px 8px; opacity: 0.6; cursor: pointer; background: none; border: none; font-family: inherit; }
+  .add:hover { opacity: 1; color: var(--text); } .add.amber { color: var(--amber); }
   .condline { display: flex; gap: 8px; padding: 2px 12px 6px; align-items: baseline; flex-wrap: wrap; }
-  .condline .k { color: #8b94a8; font-size: 11px; width: 64px; }
-  .pill { font-size: 10px; padding: 1px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.15); color: #98a2b8; cursor: pointer; }
-  .pill.on { color: #e8c14b; border-color: rgba(232,193,75,0.5); }
-  .menu { position: absolute; z-index: 5; background: rgba(28,28,28,0.99); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 3px; display: flex; flex-direction: column; min-width: 190px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
-  .menu button { text-align: left; background: none; border: none; color: #c2cadb; padding: 5px 8px; font-size: 11px; cursor: pointer; border-radius: 3px; font-family: inherit; }
-  .menu button:hover { background: rgba(255,255,255,0.06); color: #dde3f0; }
+  .condline .k { color: var(--muted); font-size: 11px; width: 64px; }
   .list { width: 176px; border-right: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; }
   .li { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
   .li:hover { background: rgba(255,255,255,0.03); } .li.on { background: rgba(80,140,255,0.10); }
-  .li .n { color: #dde3f0; } .li .s { color: #8b94a8; font-size: 10px; margin-top: 2px; line-height: 1.35; }
-  .topbar { display: flex; gap: 8px; align-items: center; padding: 12px 24px 0; }
-  .topbar .lbl { font-size: 11px; letter-spacing: 1px; }
-  .footer { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: auto; }
-  .note { color: #8b94a8; font-size: 11px; line-height: 1.5; max-width: 320px; padding: 8px 0; }
+  .li .n { color: var(--text); } .li .s { color: var(--muted); font-size: 10px; margin-top: 2px; line-height: 1.35; }
+  /* D prose */
+  .p { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 2.1; color: #98a2b8; padding: 10px 14px; }
+  .pc { display: inline-block; padding: 0 7px; border-radius: 4px; background: rgba(46,46,46,0.9); border: 1px solid rgba(255,255,255,0.1); color: var(--text); font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 22px; cursor: pointer; vertical-align: baseline; }
+  .pc:hover { border-color: rgba(80,140,255,0.5); } .pc.on { background: rgba(80,140,255,0.18); border-color: rgba(80,140,255,0.5); color: var(--blue); }
+  .pc.amber { color: var(--amber); } .pc.k { color: #98a2b8; background: transparent; border-color: transparent; }
+  .pins { color: var(--muted); opacity: 0.55; font-size: 12px; cursor: pointer; border: none; background: none; font-family: inherit; }
+  .pins:hover { opacity: 1; color: var(--text); }
+  /* E cards */
+  .E { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; }
+  .E .hero { margin: 12px 12px 8px; padding: 12px; border-radius: 10px; background: linear-gradient(180deg, rgba(80,140,255,0.14), rgba(80,140,255,0.05)); border: 1px solid rgba(80,140,255,0.25); display: flex; gap: 10px; align-items: flex-start; }
+  .E .hero .ic { width: 34px; height: 34px; border-radius: 9px; background: rgba(80,140,255,0.2); color: var(--blue); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .E .hero .ttl { color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer; }
+  .E .hero .ttl:hover { color: var(--blue); }
+  .E .grp { margin: 6px 12px; border-radius: 10px; border: 1px solid rgba(232,193,75,0.3); overflow: hidden; }
+  .E .grp .gh { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(232,193,75,0.08); border-bottom: 1px solid rgba(232,193,75,0.2); }
+  .E .grp .gh.else { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.08); border-top: 1px solid rgba(255,255,255,0.08); }
+  .E .grp .gh .w { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--amber); }
+  .E .grp .gh.else .w { color: var(--muted); }
+  .E .grp .gh .c { color: var(--text); font-family: ui-monospace, Menlo, monospace; font-size: 12px; cursor: pointer; }
+  .E .grp .gh .c:hover { color: var(--blue); }
+  .E .grp .gb { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .E .ac { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); cursor: pointer; position: relative; }
+  .E .ac:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); }
+  .E .ac.open { border-color: rgba(80,140,255,0.5); background: rgba(80,140,255,0.08); }
+  .E .ac .ic { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .E .ac .ttl { color: var(--text); font-weight: 600; font-size: 13px; }
+  .E .ac .sub { color: var(--muted); font-size: 11px; margin-top: 1px; font-family: ui-monospace, Menlo, monospace; }
+  .E .ac .kb { margin-left: auto; color: var(--muted); font-size: 16px; padding: 0 4px; border-radius: 4px; opacity: 0; }
+  .E .ac:hover .kb, .E .ac.open .kb { opacity: 1; }
+  .E .ac .kb:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .E .addc { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border-radius: 8px; border: 1px dashed rgba(255,255,255,0.14); color: var(--muted); cursor: pointer; font-size: 12px; }
+  .E .addc:hover { color: var(--text); border-color: rgba(255,255,255,0.3); }
+  .E .edit { padding: 6px 12px 12px; }
+  .E .edit .lbl { font-family: system-ui, sans-serif; font-size: 10px; letter-spacing: 0.3px; text-transform: none; color: #98a2b8; }
+  .E .field { border-radius: 6px; }
+  /* F flow */
+  .F { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; }
+  .F .flow { padding: 12px 12px 16px; position: relative; }
+  .F .node { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 22px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; position: relative; }
+  .F .node:hover { border-color: rgba(255,255,255,0.25); }
+  .F .node.open { border-color: rgba(80,140,255,0.5); background: rgba(80,140,255,0.08); }
+  .F .node .ic { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .F .node .t { color: var(--text); font-weight: 600; }
+  .F .node .s { color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .F .trig { background: rgba(80,140,255,0.12); border-color: rgba(80,140,255,0.35); }
+  .F .link { width: 2px; height: 14px; background: rgba(255,255,255,0.14); margin-left: 22px; }
+  .F .dec { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: rgba(232,193,75,0.09); border: 1px solid rgba(232,193,75,0.35); position: relative; }
+  .F .dec .dia { width: 18px; height: 18px; transform: rotate(45deg); background: rgba(232,193,75,0.25); border: 1px solid var(--amber); border-radius: 3px; flex-shrink: 0; }
+  .F .dec .c { color: var(--text); font-family: ui-monospace, Menlo, monospace; font-size: 12px; cursor: pointer; flex: 1; }
+  .F .dec .c:hover { color: var(--blue); }
+  .F .lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .F .lane { border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); padding: 6px; display: flex; flex-direction: column; gap: 6px; background: rgba(255,255,255,0.02); }
+  .F .lane .lh { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 2px 4px; }
+  .F .lane.yes .lh { color: var(--green); } .F .lane.no .lh { color: var(--red); }
+  .F .lane .node { padding: 6px 8px; border-radius: 8px; }
+  .F .lane .node .s { display: none; }
+  .F .lane .node.open .s { display: block; }
+  .F .mini { color: var(--muted); font-size: 11px; padding: 4px; text-align: center; border-radius: 6px; border: 1px dashed rgba(255,255,255,0.12); cursor: pointer; }
+  .F .mini:hover { color: var(--text); }
+  .F .pop { margin: 6px 0; padding: 4px; border-radius: 8px; background: rgba(28,28,28,0.99); border: 1px solid rgba(80,140,255,0.35); }
+  /* G grid */
+  .G { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; }
+  .G .tb { display: flex; gap: 4px; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); align-items: center; }
+  .G .tb .btn { display: inline-flex; gap: 4px; align-items: center; }
+  .G table { width: 100%; border-collapse: collapse; }
+  .G th { text-align: left; color: var(--muted); font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; }
+  .G td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: middle; font-family: ui-monospace, Menlo, monospace; }
+  .G tr.r:hover td { background: rgba(255,255,255,0.03); }
+  .G tr.g td { background: rgba(232,193,75,0.07); color: var(--amber); font-family: system-ui, sans-serif; font-weight: 600; font-size: 11px; }
+  .G tr.g.else td { background: rgba(255,255,255,0.04); color: var(--muted); }
+  .G tr.g td .c { color: var(--text); font-family: ui-monospace, Menlo, monospace; font-weight: 400; cursor: pointer; }
+  .G tr.g td .c:hover { color: var(--blue); }
+  .G td.cell { cursor: text; color: var(--text); }
+  .G td.cell:hover { outline: 1px solid rgba(80,140,255,0.4); outline-offset: -1px; }
+  .G td.num { color: var(--muted); width: 26px; text-align: right; }
+  .G td input.cellin { background: rgba(46,46,46,0.9); border: 1px solid rgba(80,140,255,0.5); border-radius: 3px; color: var(--text); font: inherit; padding: 2px 4px; width: 100%; outline: none; }
+  .G td select.cellin { background: rgba(46,46,46,0.9); border: 1px solid rgba(80,140,255,0.5); border-radius: 3px; color: var(--text); font: inherit; padding: 2px 2px; width: 100%; outline: none; }
+  .G td .ind { display: inline-block; width: 12px; border-left: 2px solid rgba(232,193,75,0.35); height: 14px; vertical-align: middle; margin-right: 4px; }
+  .G tr.r td .rowctl { opacity: 0; display: flex; gap: 2px; }
+  .G tr.r:hover td .rowctl { opacity: 1; }
+  .G .rowctl button { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 3px; font-size: 12px; }
+  .G .rowctl button:hover { color: var(--text); }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useRef, useEffect } = React;
+const { useState } = React;
 
-// ─── data: shaped like the real ScriptDef (flat actions + blocks table + block tags) ───
+// ═══ data: shaped like the real ScriptDef (flat actions + blocks table + block tags) ═══
 const uid = (p) => p + "_" + Math.random().toString(36).slice(2, 8);
+const BLANK_COND = () => ({ type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false });
 const SPIKES = () => ({
   id: "spikes", label: "spike pop intervals", owner: "spike cube 1",
   trigger: { type: "on_timer", interval: 2, repeat: true, delay: 0, oneShot: false },
@@ -116,20 +204,20 @@ const COIN = () => ({
   ],
 });
 
-// ─── vocabulary: display names + per-type field editors + sentence grammar ───
+// ═══ vocabulary ═══
 const SCOPES = ["🌐 Global", "★ this object", "hurt spikes", "spike cube 1", "coin zone"];
 const TARGETS = ["★ this object", "★ this volume", "hurt spikes", "spike cube 1", "coin zone", "door 3"];
 const ACTIONS = {
-  play_animation: { verb: "play animation", fields: [["clip","Clip","text"],["target","On","select",TARGETS],["loop","Loop","toggle"],["hold","Hold at end","toggle"],["blend","Blend (s)","number"],["delay","After (s)","number"]],
+  play_animation: { verb: "play animation", icon: "play", tint: "#80aaff", fields: [["clip","Clip","text"],["target","On","select",TARGETS],["loop","Loop","toggle"],["hold","Hold at end","toggle"],["blend","Blend (s)","number"],["delay","After (s)","number"]],
     sentence: a => [a.clip, `on ${a.target}`, [a.hold ? "hold at end" : null, a.loop ? "loop" : null].filter(Boolean).join(" · ")] },
-  play_sound: { verb: "play sound", fields: [["sound","Sound","text"],["volume","Volume","number"],["at","Play at","select",TARGETS],["loop","Loop","toggle"],["delay","After (s)","number"]],
+  play_sound: { verb: "play sound", icon: "sound", tint: "#44cc88", fields: [["sound","Sound","text"],["volume","Volume","number"],["at","Play at","select",TARGETS],["loop","Loop","toggle"],["delay","After (s)","number"]],
     sentence: a => [a.sound, "", `vol ${a.volume} · at ${a.at}${a.loop ? " · loop" : ""}`] },
-  despawn_object: { verb: "despawn", fields: [["target","Target","select",TARGETS],["fade","Fade out (s)","number"],["delay","After (s)","number"]],
+  despawn_object: { verb: "despawn", icon: "despawn", tint: "#cc6666", fields: [["target","Target","select",TARGETS],["fade","Fade out (s)","number"],["delay","After (s)","number"]],
     sentence: a => [a.target, "", `fade ${a.fade}s`] },
-  spawn_object: { verb: "spawn", fields: [["target","Target","select",TARGETS],["delay","After (s)","number"]], sentence: a => [a.target, "", ""] },
-  set_state: { verb: "set", fields: [["scope","Whose state","select",SCOPES],["key","State key","text"],["value","Value","select",["true","false","toggle"]],["delay","After (s)","number"]],
-    sentence: a => [`${a.scope} › ${a.key}`, `→ ${a.value === "toggle" ? "toggle" : a.value}`, ""] },
-  adjust_number: { verb: "add", fields: [["scope","Whose state","select",SCOPES],["key","State key","text"],["change","± Change","text"],["delay","After (s)","number"]],
+  spawn_object: { verb: "spawn", icon: "spawn", tint: "#44cc88", fields: [["target","Target","select",TARGETS],["delay","After (s)","number"]], sentence: a => [a.target, "", ""] },
+  set_state: { verb: "set", icon: "state", tint: "#e8c14b", fields: [["scope","Whose state","select",SCOPES],["key","State key","text"],["value","Value","select",["true","false","toggle"]],["delay","After (s)","number"]],
+    sentence: a => [`${a.scope} › ${a.key}`, `→ ${a.value}`, ""] },
+  adjust_number: { verb: "add", icon: "state", tint: "#e8c14b", fields: [["scope","Whose state","select",SCOPES],["key","State key","text"],["change","± Change","text"],["delay","After (s)","number"]],
     sentence: a => [`${a.key}  ${a.change}`, a.scope === "🌐 Global" ? "" : `on ${a.scope}`, ""] },
 };
 const ACTION_TYPES = Object.keys(ACTIONS);
@@ -154,9 +242,28 @@ const triggerText = (t, owner) => {
   if (t.type === "on_game_start") return "on game start";
   return "when a state becomes a value";
 };
-const triggerSub = (t) => [t.type === "on_timer" ? (t.repeat ? "repeating" : "fires once") : null, t.delay ? `after ${t.delay}s` : "no delay", t.oneShot ? "one-shot" : null].filter(Boolean).join(" · ");
+const sentence = (a) => { const s = ACTIONS[a.type].sentence(a); return { verb: ACTIONS[a.type].verb, noun: s[0], tail: [s[1], s[2], a.delay ? `after ${a.delay}s` : ""].filter(Boolean).join(" · ") }; };
 
-// ─── generic field editor ───
+// ═══ icons (inline SVG, 16px, stroke) ═══
+function Icon({ name, size = 16 }) {
+  const p = { width: size, height: size, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" };
+  switch (name) {
+    case "clock": return <svg {...p}><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></svg>;
+    case "enter": return <svg {...p}><path d="M3 8h7M7 4.5 10.5 8 7 11.5" /><path d="M12.5 3v10" /></svg>;
+    case "play": return <svg {...p}><path d="M5 3.5v9l7-4.5z" /></svg>;
+    case "sound": return <svg {...p}><path d="M3 6.5v3h2.5L9 12V4L5.5 6.5z" /><path d="M11 6a3 3 0 0 1 0 4" /></svg>;
+    case "despawn": return <svg {...p}><rect x="3" y="3" width="10" height="10" rx="2" /><path d="M6 6l4 4M10 6l-4 4" /></svg>;
+    case "spawn": return <svg {...p}><rect x="3" y="3" width="10" height="10" rx="2" /><path d="M8 5.5v5M5.5 8h5" /></svg>;
+    case "state": return <svg {...p}><rect x="2" y="5" width="12" height="6" rx="3" /><circle cx="10" cy="8" r="1.8" fill="currentColor" stroke="none" /></svg>;
+    case "branch": return <svg {...p}><path d="M8 2v4M8 6l-4 4M8 6l4 4M4 10v4M12 10v4" /></svg>;
+    case "plus": return <svg {...p}><path d="M8 3.5v9M3.5 8h9" /></svg>;
+    case "dots": return <svg {...p}><circle cx="4" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="8" cy="8" r="1.2" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r="1.2" fill="currentColor" stroke="none" /></svg>;
+    case "filter": return <svg {...p}><path d="M2.5 3.5h11l-4.5 5v4l-2-1v-3z" /></svg>;
+    default: return null;
+  }
+}
+
+// ═══ shared editors ═══
 function Field({ def, value, onChange }) {
   const [key, label, kind, options] = def;
   if (kind === "toggle") return (
@@ -170,89 +277,60 @@ function Field({ def, value, onChange }) {
       <input className="field" value={value ?? ""} inputMode={kind === "number" ? "decimal" : undefined}
         onChange={e => onChange(kind === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)} /></div>);
 }
-
-// ─── one action row: sentence at rest, inline fields when open ───
-function ActionRow({ a, open, onOpen, onChange, onDelete, onWrap, onMove, moveTargets, cols3 }) {
+function ActionEditor({ a, onChange, cols3, className }) {
   const spec = ACTIONS[a.type];
-  const [noun, mid, tail] = spec.sentence(a);
-  const [menu, setMenu] = useState(false);
-  const fullTail = [mid, tail, a.delay ? `after ${a.delay}s` : ""].filter(Boolean).join(" · ");
   return (
-    <div style={{ position: "relative" }}>
-      <div className={"row" + (open ? " open" : "")} onClick={onOpen}>
-        <span className="verb">{spec.verb}</span><span className="noun">{noun}</span>
-        {fullTail && <span className="tail">{fullTail}</span>}
-        <span className="ctl" onClick={e => e.stopPropagation()}>
-          {onWrap && <button className="if" title="Wrap in an if-block" onClick={onWrap}>if</button>}
-          {onMove && <button title="Move to…" onClick={() => setMenu(m => !m)}>⇄</button>}
-          <button title="Duplicate" onClick={() => onChange({ ...a, id: uid("a") }, "dup")}>⧉</button>
-          <button className="x" title="Delete" onClick={onDelete}>×</button>
-        </span>
-      </div>
-      {menu && (
-        <div className="menu" style={{ right: 8, top: 28 }} onMouseLeave={() => setMenu(false)}>
-          {moveTargets.map(t => <button key={t.label} onClick={() => { setMenu(false); onMove(t.tag); }}>{t.label}</button>)}
-        </div>
-      )}
-      {open && (
-        <div className={"edit" + (cols3 ? " cols3" : "")} onClick={e => e.stopPropagation()}>
-          <div className="f"><span className="lbl">Action</span>
-            <select className="field" value={a.type} onChange={e => onChange({ id: a.id, type: e.target.value, block: a.block, delay: a.delay, ...NEW_ACTION[e.target.value] })}>
-              {ACTION_TYPES.map(t => <option key={t} value={t}>{ACTIONS[t].verb}  ({t})</option>)}
-            </select></div>
-          {spec.fields.map(def => <Field key={def[0]} def={def} value={a[def[0]]} onChange={v => onChange({ ...a, [def[0]]: v })} />)}
-        </div>
-      )}
+    <div className={"edit" + (cols3 ? " cols3" : "") + (className ? " " + className : "")} onClick={e => e.stopPropagation()}>
+      <div className="f"><span className="lbl">Action</span>
+        <select className="field" value={a.type} onChange={e => onChange({ id: a.id, type: e.target.value, block: a.block, delay: a.delay, ...NEW_ACTION[e.target.value] })}>
+          {ACTION_TYPES.map(t => <option key={t} value={t}>{ACTIONS[t].verb}  ({t})</option>)}</select></div>
+      {spec.fields.map(def => <Field key={def[0]} def={def} value={a[def[0]]} onChange={v => onChange({ ...a, [def[0]]: v })} />)}
     </div>
   );
 }
-
-// ─── one condition: sentence at rest, editor when open ───
-function CondRow({ c, open, onOpen, onChange, onDelete, cols3 }) {
+function CondEditor({ c, onChange, onDelete, cols3, style }) {
   return (
-    <div>
-      <span className={"ed" + (open ? " on" : "")} onClick={onOpen}>{condText(c)}</span>
-      {open && (
-        <div className={"edit cond" + (cols3 ? " cols3" : "")} onClick={e => e.stopPropagation()}>
-          <div className="f"><span className="lbl">Condition</span>
-            <select className="field" value={c.type} onChange={e => onChange({ ...c, type: e.target.value })}>{Object.entries(COND_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-          {c.type !== "player_falling" && c.type !== "has_item" && <Field def={["scope","Whose state","select",SCOPES]} value={c.scope} onChange={v => onChange({ ...c, scope: v })} />}
-          {c.type !== "player_falling" && <Field def={["key", c.type === "has_item" ? "Item" : "State key", "text"]} value={c.key} onChange={v => onChange({ ...c, key: v })} />}
-          {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") &&
-            <Field def={["value", c.type === "compare_number" ? "Compare" : c.type === "has_item" ? "Count" : "Equals", "text"]} value={c.value} onChange={v => onChange({ ...c, value: v })} />}
-          <Field def={["not","Unless (invert)","toggle"]} value={c.not} onChange={v => onChange({ ...c, not: v })} />
-          <div className="f" style={{ justifyContent: "flex-end" }}><button className="btn danger" onClick={onDelete}>remove condition</button></div>
-        </div>
-      )}
+    <div className={"edit cond" + (cols3 ? " cols3" : "")} style={style} onClick={e => e.stopPropagation()}>
+      <div className="f"><span className="lbl">Condition</span>
+        <select className="field" value={c.type} onChange={e => onChange({ ...c, type: e.target.value })}>{Object.entries(COND_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+      {c.type !== "player_falling" && c.type !== "has_item" && <Field def={["scope","Whose state","select",SCOPES]} value={c.scope} onChange={v => onChange({ ...c, scope: v })} />}
+      {c.type !== "player_falling" && <Field def={["key", c.type === "has_item" ? "Item" : "State key", "text"]} value={c.key} onChange={v => onChange({ ...c, key: v })} />}
+      {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") &&
+        <Field def={["value", c.type === "compare_number" ? "Compare" : c.type === "has_item" ? "Count" : "Equals", "text"]} value={c.value} onChange={v => onChange({ ...c, value: v })} />}
+      <Field def={["not","Unless (invert)","toggle"]} value={c.not} onChange={v => onChange({ ...c, not: v })} />
+      {onDelete && <div className="f" style={{ justifyContent: "flex-end" }}><button className="btn danger" onClick={onDelete}>remove condition</button></div>}
     </div>
   );
 }
-
-// ─── trigger heading ───
-function TriggerHead({ script, setScript, open, onOpen, cols3 }) {
+function TriggerEditor({ script, setScript, cols3, style }) {
   const t = script.trigger;
   const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
   return (
-    <div>
-      <div className="head">
-        <div className={"when ed" + (open ? " on" : "")} onClick={onOpen}>{triggerText(t, script.owner)}</div>
-        <div className="sub">{triggerSub(t)} · runs on ★ {script.owner}</div>
-      </div>
-      {open && (
-        <div className={"edit cond" + (cols3 ? " cols3" : "")} style={{ margin: "4px 12px 0" }}>
-          <div className="f"><span className="lbl">Trigger</span>
-            <select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.entries(TRIGGERS).map(([k, v]) => <option key={k} value={k}>{v}  ({k})</option>)}</select></div>
-          {t.type === "on_timer" && <Field def={["interval","Interval (s)","number"]} value={t.interval} onChange={v => set({ interval: v })} />}
-          {t.type === "on_timer" && <Field def={["repeat","Repeat","toggle"]} value={t.repeat} onChange={v => set({ repeat: v })} />}
-          <Field def={["delay","Delay (s)","number"]} value={t.delay} onChange={v => set({ delay: v })} />
-          <Field def={["oneShot","One-shot","toggle"]} value={t.oneShot} onChange={v => set({ oneShot: v })} />
-        </div>
-      )}
+    <div className={"edit cond" + (cols3 ? " cols3" : "")} style={style} onClick={e => e.stopPropagation()}>
+      <div className="f"><span className="lbl">Trigger</span>
+        <select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.entries(TRIGGERS).map(([k, v]) => <option key={k} value={k}>{v}  ({k})</option>)}</select></div>
+      {t.type === "on_timer" && <Field def={["interval","Interval (s)","number"]} value={t.interval} onChange={v => set({ interval: v })} />}
+      {t.type === "on_timer" && <Field def={["repeat","Repeat","toggle"]} value={t.repeat} onChange={v => set({ repeat: v })} />}
+      <Field def={["delay","Delay (s)","number"]} value={t.delay} onChange={v => set({ delay: v })} />
+      <Field def={["oneShot","One-shot","toggle"]} value={t.oneShot} onChange={v => set({ oneShot: v })} />
+    </div>
+  );
+}
+/** Trigger settings as visible, clickable chips: repeating / delay / one-shot. Booleans toggle in place; delay opens the editor. */
+function TriggerChips({ script, setScript, onOpenEditor, editorOpen }) {
+  const t = script.trigger;
+  const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
+  return (
+    <div className="chips">
+      {t.type === "on_timer" && <span className={"chip" + (t.repeat ? " on" : "")} title="Click to toggle" onClick={() => set({ repeat: !t.repeat })}>{t.repeat ? "repeating" : "fires once"}</span>}
+      <span className={"chip" + (editorOpen ? " on" : "")} title="Click to edit the trigger" onClick={onOpenEditor}>{t.delay ? `delay ${t.delay}s` : "no delay"}</span>
+      <span className={"chip" + (t.oneShot ? " on" : "")} title="Click to toggle" onClick={() => set({ oneShot: !t.oneShot })}>{t.oneShot ? "one-shot" : "every time"}</span>
+      <span className="chip" title="Edit trigger type / interval" onClick={onOpenEditor}>⋯</span>
     </div>
   );
 }
 
-// ─── shared editing helpers over the script model ───
+// ═══ shared script operations (one open-editor key per panel) ═══
 function useScriptOps(script, setScript, openState) {
   const [open, setOpen] = openState;
   const isOpen = (k) => open === k;
@@ -262,52 +340,112 @@ function useScriptOps(script, setScript, openState) {
     : s.actions.map(x => x.id === id ? na : x) }));
   const del = (id) => setScript(s => ({ ...s, actions: s.actions.filter(x => x.id !== id) }));
   const add = (tag) => { const id = uid("a"); setScript(s => ({ ...s, actions: [...s.actions, { id, type: "set_state", delay: 0, ...NEW_ACTION.set_state, ...(tag ? { block: tag } : {}) }] })); setOpen(id); };
-  const wrap = (id) => { const bid = uid("blk"); setScript(s => ({ ...s, blocks: [...s.blocks, { id: bid, branches: [{ conditions: [{ type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] }] }],
-    actions: s.actions.map(x => x.id === id ? { ...x, block: { id: bid, branch: 0 } } : x) })); setOpen("cond:" + bid + ":0"); };
+  const wrap = (id) => { const bid = uid("blk"); setScript(s => ({ ...s, blocks: [...s.blocks, { id: bid, branches: [{ conditions: [BLANK_COND()] }] }],
+    actions: s.actions.map(x => x.id === id ? { ...x, block: { id: bid, branch: 0 } } : x) })); setOpen(`cond:${bid}:0:0`); };
   const move = (id, tag) => setScript(s => ({ ...s, actions: s.actions.map(x => { if (x.id !== id) return x; const { block, ...rest } = x; return tag ? { ...rest, block: tag } : rest; }) }));
-  const addBlock = () => { const bid = uid("blk"); setScript(s => ({ ...s, blocks: [...s.blocks, { id: bid, branches: [{ conditions: [{ type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] }] }] })); setOpen("cond:" + bid + ":0"); };
+  const addBlock = () => { const bid = uid("blk"); setScript(s => ({ ...s, blocks: [...s.blocks, { id: bid, branches: [{ conditions: [BLANK_COND()] }] }] })); setOpen(`cond:${bid}:0:0`); };
   const patchBlock = (nb) => setScript(s => ({ ...s, blocks: s.blocks.map(b => b.id === nb.id ? nb : b) }));
-  const unwrap = (bid) => setScript(s => ({ ...s, blocks: s.blocks.filter(b => b.id !== bid), actions: s.actions.map(x => x.block?.id === bid ? (({ block, ...r }) => r)(x) : x) }));
-  const moveTargets = (self) => [{ label: "top level", tag: undefined }, ...script.blocks.flatMap((b, k) => [
+  const setConds = (b, j, conditions) => patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions } : x) });
+  const untag = (pred) => setScript(s => ({ ...s, actions: s.actions.map(x => pred(x) ? (({ block, ...r }) => r)(x) : x) }));
+  const unwrap = (bid) => { setScript(s => ({ ...s, blocks: s.blocks.filter(b => b.id !== bid) })); untag(x => x.block?.id === bid); };
+  const removeBranch = (b, j) => { patchBlock({ ...b, branches: b.branches.filter((_, i) => i !== j) }); untag(x => x.block?.id === b.id && x.block.branch === j); };
+  const removeElse = (b) => { patchBlock({ ...b, else: false }); untag(x => x.block?.id === b.id && x.block.branch === -1); };
+  const addBranch = (b) => patchBlock({ ...b, branches: [...b.branches, { conditions: [BLANK_COND()] }] });
+  const addElse = (b) => patchBlock({ ...b, else: true });
+  const moveTargets = (self) => [{ label: "top level", tag: undefined }, ...script.blocks.flatMap((b) => [
     ...b.branches.map((br, j) => ({ label: `${j === 0 ? "if" : "else if"} ${br.conditions.map(condText).join(" and ") || "(always)"}`, tag: { id: b.id, branch: j } })),
-    ...(b.else ? [{ label: `else (of if ${condText(b.branches[0].conditions[0] ?? {})})`, tag: { id: b.id, branch: -1 } }] : [])])]
+    ...(b.else ? [{ label: `else (of if ${b.branches[0].conditions.map(condText).join(" and ")})`, tag: { id: b.id, branch: -1 } }] : [])])]
     .filter(t => !(self?.block && t.tag && t.tag.id === self.block.id && t.tag.branch === self.block.branch) && !(!self?.block && !t.tag));
-  return { isOpen, toggleOpen, patch, del, add, wrap, move, addBlock, patchBlock, unwrap, moveTargets };
+  const inBranch = (b, j) => (a) => a.block?.id === b.id && a.block.branch === j;
+  return { open, isOpen, toggleOpen, setOpen, patch, del, add, wrap, move, addBlock, patchBlock, setConds, unwrap, removeBranch, removeElse, addBranch, addElse, moveTargets, inBranch };
+}
+function RowMenu({ a, ops, onClose, extra }) {
+  return (
+    <div className="menu" style={{ right: 8, top: 28 }} onMouseLeave={onClose} onClick={e => e.stopPropagation()}>
+      {!a.block && <button onClick={() => { onClose(); ops.wrap(a.id); }}>Wrap in an if-block</button>}
+      <div className="sep"></div>
+      <div className="lbl" style={{ padding: "2px 8px" }}>Move to</div>
+      {ops.moveTargets(a).map(t => <button key={t.label} onClick={() => { onClose(); ops.move(a.id, t.tag); }}>{t.label}</button>)}
+      <div className="sep"></div>
+      <button onClick={() => { onClose(); ops.patch(a.id, { ...a, id: uid("a") }, "dup"); }}>Duplicate</button>
+      <button style={{ color: "var(--red)" }} onClick={() => { onClose(); ops.del(a.id); }}>Delete</button>
+      {extra}
+    </div>
+  );
 }
 
+// ═══ A · B · C building blocks (sentence rows / outline) ═══
+function ActionRow({ a, ops, cols3 }) {
+  const { verb, noun, tail } = sentence(a);
+  const [menu, setMenu] = useState(false);
+  const open = ops.isOpen(a.id);
+  return (
+    <div style={{ position: "relative" }}>
+      <div className={"row" + (open ? " open" : "")} onClick={() => ops.toggleOpen(a.id)}>
+        <span className="verb">{verb}</span><span className="noun">{noun}</span>
+        {tail && <span className="tail">{tail}</span>}
+        <span className="ctl" onClick={e => e.stopPropagation()}>
+          {!a.block && <button className="if" title="Wrap in an if-block" onClick={() => ops.wrap(a.id)}>if</button>}
+          <button title="Move to…" onClick={() => setMenu(m => !m)}>⇄</button>
+          <button title="Duplicate" onClick={() => ops.patch(a.id, { ...a, id: uid("a") }, "dup")}>⧉</button>
+          <button className="x" title="Delete" onClick={() => ops.del(a.id)}>×</button>
+        </span>
+      </div>
+      {menu && <RowMenu a={a} ops={ops} onClose={() => setMenu(false)} />}
+      {open && <ActionEditor a={a} cols3={cols3} onChange={na => ops.patch(a.id, na)} />}
+    </div>
+  );
+}
+function Rows({ script, ops, filter, cols3 }) { return script.actions.filter(filter).map(a => <ActionRow key={a.id} a={a} ops={ops} cols3={cols3} />); }
+function CondSentence({ c, k, ops, onChange, onDelete, cols3 }) {
+  const open = ops.isOpen(k);
+  return (<span style={{ display: "inline" }}>
+    <span className={"ed" + (open ? " on" : "")} onClick={() => ops.toggleOpen(k)}>{condText(c)}</span>
+    {open && <CondEditor c={c} onChange={onChange} onDelete={onDelete} cols3={cols3} />}
+  </span>);
+}
 function BranchConds({ b, j, ops, cols3 }) {
   const br = b.branches[j];
-  const setConds = (conditions) => ops.patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions } : x) });
   return (
     <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap", alignItems: "baseline" }}>
       {br.conditions.map((c, i) => (
         <span key={i} style={{ display: "inline-flex", gap: 6, alignItems: "baseline" }}>
           {i > 0 && <span className="dim">and</span>}
-          <CondRow c={c} cols3={cols3} open={ops.isOpen(`cond:${b.id}:${j}:${i}`)} onOpen={() => ops.toggleOpen(`cond:${b.id}:${j}:${i}`)}
-            onChange={nc => setConds(br.conditions.map((x, k) => k === i ? nc : x))} onDelete={() => setConds(br.conditions.filter((_, k) => k !== i))} />
-        </span>
-      ))}
+          <CondSentence c={c} k={`cond:${b.id}:${j}:${i}`} ops={ops} cols3={cols3}
+            onChange={nc => ops.setConds(b, j, br.conditions.map((x, q) => q === i ? nc : x))} onDelete={() => ops.setConds(b, j, br.conditions.filter((_, q) => q !== i))} />
+        </span>))}
       {br.conditions.length === 0 && <span className="amber" style={{ fontSize: 10 }}>⚠ always passes</span>}
-      <button className="add" style={{ padding: "0 4px" }} onClick={() => { setConds([...br.conditions, { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }]); ops.toggleOpen(`cond:${b.id}:${j}:${br.conditions.length}`); }}>+ and</button>
+      <button className="add" style={{ padding: "0 4px" }} onClick={() => { ops.setConds(b, j, [...br.conditions, BLANK_COND()]); ops.setOpen(`cond:${b.id}:${j}:${br.conditions.length}`); }}>+ and</button>
     </span>
   );
 }
-
-function Rows({ script, ops, filter, cols3 }) {
-  const rows = script.actions.filter(filter);
-  return rows.map(a => (
-    <ActionRow key={a.id} a={a} cols3={cols3} open={ops.isOpen(a.id)} onOpen={() => ops.toggleOpen(a.id)}
-      onChange={(na, mode) => ops.patch(a.id, na, mode)} onDelete={() => ops.del(a.id)}
-      onWrap={a.block ? undefined : () => ops.wrap(a.id)} onMove={(tag) => ops.move(a.id, tag)} moveTargets={ops.moveTargets(a)} />
-  ));
+function TriggerHead({ script, setScript, ops, cols3 }) {
+  const open = ops.isOpen("trig");
+  return (
+    <div>
+      <div className="head">
+        <div className={"when ed" + (open ? " on" : "")} onClick={() => ops.toggleOpen("trig")}>{triggerText(script.trigger, script.owner)}</div>
+        <TriggerChips script={script} setScript={setScript} editorOpen={open} onOpenEditor={() => ops.toggleOpen("trig")} />
+      </div>
+      {open && <TriggerEditor script={script} setScript={setScript} cols3={cols3} style={{ margin: "6px 12px 0" }} />}
+    </div>
+  );
 }
-
-// ─── B (and C): outline ───
+function ScriptConds({ script, setScript, ops, cols3 }) {
+  const set = (conditions) => setScript({ ...script, conditions });
+  return (
+    <div className="condline"><span className="k">only when</span>
+      {script.conditions.length === 0 && <span className="dim">— always</span>}
+      {script.conditions.map((c, i) => <span key={i} style={{ display: "inline-flex", gap: 6 }}>{i > 0 && <span className="dim">and</span>}
+        <CondSentence c={c} k={"sc:" + i} ops={ops} cols3={cols3} onChange={nc => set(script.conditions.map((x, q) => q === i ? nc : x))} onDelete={() => set(script.conditions.filter((_, q) => q !== i))} /></span>)}
+      <button className="add" style={{ padding: 0 }} onClick={() => { set([...script.conditions, BLANK_COND()]); ops.setOpen("sc:" + script.conditions.length); }}>+ condition</button>
+    </div>
+  );
+}
 function Outline({ script, setScript, ops, cols3, collapsed, setCollapsed }) {
-  const inBranch = (b, j) => (a) => a.block?.id === b.id && a.block.branch === j;
   return (
     <div style={{ padding: "6px 6px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
-      {script.blocks.map((b, k) => {
+      {script.blocks.map((b) => {
         const isCol = !!collapsed[b.id];
         const count = script.actions.filter(a => a.block?.id === b.id).length;
         const rule = (word, j) => (
@@ -316,213 +454,361 @@ function Outline({ script, setScript, ops, cols3, collapsed, setCollapsed }) {
             <span className="w" onClick={() => setCollapsed({ ...collapsed, [b.id]: !isCol })}>{word}</span>
             {j >= 0 ? <BranchConds b={b} j={j} ops={ops} cols3={cols3} /> : null}
             {j === 0 && <span className="n">{count} action{count === 1 ? "" : "s"}{isCol ? " · collapsed" : ""}</span>}
-            {j > 0 && <button className="add" style={{ marginLeft: "auto", padding: 0 }} title="Remove this branch — its actions go to the top level"
-              onClick={() => { ops.patchBlock({ ...b, branches: b.branches.filter((_, i) => i !== j) }); setScript(s => ({ ...s, actions: s.actions.map(a => a.block?.id === b.id && a.block.branch === j ? (({ block, ...r }) => r)(a) : a) })); }}>× branch</button>}
-            {j === -1 && <button className="add" style={{ marginLeft: "auto", padding: 0 }} onClick={() => { ops.patchBlock({ ...b, else: false }); setScript(s => ({ ...s, actions: s.actions.map(a => a.block?.id === b.id && a.block.branch === -1 ? (({ block, ...r }) => r)(a) : a) })); }}>× else</button>}
-          </div>
-        );
+            {j > 0 && <button className="add" style={{ marginLeft: "auto", padding: 0 }} onClick={() => ops.removeBranch(b, j)}>× branch</button>}
+            {j === -1 && <button className="add" style={{ marginLeft: "auto", padding: 0 }} onClick={() => ops.removeElse(b)}>× else</button>}
+          </div>);
         return (
           <div key={b.id}>
-            {b.branches.map((br, j) => (
-              <div key={j}>
-                {rule(j === 0 ? "if" : "else if", j)}
-                {!isCol && <div className="branch"><Rows script={script} ops={ops} filter={inBranch(b, j)} cols3={cols3} /><button className="add" onClick={() => ops.add({ id: b.id, branch: j })}>+ action</button></div>}
-              </div>
-            ))}
+            {b.branches.map((br, j) => (<div key={j}>{rule(j === 0 ? "if" : "else if", j)}
+              {!isCol && <div className="branch"><Rows script={script} ops={ops} filter={ops.inBranch(b, j)} cols3={cols3} /><button className="add" onClick={() => ops.add({ id: b.id, branch: j })}>+ action</button></div>}</div>))}
             {b.else && rule("else", -1)}
-            {b.else && !isCol && <div className="branch"><Rows script={script} ops={ops} filter={inBranch(b, -1)} cols3={cols3} /><button className="add" onClick={() => ops.add({ id: b.id, branch: -1 })}>+ action</button></div>}
+            {b.else && !isCol && <div className="branch"><Rows script={script} ops={ops} filter={ops.inBranch(b, -1)} cols3={cols3} /><button className="add" onClick={() => ops.add({ id: b.id, branch: -1 })}>+ action</button></div>}
             {!isCol && <div style={{ display: "flex", gap: 4, padding: "2px 8px 6px" }}>
-              <button className="add" onClick={() => ops.patchBlock({ ...b, branches: [...b.branches, { conditions: [{ type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] }] })}>+ else if</button>
-              {!b.else && <button className="add" onClick={() => ops.patchBlock({ ...b, else: true })}>+ else</button>}
+              <button className="add" onClick={() => ops.addBranch(b)}>+ else if</button>
+              {!b.else && <button className="add" onClick={() => ops.addElse(b)}>+ else</button>}
               <span style={{ flex: 1 }}></span>
-              <button className="add" title="Remove the block — its actions become top-level" onClick={() => ops.unwrap(b.id)}>unwrap</button>
+              <button className="add" onClick={() => ops.unwrap(b.id)}>unwrap</button>
             </div>}
-          </div>
-        );
+          </div>);
       })}
       <div style={{ marginTop: 4 }}><Rows script={script} ops={ops} filter={a => !a.block} cols3={cols3} /></div>
-      <div style={{ display: "flex", gap: 4, padding: "6px 8px 0" }}>
-        <button className="add" onClick={() => ops.add()}>+ action</button>
-        <button className="add amber" onClick={ops.addBlock}>+ if</button>
-      </div>
+      <div style={{ display: "flex", gap: 4, padding: "6px 8px 0" }}><button className="add" onClick={() => ops.add()}>+ action</button><button className="add amber" onClick={ops.addBlock}>+ if</button></div>
     </div>
   );
 }
-
-// ─── A: sentence rows with the current amber cards (structure axis unchanged) ───
-function SentenceRows({ script, setScript, ops }) {
-  const inBranch = (b, j) => (a) => a.block?.id === b.id && a.block.branch === j;
-  return (
-    <div style={{ padding: "6px 6px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
-      {script.blocks.map((b, k) => (
-        <div className="card" key={b.id}>
-          {b.branches.map((br, j) => (
-            <div key={j}>
-              <div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</span>
-                <button className="btn" style={{ padding: "2px 6px", fontSize: 10 }} onClick={() => ops.patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions: [...x.conditions, { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] } : x) })}>+ condition</button></div>
-              <TodayConds conditions={br.conditions} onChange={conditions => ops.patchBlock({ ...b, branches: b.branches.map((x, i) => i === j ? { conditions } : x) })} />
-              <div className="branch" style={{ marginLeft: 4 }}><Rows script={script} ops={ops} filter={inBranch(b, j)} /><button className="add" onClick={() => ops.add({ id: b.id, branch: j })}>+ action here</button></div>
-            </div>
-          ))}
-          {b.else && <div><div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">ELSE #{k + 1}</span></div>
-            <div className="branch" style={{ marginLeft: 4 }}><Rows script={script} ops={ops} filter={inBranch(b, -1)} /><button className="add" onClick={() => ops.add({ id: b.id, branch: -1 })}>+ action here</button></div></div>}
-          <div style={{ display: "flex", gap: 4, paddingTop: 4 }}>
-            <button className="btn" style={{ fontSize: 10 }} onClick={() => ops.patchBlock({ ...b, branches: [...b.branches, { conditions: [{ type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }] }] })}>+ else if</button>
-            {!b.else && <button className="btn" style={{ fontSize: 10 }} onClick={() => ops.patchBlock({ ...b, else: true })}>+ else</button>}
-            <span style={{ flex: 1 }}></span>
-            <button className="btn dim" style={{ fontSize: 10 }} onClick={() => ops.unwrap(b.id)}>unwrap</button>
-          </div>
-        </div>
-      ))}
-      <Rows script={script} ops={ops} filter={a => !a.block} />
-    </div>
-  );
-}
-
-function Chrome({ width, title, children, showBack = true, prose }) {
-  return (
-    <div className={"panel" + (prose ? " prose" : "")} style={{ width }}>
-      <div className="ph"><span className="t">SCRIPTS</span><span className="dim">✕</span></div>
-      <div className="tabs">{["LEVEL","SELECTED","DIALOGUE","STATE","ITEMS","UI"].map(t => <div key={t} className={"tab" + (t === "SELECTED" ? " on" : "")}>{t}</div>)}</div>
-      {showBack && <div className="back"><div className="b">←</div><div className="name">{title}</div><div className="dim">?</div></div>}
-      {children}
-    </div>
-  );
-}
-
-function ScriptConds({ script, setScript, ops, cols3 }) {
-  const set = (conditions) => setScript({ ...script, conditions });
-  return (
-    <div className="condline"><span className="k">only when</span>
-      {script.conditions.length === 0 && <span className="dim">— always</span>}
-      {script.conditions.map((c, i) => <span key={i} style={{ display: "inline-flex", gap: 6 }}>{i > 0 && <span className="dim">and</span>}
-        <CondRow c={c} cols3={cols3} open={ops.isOpen("sc:" + i)} onOpen={() => ops.toggleOpen("sc:" + i)} onChange={nc => set(script.conditions.map((x, k) => k === i ? nc : x))} onDelete={() => set(script.conditions.filter((_, k) => k !== i))} /></span>)}
-      <button className="add" style={{ padding: 0 }} onClick={() => { set([...script.conditions, { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false }]); ops.toggleOpen("sc:" + script.conditions.length); }}>+ condition</button>
-    </div>
-  );
-}
-
-// A keeps today's sections verbatim (field stacks + section labels); only action rows change.
+// A keeps today's sections verbatim; only action rows change.
 function TodayHead({ script, setScript }) {
-  const t = script.trigger;
-  const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
+  const t = script.trigger; const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
+  const F = ({ label, children }) => <div style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">{label}</span>{children}</div>;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "8px 12px" }}>
-      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Label</span><input className="field" value={script.label} onChange={e => setScript({ ...script, label: e.target.value })} /></div>
-      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Trigger</span>
-        <select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.keys(TRIGGERS).map(k => <option key={k} value={k}>{k}</option>)}</select></div>
-      {t.type === "on_timer" && <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3 }}><span className="lbl">Interval (seconds)</span><input className="field" value={t.interval} onChange={e => set({ interval: Number(e.target.value) })} /></div>}
+      <F label="Label"><input className="field" value={script.label} onChange={e => setScript({ ...script, label: e.target.value })} /></F>
+      <F label="Trigger"><select className="field" value={t.type} onChange={e => set({ type: e.target.value })}>{Object.keys(TRIGGERS).map(k => <option key={k} value={k}>{k}</option>)}</select></F>
+      {t.type === "on_timer" && <F label="Interval (seconds)"><input className="field" value={t.interval} onChange={e => set({ interval: Number(e.target.value) })} /></F>}
       {t.type === "on_timer" && <div className="toggle" onClick={() => set({ repeat: !t.repeat })}><span className={"box" + (t.repeat ? " on" : "")}></span>Repeat every interval (off = fire once)</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div className="toggle" onClick={() => set({ oneShot: !t.oneShot })}><span className={"box" + (t.oneShot ? " on" : "")}></span>One-shot</div>
         <span style={{ flex: 1 }}></span><span className="dim">Delay (s)</span><input className="field" style={{ width: 56 }} value={t.delay} onChange={e => set({ delay: Number(e.target.value) })} />
       </div>
-    </div>
-  );
+    </div>);
 }
 function TodayCondRow({ c, onChange, onDelete }) {
+  const F = ({ label, children, style }) => <div style={{ display: "flex", flexDirection: "column", gap: 3, ...style }}><span className="lbl">{label}</span>{children}</div>;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
       <select className="field" style={{ flex: "0 0 120px" }} value={c.type} onChange={e => onChange({ ...c, type: e.target.value })}>{Object.entries(COND_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 90 }}><span className="lbl">Whose state</span><select className="field" value={c.scope} onChange={e => onChange({ ...c, scope: e.target.value })}>{SCOPES.map(o => <option key={o} value={o}>{o}</option>)}</select></div>
+      <F label="Whose state" style={{ flex: 1, minWidth: 90 }}><select className="field" value={c.scope} onChange={e => onChange({ ...c, scope: e.target.value })}>{SCOPES.map(o => <option key={o} value={o}>{o}</option>)}</select></F>
       <div className="toggle" style={{ padding: "6px 0" }} onClick={() => onChange({ ...c, not: !c.not })}><span className={"box" + (c.not ? " on" : "")}></span><span className="dim">unless</span></div>
-      <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1, minWidth: 90 }}><span className="lbl">State key</span><input className="field" value={c.key} onChange={e => onChange({ ...c, key: e.target.value })} /></div>
-      {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") && <div className="f" style={{ display: "flex", flexDirection: "column", gap: 3, flex: "0 0 90px" }}><span className="lbl">Equals</span><input className="field" value={c.value} onChange={e => onChange({ ...c, value: e.target.value })} /></div>}
+      <F label="State key" style={{ flex: 1, minWidth: 90 }}><input className="field" value={c.key} onChange={e => onChange({ ...c, key: e.target.value })} /></F>
+      {(c.type === "state_equals" || c.type === "compare_number" || c.type === "has_item") && <F label="Equals" style={{ flex: "0 0 90px" }}><input className="field" value={c.value} onChange={e => onChange({ ...c, value: e.target.value })} /></F>}
       <button className="btn danger" style={{ padding: "6px 6px" }} onClick={onDelete}>×</button>
-    </div>
-  );
+    </div>);
 }
 function TodayConds({ conditions, onChange, label }) {
-  const blank = { type: "has_state", scope: "🌐 Global", key: "flag", value: "true", not: false };
   return (
     <div style={{ padding: "0 12px 4px" }}>
-      {label && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 4px" }}><span className="sec">Conditions</span><button className="btn" onClick={() => onChange([...conditions, blank])}>+ Add</button></div>}
+      {label && <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0 4px" }}><span className="sec">Conditions</span><button className="btn" onClick={() => onChange([...conditions, BLANK_COND()])}>+ Add</button></div>}
       {conditions.map((c, i) => <TodayCondRow key={i} c={c} onChange={nc => onChange(conditions.map((x, k) => k === i ? nc : x))} onDelete={() => onChange(conditions.filter((_, k) => k !== i))} />)}
       {conditions.length === 0 && label && <div className="dim" style={{ fontSize: 11, padding: "4px 0" }}>(none)</div>}
-    </div>
-  );
+    </div>);
 }
-
-function PanelA({ prose }) {
-  const [script, setScript] = useState(SPIKES);
-  const openState = useState(null);
-  const ops = useScriptOps(script, setScript, openState);
+function SentenceCards({ script, ops }) {
   return (
-    <Chrome width={320} title={script.label} prose={prose}>
-      <TodayHead script={script} setScript={setScript} />
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
-      <TodayConds label conditions={script.conditions} onChange={conditions => setScript({ ...script, conditions })} />
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px 0" }}><span className="sec">Actions</span><div style={{ display: "flex", gap: 4 }}><button className="btn" onClick={() => ops.add()}>+ Add</button><button className="btn amber" onClick={ops.addBlock}>+ If</button></div></div>
-      <SentenceRows script={script} setScript={setScript} ops={ops} />
-      <div className="footer"><button className="btn primary" style={{ flex: 1 }}>Disable</button><button className="btn danger">Delete</button></div>
-    </Chrome>
-  );
+    <div style={{ padding: "6px 6px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
+      {script.blocks.map((b, k) => (
+        <div className="card" key={b.id}>
+          {b.branches.map((br, j) => (<div key={j}>
+            <div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">{j === 0 ? `IF #${k + 1}` : `ELSE IF #${k + 1}.${j}`}</span>
+              <button className="btn" style={{ padding: "2px 6px", fontSize: 10 }} onClick={() => ops.setConds(b, j, [...br.conditions, BLANK_COND()])}>+ condition</button></div>
+            <TodayConds conditions={br.conditions} onChange={conditions => ops.setConds(b, j, conditions)} />
+            <div className="branch" style={{ marginLeft: 4 }}><Rows script={script} ops={ops} filter={ops.inBranch(b, j)} /><button className="add" onClick={() => ops.add({ id: b.id, branch: j })}>+ action here</button></div>
+          </div>))}
+          {b.else && <div><div className="brule" style={{ padding: "6px 4px 2px" }}><span className="w">ELSE #{k + 1}</span></div>
+            <div className="branch" style={{ marginLeft: 4 }}><Rows script={script} ops={ops} filter={ops.inBranch(b, -1)} /><button className="add" onClick={() => ops.add({ id: b.id, branch: -1 })}>+ action here</button></div></div>}
+          <div style={{ display: "flex", gap: 4, paddingTop: 4 }}>
+            <button className="btn" style={{ fontSize: 10 }} onClick={() => ops.addBranch(b)}>+ else if</button>
+            {!b.else && <button className="btn" style={{ fontSize: 10 }} onClick={() => ops.addElse(b)}>+ else</button>}
+            <span style={{ flex: 1 }}></span><button className="btn dim" style={{ fontSize: 10 }} onClick={() => ops.unwrap(b.id)}>unwrap</button>
+          </div>
+        </div>))}
+      <Rows script={script} ops={ops} filter={a => !a.block} />
+    </div>);
 }
-
-function PanelB({ prose }) {
-  const [script, setScript] = useState(SPIKES);
-  const openState = useState(null);
-  const [collapsed, setCollapsed] = useState({});
-  const ops = useScriptOps(script, setScript, openState);
+function Chrome({ width, title, children, showBack = true, className }) {
   return (
-    <Chrome width={320} title={script.label} prose={prose}>
-      <TriggerHead script={script} setScript={setScript} open={ops.isOpen("trig")} onOpen={() => ops.toggleOpen("trig")} />
-      <ScriptConds script={script} setScript={setScript} ops={ops} />
-      <Outline script={script} setScript={setScript} ops={ops} collapsed={collapsed} setCollapsed={setCollapsed} />
-      <div className="footer"><button className="btn primary" style={{ flex: 1 }}>Disable</button><button className="btn danger">Delete</button></div>
-    </Chrome>
-  );
+    <div className={"panel" + (className ? " " + className : "")} style={{ width }}>
+      <div className="ph"><span className="t">SCRIPTS</span><span className="dim">✕</span></div>
+      <div className="tabs">{["LEVEL","SELECTED","DIALOGUE","STATE","ITEMS","UI"].map(t => <div key={t} className={"tab" + (t === "SELECTED" ? " on" : "")}>{t}</div>)}</div>
+      {showBack && <div className="back"><div className="b">←</div><div className="name">{title}</div><div className="dim">?</div></div>}
+      {children}
+    </div>);
 }
+const Footer = () => <div className="footer"><button className="btn primary" style={{ flex: 1 }}>Disable</button><button className="btn danger">Delete</button></div>;
 
-function PanelC({ prose }) {
-  const [scripts, setScripts] = useState(() => ({ spikes: SPIKES(), coin: COIN() }));
-  const [cur, setCur] = useState("spikes");
-  const openState = useState(null);
-  const [collapsed, setCollapsed] = useState({});
-  const script = scripts[cur];
-  const setScript = (v) => setScripts(all => ({ ...all, [cur]: typeof v === "function" ? v(all[cur]) : v }));
+// ═══ A ═══
+function PanelA() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null));
+  return (<Chrome width={320} title={script.label}>
+    <TodayHead script={script} setScript={setScript} />
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
+    <TodayConds label conditions={script.conditions} onChange={conditions => setScript({ ...script, conditions })} />
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", margin: "4px 0" }}></div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px 0" }}><span className="sec">Actions</span><div style={{ display: "flex", gap: 4 }}><button className="btn" onClick={() => ops.add()}>+ Add</button><button className="btn amber" onClick={ops.addBlock}>+ If</button></div></div>
+    <SentenceCards script={script} ops={ops} /><Footer />
+  </Chrome>);
+}
+// ═══ B ═══
+function PanelB() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const [collapsed, setCollapsed] = useState({});
+  return (<Chrome width={320} title={script.label}>
+    <TriggerHead script={script} setScript={setScript} ops={ops} />
+    <ScriptConds script={script} setScript={setScript} ops={ops} />
+    <Outline script={script} setScript={setScript} ops={ops} collapsed={collapsed} setCollapsed={setCollapsed} /><Footer />
+  </Chrome>);
+}
+// ═══ C ═══
+function PanelC() {
+  const [scripts, setScripts] = useState(() => ({ spikes: SPIKES(), coin: COIN() })); const [cur, setCur] = useState("spikes");
+  const openState = useState(null); const [collapsed, setCollapsed] = useState({});
+  const script = scripts[cur]; const setScript = (v) => setScripts(all => ({ ...all, [cur]: typeof v === "function" ? v(all[cur]) : v }));
   const ops = useScriptOps(script, setScript, openState);
   const summary = (s) => `${triggerText(s.trigger, s.owner)} → ${s.actions.length} action${s.actions.length === 1 ? "" : "s"}${s.blocks.length ? ` in ${s.blocks.reduce((n, b) => n + b.branches.length + (b.else ? 1 : 0), 0)} branches` : ""}`;
-  return (
-    <Chrome width={520} showBack={false} prose={prose}>
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <div className="list">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px 4px" }}><span className="sec">Selected</span><button className="btn" style={{ padding: "2px 6px" }}>+ New</button></div>
-          {Object.values(scripts).map(s => <div key={s.id} className={"li" + (s.id === cur ? " on" : "")} onClick={() => { setCur(s.id); openState[1](null); }}><div className="n">{s.label}</div><div className="s">{summary(s)}</div></div>)}
-        </div>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-          <TriggerHead script={script} setScript={setScript} cols3 open={ops.isOpen("trig")} onOpen={() => ops.toggleOpen("trig")} />
-          <ScriptConds script={script} setScript={setScript} ops={ops} cols3 />
-          <Outline script={script} setScript={setScript} ops={ops} cols3 collapsed={collapsed} setCollapsed={setCollapsed} />
-          <div className="footer"><button className="btn primary" style={{ flex: 1 }}>Disable</button><button className="btn danger">Delete</button></div>
-        </div>
+  return (<Chrome width={520} showBack={false}>
+    <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div className="list">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px 4px" }}><span className="sec">Selected</span><button className="btn" style={{ padding: "2px 6px" }}>+ New</button></div>
+        {Object.values(scripts).map(s => <div key={s.id} className={"li" + (s.id === cur ? " on" : "")} onClick={() => { setCur(s.id); openState[1](null); }}><div className="n">{s.label}</div><div className="s">{summary(s)}</div></div>)}
       </div>
-    </Chrome>
-  );
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <TriggerHead script={script} setScript={setScript} ops={ops} cols3 />
+        <ScriptConds script={script} setScript={setScript} ops={ops} cols3 />
+        <Outline script={script} setScript={setScript} ops={ops} cols3 collapsed={collapsed} setCollapsed={setCollapsed} /><Footer />
+      </div>
+    </div>
+  </Chrome>);
+}
+// ═══ D · Prose ═══
+function PanelD() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null));
+  const t = script.trigger;
+  const Chip = ({ k, children, cls }) => <span className={"pc " + (cls || "") + (ops.isOpen(k) ? " on" : "")} onClick={() => ops.toggleOpen(k)}>{children}</span>;
+  const ActionChip = ({ a }) => { const s = sentence(a); return <Chip k={a.id}>{s.verb} {s.noun}{a.delay ? <span className="dim"> after {a.delay}s</span> : null}</Chip>; };
+  const list = (items, conj) => items.map((a, i) => <span key={a.id}>{i > 0 && <span> {i === items.length - 1 ? conj : ","} </span>}<ActionChip a={a} /></span>);
+  const editorFor = () => {
+    const k = ops.open; if (!k) return null;
+    if (k === "trig") return <TriggerEditor script={script} setScript={setScript} style={{ margin: "0 14px 8px" }} />;
+    if (k.startsWith("cond:")) { const [, bid, j, i] = k.split(":"); const b = script.blocks.find(x => x.id === bid); const br = b?.branches[+j]; const c = br?.conditions[+i]; if (!c) return null;
+      return <CondEditor c={c} style={{ margin: "0 14px 8px" }} onChange={nc => ops.setConds(b, +j, br.conditions.map((x, q) => q === +i ? nc : x))} onDelete={() => ops.setConds(b, +j, br.conditions.filter((_, q) => q !== +i))} />; }
+    const a = script.actions.find(x => x.id === k); if (!a) return null;
+    return <div style={{ margin: "0 14px 8px", background: "rgba(80,140,255,0.06)", outline: "1px solid rgba(80,140,255,0.3)", borderRadius: 4 }}><ActionEditor a={a} onChange={na => ops.patch(a.id, na)} />
+      <div style={{ display: "flex", gap: 4, padding: "0 8px 8px" }}>{!a.block && <button className="btn amber" onClick={() => ops.wrap(a.id)}>wrap in if</button>}<span style={{ flex: 1 }}></span><button className="btn danger" onClick={() => ops.del(a.id)}>delete</button></div></div>;
+  };
+  const ChipTrig = () => <Chip k="trig">{triggerText(t, script.owner)}</Chip>;
+  return (<Chrome width={340} title={script.label}>
+    <div className="p">
+      <ChipTrig />{t.repeat && t.type === "on_timer" ? <span>, repeating</span> : null}{t.oneShot ? <span>, once only</span> : null}, on <span className="pc k">★ {script.owner}</span>:<br />
+      {script.blocks.map((b) => (<span key={b.id}>
+        {b.branches.map((br, j) => (<span key={j}>{j === 0 ? "if " : "otherwise, if "}
+          {br.conditions.map((c, i) => <span key={i}>{i > 0 && " and "}<Chip k={`cond:${b.id}:${j}:${i}`} cls={c.not ? "amber" : ""}>{condText(c)}</Chip></span>)}
+          <button className="pins" onClick={() => { ops.setConds(b, j, [...br.conditions, BLANK_COND()]); ops.setOpen(`cond:${b.id}:${j}:${br.conditions.length}`); }}> +and</button>, then {list(script.actions.filter(ops.inBranch(b, j)), "and")}
+          <button className="pins" onClick={() => ops.add({ id: b.id, branch: j })}> +and…</button>{j < b.branches.length - 1 || b.else ? ";" : "."}<br /></span>))}
+        {b.else && <span>otherwise, {list(script.actions.filter(ops.inBranch(b, -1)), "and")}<button className="pins" onClick={() => ops.add({ id: b.id, branch: -1 })}> +and…</button>.<br /></span>}
+        {!b.else && <button className="pins" onClick={() => ops.addElse(b)}>+ otherwise…</button>}
+      </span>))}
+      {script.actions.filter(a => !a.block).length > 0 && <span>Also, {list(script.actions.filter(a => !a.block), "and")}.</span>}
+      <button className="pins" onClick={() => ops.add()}> +then…</button>
+    </div>
+    {editorFor()}<Footer />
+  </Chrome>);
+}
+// ═══ E · Cards ═══
+function CardAction({ a, ops, mono }) {
+  const spec = ACTIONS[a.type]; const s = sentence(a); const [menu, setMenu] = useState(false); const open = ops.isOpen(a.id);
+  return (<div>
+    <div className={"ac" + (open ? " open" : "")} onClick={() => ops.toggleOpen(a.id)}>
+      <div className="ic" style={{ background: spec.tint + "22", color: spec.tint }}><Icon name={spec.icon} /></div>
+      <div style={{ minWidth: 0 }}><div className="ttl">{s.noun}</div><div className="sub">{spec.verb}{s.tail ? " · " + s.tail : ""}</div></div>
+      <span className="kb" onClick={e => { e.stopPropagation(); setMenu(m => !m); }}><Icon name="dots" /></span>
+      {menu && <RowMenu a={a} ops={ops} onClose={() => setMenu(false)} />}
+    </div>
+    {open && <ActionEditor a={a} onChange={na => ops.patch(a.id, na)} />}
+  </div>);
+}
+function PanelE() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  const condHead = (b, j, word, cls) => {
+    const br = b.branches[j];
+    return (<div className={"gh " + (cls || "")}>
+      <Icon name="branch" /><span className="w">{word}</span>
+      {j >= 0 && br.conditions.map((c, i) => <span key={i} style={{ display: "inline-flex", gap: 6 }}>{i > 0 && <span className="dim">and</span>}
+        <span className={"c" + (ops.isOpen(`cond:${b.id}:${j}:${i}`) ? " blue" : "")} onClick={() => ops.toggleOpen(`cond:${b.id}:${j}:${i}`)}>{condText(c)}</span></span>)}
+      {j >= 0 && <span className="pins" style={{ marginLeft: 4 }} onClick={() => { ops.setConds(b, j, [...br.conditions, BLANK_COND()]); ops.setOpen(`cond:${b.id}:${j}:${br.conditions.length}`); }}>+ and</span>}
+      <span style={{ flex: 1 }}></span>
+      {j > 0 && <span className="pins" onClick={() => ops.removeBranch(b, j)}>×</span>}{j === -1 && <span className="pins" onClick={() => ops.removeElse(b)}>×</span>}
+    </div>);
+  };
+  const condEditor = (b, j) => { const k = ops.open; if (!k || !k.startsWith(`cond:${b.id}:${j}:`)) return null; const i = +k.split(":")[3]; const br = b.branches[j]; const c = br.conditions[i]; if (!c) return null;
+    return <CondEditor c={c} style={{ margin: "6px 6px 0" }} onChange={nc => ops.setConds(b, j, br.conditions.map((x, q) => q === i ? nc : x))} onDelete={() => ops.setConds(b, j, br.conditions.filter((_, q) => q !== i))} />; };
+  return (<Chrome width={340} title={script.label} className="E">
+    <div className="hero">
+      <div className="ic"><Icon name={t.type === "on_timer" ? "clock" : "enter"} size={18} /></div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="ttl" onClick={() => ops.toggleOpen("trig")}>{triggerText(t, script.owner)}</div>
+        <div className="sub" style={{ color: "var(--muted)", fontSize: 11 }}>on ★ {script.owner}</div>
+        <TriggerChips script={script} setScript={setScript} editorOpen={ops.isOpen("trig")} onOpenEditor={() => ops.toggleOpen("trig")} />
+      </div>
+    </div>
+    {ops.isOpen("trig") && <TriggerEditor script={script} setScript={setScript} style={{ margin: "0 12px 6px" }} />}
+    {script.conditions.length > 0 && <div style={{ padding: "2px 14px 6px", fontSize: 12 }}><span className="dim">only when </span>{script.conditions.map((c, i) => <span key={i}>{i > 0 && " and "}<span className="ed" onClick={() => ops.toggleOpen("sc:" + i)}>{condText(c)}</span></span>)}</div>}
+    {script.blocks.map((b) => (
+      <div className="grp" key={b.id}>
+        {b.branches.map((br, j) => (<div key={j}>{condHead(b, j, j === 0 ? "IF" : "ELSE IF")}{condEditor(b, j)}
+          <div className="gb">{script.actions.filter(ops.inBranch(b, j)).map(a => <CardAction key={a.id} a={a} ops={ops} />)}<div className="addc" onClick={() => ops.add({ id: b.id, branch: j })}><Icon name="plus" /> action</div></div></div>))}
+        {b.else && <div>{condHead(b, -1, "ELSE", "else")}<div className="gb">{script.actions.filter(ops.inBranch(b, -1)).map(a => <CardAction key={a.id} a={a} ops={ops} />)}<div className="addc" onClick={() => ops.add({ id: b.id, branch: -1 })}><Icon name="plus" /> action</div></div></div>}
+        <div style={{ display: "flex", gap: 6, padding: "4px 8px 8px", background: "rgba(255,255,255,0.02)" }}>
+          <span className="pins" onClick={() => ops.addBranch(b)}>+ else if</span>{!b.else && <span className="pins" onClick={() => ops.addElse(b)}>+ else</span>}<span style={{ flex: 1 }}></span><span className="pins" onClick={() => ops.unwrap(b.id)}>unwrap</span>
+        </div>
+      </div>))}
+    <div style={{ padding: "0 12px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {script.actions.filter(a => !a.block).map(a => <CardAction key={a.id} a={a} ops={ops} />)}
+      <div style={{ display: "flex", gap: 6 }}><div className="addc" style={{ flex: 1 }} onClick={() => ops.add()}><Icon name="plus" /> action</div><div className="addc" style={{ flex: 1, color: "var(--amber)" }} onClick={ops.addBlock}><Icon name="branch" /> if-block</div></div>
+    </div>
+    <Footer />
+  </Chrome>);
+}
+// ═══ F · Flow ═══
+function FlowNode({ a, ops, small }) {
+  const spec = ACTIONS[a.type]; const s = sentence(a); const open = ops.isOpen(a.id); const [menu, setMenu] = useState(false);
+  return (<div>
+    <div className={"node" + (open ? " open" : "")} onClick={() => ops.toggleOpen(a.id)}>
+      <div className="ic" style={{ background: spec.tint + "22", color: spec.tint }}><Icon name={spec.icon} size={14} /></div>
+      <div style={{ minWidth: 0 }}><div className="t">{spec.verb} <span style={{ fontWeight: 400 }}>{s.noun}</span></div>{s.tail && <div className="s">{s.tail}</div>}</div>
+      <span className="kb dim" style={{ marginLeft: "auto" }} onClick={e => { e.stopPropagation(); setMenu(m => !m); }}><Icon name="dots" /></span>
+      {menu && <RowMenu a={a} ops={ops} onClose={() => setMenu(false)} />}
+    </div>
+    {open && <div className="pop"><ActionEditor a={a} onChange={na => ops.patch(a.id, na)} /></div>}
+  </div>);
+}
+function PanelF() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  const lane = (b, j, cls, label) => (
+    <div className={"lane " + cls}><div className="lh">{label}</div>
+      {script.actions.filter(ops.inBranch(b, j)).map(a => <FlowNode key={a.id} a={a} ops={ops} small />)}
+      <div className="mini" onClick={() => ops.add({ id: b.id, branch: j })}>+ step</div>
+    </div>);
+  return (<Chrome width={440} title={script.label} className="F">
+    <div className="flow">
+      <div className={"node trig" + (ops.isOpen("trig") ? " open" : "")} onClick={() => ops.toggleOpen("trig")}>
+        <div className="ic" style={{ background: "rgba(80,140,255,0.25)", color: "var(--blue)" }}><Icon name={t.type === "on_timer" ? "clock" : "enter"} size={14} /></div>
+        <div><div className="t">{triggerText(t, script.owner)}</div><div className="s">on ★ {script.owner}</div></div>
+      </div>
+      <div onClick={e => e.stopPropagation()} style={{ paddingLeft: 6 }}><TriggerChips script={script} setScript={setScript} editorOpen={ops.isOpen("trig")} onOpenEditor={() => ops.toggleOpen("trig")} /></div>
+      {ops.isOpen("trig") && <div className="pop"><TriggerEditor script={script} setScript={setScript} /></div>}
+      {script.blocks.map((b) => {
+        const br = b.branches[0];
+        return (<div key={b.id}>
+          <div className="link"></div>
+          <div className="dec"><div className="dia"></div>
+            <span className="c" onClick={() => ops.toggleOpen(`cond:${b.id}:0:0`)}>{br.conditions.map(condText).join(" and ") || "(always)"}</span>
+            <span className="pins" onClick={() => ops.unwrap(b.id)} title="Remove the decision (steps move up)">×</span>
+          </div>
+          {ops.isOpen(`cond:${b.id}:0:0`) && br.conditions[0] && <div className="pop"><CondEditor c={br.conditions[0]} onChange={nc => ops.setConds(b, 0, br.conditions.map((x, q) => q === 0 ? nc : x))} /></div>}
+          <div className="lanes">{lane(b, 0, "yes", "yes")}{b.else ? lane(b, -1, "no", "no") : <div className="lane no"><div className="lh">no</div><div className="mini" onClick={() => ops.addElse(b)}>+ else steps</div></div>}</div>
+          {b.branches.length > 1 && <div className="dim" style={{ fontSize: 10, padding: "4px 2px" }}>+ {b.branches.length - 1} else-if branch{b.branches.length > 2 ? "es" : ""} (shown in the outline view)</div>}
+        </div>);
+      })}
+      {script.actions.filter(a => !a.block).map(a => <div key={a.id}><div className="link"></div><FlowNode a={a} ops={ops} /></div>)}
+      <div className="link"></div>
+      <div style={{ display: "flex", gap: 6 }}><div className="mini" style={{ flex: 1 }} onClick={() => ops.add()}>+ step</div><div className="mini" style={{ flex: 1, color: "var(--amber)" }} onClick={ops.addBlock}>+ decision</div></div>
+    </div>
+    <Footer />
+  </Chrome>);
+}
+// ═══ G · Grid ═══
+function Cell({ value, onChange, options, width }) {
+  const [ed, setEd] = useState(false);
+  if (!ed) return <td className="cell" style={{ width }} onClick={() => setEd(true)}>{String(value ?? "")}</td>;
+  if (options) return <td style={{ width }}><select autoFocus className="cellin" value={value} onBlur={() => setEd(false)} onChange={e => { onChange(e.target.value); setEd(false); }}>{options.map(o => <option key={o} value={o}>{o}</option>)}</select></td>;
+  return <td style={{ width }}><input autoFocus className="cellin" defaultValue={value ?? ""} onBlur={e => { onChange(e.target.value); setEd(false); }} onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEd(false); }} /></td>;
+}
+function GridRow({ a, ops, n, indent }) {
+  const spec = ACTIONS[a.type]; const s = sentence(a); const [menu, setMenu] = useState(false);
+  const primary = spec.fields.find(f => f[0] === "key") ?? spec.fields[0]; const num = (v) => v === "" ? 0 : Number(v);
+  return (<tr className="r">
+    <td className="num">{n}</td>
+    <td style={{ width: 118, position: "relative" }}>{indent && <span className="ind"></span>}<span style={{ color: spec.tint }}><Icon name={spec.icon} size={12} /></span> <span style={{ color: "var(--text)" }}>{spec.verb}</span></td>
+    <Cell value={a[primary[0]]} options={primary[2] === "select" ? primary[3] : undefined} onChange={v => ops.patch(a.id, { ...a, [primary[0]]: v })} />
+    <td className="dim" style={{ fontSize: 11 }}>{s.tail.replace(/ · after .*$/, "")}</td>
+    <Cell value={a.delay} width={52} onChange={v => ops.patch(a.id, { ...a, delay: num(v) })} />
+    <td style={{ width: 28, position: "relative" }}><div className="rowctl"><button onClick={() => setMenu(m => !m)}>⋯</button></div>{menu && <RowMenu a={a} ops={ops} onClose={() => setMenu(false)} />}</td>
+  </tr>);
+}
+function PanelG() {
+  const [script, setScript] = useState(SPIKES); const ops = useScriptOps(script, setScript, useState(null)); const t = script.trigger;
+  let n = 0;
+  const groupRow = (b, j, word, cls) => { const br = j >= 0 ? b.branches[j] : null; return (
+    <tr className={"g " + (cls || "")} key={"g" + j}><td colSpan={6}>
+      <span style={{ marginRight: 8 }}>{word}</span>
+      {br && br.conditions.map((c, i) => <span key={i}>{i > 0 && <span className="dim"> and </span>}<span className={"c" + (ops.isOpen(`cond:${b.id}:${j}:${i}`) ? " blue" : "")} onClick={() => ops.toggleOpen(`cond:${b.id}:${j}:${i}`)}>{condText(c)}</span></span>)}
+      {br && <span className="pins" style={{ marginLeft: 6 }} onClick={() => { ops.setConds(b, j, [...br.conditions, BLANK_COND()]); ops.setOpen(`cond:${b.id}:${j}:${br.conditions.length}`); }}>+ and</span>}
+      <span style={{ float: "right", display: "flex", gap: 8 }}>
+        {j === 0 && <span className="pins" onClick={() => ops.addBranch(b)}>+ else if</span>}{j === 0 && !b.else && <span className="pins" onClick={() => ops.addElse(b)}>+ else</span>}
+        <span className="pins" onClick={() => ops.add({ id: b.id, branch: j })}>+ row</span>
+        {j === 0 ? <span className="pins" onClick={() => ops.unwrap(b.id)}>unwrap</span> : <span className="pins" onClick={() => j === -1 ? ops.removeElse(b) : ops.removeBranch(b, j)}>×</span>}
+      </span>
+    </td></tr>); };
+  const condEditorRow = (b, j) => { const k = ops.open; if (!k || !k.startsWith(`cond:${b.id}:${j}:`)) return null; const i = +k.split(":")[3]; const br = b.branches[j]; const c = br.conditions[i]; if (!c) return null;
+    return <tr key={"ce" + j}><td colSpan={6} style={{ padding: 0 }}><CondEditor c={c} cols3 style={{ margin: 6 }} onChange={nc => ops.setConds(b, j, br.conditions.map((x, q) => q === i ? nc : x))} onDelete={() => ops.setConds(b, j, br.conditions.filter((_, q) => q !== i))} /></td></tr>; };
+  return (<Chrome width={520} title={script.label} className="G">
+    <div className="tb">
+      <span style={{ color: "var(--blue)", display: "inline-flex", gap: 6, alignItems: "center", cursor: "pointer" }} onClick={() => ops.toggleOpen("trig")}><Icon name={t.type === "on_timer" ? "clock" : "enter"} /><b style={{ color: "var(--text)" }}>{triggerText(t, script.owner)}</b></span>
+      <TriggerChips script={script} setScript={setScript} editorOpen={ops.isOpen("trig")} onOpenEditor={() => ops.toggleOpen("trig")} />
+      <span style={{ flex: 1 }}></span>
+      <button className="btn" onClick={() => ops.add()}><Icon name="plus" size={12} /> row</button><button className="btn amber" onClick={ops.addBlock}><Icon name="branch" size={12} /> if</button>
+    </div>
+    {ops.isOpen("trig") && <TriggerEditor script={script} setScript={setScript} cols3 style={{ margin: "6px 10px 0" }} />}
+    <table>
+      <thead><tr><th></th><th>Action</th><th>What</th><th>Params</th><th>After</th><th></th></tr></thead>
+      <tbody>
+        {script.blocks.map((b) => [
+          ...b.branches.flatMap((br, j) => [groupRow(b, j, j === 0 ? "IF" : "ELSE IF"), condEditorRow(b, j),
+            ...script.actions.filter(ops.inBranch(b, j)).map(a => <GridRow key={a.id} a={a} ops={ops} n={++n} indent />)]),
+          ...(b.else ? [groupRow(b, -1, "ELSE", "else"), ...script.actions.filter(ops.inBranch(b, -1)).map(a => <GridRow key={a.id} a={a} ops={ops} n={++n} indent />)] : []),
+        ])}
+        {script.actions.filter(a => !a.block).map(a => <GridRow key={a.id} a={a} ops={ops} n={++n} />)}
+      </tbody>
+    </table>
+    {ops.open && script.actions.find(a => a.id === ops.open) && <div style={{ margin: "6px 10px" }}><div className="lbl" style={{ padding: "4px 8px 0" }}>all fields — {ACTIONS[script.actions.find(a => a.id === ops.open).type].verb}</div><ActionEditor cols3 a={script.actions.find(a => a.id === ops.open)} onChange={na => ops.patch(na.id, na)} /></div>}
+    <div className="dim" style={{ padding: "6px 12px", fontSize: 11 }}>Click a cell to edit it in place · ⋯ on a row for move / duplicate / delete · Enter commits, Esc cancels.</div>
+    <Footer />
+  </Chrome>);
 }
 
+// ═══ App ═══
+const OPTIONS = [
+  ["a", "A · Sentence rows", <span><b>A · Sentence rows.</b> Today's panel, untouched — only the action rows become one-line sentences (click to edit inline, hover for if · ⇄ · ⧉ · ×).</span>, PanelA],
+  ["b", "B · Outline", <span><b>B · Outline.</b> The trigger is the heading; its settings are the chips under it (click <i>repeating</i> / <i>one-shot</i> to toggle, <i>delay</i> or ⋯ for the full form). IF / ELSE are slim rules — click the word to collapse, the condition to edit.</span>, PanelB],
+  ["c", "C · Wide pane", <span><b>C · Wide pane.</b> B at 520px with the script list beside it; click a list row to switch. Fields open in three columns.</span>, PanelC],
+  ["d", "D · Prose", <span><b>D · Prose.</b> The script is a paragraph. Every chip is a field — click one and its editor opens under the paragraph; <i>+and…</i> / <i>+then…</i> insert into the sentence.</span>, PanelD],
+  ["e", "E · Cards", <span><b>E · Cards.</b> App-style: a hero card for the trigger, each action a card with an icon tile, title and subtitle, ⋯ for move / duplicate / delete. Branches are grouped cards with a coloured header strip.</span>, PanelE],
+  ["f", "F · Flow", <span><b>F · Flow.</b> Shortcuts-style timeline: trigger node → decision diamond → <i>yes</i> / <i>no</i> lanes side by side → the steps that always run. Click a node to edit it in a popover.</span>, PanelF],
+  ["g", "G · Grid", <span><b>G · Grid.</b> Dense and data-first: one row per action, grouped under IF / ELSE header rows; click a cell to edit in place, ⋯ for the row menu, the full field set opens below for the selected row.</span>, PanelG],
+];
 function App() {
-  const [view, setView] = useState("all");
-  const [prose, setProse] = useState(false);
-  const [key, setKey] = useState(0);
-  const show = (k) => view === "all" || view === k;
+  const [view, setView] = useState("all"); const [key, setKey] = useState(0);
   return (
     <div>
       <div className="topbar">
         <span className="lbl">Script editor prototype</span>
-        {[["all","A · B · C"],["a","A · Sentence rows"],["b","B · Outline"],["c","C · Wide pane"]].map(([k, l]) => <button key={k} className={"btn" + (view === k ? " primary" : "")} onClick={() => setView(k)}>{l}</button>)}
+        <button className={"btn" + (view === "all" ? " primary" : "")} onClick={() => setView("all")}>all</button>
+        {OPTIONS.map(([k, l]) => <button key={k} className={"btn" + (view === k ? " primary" : "")} onClick={() => setView(k)}>{l}</button>)}
         <span style={{ flex: 1 }}></span>
-        <button className="btn" onClick={() => setProse(p => !p)}>verbs: {prose ? "proportional" : "monospace"}</button>
         <button className="btn" onClick={() => setKey(k => k + 1)}>reset data</button>
       </div>
       <div className="stage" key={key}>
-        {show("a") && <div><div className="note"><b className="blue">A · Sentence rows.</b> The conservative step: today's panel exactly — LABEL / TRIGGER field stacks, the CONDITIONS section, numbered amber IF cards with their buttons — and ONLY the action rows change: one sentence each, click to edit inline, hover for if · ⇄ · ⧉ · ×.</div><PanelA prose={prose} /></div>}
-        {show("b") && <div><div className="note"><b className="blue">B · Outline.</b> The full rethink — same compact rows, but the whole panel reads top-down as an outline: the trigger is the heading (click to edit), IF / ELSE are slim rules — click the word to collapse, click the condition to edit, "+ and" adds a condition. Branches indent; no nested cards.</div><PanelB prose={prose} /></div>}
-        {show("c") && <div><div className="note"><b className="blue">C · Wide pane.</b> 520px with the script list beside the editor; click a list row to switch. Same outline; fields open in three columns.</div><PanelC prose={prose} /></div>}
+        {OPTIONS.filter(([k]) => view === "all" || view === k).map(([k, l, note, P]) => <div className="opt" key={k}><div className="note">{note}</div><P /></div>)}
       </div>
-    </div>
-  );
+    </div>);
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
 </script>
