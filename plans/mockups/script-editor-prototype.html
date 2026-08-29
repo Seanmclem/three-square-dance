@@ -322,9 +322,9 @@ function TriggerChips({ script, setScript, onOpenEditor, editorOpen }) {
   const set = (p) => setScript({ ...script, trigger: { ...t, ...p } });
   return (
     <div className="chips">
-      {t.type === "on_timer" && <span className={"chip" + (t.repeat ? " on" : "")} title="Click to toggle" onClick={() => set({ repeat: !t.repeat })}>{t.repeat ? "repeating" : "fires once"}</span>}
-      <span className={"chip" + (editorOpen ? " on" : "")} title="Click to edit the trigger" onClick={onOpenEditor}>{t.delay ? `delay ${t.delay}s` : "no delay"}</span>
-      <span className={"chip" + (t.oneShot ? " on" : "")} title="Click to toggle" onClick={() => set({ oneShot: !t.oneShot })}>{t.oneShot ? "one-shot" : "every time"}</span>
+      {t.type === "on_timer" && <span className={"chip" + (t.repeat ? " on" : "")} title="Does the timer keep firing? Click to toggle" onClick={() => set({ repeat: !t.repeat })}>{t.repeat ? `timer repeats every ${t.interval}s` : "timer fires once"}</span>}
+      <span className={"chip" + (editorOpen ? " on" : "")} title="Click to edit the trigger" onClick={onOpenEditor}>{t.delay ? `after a ${t.delay}s delay` : "no delay"}</span>
+      <span className={"chip" + (t.oneShot ? " on" : "")} title="One-shot: the script runs once, ever. Click to toggle" onClick={() => set({ oneShot: !t.oneShot })}>{t.oneShot ? "one-shot · runs once, ever" : "runs each time it fires"}</span>
       <span className="chip" title="Edit trigger type / interval" onClick={onOpenEditor}>⋯</span>
     </div>
   );
