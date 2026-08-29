@@ -12285,7 +12285,7 @@
           },
           "scripts": [
             {
-              "id": "script_5785bb14",
+              "id": "script_db242c36",
               "label": "spike pop intervals",
               "zoneId": "demo",
               "enabled": true,
@@ -12319,51 +12319,6 @@
                   }
                 },
                 {
-                  "type": "despawn_object",
-                  "delay": 0,
-                  "targetId": "vol_11875031",
-                  "block": {
-                    "id": "blk_282578e5",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "spawn_object",
-                  "delay": 0,
-                  "targetId": "vol_11875031",
-                  "block": {
-                    "id": "blk_3e63ced1",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_003",
-                  "targetId": "self",
-                  "volume": 2,
-                  "block": {
-                    "id": "blk_6f67b30a",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_004",
-                  "targetId": "self",
-                  "volume": 2,
-                  "block": {
-                    "id": "blk_2958ced9",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "set_state",
-                  "targetId": "vol_11875031",
-                  "stateKey": "spikes-up",
-                  "stateValue": "__toggle__",
-                  "delay": 1
-                },
-                {
                   "type": "spawn_object",
                   "block": {
                     "id": "blk_57efd055",
@@ -12388,6 +12343,34 @@
                     "branch": 0
                   },
                   "targetId": "vol_11875031"
+                },
+                {
+                  "type": "play_sound",
+                  "block": {
+                    "id": "blk_57efd055",
+                    "branch": 0
+                  },
+                  "sound": "impactmining_003",
+                  "targetId": "self"
+                },
+                {
+                  "type": "set_state",
+                  "block": {
+                    "id": "blk_50c5b3ba",
+                    "branch": 0
+                  },
+                  "targetId": "self",
+                  "stateKey": "spikes-out",
+                  "stateValue": false
+                },
+                {
+                  "type": "play_sound",
+                  "block": {
+                    "id": "blk_50c5b3ba",
+                    "branch": 0
+                  },
+                  "sound": "impactmining_004",
+                  "targetId": "self"
                 }
               ],
               "oneShot": false,
@@ -12416,59 +12399,6 @@
                           "type": "state_equals",
                           "entityId": "self",
                           "stateKey": "spikes-out",
-                          "stateValue": true
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_282578e5",
-                  "branches": [
-                    {
-                      "conditions": []
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_3e63ced1",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "entityId": "vol_11875031",
-                          "stateKey": "spikes-up",
-                          "stateValue": false
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_6f67b30a",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "stateKey": "spikes-up",
-                          "entityId": "vol_11875031",
-                          "stateValue": false
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_2958ced9",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "entityId": "vol_11875031",
-                          "stateKey": "spikes-up",
                           "stateValue": true
                         }
                       ]
@@ -12519,7 +12449,7 @@
           },
           "scripts": [
             {
-              "id": "script_ea1007df",
+              "id": "script_bc504fe0",
               "label": "spike pop intervals",
               "zoneId": "demo",
               "enabled": true,
@@ -12553,51 +12483,6 @@
                   }
                 },
                 {
-                  "type": "despawn_object",
-                  "delay": 0,
-                  "targetId": "vol_9cb88562",
-                  "block": {
-                    "id": "blk_282578e5",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "spawn_object",
-                  "delay": 0,
-                  "targetId": "vol_9cb88562",
-                  "block": {
-                    "id": "blk_3e63ced1",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_003",
-                  "targetId": "self",
-                  "volume": 2,
-                  "block": {
-                    "id": "blk_6f67b30a",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "impactmining_004",
-                  "targetId": "self",
-                  "volume": 2,
-                  "block": {
-                    "id": "blk_2958ced9",
-                    "branch": 0
-                  }
-                },
-                {
-                  "type": "set_state",
-                  "targetId": "vol_9cb88562",
-                  "stateKey": "spikes-up",
-                  "stateValue": "__toggle__",
-                  "delay": 1
-                },
-                {
                   "type": "spawn_object",
                   "block": {
                     "id": "blk_57efd055",
@@ -12622,6 +12507,34 @@
                     "branch": 0
                   },
                   "targetId": "vol_9cb88562"
+                },
+                {
+                  "type": "play_sound",
+                  "block": {
+                    "id": "blk_57efd055",
+                    "branch": 0
+                  },
+                  "sound": "impactmining_003",
+                  "targetId": "self"
+                },
+                {
+                  "type": "set_state",
+                  "block": {
+                    "id": "blk_50c5b3ba",
+                    "branch": 0
+                  },
+                  "targetId": "self",
+                  "stateKey": "spikes-out",
+                  "stateValue": false
+                },
+                {
+                  "type": "play_sound",
+                  "block": {
+                    "id": "blk_50c5b3ba",
+                    "branch": 0
+                  },
+                  "sound": "impactmining_004",
+                  "targetId": "self"
                 }
               ],
               "oneShot": false,
@@ -12650,59 +12563,6 @@
                           "type": "state_equals",
                           "entityId": "self",
                           "stateKey": "spikes-out",
-                          "stateValue": true
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_282578e5",
-                  "branches": [
-                    {
-                      "conditions": []
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_3e63ced1",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "entityId": "vol_9cb88562",
-                          "stateKey": "spikes-up",
-                          "stateValue": false
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_6f67b30a",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "stateKey": "spikes-up",
-                          "entityId": "vol_9cb88562",
-                          "stateValue": false
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "id": "blk_2958ced9",
-                  "branches": [
-                    {
-                      "conditions": [
-                        {
-                          "type": "state_equals",
-                          "entityId": "vol_9cb88562",
-                          "stateKey": "spikes-up",
                           "stateValue": true
                         }
                       ]
@@ -13002,7 +12862,7 @@
         {
           "id": "pfi_84888613",
           "prefabId": "pfb_5e81e6ab",
-          "version": 2,
+          "version": 5,
           "variables": {},
           "origin": {
             "position": {
@@ -13016,7 +12876,7 @@
         {
           "id": "pfi_35ce2e91",
           "prefabId": "pfb_5e81e6ab",
-          "version": 2,
+          "version": 5,
           "variables": {},
           "origin": {
             "position": {
@@ -13696,7 +13556,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_a92a60f0",
+              "id": "script_86e29f09",
               "label": "Hurt spikes",
               "zoneId": "demo",
               "enabled": true,
@@ -13724,12 +13584,6 @@
               "oneShot": false
             }
           ],
-          "stateSchema": {
-            "spikes-up": {
-              "type": "boolean",
-              "default": false
-            }
-          },
           "prefab": {
             "prefabId": "pfb_5e81e6ab",
             "instanceId": "pfi_84888613",
@@ -13752,7 +13606,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_cdb8ad19",
+              "id": "script_62913000",
               "label": "Hurt spikes",
               "zoneId": "demo",
               "enabled": true,
@@ -13780,12 +13634,6 @@
               "oneShot": false
             }
           ],
-          "stateSchema": {
-            "spikes-up": {
-              "type": "boolean",
-              "default": false
-            }
-          },
           "prefab": {
             "prefabId": "pfb_5e81e6ab",
             "instanceId": "pfi_35ce2e91",
