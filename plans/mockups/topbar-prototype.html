@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Top bar prototype — A…E</title>
+<title>Top bar prototype — A…F</title>
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -317,6 +317,43 @@ function BarE() {
   </div>);
 }
 
+
+// ═══ F · Command bar + A's Save + "Top" ═══
+function BarF() {
+  const e = useEditor(); const [sm, setSm] = useState(false); const [pm, setPm] = useState(false); const [fm, setFm] = useState(false);
+  return (<div>
+    <div className="frame"><div className="bar" style={{ gap: 8 }}>
+      <span className="mark">S</span>
+      <div className="crumb" style={{ position: "relative" }}>
+        <span className="p" onClick={() => setPm(m => !m)}>Platfrom Obby</span><span style={{ color: "var(--dim)" }}>›</span>
+        <span className="s" onClick={() => setSm(m => !m)}>{e.scene}<span style={{ color: "var(--amber)", display: "inline-flex" }}><Ic name="star" size={10} /></span><Ic name="chev" size={11} /></span>
+        {sm && <SceneMenu e={e} onClose={() => setSm(false)} />}
+        {pm && <ProjectMenu onClose={() => setPm(false)} />}
+      </div>
+      <span className="status"><span className={"dot" + (e.dirty ? " dirty" : "")} />{e.dirty ? "unsaved changes" : `saved ${e.saved} ago`}</span>
+      <span style={{ flex: 1 }} />
+      <div style={{ position: "relative" }}>
+        <button className="ib" onClick={() => setFm(m => !m)}><Ic name="layers" /> Floor {["G", "1", "2", "3"][e.floor]}<Ic name="chev" size={11} /></button>
+        {fm && <div className="pop" onMouseLeave={() => setFm(false)} style={{ minWidth: 140 }}>
+          {["Ground", "Floor 1", "Floor 2", "Floor 3"].map((f, i) => <button key={f} className={e.floor === i ? "cur" : ""} onClick={() => { e.setFloor(i); setFm(false); }}>{f}<span className="kbd">{i}</span></button>)}
+        </div>}
+      </div>
+      <button className={"ib" + (e.top ? " on" : "")} onClick={() => e.setTop(t => !t)}><Ic name="top" /> Top<Tip t="Top-down view" /></button>
+      <div className="sep" />
+      <button className="ib ghost" disabled={!e.undo} onClick={e.doUndo}><Ic name="undo" /><Tip t="Undo" k="⌘Z" /></button>
+      <button className="ib ghost" disabled={!e.redo} onClick={e.doRedo}><Ic name="redo" /><Tip t="Redo" k="⌘Y" /></button>
+      <div className="sep" />
+      <button className="ib" onClick={e.save} style={e.dirty ? { color: "var(--amber)", borderColor: "rgba(232,193,75,0.4)" } : undefined}><Ic name="save" /> Save<Tip t={e.dirty ? "Save — unsaved changes" : `Saved ${e.saved} ago`} k="⌘S" /></button>
+      <button className="ib primary"><Ic name="play" /> Play</button>
+      <div style={{ position: "relative" }}>
+        <button className="ib ghost" onClick={() => setPm(m => !m)}><Ic name="dots" /></button>
+        {pm && <ProjectMenu right onClose={() => setPm(false)} />}
+      </div>
+    </div><div className="vp" /></div>
+    <Sim e={e} />
+  </div>);
+}
+
 // ═══ Today (reference) ═══
 function BarToday() {
   const sq = { width: 28, height: 28, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, background: "transparent", color: "#7a7a7a", fontSize: 12, fontFamily: "inherit", cursor: "pointer" };
@@ -351,10 +388,11 @@ const OPTIONS = [
   ["b", "B · Command bar", <span><b>B · Command bar.</b> Logo mark + breadcrumb only on the left; ONE primary button (Play); floors collapse into a <i>Floor G ▾</i> menu; the save state is a pill that turns amber and becomes the Save button when dirty ("Unsaved · Save now"). File actions live behind ⋯.</span>, BarB],
   ["c", "C · Scene tabs", <span><b>C · Scene tabs.</b> Scenes are tabs along the bar (★ marks the entry scene, an amber dot marks unsaved), + adds one. Everything else is icons on the right. Best when you hop between scenes a lot.</span>, BarC],
   ["d", "D · Icon bar", <span><b>D · Icon bar.</b> Text-free: every action is an icon with a hover tooltip + shortcut; project / scene is one compact menu button; save state is a dot that turns amber (and the Save icon does too). Maximum room, minimum reading.</span>, BarD],
+  ["f", "F · B + Save + Top", <span><b>F · Command bar, with A's Save button and a labelled Top.</b> B's left side (logo mark · breadcrumb) plus a small save status; B's Floor menu; the Top button says <i>Top</i>; A's explicit <i>Save</i> button (turns amber when dirty) sits before the primary Play; ⋯ for file actions.</span>, BarF],
   ["e", "E · Two tiers", <span><b>E · Two tiers.</b> A slim top row for the project (brand · breadcrumb · save state · New / Load / Save / Export / help) and a second row for editing (floors, Top view, Undo / Redo, Play project). Costs ~24px of height, buys total clarity and labels everywhere.</span>, BarE],
 ];
 function App() {
-  const [view, setView] = useState("all"); const [key, setKey] = useState(0);
+  const [view, setView] = useState("f"); const [key, setKey] = useState(0);
   return (
     <div className="page">
       <div className="topbar">
