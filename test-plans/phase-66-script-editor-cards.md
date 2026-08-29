@@ -20,3 +20,17 @@
 6. *+ action* inside a branch and at the bottom both add an opened card.
 7. Dialogue-option effects and UI-menu options use the same cards and rows.
 8. Scene JSON: only the edits you made changed; opening/closing cards writes nothing.
+
+### v4.79.51 — top bar (direction F)
+
+1. Breadcrumb: project name click → New / Open / Export / Close project; scene click →
+   every scene listed (★ = entry, "current"), New scene…, Make this the entry scene
+   (hidden on the entry scene), Delete scene… (disabled on the entry/only scene).
+   Picking a scene switches (saves first, as before).
+2. Save state: green dot + "saved Nm ago"; after an edit, amber "unsaved changes" and
+   the Save button turns amber; Save restores green.
+3. Floor G ▾ menu picks the floor; the button label follows. Top → top-down view.
+4. Undo / redo icons enable/disable with history; ? opens shortcuts; ↻ (desktop) reloads.
+5. Play (green) plays the project; ⋯ has Entry scene, Export, New empty world,
+   Load scene JSON… (opens the file picker), Close project.
+6. No project open: breadcrumb reads "no project" with New / Open; no scene, no Play.
