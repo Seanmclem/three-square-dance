@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { hasEnabledMover } from "@/world/moverDefs";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
@@ -439,7 +440,7 @@ export class ShapeBuilder {
     // Mover path (Phase 31): kinematic body carrying the full rest pose; the
     // local-space hull/trimesh attaches body-relative.
     let moverBody: RAPIER.RigidBody | undefined;
-    if (shape.mover?.enabled) {
+    if (hasEnabledMover(shape)) {
       const D2R = Math.PI / 180;
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
         shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",

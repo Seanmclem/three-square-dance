@@ -696,7 +696,7 @@ export class ScriptEngine {
         const op = action.type === "start_mover" ? "start"
                  : action.type === "stop_mover"  ? "stop" : "toggle";
         for (const id of this._resolveTargets(action.targetId))
-          this._bus.emit("mover:set", { targetId: id, op });
+          this._bus.emit("mover:set", { targetId: id, op, moverId: action.moverId });
         break;
       }
 

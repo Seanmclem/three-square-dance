@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { hasEnabledMover } from "@/world/moverDefs";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
@@ -464,7 +465,7 @@ export class PlatformBuilder {
     // Mover path (Phase 31): kinematic body carrying position + yaw; the
     // collider attaches body-relative. Only for plain slabs — CSG-cut and
     // polygon platforms bake world-space geometry that a mover can't animate.
-    if (platform.mover?.enabled && !capInWorldSpace && !isPolygon) {
+    if (hasEnabledMover(platform) && !capInWorldSpace && !isPolygon) {
       const angle = ((platform.rotation?.y ?? 0) * Math.PI) / 180;
       const moverBody = physicsWorld.createKinematicBody(
         platform.position,

@@ -440,7 +440,7 @@ export interface BusEvents {
   // state machine until it ends (one-shot), is cleared ("__auto__"), or the player moves.
   "character:play-animation": { clipName: string; loop?: boolean; hold?: boolean };
   // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
-  "mover:set":             { targetId: string; op: "start" | "stop" | "toggle" };
+  "mover:set":             { targetId: string; op: "start" | "stop" | "toggle"; moverId?: string };
   "state:changed":         { key: string; value: JsonValue };
   // Prefabs (Phase 44). Instance records are pure metadata — no ZoneManager listener.
   "prefab:selected":       { prefab: PrefabDef };   // panel → PrefabTool: arm placement
@@ -777,7 +777,8 @@ export interface PlatformDef {
   // (so rooms under a ceiling stay editable) but is fully solid in preview/game.
   editorGhost?:           boolean;
   groupIds?:              string[];
-  mover?:                 MoverDef;
+  mover?:                 MoverDef;      // legacy single mover (Phase 31) — read, never written
+  movers?:                MoverDef[];    // Phase 67 — composed per frame (slides sum, spins multiply)
   sound?:                 AttachedSound;   // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
   startHidden?:           boolean;         // despawned at preview/game start — reveal with spawn_object
 }
@@ -960,7 +961,8 @@ export interface ShapeDef {
   taperZ?: number;
   shearX?: number;              // top-face offset in meters, default 0
   shearZ?: number;
-  mover?:  MoverDef;
+  mover?:  MoverDef;    // legacy single mover — read, never written
+  movers?: MoverDef[];  // Phase 67
   sound?:  AttachedSound;       // attached spatial emitter — follows the mesh (incl. movers) (Phase 36)
   startHidden?: boolean;        // despawned at preview/game start — reveal with spawn_object
   prefab?: PrefabStamp;         // member of a placed prefab instance (Phase 44)
@@ -974,6 +976,7 @@ export type MoverKind = "slide" | "spin";
 // at runtime the MoverSystem drives the mesh + a kinematic Rapier body and never
 // writes back to WorldState. Runs only in preview/game.
 export interface MoverDef {
+  id?:      string;              // mvr_<uuid8> — Phase 67: lets scripts target ONE of an entity's movers; editor-assigned
   enabled: boolean;
   kind:    MoverKind;
   axis:    "x" | "y" | "z";   // entity-local axis (rotated by entity rotation)
@@ -1077,7 +1080,8 @@ export interface WorldObject {
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
   // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
   colliders?: AttachedCollider[];
-  mover?:     MoverDef;
+  mover?:     MoverDef;    // legacy single mover — read, never written
+  movers?:    MoverDef[];  // Phase 67
   sound?:     AttachedSound;   // attached spatial emitter — a PositionalAudio that follows the mesh, incl. movers (Phase 36)
   startHidden?: boolean;       // despawned at preview/game start — reveal with spawn_object
   prefab?:    PrefabStamp;     // set when this object is a member of a placed prefab instance (Phase 44)
@@ -1428,6 +1432,7 @@ export interface ScriptAction {
   dialogue?:     DialogueDef;  // @deprecated — legacy data only; read by migrateDialogues, never at runtime
   dialogueId?:   string;       // show_dialogue: DialogueTreeDef id (zone registry)
   material?:     string;
+  moverId?:      string;       // start/stop/toggle_mover — Phase 67: one mover (by MoverDef.id); absent = all
   position?:     Vec3;
   positionKey?:  string;      // teleport_player: read destination Vec3 from this state key (overrides position)
   posSource?:    'player' | 'object' | 'coords';  // store_position: where the stored position comes from

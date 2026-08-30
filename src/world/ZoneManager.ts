@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { enabledMovers, hasEnabledMover } from "@/world/moverDefs";
 import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
@@ -250,20 +251,20 @@ export class ZoneManager {
   private _syncPlatformMover(platform: PlatformDef, meshes: THREE.Mesh[], moverBody?: RAPIER.RigidBody): void {
     // moverBody absent = mover disabled, or a CSG-cut/polygon platform (world-
     // space-baked geometry — excluded from movers, see PlatformBuilder).
-    if (!moverBody || !platform.mover) return;
+    if (!moverBody || !hasEnabledMover(platform)) return;
     const a = ((platform.rotation?.y ?? 0) * Math.PI) / 180;
-    this._movers.register(platform.id, platform.mover, meshes, moverBody,
+    this._movers.register(platform.id, enabledMovers(platform), meshes, moverBody,
       platform.position, { x: 0, y: Math.sin(a / 2), z: 0, w: Math.cos(a / 2) });
   }
 
   private _syncShapeMover(shape: ShapeDef, meshes: THREE.Mesh[], moverBody?: RAPIER.RigidBody): void {
-    if (!shape.mover?.enabled) return;
+    if (!hasEnabledMover(shape)) return;
     const D2R = Math.PI / 180;
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ",
     ));
     // moverBody may be null (degenerate hull) — the mesh still animates.
-    this._movers.register(shape.id, shape.mover, meshes, moverBody ?? null, shape.position, q);
+    this._movers.register(shape.id, enabledMovers(shape), meshes, moverBody ?? null, shape.position, q);
   }
 
   init(): void {
@@ -453,7 +454,7 @@ export class ZoneManager {
         }
         // `"colliders" in changes` (not truthiness): clearing the override back to
         // undefined — the object re-tracks the asset default — must also rebuild.
-        if (changes.position || changes.rotation || changes.scale || "colliders" in changes || changes.mover || "ai" in changes) {
+        if (changes.position || changes.rotation || changes.scale || "colliders" in changes || changes.mover || "movers" in changes || "ai" in changes) {
           const entry = this._loadedZones.get(zoneId);
           const obj   = this._worldState.zones.get(zoneId)?.objects.find(o => o.id === id);
           if (entry && obj) {
@@ -1346,8 +1347,8 @@ export class ZoneManager {
     // solid while moving, attached volumes ride it, rest-pose reset on
     // preview:stop — registered as a DORMANT (aiDriven) entry the EnemyAI
     // system drives; a real mover def wins when both are enabled.
-    const aiHost = !obj.mover?.enabled && !!obj.ai?.enabled;
-    if ((obj.mover?.enabled || aiHost) && mesh) {
+    const aiHost = !hasEnabledMover(obj) && !!obj.ai?.enabled;
+    if ((hasEnabledMover(obj) || aiHost) && mesh) {
       if (effective.some(c => !c.isSensor)) {
         const D2R = Math.PI / 180;
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
@@ -1357,11 +1358,9 @@ export class ZoneManager {
       }
       this._movers.register(
         obj.id,
-        // An aiDriven host entry must get an INERT def — reusing the object's
-        // real-but-disabled mover def leaked its autoStart/axis into the AI
-        // host (the floating-crab bug's other half).
-        aiHost ? { enabled: false, kind: "slide", axis: "x", autoStart: false }
-               : (obj.mover ?? { enabled: false, kind: "slide", axis: "x", autoStart: false }),
+        // An aiDriven host entry registers NO movers (Phase 67 — the
+        // floating-crab fix by construction: nothing to leak or re-arm).
+        aiHost ? [] : enabledMovers(obj),
         [mesh], moverBody ?? null, obj.position, undefined, aiHost,
       );
     }

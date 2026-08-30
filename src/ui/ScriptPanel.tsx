@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Fragment } from "react";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
+  MoverDef,
   ScriptIfBlock,
   ScriptTrigger,
   ScriptAction,
@@ -3182,8 +3183,33 @@ function ActionFields({
 
     case "start_mover":
     case "stop_mover":
-    case "toggle_mover":
-      return <F label="Target">{moverTargetPicker}</F>;
+    case "toggle_mover": {
+      // Phase 67 — a target with several movers can be steered per mover.
+      const tid = action.targetId === "self" ? owner?.id : action.targetId;
+      const host = zoneObjects.find(o => o.id === tid) ?? zonePlatforms.find(x => x.id === tid) ?? zoneShapes.find(x => x.id === tid);
+      const hostMovers = host
+        ? ((host as { movers?: MoverDef[]; mover?: MoverDef }).movers
+            ?? ((host as { mover?: MoverDef }).mover ? [(host as { mover?: MoverDef }).mover!] : [])).filter(m => m.enabled)
+        : [];
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <F label="Target">{moverTargetPicker}</F>
+          {hostMovers.length > 1 && (
+            <F label="Which mover">
+              <select style={S.select} value={action.moverId ?? ""}
+                onChange={(e) => set({ moverId: e.target.value || undefined })}>
+                <option value="">all movers</option>
+                {hostMovers.map((m, i) => (
+                  <option key={m.id ?? i} value={m.id ?? ""} disabled={!m.id}>
+                    {`${m.kind} ${m.axis.toUpperCase()} #${i + 1}`}{m.id ? "" : " (open its Motion section once to enable)"}
+                  </option>
+                ))}
+              </select>
+            </F>
+          )}
+        </div>
+      );
+    }
 
     case "light_on":
     case "light_off":

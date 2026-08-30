@@ -1814,7 +1814,7 @@ function WallGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectPay
 // nested fields wholesale — same hazard as ShapeDef.mesh). Movers run only in
 // preview/game; the editor shows the rest pose.
 
-const MOVER_DEFAULTS: Required<MoverDef> = {
+const MOVER_DEFAULTS: Required<Omit<MoverDef, "id">> = {
   enabled: true, kind: "slide", axis: "y",
   distance: 2, duration: 2, dwell: 0, mode: "loop", phase: 0,
   speed: 45, autoStart: true,
@@ -1829,13 +1829,54 @@ const MOVER_SEG_BTN = (active: boolean): React.CSSProperties => ({
   outline: active ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
 });
 
-function MoverSection({ entityId, mover, onCommit }: {
+function newMoverId(): string { return `mvr_${crypto.randomUUID().slice(0, 8)}`; }
+
+/** Phase 67 — an entity's motion is a LIST of movers, composed at runtime
+ *  (slides sum, spins multiply). Reads `movers` or the legacy single `mover`;
+ *  every commit writes `movers` (ids ensured) and clears the legacy field. */
+function MoverSection({ entityId, mover, movers, onCommit }: {
   entityId: string;
-  mover: MoverDef | undefined;
-  onCommit: (m: MoverDef) => void;
+  mover: MoverDef | undefined;          // legacy single (read-only input)
+  movers: MoverDef[] | undefined;
+  onCommit: (list: MoverDef[]) => void;
 }) {
-  const cur: Required<MoverDef> = { ...MOVER_DEFAULTS, ...mover };
-  const enabled = mover?.enabled ?? false;
+  const list = movers ?? (mover ? [mover] : []);
+  const commitList = (next: MoverDef[]) =>
+    onCommit(next.map(m => (m.id ? m : { ...m, id: newMoverId() })));
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ color: list.some(m => m.enabled) ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>
+          MOTION{list.length > 1 ? ` · ${list.length}` : ""}
+        </span>
+        <span style={{ flex: 1 }} />
+        <button
+          title="Add a motion — they compose: slides add up, spins stack (e.g. one spin + one bob)"
+          onClick={() => commitList([...list, { ...MOVER_DEFAULTS, kind: list.length ? "spin" : "slide", id: newMoverId() }])}
+          style={{ padding: "2px 8px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.12)",
+                   background: "rgba(255,255,255,0.05)", color: "#c0c0c0", fontSize: 10, cursor: "pointer", fontFamily: "monospace" }}>
+          + motion
+        </button>
+      </div>
+      {list.map((m, i) => (
+        <MoverEditor key={`${entityId}:${m.id ?? i}`} mover={m} index={i} count={list.length}
+          onChange={nm => commitList(list.map((x, k) => (k === i ? nm : x)))}
+          onRemove={() => commitList(list.filter((_, k) => k !== i))} />
+      ))}
+      {list.length === 0 && (
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>No motion — + motion adds a slide or spin (runs in preview/game only).</div>
+      )}
+    </div>
+  );
+}
+
+function MoverEditor({ mover, index, count, onChange, onRemove }: {
+  mover: MoverDef; index: number; count: number;
+  onChange: (m: MoverDef) => void;
+  onRemove: () => void;
+}) {
+  const cur: Required<Omit<MoverDef, "id">> & { id?: string } = { ...MOVER_DEFAULTS, ...mover };
+  const enabled = mover.enabled ?? false;
   const [distStr,  setDistStr]  = useState(String(cur.distance));
   const [durStr,   setDurStr]   = useState(String(cur.duration));
   const [dwellStr, setDwellStr] = useState(String(cur.dwell));
@@ -1843,14 +1884,7 @@ function MoverSection({ entityId, mover, onCommit }: {
   const [speedStr, setSpeedStr] = useState(String(cur.speed));
   const { schedule, flush } = useFieldDebounce(300);
 
-  useEffect(() => {
-    const c = { ...MOVER_DEFAULTS, ...mover };
-    setDistStr(String(c.distance)); setDurStr(String(c.duration));
-    setDwellStr(String(c.dwell));   setPhaseStr(String(c.phase));
-    setSpeedStr(String(c.speed));
-  }, [entityId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const commit = (changes: Partial<MoverDef>) => onCommit({ ...cur, ...changes });
+  const commit = (changes: Partial<MoverDef>) => onChange({ ...cur, ...changes });
   const commitNum = (field: "distance" | "duration" | "dwell" | "phase" | "speed", val: string) => {
     const n = parseFloat(val);
     if (Number.isFinite(n)) commit({ [field]: n });
@@ -1869,13 +1903,20 @@ function MoverSection({ entityId, mover, onCommit }: {
   );
 
   return (
-    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-        <input type="checkbox" checked={enabled} onChange={e => commit({ enabled: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
-        <span style={{ color: enabled ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>MOTION</span>
-      </label>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "6px 8px", borderRadius: 6,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flex: 1 }}>
+          <input type="checkbox" checked={enabled} onChange={e => commit({ enabled: e.target.checked })} style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: enabled ? "#9ab" : "#8b94a8", fontSize: 10, letterSpacing: 1 }}>
+            {cur.kind === "spin" ? "SPIN" : "SLIDE"} {cur.axis.toUpperCase()}{count > 1 ? ` · #${index + 1}` : ""}
+          </span>
+        </label>
+        <button title="Remove this motion" onClick={onRemove}
+          style={{ padding: "0 6px", borderRadius: 4, border: "none", background: "none", color: "#cc6666", fontSize: 11, cursor: "pointer" }}>×</button>
+      </div>
       {enabled && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 22, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 12, borderLeft: "1px solid rgba(255,255,255,0.06)", marginLeft: 4 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <div style={{ ...LABEL, marginBottom: 2 }}>KIND</div>
@@ -1914,7 +1955,7 @@ function MoverSection({ entityId, mover, onCommit }: {
               {cur.mode === "loop" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {numField("PHASE (0–1)", phaseStr, setPhaseStr, "phase", 0.1, 0,
-                    "Where in the loop this platform starts. 0 = beginning of the cycle, 0.5 = half a cycle behind (starts at the far end). Use it to desync identical movers — e.g. one platform up while another is down. Loop mode only.")}
+                    "Where in the loop this mover starts. 0 = beginning of the cycle, 0.5 = half a cycle behind (starts at the far end). Use it to desync identical movers — e.g. one platform up while another is down. Loop mode only.")}
                 </div>
               )}
             </>
@@ -2086,8 +2127,8 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
 
       {/* Motion (Phase 31) — polygon platforms bake world-space geometry and can't animate */}
       {plat && !plat.points?.length && (
-        <MoverSection entityId={selected.id} mover={plat.mover}
-          onCommit={m => onObjectUpdate({ mover: m } as unknown as Partial<WorldObject>)} />
+        <MoverSection entityId={selected.id} mover={plat.mover} movers={plat.movers}
+          onCommit={list => onObjectUpdate({ movers: list, mover: undefined } as unknown as Partial<WorldObject>)} />
       )}
     </div>
   );
@@ -2308,8 +2349,8 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
 
       {/* Motion (Phase 31) */}
       {shape && (
-        <MoverSection entityId={selected.id} mover={shape.mover}
-          onCommit={m => onObjectUpdate({ mover: m } as unknown as Partial<WorldObject>)} />
+        <MoverSection entityId={selected.id} mover={shape.mover} movers={shape.movers}
+          onCommit={list => onObjectUpdate({ movers: list, mover: undefined } as unknown as Partial<WorldObject>)} />
       )}
     </div>
   );
@@ -3485,8 +3526,8 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
 
       {/* Motion (Phase 31) */}
       {objData && (
-        <MoverSection entityId={selected.id} mover={objData.mover}
-          onCommit={m => onObjectUpdate({ mover: m })} />
+        <MoverSection entityId={selected.id} mover={objData.mover} movers={objData.movers}
+          onCommit={list => onObjectUpdate({ movers: list, mover: undefined })} />
       )}
     </div>
   );
@@ -6355,8 +6396,8 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         >
           <option value="">— not attached (static) —</option>
           {(["platforms", "shapes", "objects"] as const).map(kind => {
-            const hosts = ((zone?.[kind] ?? []) as Array<{ id: string; label?: string; assetId?: string; mover?: { enabled?: boolean } }>)
-              .filter(h => h.mover?.enabled);
+            const hosts = ((zone?.[kind] ?? []) as Array<{ id: string; label?: string; assetId?: string; mover?: { enabled?: boolean }; movers?: Array<{ enabled?: boolean }> }>)
+              .filter(h => h.mover?.enabled || h.movers?.some(m => m.enabled));
             if (!hosts.length) return null;
             return (
               <optgroup key={kind} label={kind[0]!.toUpperCase() + kind.slice(1)}>
@@ -6371,8 +6412,8 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           {/* Dangling host (deleted / mover removed): keep it visible instead of silently clearing. */}
           {vol.attachTo &&
             !(["platforms", "shapes", "objects"] as const).some(kind =>
-              ((zone?.[kind] ?? []) as Array<{ id: string; mover?: { enabled?: boolean } }>)
-                .some(h => h.id === vol.attachTo && h.mover?.enabled)) && (
+              ((zone?.[kind] ?? []) as Array<{ id: string; mover?: { enabled?: boolean }; movers?: Array<{ enabled?: boolean }> }>)
+                .some(h => h.id === vol.attachTo && (h.mover?.enabled || h.movers?.some(m => m.enabled)))) && (
             <option value={vol.attachTo}>{vol.attachTo} (missing/no mover — static)</option>
           )}
         </select>

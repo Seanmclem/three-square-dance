@@ -17,25 +17,35 @@ const _v        = new THREE.Vector3();
 // synchronously, so sharing one literal avoids 2 allocations per mover per frame.
 const _tv = { x: 0, y: 0, z: 0 };
 const _tq = { x: 0, y: 0, z: 0, w: 1 };
+// Phase 67 scratch — per-sub accumulation into the one composed pose.
+const _sum  = new THREE.Vector3();
+const _off1 = new THREE.Vector3();
+const _q1   = new THREE.Quaternion();
 
 interface MeshRest { obj: THREE.Object3D; pos: THREE.Vector3; quat: THREE.Quaternion }
 
+/** Phase 67 — one mover's clock. Each sub keeps its own duration/dwell/phase
+ *  state; the entry composes every sub into ONE pose per frame. */
+interface MoverSub {
+  def:      MoverDef;
+  running:  boolean;
+  t:        number;             // slide: seconds into the cycle; spin: unused
+  progress: number;             // slide "once": 0..1 along the leg
+  dir:      1 | -1;             // slide "once": travel direction
+  angle:    number;             // spin: accumulated radians
+}
+
 interface MoverEntry {
-  def:        MoverDef;
+  subs:       MoverSub[];         // Phase 67 — [] on aiDriven host entries
   meshes:     MeshRest[];
   body:       RAPIER.RigidBody | null;
   origin:     THREE.Vector3;      // entity rest position (= kinematic body rest pose)
   originQuat: THREE.Quaternion;   // entity rest rotation
-  running:    boolean;
   // Phase 61 — entry exists only as an AI enemy's kinematic HOST (body,
   // volume riding, rest-pose reset). Never advanced by this system
-  // (running stays false) and immune to mover:set ops; EnemyAI drives it
+  // (subs stays empty) and immune to mover:set ops; EnemyAI drives it
   // through entryFor().
   aiDriven?:  boolean;
-  t:          number;             // slide: seconds into the cycle; spin: unused
-  progress:   number;             // slide "once": 0..1 along the leg
-  dir:        1 | -1;             // slide "once": travel direction
-  angle:      number;             // spin: accumulated radians
   // carry: where the body was told to be last frame → per-frame world delta
   prevPos:    THREE.Vector3;
   delta:      THREE.Vector3;
@@ -57,7 +67,7 @@ export class MoverSystem {
   constructor(bus: EventBus) {
     bus.on("preview:start", () => { this._active = true; });
     bus.on("preview:stop",  () => { this._active = false; this._resetAll(); });
-    bus.on("mover:set",     ({ targetId, op }) => this._setOp(targetId, op));
+    bus.on("mover:set",     ({ targetId, op, moverId }) => this._setOp(targetId, op, moverId));
   }
 
   /** Bound once — handed to CharacterBody's contact scan without a per-frame closure. */
@@ -66,14 +76,14 @@ export class MoverSystem {
   /** True when any mover can move this frame — gates ALL per-frame carry/push work. */
   anyRunning(): boolean {
     if (!this._active) return false;
-    for (const e of this._entries.values()) if (e.running) return true;
+    for (const e of this._entries.values()) if (e.subs.some(s => s.running)) return true;
     return false;
   }
 
   /** meshes' current transforms are captured as the rest pose — call after the builder finished posing them. */
   register(
     entityId: string,
-    def: MoverDef,
+    defs: MoverDef[],
     meshes: THREE.Object3D[],
     body: RAPIER.RigidBody | null,
     origin: Vec3,
@@ -86,14 +96,15 @@ export class MoverSystem {
     const prev = this._entries.get(entityId);
     if (prev?.body) this._byHandle.delete(prev.body.handle);
     const entry: MoverEntry = {
-      def,
+      // Phase 67 — one clock per mover; an aiDriven host registers none.
+      subs: aiDriven ? [] : defs.map(def => ({
+        def, running: def.autoStart ?? true, t: 0, progress: 0, dir: 1 as const, angle: 0,
+      })),
       meshes: meshes.map(m => ({ obj: m, pos: m.position.clone(), quat: m.quaternion.clone() })),
       body,
       origin:     new THREE.Vector3(origin.x, origin.y, origin.z),
       originQuat: oq,
-      running:    aiDriven ? false : (def.autoStart ?? true),
       aiDriven,
-      t: 0, progress: 0, dir: 1, angle: 0,
       prevPos: new THREE.Vector3(origin.x, origin.y, origin.z),
       delta:   new THREE.Vector3(),
     };
@@ -172,36 +183,36 @@ export class MoverSystem {
   update(dt: number): void {
     if (!this._active || this._entries.size === 0) return;
     for (const [id, e] of this._entries) {
-      if (!e.running) continue;
-      this._advance(e, dt);
+      if (!e.subs.some(s => s.running)) continue;
+      for (const s of e.subs) if (s.running) this._advance(s, dt);
       reportTransformWrite(id, "MoverSystem");
       this._applyPose(e);
-      // Stopped this frame (a "once" slide reached an end): the final pose is
-      // applied above; kill the residual delta so a rider stops being carried.
-      if (!e.running) e.delta.set(0, 0, 0);
+      // Every sub stopped this frame (a "once" slide reached an end): the final
+      // pose is applied above; kill the residual delta so a rider stops being carried.
+      if (!e.subs.some(s => s.running)) e.delta.set(0, 0, 0);
     }
   }
 
   // ── internals ─────────────────────────────────────────────────────────────
 
-  private _advance(e: MoverEntry, dt: number): void {
-    const d = e.def;
+  private _advance(s: MoverSub, dt: number): void {
+    const d = s.def;
     if (d.kind === "spin") {
-      e.angle += (d.speed ?? 45) * (Math.PI / 180) * dt;
+      s.angle += (d.speed ?? 45) * (Math.PI / 180) * dt;
       return;
     }
     const duration = Math.max(d.duration ?? 2, 0.05);
     if ((d.mode ?? "loop") === "once") {
-      e.progress += (e.dir * dt) / duration;
-      if (e.progress >= 1) { e.progress = 1; e.running = false; }
-      if (e.progress <= 0) { e.progress = 0; e.running = false; }
+      s.progress += (s.dir * dt) / duration;
+      if (s.progress >= 1) { s.progress = 1; s.running = false; }
+      if (s.progress <= 0) { s.progress = 0; s.running = false; }
     } else {
-      e.t += dt;
+      s.t += dt;
     }
   }
 
-  /** Slide scalar 0..1 (eased) for the entry's current time state. */
-  private _slideU(e: MoverEntry): number {
+  /** Slide scalar 0..1 (eased) for the sub's current time state. */
+  private _slideU(e: MoverSub): number {
     const d = e.def;
     let u: number;
     if ((d.mode ?? "loop") === "once") {
@@ -220,17 +231,24 @@ export class MoverSystem {
   }
 
   private _applyPose(e: MoverEntry): void {
-    const d = e.def;
-    _axis.set(d.axis === "x" ? 1 : 0, d.axis === "y" ? 1 : 0, d.axis === "z" ? 1 : 0);
-
-    if (d.kind === "slide") {
-      const s = this._slideU(e) * (d.distance ?? 2);
-      _slideOff.copy(_axis).multiplyScalar(s).applyQuaternion(e.originQuat);
-      _spinQ.identity();
-    } else {
-      _slideOff.set(0, 0, 0);
-      _spinQ.setFromAxisAngle(_axis, e.angle);
+    // Phase 67 — compose every sub into one pose: slides SUM (in local space,
+    // rotated to world once), spins MULTIPLY in list order. A paused sub keeps
+    // contributing its frozen offset/angle, exactly like a stopped single
+    // mover kept its last pose.
+    _sum.set(0, 0, 0);
+    _spinQ.identity();
+    for (const s of e.subs) {
+      const d = s.def;
+      _axis.set(d.axis === "x" ? 1 : 0, d.axis === "y" ? 1 : 0, d.axis === "z" ? 1 : 0);
+      if (d.kind === "slide") {
+        _off1.copy(_axis).multiplyScalar(this._slideU(s) * (d.distance ?? 2));
+        _sum.add(_off1);
+      } else {
+        _q1.setFromAxisAngle(_axis, s.angle);
+        _spinQ.multiply(_q1);
+      }
     }
+    _slideOff.copy(_sum).applyQuaternion(e.originQuat);
 
     // Body pose: rest pose composed with the local-space motion.
     _pos.copy(e.origin).add(_slideOff);
@@ -257,13 +275,12 @@ export class MoverSystem {
 
   private _resetAll(): void {
     for (const e of this._entries.values()) {
-      e.t = 0; e.progress = 0; e.dir = 1; e.angle = 0;
-      // aiDriven entries NEVER run as movers — the re-arm here was the
-      // floating-crab bug: an entity with a leftover DISABLED mover def
-      // (autoStart true) got re-armed on every preview exit, and from run 2
-      // on the "mover" bobbed it whenever the AI wasn't writing the mesh
-      // (i.e. during script-anim freezes like the checkpoint Dance).
-      e.running = e.aiDriven ? false : (e.def.autoStart ?? true);
+      // aiDriven entries register no subs (the floating-crab fix, kept by
+      // construction): there is nothing here to re-arm.
+      for (const s of e.subs) {
+        s.t = 0; s.progress = 0; s.dir = 1; s.angle = 0;
+        s.running = s.def.autoStart ?? true;
+      }
       e.delta.set(0, 0, 0);
       e.prevPos.copy(e.origin);
       for (const m of e.meshes) {
@@ -278,21 +295,25 @@ export class MoverSystem {
     }
   }
 
-  private _setOp(targetId: string, op: "start" | "stop" | "toggle"): void {
+  private _setOp(targetId: string, op: "start" | "stop" | "toggle", moverId?: string): void {
     const e = this._entries.get(targetId);
     if (!e || e.aiDriven) return;   // AI host entries never run as movers (Phase 61)
-    if (op === "start") { e.running = true; return; }
-    if (op === "stop")  { e.running = false; e.delta.set(0, 0, 0); return; }
-    // toggle: a "once" slide heads for the other end (door open/close);
-    // everything else pauses/resumes.
-    if (e.def.kind === "slide" && (e.def.mode ?? "loop") === "once") {
-      if      (e.progress <= 0) e.dir = 1;
-      else if (e.progress >= 1) e.dir = -1;
-      else                      e.dir = e.dir === 1 ? -1 : 1;
-      e.running = true;
-      return;
+    // Phase 67 — no moverId = every mover (the pre-67 behaviour); an id picks one.
+    const subs = moverId ? e.subs.filter(s => s.def.id === moverId) : e.subs;
+    for (const s of subs) {
+      if (op === "start") { s.running = true; continue; }
+      if (op === "stop")  { s.running = false; continue; }
+      // toggle: a "once" slide heads for the other end (door open/close);
+      // everything else pauses/resumes.
+      if (s.def.kind === "slide" && (s.def.mode ?? "loop") === "once") {
+        if      (s.progress <= 0) s.dir = 1;
+        else if (s.progress >= 1) s.dir = -1;
+        else                      s.dir = s.dir === 1 ? -1 : 1;
+        s.running = true;
+        continue;
+      }
+      s.running = !s.running;
     }
-    e.running = !e.running;
-    if (!e.running) e.delta.set(0, 0, 0);   // paused mid-motion: no residual carry
+    if (!e.subs.some(s => s.running)) e.delta.set(0, 0, 0);   // paused mid-motion: no residual carry
   }
 }

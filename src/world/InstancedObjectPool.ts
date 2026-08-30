@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { hasEnabledMover } from "@/world/moverDefs";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "./WorldState";
@@ -73,7 +74,7 @@ export class InstancedObjectPool {
    * the per-object clone path. Declines after the zone pool has been finalized.
    */
   async tryAdd(obj: WorldObject, zoneId: string): Promise<{ localAABB: { center: Vec3; size: Vec3 } | null } | null> {
-    if (obj.autoPlayAnimation || obj.material || obj.mover?.enabled || obj.sound || obj.properties.interactable) return null;
+    if (obj.autoPlayAnimation || obj.material || hasEnabledMover(obj) || obj.sound || obj.properties.interactable) return null;
     const excluded = this._excludedIds(zoneId);
     if (excluded.has(obj.id) || obj.groupIds?.some(g => excluded.has(g))) return null;
 
