@@ -167,13 +167,13 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "lights" | "sound" | "audio"
+type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
   | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-sounds" | "spawn-controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
-  animations: "Animations", colliders: "Colliders", lights: "Lights", sound: "Sound", audio: "Audio",
+  animations: "Animations", colliders: "Colliders", motion: "Motion", lights: "Lights", sound: "Sound", audio: "Audio",
   "audio-mixer": "Mixer", "audio-music": "Background Music", "audio-ambient": "Ambient", "audio-character": "Character Sounds",
   scripts: "Scripts",
   ai: "Enemy AI",
@@ -189,6 +189,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   vert: "ELEVATION",
   animations: "CLIPS · AUTO-PLAY",
   colliders: "SHAPE · OFFSET · SENSOR",
+  motion: "SLIDE · SPIN · COMPOSED",
   lights: "WORLD SUN · AMBIENT · PLACED",
   sound: "SPATIAL EMITTER",
   audio: "MIXER · AMBIENT · MUSIC",
@@ -219,12 +220,12 @@ const GEO_SUBTITLES: Partial<Record<string, string>> = {
 const OBJECT_SCREENS: Record<string, ScreenId[]> = {
   wall:     ["geo", "mat", "open", "seg"],
   floor:    ["geo", "mat", "vert"],
-  platform: ["geo", "mat", "sound"],
+  platform: ["geo", "mat", "motion", "sound"],
   stair:    ["geo", "mat"],
   ladder:   ["geo", "mat"],
-  object:   ["geo", "mat", "colliders", "sound", "scripts", "ai"],
+  object:   ["geo", "mat", "colliders", "motion", "sound", "scripts", "ai"],
   opening:  ["geo"],
-  shape:    ["geo", "mat", "sound"],
+  shape:    ["geo", "mat", "motion", "sound"],
 };
 
 // ── Summary helpers ───────────────────────────────────────────────────────────
@@ -295,6 +296,13 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       const assetId = (selected.data as WorldObject | null)?.assetId;
       const n = assets.find(a => a.id === assetId)?.animations?.length ?? 0;
       return `${n} clip${n !== 1 ? "s" : ""}`;
+    }
+    case "motion": {
+      const e = selected.data as { movers?: MoverDef[]; mover?: MoverDef } | null;
+      const list = (e?.movers ?? (e?.mover ? [e.mover] : [])).filter(m => m.enabled);
+      if (list.length === 0) return "none";
+      if (list.length <= 2) return list.map(m => `${m.kind} ${m.axis.toUpperCase()}`).join(" + ");
+      return `${list.length} motions`;
     }
     case "colliders": {
       const obj = selected.data as WorldObject | null;
@@ -918,6 +926,8 @@ export function PropertiesPanel({
             hullPointsFor={hullPointsFor}
             bus={bus}
           />
+        ) : currentScreen === "motion" ? (
+          <MotionScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
@@ -1829,6 +1839,35 @@ const MOVER_SEG_BTN = (active: boolean): React.CSSProperties => ({
   outline: active ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)",
 });
 
+/** Phase 67.1 — Motion as its own drilldown page (was embedded in Geometry). */
+function MotionScreen({ selected, onObjectUpdate }: {
+  selected: SelectedObjectPayload;
+  onObjectUpdate: (changes: Partial<WorldObject>) => void;
+}) {
+  const data = selected.data as ({ movers?: MoverDef[]; mover?: MoverDef; points?: unknown[] } & Record<string, unknown>) | null;
+  const polygonPlatform = selected.type === "platform" && !!(data?.points as unknown[] | undefined)?.length;
+  return (
+    <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+      {polygonPlatform ? (
+        <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
+          Polygon platforms bake world-space geometry and can't animate — motion
+          is available on plain slab platforms, shapes, and objects.
+        </div>
+      ) : data ? (
+        <>
+          <MoverSection entityId={selected.id} mover={data.mover} movers={data.movers}
+            onCommit={list => onObjectUpdate({ movers: list, mover: undefined } as unknown as Partial<WorldObject>)} />
+          <div style={{ color: "#8a92a6", fontSize: 9, lineHeight: 1.5 }}>
+            Motions compose: slides add up, spins stack — e.g. one spin + one
+            up-down slide makes a spinning, bobbing object. Scripts can start or
+            stop each motion separately (start/stop/toggle_mover → "Which mover").
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function newMoverId(): string { return `mvr_${crypto.randomUUID().slice(0, 8)}`; }
 
 /** Phase 67 — an entity's motion is a LIST of movers, composed at runtime
@@ -2125,11 +2164,6 @@ function PlatformGeoView({ selected, onObjectUpdate }: { selected: SelectedObjec
         </span>
       </div>
 
-      {/* Motion (Phase 31) — polygon platforms bake world-space geometry and can't animate */}
-      {plat && !plat.points?.length && (
-        <MoverSection entityId={selected.id} mover={plat.mover} movers={plat.movers}
-          onCommit={list => onObjectUpdate({ movers: list, mover: undefined } as unknown as Partial<WorldObject>)} />
-      )}
     </div>
   );
 }
@@ -2347,11 +2381,6 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
         </label>
       </div>
 
-      {/* Motion (Phase 31) */}
-      {shape && (
-        <MoverSection entityId={selected.id} mover={shape.mover} movers={shape.movers}
-          onCommit={list => onObjectUpdate({ movers: list, mover: undefined } as unknown as Partial<WorldObject>)} />
-      )}
     </div>
   );
 }
@@ -3524,11 +3553,6 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
         </label>
       </div>
 
-      {/* Motion (Phase 31) */}
-      {objData && (
-        <MoverSection entityId={selected.id} mover={objData.mover} movers={objData.movers}
-          onCommit={list => onObjectUpdate({ movers: list, mover: undefined })} />
-      )}
     </div>
   );
 }

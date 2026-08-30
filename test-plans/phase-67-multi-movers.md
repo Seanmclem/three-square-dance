@@ -1,6 +1,6 @@
 # Phase 67 — Multiple movers — test plan
 
-1. Select an object → MOTION → + motion twice: a Slide Y and a Spin Y row, each
+1. Select an object → the **Motion** row (its own page, no longer inside Geometry; summary shows e.g. "spin Y + slide Y") → + motion twice: a Slide Y and a Spin Y row, each
    with its own enable, fields, and ×. The JSON gains `movers: [...]` with
    `mvr_` ids; a legacy `mover` field is removed on the first edit.
 2. Preview: the object spins while bobbing. Stand on it — you ride the bob and
