@@ -1773,10 +1773,38 @@
       "tags": [
         "platformer",
         "prop",
+        "animated",
         "cc0",
         "platformer-game-kit"
       ],
       "dateAdded": "2026-07-26",
+      "attribution": {
+        "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
+        "author": "Quaternius",
+        "sourceName": "Platformer Game Kit",
+        "patreonUrl": "https://www.patreon.com/c/quaternius/posts",
+        "license": "CC0"
+      },
+      "animations": [
+        "Door_Close",
+        "Door_Open"
+      ]
+    },
+    {
+      "id": "doorway",
+      "label": "Doorway",
+      "category": "Platform: Objects",
+      "path": "/assets/models/doorway.gltf",
+      "thumbnail": "/assets/models/doorway_thumb.png",
+      "collidable": true,
+      "colliderType": "mesh",
+      "tags": [
+        "platformer",
+        "prop",
+        "cc0",
+        "platformer-game-kit"
+      ],
+      "dateAdded": "2026-08-30",
       "attribution": {
         "sourceUrl": "https://quaternius.com/packs/ultimateplatformer.html",
         "author": "Quaternius",
