@@ -234,7 +234,7 @@ const sums = (v) => ({
 // ═══ A · Collapsible sections ═══
 function PanelA() {
   const [v, set] = useVol();
-  const [open, setOpen] = useState({ transform: true, behavior: true, appearance: false });
+  const [open, setOpen] = useState({ geo: true, scripts: true, state: false, attach: false, appearance: false });
   const sm = sums(v);
   const Acc = ({ id, title, sum, children }) => (
     <div className="acc">
@@ -245,15 +245,10 @@ function PanelA() {
     </div>);
   return (<div className="panel">
     <Header v={v} set={set} />
-    <Acc id="transform" title="Shape & Transform" sum={sm.transform}><TransformFields v={v} set={set} /></Acc>
-    <Acc id="behavior" title="Behavior" sum={`${sm.scripts} · ${sm.state} · ${sm.attach}`}>
-      <ScriptsFields v={v} set={set} />
-      <div className="hair" />
-      <div className="lbl">State (this volume only)</div>
-      <StateFields v={v} set={set} blurb />
-      <div className="hair" />
-      <AttachField v={v} set={set} />
-    </Acc>
+    <Acc id="geo" title="Geometry" sum={sm.transform}><TransformFields v={v} set={set} /></Acc>
+    <Acc id="scripts" title="Scripts" sum={sm.scripts}><ScriptsFields v={v} set={set} /></Acc>
+    <Acc id="state" title="State" sum={sm.state}><StateFields v={v} set={set} blurb /></Acc>
+    <Acc id="attach" title="Attach" sum={sm.attach}><AttachField v={v} set={set} /></Acc>
     <Acc id="appearance" title="Appearance" sum={sm.appearance}><AppearanceFields v={v} set={set} /></Acc>
     <div style={{ flex: 1 }} />
     <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
@@ -335,7 +330,7 @@ function PanelC() {
 }
 
 const OPTIONS = [
-  ["a", "A · Sections", <span><b>A · Collapsible sections.</b> Three groups — Shape &amp; Transform, Behavior (scripts + state + attach), Appearance — each with a live summary when collapsed, so nothing is invisible, just foldable. Appearance starts closed (the rarely-touched part). The long state blurb lives inside its group.</span>, PanelA],
+  ["a", "A · Sections", <span><b>A · Collapsible sections.</b> The same five areas as B — Geometry, Scripts, State, Attach, Appearance — but as accordions with live summaries instead of separate pages: everything stays on one screen, fold what you're not using. Geometry and Scripts start open.</span>, PanelA],
   ["b", "B · Drilldown", <span><b>B · Drilldown rows.</b> Exactly how objects already work: five category rows with live summaries (geometry, scripts, state, attach, appearance), each opening its own page with ← back. Most consistent with the rest of the editor; costs one click per area.</span>, PanelB],
   ["c", "C · Dense", <span><b>C · Dense.</b> Everything stays visible — your "things you might always want to see" instinct — but compacted: label-left rows, the state blurb collapsed into an ⓘ tooltip, state keys as chips, tighter spacing. Roughly half the height of today with zero clicks added.</span>, PanelC],
 ];
