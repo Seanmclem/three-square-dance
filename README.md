@@ -67,23 +67,21 @@ Worth knowing:
 
 **Basic workflow:** pick a tool from the left toolbar → click in the viewport to build → switch to Select and edit properties on the right → ▶ to walk around (**Esc** to come back) → **Save** in the top bar (the pill next to it shows save state).
 
-**Camera:**
+**Camera** (the **?** button in the top bar lists all shortcuts, per tool):
 | Input | Action |
 |---|---|
 | Right-click drag | Orbit |
 | Middle-click drag | Pan |
 | Scroll | Zoom |
-| WASD | Pan |
-| Q / E | Rotate 45° |
-| F | Frame selected object |
+| WASD | Move the focus point |
 
 ---
 
 ## Ship a game
 
-In the top bar: **PROJ ▾ → ⋯ → Export game…**
+In the top bar, click the project name and choose **Export game…** (it also lives in the **⋯** menu).
 
-The export is a self-contained static bundle written to your workspace's `exports/` folder: the runtime, your scenes, and only the assets your game actually references (a demo project came out at 68 files / ~11 MB). Drop the folder on any static host (GitHub Pages, Netlify, Cloudflare Pages, S3) and the game runs at its own URL. Test locally first with `python3 -m http.server` from inside the folder.
+The export is a self-contained static bundle written to the workspace state folder's `exports/` (in dev: `.worldbuilder/exports/<project>-bundle/`; the app reveals the folder when it finishes): the runtime, your scenes, and only the assets your game actually references (a demo project came out at 68 files / ~11 MB). Drop the folder on any static host (GitHub Pages, Netlify, Cloudflare Pages, S3) and the game runs at its own URL. Test locally first with `python3 -m http.server` from inside the folder.
 
 Details, hosting recipes, and caveats: [`PUBLISHING_GUIDE.md`](./PUBLISHING_GUIDE.md).
 
@@ -121,7 +119,7 @@ src/
   scripting/    Script engine + actions
   runtime/      Standalone game runtime (title screen, scene routing)
   project/      Multi-scene project management
-  export/       Game bundle exporter
+  export/       Asset-reference scan for export (the bundler is desktop/export.ts)
   prefab/       Prefab recipes and instances
   audio/        Sound library, mixer, playlists
   assets/       Asset library and manifests
