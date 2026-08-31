@@ -715,7 +715,7 @@
                 "id": "col_172f13ec",
                 "shape": "box",
                 "offset": {
-                  "x": -5.960464477539063e-8,
+                  "x": -5.960464477539063e-08,
                   "y": 0.751679808832705,
                   "z": 0.01855784778791364
                 },
@@ -1213,7 +1213,7 @@
   "playerSettings": {
     "cameraMode": "thirdperson",
     "moveSpeed": 6,
-    "jumpHeight": 1.2,
+    "jumpHeight": 3.5,
     "fov": 75,
     "thirdPersonDistance": 3.4,
     "thirdPersonHeight": 0.8,
