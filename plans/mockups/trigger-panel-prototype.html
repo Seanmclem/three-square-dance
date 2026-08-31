@@ -41,6 +41,8 @@
   .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
   .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
+  .rng { -webkit-appearance: none; appearance: none; flex: 1; height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; outline: none; margin: 0; }
+  .rng::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #1c1c1c; }
   /* state key cards */
   .skey { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.025); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
   .skey .top { display: flex; align-items: center; gap: 6px; }
@@ -122,7 +124,11 @@ function TransformFields({ v, set, dense }) {
         <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
       </div></div>
     {!dense && <div><div className="lbl" style={{ marginBottom: 3 }}>Rotation (Y°)</div>
-      <input className="field" value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} /></div>}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input className="field" style={{ width: "33%" }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} />
+        <input type="range" className="rng" min={-180} max={180} step={5} value={v.rotY}
+          onChange={e => set({ rotY: parseFloat(e.target.value) })} />
+      </div></div>}
   </>);
 }
 function AttachField({ v, set }) {
@@ -308,7 +314,11 @@ function PanelC() {
           <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
         </div></div>
       <div className="kv"><span className="k">Rot Y°</span>
-        <input className="field" style={{ width: 80 }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} /></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input className="field" style={{ width: 64 }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} />
+          <input type="range" className="rng" min={-180} max={180} step={5} value={v.rotY}
+            onChange={e => set({ rotY: parseFloat(e.target.value) })} />
+        </div></div>
       <div className="kv"><span className="k">Attach</span>
         <select className="field" value={v.attachTo} onChange={e => set({ attachTo: e.target.value })}>
           {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
