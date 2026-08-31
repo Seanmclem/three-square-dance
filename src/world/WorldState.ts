@@ -1,4 +1,6 @@
 import type { EventBus } from "@/core/EventBus";
+import { DEFAULT_PLAYER_SETTINGS, SETTINGS_PAGES, resolvePlayerSettings, type SettingsPage } from "@/shared/playerSettingsDefaults";
+import type { PlayerSettings } from "@/types";
 import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
@@ -24,6 +26,12 @@ export class WorldState {
   // by App (project open) and SceneRouter (runtime). NOT serialized: toJSON()
   // hand-builds its output from the listed fields (activeZoneId precedent).
   gameItems?:       ItemDef[];
+  // Phase 68 — game-wide player-settings defaults (game.json) + this scene's
+  // sparse override layer. In memory `world.playerSettings` is ALWAYS the
+  // resolved merge (defaults ← game ← overrides) so every consumer keeps
+  // reading it untouched; toJSON persists only the sparse layer.
+  private _gamePlayerSettings?: PlayerSettings;
+  scenePlayerOverrides: Partial<PlayerSettings> = {};
   gameStateSchema?: Record<string, StateSchema>;
   gameUiElements?:  UiElementDef[];
   // Prefab library (Phase 44) — session-only mirror of the App's library state
@@ -455,7 +463,7 @@ export class WorldState {
         ambientLight: { color: "#aabbcc", intensity: 0.5 },
         sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+        playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
     this._touch("spawn", undefined, SPAWN_ID);
@@ -556,7 +564,7 @@ export class WorldState {
         ambientLight: { color: "#aabbcc", intensity: 0.5 },
         sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+        playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
     if (changes.ambient) this.world.ambientLight = { ...this.world.ambientLight, ...changes.ambient };
@@ -579,7 +587,7 @@ export class WorldState {
         ambientLight: { color: "#aabbcc", intensity: 0.5 },
         sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+        playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
     this.world.audio = { ...this.world.audio, ...changes };
@@ -595,11 +603,56 @@ export class WorldState {
         ambientLight: { color: "#aabbcc", intensity: 0.5 },
         sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
         skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-        playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 },
+        playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
     this.world.skybox = skybox;
     this._bus.emit("world:sky", { skybox });
+  }
+
+  // ── Player settings (Phase 68: game defaults + per-scene overrides) ─────────
+
+  get gamePlayerSettings(): PlayerSettings | undefined { return this._gamePlayerSettings; }
+
+  /** Set/replace the game-wide defaults (game.json) and re-resolve. */
+  setGamePlayerSettings(ps: PlayerSettings | undefined): void {
+    this._gamePlayerSettings = ps;
+    this._resolvePlayerSettings();
+  }
+
+  /** Scene-scope edit: lands in the override layer AND the resolved view. */
+  updateScenePlayerSettings(changes: Partial<PlayerSettings>): void {
+    this.scenePlayerOverrides = { ...this.scenePlayerOverrides, ...changes };
+    this._resolvePlayerSettings();
+  }
+
+  /** Flip one page's override: ON copies the page's current effective values
+   *  into the scene layer (nothing visibly changes); OFF deletes them (the
+   *  page snaps to game defaults). */
+  setSettingsPageOverride(page: SettingsPage, on: boolean): void {
+    const next = { ...this.scenePlayerOverrides };
+    const eff = this.world?.playerSettings ?? resolvePlayerSettings(this._gamePlayerSettings, this.scenePlayerOverrides);
+    for (const k of SETTINGS_PAGES[page]) {
+      if (on) (next as Record<string, unknown>)[k] = eff[k];
+      else delete (next as Record<string, unknown>)[k];
+    }
+    this.scenePlayerOverrides = next;
+    this._resolvePlayerSettings();
+  }
+
+  /** "Make these the game defaults": returns the resolved settings (the new
+   *  game layer — caller persists to game.json) and clears every override. */
+  promoteSettingsToGame(): PlayerSettings {
+    const resolved = resolvePlayerSettings(this._gamePlayerSettings, this.scenePlayerOverrides);
+    this._gamePlayerSettings = resolved;
+    this.scenePlayerOverrides = {};
+    this._resolvePlayerSettings();
+    return resolved;
+  }
+
+  private _resolvePlayerSettings(): void {
+    if (!this.world) return;
+    this.world.playerSettings = resolvePlayerSettings(this._gamePlayerSettings, this.scenePlayerOverrides);
   }
 
   // ── Decal mutations ──────────────────────────────────────────────────────────
@@ -842,7 +895,7 @@ export class WorldState {
   toJSON(): SceneFile {
     return {
       metadata:    { ...(this.metadata ?? { name: "Untitled", version: "1", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() }), uvVersion: 1 },  // Phase 10.8: every save is world-space-UV
-      world:       this.world    ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { cameraMode: "fps", moveSpeed: 5, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1 }, stateSchema: DEFAULT_STATE_SCHEMA },
+      world:       (this.world ? { ...this.world, playerSettings: this.scenePlayerOverrides as PlayerSettings } : undefined) ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { ...DEFAULT_PLAYER_SETTINGS }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
       // The prefab edit mode's staging zone must NEVER serialize (belt-and-braces
       // on top of the App's save/autosave gates — Phase 47).
@@ -855,6 +908,10 @@ export class WorldState {
   loadFromJSON(file: SceneFile): void {
     this.metadata = file.metadata;
     this.world    = file.world;
+    // Phase 68 — whatever the file carries (full legacy settings or a sparse
+    // override layer) IS the scene's override layer; resolve into memory.
+    this.scenePlayerOverrides = { ...(file.world?.playerSettings ?? {}) } as Partial<PlayerSettings>;
+    this._resolvePlayerSettings();
     this.terrain  = file.terrain;
     this.zones.clear();
     this.transitions.clear();

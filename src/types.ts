@@ -1372,6 +1372,9 @@ export interface ItemDef {
  */
 export interface GameConfig {
   gameVersion:  1;
+  /** Phase 68 — game-wide player-settings defaults; scenes override per page
+   *  (their sparse WorldConfig.playerSettings layer wins per field). */
+  playerSettings?: PlayerSettings;
   items?:       ItemDef[];
   stateSchema?: Record<string, StateSchema>;
   lightingQuality?: "fancy" | "fast";   // game-wide default; a scene's own setting wins

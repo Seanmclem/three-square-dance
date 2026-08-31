@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
@@ -420,6 +421,12 @@ interface PropertiesPanelProps {
   assets?:                  AssetDef[];
   sounds?:                  SoundDef[];
   onPlayerSettingsChange?:  (s: Partial<PlayerSettings>) => void;
+  // Phase 68 — game-wide defaults with per-scene (per-page) overrides.
+  gamePlayerSettings?:        PlayerSettings;
+  scenePlayerOverrides?:      Partial<PlayerSettings>;
+  onGamePlayerSettingsChange?: (s: Partial<PlayerSettings>) => void;
+  onSettingsPageOverride?:    (page: SettingsPage, on: boolean) => void;
+  onPromoteSettingsToGame?:   () => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
   // World-level ambient/sun/environment lighting (Lights drilldown page).
   worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number; quality?: "fancy" | "fast" };
@@ -481,7 +488,8 @@ export function PropertiesPanel({
   onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete,
   onVolumeScriptsChange,
   onEditScript,
-  zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], onPlayerSettingsChange, onSpawnPositionChange,
+  zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], gamePlayerSettings, scenePlayerOverrides, onGamePlayerSettingsChange, onSettingsPageOverride, onPromoteSettingsToGame,
+  onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
@@ -761,7 +769,12 @@ export function PropertiesPanel({
       {/* Scrollable body */}
       <div ref={bodyRef} style={{ flex: 1, overflowY: "auto" }}>
         {selected?.id === "__spawn__" && playerSettings && onPlayerSettingsChange ? (
-          <SpawnSettingsView
+          <SpawnSettingsScoped
+            gameSettings={gamePlayerSettings}
+            sceneOverrides={scenePlayerOverrides}
+            onGameChange={onGamePlayerSettingsChange}
+            onPageOverride={onSettingsPageOverride}
+            onPromote={onPromoteSettingsToGame}
             settings={playerSettings} assets={assets} onChange={onPlayerSettingsChange}
             position={selected.position} onPositionChange={onSpawnPositionChange}
             screen={currentScreen} onOpen={push}
@@ -5183,6 +5196,99 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
         />
       </div>
     </div>
+  );
+}
+
+// ── SpawnSettingsScoped (Phase 68) ────────────────────────────────────────────
+// Wraps SpawnSettingsView with the game-defaults machinery: a Scene ⇄ Game
+// scope switch on the root, and a per-page override banner. With no game layer
+// (single-scene mode) it renders the plain view exactly as before.
+const SPAWN_PAGE_MAP: Partial<Record<ScreenId, SettingsPage>> = {
+  "spawn-movement": "movement", "spawn-camera": "camera",
+  "spawn-character": "character", "spawn-sounds": "sounds",
+};
+function SpawnSettingsScoped({ gameSettings, sceneOverrides, onGameChange, onPageOverride, onPromote,
+  settings, assets, onChange, position, onPositionChange, screen, onOpen }: {
+  gameSettings?: PlayerSettings;
+  sceneOverrides?: Partial<PlayerSettings>;
+  onGameChange?: (s: Partial<PlayerSettings>) => void;
+  onPageOverride?: (page: SettingsPage, on: boolean) => void;
+  onPromote?: () => void;
+  settings: PlayerSettings; assets: AssetDef[]; onChange: (s: Partial<PlayerSettings>) => void;
+  position?: Vec3; onPositionChange?: (pos: Vec3) => void;
+  screen: ScreenId | null; onOpen: (s: ScreenId) => void;
+}) {
+  const [scope, setScope] = useState<"scene" | "game">("scene");
+  const hasGame = !!gameSettings && !!onGameChange;
+  if (!hasGame) {
+    return <SpawnSettingsView settings={settings} assets={assets} onChange={onChange}
+      position={position} onPositionChange={onPositionChange} screen={screen} onOpen={onOpen} />;
+  }
+  const page = screen ? SPAWN_PAGE_MAP[screen] : undefined;
+  const overridden = page ? pageOverridden(sceneOverrides, page) : false;
+  const scopeBar = (
+    <div style={{ display: "flex", gap: 4, padding: "10px 16px 0" }}>
+      {(["scene", "game"] as const).map(k => (
+        <button key={k} onClick={() => setScope(k)}
+          title={k === "scene" ? "This scene's settings (game defaults + this scene's overrides)" : "The game-wide defaults every scene starts from"}
+          style={{ flex: 1, padding: "4px 0", borderRadius: 4, cursor: scope === k ? "default" : "pointer",
+            fontFamily: "monospace", fontSize: 10, border: "none",
+            background: scope === k ? "rgba(80,140,255,0.18)" : "rgba(46,46,46,0.6)",
+            color: scope === k ? "#80aaff" : "#9a9a9a",
+            outline: scope === k ? "1px solid rgba(80,140,255,0.4)" : "1px solid rgba(255,255,255,0.06)" }}>
+          {k === "scene" ? "THIS SCENE" : "GAME DEFAULTS"}
+        </button>
+      ))}
+    </div>
+  );
+  if (scope === "game") {
+    return (
+      <>
+        {scopeBar}
+        <div style={{ padding: "8px 16px 0", color: "#e0a050", fontSize: 9, lineHeight: 1.5 }}>
+          Editing the GAME defaults — every scene without its own override follows these.
+        </div>
+        <SpawnSettingsView settings={gameSettings!} assets={assets} onChange={onGameChange!}
+          screen={screen} onOpen={onOpen} />
+      </>
+    );
+  }
+  return (
+    <>
+      {scopeBar}
+      {page && onPageOverride && (
+        <div style={{ margin: "8px 16px 0", padding: "6px 8px", borderRadius: 6,
+          background: overridden ? "rgba(232,193,75,0.07)" : "rgba(255,255,255,0.03)",
+          border: `1px solid ${overridden ? "rgba(232,193,75,0.35)" : "rgba(255,255,255,0.08)"}`,
+          display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ flex: 1, color: overridden ? "#e8c14b" : "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
+            {overridden
+              ? "Overriding the game defaults for this scene."
+              : "Using the game defaults — override to change this page for this scene only."}
+          </span>
+          <button onClick={() => onPageOverride(page, !overridden)}
+            title={overridden ? "Discard this page's scene values and follow the game defaults again" : "Copy the current values into this scene and edit them independently"}
+            style={{ padding: "3px 8px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.05)", color: "#c0c0c0", fontSize: 9, cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+            {overridden ? "Use game defaults" : "Override for this scene"}
+          </button>
+        </div>
+      )}
+      <div style={page && !overridden ? { opacity: 0.55, pointerEvents: "none" } : undefined}>
+        <SpawnSettingsView settings={settings} assets={assets} onChange={onChange}
+          position={position} onPositionChange={onPositionChange} screen={screen} onOpen={onOpen} />
+      </div>
+      {!page && onPromote && (
+        <div style={{ padding: "4px 16px 12px" }}>
+          <button onClick={onPromote}
+            title="Copy this scene's effective settings into the game defaults and clear every override in this scene"
+            style={{ width: "100%", padding: "5px 0", borderRadius: 4, border: "1px solid rgba(232,193,75,0.35)",
+              background: "rgba(232,193,75,0.08)", color: "#e0a050", fontSize: 10, cursor: "pointer", fontFamily: "monospace" }}>
+            ★ Make these the game defaults
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

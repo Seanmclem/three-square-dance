@@ -31,6 +31,7 @@ import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
 import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@/prefab/library";
+import { DEFAULT_PLAYER_SETTINGS, resolvePlayerSettings, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, captureInstanceToPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
 import { PrefabEditSession } from "@/prefab/PrefabEditSession";
 import { PrefabEditBar } from "@/ui/PrefabEditBar";
@@ -630,6 +631,19 @@ export default function App() {
           world.prefabLibrary = store.game.prefabs;
           setPrefabs(store.game.prefabs ?? []);
           syncPrefabInstances();   // library is authoritative now — heal/refresh instances
+          // Phase 68 — game-wide player-settings defaults: seed from the entry
+          // scene on first contact (this inline block mirrors adoptProject).
+          if (!store.game.playerSettings) {
+            try {
+              const src = sceneId === store.entryScene
+                ? world.world?.playerSettings
+                : (await store.loadScene(store.entryScene)).world?.playerSettings;
+              store.game.playerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...src };
+              await store.writeGame();
+            } catch (e) { console.warn("[settings] seeding game defaults failed:", e); }
+          }
+          world.setGamePlayerSettings(store.game.playerSettings);
+          setPlayerSettingsRev(v => v + 1);
         }
       } catch (e) { console.warn('Project restore failed:', e); }
     })();
@@ -1286,6 +1300,7 @@ export default function App() {
   // Kept for TopBar's <input type="file"> fallback path
   /** Drop project context (saving the current scene first unless `skipSave`). */
   const closeProject = useCallback(async (opts?: { skipSave?: boolean }): Promise<void> => {
+    worldRef.current?.setGamePlayerSettings(undefined);   // Phase 68 — no project, no game layer
     if (editingPrefabRef.current) return;   // no project close under prefab edit mode
     const proj = projectRef.current;
     if (!proj) return;
@@ -1394,6 +1409,22 @@ export default function App() {
       worldRef.current.gameUiElements  = store.game.uiElements;
       worldRef.current.prefabLibrary   = store.game.prefabs;
     }
+    // Phase 68 — seed game-wide player settings on first contact: the game
+    // should keep feeling like its ENTRY scene, so that scene's settings
+    // become the defaults (fetched if it isn't the one being adopted).
+    void (async () => {
+      if (!store.game.playerSettings) {
+        try {
+          const src = sceneId === store.entryScene
+            ? worldRef.current?.world?.playerSettings
+            : (await store.loadScene(store.entryScene)).world?.playerSettings;
+          store.game.playerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...src };
+          await store.writeGame();
+        } catch (e) { console.warn("[settings] seeding game defaults failed:", e); }
+      }
+      worldRef.current?.setGamePlayerSettings(store.game.playerSettings);
+      setPlayerSettingsRev(v => v + 1);
+    })();
     setWorldItems(store.game.items ?? []);
     setWorldUiElements(store.game.uiElements ?? []);
     setGameSchema(store.game.stateSchema ?? {});
@@ -1475,6 +1506,7 @@ export default function App() {
       world.gameItems       = proj.store.game.items;
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
+      world.setGamePlayerSettings(proj.store.game.playerSettings);
       const next = { ...proj, sceneId: target };
       projectRef.current = next;
       setProject(next);
@@ -1595,14 +1627,46 @@ export default function App() {
     const world = worldRef.current;
     if (!world?.world) return;
     worldRef.current?.transaction("update player settings", () => {
-      // Assign a fresh object (new reference) so the panel reflects the change.
-      world.world!.playerSettings = { ...world.world!.playerSettings, ...changes };
+      // Phase 68 — scene-scope edits land in the scene's override layer and the
+      // resolved view together (fresh object either way, so the panel updates).
+      world.updateScenePlayerSettings(changes);
     });
     syncHistory();
     // syncHistory() no-ops once undo/dirty are already set, so force a re-render
     // for the spawn settings panel.
     setPlayerSettingsRev(v => v + 1);
   }, [syncHistory]);
+
+  // Phase 68 — game-scope settings edits (game.json defaults) + page overrides.
+  const handleGamePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
+    const world = worldRef.current, proj = projectRef.current;
+    if (!world || !proj) return;
+    const next = { ...resolvePlayerSettings(world.gamePlayerSettings, {}), ...changes };
+    proj.store.game.playerSettings = next;
+    void proj.store.writeGame().catch(e => console.warn("[settings] game.json write failed:", e));
+    world.setGamePlayerSettings(next);
+    setPlayerSettingsRev(v => v + 1);
+  }, []);
+
+  const handleSettingsPageOverride = useCallback((page: SettingsPage, on: boolean): void => {
+    const world = worldRef.current;
+    if (!world) return;
+    world.transaction(on ? "override player settings page" : "use game defaults", () => {
+      world.setSettingsPageOverride(page, on);
+    });
+    syncHistory();
+    setPlayerSettingsRev(v => v + 1);
+  }, [syncHistory]);
+
+  const handlePromoteSettingsToGame = useCallback((): void => {
+    const world = worldRef.current, proj = projectRef.current;
+    if (!world || !proj) return;
+    const resolved = world.promoteSettingsToGame();
+    proj.store.game.playerSettings = resolved;
+    void proj.store.writeGame().catch(e => console.warn("[settings] game.json write failed:", e));
+    setIsDirty(true);   // the scene's override layer changed too
+    setPlayerSettingsRev(v => v + 1);
+  }, []);
 
   const handleSelectLight = useCallback((id: string): void => {
     const world = worldRef.current;
@@ -3673,6 +3737,11 @@ export default function App() {
         assets={assets}
         sounds={sounds}
         onPlayerSettingsChange={handlePlayerSettingsChange}
+        gamePlayerSettings={project ? worldRef.current?.gamePlayerSettings : undefined}
+        scenePlayerOverrides={worldRef.current?.scenePlayerOverrides}
+        onGamePlayerSettingsChange={project ? handleGamePlayerSettingsChange : undefined}
+        onSettingsPageOverride={project ? handleSettingsPageOverride : undefined}
+        onPromoteSettingsToGame={project ? handlePromoteSettingsToGame : undefined}
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
         onWorldLightingChange={handleWorldLightingChange}
