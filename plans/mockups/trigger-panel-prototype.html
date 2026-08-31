@@ -41,6 +41,9 @@
   .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
   .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
+  .rotwrap { position: relative; display: inline-flex; align-items: center; }
+  .rotwrap .rst { position: absolute; right: 4px; background: none; border: none; color: var(--red); font-size: 11px; cursor: pointer; padding: 0 2px; line-height: 1; }
+  .rotwrap .rst.off { color: #555c6e; cursor: default; }
   .rng { -webkit-appearance: none; appearance: none; flex: 1; height: 3px; background: rgba(255,255,255,0.15); border-radius: 2px; outline: none; margin: 0; }
   .rng::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--blue); cursor: pointer; border: 2px solid #1c1c1c; }
   /* state key cards */
@@ -107,6 +110,20 @@ const Axis = ({ k, color, value, onChange }) => (
   <div className="axis"><span style={{ color }}>{k}</span>
     <input value={value} onChange={e => onChange(parseFloat(e.target.value) || 0)} /></div>
 );
+function RotField({ value, width, onChange }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+      <span className="rotwrap" style={{ width }}>
+        <input className="field" style={{ paddingRight: 18 }} value={value} onChange={e => onChange(parseFloat(e.target.value) || 0)} />
+        <button className={"rst" + (value === 0 ? " off" : "")} title="Reset rotation to 0°"
+          onClick={() => onChange(0)}>×</button>
+      </span>
+      <input type="range" className="rng" min={-180} max={180} step={5} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))} />
+    </div>
+  );
+}
+
 function TransformFields({ v, set, dense }) {
   return (<>
     <div><div className="lbl" style={{ marginBottom: 3 }}>Shape</div>
@@ -126,11 +143,7 @@ function TransformFields({ v, set, dense }) {
         <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
       </div></div>
     {!dense && <div><div className="lbl" style={{ marginBottom: 3 }}>Rotation (Y°)</div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <input className="field" style={{ width: "33%" }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} />
-        <input type="range" className="rng" min={-180} max={180} step={5} value={v.rotY}
-          onChange={e => set({ rotY: parseFloat(e.target.value) })} />
-      </div></div>}
+      <RotField value={v.rotY} width="33%" onChange={rotY => set({ rotY })} /></div>}
   </>);
 }
 function AttachField({ v, set }) {
@@ -338,11 +351,7 @@ function PanelC() {
           <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
         </div></div>
       <div className="kv"><span className="k">Rot Y°</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <input className="field" style={{ width: 64 }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} />
-          <input type="range" className="rng" min={-180} max={180} step={5} value={v.rotY}
-            onChange={e => set({ rotY: parseFloat(e.target.value) })} />
-        </div></div>
+        <RotField value={v.rotY} width={72} onChange={rotY => set({ rotY })} /></div>
       <div className="kv"><span className="k">Attach</span>
         <select className="field" value={v.attachTo} onChange={e => set({ attachTo: e.target.value })}>
           {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
