@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -34.57736991267693,
+        "x": -36.22466774086044,
         "y": 5.954637890594723,
-        "z": -92.20730728750344
+        "z": -73.27836285270695
       },
       "radius": 17.938297294236026,
-      "phi": 1.1100000000000008,
-      "theta": 18.803009999886903
+      "phi": 0.9500000000000033,
+      "theta": 18.853009999886883
     }
   },
   "world": {
@@ -38,28 +38,7 @@
     "skybox": "sky",
     "fogColor": "#1a1f2e",
     "fogDensity": 0.012,
-    "playerSettings": {
-      "cameraMode": "thirdperson",
-      "fov": 75,
-      "thirdPersonDistance": 3.4,
-      "thirdPersonHeight": 0.8,
-      "thirdPersonPitch": 18,
-      "modelAssetId": "character",
-      "characterScale": 0.9,
-      "jumpAnimSpeed": 1.2,
-      "footstepDistance": 2,
-      "footstepSound": "footstep_carpet_000",
-      "jumpSound": "phasejump1",
-      "animClips": {
-        "walk": "Run"
-      },
-      "footstepVolume": 0.1,
-      "jumpVolume": 0.1,
-      "landSound": "footstep_grass_001",
-      "landVolume": 0.1,
-      "moveSpeed": 6,
-      "jumpHeight": 1.2
-    },
+    "playerSettings": {},
     "stateSchema": {
       "Hearts": {
         "type": "number",
@@ -13931,6 +13910,34 @@
             },
             "rotationY": 0
           }
+        },
+        {
+          "id": "pfi_71c7a328",
+          "prefabId": "pfb_85a3fab7",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -33.4,
+              "y": -1.7762510259766846,
+              "z": -55.900000000000006
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_e99056b2",
+          "prefabId": "pfb_5c1695b8",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -35.01597857911962,
+              "y": 8.342363408810389,
+              "z": -72.75
+            },
+            "rotationY": 0
+          }
         }
       ],
       "ladders": [
@@ -13951,56 +13958,6 @@
         }
       ],
       "triggerVolumes": [
-        {
-          "id": "vol_d8ccfafc",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -33.4,
-            "y": -1.7762510259766846,
-            "z": -55.900000000000006
-          },
-          "size": {
-            "x": 122.2,
-            "y": 2.5,
-            "z": 137.20000000000002
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "scr_d62ed82a",
-              "label": "Kill Floor Enter",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter",
-                "targetId": "vol_d8ccfafc"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "respawn_player",
-                  "positionKey": "checkpoint",
-                  "fadeDuration": 0.4,
-                  "restoreHealth": true
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "visual": {
-            "enabled": false,
-            "style": "gradient",
-            "color": "#5a3d8f",
-            "fadeDir": "up",
-            "opacity": 0.8,
-            "fadeHeight": 1,
-            "animate": false
-          },
-          "editorTint": {
-            "color": "#b28e01",
-            "opacity": 0.05
-          }
-        },
         {
           "id": "vol_a9be2847",
           "label": "Trigger Volume",
@@ -14238,51 +14195,6 @@
               "oneShot": true
             }
           ]
-        },
-        {
-          "id": "vol_2c7cc347",
-          "label": "Trigger Volume",
-          "position": {
-            "x": -35.01597857911962,
-            "y": 8.342363408810389,
-            "z": -72.75
-          },
-          "size": {
-            "x": 7,
-            "y": 2.5,
-            "z": 0.5
-          },
-          "zoneId": "demo",
-          "scripts": [
-            {
-              "id": "scr_bb7e1c89",
-              "label": "Checkpont 3 trigger",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_animation",
-                  "targetId": "obj_e043c8bb",
-                  "animation": "Dance"
-                },
-                {
-                  "type": "store_position",
-                  "stateKey": "checkpoint",
-                  "posSource": "object",
-                  "targetId": "cp_b1c9ad67"
-                }
-              ],
-              "oneShot": true
-            }
-          ],
-          "editorTint": {
-            "color": "#4c00ff",
-            "opacity": 0.12
-          }
         },
         {
           "id": "vol_4b2ee12e",
@@ -14717,6 +14629,111 @@
               "oneShot": true
             }
           ]
+        },
+        {
+          "id": "vol_e952fd24",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -33.4,
+            "y": -1.7762510259766846,
+            "z": -55.900000000000006
+          },
+          "size": {
+            "x": 122.2,
+            "y": 2.5,
+            "z": 137.20000000000002
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_1a2b34a7",
+              "label": "Kill Floor Enter",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter",
+                "targetId": "vol_e952fd24"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "respawn_player",
+                  "positionKey": "checkpoint",
+                  "fadeDuration": 0.4,
+                  "restoreHealth": true
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "visual": {
+            "enabled": false,
+            "style": "gradient",
+            "color": "#5a3d8f",
+            "fadeDir": "up",
+            "opacity": 0.8,
+            "fadeHeight": 1,
+            "animate": false
+          },
+          "editorTint": {
+            "color": "#b28e01",
+            "opacity": 0.05
+          },
+          "prefab": {
+            "prefabId": "pfb_85a3fab7",
+            "instanceId": "pfi_71c7a328",
+            "memberKey": "vol_d8ccfafc"
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        {
+          "id": "vol_2377df30",
+          "label": "Trigger Volume",
+          "position": {
+            "x": -35.01597857911962,
+            "y": 8.342363408810389,
+            "z": -72.75
+          },
+          "size": {
+            "x": 7,
+            "y": 2.5,
+            "z": 0.5
+          },
+          "zoneId": "demo",
+          "scripts": [
+            {
+              "id": "script_126f55a6",
+              "label": "Checkpont 3 trigger",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "store_position",
+                  "stateKey": "checkpoint",
+                  "posSource": "object",
+                  "targetId": "cp_b1c9ad67"
+                }
+              ],
+              "oneShot": true
+            }
+          ],
+          "editorTint": {
+            "color": "#4c00ff",
+            "opacity": 0.12
+          },
+          "prefab": {
+            "prefabId": "pfb_5c1695b8",
+            "instanceId": "pfi_e99056b2",
+            "memberKey": "vol_2c7cc347"
+          }
         }
       ],
       "scripts": [

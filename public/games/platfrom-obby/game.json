@@ -40,78 +40,6 @@
       "dateAdded": "2026-07-26"
     },
     {
-      "id": "pfb_c1006ccb",
-      "name": "Pipe base and corner",
-      "kind": "snapshot",
-      "version": 2,
-      "variables": [],
-      "template": [
-        {
-          "memberKey": "obj_92addde7",
-          "type": "object",
-          "def": {
-            "id": "obj_92addde7",
-            "assetId": "pipe_90",
-            "position": {
-              "x": 0.0020553262575759845,
-              "y": 2.0009636547164726,
-              "z": 0.0003649474295350785
-            },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "floor": 0,
-            "zoneId": "__prefab_edit__",
-            "properties": {
-              "interactable": false,
-              "npcSpawn": false,
-              "lootTableId": null,
-              "triggerEventId": null
-            }
-          }
-        },
-        {
-          "memberKey": "obj_3a3b389d",
-          "type": "object",
-          "def": {
-            "id": "obj_3a3b389d",
-            "assetId": "pipe_straight",
-            "position": {
-              "x": -0.0020553262575759845,
-              "y": 0,
-              "z": -0.00036494742953863124
-            },
-            "rotation": {
-              "x": 0,
-              "y": 0,
-              "z": 0
-            },
-            "scale": {
-              "x": 1,
-              "y": 1,
-              "z": 1
-            },
-            "floor": 0,
-            "zoneId": "__prefab_edit__",
-            "properties": {
-              "interactable": false,
-              "npcSpawn": false,
-              "lootTableId": null,
-              "triggerEventId": null
-            }
-          }
-        }
-      ],
-      "dateAdded": "2026-07-28"
-    },
-    {
       "id": "pfb_741ffb6f",
       "name": "Stairs - wood - 2length",
       "kind": "snapshot",
@@ -1051,6 +979,167 @@
         }
       ],
       "dateAdded": "2026-08-28"
+    },
+    {
+      "id": "pfb_85a3fab7",
+      "name": "Kill Floor",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "vol_d8ccfafc",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_d8ccfafc",
+            "label": "Trigger Volume",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "size": {
+              "x": 122.2,
+              "y": 2.5,
+              "z": 137.20000000000002
+            },
+            "zoneId": "demo",
+            "scripts": [
+              {
+                "id": "scr_d62ed82a",
+                "label": "Kill Floor Enter",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter",
+                  "targetId": "vol_d8ccfafc"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "respawn_player",
+                    "positionKey": "checkpoint",
+                    "fadeDuration": 0.4,
+                    "restoreHealth": true
+                  }
+                ],
+                "oneShot": false
+              }
+            ],
+            "visual": {
+              "enabled": false,
+              "style": "gradient",
+              "color": "#5a3d8f",
+              "fadeDir": "up",
+              "opacity": 0.8,
+              "fadeHeight": 1,
+              "animate": false
+            },
+            "editorTint": {
+              "color": "#b28e01",
+              "opacity": 0.05
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-08-31"
+    },
+    {
+      "id": "pfb_5c1695b8",
+      "name": "Checkpoint Test",
+      "kind": "snapshot",
+      "version": 1,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "vol_2c7cc347",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_2c7cc347",
+            "label": "Trigger Volume",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "size": {
+              "x": 7,
+              "y": 2.5,
+              "z": 0.5
+            },
+            "zoneId": "demo",
+            "scripts": [
+              {
+                "id": "scr_bb7e1c89",
+                "label": "Checkpont 3 trigger",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "store_position",
+                    "stateKey": "checkpoint",
+                    "posSource": "object",
+                    "targetId": "cp_b1c9ad67"
+                  }
+                ],
+                "oneShot": true
+              }
+            ],
+            "editorTint": {
+              "color": "#4c00ff",
+              "opacity": 0.12
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-08-31"
+    },
+    {
+      "id": "pfb_55ec1576",
+      "name": "Prefab 11",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "vol_pftest01",
+          "type": "trigger-volume",
+          "def": {
+            "id": "vol_pftest01",
+            "zoneId": "__prefab_edit__",
+            "label": "prefab-test vol",
+            "position": {
+              "x": 1,
+              "y": 0,
+              "z": 0
+            },
+            "size": {
+              "x": 2,
+              "y": 1,
+              "z": 2
+            }
+          }
+        },
+        {
+          "memberKey": "cp_pftest01",
+          "type": "checkpoint",
+          "def": {
+            "id": "cp_pftest01",
+            "label": "prefab-test cp",
+            "position": {
+              "x": -1,
+              "y": 0,
+              "z": 0
+            },
+            "facingDeg": 90
+          }
+        }
+      ],
+      "dateAdded": "2026-08-31"
     }
   ],
   "uiElements": [
