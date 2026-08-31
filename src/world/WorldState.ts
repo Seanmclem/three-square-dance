@@ -877,6 +877,14 @@ export class WorldState {
         else if (state === "removed") this._bus.emit("decal:removed", { zoneId: z, id });
         else                          this._bus.emit("decal:updated", { zoneId: z, id, changes: target as Partial<DecalDef> });
         break;
+      case "checkpoint":
+        // v4.79.63 — undo/redo finally moves the marker too (the long-known
+        // "checkpoint undo reverts data but not the marker" gap): CheckpointTool
+        // builds/rebuilds/removes markers off these same events.
+        if (state === "added")        this._bus.emit("checkpoint:added", { zoneId: z, checkpoint: target as CheckpointDef });
+        else if (state === "removed") this._bus.emit("checkpoint:removed", { zoneId: z, id });
+        else                          this._bus.emit("checkpoint:updated", { zoneId: z, id, changes: target as Partial<CheckpointDef> });
+        break;
       case "light":
         if (state === "added")        this._bus.emit("light:added", { zoneId: z, light: target as LightDef });
         else if (state === "removed") this._bus.emit("light:removed", { zoneId: z, id });
