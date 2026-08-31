@@ -643,7 +643,7 @@
                 "id": "col_172f13ec",
                 "shape": "box",
                 "offset": {
-                  "x": -5.960464477539063e-8,
+                  "x": -5.960464477539063e-08,
                   "y": 0.751679808832705,
                   "z": 0.01855784778791364
                 },
@@ -1093,49 +1093,6 @@
               "color": "#4c00ff",
               "opacity": 0.12
             }
-          }
-        }
-      ],
-      "dateAdded": "2026-08-31"
-    },
-    {
-      "id": "pfb_55ec1576",
-      "name": "Prefab 11",
-      "kind": "snapshot",
-      "version": 2,
-      "variables": [],
-      "template": [
-        {
-          "memberKey": "vol_pftest01",
-          "type": "trigger-volume",
-          "def": {
-            "id": "vol_pftest01",
-            "zoneId": "__prefab_edit__",
-            "label": "prefab-test vol",
-            "position": {
-              "x": 1,
-              "y": 0,
-              "z": 0
-            },
-            "size": {
-              "x": 2,
-              "y": 1,
-              "z": 2
-            }
-          }
-        },
-        {
-          "memberKey": "cp_pftest01",
-          "type": "checkpoint",
-          "def": {
-            "id": "cp_pftest01",
-            "label": "prefab-test cp",
-            "position": {
-              "x": -1,
-              "y": 0,
-              "z": 0
-            },
-            "facingDeg": 90
           }
         }
       ],
