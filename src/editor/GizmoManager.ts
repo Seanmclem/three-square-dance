@@ -711,6 +711,14 @@ export class GizmoManager implements IEditorModule {
         });
         break;
       }
+      case "checkpoint": {
+        const c = zone.checkpoints?.find(x => x.id === ref.id);
+        if (!c) break;
+        this._worldState.updateCheckpoint(zoneId, ref.id, {
+          position: { x: c.position.x + delta.x, y: c.position.y + delta.y, z: c.position.z + delta.z },
+        });
+        break;
+      }
     }
   }
 

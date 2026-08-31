@@ -548,6 +548,16 @@ the user's tab had written. Rules:
   target). A count can't tell you WHICH one died. Corollary smell that was missed in
   the moment: the thing you deleted still existing afterwards (the test def was still
   on disk) means something ELSE took the bullet.
+- **TransformControls drags cannot be synthesized in a hidden tab** (2026-08-31).
+  The gizmo positions itself in its `updateMatrixWorld` during RENDER; with rAF
+  frozen the handles never move to the pivot, so synthetic PointerEvents raycast
+  against unpositioned pickers and the drag never engages. Forcing
+  `renderer.render(scene, camera)` between events did NOT fix it (handles still
+  projected wildly offscreen — likely a separate overlay/scene render path). Stub
+  `canvas.setPointerCapture` regardless (it throws on fake pointerIds), but for
+  real gizmo-drag verification use OS-level clicks on the visible shell window
+  (section below) or ask the user to try it — don't burn attempts on hidden-tab
+  pointer synthesis.
 - **Go slow.** One action → read state → verify → next action. Never batch
   clicks across unverified UI state — a wrong assumption compounds.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and
