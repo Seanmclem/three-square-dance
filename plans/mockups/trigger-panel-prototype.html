@@ -1,0 +1,314 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Trigger panel prototype — A…C</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root { --panel: rgba(28,28,28,0.97); --line: rgba(255,255,255,0.08); --text: #dde3f0; --text2: #c2cadb; --muted: #8b94a8; --blue: #80aaff; --green: #50c878; --amber: #e8c14b; --red: #cc6666; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1115; color: var(--text2); font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .page { padding: 20px 24px 60px; display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .topbar { display: flex; gap: 6px; align-items: center; padding: 16px 24px 0; }
+  .topbar .lbl { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
+  .btn { padding: 4px 8px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: #c0c0c0; font-size: 11px; cursor: pointer; font-family: inherit; }
+  .btn:hover { color: var(--text); } .btn.primary { background: rgba(80,140,255,0.25); }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 290px; padding-bottom: 8px; font-family: system-ui, sans-serif; }
+  .note b { color: var(--blue); }
+  .panel { width: 290px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; min-height: 640px; display: flex; flex-direction: column; overflow: hidden; }
+  .ph { padding: 12px 16px 4px; }
+  .ph .t { color: var(--blue); font-size: 12px; letter-spacing: 2px; }
+  .ph .n { color: var(--text); font-size: 14px; margin-top: 4px; }
+  .ph .s { color: var(--muted); font-size: 10px; letter-spacing: 1px; }
+  .lbl { color: #8b94a8; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .field { background: rgba(46,46,46,0.9); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #d4d8e2; font-size: 11px; padding: 4px 6px; font-family: inherit; width: 100%; outline: none; }
+  .seg { display: flex; gap: 4px; }
+  .seg button { flex: 1; padding: 4px 0; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 10px; border: none; background: rgba(46,46,46,0.6); color: #9a9a9a; outline: 1px solid rgba(255,255,255,0.06); }
+  .seg button.on { background: rgba(80,140,255,0.18); color: var(--blue); outline: 1px solid rgba(80,140,255,0.4); cursor: default; }
+  .row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .axis { display: flex; gap: 4px; align-items: center; background: rgba(46,46,46,0.9); border: 1px solid rgba(255,255,255,0.07); border-radius: 4px; padding: 2px 6px; }
+  .axis span { font-size: 9px; } .axis input { width: 100%; min-width: 0; border: none; outline: none; background: transparent; color: #c0c0c0; font-size: 10px; font-family: inherit; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); color: var(--text2); font-size: 10px; }
+  .chip .x { color: var(--red); cursor: pointer; opacity: 0.7; } .chip .x:hover { opacity: 1; }
+  .scriptrow { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); cursor: pointer; }
+  .scriptrow:hover { border-color: rgba(255,255,255,0.16); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .bigbtn { width: 100%; padding: 6px 0; border-radius: 5px; font-size: 11px; cursor: pointer; font-family: inherit; }
+  .bigbtn.blue { background: rgba(80,140,255,0.10); border: 1px solid rgba(80,140,255,0.3); color: var(--blue); }
+  .bigbtn.red { background: rgba(200,60,60,0.12); border: 1px solid rgba(200,60,60,0.3); color: var(--red); }
+  .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
+  .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
+  /* A · accordions */
+  .acc { border-top: 1px solid rgba(255,255,255,0.06); }
+  .acc .hd { display: flex; align-items: center; gap: 8px; padding: 9px 16px; cursor: pointer; }
+  .acc .hd:hover { background: rgba(255,255,255,0.03); }
+  .acc .hd .t { color: var(--text); font-size: 12px; font-family: system-ui, sans-serif; }
+  .acc .hd .sum { margin-left: auto; color: var(--muted); font-size: 10px; text-align: right; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acc .hd .tri { color: var(--muted); font-size: 9px; width: 10px; }
+  .acc .bd { padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+  /* B · drilldown */
+  .drow { display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-top: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
+  .drow:hover { background: rgba(255,255,255,0.03); }
+  .drow .t { color: var(--text); font-size: 13px; font-family: system-ui, sans-serif; }
+  .drow .sum { margin-left: auto; color: var(--muted); font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drow .chev { color: var(--muted); }
+  .back { display: flex; align-items: center; gap: 8px; padding: 8px 16px; }
+  .back button { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #c0c0c0; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-family: inherit; }
+  /* C · dense */
+  .dense { padding: 8px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .kv { display: grid; grid-template-columns: 62px 1fr; gap: 6px; align-items: center; }
+  .kv .k { color: var(--muted); font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .hair { height: 1px; background: rgba(255,255,255,0.06); margin: 2px 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+// ═══ one shared model — every option edits the same fields ═══
+function useVol() {
+  const [v, setV] = useState({
+    label: "Trigger Volume", shape: "BOX", editMode: "MOVE",
+    pos: { x: -33.4, y: -1.78, z: -55.9 }, size: { w: 122.2, h: 2.5, d: 137.2 }, rotY: 0,
+    attachTo: "", stateKeys: [{ key: "spikes-up", type: "boolean" }],
+    gradientFill: false, customShading: true, color: "#c9a83a", opacity: 0.05,
+    scripts: [{ name: "Kill Floor Enter", trigger: "on_player_enter", actions: 1 }],
+  });
+  const set = (p) => setV(x => ({ ...x, ...p }));
+  return [v, set];
+}
+const HOSTS = ["— not attached (static) —", "spike cube 1", "moving platform"];
+
+// ═══ shared field blocks (identical controls in every option) ═══
+const Axis = ({ k, color, value, onChange }) => (
+  <div className="axis"><span style={{ color }}>{k}</span>
+    <input value={value} onChange={e => onChange(parseFloat(e.target.value) || 0)} /></div>
+);
+function TransformFields({ v, set, dense }) {
+  return (<>
+    <div><div className="lbl" style={{ marginBottom: 3 }}>Shape</div>
+      <div className="seg">{["BOX","SPHERE","CYL","CAPS"].map(s => <button key={s} className={v.shape === s ? "on" : ""} onClick={() => set({ shape: s })}>{s}</button>)}</div></div>
+    <div><div className="lbl" style={{ marginBottom: 3 }}>Edit mode</div>
+      <div className="seg">{["MOVE","RESIZE"].map(s => <button key={s} className={v.editMode === s ? "on" : ""} onClick={() => set({ editMode: s })}>{s}</button>)}</div></div>
+    <div><div className="lbl" style={{ marginBottom: 3 }}>Position</div>
+      <div className="row3">
+        <Axis k="X" color="#ff6b6b" value={v.pos.x} onChange={x => set({ pos: { ...v.pos, x } })} />
+        <Axis k="Y" color="#6bff8a" value={v.pos.y} onChange={y => set({ pos: { ...v.pos, y } })} />
+        <Axis k="Z" color="#6b8aff" value={v.pos.z} onChange={z => set({ pos: { ...v.pos, z } })} />
+      </div></div>
+    <div><div className="lbl" style={{ marginBottom: 3 }}>Size (W · H · D)</div>
+      <div className="row3">
+        <Axis k="W" color="#98a2b8" value={v.size.w} onChange={w => set({ size: { ...v.size, w } })} />
+        <Axis k="H" color="#98a2b8" value={v.size.h} onChange={h => set({ size: { ...v.size, h } })} />
+        <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
+      </div></div>
+    {!dense && <div><div className="lbl" style={{ marginBottom: 3 }}>Rotation (Y°)</div>
+      <input className="field" value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} /></div>}
+  </>);
+}
+function AttachField({ v, set }) {
+  return (<div><div className="lbl" style={{ marginBottom: 3 }}>Attached to</div>
+    <select className="field" value={v.attachTo} onChange={e => set({ attachTo: e.target.value })}>
+      {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
+    </select></div>);
+}
+function StateFields({ v, set, blurb }) {
+  const [draft, setDraft] = useState("");
+  return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    {blurb && <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
+      Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via "Whose state".</div>}
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {v.stateKeys.map((k, i) => <span key={k.key} className="chip">{k.key} <span style={{ color: "#8b94a8" }}>· {k.type}</span>
+        <span className="x" onClick={() => set({ stateKeys: v.stateKeys.filter((_, j) => j !== i) })}>×</span></span>)}
+      {v.stateKeys.length === 0 && <span style={{ color: "#8b94a8", fontSize: 10 }}>none</span>}
+    </div>
+    <div style={{ display: "flex", gap: 4 }}>
+      <input className="field" placeholder="new key (e.g. health)" value={draft} onChange={e => setDraft(e.target.value)} />
+      <button className="btn" onClick={() => { if (draft.trim()) { set({ stateKeys: [...v.stateKeys, { key: draft.trim(), type: "boolean" }] }); setDraft(""); } }}>+ add</button>
+    </div>
+  </div>);
+}
+function AppearanceFields({ v, set }) {
+  return (<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+      <input type="checkbox" className="switch" checked={v.gradientFill} onChange={e => set({ gradientFill: e.target.checked })} />
+      <span style={{ fontSize: 11 }}>Show gradient fill</span></label>
+    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+      <input type="checkbox" className="switch" checked={v.customShading} onChange={e => set({ customShading: e.target.checked })} />
+      <span style={{ fontSize: 11 }}>Custom color / opacity (editor only)</span></label>
+    {v.customShading && (<div className="kv" style={{ gridTemplateColumns: "62px 1fr 62px" }}>
+      <span className="k">Color</span>
+      <input type="color" value={v.color} onChange={e => set({ color: e.target.value })} style={{ width: 42, height: 24, padding: 0, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, background: "transparent", cursor: "pointer" }} />
+      <input className="field" value={v.opacity} onChange={e => set({ opacity: parseFloat(e.target.value) || 0 })} />
+    </div>)}
+  </div>);
+}
+function ScriptsFields({ v, set }) {
+  return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div style={{ display: "flex", gap: 4 }}>
+      <button className="btn" style={{ color: "#50c878", borderColor: "rgba(80,200,120,0.35)" }}
+        onClick={() => set({ scripts: [...v.scripts, { name: "Enter script", trigger: "on_player_enter", actions: 0 }] })}>+ Enter</button>
+      <button className="btn" style={{ color: "#e8c14b", borderColor: "rgba(232,193,75,0.35)" }}
+        onClick={() => set({ scripts: [...v.scripts, { name: "Exit script", trigger: "on_player_exit", actions: 0 }] })}>+ Exit</button>
+    </div>
+    {v.scripts.map((s, i) => (
+      <div key={i} className="scriptrow">
+        <span className="dot" />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "#50c878", fontSize: 11 }}>{s.name}</div>
+          <div style={{ color: "#8b94a8", fontSize: 9 }}>{s.trigger} · {s.actions} action{s.actions === 1 ? "" : "s"}</div>
+        </div>
+        <span style={{ marginLeft: "auto", color: "#cc6666", cursor: "pointer" }}
+          onClick={e => { e.stopPropagation(); set({ scripts: v.scripts.filter((_, j) => j !== i) }); }}>×</span>
+      </div>))}
+    {v.scripts.length > 0 && <div style={{ color: "#8a92a6", fontSize: 9, fontStyle: "italic" }}>Click a script to edit its actions →</div>}
+  </div>);
+}
+const FooterBtns = () => (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+  <button className="bigbtn blue">⬡ Create Prefab</button>
+  <button className="bigbtn red">Delete Volume</button>
+</div>);
+const Header = ({ v, set }) => (
+  <div className="ph"><span className="t">PROPERTIES</span>
+    <input className="n" value={v.label} onChange={e => set({ label: e.target.value })}
+      style={{ background: "transparent", border: "1px solid transparent", borderRadius: 4, color: "var(--text)", fontSize: 14, fontFamily: "inherit", width: "100%", outline: "none", padding: "2px 0", marginTop: 4 }} />
+    <div className="s">TRIGGER VOLUME · vol_11875031</div>
+  </div>);
+
+// ═══ summaries (shared) ═══
+const sums = (v) => ({
+  transform: `${v.shape.toLowerCase()} · ${v.size.w}×${v.size.h}×${v.size.d}`,
+  attach: v.attachTo || "static",
+  state: v.stateKeys.length ? v.stateKeys.map(k => k.key).join(" · ") : "none",
+  appearance: `${v.customShading ? "custom color" : "default"}${v.gradientFill ? " · gradient" : ""}`,
+  scripts: v.scripts.length ? `${v.scripts.length} script${v.scripts.length === 1 ? "" : "s"}` : "none",
+});
+
+// ═══ A · Collapsible sections ═══
+function PanelA() {
+  const [v, set] = useVol();
+  const [open, setOpen] = useState({ transform: true, behavior: true, appearance: false });
+  const sm = sums(v);
+  const Acc = ({ id, title, sum, children }) => (
+    <div className="acc">
+      <div className="hd" onClick={() => setOpen(o => ({ ...o, [id]: !o[id] }))}>
+        <span className="tri">{open[id] ? "▾" : "▸"}</span><span className="t">{title}</span><span className="sum">{sum}</span>
+      </div>
+      {open[id] && <div className="bd">{children}</div>}
+    </div>);
+  return (<div className="panel">
+    <Header v={v} set={set} />
+    <Acc id="transform" title="Shape & Transform" sum={sm.transform}><TransformFields v={v} set={set} /></Acc>
+    <Acc id="behavior" title="Behavior" sum={`${sm.scripts} · ${sm.state} · ${sm.attach}`}>
+      <ScriptsFields v={v} set={set} />
+      <div className="hair" />
+      <div className="lbl">State (this volume only)</div>
+      <StateFields v={v} set={set} blurb />
+      <div className="hair" />
+      <AttachField v={v} set={set} />
+    </Acc>
+    <Acc id="appearance" title="Appearance" sum={sm.appearance}><AppearanceFields v={v} set={set} /></Acc>
+    <div style={{ flex: 1 }} />
+    <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
+  </div>);
+}
+
+// ═══ B · Drilldown rows (object-panel parity) ═══
+function PanelB() {
+  const [v, set] = useVol();
+  const [screen, setScreen] = useState(null);
+  const sm = sums(v);
+  const rows = [
+    ["geo", "Geometry", sm.transform, <TransformFields v={v} set={set} />],
+    ["scripts", "Scripts", sm.scripts, <ScriptsFields v={v} set={set} />],
+    ["state", "State", sm.state, <StateFields v={v} set={set} blurb />],
+    ["attach", "Attach", sm.attach, <AttachField v={v} set={set} />],
+    ["appearance", "Appearance", sm.appearance, <AppearanceFields v={v} set={set} />],
+  ];
+  const cur = rows.find(r => r[0] === screen);
+  return (<div className="panel">
+    {!cur ? (<>
+      <Header v={v} set={set} />
+      {rows.map(([id, t, sum]) => (
+        <div key={id} className="drow" onClick={() => setScreen(id)}>
+          <span className="t">{t}</span><span className="sum">{sum}</span><span className="chev">›</span>
+        </div>))}
+      <div style={{ flex: 1 }} />
+      <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
+    </>) : (<>
+      <div className="back"><button onClick={() => setScreen(null)}>←</button>
+        <span style={{ color: "var(--text)", fontSize: 13, fontFamily: "system-ui, sans-serif" }}>{cur[1]}</span></div>
+      <div style={{ padding: "8px 16px", display: "flex", flexDirection: "column", gap: 10 }}>{cur[3]}</div>
+    </>)}
+  </div>);
+}
+
+// ═══ C · Dense (everything visible, compacted) ═══
+function PanelC() {
+  const [v, set] = useVol();
+  return (<div className="panel">
+    <Header v={v} set={set} />
+    <div className="dense">
+      <div className="kv"><span className="k">Shape</span>
+        <div className="seg">{["BOX","SPHERE","CYL","CAPS"].map(s => <button key={s} className={v.shape === s ? "on" : ""} onClick={() => set({ shape: s })}>{s[0] + s.slice(1).toLowerCase()}</button>)}</div></div>
+      <div className="kv"><span className="k">Edit</span>
+        <div className="seg">{["MOVE","RESIZE"].map(s => <button key={s} className={v.editMode === s ? "on" : ""} onClick={() => set({ editMode: s })}>{s[0] + s.slice(1).toLowerCase()}</button>)}</div></div>
+      <div className="kv"><span className="k">Position</span>
+        <div className="row3">
+          <Axis k="X" color="#ff6b6b" value={v.pos.x} onChange={x => set({ pos: { ...v.pos, x } })} />
+          <Axis k="Y" color="#6bff8a" value={v.pos.y} onChange={y => set({ pos: { ...v.pos, y } })} />
+          <Axis k="Z" color="#6b8aff" value={v.pos.z} onChange={z => set({ pos: { ...v.pos, z } })} />
+        </div></div>
+      <div className="kv"><span className="k">Size</span>
+        <div className="row3">
+          <Axis k="W" color="#98a2b8" value={v.size.w} onChange={w => set({ size: { ...v.size, w } })} />
+          <Axis k="H" color="#98a2b8" value={v.size.h} onChange={h => set({ size: { ...v.size, h } })} />
+          <Axis k="D" color="#98a2b8" value={v.size.d} onChange={d => set({ size: { ...v.size, d } })} />
+        </div></div>
+      <div className="kv"><span className="k">Rot Y°</span>
+        <input className="field" style={{ width: 80 }} value={v.rotY} onChange={e => set({ rotY: parseFloat(e.target.value) || 0 })} /></div>
+      <div className="kv"><span className="k">Attach</span>
+        <select className="field" value={v.attachTo} onChange={e => set({ attachTo: e.target.value })}>
+          {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
+        </select></div>
+      <div className="hair" />
+      <div className="kv" style={{ alignItems: "start" }}><span className="k" title={"Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via “Whose state”."}>State ⓘ</span>
+        <StateFields v={v} set={set} /></div>
+      <div className="hair" />
+      <div className="kv" style={{ alignItems: "start" }}><span className="k">Scripts</span><ScriptsFields v={v} set={set} /></div>
+      <div className="hair" />
+      <div className="kv" style={{ alignItems: "start" }}><span className="k">Look</span><AppearanceFields v={v} set={set} /></div>
+    </div>
+    <div style={{ flex: 1 }} />
+    <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
+  </div>);
+}
+
+const OPTIONS = [
+  ["a", "A · Sections", <span><b>A · Collapsible sections.</b> Three groups — Shape &amp; Transform, Behavior (scripts + state + attach), Appearance — each with a live summary when collapsed, so nothing is invisible, just foldable. Appearance starts closed (the rarely-touched part). The long state blurb lives inside its group.</span>, PanelA],
+  ["b", "B · Drilldown", <span><b>B · Drilldown rows.</b> Exactly how objects already work: five category rows with live summaries (geometry, scripts, state, attach, appearance), each opening its own page with ← back. Most consistent with the rest of the editor; costs one click per area.</span>, PanelB],
+  ["c", "C · Dense", <span><b>C · Dense.</b> Everything stays visible — your "things you might always want to see" instinct — but compacted: label-left rows, the state blurb collapsed into an ⓘ tooltip, state keys as chips, tighter spacing. Roughly half the height of today with zero clicks added.</span>, PanelC],
+];
+function App() {
+  const [view, setView] = useState("all"); const [key, setKey] = useState(0);
+  return (<div>
+    <div className="topbar">
+      <span className="lbl">TRIGGER VOLUME PANEL</span>
+      <button className={"btn" + (view === "all" ? " primary" : "")} onClick={() => setView("all")}>all</button>
+      {OPTIONS.map(([k, l]) => <button key={k} className={"btn" + (view === k ? " primary" : "")} onClick={() => setView(k)}>{l}</button>)}
+      <span style={{ flex: 1 }} />
+      <button className="btn" onClick={() => setKey(k => k + 1)}>reset</button>
+    </div>
+    <div className="page" key={key}>
+      {OPTIONS.filter(([k]) => view === "all" || view === k).map(([k, l, note, P]) => <div key={k}><div className="note">{note}</div><P /></div>)}
+    </div>
+  </div>);
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
