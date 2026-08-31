@@ -41,6 +41,11 @@
   .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
   .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
+  .ibtn { background: none; border: 1px solid #3a4257; border-radius: 50%; width: 16px; height: 16px; padding: 0;
+    color: #98a2b8; font-size: 10px; line-height: 1; cursor: pointer; flex: none; }
+  .ibtn.on { color: #7fb2ff; border-color: #4a6fa8; background: #1c2740; }
+  .iblurb { color: #b9c2d6; font-size: 11px; line-height: 1.55; background: #191e2b; border: 1px solid #2a3145;
+    border-left: 2px solid #4a6fa8; border-radius: 6px; padding: 7px 9px; }
   .rotwrap { position: relative; display: inline-flex; align-items: center; }
   .rotwrap .rst { position: absolute; right: 4px; background: none; border: none; color: var(--red); font-size: 11px; cursor: pointer; padding: 0 2px; line-height: 1; }
   .rotwrap .rst.off { color: #555c6e; cursor: default; }
@@ -152,6 +157,15 @@ function AttachField({ v, set }) {
       {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
     </select></div>);
 }
+const STATE_BLURB = "Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via \u201cWhose state\u201d.";
+function InfoBlurb({ text, style }) {
+  const [open, setOpen] = useState(false);
+  return (<>
+    <button className={"ibtn" + (open ? " on" : "")} title={open ? "Hide description" : "What is this?"}
+      style={style} onClick={() => setOpen(o => !o)}>i</button>
+    {open && <div className="iblurb">{text}</div>}
+  </>);
+}
 function StateFields({ v, set, blurb }) {
   const [draft, setDraft] = useState("");
   const patch = (i, p) => set({ stateKeys: v.stateKeys.map((k, j) => j === i ? { ...k, ...p } : k) });
@@ -173,8 +187,7 @@ function StateFields({ v, set, blurb }) {
         <input className="field" placeholder="(empty)" value={k.def ?? ""} onChange={e => patch(i, { def: e.target.value })} /></div>);
   };
   return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {blurb && <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
-      Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via "Whose state".</div>}
+    {blurb && <InfoBlurb text={STATE_BLURB} style={{ alignSelf: "flex-end", marginBottom: -2 }} />}
     {v.stateKeys.map((k, i) => (
       <div key={k.key} className="skey">
         <div className="top">
@@ -357,9 +370,10 @@ function PanelC() {
           {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
         </select></div>
       <div className="hair" />
-      <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}
-        title={"Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via “Whose state”."}>State (this volume only) ⓘ</span>
-        <div style={{ marginTop: 4 }}><StateFields v={v} set={set} /></div></div>
+      <div><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>State (this volume only)</span>
+        </div>
+        <div style={{ marginTop: 4 }}><StateFields v={v} set={set} blurb /></div></div>
       <div className="hair" />
       <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Entry / exit scripts</span>
         <div style={{ marginTop: 4 }}><ScriptsFields v={v} set={set} /></div></div>
@@ -378,7 +392,7 @@ function PanelC() {
 const OPTIONS = [
   ["a", "A · Sections", <span><b>A · Collapsible sections.</b> The same five areas as B — Geometry, Scripts, State, Attach, Appearance — but as accordions with live summaries instead of separate pages: everything stays on one screen, fold what you're not using. Geometry and Scripts start open.</span>, PanelA],
   ["b", "B · Drilldown", <span><b>B · Drilldown rows.</b> Exactly how objects already work: five category rows with live summaries (geometry, scripts, state, attach, appearance), each opening its own page with ← back. Most consistent with the rest of the editor; costs one click per area.</span>, PanelB],
-  ["c", "C · Dense", <span><b>C · Dense.</b> Everything stays visible — your "things you might always want to see" instinct — but compacted: label-left rows, the state blurb collapsed into an ⓘ tooltip, state keys as chips, tighter spacing. Roughly half the height of today with zero clicks added.</span>, PanelC],
+  ["c", "C · Dense", <span><b>C · Dense.</b> Everything stays visible — your "things you might always want to see" instinct — but compacted: label-left rows, the state description behind a click-to-open ⓘ, state keys as chips, tighter spacing. Roughly half the height of today with zero clicks added.</span>, PanelC],
 ];
 function App() {
   const [view, setView] = useState("all"); const [key, setKey] = useState(0);
