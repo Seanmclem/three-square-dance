@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "name": "level_2",
+    "version": "1.0",
+    "author": "",
+    "created": "2026-08-31T14:51:43.938Z",
+    "lastModified": "2026-08-31T14:51:43.938Z",
+    "uvVersion": 1,
+    "editorCamera": {
+      "focus": {
+        "x": 0.024721016737351303,
+        "y": 5.954637890594723,
+        "z": -1.1885912007176163
+      },
+      "radius": 27.166168986416686,
+      "phi": 1.1100000000000008,
+      "theta": 18.803009999886903
+    }
+  },
+  "world": {
+    "size": {
+      "width": 200,
+      "depth": 200
+    },
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 0.5
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 2,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012,
+    "playerSettings": {},
+    "lightingFromGame": true,
+    "stateSchema": {
+      "health": {
+        "type": "number",
+        "default": 100,
+        "min": 0,
+        "max": 100
+      }
+    },
+    "audio": {}
+  },
+  "terrain": null,
+  "zones": [
+    {
+      "id": "demo",
+      "name": "Demo Zone",
+      "type": "outdoor",
+      "bounds": {
+        "x": -250,
+        "z": -250,
+        "width": 500,
+        "depth": 500
+      },
+      "nodes": [],
+      "floors": [],
+      "walls": [],
+      "platforms": [],
+      "stairs": [],
+      "objects": []
+    }
+  ],
+  "transitions": [],
+  "groups": []
+}

@@ -5,7 +5,8 @@
   "version": "1.0.0",
   "entryScene": "level_1",
   "scenes": {
-    "level_1": "scenes/level_1.json"
+    "level_1": "scenes/level_1.json",
+    "level_2": "scenes/level_2.json"
   },
   "assetsBase": "/",
   "game": "game.json"

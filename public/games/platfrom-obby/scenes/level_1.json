@@ -8,11 +8,11 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -33.79770454580711,
+        "x": -34.57736991267693,
         "y": 5.954637890594723,
-        "z": -90.04731814661402
+        "z": -92.20730728750344
       },
-      "radius": 12.788297294236,
+      "radius": 17.938297294236026,
       "phi": 1.1100000000000008,
       "theta": 18.803009999886903
     }
@@ -40,8 +40,6 @@
     "fogDensity": 0.012,
     "playerSettings": {
       "cameraMode": "thirdperson",
-      "moveSpeed": 6,
-      "jumpHeight": 3.5,
       "fov": 75,
       "thirdPersonDistance": 3.4,
       "thirdPersonHeight": 0.8,
@@ -58,7 +56,9 @@
       "footstepVolume": 0.1,
       "jumpVolume": 0.1,
       "landSound": "footstep_grass_001",
-      "landVolume": 0.1
+      "landVolume": 0.1,
+      "moveSpeed": 6,
+      "jumpHeight": 1.2
     },
     "stateSchema": {
       "Hearts": {
