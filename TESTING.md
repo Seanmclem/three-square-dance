@@ -533,6 +533,21 @@ the user's tab had written. Rules:
   v4.14.1: `writeAutosave` is gated on a load-time content baseline, so a tab that
   never changed the world never writes. The gate is content-compared (not React
   `isDirty`), so console-driven test transactions still autosave normally.
+- **⚠️ Destructive UI clicks: target the row first, and verify IDENTITY, not counts**
+  (2026-08-31). A cleanup step needed a test prefab's per-row "Delete prefab" ×. It
+  found all delete buttons and walked UP the DOM from each, checking ancestor
+  `innerText` for the row label — but in a dense list an ancestor spans neighboring
+  rows, so the walk matched the ADJACENT row's button and deleted the user's "Pipe
+  base and corner" def instead. The post-check asserted only `prefabLibrary.length`
+  (11 → 10 ✓), which passes identically for a wrong same-kind deletion, so the loss
+  was committed and surfaced only later via a structural id-diff against the pre-test
+  commit. Two rules: (1) locate the ROW by its unique label first, then click a button
+  scoped to that row (`row.querySelector(...)`) — never button-up text walks; (2) after
+  any automated delete, snapshot ids before and set-diff after: assert the target id is
+  gone AND nothing else is (`before.filter(x => !after.has(x))` equals exactly the
+  target). A count can't tell you WHICH one died. Corollary smell that was missed in
+  the moment: the thing you deleted still existing afterwards (the test def was still
+  on disk) means something ELSE took the bullet.
 - **Go slow.** One action → read state → verify → next action. Never batch
   clicks across unverified UI state — a wrong assumption compounds.
 - **Watch for errors.** The vite-plugin-checker overlay (red, top of page) and
