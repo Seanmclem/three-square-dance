@@ -5,7 +5,7 @@ import { volumeExtents } from "@/world/volumeShape";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
-import type { TriggerVolume, Euler3, Scale3, ToolId } from "@/types";
+import type { EditorObjectType, SelectedRef, TriggerVolume, Euler3, Scale3, ToolId } from "@/types";
 
 type State = "IDLE" | "PLACING";
 
@@ -142,6 +142,27 @@ export class TriggerVolumeTool {
             ref: { id: vol.id, type: "trigger-volume", zoneId: this._activeZoneId },
           });
           return;
+        }
+        // Prefab member (v4.79.62): a plain Select-tool click on a stamped volume
+        // selects the whole instance — parity with every SelectionManager-picked
+        // member kind (Phase 47.1). Shift-click above still toggles just the
+        // volume, and the Trigger tool keeps single-select (it edits volumes).
+        const stamp = (vol as { prefab?: { instanceId: string } }).prefab;
+        if (isSelectMode(this._toolId) && stamp) {
+          const zone = this._world.zones.get(this._activeZoneId);
+          const refs: SelectedRef[] = [{ id: vol.id, type: "trigger-volume", zoneId: this._activeZoneId }];
+          const gatherMembers = (type: EditorObjectType, arr: Array<{ id: string; prefab?: { instanceId: string } }> | undefined): void => {
+            for (const e of arr ?? []) {
+              if (e.prefab?.instanceId === stamp.instanceId && e.id !== vol.id) refs.push({ id: e.id, type, zoneId: this._activeZoneId });
+            }
+          };
+          gatherMembers("object", zone?.objects);
+          gatherMembers("trigger-volume", zone?.triggerVolumes);
+          gatherMembers("shape", zone?.shapes);
+          gatherMembers("stair", zone?.stairs);
+          gatherMembers("ladder", zone?.ladders);
+          gatherMembers("checkpoint", zone?.checkpoints);
+          if (refs.length > 1) { this._bus.emit("selection:set", { refs }); return; }
         }
         this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint
         this._selectedId = vol.id;

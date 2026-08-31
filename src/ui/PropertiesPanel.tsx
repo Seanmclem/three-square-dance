@@ -568,6 +568,13 @@ export function PropertiesPanel({
     const summary = Object.entries(counts)
       .map(([t, n]) => `${n} ${t}${n > 1 ? "s" : ""}`)
       .join(" · ");
+    const memberLabelFor = (r: SelectedRef): string => {
+      const zone = zones?.find(z => z.id === r.zoneId);
+      const pools = [zone?.objects, zone?.triggerVolumes, zone?.shapes, zone?.stairs, zone?.ladders, zone?.checkpoints] as
+        Array<Array<{ id: string; label?: string; assetId?: string }> | undefined>;
+      for (const p of pools) { const e = p?.find(x => x.id === r.id); if (e) return e.label || e.assetId || r.id.slice(0, 12); }
+      return r.id.slice(0, 12);
+    };
     const ACTION_BTN: React.CSSProperties = {
       width: "100%", padding: "9px 0", marginBottom: 8, borderRadius: 5,
       border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
@@ -598,6 +605,8 @@ export function PropertiesPanel({
             onUnlink={onPrefabUnlink}
             onDeleteInstance={onPrefabDeleteInstance}
             onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
+            members={multiSelected.map(r => ({ ref: r, label: memberLabelFor(r) }))}
+            onSelectMember={ref => bus?.emit("selection:set", { refs: [ref] })}
           />
         )}
         <div style={{ padding: 16 }}>
@@ -1246,7 +1255,7 @@ function PrefabVarField({ def, value, onCommit }: {
   );
 }
 
-function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onPushToPrefab, onUnlink, onDeleteInstance, onSelectAll, onEdit, defaultOpen = true }: {
+function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, onPushToPrefab, onUnlink, onDeleteInstance, onSelectAll, onEdit, members, onSelectMember, defaultOpen = true }: {
   info:               { prefab: PrefabDef | null; record: PrefabInstanceRecord; memberCount?: number };
   onVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
@@ -1256,6 +1265,8 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
   onDeleteInstance?:  () => void;
   onSelectAll?:       () => void;   // select every piece (passed only where the selection ISN'T already the whole instance)
   onEdit?:            () => void;   // enter prefab edit (snapshot kind only)
+  members?:           { ref: SelectedRef; label: string }[];   // whole-instance view: the individual pieces
+  onSelectMember?:    (ref: SelectedRef) => void;              // row click → select just that piece
   defaultOpen?:       boolean;      // single-entity views start collapsed; the whole-instance view starts open
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -1342,6 +1353,29 @@ function PrefabSection({ info, onVariablesChange, onOriginChange, onReexpand, on
               Platform tiles are walked on 1m above Y.
             </div>
           </div>
+
+          {members && members.length > 1 && onSelectMember && (
+            <div>
+              <div style={LABEL}>PIECES ({members.length})</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {members.map(m => (
+                  <button
+                    key={m.ref.id}
+                    onClick={() => onSelectMember(m.ref)}
+                    title="Select just this piece (shift-click in the viewport does the same)"
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
+                             background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+                             borderRadius: 4, padding: "4px 8px", cursor: "pointer" }}
+                  >
+                    <span style={{ color: "#8b94a8", fontSize: 9, fontFamily: "monospace", flexShrink: 0 }}>{m.ref.type}</span>
+                    <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace", flex: 1, minWidth: 0,
+                                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.label}</span>
+                    <span style={{ color: "#505060", fontSize: 12 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {onSelectAll && (info.memberCount ?? 0) > 1 && (
