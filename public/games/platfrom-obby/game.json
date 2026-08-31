@@ -250,7 +250,7 @@
       "id": "pfb_aeaf3238",
       "name": "Coin Single",
       "kind": "snapshot",
-      "version": 2,
+      "version": 3,
       "variables": [],
       "template": [
         {
@@ -260,8 +260,8 @@
             "id": "obj_573eea53",
             "assetId": "coin",
             "position": {
-              "x": 0,
-              "y": 0,
+              "x": 0.342345,
+              "y": 0.385919,
               "z": 0
             },
             "rotation": {
@@ -275,24 +275,12 @@
               "z": 0.6
             },
             "floor": 0,
-            "zoneId": "__prefab_edit__",
+            "zoneId": "demo",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
               "lootTableId": null,
               "triggerEventId": null
-            },
-            "mover": {
-              "enabled": true,
-              "kind": "slide",
-              "axis": "y",
-              "distance": 0.2,
-              "duration": 0.7,
-              "dwell": 0,
-              "mode": "loop",
-              "phase": 0,
-              "speed": 45,
-              "autoStart": true
             },
             "colliders": [
               {
@@ -313,7 +301,7 @@
             ],
             "scripts": [
               {
-                "id": "scr_1dc3ad6b",
+                "id": "script_210a808d",
                 "label": "coin1",
                 "zoneId": "demo",
                 "enabled": true,
@@ -338,6 +326,34 @@
                   }
                 ],
                 "oneShot": true
+              }
+            ],
+            "movers": [
+              {
+                "enabled": true,
+                "kind": "slide",
+                "axis": "y",
+                "distance": 0.2,
+                "duration": 0.7,
+                "dwell": 0.2,
+                "mode": "loop",
+                "phase": 0,
+                "speed": 45,
+                "autoStart": true,
+                "id": "mvr_2de24035"
+              },
+              {
+                "enabled": true,
+                "kind": "spin",
+                "axis": "y",
+                "distance": 2,
+                "duration": 2,
+                "dwell": 0,
+                "mode": "loop",
+                "phase": 0,
+                "speed": 75,
+                "autoStart": true,
+                "id": "mvr_5c6cd465"
               }
             ]
           }

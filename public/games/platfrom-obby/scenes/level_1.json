@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -35.28060130814074,
+        "x": -33.79770454580711,
         "y": 5.954637890594723,
-        "z": -95.15071336346512
+        "z": -90.04731814661402
       },
       "radius": 12.788297294236,
       "phi": 1.1100000000000008,
@@ -9343,276 +9343,6 @@
           }
         },
         {
-          "id": "obj_92995a39",
-          "assetId": "coin",
-          "position": {
-            "x": -27.962791249504694,
-            "y": 8.403405928097873,
-            "z": -47.5
-          },
-          "rotation": {
-            "x": 0,
-            "y": 90,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "mover": {
-            "enabled": true,
-            "kind": "slide",
-            "axis": "y",
-            "distance": 0.2,
-            "duration": 0.7,
-            "dwell": 0,
-            "mode": "loop",
-            "phase": 0,
-            "speed": 45,
-            "autoStart": true
-          },
-          "colliders": [
-            {
-              "id": "col_447cc8e9",
-              "shape": "sphere",
-              "offset": {
-                "x": 0,
-                "y": 0.9600939750671387,
-                "z": 0
-              },
-              "size": {
-                "x": 1.15,
-                "y": 0,
-                "z": 0
-              },
-              "isSensor": true
-            }
-          ],
-          "scripts": [
-            {
-              "id": "script_b0207816",
-              "label": "coin1",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "adjust_number",
-                  "stateKey": "coins",
-                  "numberDelta": 1
-                },
-                {
-                  "type": "despawn_object",
-                  "fadeDuration": 0.15,
-                  "targetId": "self"
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "powerup9"
-                }
-              ],
-              "oneShot": true
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_aeaf3238",
-            "instanceId": "pfi_11e25124",
-            "memberKey": "obj_573eea53"
-          }
-        },
-        {
-          "id": "obj_7217f4d9",
-          "assetId": "coin",
-          "position": {
-            "x": -24.5,
-            "y": 9.092667409694648,
-            "z": -47.5
-          },
-          "rotation": {
-            "x": 0,
-            "y": 90,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "mover": {
-            "enabled": true,
-            "kind": "slide",
-            "axis": "y",
-            "distance": 0.2,
-            "duration": 0.7,
-            "dwell": 0,
-            "mode": "loop",
-            "phase": 0,
-            "speed": 45,
-            "autoStart": true
-          },
-          "colliders": [
-            {
-              "id": "col_447cc8e9",
-              "shape": "sphere",
-              "offset": {
-                "x": 0,
-                "y": 0.9600939750671387,
-                "z": 0
-              },
-              "size": {
-                "x": 1.15,
-                "y": 0,
-                "z": 0
-              },
-              "isSensor": true
-            }
-          ],
-          "scripts": [
-            {
-              "id": "script_14ee4ba2",
-              "label": "coin1",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "adjust_number",
-                  "stateKey": "coins",
-                  "numberDelta": 1
-                },
-                {
-                  "type": "despawn_object",
-                  "fadeDuration": 0.15,
-                  "targetId": "self"
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "powerup9"
-                }
-              ],
-              "oneShot": true
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_aeaf3238",
-            "instanceId": "pfi_951e1b52",
-            "memberKey": "obj_573eea53"
-          }
-        },
-        {
-          "id": "obj_98535387",
-          "assetId": "coin",
-          "position": {
-            "x": -20,
-            "y": 9.57817499127963,
-            "z": -47.5
-          },
-          "rotation": {
-            "x": 0,
-            "y": 90,
-            "z": 0
-          },
-          "scale": {
-            "x": 0.6,
-            "y": 0.6,
-            "z": 0.6
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          },
-          "mover": {
-            "enabled": true,
-            "kind": "slide",
-            "axis": "y",
-            "distance": 0.2,
-            "duration": 0.7,
-            "dwell": 0,
-            "mode": "loop",
-            "phase": 0,
-            "speed": 45,
-            "autoStart": true
-          },
-          "colliders": [
-            {
-              "id": "col_447cc8e9",
-              "shape": "sphere",
-              "offset": {
-                "x": 0,
-                "y": 0.9600939750671387,
-                "z": 0
-              },
-              "size": {
-                "x": 1.15,
-                "y": 0,
-                "z": 0
-              },
-              "isSensor": true
-            }
-          ],
-          "scripts": [
-            {
-              "id": "script_676318dd",
-              "label": "coin1",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_player_enter"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "adjust_number",
-                  "stateKey": "coins",
-                  "numberDelta": 1
-                },
-                {
-                  "type": "despawn_object",
-                  "fadeDuration": 0.15,
-                  "targetId": "self"
-                },
-                {
-                  "type": "play_sound",
-                  "sound": "powerup9"
-                }
-              ],
-              "oneShot": true
-            }
-          ],
-          "prefab": {
-            "prefabId": "pfb_aeaf3238",
-            "instanceId": "pfi_b680d282",
-            "memberKey": "obj_573eea53"
-          }
-        },
-        {
           "id": "obj_15613d37",
           "label": "Tile 0,0",
           "assetId": "platform_grass_corner_tall",
@@ -13543,6 +13273,324 @@
             "instanceId": "pfi_5e248460",
             "memberKey": "tile_1_1"
           }
+        },
+        {
+          "id": "obj_92995a39",
+          "assetId": "coin",
+          "position": {
+            "x": -27.988677785073193,
+            "y": 8.789324928097873,
+            "z": -47.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": [
+            {
+              "id": "col_447cc8e9",
+              "shape": "sphere",
+              "offset": {
+                "x": 0,
+                "y": 0.9600939750671387,
+                "z": 0
+              },
+              "size": {
+                "x": 1.15,
+                "y": 0,
+                "z": 0
+              },
+              "isSensor": true
+            }
+          ],
+          "scripts": [
+            {
+              "id": "script_86184301",
+              "label": "coin1",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 1
+                },
+                {
+                  "type": "despawn_object",
+                  "fadeDuration": 0.15,
+                  "targetId": "self"
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup9"
+                }
+              ],
+              "oneShot": true
+            }
+          ],
+          "movers": [
+            {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "y",
+              "distance": 0.2,
+              "duration": 0.7,
+              "dwell": 0.2,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true,
+              "id": "mvr_2de24035"
+            },
+            {
+              "enabled": true,
+              "kind": "spin",
+              "axis": "y",
+              "distance": 2,
+              "duration": 2,
+              "dwell": 0,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 75,
+              "autoStart": true,
+              "id": "mvr_5c6cd465"
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_aeaf3238",
+            "instanceId": "pfi_11e25124",
+            "memberKey": "obj_573eea53"
+          }
+        },
+        {
+          "id": "obj_7217f4d9",
+          "assetId": "coin",
+          "position": {
+            "x": -24.157655,
+            "y": 9.092667443504316,
+            "z": -47.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": [
+            {
+              "id": "col_447cc8e9",
+              "shape": "sphere",
+              "offset": {
+                "x": 0,
+                "y": 0.9600939750671387,
+                "z": 0
+              },
+              "size": {
+                "x": 1.15,
+                "y": 0,
+                "z": 0
+              },
+              "isSensor": true
+            }
+          ],
+          "scripts": [
+            {
+              "id": "script_0a727381",
+              "label": "coin1",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 1
+                },
+                {
+                  "type": "despawn_object",
+                  "fadeDuration": 0.15,
+                  "targetId": "self"
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup9"
+                }
+              ],
+              "oneShot": true
+            }
+          ],
+          "movers": [
+            {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "y",
+              "distance": 0.2,
+              "duration": 0.7,
+              "dwell": 0.2,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true,
+              "id": "mvr_2de24035"
+            },
+            {
+              "enabled": true,
+              "kind": "spin",
+              "axis": "y",
+              "distance": 2,
+              "duration": 2,
+              "dwell": 0,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 75,
+              "autoStart": true,
+              "id": "mvr_5c6cd465"
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_aeaf3238",
+            "instanceId": "pfi_951e1b52",
+            "memberKey": "obj_573eea53"
+          }
+        },
+        {
+          "id": "obj_98535387",
+          "assetId": "coin",
+          "position": {
+            "x": -19.657655,
+            "y": 9.602743741444282,
+            "z": -47.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 0.6,
+            "y": 0.6,
+            "z": 0.6
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "colliders": [
+            {
+              "id": "col_447cc8e9",
+              "shape": "sphere",
+              "offset": {
+                "x": 0,
+                "y": 0.9600939750671387,
+                "z": 0
+              },
+              "size": {
+                "x": 1.15,
+                "y": 0,
+                "z": 0
+              },
+              "isSensor": true
+            }
+          ],
+          "scripts": [
+            {
+              "id": "script_c52e790b",
+              "label": "coin1",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "coins",
+                  "numberDelta": 1
+                },
+                {
+                  "type": "despawn_object",
+                  "fadeDuration": 0.15,
+                  "targetId": "self"
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup9"
+                }
+              ],
+              "oneShot": true
+            }
+          ],
+          "movers": [
+            {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "y",
+              "distance": 0.2,
+              "duration": 0.7,
+              "dwell": 0.2,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true,
+              "id": "mvr_2de24035"
+            },
+            {
+              "enabled": true,
+              "kind": "spin",
+              "axis": "y",
+              "distance": 2,
+              "duration": 2,
+              "dwell": 0,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 75,
+              "autoStart": true,
+              "id": "mvr_5c6cd465"
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_aeaf3238",
+            "instanceId": "pfi_b680d282",
+            "memberKey": "obj_573eea53"
+          }
         }
       ],
       "prefabInstances": [
@@ -13662,7 +13710,7 @@
         {
           "id": "pfi_11e25124",
           "prefabId": "pfb_aeaf3238",
-          "version": 2,
+          "version": 3,
           "variables": {},
           "origin": {
             "position": {
@@ -13676,7 +13724,7 @@
         {
           "id": "pfi_951e1b52",
           "prefabId": "pfb_aeaf3238",
-          "version": 2,
+          "version": 3,
           "variables": {},
           "origin": {
             "position": {
@@ -13690,7 +13738,7 @@
         {
           "id": "pfi_b680d282",
           "prefabId": "pfb_aeaf3238",
-          "version": 2,
+          "version": 3,
           "variables": {},
           "origin": {
             "position": {
