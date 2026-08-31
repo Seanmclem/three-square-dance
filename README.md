@@ -1,93 +1,73 @@
-# Three Square Dance
+# SquareDance
 
-A 3D world editor for building explorable spaces — rooms, buildings, dungeons, whatever. You draw walls, lay floors, raise platforms, place stairs, and then walk through it all in first or third person. Physics are live from day one, so what you build is what you'd actually collide with in a game.
+Build small 3D games by drawing them.
 
-Ships as a **native desktop app** (Deno desktop, bundled-Chromium window) for macOS and Windows: projects and imported assets live in a real workspace folder (`~/WorldBuilder`, dev checkouts use `<repo>/public`) with atomic saves, rotating backups, and trash-instead-of-delete; **Export game…** produces a self-contained static bundle (runtime + only the assets the game references) you can drop on any web host.
+![status: alpha](https://img.shields.io/badge/status-alpha-orange)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Three.js](https://img.shields.io/badge/Three.js-r167-000000?logo=threedotjs&logoColor=white)
+![Rapier3D](https://img.shields.io/badge/Rapier3D-WASM-8A2BE2)
+![Deno](https://img.shields.io/badge/Deno-2.9%2B-70FFAF?logo=deno&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)
 
-Built with Vite + React + Three.js (no R3F), Rapier3D for physics, and `three-bvh-csg` for boolean geometry (wall openings, stair cutouts, etc.).
+SquareDance is a desktop app for making explorable 3D worlds and small games without a big engine's learning curve. You draw walls and floors, raise platforms and stairs, drop in props and characters, and wire up behavior — triggers, scripts, dialogue, enemies, pickups — without writing code. Physics is live from the first wall you draw: press Play at any moment and walk through what you just built in first or third person. When a game is done, one menu click exports it as a plain folder of static files you can put on any web host.
 
----
+Under the hood it's a hand-built Three.js scene (no react-three-fiber) with a React UI that talks to the engine only through a typed event bus. Every surface gets a real Rapier collider, wall openings are CSG-cut geometry, and the whole thing ships as a Deno-native desktop app (bundled-Chromium window served by the shell's own local server) with atomic saves, rotating backups, and trash-instead-of-delete.
 
-## What's working
-
-**World building tools**
-- Wall tool — click to chain walls, walls snap to nodes, closed loops prompt auto-floor creation
-- Floor tool — rectangular drag or polygon (click to place vertices, click the first point to close)
-- Platform tool — rectangular or polygon, draggable nodes, sits at the right height automatically
-- Stair tool — click a bottom point, click a top point, stairs generate with correct step geometry
-- Select tool — click to select any object, properties panel updates on the right
-
-**Geometry details**
-- Connected walls merge into a single mesh with proper mitered corners and UV continuity
-- Per-wall-segment material overrides — different materials on each wall in a run
-- Walls support openings: doors, windows, arches, passages — all CSG-cut with proper inner face trim
-- Stairs have separate body and riser materials
-- Platforms have separate cap and side materials, polygon shapes, optional railings
-- Stair CSG cutter — enable a cut box on any stair to punch a hole through the floor/platform above it, with visible inner faces at the opening
-
-**Multi-floor**
-- Floors are stacked by level with correct elevations
-- Non-active floors dim down so you can see what you're working on
-- Platforms and stairs carry `floorLevel` tags so dimming applies correctly
-
-**Materials**
-- PBR materials loaded from a manifest (albedo, normal, roughness, metalness, AO, displacement)
-- Per-object material overrides: tile scale X/Y, roughness, displacement, map toggles
-- Low/medium/high quality setting controls texture resolution
-
-**Preview mode**
-- Press P to enter first/third-person preview using the Rapier character controller
-- Walk up stairs, collide with walls, trigger door transitions between zones
-- Esc to return to editor
-
-**Save / Load**
-- Saves the full world to a JSON file (download)
-- Load any previously saved JSON back in
+> **Alpha.** This is an actively developed solo project. File formats can still change, installers are unsigned, and things break. Fun to poke at; don't ship your magnum opus on it yet.
 
 ---
 
-## What's next
+## What's in the box
 
-- **Phase 7 — Asset browser & model importer**: place GLTF props in the world, thumbnail generation, asset manifest
-- **Phase 8 — Scripting & triggers**: trigger volumes, event scripts (on_enter, on_interact, etc.), flag system, dialogue
-- **Phase 9 — Persistence**: game save/load separate from world save, editor preferences, auto-save, default spawn points
-- **Phase 10 — NPCs & enemies**: patrol paths, faction system, basic combat
-- **Phase 11 — Terrain**: height sculpting, multi-layer material blending shader
-- **Phase 12 — Polish**: post-processing, inventory UI, quest stubs, audio
+**Building**
+- Walls (click to chain, auto-mitered corners), floors (rect or polygon), platforms, stairs with landings, ladders, primitive shapes
+- Openings cut straight through walls — doors, windows, arches, passages — plus a stair cutter that punches through the floor above
+- Multi-floor stacking with dimming, face/vertex/edge editing, brush inset & carve
+- Decals, skyboxes, placeable lights, PBR material library with per-object overrides
+
+**Assets & prefabs**
+- Import GLTF/OBJ models — thumbnails, box colliders, and manifest entries are generated for you; re-stage thumbnails, re-origin models, tag and filter the library
+- Per-object collider editing: boxes, sensors, baked hull/trimesh
+- Prefabs: turn anything into a reusable recipe; linked instances with per-instance overrides
+
+**Behavior & characters**
+- Per-object scripts in a card-based editor — actions, conditions, if/else branches — plus trigger volumes (box/sphere/cylinder/capsule, attachable to moving things)
+- Movers (slide/spin, composable) and GLTF animation clip playback
+- Branching dialogue trees with condition-gated options and a flowchart view
+- Enemy AI: detect → chase → attack, leashes, free roam — the brain is a pure function with headless tests
+
+**Game systems**
+- Global + per-entity game state with a schema (defaults, clamps), inventory and items, checkpoints, hazards, death & respawn
+- Custom HUDs and menus: health bars, counters, your own 2D graphics, driven from scripts
+- Audio: spatial sounds, a 4-bus mixer, music and ambient playlists with silence gaps
+- Multi-scene projects with portals between scenes, runtime saves, gamepad and touch controls, a pause menu
+
+**Playing**
+- Two ways to play: the bottom-left ▶ previews instantly in-editor (unsaved edits included); the top-bar **▶ Play** saves and opens the game in its own native runtime window with a title screen
 
 ---
 
-## Getting started
+## Run it locally
 
-**Requirements:** Node 18+, Deno 2.9+
+You'll need [Deno](https://deno.com) **2.9+** and Node 18+.
 
 ```bash
 npm install
-
-# Desktop app, dev loop (native window; backend hot-reloads, frontend needs `npm run build`)
-npm run build
-deno task desktop:hmr
-
-# Release binaries (all cross-compiled from one machine, output in build/)
-deno task compile:all        # or compile:mac-arm64 / compile:mac-x64 / compile:win-x64
+deno task desktop:dev
 ```
 
-In dev the workspace is the repo itself: projects live in `public/games/`, state
-(backups, trash, autosave, exports) in `.worldbuilder/`. The compiled app uses
-`~/WorldBuilder` (override with `WORLDBUILDER_WORKSPACE`).
+That opens the native editor window with the full dev loop: backend changes (`desktop/*.ts`) hot-reload, frontend changes (`src/**`) rebuild in ~3s — then click **↻** in the top bar to pick them up.
 
-`npm run dev` (Vite on :7373) still renders the editor in a plain browser, but
-saving/importing needs the desktop shell — persistence goes through its local
-server.
+Worth knowing:
 
-**Basic workflow:**
-1. Pick a tool from the toolbar (Wall, Floor, Platform, Stair)
-2. Click in the viewport to place things
-3. Select tool → click an object → edit properties on the right panel
-4. Press **P** to walk around in preview mode, **Esc** to come back
-5. Save/Load buttons in the top bar — saves as a `.json` file you can reload later
+- `npm run typecheck` before committing — the build watcher doesn't typecheck.
+- `npm run dev` serves the editor in a plain browser on :7373 with instant HMR, good for UI iteration — but nothing can save there; persistence goes through the desktop shell.
+- In dev, the workspace is the repo itself: projects live in `public/games/`, state (autosave, backups, trash, exports) in `.worldbuilder/`. The packaged app uses `~/WorldBuilder`. Override either with `WORLDBUILDER_WORKSPACE=/some/path`.
 
-**Camera controls:**
+**Basic workflow:** pick a tool from the left toolbar → click in the viewport to build → switch to Select and edit properties on the right → ▶ to walk around (**Esc** to come back) → **Save** in the top bar (the pill next to it shows save state).
+
+**Camera:**
 | Input | Action |
 |---|---|
 | Right-click drag | Orbit |
@@ -99,33 +79,53 @@ server.
 
 ---
 
-## Tech
+## Ship a game
 
-| Thing | What it's for |
-|---|---|
-| Three.js | 3D rendering, all geometry built by hand (no R3F) |
-| Rapier3D (WASM) | Physics — every surface generates a real collider |
-| three-bvh-csg | Boolean mesh ops for wall openings and stair cutouts |
-| three-mesh-bvh | Fast raycasting for editor selection and snapping |
-| React | UI panels only — React never touches Three.js objects |
-| Vite | Build tooling + HMR |
+In the top bar: **PROJ ▾ → ⋯ → Export game…**
 
-React and Three.js communicate exclusively through a typed `EventBus`. No shared references, no exceptions.
+The export is a self-contained static bundle written to your workspace's `exports/` folder: the runtime, your scenes, and only the assets your game actually references (a demo project came out at 68 files / ~11 MB). Drop the folder on any static host — GitHub Pages, Netlify, Cloudflare Pages, S3 — and the game runs at its own URL. Test locally first with `python3 -m http.server` from inside the folder.
+
+Details, hosting recipes, and caveats: [`PUBLISHING_GUIDE.md`](./PUBLISHING_GUIDE.md).
+
+## Build the desktop app
+
+```bash
+deno task compile:all   # or compile:mac-arm64 / compile:mac-x64 / compile:win-x64
+```
+
+Outputs `build/SquareDance.app` (Apple Silicon), `build/SquareDance-intel.app`, and `build/SquareDance.msi`, each embedding the frontend build — all cross-compiled from one machine. Alpha caveat: builds are ad-hoc signed, so on macOS it's right-click → Open the first time. See [`DESKTOP_GUIDE.md`](./DESKTOP_GUIDE.md).
 
 ---
+
+## Docs
+
+| Doc | What's in it |
+|---|---|
+| [`WORLD_EDITOR_ARCHITECTURE.md`](./WORLD_EDITOR_ARCHITECTURE.md) | The canonical spec + changelog — every system, every phase |
+| [`DESKTOP_GUIDE.md`](./DESKTOP_GUIDE.md) | Desktop shell, Deno backend, packaging |
+| [`PUBLISHING_GUIDE.md`](./PUBLISHING_GUIDE.md) | Exporting and hosting games, releases |
+| [`TESTING.md`](./TESTING.md) / [`HUMAN_TESTING.md`](./HUMAN_TESTING.md) | Automated + click-by-click testing |
+| [`PROFILING.md`](./PROFILING.md) | Performance and framerate |
+| [`OBJECT_SCRIPTS_GUIDE.md`](./OBJECT_SCRIPTS_GUIDE.md), [`DIALOGUES_GUIDE.md`](./DIALOGUES_GUIDE.md), [`PREFABS_GUIDE.md`](./PREFABS_GUIDE.md), [`GAMEPLAY_STATE.md`](./GAMEPLAY_STATE.md), [`STATE_ITEMS_GUIDE.md`](./STATE_ITEMS_GUIDE.md), [`HAZARDS_GUIDE.md`](./HAZARDS_GUIDE.md), [`GUI_GUIDE.md`](./GUI_GUIDE.md), [`AUDIO.md`](./AUDIO.md), [`COLLIDERS_GUIDE.md`](./COLLIDERS_GUIDE.md) | Per-feature guides |
 
 ## Project structure
 
 ```
 src/
   core/         SceneManager, AssetManager, InputManager, EventBus
-  world/        ZoneManager, WorldState, WorldSerializer, WorldLoader
-  builders/     WallBuilder, FloorBuilder, PlatformBuilder, StairBuilder
-  editor/       Tool implementations (WallTool, FloorTool, etc.)
-  physics/      PhysicsWorld, ColliderBuilder, CharacterBody
-  preview/      PreviewController, CharacterController, TriggerSystem
-  ui/           React components (Toolbar, PropertiesPanel, ZonePanel, etc.)
-  utils/        csg.ts, math.ts, uuid.ts
+  world/        WorldState, ZoneManager, serialization, movers
+  builders/     Wall/Floor/Platform/Stair/Shape geometry builders
+  editor/       Tools, gizmos, history, thumbnails, baking
+  physics/      PhysicsWorld, colliders, character body
+  preview/      Character controller, enemy AI, object placement
+  scripting/    Script engine + actions
+  runtime/      Standalone game runtime (title screen, scene routing)
+  project/      Multi-scene project management
+  export/       Game bundle exporter
+  prefab/       Prefab recipes and instances
+  audio/        Sound library, mixer, playlists
+  assets/       Asset library and manifests
+  input/        Control schemes (keyboard, gamepad, touch)
+  ui/           React panels — talks to the engine only via the EventBus
+desktop/        Deno shell: window, local server, persistence, packaging
 ```
-
-Full architecture notes in [`WORLD_EDITOR_ARCHITECTURE.md`](./WORLD_EDITOR_ARCHITECTURE.md).
