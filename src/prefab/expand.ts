@@ -1,6 +1,6 @@
 import type { WorldState } from "@/world/WorldState";
 import type {
-  EditorObjectType, LadderDef, PrefabDef, PrefabInstanceRecord, PrefabStamp,
+  CheckpointDef, EditorObjectType, LadderDef, PrefabDef, PrefabInstanceRecord, PrefabStamp,
   PrefabTemplateEntity, PrefabVarValue, ScriptDef, ShapeDef, StairDef,
   TriggerVolume, Vec3, WorldObject,
 } from "@/types";
@@ -15,7 +15,7 @@ import { GENERATORS } from "@/prefab/generators";
 
 /** Entity types a prefab may contain (position-anchored; node-backed types are
  *  not capturable — wall/floor/platform diffing over shared nodes is deferred). */
-export const PREFABABLE = new Set<EditorObjectType>(["object", "trigger-volume", "shape", "stair", "ladder"]);
+export const PREFABABLE = new Set<EditorObjectType>(["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint"]);
 
 const uuid8 = (): string => crypto.randomUUID().slice(0, 8);
 
@@ -26,6 +26,7 @@ function newMemberId(type: EditorObjectType): string {
     case "shape":          return `shape_${uuid8()}`;
     case "stair":          return `stair_${uuid8()}`;
     case "ladder":         return `ladder_${uuid8()}`;
+    case "checkpoint":     return `cp_${uuid8()}`;
     default:               return crypto.randomUUID();
   }
 }
@@ -192,6 +193,13 @@ function materializeMembers(
         l.rotationY = l.rotationY + record.origin.rotationY;
         break;
       }
+      case "checkpoint": {
+        const c = def as CheckpointDef;
+        c.id = id; c.prefab = stamp;
+        c.position  = toWorld(c.position, record.origin);
+        c.facingDeg = c.facingDeg + record.origin.rotationY;
+        break;
+      }
     }
     return { type: member.type, id, memberKey: member.memberKey, def };
   });
@@ -204,6 +212,7 @@ function addMember(world: WorldState, zoneId: string, m: Materialized): void {
     case "shape":          world.addShape(zoneId, m.def as ShapeDef); break;
     case "stair":          world.addStair(zoneId, m.def as StairDef); break;
     case "ladder":         world.addLadder(zoneId, m.def as LadderDef); break;
+    case "checkpoint":     world.addCheckpoint(zoneId, m.def as CheckpointDef); break;
   }
 }
 
@@ -214,6 +223,7 @@ function removeMember(world: WorldState, zoneId: string, type: EditorObjectType,
     case "shape":          world.removeShape(zoneId, id); break;
     case "stair":          world.removeStair(zoneId, id); break;
     case "ladder":         world.removeLadder(zoneId, id); break;
+    case "checkpoint":     world.removeCheckpoint(zoneId, id); break;
   }
 }
 
@@ -234,6 +244,7 @@ export function collectInstanceMembers(
   scan("shape", zone.shapes);
   scan("stair", zone.stairs);
   scan("ladder", zone.ladders);
+  scan("checkpoint", zone.checkpoints);
   return out;
 }
 
@@ -310,6 +321,7 @@ export function unlinkInstance(world: WorldState, zoneId: string, instanceId: st
         case "shape":          world.updateShape(zoneId, e.id, changes); break;
         case "stair":          world.updateStair(zoneId, e.id, changes); break;
         case "ladder":         world.updateLadder(zoneId, e.id, changes); break;
+        case "checkpoint":     world.updateCheckpoint(zoneId, e.id, changes); break;
       }
     }
     world.removePrefabInstance(zoneId, instanceId);
@@ -369,6 +381,7 @@ export function captureSnapshotPrefab(
       case "shape":          return zone.shapes?.find(e => e.id === id);
       case "stair":          return zone.stairs.find(e => e.id === id);
       case "ladder":         return zone.ladders?.find(e => e.id === id);
+      case "checkpoint":     return zone.checkpoints?.find(e => e.id === id);
       default:               return undefined;
     }
   };
@@ -438,6 +451,7 @@ export function captureInstanceToPrefab(
       case "shape":          return zone.shapes?.find(e => e.id === id);
       case "stair":          return zone.stairs.find(e => e.id === id);
       case "ladder":         return zone.ladders?.find(e => e.id === id);
+      case "checkpoint":     return zone.checkpoints?.find(e => e.id === id);
       default:               return undefined;
     }
   };
@@ -487,6 +501,12 @@ export function captureInstanceToPrefab(
         const l = def as unknown as LadderDef;
         l.position  = toLocal(l.position, record.origin);
         l.rotationY = l.rotationY - record.origin.rotationY;
+        break;
+      }
+      case "checkpoint": {
+        const c = def as unknown as CheckpointDef;
+        c.position  = toLocal(c.position, record.origin);
+        c.facingDeg = c.facingDeg - record.origin.rotationY;
         break;
       }
     }

@@ -546,6 +546,7 @@ export interface CheckpointDef {
   position:  Vec3;
   facingDeg: number;
   groupIds?: string[];
+  prefab?:   PrefabStamp;     // member of a placed prefab instance (v4.79.59)
 }
 
 // ─── Placed lights (Phase 35) ─────────────────────────────────────────────────
