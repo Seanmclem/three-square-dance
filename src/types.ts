@@ -644,6 +644,9 @@ export interface WorldConfig {
   // Lighting rig quality, saved with the scene and honored by published games:
   // "fancy" (default) = sun + fill + rim; "fast" = sun only (big-level framerate).
   lightingQuality?: "fancy" | "fast";
+  /** Phase 68 Part 2 — true = this scene follows the game's lighting defaults
+   *  (resolved in at load); editing any lighting value flips it off. */
+  lightingFromGame?: boolean;
   skybox:          string;
   fogColor:        string;
   fogDensity:      number;
@@ -1375,6 +1378,18 @@ export interface GameConfig {
   /** Phase 68 — game-wide player-settings defaults; scenes override per page
    *  (their sparse WorldConfig.playerSettings layer wins per field). */
   playerSettings?: PlayerSettings;
+  /** Phase 68 Part 2 — game-wide lighting/environment defaults; a scene with
+   *  lightingFromGame follows these, editing any value overrides in place. */
+  lighting?: {
+    ambientLight: { color: string; intensity: number };
+    sunLight:     { color: string; intensity: number; position: Vec3 };
+    envIntensity?: number;
+    skybox:       string;
+    fogColor:     string;
+    fogDensity:   number;
+  };
+  /** Phase 68 Part 2 — game-wide audio-mixer default (scene mix wins when present). */
+  audio?: { mix?: AudioMix };
   items?:       ItemDef[];
   stateSchema?: Record<string, StateSchema>;
   lightingQuality?: "fancy" | "fast";   // game-wide default; a scene's own setting wins

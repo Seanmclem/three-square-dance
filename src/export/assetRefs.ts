@@ -215,6 +215,7 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
 
   if (game) {
     collectPlayerSettings(refs, game.playerSettings);  // Phase 68 — game-default character model/sounds
+    if (game.lighting?.skybox && game.lighting.skybox !== "sky") add(refs.skyboxes, game.lighting.skybox);  // game-default sky
     collectItems(refs, game.items);                // game-wide item registry (icons)
     collectUiElements(refs, game.uiElements);      // game-wide GUI registry
     for (const p of game.prefabs ?? []) collectPrefabTemplate(refs, p.template);  // prefab library templates

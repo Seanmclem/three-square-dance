@@ -631,19 +631,7 @@ export default function App() {
           world.prefabLibrary = store.game.prefabs;
           setPrefabs(store.game.prefabs ?? []);
           syncPrefabInstances();   // library is authoritative now — heal/refresh instances
-          // Phase 68 — game-wide player-settings defaults: seed from the entry
-          // scene on first contact (this inline block mirrors adoptProject).
-          if (!store.game.playerSettings) {
-            try {
-              const src = sceneId === store.entryScene
-                ? world.world?.playerSettings
-                : (await store.loadScene(store.entryScene)).world?.playerSettings;
-              store.game.playerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...src };
-              await store.writeGame();
-            } catch (e) { console.warn("[settings] seeding game defaults failed:", e); }
-          }
-          world.setGamePlayerSettings(store.game.playerSettings);
-          setPlayerSettingsRev(v => v + 1);
+          await seedAndApplyGameDefaults(store, sceneId);
         }
       } catch (e) { console.warn('Project restore failed:', e); }
     })();
@@ -1301,6 +1289,8 @@ export default function App() {
   /** Drop project context (saving the current scene first unless `skipSave`). */
   const closeProject = useCallback(async (opts?: { skipSave?: boolean }): Promise<void> => {
     worldRef.current?.setGamePlayerSettings(undefined);   // Phase 68 — no project, no game layer
+    worldRef.current?.setGameLighting(undefined);
+    worldRef.current?.setGameAudioMix(undefined);
     if (editingPrefabRef.current) return;   // no project close under prefab edit mode
     const proj = projectRef.current;
     if (!proj) return;
@@ -1381,7 +1371,9 @@ export default function App() {
       ambientLight: { color: "#aabbcc", intensity: 0.5 },
       sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } },
       skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012,
-      playerSettings: { cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75, thirdPersonDistance: 4, thirdPersonHeight: 2 },
+      // Phase 68 — a new scene INHERITS: empty settings-override layer, lighting from the game.
+      playerSettings: {} as PlayerSettings,
+      lightingFromGame: true,
       stateSchema: DEFAULT_STATE_SCHEMA,
     },
     terrain: null,
@@ -1412,19 +1404,7 @@ export default function App() {
     // Phase 68 — seed game-wide player settings on first contact: the game
     // should keep feeling like its ENTRY scene, so that scene's settings
     // become the defaults (fetched if it isn't the one being adopted).
-    void (async () => {
-      if (!store.game.playerSettings) {
-        try {
-          const src = sceneId === store.entryScene
-            ? worldRef.current?.world?.playerSettings
-            : (await store.loadScene(store.entryScene)).world?.playerSettings;
-          store.game.playerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...src };
-          await store.writeGame();
-        } catch (e) { console.warn("[settings] seeding game defaults failed:", e); }
-      }
-      worldRef.current?.setGamePlayerSettings(store.game.playerSettings);
-      setPlayerSettingsRev(v => v + 1);
-    })();
+    void seedAndApplyGameDefaults(store, sceneId);
     setWorldItems(store.game.items ?? []);
     setWorldUiElements(store.game.uiElements ?? []);
     setGameSchema(store.game.stateSchema ?? {});
@@ -1507,6 +1487,8 @@ export default function App() {
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
       world.setGamePlayerSettings(proj.store.game.playerSettings);
+      world.setGameLighting(proj.store.game.lighting);
+      world.setGameAudioMix(proj.store.game.audio?.mix);
       const next = { ...proj, sceneId: target };
       projectRef.current = next;
       setProject(next);
@@ -1636,6 +1618,65 @@ export default function App() {
     // for the spawn settings panel.
     setPlayerSettingsRev(v => v + 1);
   }, [syncHistory]);
+
+  /** Phase 68 — first contact with a project seeds every missing game default
+   *  from the ENTRY scene (the game should keep feeling like it), then hands
+   *  the layers to the world. Shared by adopt + the boot-restore path. */
+  const seedAndApplyGameDefaults = useCallback(async (store: ProjectStore, sceneId: string): Promise<void> => {
+    const world = worldRef.current;
+    try {
+      let write = false;
+      const entryWorld = async () => sceneId === store.entryScene
+        ? world?.world
+        : (await store.loadScene(store.entryScene)).world;
+      if (!store.game.playerSettings) {
+        store.game.playerSettings = { ...DEFAULT_PLAYER_SETTINGS, ...(await entryWorld())?.playerSettings };
+        write = true;
+      }
+      if (!store.game.lighting) {
+        const w = await entryWorld();
+        if (w) {
+          store.game.lighting = {
+            ambientLight: { ...w.ambientLight }, sunLight: { ...w.sunLight },
+            envIntensity: w.envIntensity, skybox: w.skybox, fogColor: w.fogColor, fogDensity: w.fogDensity,
+          };
+          write = true;
+        }
+      }
+      if (!store.game.audio?.mix) {
+        const w = await entryWorld();
+        store.game.audio = { mix: { master: 1, music: 1, sfx: 1, ambient: 1, ...w?.audio?.mix } };
+        write = true;
+      }
+      if (write) await store.writeGame();
+    } catch (e) { console.warn("[settings] seeding game defaults failed:", e); }
+    world?.setGamePlayerSettings(store.game.playerSettings);
+    world?.setGameLighting(store.game.lighting);
+    world?.setGameAudioMix(store.game.audio?.mix);
+    setPlayerSettingsRev(v => v + 1);
+  }, []);
+
+  // Phase 68 Part 2 — lighting / mixer inherit + promote.
+  const handleInheritLighting = useCallback((): void => {
+    worldRef.current?.inheritLighting(); setIsDirty(true); setPlayerSettingsRev(v => v + 1);
+  }, []);
+  const handlePromoteLighting = useCallback((): void => {
+    const world = worldRef.current, proj = projectRef.current;
+    if (!world || !proj) return;
+    proj.store.game.lighting = world.promoteLightingToGame();
+    void proj.store.writeGame().catch(e => console.warn("[settings] game.json write failed:", e));
+    setIsDirty(true); setPlayerSettingsRev(v => v + 1);
+  }, []);
+  const handleInheritAudioMix = useCallback((): void => {
+    worldRef.current?.inheritAudioMix(); setIsDirty(true); setPlayerSettingsRev(v => v + 1);
+  }, []);
+  const handlePromoteAudioMix = useCallback((): void => {
+    const world = worldRef.current, proj = projectRef.current;
+    if (!world || !proj) return;
+    proj.store.game.audio = { ...proj.store.game.audio, mix: world.promoteAudioMixToGame() };
+    void proj.store.writeGame().catch(e => console.warn("[settings] game.json write failed:", e));
+    setIsDirty(true); setPlayerSettingsRev(v => v + 1);
+  }, []);
 
   // Phase 68 — game-scope settings edits (game.json defaults) + page overrides.
   const handleGamePlayerSettingsChange = useCallback((changes: Partial<PlayerSettings>): void => {
@@ -3742,6 +3783,12 @@ export default function App() {
         onGamePlayerSettingsChange={project ? handleGamePlayerSettingsChange : undefined}
         onSettingsPageOverride={project ? handleSettingsPageOverride : undefined}
         onPromoteSettingsToGame={project ? handlePromoteSettingsToGame : undefined}
+        lightingOverridden={!worldRef.current?.world?.lightingFromGame}
+        onInheritLighting={project ? handleInheritLighting : undefined}
+        onPromoteLighting={project ? handlePromoteLighting : undefined}
+        audioMixOverridden={!!worldRef.current?.sceneOwnsAudioMix}
+        onInheritAudioMix={project ? handleInheritAudioMix : undefined}
+        onPromoteAudioMix={project ? handlePromoteAudioMix : undefined}
         onSpawnPositionChange={handleSpawnPositionChange}
         worldLighting={worldLighting}
         onWorldLightingChange={handleWorldLightingChange}

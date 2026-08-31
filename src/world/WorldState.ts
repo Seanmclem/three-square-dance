@@ -1,6 +1,6 @@
 import type { EventBus } from "@/core/EventBus";
 import { DEFAULT_PLAYER_SETTINGS, SETTINGS_PAGES, resolvePlayerSettings, type SettingsPage } from "@/shared/playerSettingsDefaults";
-import type { PlayerSettings } from "@/types";
+import type { AudioMix, PlayerSettings } from "@/types";
 import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
@@ -32,6 +32,11 @@ export class WorldState {
   // reading it untouched; toJSON persists only the sparse layer.
   private _gamePlayerSettings?: PlayerSettings;
   scenePlayerOverrides: Partial<PlayerSettings> = {};
+  // Phase 68 Part 2 — game lighting/mixer defaults + the scene's ownership.
+  private _gameLighting?: NonNullable<import("@/types").GameConfig["lighting"]>;
+  private _gameAudioMix?: AudioMix;
+  private _sceneAudioMix?: AudioMix;
+  sceneOwnsAudioMix = false;
   gameStateSchema?: Record<string, StateSchema>;
   gameUiElements?:  UiElementDef[];
   // Prefab library (Phase 44) — session-only mirror of the App's library state
@@ -567,6 +572,7 @@ export class WorldState {
         playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
+    if (changes.ambient || changes.sun || changes.envIntensity !== undefined) this.world.lightingFromGame = undefined;   // Phase 68 — editing takes ownership
     if (changes.ambient) this.world.ambientLight = { ...this.world.ambientLight, ...changes.ambient };
     if (changes.sun)     this.world.sunLight     = { ...this.world.sunLight,     ...changes.sun };
     if (changes.envIntensity !== undefined) this.world.envIntensity = changes.envIntensity;
@@ -590,6 +596,7 @@ export class WorldState {
         playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
+    if (changes.mix) { this.sceneOwnsAudioMix = true; this._sceneAudioMix = { ...this._sceneAudioMix, ...changes.mix } as AudioMix; }
     this.world.audio = { ...this.world.audio, ...changes };
     this._bus.emit("world:audio", { audio: this.world.audio });
   }
@@ -606,6 +613,7 @@ export class WorldState {
         playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
+    this.world.lightingFromGame = undefined;   // Phase 68 — editing takes ownership
     this.world.skybox = skybox;
     this._bus.emit("world:sky", { skybox });
   }
@@ -653,6 +661,80 @@ export class WorldState {
   private _resolvePlayerSettings(): void {
     if (!this.world) return;
     this.world.playerSettings = resolvePlayerSettings(this._gamePlayerSettings, this.scenePlayerOverrides);
+  }
+
+  // ── Lighting / audio-mix game defaults (Phase 68 Part 2) ───────────────────
+
+  get gameLighting(): import("@/types").GameConfig["lighting"] { return this._gameLighting; }
+  get gameAudioMix(): AudioMix | undefined { return this._gameAudioMix; }
+
+  setGameLighting(l: import("@/types").GameConfig["lighting"]): void {
+    this._gameLighting = l ?? undefined;
+    this._resolveLighting(true);
+  }
+  setGameAudioMix(mix: AudioMix | undefined): void {
+    this._gameAudioMix = mix ? { ...mix } : undefined;
+    this._resolveAudioMix(true);
+  }
+
+  /** "Use game defaults": the scene follows the game's lighting again. */
+  inheritLighting(): void {
+    if (!this.world) return;
+    this.world.lightingFromGame = true;
+    this._resolveLighting(true);
+  }
+  /** "Use game defaults" for the mixer. */
+  inheritAudioMix(): void {
+    this.sceneOwnsAudioMix = false;
+    this._sceneAudioMix = undefined;
+    this._resolveAudioMix(true);
+  }
+  /** Promote this scene's lighting to the game defaults (caller persists). */
+  promoteLightingToGame(): NonNullable<import("@/types").GameConfig["lighting"]> {
+    const w = this.world!;
+    this._gameLighting = {
+      ambientLight: { ...w.ambientLight }, sunLight: { ...w.sunLight },
+      envIntensity: w.envIntensity, skybox: w.skybox, fogColor: w.fogColor, fogDensity: w.fogDensity,
+    };
+    w.lightingFromGame = true;
+    return structuredClone(this._gameLighting);
+  }
+  /** Promote this scene's mixer to the game default (caller persists). */
+  promoteAudioMixToGame(): AudioMix {
+    const mix: AudioMix = { master: 1, music: 1, sfx: 1, ambient: 1, ...this._sceneAudioMix ?? this._gameAudioMix };
+    this._gameAudioMix = { ...mix };
+    this.sceneOwnsAudioMix = false;
+    this._sceneAudioMix = undefined;
+    this._resolveAudioMix(true);
+    return mix;
+  }
+
+  private _resolveLighting(emit: boolean): void {
+    const w = this.world;
+    if (!w || !w.lightingFromGame || !this._gameLighting) return;
+    const g = this._gameLighting;
+    w.ambientLight = { ...g.ambientLight };
+    w.sunLight     = { ...g.sunLight };
+    w.envIntensity = g.envIntensity;
+    w.skybox       = g.skybox;
+    w.fogColor     = g.fogColor;
+    w.fogDensity   = g.fogDensity;
+    if (emit) {
+      this._bus.emit("world:lighting", {
+        ambient: { color: w.ambientLight.color, intensity: w.ambientLight.intensity },
+        sun:     { color: w.sunLight.color,     intensity: w.sunLight.intensity },
+        envIntensity: w.envIntensity ?? 1,
+        quality: w.lightingQuality ?? "fancy",
+      });
+      this._bus.emit("world:sky", { skybox: w.skybox });
+    }
+  }
+  private _resolveAudioMix(emit = false): void {
+    const w = this.world;
+    if (!w) return;
+    const mix = this.sceneOwnsAudioMix ? this._sceneAudioMix : this._gameAudioMix;
+    w.audio = { ...w.audio, mix: mix ? { ...mix } : undefined };
+    if (emit) this._bus.emit("world:audio", { audio: w.audio });
   }
 
   // ── Decal mutations ──────────────────────────────────────────────────────────
@@ -895,7 +977,8 @@ export class WorldState {
   toJSON(): SceneFile {
     return {
       metadata:    { ...(this.metadata ?? { name: "Untitled", version: "1", author: "", created: new Date().toISOString(), lastModified: new Date().toISOString() }), uvVersion: 1 },  // Phase 10.8: every save is world-space-UV
-      world:       (this.world ? { ...this.world, playerSettings: this.scenePlayerOverrides as PlayerSettings } : undefined) ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { ...DEFAULT_PLAYER_SETTINGS }, stateSchema: DEFAULT_STATE_SCHEMA },
+      world:       (this.world ? { ...this.world, playerSettings: this.scenePlayerOverrides as PlayerSettings,
+                       ...(this.world.audio ? { audio: { ...this.world.audio, mix: this.sceneOwnsAudioMix ? this._sceneAudioMix : undefined } } : {}) } : undefined) ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { ...DEFAULT_PLAYER_SETTINGS }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
       // The prefab edit mode's staging zone must NEVER serialize (belt-and-braces
       // on top of the App's save/autosave gates — Phase 47).
@@ -912,6 +995,12 @@ export class WorldState {
     // override layer) IS the scene's override layer; resolve into memory.
     this.scenePlayerOverrides = { ...(file.world?.playerSettings ?? {}) } as Partial<PlayerSettings>;
     this._resolvePlayerSettings();
+    // Phase 68 Part 2 — audio-mix ownership is presence-based; lighting follows
+    // the game layer when the scene says so.
+    this._sceneAudioMix = file.world?.audio?.mix ? { ...file.world.audio.mix } : undefined;
+    this.sceneOwnsAudioMix = !!file.world?.audio?.mix;
+    this._resolveAudioMix();
+    this._resolveLighting(false);
     this.terrain  = file.terrain;
     this.zones.clear();
     this.transitions.clear();

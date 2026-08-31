@@ -427,6 +427,13 @@ interface PropertiesPanelProps {
   onGamePlayerSettingsChange?: (s: Partial<PlayerSettings>) => void;
   onSettingsPageOverride?:    (page: SettingsPage, on: boolean) => void;
   onPromoteSettingsToGame?:   () => void;
+  // Phase 68 Part 2 — lighting / mixer inherit + promote.
+  lightingOverridden?:        boolean;
+  onInheritLighting?:         () => void;
+  onPromoteLighting?:         () => void;
+  audioMixOverridden?:        boolean;
+  onInheritAudioMix?:         () => void;
+  onPromoteAudioMix?:         () => void;
   onSpawnPositionChange?:   (pos: Vec3) => void;
   // World-level ambient/sun/environment lighting (Lights drilldown page).
   worldLighting?:           { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number; quality?: "fancy" | "fast" };
@@ -489,6 +496,7 @@ export function PropertiesPanel({
   onVolumeScriptsChange,
   onEditScript,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], gamePlayerSettings, scenePlayerOverrides, onGamePlayerSettingsChange, onSettingsPageOverride, onPromoteSettingsToGame,
+  lightingOverridden, onInheritLighting, onPromoteLighting, audioMixOverridden, onInheritAudioMix, onPromoteAudioMix,
   onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
@@ -782,6 +790,8 @@ export function PropertiesPanel({
         ) : !selected ? (
           currentScreen === "lights" ? (
             <>
+              <InheritBanner overridden={lightingOverridden ?? true} what="lighting"
+                onInherit={onInheritLighting} onPromote={onPromoteLighting} />
               {worldLighting && onWorldLightingChange && (
                 <LightingQualitySection
                   quality={worldLighting.quality ?? "fancy"}
@@ -796,7 +806,13 @@ export function PropertiesPanel({
           ) : currentScreen === "audio" ? (
             <AudioMenuSection audio={worldAudio} playerSettings={playerSettings} onOpen={push} />
           ) : currentScreen === "audio-mixer" ? (
-            onWorldAudioChange ? <AudioMixerPage audio={worldAudio} onChange={onWorldAudioChange} /> : null
+            onWorldAudioChange ? (
+              <>
+                <InheritBanner overridden={audioMixOverridden ?? true} what="mixer levels"
+                  onInherit={onInheritAudioMix} onPromote={onPromoteAudioMix} />
+                <AudioMixerPage audio={worldAudio} onChange={onWorldAudioChange} />
+              </>
+            ) : null
           ) : currentScreen === "audio-music" ? (
             onWorldAudioChange ? <AudioSlotPage kind="music" audio={worldAudio} onChange={onWorldAudioChange} /> : null
           ) : currentScreen === "audio-ambient" ? (
@@ -5195,6 +5211,42 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
           onBlur={e => flush(() => commitTile(e.target.value))}
         />
       </div>
+    </div>
+  );
+}
+
+// ── InheritBanner (Phase 68 Part 2) ───────────────────────────────────────────
+// Lighting / mixer version of the settings-page banner: editing any value
+// implicitly takes ownership for this scene; this banner shows which state
+// you're in and offers "use game defaults" / "make this the game default".
+function InheritBanner({ overridden, what, onInherit, onPromote }: {
+  overridden: boolean; what: string; onInherit?: () => void; onPromote?: () => void;
+}) {
+  if (!onInherit && !onPromote) return null;
+  return (
+    <div style={{ margin: "10px 16px 0", padding: "6px 8px", borderRadius: 6,
+      background: overridden ? "rgba(232,193,75,0.07)" : "rgba(255,255,255,0.03)",
+      border: `1px solid ${overridden ? "rgba(232,193,75,0.35)" : "rgba(255,255,255,0.08)"}`,
+      display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span style={{ flex: 1, minWidth: 120, color: overridden ? "#e8c14b" : "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
+        {overridden
+          ? `This scene overrides the game's ${what}.`
+          : `Following the game's ${what} — editing any value overrides it for this scene.`}
+      </span>
+      {overridden && onInherit && (
+        <button onClick={onInherit} title={`Discard this scene's ${what} and follow the game defaults`}
+          style={{ padding: "3px 8px", borderRadius: 4, border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.05)", color: "#c0c0c0", fontSize: 9, cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+          Use game defaults
+        </button>
+      )}
+      {overridden && onPromote && (
+        <button onClick={onPromote} title={`Copy this scene's ${what} into the game defaults (this scene then follows them)`}
+          style={{ padding: "3px 8px", borderRadius: 4, border: "1px solid rgba(232,193,75,0.35)",
+            background: "rgba(232,193,75,0.08)", color: "#e0a050", fontSize: 9, cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+          ★ Make this the game default
+        </button>
+      )}
     </div>
   );
 }

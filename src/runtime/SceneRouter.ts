@@ -111,6 +111,8 @@ export class SceneRouter {
       world.gameStateSchema = this.deps.manifest.game?.stateSchema;
       world.gameUiElements  = this.deps.manifest.game?.uiElements;
       world.setGamePlayerSettings(this.deps.manifest.game?.playerSettings);   // Phase 68 — re-resolves
+      world.setGameLighting(this.deps.manifest.game?.lighting);
+      world.setGameAudioMix(this.deps.manifest.game?.audio?.mix);
       // Game-wide lighting-quality default (scene's own setting wins). Applied
       // via updateWorldLighting so the world:lighting re-emit reaches SceneManager.
       const gameLQ = this.deps.manifest.game?.lightingQuality;
