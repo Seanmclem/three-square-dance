@@ -40,6 +40,78 @@
       "dateAdded": "2026-07-26"
     },
     {
+      "id": "pfb_c1006ccb",
+      "name": "Pipe base and corner",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_92addde7",
+          "type": "object",
+          "def": {
+            "id": "obj_92addde7",
+            "assetId": "pipe_90",
+            "position": {
+              "x": 0.0020553262575759845,
+              "y": 2.0009636547164726,
+              "z": 0.0003649474295350785
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            }
+          }
+        },
+        {
+          "memberKey": "obj_3a3b389d",
+          "type": "object",
+          "def": {
+            "id": "obj_3a3b389d",
+            "assetId": "pipe_straight",
+            "position": {
+              "x": -0.0020553262575759845,
+              "y": 0,
+              "z": -0.00036494742953863124
+            },
+            "rotation": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "scale": {
+              "x": 1,
+              "y": 1,
+              "z": 1
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-07-28"
+    },
+    {
       "id": "pfb_741ffb6f",
       "name": "Stairs - wood - 2length",
       "kind": "snapshot",
