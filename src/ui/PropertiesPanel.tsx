@@ -5985,6 +5985,63 @@ const DEFAULT_VOLUME_VISUAL: TriggerVolumeVisual = {
 };
 const clamp01 = (n: number) => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
 
+/** Phase 69 — collapsible section for the trigger-volume view. Header matches
+ *  GroupsAccordion's row (ROW_BASE + rotating chevron) plus a live summary
+ *  shown while collapsed. */
+function Section({ title, summary, open, onToggle, children }: {
+  title: string; summary?: string; open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.05)", gap: 8 }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500, flexShrink: 0 }}>{title}</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          {!open && summary && (
+            <span style={{ color: "#8b94a8", fontSize: 10, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{summary}</span>
+          )}
+          <span style={{ color: "#505060", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Phase 69 — caption row with a ⓘ toggle; the explainer only renders when
+ *  pressed, at a readable size. `children` render under the caption always. */
+function InfoBlurb({ heading, text, children }: { heading: string; text: string; children?: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ ...LABEL, marginBottom: 0 }}>{heading}</div>
+        <button
+          onClick={() => setOpen(o => !o)}
+          title={open ? "Hide description" : "What is this?"}
+          style={{ background: "none", border: "none", padding: "0 2px", cursor: "pointer", fontSize: 12, lineHeight: 1, color: open ? "#80aaff" : "#8b94a8" }}
+        >ⓘ</button>
+      </div>
+      {children}
+      {open && (
+        <div style={{ marginTop: 5, color: "#b9c2d6", fontSize: 11, lineHeight: 1.55, padding: "7px 9px",
+                      background: "rgba(255,255,255,0.03)", borderLeft: "2px solid rgba(80,140,255,0.5)", borderRadius: 4 }}>
+          {text}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Shared script list rows (volume ENTRY/EXIT section + object Scripts screen):
  *  enabled dot, label, trigger + action count, delete — editing happens in the
  *  Scripts panel. */
@@ -6203,8 +6260,9 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
 // Per-entity state keys: schema rows (key / type / default / min-max) stored on
 // the entity's `stateSchema`; values live namespaced in the global GameState and
 // are shown here live during preview. The raw `__ent.` keys are never displayed.
-function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus }: {
+function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus, heading }: {
   entityId: string;
+  heading?: string;   // Phase 69 — the trigger view passes a short heading (its Section is titled State)
   stateSchema?: Record<string, StateSchema>;
   onObjectUpdate?: (changes: Partial<WorldObject>) => void;
   bus?: EventBus;
@@ -6226,63 +6284,79 @@ function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus }: {
   const SEL: React.CSSProperties = { background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c2cadb", fontSize: 10, fontFamily: "monospace", padding: "2px 4px" };
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <div style={LABEL}>STATE (this {entityId.startsWith("vol_") ? "volume" : "object"} only)</div>
+      <div style={{ marginBottom: 6 }}>
+        <InfoBlurb
+          heading={heading ?? `STATE (this ${entityId.startsWith("vol_") ? "volume" : "object"} only)`}
+          text={`Keys this ${entityId.startsWith("vol_") ? "volume" : "object"} tracks for itself (health, open, mood…) — every copy and prefab instance gets its own values. Scripts read/write them via the “Whose state” scope. Live values show while playing.`}
+        />
       </div>
-      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5, marginBottom: 6 }}>
-        Keys this entity tracks for itself (health, open, mood…) — every copy and
-        prefab instance gets its own values. Scripts read/write them via the
-        &ldquo;Whose state&rdquo; scope. Live values show while playing.
-      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: entries.length ? 6 : 0 }}>
       {entries.map(([key, s]) => {
         const live = gameState.get(entKey(entityId, key));
+        const seg = (active: boolean): React.CSSProperties => ({
+          background: active ? "rgba(80,140,255,0.25)" : "transparent",
+          border: "1px solid " + (active ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.1)"),
+          borderRadius: 3, color: active ? "#80aaff" : "#98a2b8", fontSize: 9,
+          fontFamily: "monospace", padding: "2px 6px", cursor: "pointer",
+        });
+        const cap: React.CSSProperties = { color: "#8b94a8", fontSize: 9, letterSpacing: 0.5, width: 40, flexShrink: 0 };
+        const setType = (type: StateSchema["type"]) => {
+          if (type === s.type) return;
+          setEntry(key, { type, default: type === "number" ? 0 : type === "boolean" ? false : "" });
+        };
         return (
-          <div key={key} style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", marginBottom: 4, padding: "4px 6px", background: "rgba(255,255,255,0.03)", borderRadius: 4 }}>
-            <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace", flex: "1 0 70px", overflow: "hidden", textOverflow: "ellipsis" }} title={key}>{key}</span>
-            {live !== undefined && (
-              <span title="live value (playing)" style={{ color: "#7fd0a0", fontSize: 10, fontFamily: "monospace" }}>▶ {String(live)}</span>
-            )}
-            <select style={SEL} value={s.type}
-              onChange={e => {
-                const type = e.target.value as StateSchema["type"];
-                setEntry(key, { type, default: type === "number" ? 0 : type === "boolean" ? false : "" });
-              }}>
-              <option value="number">number</option>
-              <option value="boolean">boolean</option>
-              <option value="string">string</option>
-            </select>
-            {s.type === "boolean" ? (
-              <select style={SEL} value={String(s.default ?? false)} title="starting value"
-                onChange={e => setEntry(key, { ...s, default: e.target.value === "true" })}>
-                <option value="false">start: false</option>
-                <option value="true">start: true</option>
-              </select>
-            ) : (
-              <input style={{ ...SEL, width: 56 }} type={s.type === "number" ? "number" : "text"}
-                title="starting value" placeholder="start"
-                defaultValue={s.default == null ? "" : String(s.default)}
-                key={key + "-def-" + String(s.default)}
-                onBlur={e => setEntry(key, { ...s, default: s.type === "number" ? (parseFloat(e.target.value) || 0) : e.target.value })}
-                onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-              />
-            )}
+          <div key={key} style={{ display: "flex", flexDirection: "column", gap: 5, padding: "6px 8px",
+                                   background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace", flex: 1, minWidth: 0,
+                             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={key}>{key}</span>
+              {live !== undefined && (
+                <span title="live value (playing)" style={{ color: "#7fd0a0", fontSize: 10, fontFamily: "monospace", flexShrink: 0 }}>▶ {String(live)}</span>
+              )}
+              <span style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                {([["boolean", "bool"], ["number", "num"], ["string", "text"]] as const).map(([t, lbl]) => (
+                  <button key={t} style={seg(s.type === t)} title={`store a ${t}`} onClick={() => setType(t)}>{lbl}</button>
+                ))}
+              </span>
+              <button title="remove key" onClick={() => removeEntry(key)}
+                style={{ background: "none", border: "none", color: "#cc6666", cursor: "pointer", fontSize: 11, padding: "0 2px", flexShrink: 0 }}>×</button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={cap}>STARTS</span>
+              {s.type === "boolean" ? (
+                <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <input type="checkbox" checked={!!s.default}
+                    onChange={e => setEntry(key, { ...s, default: e.target.checked })} />
+                  <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{s.default ? "true" : "false"}</span>
+                </label>
+              ) : (
+                <input style={{ ...SEL, width: 72 }} type={s.type === "number" ? "number" : "text"}
+                  title="starting value" placeholder={s.type === "number" ? "0" : "(empty)"}
+                  defaultValue={s.default == null ? "" : String(s.default)}
+                  key={key + "-def-" + String(s.default)}
+                  onBlur={e => setEntry(key, { ...s, default: s.type === "number" ? (parseFloat(e.target.value) || 0) : e.target.value })}
+                  onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                />
+              )}
+            </div>
             {s.type === "number" && (
-              <>
-                <input style={{ ...SEL, width: 44 }} type="number" title="minimum (clamped)" placeholder="min"
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={cap}>MIN</span>
+                <input style={{ ...SEL, width: 56 }} type="number" title="minimum (clamped)" placeholder="—"
                   defaultValue={s.min ?? ""} key={key + "-min-" + String(s.min)}
                   onBlur={e => setEntry(key, { ...s, min: e.target.value === "" ? undefined : parseFloat(e.target.value) })}
                   onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
-                <input style={{ ...SEL, width: 44 }} type="number" title="maximum (clamped)" placeholder="max"
+                <span style={{ ...cap, width: "auto" }}>MAX</span>
+                <input style={{ ...SEL, width: 56 }} type="number" title="maximum (clamped)" placeholder="—"
                   defaultValue={s.max ?? ""} key={key + "-max-" + String(s.max)}
                   onBlur={e => setEntry(key, { ...s, max: e.target.value === "" ? undefined : parseFloat(e.target.value) })}
                   onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
-              </>
+              </div>
             )}
-            <button title="remove key" onClick={() => removeEntry(key)}
-              style={{ background: "none", border: "none", color: "#cc6666", cursor: "pointer", fontSize: 11, padding: "0 2px" }}>×</button>
           </div>
         );
       })}
+      </div>
       <div style={{ display: "flex", gap: 4 }}>
         <input style={{ ...SEL, flex: 1 }} placeholder="new key (e.g. health)" value={newKey}
           onChange={e => setNewKey(e.target.value)}
@@ -6408,15 +6482,22 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
   }, [bus]);
   const [posStr,  setPosStr]  = useState({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
   const [sizeStr, setSizeStr] = useState({ x: String(vol?.size.x ?? 1),     y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
+  const [rotStr,  setRotStr]  = useState(String(vol?.rotation?.y ?? 0));
+  // Phase 69 — accordion open state (Geometry + Scripts start open; Groups keeps
+  // its own groupsOpen wiring shared with the other entity views).
+  const [secOpen, setSecOpen] = useState({ geometry: true, scripts: true, state: false, attach: false, appearance: false });
+  const toggleSec = (k: keyof typeof secOpen) => setSecOpen(prev => ({ ...prev, [k]: !prev[k] }));
   const { schedule, flush } = useFieldDebounce(300);
 
   useEffect(() => {
     setPosStr({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) });
     setSizeStr({ x: String(vol?.size.x ?? 1),    y: String(vol?.size.y ?? 1),     z: String(vol?.size.z ?? 1) });
+    setRotStr(String(vol?.rotation?.y ?? 0));
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resync when position/size change externally (gizmo move, face-handle resize).
   useEffect(() => { setPosStr({ x: String(vol?.position.x ?? 0), y: String(vol?.position.y ?? 0), z: String(vol?.position.z ?? 0) }); }, [vol?.position.x, vol?.position.y, vol?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setSizeStr({ x: String(vol?.size.x ?? 1), y: String(vol?.size.y ?? 1), z: String(vol?.size.z ?? 1) }); }, [vol?.size.x, vol?.size.y, vol?.size.z]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setRotStr(String(vol?.rotation?.y ?? 0)); }, [vol?.rotation?.y]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!vol) return null;
   const scripts = vol.scripts ?? [];
@@ -6433,6 +6514,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
     const min = shape !== "box" && axis === "x" ? 0.25 : 0.14;
     if (Number.isFinite(n) && n >= min) onObjectUpdate({ size: { ...vol.size, [axis]: n } } as Partial<WorldObject>);
   };
+  const commitRot = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) onObjectUpdate({ rotation: { x: 0, y: n, z: 0 } } as Partial<WorldObject>); };
 
   // Switching shape converts the size so the volume keeps roughly its footprint:
   // box → round inscribes the radius in the XZ extents; round → box circumscribes.
@@ -6465,35 +6547,45 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
     onScriptsChange(scripts.filter(s => s.id !== id));
   }
 
+  const fmt = (n: number) => Math.round(n * 10) / 10;
+  const rotYNow = vol.rotation?.y ?? 0;
+  const geoSummary = `${shape} · ${shape === "box" ? `${fmt(vol.size.x)}×${fmt(vol.size.y)}×${fmt(vol.size.z)}`
+    : shape === "sphere" ? `r ${fmt(vol.size.x)}` : `r ${fmt(vol.size.x)} × h ${fmt(vol.size.y)}`}${rotYNow ? ` · ${fmt(rotYNow)}°` : ""}`;
+  const scriptsSummary = scripts.length ? `${scripts.length} script${scripts.length !== 1 ? "s" : ""}` : "none";
+  const stateSummary = Object.keys(vol.stateSchema ?? {}).join(" · ") || "none";
+  const attachHost = vol.attachTo
+    ? (["platforms", "shapes", "objects"] as const)
+        .flatMap(k => (zone?.[k] ?? []) as Array<{ id: string; label?: string; assetId?: string }>)
+        .find(h => h.id === vol.attachTo)
+    : undefined;
+  const attachSummary = vol.attachTo ? (attachHost?.label || attachHost?.assetId || vol.attachTo) : "static";
+  const lookSummary = [vis?.enabled ? "gradient" : "", vol.editorTint ? "custom color" : ""].filter(Boolean).join(" · ") || "none";
+
   return (
     <>
     {/* Prefab membership first (collapsed) — same top placement as the object root view. */}
     {prefabSection}
-    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.5,
-                    padding: "6px 8px", background: "rgba(255,255,255,0.03)",
-                    borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
-        An invisible 3D detection region — box, sphere, cylinder, or capsule.
-        Scripts fire when the player walks in or out. Trigger volumes are
-        independent of map zones — they can run any action.
-      </div>
-      <div>
-        <div style={LABEL}>LABEL</div>
-        <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>{vol.label}</div>
-      </div>
+
+    {/* Phase 69 — option-A accordions: everything from the old flat column,
+        grouped into collapsible sections with live summaries. */}
+    <Section title="Geometry" summary={geoSummary} open={secOpen.geometry} onToggle={() => toggleSec("geometry")}>
+      <InfoBlurb heading="LABEL"
+        text="An invisible 3D detection region — box, sphere, cylinder, or capsule. Scripts fire when the player walks in or out. Trigger volumes are independent of map zones — they can run any action.">
+        <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>{vol.label}</div>
+      </InfoBlurb>
       <div>
         <div style={LABEL}>SHAPE</div>
         <div style={{ display: "flex", gap: 4 }}>
-          {(["box", "sphere", "cylinder", "capsule"] as const).map(s => (
-            <button key={s} onClick={() => setShape(s)}
-              title={s === "box" ? "Rectangular volume" : `${s[0]!.toUpperCase() + s.slice(1)} volume — resize by drag handles (side = radius${s === "sphere" ? "" : ", top/bottom = height"}) or the numeric fields`}
+          {(["box", "sphere", "cylinder", "capsule"] as const).map(sh => (
+            <button key={sh} onClick={() => setShape(sh)}
+              title={sh === "box" ? "Rectangular volume" : `${sh[0]!.toUpperCase() + sh.slice(1)} volume — resize by drag handles (side = radius${sh === "sphere" ? "" : ", top/bottom = height"}) or the numeric fields`}
               style={{
                 flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 9, fontFamily: "monospace",
-                border: "1px solid " + (shape === s ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
-                background: shape === s ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
-                color: shape === s ? "#80aaff" : "#c0c0c0", cursor: "pointer",
+                border: "1px solid " + (shape === sh ? "rgba(80,140,255,0.5)" : "rgba(255,255,255,0.12)"),
+                background: shape === sh ? "rgba(80,140,255,0.25)" : "rgba(46,46,46,0.9)",
+                color: shape === sh ? "#80aaff" : "#c0c0c0", cursor: "pointer",
               }}>
-              {s.toUpperCase().slice(0, s === "cylinder" ? 3 : s === "capsule" ? 4 : 6)}
+              {sh.toUpperCase().slice(0, sh === "cylinder" ? 3 : sh === "capsule" ? 4 : 6)}
             </button>
           ))}
         </div>
@@ -6522,7 +6614,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
             <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
               <span style={{ color, fontSize: 9 }}>{axis.toUpperCase()}</span>
               <input type="number" step={0.5} value={posStr[axis]}
-                onChange={e => { setPosStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
+                onChange={e => { setPosStr(pv => ({ ...pv, [axis]: e.target.value })); schedule(() => commitPos(axis, e.target.value)); }}
                 onBlur={e => flush(() => commitPos(axis, e.target.value))}
                 onKeyDown={e => { if (e.key === "Enter") flush(() => commitPos(axis, (e.target as HTMLInputElement).value)); }}
                 style={{ width: "100%", minWidth: 0, border: "none", outline: "none", background: "transparent", color: "#c0c0c0", fontSize: 10, fontFamily: "monospace" }}
@@ -6543,7 +6635,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
               <input type="number" step={shape !== "box" && axis === "x" ? 0.25 : axis === "y" ? 0.1 : 0.5}
                 min={shape !== "box" && axis === "x" ? 0.25 : 0.14} value={sizeStr[axis]}
                 style={{ ...NUM_INPUT, padding: "2px 4px", fontSize: 10 }}
-                onChange={e => { setSizeStr(p => ({ ...p, [axis]: e.target.value })); schedule(() => commitSize(axis, e.target.value)); }}
+                onChange={e => { setSizeStr(pv => ({ ...pv, [axis]: e.target.value })); schedule(() => commitSize(axis, e.target.value)); }}
                 onBlur={e => flush(() => commitSize(axis, e.target.value))}
                 onKeyDown={e => { if (e.key === "Enter") flush(() => commitSize(axis, (e.target as HTMLInputElement).value)); }}
               />
@@ -6557,20 +6649,70 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
       </div>
       <div>
         <div style={LABEL}>ROTATION (Y°)</div>
-        <input
-          type="number"
-          key={vol.id + "-roty"}
-          defaultValue={vol.rotation?.y ?? 0}
-          style={NUM_INPUT}
-          onBlur={e => onObjectUpdate({ rotation: { x: 0, y: parseFloat(e.target.value) || 0, z: 0 } } as Partial<WorldObject>)}
-          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ position: "relative", width: "33%", flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+            <input type="text" inputMode="decimal" value={rotStr}
+              style={{ ...NUM_INPUT, paddingRight: 20 }}
+              onChange={e => { const v = e.target.value; setRotStr(v); schedule(() => commitRot(v)); }}
+              onBlur={e => flush(() => commitRot(e.target.value))}
+              onKeyDown={e => { if (e.key === "Enter") flush(() => commitRot((e.target as HTMLInputElement).value)); }}
+            />
+            <button
+              title="Reset rotation to 0°"
+              onClick={() => { setRotStr("0"); flush(() => commitRot("0")); }}
+              style={{ position: "absolute", right: 4, background: "none", border: "none", padding: "0 2px",
+                       lineHeight: 1, fontSize: 11, cursor: (parseFloat(rotStr) || 0) === 0 ? "default" : "pointer",
+                       color: (parseFloat(rotStr) || 0) === 0 ? "#4a5162" : "#cc6666" }}
+            >×</button>
+          </span>
+          <input type="range" min={-180} max={180} step={5} value={parseFloat(rotStr) || 0}
+            title="Drag to rotate (5° steps)"
+            onChange={e => { const v = e.target.value; setRotStr(v); schedule(() => commitRot(v)); }}
+            style={{ flex: 1, minWidth: 0, accentColor: "#5a8dee", cursor: "pointer" }}
+          />
+        </div>
+      </div>
+    </Section>
+
+    <Section title="Scripts" summary={scriptsSummary} open={secOpen.scripts} onToggle={() => toggleSec("scripts")}>
+      <div>
+        {onScriptsChange && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+            <button
+              onClick={() => addScript("on_player_enter")}
+              title="Add a script that fires when the player walks in"
+              style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                       background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
+                       borderRadius: 3, color: "#44ccaa" }}
+            >+ Enter</button>
+            <button
+              onClick={() => addScript("on_player_exit")}
+              title="Add a script that fires when the player walks out"
+              style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                       background: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.25)",
+                       borderRadius: 3, color: "#ccaa44" }}
+            >+ Exit</button>
+          </div>
+        )}
+        <ScriptListRows
+          scripts={scripts}
+          emptyHint="No scripts — add Entry or Exit above"
+          onToggle={onScriptsChange ? toggleScript : undefined}
+          onDelete={onScriptsChange ? deleteScript : undefined}
+          onOpen={onEditScript}
         />
       </div>
+    </Section>
 
+    <Section title="State" summary={stateSummary} open={secOpen.state} onToggle={() => toggleSec("state")}>
+      <EntityStateSection entityId={vol.id} stateSchema={vol.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus}
+        heading="THIS VOLUME ONLY" />
+    </Section>
+
+    <Section title="Attach" summary={attachSummary} open={secOpen.attach} onToggle={() => toggleSec("attach")}>
       {/* Attached to (Phase 53): the volume rides a mover-enabled entity — its
           sensor + visuals follow in preview/game. Position stays the rest pose. */}
       <div>
-        <div style={LABEL}>ATTACHED TO</div>
         <select
           value={vol.attachTo ?? ""}
           onChange={e => onObjectUpdate({ attachTo: e.target.value || undefined } as Partial<WorldObject>)}
@@ -6609,11 +6751,10 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           </div>
         )}
       </div>
+    </Section>
 
-      {/* Per-entity state keys (Phase 60) */}
-      <EntityStateSection entityId={vol.id} stateSchema={vol.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus} />
-
-      {/* Visual section — optional decorative fill (shows in preview + game) */}
+    <Section title="Appearance" summary={lookSummary} open={secOpen.appearance} onToggle={() => toggleSec("appearance")}>
+      {/* Visual — optional decorative fill (shows in preview + game) */}
       <div>
         <div style={LABEL}>VISUAL</div>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: vis?.enabled ? 8 : 0 }}>
@@ -6693,45 +6834,24 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           </div>
         )}
       </div>
+    </Section>
 
-      {/* Scripts section */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={LABEL}>ENTRY / EXIT SCRIPTS</div>
-          {onScriptsChange && (
-            <div style={{ display: "flex", gap: 4 }}>
-              <button
-                onClick={() => addScript("on_player_enter")}
-                title="Add a script that fires when the player walks in"
-                style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
-                         background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
-                         borderRadius: 3, color: "#44ccaa" }}
-              >+ Enter</button>
-              <button
-                onClick={() => addScript("on_player_exit")}
-                title="Add a script that fires when the player walks out"
-                style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
-                         background: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.25)",
-                         borderRadius: 3, color: "#ccaa44" }}
-              >+ Exit</button>
-            </div>
-          )}
-        </div>
-        <ScriptListRows
-          scripts={scripts}
-          emptyHint="No scripts — add Entry or Exit above"
-          onToggle={onScriptsChange ? toggleScript : undefined}
-          onDelete={onScriptsChange ? deleteScript : undefined}
-          onOpen={onEditScript}
-        />
-      </div>
+    <GroupsAccordion
+      open={groupsOpen}
+      onToggle={onToggleGroups}
+      selected={selected}
+      groups={groups}
+      onObjectUpdate={onObjectUpdate}
+      onSelectGroup={onSelectGroup}
+    />
 
+    <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
       {onCreatePrefab && (
         <button
           onClick={onCreatePrefab}
           title="Capture this volume — size, scripts, state keys, attach-to — as a reusable prefab (the volume becomes its first instance)"
           style={{
-            marginTop: 4, padding: "6px 0", width: "100%",
+            padding: "6px 0", width: "100%",
             background: "rgba(80,140,255,0.10)", border: "1px solid rgba(80,140,255,0.3)",
             borderRadius: 5, color: "#80aaff", fontSize: 11, cursor: "pointer", fontFamily: "monospace",
           }}
@@ -6743,7 +6863,7 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         <button
           onClick={onDelete}
           style={{
-            marginTop: 4, padding: "6px 0", width: "100%",
+            padding: "6px 0", width: "100%",
             background: "rgba(200,60,60,0.12)", border: "1px solid rgba(200,60,60,0.3)",
             borderRadius: 5, color: "#cc6666", fontSize: 11, cursor: "pointer", fontFamily: "monospace",
           }}
@@ -6752,14 +6872,6 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         >Delete Volume</button>
       )}
     </div>
-    <GroupsAccordion
-      open={groupsOpen}
-      onToggle={onToggleGroups}
-      selected={selected}
-      groups={groups}
-      onObjectUpdate={onObjectUpdate}
-      onSelectGroup={onSelectGroup}
-    />
     </>
   );
 }
