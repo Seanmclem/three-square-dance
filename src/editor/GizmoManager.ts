@@ -494,6 +494,10 @@ export class GizmoManager implements IEditorModule {
         const cz = nodes.reduce((s, n) => s + n.z, 0) / nodes.length;
         return new THREE.Vector3(cx, 0, cz);
       }
+      case "checkpoint": {
+        const c = zone.checkpoints?.find(x => x.id === ref.id);
+        return c ? new THREE.Vector3(c.position.x, c.position.y, c.position.z) : null;
+      }
       default:
         return null;
     }
@@ -584,7 +588,8 @@ export class GizmoManager implements IEditorModule {
         ref.type === "trigger-volume" ? zone.triggerVolumes :
         ref.type === "shape" ? zone.shapes :
         ref.type === "stair" ? zone.stairs :
-        ref.type === "ladder" ? zone.ladders : undefined;
+        ref.type === "ladder" ? zone.ladders :
+        ref.type === "checkpoint" ? zone.checkpoints : undefined;
       return arr?.find(e => e.id === ref.id)?.prefab?.instanceId ?? null;
     };
     const ids = this._groupRefs.map(findStamp);
@@ -598,7 +603,8 @@ export class GizmoManager implements IEditorModule {
       (zone.triggerVolumes ?? []).filter(v => v.prefab?.instanceId === instanceId).length +
       (zone.shapes ?? []).filter(s => s.prefab?.instanceId === instanceId).length +
       zone.stairs.filter(s => s.prefab?.instanceId === instanceId).length +
-      (zone.ladders ?? []).filter(l => l.prefab?.instanceId === instanceId).length;
+      (zone.ladders ?? []).filter(l => l.prefab?.instanceId === instanceId).length +
+      (zone.checkpoints ?? []).filter(c => c.prefab?.instanceId === instanceId).length;
     if (memberCount !== this._groupRefs.length) return;
     this._worldState.updatePrefabInstance(zoneId!, instanceId, {
       origin: {

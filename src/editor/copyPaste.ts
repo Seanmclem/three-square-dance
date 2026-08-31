@@ -3,11 +3,12 @@ import { membersByGroup } from "@/editor/groupMembers";
 import { remapScripts } from "@/prefab/expand";
 import type {
   SelectedObjectPayload, SelectedRef, EditorObjectType, GroupDef,
-  WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume, WallNode, Vec2, Vec3,
+  WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume,
+  CheckpointDef, WallNode, Vec2, Vec3,
 } from "@/types";
 
 /** Selection types that can be copied. (Openings/spawn/terrain are excluded.) */
-const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "ladder", "object", "trigger-volume", "shape"]);
+const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "ladder", "object", "trigger-volume", "shape", "checkpoint"]);
 
 /** One copied entity, tagged with its type so paste can route per-entity. */
 export interface ClipEntity {
@@ -45,6 +46,7 @@ function newId(type: EditorObjectType): string {
     case "object":         return `obj_${uuid8()}`;
     case "trigger-volume": return `vol_${uuid8()}`;
     case "shape":          return `shape_${uuid8()}`;
+    case "checkpoint":     return `cp_${uuid8()}`;
     default:               return uuid();  // floor + nodes use full uuids
   }
 }
@@ -89,6 +91,7 @@ function defsForRef(world: WorldState, ref: SelectedRef): ClipEntity[] {
     case "object":         { const o = zone.objects.find(x => x.id === ref.id);   return o ? [{ type: ref.type, def: structuredClone(o) }] : []; }
     case "trigger-volume": { const v = zone.triggerVolumes?.find(x => x.id === ref.id); return v ? [{ type: ref.type, def: structuredClone(v) }] : []; }
     case "shape":          { const s = zone.shapes?.find(x => x.id === ref.id);         return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
+    case "checkpoint":     { const c = zone.checkpoints?.find(x => x.id === ref.id);     return c ? [{ type: ref.type, def: structuredClone(c) }] : []; }
     default:               return [];
   }
 }
@@ -284,6 +287,11 @@ export function pasteClipboard(
         case "shape": {
           const s = ent.def as ShapeDef;
           world.addShape(zoneId, { ...s, id, position: off3(s.position, dx, dz) });
+          break;
+        }
+        case "checkpoint": {
+          const c = ent.def as CheckpointDef;
+          world.addCheckpoint(zoneId, { ...c, id, position: off3(c.position, dx, dz) });
           break;
         }
       }

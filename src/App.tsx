@@ -1839,7 +1839,8 @@ export default function App() {
         ref.type === "trigger-volume" ? zone.triggerVolumes?.find(e => e.id === ref.id) :
         ref.type === "shape"          ? zone.shapes?.find(e => e.id === ref.id) :
         ref.type === "stair"          ? zone.stairs?.find(e => e.id === ref.id) :
-        ref.type === "ladder"         ? zone.ladders?.find(e => e.id === ref.id) : undefined;
+        ref.type === "ladder"         ? zone.ladders?.find(e => e.id === ref.id) :
+        ref.type === "checkpoint"     ? zone.checkpoints?.find(e => e.id === ref.id) : undefined;
       const instId = (ent as { prefab?: { instanceId?: string } } | undefined)?.prefab?.instanceId;
       if (!instId) continue;
       if (!stamps.has(ref.zoneId)) stamps.set(ref.zoneId, new Set());
@@ -3264,7 +3265,7 @@ export default function App() {
     if (!record || !zone) return null;
     if (multiSelected.length > 1) {
       const memberIds = new Set<string>();
-      for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? []]) {
+      for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? [], zone.checkpoints ?? []]) {
         for (const e of arr as Array<{ id: string; prefab?: { instanceId: string } }>) {
           if (e.prefab?.instanceId === record.id) memberIds.add(e.id);
         }
@@ -3311,7 +3312,8 @@ export default function App() {
         prev.type === "trigger-volume" ? zone?.triggerVolumes :
         prev.type === "shape" ? zone?.shapes :
         prev.type === "stair" ? zone?.stairs :
-        prev.type === "ladder" ? zone?.ladders : undefined;
+        prev.type === "ladder" ? zone?.ladders :
+        prev.type === "checkpoint" ? zone?.checkpoints : undefined;
       const data = arr?.find(e => e.id === prev.id);
       if (!data) { busRef.current.emit("object:deselected", {}); return null; }
       return { ...prev, data: data as SelectedObjectPayload["data"] };

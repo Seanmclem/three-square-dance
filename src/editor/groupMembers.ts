@@ -17,6 +17,7 @@ const COLLECTIONS: { type: EditorObjectType; key: keyof ZoneDef }[] = [
   { type: "object",         key: "objects" },
   { type: "trigger-volume", key: "triggerVolumes" },
   { type: "shape",          key: "shapes" },
+  { type: "checkpoint",     key: "checkpoints" },
 ];
 
 type Grouped = { id: string; label?: string; groupIds?: string[] };

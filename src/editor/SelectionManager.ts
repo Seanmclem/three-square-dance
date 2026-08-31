@@ -201,6 +201,7 @@ export class SelectionManager implements IEditorModule {
     gather("shape", zone.shapes);
     gather("stair", zone.stairs);
     gather("ladder", zone.ladders);
+    gather("checkpoint", zone.checkpoints);
     return refs;
   }
 
