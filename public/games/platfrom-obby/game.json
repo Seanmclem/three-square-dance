@@ -1077,5 +1077,27 @@
       "emptyGraphicId": "heart_outline_icon",
       "startVisible": true
     }
-  ]
+  ],
+  "playerSettings": {
+    "cameraMode": "thirdperson",
+    "moveSpeed": 6,
+    "jumpHeight": 1.2,
+    "fov": 75,
+    "thirdPersonDistance": 3.4,
+    "thirdPersonHeight": 0.8,
+    "jumpAnimSpeed": 1.2,
+    "characterScale": 0.9,
+    "thirdPersonPitch": 18,
+    "modelAssetId": "character",
+    "footstepDistance": 2,
+    "footstepSound": "footstep_carpet_000",
+    "jumpSound": "phasejump1",
+    "animClips": {
+      "walk": "Run"
+    },
+    "footstepVolume": 0.1,
+    "jumpVolume": 0.1,
+    "landSound": "footstep_grass_001",
+    "landVolume": 0.1
+  }
 }
