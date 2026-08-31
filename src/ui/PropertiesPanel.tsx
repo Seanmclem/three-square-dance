@@ -833,6 +833,9 @@ export function PropertiesPanel({
           <TriggerVolumeView
             selected={selected}
             onDelete={onDelete}
+            onCreatePrefab={onCreatePrefab && !prefabInfo
+              ? () => onCreatePrefab([{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef])
+              : undefined}
             onScriptsChange={onVolumeScriptsChange}
             onEditScript={onEditScript}
             groups={groups}
@@ -6375,9 +6378,10 @@ function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone, onCreatePrefab }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
+  onCreatePrefab?:  () => void;   // v4.79.57 — single-volume capture (absent when already a prefab member)
   onScriptsChange?: (scripts: ScriptDef[]) => void;
   onEditScript?:    (scriptId: string) => void;
   groups:           GroupDef[];
@@ -6722,6 +6726,19 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
         />
       </div>
 
+      {onCreatePrefab && (
+        <button
+          onClick={onCreatePrefab}
+          title="Capture this volume — size, scripts, state keys, attach-to — as a reusable prefab (the volume becomes its first instance)"
+          style={{
+            marginTop: 4, padding: "6px 0", width: "100%",
+            background: "rgba(80,140,255,0.10)", border: "1px solid rgba(80,140,255,0.3)",
+            borderRadius: 5, color: "#80aaff", fontSize: 11, cursor: "pointer", fontFamily: "monospace",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(80,140,255,0.2)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(80,140,255,0.10)"; }}
+        >⬡ Create Prefab</button>
+      )}
       {onDelete && (
         <button
           onClick={onDelete}
