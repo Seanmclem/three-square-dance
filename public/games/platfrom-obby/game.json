@@ -1099,5 +1099,31 @@
     "jumpVolume": 0.1,
     "landSound": "footstep_grass_001",
     "landVolume": 0.1
+  },
+  "lighting": {
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 0.5
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 2,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012
+  },
+  "audio": {
+    "mix": {
+      "master": 1,
+      "music": 0.5,
+      "sfx": 1,
+      "ambient": 1
+    }
   }
 }
