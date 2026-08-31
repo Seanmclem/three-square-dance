@@ -94,6 +94,8 @@ function useVol() {
     ],
     gradientFill: false, customShading: true, color: "#c9a83a", opacity: 0.05,
     scripts: [{ name: "Kill Floor Enter", trigger: "on_player_enter", actions: 1 }],
+    zoneGroups: [{ name: "kill floors", members: 4 }, { name: "level hazards", members: 9 }],
+    memberOf: ["kill floors"],
   });
   const set = (p) => setV(x => ({ ...x, ...p }));
   return [v, set];
@@ -217,6 +219,25 @@ function ScriptsFields({ v, set }) {
     {v.scripts.length > 0 && <div style={{ color: "#8a92a6", fontSize: 9, fontStyle: "italic" }}>Click a script to edit its actions →</div>}
   </div>);
 }
+function GroupsFields({ v, set }) {
+  const [draft, setDraft] = useState("");
+  const toggle = (name) => set({ memberOf: v.memberOf.includes(name) ? v.memberOf.filter(g => g !== name) : [...v.memberOf, name] });
+  return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    {v.zoneGroups.map(g => (
+      <label key={g.name} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <input type="checkbox" className="switch" checked={v.memberOf.includes(g.name)} onChange={() => toggle(g.name)} />
+        <span style={{ fontSize: 11, color: v.memberOf.includes(g.name) ? "var(--text)" : "var(--text2)" }}>⊞ {g.name}</span>
+        <span style={{ marginLeft: "auto", color: "#8b94a8", fontSize: 9 }}>{g.members + (v.memberOf.includes(g.name) ? 1 : 0)} members</span>
+      </label>))}
+    <div style={{ display: "flex", gap: 4 }}>
+      <input className="field" placeholder="new group…" value={draft} onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && draft.trim()) { set({ zoneGroups: [...v.zoneGroups, { name: draft.trim(), members: 0 }], memberOf: [...v.memberOf, draft.trim()] }); setDraft(""); } }} />
+      <button className="btn" onClick={() => { if (draft.trim()) { set({ zoneGroups: [...v.zoneGroups, { name: draft.trim(), members: 0 }], memberOf: [...v.memberOf, draft.trim()] }); setDraft(""); } }}>+ group</button>
+    </div>
+    <div style={{ color: "#8a92a6", fontSize: 9, fontStyle: "italic" }}>Scripts can target a group — actions fan out to every member.</div>
+  </div>);
+}
+
 const FooterBtns = () => (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
   <button className="bigbtn blue">⬡ Create Prefab</button>
   <button className="bigbtn red">Delete Volume</button>
@@ -235,12 +256,13 @@ const sums = (v) => ({
   state: v.stateKeys.length ? v.stateKeys.map(k => `${k.key}`).join(" · ") : "none",
   appearance: `${v.customShading ? "custom color" : "default"}${v.gradientFill ? " · gradient" : ""}`,
   scripts: v.scripts.length ? `${v.scripts.length} script${v.scripts.length === 1 ? "" : "s"}` : "none",
+  groups: v.memberOf.length ? v.memberOf.map(g => `⊞ ${g}`).join(" · ") : "none",
 });
 
 // ═══ A · Collapsible sections ═══
 function PanelA() {
   const [v, set] = useVol();
-  const [open, setOpen] = useState({ geo: true, scripts: true, state: false, attach: false, appearance: false });
+  const [open, setOpen] = useState({ geo: true, scripts: true, state: false, attach: false, appearance: false, groups: false });
   const sm = sums(v);
   const Acc = ({ id, title, sum, children }) => (
     <div className="acc">
@@ -256,6 +278,7 @@ function PanelA() {
     <Acc id="state" title="State" sum={sm.state}><StateFields v={v} set={set} blurb /></Acc>
     <Acc id="attach" title="Attach" sum={sm.attach}><AttachField v={v} set={set} /></Acc>
     <Acc id="appearance" title="Appearance" sum={sm.appearance}><AppearanceFields v={v} set={set} /></Acc>
+    <Acc id="groups" title="Groups" sum={sm.groups}><GroupsFields v={v} set={set} /></Acc>
     <div style={{ flex: 1 }} />
     <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
   </div>);
@@ -272,6 +295,7 @@ function PanelB() {
     ["state", "State", sm.state, <StateFields v={v} set={set} blurb />],
     ["attach", "Attach", sm.attach, <AttachField v={v} set={set} />],
     ["appearance", "Appearance", sm.appearance, <AppearanceFields v={v} set={set} />],
+    ["groups", "Groups", sm.groups, <GroupsFields v={v} set={set} />],
   ];
   const cur = rows.find(r => r[0] === screen);
   return (<div className="panel">
@@ -333,6 +357,9 @@ function PanelC() {
       <div className="hair" />
       <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Look</span>
         <div style={{ marginTop: 4 }}><AppearanceFields v={v} set={set} /></div></div>
+      <div className="hair" />
+      <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Groups</span>
+        <div style={{ marginTop: 4 }}><GroupsFields v={v} set={set} /></div></div>
     </div>
     <div style={{ flex: 1 }} />
     <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
