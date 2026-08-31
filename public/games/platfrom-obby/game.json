@@ -715,7 +715,7 @@
                 "id": "col_172f13ec",
                 "shape": "box",
                 "offset": {
-                  "x": -5.960464477539063e-08,
+                  "x": -5.960464477539063e-8,
                   "y": 0.751679808832705,
                   "z": 0.01855784778791364
                 },
@@ -1120,7 +1120,7 @@
       "id": "pfb_5c1695b8",
       "name": "Checkpoint Test",
       "kind": "snapshot",
-      "version": 1,
+      "version": 2,
       "variables": [],
       "template": [
         {
@@ -1139,7 +1139,7 @@
               "y": 2.5,
               "z": 0.5
             },
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "scripts": [
               {
                 "id": "scr_bb7e1c89",
@@ -1155,7 +1155,7 @@
                     "type": "store_position",
                     "stateKey": "checkpoint",
                     "posSource": "object",
-                    "targetId": "cp_b1c9ad67"
+                    "targetId": "cp_975cb4ce"
                   }
                 ],
                 "oneShot": true
@@ -1165,6 +1165,20 @@
               "color": "#4c00ff",
               "opacity": 0.12
             }
+          }
+        },
+        {
+          "memberKey": "cp_975cb4ce",
+          "type": "checkpoint",
+          "def": {
+            "id": "cp_975cb4ce",
+            "label": "Checkpoint",
+            "position": {
+              "x": -0.006920552791585433,
+              "y": 0,
+              "z": -1.2957602280876688
+            },
+            "facingDeg": 0
           }
         }
       ],

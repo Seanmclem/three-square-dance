@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -7.1485033679889645,
+        "x": -2.8032410001484585,
         "y": 10.580493145796058,
-        "z": 23.736300399866142
+        "z": 31.166398424696016
       },
-      "radius": 27.166168986416686,
-      "phi": 0.9507963267949034,
-      "theta": 19.28800999988687
+      "radius": 29.116168986416696,
+      "phi": 1.0357963267948995,
+      "theta": 22.103009999886876
     }
   },
   "world": {
@@ -906,13 +906,27 @@
         {
           "id": "pfi_fb768dc3",
           "prefabId": "pfb_5c1695b8",
-          "version": 1,
+          "version": 2,
           "variables": {},
           "origin": {
             "position": {
               "x": -3,
               "y": 9.517862953544952,
               "z": 22
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_b93012d2",
+          "prefabId": "pfb_55ec1576",
+          "version": 1,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": 4,
+              "y": 0,
+              "z": 3
             },
             "rotationY": 0
           }
@@ -924,7 +938,7 @@
           "label": "Trigger Volume",
           "position": {
             "x": -3,
-            "y": 0,
+            "y": -0.5802688923412491,
             "z": 0
           },
           "size": {
@@ -990,7 +1004,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_e3e02647",
+              "id": "script_3c1d5d40",
               "label": "Checkpont 3 trigger",
               "zoneId": "demo",
               "enabled": true,
@@ -1003,7 +1017,7 @@
                   "type": "store_position",
                   "stateKey": "checkpoint",
                   "posSource": "object",
-                  "targetId": "cp_b1c9ad67"
+                  "targetId": "cp_7b2ff346"
                 }
               ],
               "oneShot": true
@@ -1030,6 +1044,21 @@
             "z": 27.3708207506472
           },
           "facingDeg": 0
+        },
+        {
+          "id": "cp_7b2ff346",
+          "label": "Checkpoint_1",
+          "position": {
+            "x": -3.0197272758711806,
+            "y": 9.517862953544952,
+            "z": 20.70423977191233
+          },
+          "facingDeg": 0,
+          "prefab": {
+            "prefabId": "pfb_5c1695b8",
+            "instanceId": "pfi_fb768dc3",
+            "memberKey": "cp_975cb4ce"
+          }
         }
       ]
     }
