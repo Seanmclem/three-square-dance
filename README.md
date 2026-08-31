@@ -67,13 +67,15 @@ Worth knowing:
 
 **Basic workflow:** pick a tool from the left toolbar → click in the viewport to build → switch to Select and edit properties on the right → ▶ to walk around (**Esc** to come back) → **Save** in the top bar (the pill next to it shows save state).
 
-**Camera** (the **?** button in the top bar lists all shortcuts, per tool):
+**Camera** (the **?** button in the top bar has per-tool shortcuts too):
 | Input | Action |
 |---|---|
 | Right-click drag | Orbit |
 | Middle-click drag | Pan |
-| Scroll | Zoom |
+| Scroll or `+` / `-` | Zoom |
 | WASD | Move the focus point |
+| Up / Down arrows | Raise or lower the focus point |
+| Left / Right arrows | Rotate around the focus point |
 
 ---
 
