@@ -73,7 +73,8 @@ Scene files under `public/games/` (`manifest.json`, `game.json`, `scenes/*.json`
 
 So, whenever work touches the editor's save/load, project, or scene paths — or any browser session that opens a project:
 
-- **Before** editing or testing: commit any dirty/untracked files under `public/games/` first, so there is a restore point. Never start a session with `?? public/games/...` in `git status`.
+- **Before** editing or testing: commit any dirty/untracked files under `public/games/` first, so there is a restore point. Never start a session with `?? public/games/...` in `git status`. This is **step zero of every work item**, not just session start — re-run `git status public/games/` before each new test/fix within a session; dirt discovered only *after* testing cannot be attributed (your test tabs vs. the user's window), and a wrong guess gets committed under a wrong message (happened 2026-08-31: a test tab's autosave-restore flush was committed as "user progress").
+- **Never attribute** `public/games/` changes to the user without evidence. Browser test tabs share the origin's localStorage: a later tab can restore an EARLIER test tab's autosave and write-through mid-test state (orphan records, test entities) even when the user saved nothing. Diff entity IDS against the last known-good commit and ask the user about anything you can't trace.
 - **After** the app writes to them: commit the resulting changes, so the new state is captured.
 
 Never add `public/games/` to `.gitignore`, and never delete or reset a scene file to "clean up" a working tree. If a scene file's diff looks like content vanished, stop and surface it — do not commit the deletion assuming it was intentional.

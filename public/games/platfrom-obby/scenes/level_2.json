@@ -916,20 +916,6 @@
             },
             "rotationY": 0
           }
-        },
-        {
-          "id": "pfi_b93012d2",
-          "prefabId": "pfb_55ec1576",
-          "version": 1,
-          "variables": {},
-          "origin": {
-            "position": {
-              "x": 4,
-              "y": 0,
-              "z": 3
-            },
-            "rotationY": 0
-          }
         }
       ],
       "triggerVolumes": [
