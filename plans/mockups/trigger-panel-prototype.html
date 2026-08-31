@@ -139,13 +139,14 @@ function StateFields({ v, set, blurb }) {
       <div className="dflt"><span className="k">Starts</span>
         <input type="checkbox" className="switch" checked={!!k.def} onChange={e => patch(i, { def: e.target.checked })} />
         <span style={{ fontSize: 10, color: "var(--text2)" }}>{k.def ? "true" : "false"}</span></div>);
-    if (k.type === "number") return (
+    if (k.type === "number") return (<>
       <div className="dflt"><span className="k">Starts</span>
-        <input className="field mini" value={k.def ?? 0} onChange={e => patch(i, { def: parseFloat(e.target.value) || 0 })} />
-        <span className="k">Min</span>
+        <input className="field mini" value={k.def ?? 0} onChange={e => patch(i, { def: parseFloat(e.target.value) || 0 })} /></div>
+      <div className="dflt"><span className="k">Min</span>
         <input className="field mini" placeholder="—" value={k.min ?? ""} onChange={e => patch(i, { min: e.target.value === "" ? undefined : parseFloat(e.target.value) })} />
         <span className="k">Max</span>
-        <input className="field mini" placeholder="—" value={k.max ?? ""} onChange={e => patch(i, { max: e.target.value === "" ? undefined : parseFloat(e.target.value) })} /></div>);
+        <input className="field mini" placeholder="—" value={k.max ?? ""} onChange={e => patch(i, { max: e.target.value === "" ? undefined : parseFloat(e.target.value) })} /></div>
+    </>);
     return (
       <div className="dflt"><span className="k">Starts</span>
         <input className="field" placeholder="(empty)" value={k.def ?? ""} onChange={e => patch(i, { def: e.target.value })} /></div>);
