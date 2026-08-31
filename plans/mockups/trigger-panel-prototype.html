@@ -41,6 +41,18 @@
   .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
   .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
+  /* state key cards */
+  .skey { border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.025); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .skey .top { display: flex; align-items: center; gap: 6px; }
+  .skey .name { color: var(--text); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .skey .x { color: var(--red); cursor: pointer; opacity: 0.6; padding: 0 2px; } .skey .x:hover { opacity: 1; }
+  .tseg { display: inline-flex; border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; overflow: hidden; }
+  .tseg button { padding: 2px 7px; border: none; background: transparent; color: #8b94a8; font-family: inherit; font-size: 9px; cursor: pointer; border-right: 1px solid rgba(255,255,255,0.08); }
+  .tseg button:last-child { border-right: none; }
+  .tseg button.on { background: rgba(80,140,255,0.18); color: var(--blue); cursor: default; }
+  .skey .dflt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .skey .dflt .k { color: var(--muted); font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase; flex-shrink: 0; }
+  .skey input.mini { width: 48px; }
   /* A · accordions */
   .acc { border-top: 1px solid rgba(255,255,255,0.06); }
   .acc .hd { display: flex; align-items: center; gap: 8px; padding: 9px 16px; cursor: pointer; }
@@ -74,7 +86,10 @@ function useVol() {
   const [v, setV] = useState({
     label: "Trigger Volume", shape: "BOX", editMode: "MOVE",
     pos: { x: -33.4, y: -1.78, z: -55.9 }, size: { w: 122.2, h: 2.5, d: 137.2 }, rotY: 0,
-    attachTo: "", stateKeys: [{ key: "spikes-up", type: "boolean" }],
+    attachTo: "", stateKeys: [
+      { key: "spikes-up", type: "boolean", def: false },
+      { key: "hits", type: "number", def: 0, min: 0, max: 3 },
+    ],
     gradientFill: false, customShading: true, color: "#c9a83a", opacity: 0.05,
     scripts: [{ name: "Kill Floor Enter", trigger: "on_player_enter", actions: 1 }],
   });
@@ -118,20 +133,47 @@ function AttachField({ v, set }) {
 }
 function StateFields({ v, set, blurb }) {
   const [draft, setDraft] = useState("");
+  const patch = (i, p) => set({ stateKeys: v.stateKeys.map((k, j) => j === i ? { ...k, ...p } : k) });
+  const typed = (k, i) => {
+    if (k.type === "boolean") return (
+      <div className="dflt"><span className="k">Starts</span>
+        <input type="checkbox" className="switch" checked={!!k.def} onChange={e => patch(i, { def: e.target.checked })} />
+        <span style={{ fontSize: 10, color: "var(--text2)" }}>{k.def ? "true" : "false"}</span></div>);
+    if (k.type === "number") return (
+      <div className="dflt"><span className="k">Starts</span>
+        <input className="field mini" value={k.def ?? 0} onChange={e => patch(i, { def: parseFloat(e.target.value) || 0 })} />
+        <span className="k">Min</span>
+        <input className="field mini" placeholder="—" value={k.min ?? ""} onChange={e => patch(i, { min: e.target.value === "" ? undefined : parseFloat(e.target.value) })} />
+        <span className="k">Max</span>
+        <input className="field mini" placeholder="—" value={k.max ?? ""} onChange={e => patch(i, { max: e.target.value === "" ? undefined : parseFloat(e.target.value) })} /></div>);
+    return (
+      <div className="dflt"><span className="k">Starts</span>
+        <input className="field" placeholder="(empty)" value={k.def ?? ""} onChange={e => patch(i, { def: e.target.value })} /></div>);
+  };
   return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
     {blurb && <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.5 }}>
       Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via "Whose state".</div>}
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-      {v.stateKeys.map((k, i) => <span key={k.key} className="chip">{k.key} <span style={{ color: "#8b94a8" }}>· {k.type}</span>
-        <span className="x" onClick={() => set({ stateKeys: v.stateKeys.filter((_, j) => j !== i) })}>×</span></span>)}
-      {v.stateKeys.length === 0 && <span style={{ color: "#8b94a8", fontSize: 10 }}>none</span>}
-    </div>
+    {v.stateKeys.map((k, i) => (
+      <div key={k.key} className="skey">
+        <div className="top">
+          <span className="name">{k.key}</span>
+          <span className="tseg">{[["boolean","bool"],["number","num"],["string","text"]].map(([t, l]) => (
+            <button key={t} className={k.type === t ? "on" : ""} title={t}
+              onClick={() => patch(i, { type: t, def: t === "boolean" ? false : t === "number" ? 0 : "", min: undefined, max: undefined })}>{l}</button>))}</span>
+          <span className="x" title="Remove this key" onClick={() => set({ stateKeys: v.stateKeys.filter((_, j) => j !== i) })}>×</span>
+        </div>
+        {typed(k, i)}
+      </div>))}
+    {v.stateKeys.length === 0 && <span style={{ color: "#8b94a8", fontSize: 10 }}>none — add a key below</span>}
     <div style={{ display: "flex", gap: 4 }}>
-      <input className="field" placeholder="new key (e.g. health)" value={draft} onChange={e => setDraft(e.target.value)} />
-      <button className="btn" onClick={() => { if (draft.trim()) { set({ stateKeys: [...v.stateKeys, { key: draft.trim(), type: "boolean" }] }); setDraft(""); } }}>+ add</button>
+      <input className="field" placeholder="new key (e.g. health)" value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter" && draft.trim()) { set({ stateKeys: [...v.stateKeys, { key: draft.trim(), type: "boolean", def: false }] }); setDraft(""); } }} />
+      <button className="btn" onClick={() => { if (draft.trim()) { set({ stateKeys: [...v.stateKeys, { key: draft.trim(), type: "boolean", def: false }] }); setDraft(""); } }}>+ add</button>
     </div>
   </div>);
 }
+
 function AppearanceFields({ v, set }) {
   return (<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
     <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -183,7 +225,7 @@ const Header = ({ v, set }) => (
 const sums = (v) => ({
   transform: `${v.shape.toLowerCase()} · ${v.size.w}×${v.size.h}×${v.size.d}`,
   attach: v.attachTo || "static",
-  state: v.stateKeys.length ? v.stateKeys.map(k => k.key).join(" · ") : "none",
+  state: v.stateKeys.length ? v.stateKeys.map(k => `${k.key}`).join(" · ") : "none",
   appearance: `${v.customShading ? "custom color" : "default"}${v.gradientFill ? " · gradient" : ""}`,
   scripts: v.scripts.length ? `${v.scripts.length} script${v.scripts.length === 1 ? "" : "s"}` : "none",
 });
@@ -276,12 +318,15 @@ function PanelC() {
           {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
         </select></div>
       <div className="hair" />
-      <div className="kv" style={{ alignItems: "start" }}><span className="k" title={"Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via “Whose state”."}>State ⓘ</span>
-        <StateFields v={v} set={set} /></div>
+      <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}
+        title={"Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via “Whose state”."}>State (this volume only) ⓘ</span>
+        <div style={{ marginTop: 4 }}><StateFields v={v} set={set} /></div></div>
       <div className="hair" />
-      <div className="kv" style={{ alignItems: "start" }}><span className="k">Scripts</span><ScriptsFields v={v} set={set} /></div>
+      <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Entry / exit scripts</span>
+        <div style={{ marginTop: 4 }}><ScriptsFields v={v} set={set} /></div></div>
       <div className="hair" />
-      <div className="kv" style={{ alignItems: "start" }}><span className="k">Look</span><AppearanceFields v={v} set={set} /></div>
+      <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Look</span>
+        <div style={{ marginTop: 4 }}><AppearanceFields v={v} set={set} /></div></div>
     </div>
     <div style={{ flex: 1 }} />
     <div style={{ padding: "10px 16px 14px", borderTop: "1px solid rgba(255,255,255,0.06)" }}><FooterBtns /></div>
