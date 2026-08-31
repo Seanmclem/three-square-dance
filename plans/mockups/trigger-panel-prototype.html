@@ -41,9 +41,8 @@
   .switch { appearance: none; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); position: relative; cursor: pointer; margin: 0; outline: none; flex-shrink: 0; }
   .switch::before { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
   .switch:checked { background: #3b82f6; } .switch:checked::before { left: 15px; }
-  .ibtn { background: none; border: 1px solid #3a4257; border-radius: 50%; width: 16px; height: 16px; padding: 0;
-    color: #98a2b8; font-size: 10px; line-height: 1; cursor: pointer; flex: none; }
-  .ibtn.on { color: #7fb2ff; border-color: #4a6fa8; background: #1c2740; }
+  .ibtn { background: none; border: none; padding: 0 2px; color: #98a2b8; font-size: 12px; line-height: 1; cursor: pointer; flex: none; }
+  .ibtn.on { color: #7fb2ff; }
   .iblurb { color: #b9c2d6; font-size: 11px; line-height: 1.55; background: #191e2b; border: 1px solid #2a3145;
     border-left: 2px solid #4a6fa8; border-radius: 6px; padding: 7px 9px; }
   .rotwrap { position: relative; display: inline-flex; align-items: center; }
@@ -158,13 +157,16 @@ function AttachField({ v, set }) {
     </select></div>);
 }
 const STATE_BLURB = "Keys this entity tracks for itself — every copy and prefab instance gets its own values. Scripts read/write them via \u201cWhose state\u201d.";
-function InfoBlurb({ text, style }) {
+function InfoBlurb({ text, heading }) {
   const [open, setOpen] = useState(false);
-  return (<>
-    <button className={"ibtn" + (open ? " on" : "")} title={open ? "Hide description" : "What is this?"}
-      style={style} onClick={() => setOpen(o => !o)}>i</button>
-    {open && <div className="iblurb">{text}</div>}
-  </>);
+  return (<div>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>{heading}</span>
+      <button className={"ibtn" + (open ? " on" : "")} title={open ? "Hide description" : "What is this?"}
+        onClick={() => setOpen(o => !o)}>ⓘ</button>
+    </div>
+    {open && <div className="iblurb" style={{ marginTop: 4 }}>{text}</div>}
+  </div>);
 }
 function StateFields({ v, set, blurb }) {
   const [draft, setDraft] = useState("");
@@ -187,7 +189,7 @@ function StateFields({ v, set, blurb }) {
         <input className="field" placeholder="(empty)" value={k.def ?? ""} onChange={e => patch(i, { def: e.target.value })} /></div>);
   };
   return (<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-    {blurb && <InfoBlurb text={STATE_BLURB} style={{ alignSelf: "flex-end", marginBottom: -2 }} />}
+    {blurb && <InfoBlurb text={STATE_BLURB} heading="This volume only" />}
     {v.stateKeys.map((k, i) => (
       <div key={k.key} className="skey">
         <div className="top">
@@ -370,10 +372,8 @@ function PanelC() {
           {HOSTS.map((h, i) => <option key={h} value={i === 0 ? "" : h}>{h}</option>)}
         </select></div>
       <div className="hair" />
-      <div><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>State (this volume only)</span>
-        </div>
-        <div style={{ marginTop: 4 }}><StateFields v={v} set={set} blurb /></div></div>
+      <div><InfoBlurb text={STATE_BLURB} heading="State (this volume only)" />
+        <div style={{ marginTop: 4 }}><StateFields v={v} set={set} /></div></div>
       <div className="hair" />
       <div><span style={{ color: "var(--muted)", fontSize: 9, letterSpacing: 0.5, textTransform: "uppercase" }}>Entry / exit scripts</span>
         <div style={{ marginTop: 4 }}><ScriptsFields v={v} set={set} /></div></div>
