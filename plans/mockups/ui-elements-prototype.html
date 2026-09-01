@@ -1,0 +1,380 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>UI elements editor prototype — A/B/C</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root { --bar: rgba(28,28,28,0.95); --line: rgba(255,255,255,0.08); --text: #dde3f0; --text2: #c2cadb; --muted: #8b94a8; --dim: #7a7a7a; --blue: #80aaff; --blueBg: rgba(80,140,255,0.14); --blueBr: rgba(80,140,255,0.3); --red: #cc6666; --card: rgba(255,255,255,0.03); --cardBr: rgba(255,255,255,0.06); --field: rgba(255,255,255,0.055); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1115; color: var(--text2); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 12px; }
+  .page { padding: 20px 24px 80px; }
+  h1 { font-size: 15px; color: var(--text); font-family: ui-monospace, Menlo, monospace; letter-spacing: 2px; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.55; max-width: 860px; margin: 6px 0 18px; }
+  .note b { color: var(--blue); }
+  .widthbar { display: flex; align-items: center; gap: 8px; margin-bottom: 22px; color: var(--muted); }
+  .widthbar button { padding: 4px 10px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: var(--text2); font-size: 11px; cursor: pointer; }
+  .widthbar button.on { background: var(--blueBg); border-color: var(--blueBr); color: var(--blue); }
+  .variants { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .variant h2 { font-size: 12px; color: var(--blue); font-family: ui-monospace, Menlo, monospace; letter-spacing: 1px; margin: 0 0 4px; }
+  .variant .vnote { color: var(--muted); font-size: 11px; line-height: 1.5; margin-bottom: 8px; max-width: 340px; min-height: 66px; }
+
+  /* panel chrome */
+  .panel { background: #17181c; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 28px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+  .phead { display: flex; align-items: center; padding: 10px 12px 8px; font-family: ui-monospace, Menlo, monospace; letter-spacing: 3px; font-size: 13px; color: var(--text); }
+  .phead .x { margin-left: auto; color: var(--dim); cursor: pointer; }
+  .ptabs { display: flex; border-bottom: 1px solid var(--line); padding: 0 8px; gap: 2px; overflow: hidden; }
+  .ptabs span { padding: 6px 7px; font-size: 10px; letter-spacing: 1px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; white-space: nowrap; }
+  .ptabs span.on { color: var(--text); border-bottom: 2px solid var(--blue); }
+  .ptool { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 8px 10px; }
+  .pbody { overflow-y: auto; max-height: 560px; padding-bottom: 10px; }
+
+  select, input[type=text], input[type=number] { background: var(--field); border: 1px solid rgba(255,255,255,0.09); border-radius: 5px; color: var(--text); font-size: 12px; padding: 5px 8px; font-family: inherit; min-width: 0; }
+  input::placeholder { color: #6b7386; }
+  .btn { padding: 4px 9px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: var(--text2); font-size: 11px; cursor: pointer; white-space: nowrap; }
+  .btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+  .btn.primary { background: rgba(80,140,255,0.25); border-color: var(--blueBr); color: var(--text); }
+  .btn.danger { color: var(--red); padding: 2px 7px; }
+
+  .chip { font-size: 10px; color: #9dbdff; background: var(--blueBg); border: 1px solid var(--blueBr); border-radius: 3px; padding: 2px 7px; letter-spacing: 1px; text-transform: uppercase; font-family: ui-monospace, Menlo, monospace; flex-shrink: 0; }
+
+  /* toggle switch */
+  .sw { position: relative; width: 30px; height: 17px; border-radius: 9px; background: rgba(255,255,255,0.14); cursor: pointer; flex-shrink: 0; transition: background .15s; }
+  .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #cfd6e4; transition: left .15s; }
+  .sw.on { background: rgba(80,140,255,0.7); }
+  .sw.on::after { left: 15px; background: #fff; }
+
+  /* element card */
+  .card { background: var(--card); border: 1px solid var(--cardBr); border-radius: 6px; margin: 0 10px 8px; overflow: hidden; }
+  .chead { display: flex; align-items: center; gap: 7px; padding: 7px 9px; cursor: pointer; user-select: none; min-width: 0; }
+  .chead:hover { background: rgba(255,255,255,0.03); }
+  .chead .chev { color: var(--dim); font-size: 10px; width: 10px; flex-shrink: 0; }
+  .chead .nm { color: var(--text); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chead .sum { color: var(--muted); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, Menlo, monospace; }
+  .chead .sp { flex: 1; }
+  .cbody { padding: 2px 10px 10px; border-top: 1px solid var(--cardBr); }
+
+  /* A: one field per row, label left */
+  .frow { display: grid; grid-template-columns: minmax(0,1fr) minmax(150px,60%); align-items: center; gap: 10px; min-height: 34px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .frow:last-child { border-bottom: none; }
+  .frow .lb { color: var(--muted); font-size: 11px; }
+  .frow .ct { display: flex; align-items: center; justify-content: flex-end; gap: 6px; min-width: 0; }
+  .frow .ct > input[type=text], .frow .ct > select { flex: 1; }
+  .frow .ct > input[type=number] { width: 100%; }
+
+  /* B: sections */
+  .sect { margin-top: 10px; }
+  .sect .sh { font-size: 9px; letter-spacing: 2px; color: #7a86a0; font-family: ui-monospace, Menlo, monospace; margin-bottom: 6px; text-transform: uppercase; }
+  .pair { display: flex; gap: 8px; }
+  .pair > label { flex: 1; display: flex; flex-direction: column; gap: 3px; color: var(--muted); font-size: 10px; min-width: 0; }
+  .agrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: rgba(0,0,0,0.25); border: 1px solid var(--cardBr); border-radius: 6px; padding: 6px; width: 120px; }
+  .agrid i { height: 20px; border-radius: 4px; background: rgba(255,255,255,0.05); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 8px; color: transparent; font-style: normal; }
+  .agrid i:hover { background: rgba(255,255,255,0.12); }
+  .agrid i.on { background: var(--blueBg); border: 1px solid var(--blueBr); color: var(--blue); }
+  .swrow { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+  .swrow .lb { color: var(--muted); font-size: 11px; }
+
+  /* C: stacked labels */
+  .stk { display: flex; flex-direction: column; gap: 3px; margin-top: 9px; min-width: 0; }
+  .stk .lb { color: var(--muted); font-size: 10px; letter-spacing: .3px; }
+  .stk input, .stk select { width: 100%; }
+  .crow { display: flex; align-items: center; gap: 7px; padding: 8px 12px; cursor: pointer; user-select: none; border-bottom: 1px solid rgba(255,255,255,0.045); min-width: 0; }
+  .crow:hover { background: rgba(255,255,255,0.025); }
+  .crow .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: rgba(255,255,255,0.15); }
+  .crow .dot.on { background: #50c878; }
+
+  /* graphic picker row */
+  .gpick { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+  .gpick .thumb { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+  .gpick input { flex: 1; font-family: ui-monospace, Menlo, monospace; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+/* ── demo data (mirrors UiElementDef in src/types.ts) ─────────────────────── */
+const ANCHORS = ["top-left","top-center","top-right","bottom-left","bottom-center","bottom-right"];
+const KINDS = ["bar","counter","icons","label","image","menu"];
+const GRAPHIC_EMOJI = { coin_icon:"🪙", heart_ico:"❤️", heart_hal:"💔", heart_out:"🤍", skull:"💀" };
+const DEMO = [
+  { id:"ui_1", kind:"counter", label:"Coin Count", anchor:"top-left",  offsetX:16, offsetY:16, startVisible:true, backdrop:true,  stateKey:"coins",  prefix:"", size:28, graphicId:"coin_icon" },
+  { id:"ui_2", kind:"icons",   label:"Hearts",     anchor:"top-right", offsetX:16, offsetY:16, startVisible:true, backdrop:false, stateKey:"Hearts", count:3, max:undefined, size:24, fullGraphicId:"heart_ico", halfGraphicId:"heart_hal", emptyGraphicId:"heart_out" },
+  { id:"ui_3", kind:"bar",     label:"Health Bar", anchor:"bottom-left", offsetX:16, offsetY:16, startVisible:false, backdrop:false, stateKey:"health", max:100, width:160, height:14, color:"#e05555", graphicId:"" },
+];
+let nextId = 4;
+function blank(kind){
+  const base = { id:"ui_"+(nextId++), kind, label:"New "+kind, anchor:"top-left", offsetX:16, offsetY:16, startVisible:false, backdrop:false };
+  if (kind==="bar")     return { ...base, stateKey:"", max:100, width:160, height:14, color:"#e05555" };
+  if (kind==="counter") return { ...base, stateKey:"", prefix:"", size:24 };
+  if (kind==="icons")   return { ...base, stateKey:"", count:3, size:24, fullGraphicId:"" };
+  if (kind==="label")   return { ...base, text:"Label text", fontSize:13, color:"#dde3f0" };
+  if (kind==="image")   return { ...base, graphicId:"", opacity:1 };
+  return { ...base, title:"", options:[] };
+}
+function summary(el){
+  const bits = [el.anchor];
+  if (el.stateKey) bits.push(el.stateKey);
+  if (el.kind==="label" && el.text) bits.push('"'+el.text+'"');
+  return bits.join(" · ");
+}
+
+/* ── shared bits ──────────────────────────────────────────────────────────── */
+function Switch({ on, onToggle }){ return <div className={"sw"+(on?" on":"")} onClick={e=>{e.stopPropagation(); onToggle();}} />; }
+function Gpick({ value, onChange, placeholder }){
+  return (
+    <div className="gpick">
+      <span className="thumb">{GRAPHIC_EMOJI[value] ?? (value ? "▦" : "")}</span>
+      <input type="text" placeholder={placeholder} value={value ?? ""} onChange={e=>onChange(e.target.value)} />
+      <button className="btn">Pick</button>
+    </div>
+  );
+}
+function PanelChrome({ width, children, onAdd }){
+  const [kind, setKind] = useState("bar");
+  return (
+    <div className="panel" style={{ width }}>
+      <div className="phead">SCRIPTS<span className="x">✕</span></div>
+      <div className="ptabs">
+        {["LEVEL","SELECTED","DIALOGUE","STATE","ITEMS","UI"].map(t =>
+          <span key={t} className={t==="UI"?"on":""}>{t}</span>)}
+      </div>
+      <div className="ptool">
+        <select value={kind} onChange={e=>setKind(e.target.value)} style={{ width: 100 }}>
+          {KINDS.map(k=><option key={k}>{k}</option>)}
+        </select>
+        <button className="btn">?</button>
+        <button className="btn primary" onClick={()=>onAdd(kind)}>+ New</button>
+      </div>
+      <div className="pbody">{children}</div>
+    </div>
+  );
+}
+
+/* kind-specific field descriptors so all three variants render identical data */
+function kindFields(el, set){
+  const num = (label, key, ph) => ({ label, ctrl: <input type="number" placeholder={ph} value={el[key] ?? ""} onChange={e=>set({ [key]: e.target.value===""?undefined:Number(e.target.value) })} /> });
+  const txt = (label, key, ph, mono) => ({ label, ctrl: <input type="text" placeholder={ph} style={mono?{fontFamily:"ui-monospace, Menlo, monospace"}:null} value={el[key] ?? ""} onChange={e=>set({ [key]: e.target.value })} /> });
+  const gfx = (label, key, ph) => ({ label, ctrl: <Gpick value={el[key]} placeholder={ph} onChange={v=>set({ [key]: v })} /> });
+  const col = (label, key, dflt) => ({ label, ctrl: <input type="color" value={el[key] ?? dflt} style={{ width: 30, height: 22, padding: 0, background: "none", border: "none", cursor: "pointer" }} onChange={e=>set({ [key]: e.target.value })} /> });
+  switch (el.kind) {
+    case "bar": return [txt("State key","stateKey","e.g. health",true), num("Full at","max","100"), num("Width px","width","160"), num("Height px","height","14"), col("Fill color","color","#e05555"), gfx("Icon (optional)","graphicId","icon id")];
+    case "counter": return [txt("State key","stateKey","e.g. coins",true), txt("Prefix","prefix","×"), num("Icon size px","size","24"), gfx("Icon (optional)","graphicId","icon id")];
+    case "icons": return [txt("State key","stateKey","e.g. health",true), num("Icon count","count","3"), num("Full at","max","= count"), num("Icon size px","size","24"), gfx("Full icon","fullGraphicId","full icon"), gfx("Half icon (optional)","halfGraphicId","rounds whole without"), gfx("Empty icon (optional)","emptyGraphicId","faded full without")];
+    case "label": return [txt("Text","text","Label text"), num("Font size px","fontSize","13"), col("Color","color","#dde3f0")];
+    case "image": return [gfx("Graphic","graphicId","graphic id"), num("Width px","width","auto"), num("Height px","height","auto"), num("Opacity 0-1","opacity","1")];
+    default: return [txt("Menu title","title","(optional)"), { label:"Options", ctrl:<button className="btn" style={{flex:1}}>Edit options… ({(el.options||[]).length})</button> }];
+  }
+}
+
+/* card header shared by A and B */
+function CardHead({ el, open, onToggle, onRemove }){
+  return (
+    <div className="chead" onClick={onToggle}>
+      <span className="chev">{open ? "▾" : "▸"}</span>
+      <span className="chip">{el.kind}</span>
+      <span className="nm">{el.label}</span>
+      {!open && <span className="sum">{summary(el)}</span>}
+      <span className="sp" />
+      <button className="btn danger" onClick={e=>{e.stopPropagation(); onRemove();}}>×</button>
+    </div>
+  );
+}
+
+/* ── A: flat vertical rows, label left ────────────────────────────────────── */
+function VariantA({ width }){
+  const [els, setEls] = useState(DEMO);
+  const [open, setOpen] = useState({ ui_1: true });
+  const upd = (id, ch) => setEls(s => s.map(e => e.id===id ? { ...e, ...ch } : e));
+  return (
+    <PanelChrome width={width} onAdd={k => { const b = blank(k); setEls(s=>[...s,b]); setOpen(o=>({ ...o, [b.id]: true })); }}>
+      {els.map(el => {
+        const set = ch => upd(el.id, ch);
+        return (
+          <div className="card" key={el.id}>
+            <CardHead el={el} open={!!open[el.id]} onToggle={()=>setOpen(o=>({ ...o, [el.id]: !o[el.id] }))} onRemove={()=>setEls(s=>s.filter(e=>e.id!==el.id))} />
+            {open[el.id] && (
+              <div className="cbody">
+                <div className="frow"><span className="lb">Element name</span><div className="ct"><input type="text" value={el.label} onChange={e=>set({label:e.target.value})} /></div></div>
+                <div className="frow"><span className="lb">Screen anchor</span><div className="ct"><select value={el.anchor} onChange={e=>set({anchor:e.target.value})}>{ANCHORS.map(a=><option key={a}>{a}</option>)}</select></div></div>
+                <div className="frow"><span className="lb">X offset</span><div className="ct"><input type="number" value={el.offsetX ?? ""} placeholder="16" onChange={e=>set({offsetX:Number(e.target.value)})} /></div></div>
+                <div className="frow"><span className="lb">Y offset</span><div className="ct"><input type="number" value={el.offsetY ?? ""} placeholder="16" onChange={e=>set({offsetY:Number(e.target.value)})} /></div></div>
+                <div className="frow"><span className="lb">Visible at start</span><div className="ct"><Switch on={!!el.startVisible} onToggle={()=>set({startVisible:!el.startVisible})} /></div></div>
+                {el.kind!=="menu" && <div className="frow"><span className="lb">Backdrop</span><div className="ct"><Switch on={!!el.backdrop} onToggle={()=>set({backdrop:!el.backdrop})} /></div></div>}
+                {kindFields(el, set).map((f,i)=>(
+                  <div className="frow" key={i}><span className="lb">{f.label}</span><div className="ct">{f.ctrl}</div></div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </PanelChrome>
+  );
+}
+
+/* ── B: sectioned card + anchor grid ──────────────────────────────────────── */
+function VariantB({ width }){
+  const [els, setEls] = useState(DEMO);
+  const [open, setOpen] = useState({ ui_1: true });
+  const upd = (id, ch) => setEls(s => s.map(e => e.id===id ? { ...e, ...ch } : e));
+  const bindFields = el => kindFields(el, ch=>upd(el.id, ch)).filter(f=>!/icon|graphic|color/i.test(f.label) || /count|size/i.test(f.label));
+  const gfxFields  = el => kindFields(el, ch=>upd(el.id, ch)).filter(f=>/icon \(|full icon|half icon|empty icon|graphic|color/i.test(f.label) && !/count|size/i.test(f.label));
+  return (
+    <PanelChrome width={width} onAdd={k => { const b = blank(k); setEls(s=>[...s,b]); setOpen(o=>({ ...o, [b.id]: true })); }}>
+      {els.map(el => {
+        const set = ch => upd(el.id, ch);
+        return (
+          <div className="card" key={el.id}>
+            <CardHead el={el} open={!!open[el.id]} onToggle={()=>setOpen(o=>({ ...o, [el.id]: !o[el.id] }))} onRemove={()=>setEls(s=>s.filter(e=>e.id!==el.id))} />
+            {open[el.id] && (
+              <div className="cbody">
+                <div className="stk"><span className="lb">Element name</span><input type="text" value={el.label} onChange={e=>set({label:e.target.value})} /></div>
+                <div className="sect">
+                  <div className="sh">Placement</div>
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                    <div className="agrid" title="Screen anchor">
+                      {ANCHORS.map(a=><i key={a} className={el.anchor===a?"on":""} title={a} onClick={()=>set({anchor:a})}>●</i>)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 110 }}>
+                      <div className="pair">
+                        <label>X offset<input type="number" value={el.offsetX ?? ""} placeholder="16" onChange={e=>set({offsetX:Number(e.target.value)})} /></label>
+                        <label>Y offset<input type="number" value={el.offsetY ?? ""} placeholder="16" onChange={e=>set({offsetY:Number(e.target.value)})} /></label>
+                      </div>
+                      <div style={{ color: "var(--dim)", fontSize: 9, marginTop: 5 }}>{el.anchor}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="sect">
+                  <div className="sh">Visibility</div>
+                  <div className="swrow"><span className="lb">Visible at start</span><Switch on={!!el.startVisible} onToggle={()=>set({startVisible:!el.startVisible})} /></div>
+                  {el.kind!=="menu" && <div className="swrow"><span className="lb">Backdrop behind element</span><Switch on={!!el.backdrop} onToggle={()=>set({backdrop:!el.backdrop})} /></div>}
+                </div>
+                <div className="sect">
+                  <div className="sh">{el.kind==="menu" ? "Menu" : el.kind==="label" ? "Text" : "Binding"}</div>
+                  {bindFields(el).map((f,i)=>(
+                    <div className="frow" key={i}><span className="lb">{f.label}</span><div className="ct">{f.ctrl}</div></div>
+                  ))}
+                </div>
+                {gfxFields(el).length > 0 && (
+                  <div className="sect">
+                    <div className="sh">Graphics</div>
+                    {gfxFields(el).map((f,i)=>(
+                      <div className="frow" key={i}><span className="lb">{f.label}</span><div className="ct">{f.ctrl}</div></div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </PanelChrome>
+  );
+}
+
+/* ── C: accordion list, one open, stacked labels ──────────────────────────── */
+function VariantC({ width }){
+  const [els, setEls] = useState(DEMO);
+  const [openId, setOpenId] = useState("ui_1");
+  const upd = (id, ch) => setEls(s => s.map(e => e.id===id ? { ...e, ...ch } : e));
+  return (
+    <PanelChrome width={width} onAdd={k => { const b = blank(k); setEls(s=>[...s,b]); setOpenId(b.id); }}>
+      {els.map(el => {
+        const set = ch => upd(el.id, ch);
+        const open = openId === el.id;
+        return (
+          <div key={el.id} style={ open ? { background: "var(--card)", borderTop: "1px solid var(--cardBr)", borderBottom: "1px solid var(--cardBr)" } : null }>
+            <div className="crow" onClick={()=>setOpenId(open ? null : el.id)}>
+              <span className="chev">{open ? "▾" : "▸"}</span>
+              <span className="chip">{el.kind}</span>
+              <span className="nm" style={{ color: "var(--text)" }}>{el.label}</span>
+              <span className="sum" style={{ color: "var(--muted)", fontSize: 10, fontFamily: "ui-monospace, Menlo, monospace" }}>{summary(el)}</span>
+              <span className="sp" style={{ flex: 1 }} />
+              <span className={"dot"+(el.startVisible?" on":"")} title={el.startVisible?"visible at start":"hidden until show_ui"} />
+              <button className="btn danger" onClick={e=>{e.stopPropagation(); setEls(s=>s.filter(x=>x.id!==el.id));}}>×</button>
+            </div>
+            {open && (
+              <div style={{ padding: "0 14px 14px" }}>
+                <div className="stk"><span className="lb">Element name</span><input type="text" value={el.label} onChange={e=>set({label:e.target.value})} /></div>
+                <div className="stk"><span className="lb">Screen anchor</span><select value={el.anchor} onChange={e=>set({anchor:e.target.value})}>{ANCHORS.map(a=><option key={a}>{a}</option>)}</select></div>
+                <div className="stk"><span className="lb">Offset from anchor (px)</span>
+                  <div className="pair">
+                    <label>X<input type="number" value={el.offsetX ?? ""} placeholder="16" onChange={e=>set({offsetX:Number(e.target.value)})} /></label>
+                    <label>Y<input type="number" value={el.offsetY ?? ""} placeholder="16" onChange={e=>set({offsetY:Number(e.target.value)})} /></label>
+                  </div>
+                </div>
+                <div className="stk">
+                  <div className="swrow"><span className="lb">Visible at start</span><Switch on={!!el.startVisible} onToggle={()=>set({startVisible:!el.startVisible})} /></div>
+                  {el.kind!=="menu" && <div className="swrow"><span className="lb">Backdrop behind element</span><Switch on={!!el.backdrop} onToggle={()=>set({backdrop:!el.backdrop})} /></div>}
+                </div>
+                {kindFields(el, set).map((f,i)=>(
+                  <div className="stk" key={i}><span className="lb">{f.label}</span>{f.ctrl}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </PanelChrome>
+  );
+}
+
+/* ── page ─────────────────────────────────────────────────────────────────── */
+function App(){
+  const [w, setW] = useState(340);
+  return (
+    <div className="page">
+      <h1>SCRIPTS → UI TAB — THREE LAYOUT DIRECTIONS</h1>
+      <div className="note">
+        The current tab packs 3-4 label+field grids per row, which overlaps at panel widths (280-600px, default 320).
+        All three directions below go <b>fully vertical with collapse/expand per element</b>; they differ in row grammar and grouping.
+        Everything is clickable: expand/collapse cards, edit fields, toggle switches, pick anchors, add elements with + New, delete with ×.
+        Same demo data as the screenshots (Coin Count counter, Hearts icons, plus a Health bar).
+      </div>
+      <div className="widthbar">
+        Panel width:
+        {[280, 320, 340, 420, 520].map(x =>
+          <button key={x} className={w===x?"on":""} onClick={()=>setW(x)}>{x}px</button>)}
+        <input type="range" min="280" max="600" value={w} onChange={e=>setW(Number(e.target.value))} style={{ width: 160 }} />
+        <span>{w}px</span>
+      </div>
+      <div className="variants">
+        <div className="variant">
+          <h2>A — FLAT ROWS + COLLAPSIBLE CARDS</h2>
+          <div className="vnote">
+            Closest to the app's existing properties-row grammar (label left, control right), but strictly
+            <b> one field per row</b>. Cards collapse to a header line with a kind chip, name, and a muted
+            "anchor · state key" summary. New elements start expanded.
+          </div>
+          <VariantA width={w} />
+        </div>
+        <div className="variant">
+          <h2>B — SECTIONED CARD + ANCHOR GRID</h2>
+          <div className="vnote">
+            Same collapsible cards, but fields grouped under tiny section headers (Placement / Visibility /
+            Binding / Graphics). The anchor dropdown becomes a <b>clickable 3×2 grid</b> that mirrors the
+            actual screen corners; X/Y offsets pair beside it.
+          </div>
+          <VariantB width={w} />
+        </div>
+        <div className="variant">
+          <h2>C — ACCORDION, ONE OPEN, STACKED LABELS</h2>
+          <div className="vnote">
+            Elements are a flat list of compact rows; opening one closes the others, so the list stays scannable
+            with many elements. Labels sit <b>above</b> full-width inputs: the roomiest option at 280px.
+            Green dot on a row = visible at start.
+          </div>
+          <VariantC width={w} />
+        </div>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
