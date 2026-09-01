@@ -739,7 +739,7 @@ export default function App() {
       // load_scene during editor PREVIEW (project mode only): route to another of the
       // project's scenes the way the runtime shell does, but non-destructively. Outside
       // preview, or with no project open, this stays the deliberate no-op (runtime parity).
-      bus.on("scene:load-request", ({ sceneId }) => {
+      bus.on("scene:load-request", ({ sceneId, fadeColor, fadeDuration }) => {
         const proj = projectRef.current;
         if (!proj || !preview.isActive || preview.mode === "occlusion") return;
         if (routingRef.current) return;                        // a portal can fire twice before teardown
@@ -753,6 +753,9 @@ export default function App() {
           routingRef.current = true;
           routeReturnSceneRef.current ??= proj.sceneId;        // remember the origin (first hop only)
           try {
+            // Fade-through (v4.79.65) — same configurable fade as the runtime
+            // SceneRouter; the fade-in HOLDS until the arrival fade-out below.
+            bus.emit("overlay:fade-in", { color: fadeColor ?? "#000000", duration: fadeDuration ?? 0.3 });
             const fired = scriptEngine.getFiredOneShots();     // survive the hop (don't re-fire cross-scene one-shots)
             preview.exit();                                    // remove character (fires the guarded preview:stop)
             const file = await proj.store.loadScene(sceneId);
@@ -766,8 +769,10 @@ export default function App() {
             projectRef.current = next; setProject(next);
             preview.enter(mode);                               // respawn at the new scene's defaultSpawn (fires preview:start → re-index + activate)
             scriptEngine.restoreFiredOneShots(fired);          // after activate(), which clears the set
+            bus.emit("overlay:fade-out", { duration: fadeDuration ?? 0.3 });
           } catch (e) {
             console.error(`[preview] load_scene "${sceneId}" failed:`, e);
+            bus.emit("overlay:fade-out", { duration: 0 });     // don't strand the black overlay
           } finally {
             routingRef.current = false;
           }
