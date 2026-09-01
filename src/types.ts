@@ -327,7 +327,7 @@ export interface BusEvents {
   "scene:load":            { json: unknown };
   "scene:saved":           { json: SceneFile };
   "scene:loaded":          { metadata: SceneMetadata };
-  "scene:load-request":    { sceneId: string };   // load_scene action → runtime SceneRouter (no editor listener)
+  "scene:load-request":    { sceneId: string; fadeColor?: string; fadeDuration?: number };   // load_scene action → runtime SceneRouter (no editor listener)
   "world:loaded":          { metadata: SceneMetadata };
   "materials:loaded":      { materials: MaterialDef[] };
   "quality:changed":       { quality: QualityScale };

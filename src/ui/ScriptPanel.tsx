@@ -2132,7 +2132,7 @@ function describeAction(a: ScriptAction, ctx: NameCtx): { title: string; sub: st
     case "flash_player": noun = a.flashColor ?? ""; if (a.flashDuration != null) tail.push(`${a.flashDuration}s`); break;
     case "show_ui": case "hide_ui": noun = ctx.uiElements?.find(u => u.id === a.uiElementId)?.label ?? a.uiElementId ?? ""; break;
     case "run_script": noun = a.script ?? ""; break;
-    case "load_scene": noun = a.sceneId ?? ""; break;
+    case "load_scene": noun = a.sceneId ?? ""; if (a.fadeDuration != null) tail.push(`${a.fadeDuration}s fade`); break;
     case "give_item": case "take_item": case "transfer_item": {
       const item = ctx.worldItems?.find(i => i.id === a.itemId)?.label ?? a.itemId ?? "";
       noun = `${a.count ?? 1}× ${item}`;
@@ -3122,6 +3122,27 @@ function ActionFields({
                 )}
               </select>
             </F>
+            <div style={{ display: "flex", gap: 4 }}>
+              <F label="Fade color" flex={1}>
+                <input
+                  style={S.field}
+                  placeholder="#000"
+                  title="Fade-through color for the transition (blank = black)"
+                  value={action.fadeColor ?? ""}
+                  onChange={(e) => set({ fadeColor: e.target.value || undefined })}
+                />
+              </F>
+              <F label="Seconds" flex="0 0 60px">
+                <input
+                  type="number" min={0} step={0.1}
+                  style={S.field}
+                  placeholder="0.3"
+                  title="Fade in/out duration (blank = 0.3s)"
+                  value={action.fadeDuration ?? ""}
+                  onChange={(e) => set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })}
+                />
+              </F>
+            </div>
             <div style={{ fontSize: 10, color: "#98a2b8" }}>
               Runtime only — routes between this project&apos;s scenes. No-op in editor preview.
             </div>
@@ -3138,6 +3159,27 @@ function ActionFields({
               onChange={(e) => set({ sceneId: e.target.value })}
             />
           </F>
+          <div style={{ display: "flex", gap: 4 }}>
+            <F label="Fade color" flex={1}>
+              <input
+                style={S.field}
+                placeholder="#000"
+                title="Fade-through color for the transition (blank = black)"
+                value={action.fadeColor ?? ""}
+                onChange={(e) => set({ fadeColor: e.target.value || undefined })}
+              />
+            </F>
+            <F label="Seconds" flex="0 0 60px">
+              <input
+                type="number" min={0} step={0.1}
+                style={S.field}
+                placeholder="0.3"
+                title="Fade in/out duration (blank = 0.3s)"
+                value={action.fadeDuration ?? ""}
+                onChange={(e) => set({ fadeDuration: e.target.value === "" ? undefined : Number(e.target.value) })}
+              />
+            </F>
+          </div>
           <div style={{ fontSize: 10, color: "#98a2b8" }}>
             Runtime only — must match a scene key in the game&apos;s manifest. Not validated here.
           </div>

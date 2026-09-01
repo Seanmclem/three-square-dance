@@ -38,8 +38,8 @@ export class SceneRouter {
   constructor(private readonly deps: SceneRouterDeps) {
     // load_scene script action → route. Unknown ids are non-fatal: log and
     // stay in the current scene (go() throws before any teardown).
-    this._offLoadRequest = deps.bus.on("scene:load-request", ({ sceneId }) => {
-      void this.go(sceneId);
+    this._offLoadRequest = deps.bus.on("scene:load-request", ({ sceneId, fadeColor, fadeDuration }) => {
+      void this.go(sceneId, { fadeColor, fadeDuration });
     });
   }
 
@@ -56,6 +56,10 @@ export class SceneRouter {
       /** Continue-from-save: one-shots + pose from the runtime save blob
        *  (state is restored by the caller before go(), values survive). */
       restore?: { firedOneShots: string[]; pose?: { x: number; y: number; z: number; facing: number } };
+      /** load_scene action fade (v4.79.64) — color + seconds for the fade-through;
+       *  defaults match the classic hardcoded black 0.3s. */
+      fadeColor?:    string;
+      fadeDuration?: number;
     },
   ): Promise<void> {
     // A portal volume can fire load_scene twice before teardown starts.
@@ -76,7 +80,7 @@ export class SceneRouter {
     try {
       this.deps.onLoading?.();
       if (preview.isActive) {
-        bus.emit("overlay:fade-in", { color: "#000000", duration: 0.3 });
+        bus.emit("overlay:fade-in", { color: opts?.fadeColor ?? "#000000", duration: opts?.fadeDuration ?? 0.3 });
       }
 
       // Capture fired one-shots BEFORE deactivate/activate (activate clears
@@ -165,7 +169,7 @@ export class SceneRouter {
       // The fade-in at the top now HOLDS (Phase 53) — release it so arrival is
       // a real fade-through-black instead of the old hard cut (which also left
       // input suppressed: fade-in mutes it and only fade-out un-mutes).
-      bus.emit("overlay:fade-out", { duration: 0.3 });
+      bus.emit("overlay:fade-out", { duration: opts?.fadeDuration ?? 0.3 });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`SceneRouter: failed to load scene "${sceneId}":`, err);

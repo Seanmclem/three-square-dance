@@ -619,7 +619,7 @@ export class ScriptEngine {
       case "load_scene":
         // Cross-scene routing (runtime shell). Only the runtime's SceneRouter
         // listens — in editor preview this is a deliberate no-op.
-        if (action.sceneId) this._bus.emit("scene:load-request", { sceneId: action.sceneId });
+        if (action.sceneId) this._bus.emit("scene:load-request", { sceneId: action.sceneId, fadeColor: action.fadeColor, fadeDuration: action.fadeDuration });
         break;
 
       case "teleport_player": {
