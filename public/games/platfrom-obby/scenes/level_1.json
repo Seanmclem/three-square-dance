@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -36.22466774086044,
+        "x": -37.369108748029305,
         "y": 5.954637890594723,
-        "z": -73.27836285270695
+        "z": -78.18790219026269
       },
-      "radius": 17.938297294236026,
-      "phi": 0.9500000000000033,
-      "theta": 18.853009999886883
+      "radius": 19.9,
+      "phi": 0.7850000000000051,
+      "theta": 14.278009999886915
     }
   },
   "world": {
@@ -55,9 +55,9 @@
     },
     "defaultSpawn": {
       "position": {
-        "x": -35.4414902815789,
-        "y": 8.344174557835807,
-        "z": -72.34473613039847
+        "x": -35.113330600226256,
+        "y": 8.397412715940446,
+        "z": -84.69512080541679
       },
       "facingDeg": 0
     },
@@ -13928,7 +13928,7 @@
         {
           "id": "pfi_e99056b2",
           "prefabId": "pfb_5c1695b8",
-          "version": 1,
+          "version": 2,
           "variables": {},
           "origin": {
             "position": {
@@ -14614,7 +14614,7 @@
           "scripts": [
             {
               "id": "scr_06565e8f",
-              "label": "New Script",
+              "label": "Finish Level",
               "zoneId": "demo",
               "enabled": true,
               "trigger": {
@@ -14623,7 +14623,9 @@
               "conditions": [],
               "actions": [
                 {
-                  "type": "load_scene"
+                  "type": "load_scene",
+                  "sceneId": "level_2",
+                  "delay": 0.5
                 }
               ],
               "oneShot": true
@@ -14706,7 +14708,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "script_126f55a6",
+              "id": "script_5bd7c122",
               "label": "Checkpont 3 trigger",
               "zoneId": "demo",
               "enabled": true,
@@ -14719,7 +14721,7 @@
                   "type": "store_position",
                   "stateKey": "checkpoint",
                   "posSource": "object",
-                  "targetId": "cp_b1c9ad67"
+                  "targetId": "cp_c29cfe05"
                 }
               ],
               "oneShot": true
@@ -14804,14 +14806,19 @@
           "facingDeg": 0
         },
         {
-          "id": "cp_b1c9ad67",
-          "label": "Checkpoint3",
+          "id": "cp_c29cfe05",
+          "label": "Checkpoint",
           "position": {
-            "x": -34.87726140211409,
-            "y": 8.342363408810387,
-            "z": -73.75214815248647
+            "x": -35.0228991319112,
+            "y": 8.342363408810389,
+            "z": -73.97863664953891
           },
-          "facingDeg": 0
+          "facingDeg": 0,
+          "prefab": {
+            "prefabId": "pfb_5c1695b8",
+            "instanceId": "pfi_e99056b2",
+            "memberKey": "cp_975cb4ce"
+          }
         }
       ]
     }
