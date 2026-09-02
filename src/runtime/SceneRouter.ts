@@ -80,7 +80,10 @@ export class SceneRouter {
     try {
       this.deps.onLoading?.();
       if (preview.isActive) {
+        // Let the fade fully cover the screen before teardown starts (v4.79.66)
+        // — zone teardown/build blocks frames, which would swallow the transition.
         bus.emit("overlay:fade-in", { color: opts?.fadeColor ?? "#000000", duration: opts?.fadeDuration ?? 0.3 });
+        await new Promise(r => setTimeout(r, (opts?.fadeDuration ?? 0.3) * 1000 + 50));
       }
 
       // Capture fired one-shots BEFORE deactivate/activate (activate clears

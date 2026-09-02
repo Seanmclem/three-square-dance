@@ -755,7 +755,11 @@ export default function App() {
           try {
             // Fade-through (v4.79.65) — same configurable fade as the runtime
             // SceneRouter; the fade-in HOLDS until the arrival fade-out below.
+            // WAIT for it to complete before teardown (v4.79.66): the rebuild
+            // blocks the main thread, so starting it immediately would swallow
+            // the CSS transition and the hop would read as a hard cut.
             bus.emit("overlay:fade-in", { color: fadeColor ?? "#000000", duration: fadeDuration ?? 0.3 });
+            await new Promise(r => setTimeout(r, (fadeDuration ?? 0.3) * 1000 + 50));
             const fired = scriptEngine.getFiredOneShots();     // survive the hop (don't re-fire cross-scene one-shots)
             preview.exit();                                    // remove character (fires the guarded preview:stop)
             const file = await proj.store.loadScene(sceneId);
