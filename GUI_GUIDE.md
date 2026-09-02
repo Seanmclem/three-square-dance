@@ -87,7 +87,10 @@ shows in the in-game bag (I / Tab).
 
 ![The UI tab — a Health bar and a Shop menu](docs/images/ui-tab.png)
 
-Pick a kind in the dropdown, hit **+ New**, fill in the row:
+Pick a kind in the dropdown, hit **+ New**, and fill in the card that opens —
+fields are grouped under Placement / Visibility / Binding / Graphics headers.
+Existing elements sit collapsed as one-line summaries (kind, name,
+anchor · state key); click a header to expand one.
 
 | Kind | What it shows | The fields that matter |
 |---|---|---|
@@ -100,8 +103,8 @@ Pick a kind in the dropdown, hit **+ New**, fill in the row:
 
 Every element also has:
 
-- **anchor** — which screen corner/edge it sticks to (top-left, top-center,
-  top-right, bottom-left, bottom-center, bottom-right) plus x/y pixel offsets.
+- **anchor** — which screen corner/edge it sticks to, picked on a 3×2 grid
+  that mirrors the screen (top-left … bottom-right), plus x/y pixel offsets.
 - **visible at start** — shown without any script. Leave it off for menus and
   popups you'll open with `show_ui`.
 - **backdrop** — a translucent grey rounded box behind the element, for

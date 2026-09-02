@@ -4974,6 +4974,15 @@ function UiElementsEditor({
   graphics: GraphicDef[];
 } & UiZoneBag) {
   const [newKind, setNewKind] = useState<(typeof UI_KINDS)[number]>("bar");
+  // Cards start collapsed; a freshly added element opens for editing.
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  function toggleExpanded(id: string): void {
+    setExpandedIds((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   function replace(id: string, next: UiElementDef): void {
     onChange(elements.map((el) => (el.id === id ? next : el)));
@@ -4996,7 +5005,14 @@ function UiElementsEditor({
         </select>
         {/* (?) sits beside + New so its right-aligned popover stays on-screen */}
         {help && <HelpTooltip side="below" align="right" text={help} />}
-        <button style={{ ...S.btn(true), whiteSpace: "nowrap", flexShrink: 0 }} onClick={() => onChange([...elements, blankUiElement(newKind)])}>
+        <button
+          style={{ ...S.btn(true), whiteSpace: "nowrap", flexShrink: 0 }}
+          onClick={() => {
+            const el = blankUiElement(newKind);
+            setExpandedIds((s) => new Set(s).add(el.id));
+            onChange([...elements, el]);
+          }}
+        >
           + New
         </button>
       </div>
@@ -5015,6 +5031,8 @@ function UiElementsEditor({
             element={el}
             graphics={graphics}
             zoneBag={zoneBag}
+            expanded={expandedIds.has(el.id)}
+            onToggleExpanded={() => toggleExpanded(el.id)}
             onReplace={(next) => replace(el.id, next)}
             onRemove={() => remove(el.id)}
           />
@@ -5063,26 +5081,64 @@ function GraphicIdField({
   );
 }
 
+// Tiny uppercase section header inside a UI-element card (option B of the
+// plans/mockups/ui-elements-prototype.html directions).
+function UiSectionHead({ label }: { label: string }) {
+  return (
+    <div style={{ fontSize: 9, letterSpacing: 2, color: "#7a86a0", fontFamily: "monospace", textTransform: "uppercase", margin: "10px 0 2px" }}>
+      {label}
+    </div>
+  );
+}
+
+// Clickable 3×2 grid mirroring the six screen anchors — replaces the dropdown.
+function UiAnchorGrid({ value, onChange }: { value: UiAnchor; onChange: (a: UiAnchor) => void }) {
+  return (
+    <div style={{
+      display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, width: 118, flexShrink: 0,
+      background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, padding: 6,
+    }}>
+      {UI_ANCHORS.map((a) => (
+        <button
+          key={a}
+          title={a}
+          onClick={() => onChange(a)}
+          style={{
+            height: 20, borderRadius: 4, cursor: "pointer", padding: 0, fontSize: 7,
+            background: value === a ? "rgba(80,140,255,0.14)" : "rgba(255,255,255,0.05)",
+            border: value === a ? "1px solid rgba(80,140,255,0.3)" : "1px solid transparent",
+            color: value === a ? "#9dbdff" : "transparent",
+          }}
+        >●</button>
+      ))}
+    </div>
+  );
+}
+
 function UiElementRow({
   element,
   graphics,
   zoneBag,
+  expanded,
+  onToggleExpanded,
   onReplace,
   onRemove,
 }: {
   element: UiElementDef;
   graphics: GraphicDef[];
   zoneBag: UiZoneBag;
+  expanded: boolean;
+  onToggleExpanded: () => void;
   onReplace: (next: UiElementDef) => void;
   onRemove: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   function set(changes: Partial<UiElementDef>): void {
     onReplace({ ...element, ...changes } as UiElementDef);
   }
 
-  const numField = (label: string, val: number | undefined, ph: string, title: string, onVal: (n: number | undefined) => void, width = 58) => (
-    <F label={label} flex={`0 0 ${width}px`}>
+  const numField = (label: string, val: number | undefined, ph: string, title: string, onVal: (n: number | undefined) => void) => (
+    <F label={label}>
       <input
         type="number"
         style={S.field}
@@ -5094,117 +5150,143 @@ function UiElementRow({
     </F>
   );
 
+  const offsetPair = (label: string, key: "offsetX" | "offsetY", val: number | undefined) => (
+    <label style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, color: "#8b94a8", fontSize: 10, minWidth: 0 }}>
+      {label}
+      <input
+        type="number"
+        style={S.field}
+        placeholder="16"
+        title="offset from the anchored edge (px)"
+        value={val ?? ""}
+        onChange={(e) => set({ [key]: e.target.value === "" ? undefined : Number(e.target.value) })}
+      />
+    </label>
+  );
+
+  // Collapsed cards show a one-line summary beside the name.
+  const summary = [element.anchor, "stateKey" in element && element.stateKey ? element.stateKey : null]
+    .filter(Boolean).join(" · ");
+
   return (
     <div style={{
-      background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "6px 8px",
+      background: "rgba(255,255,255,0.03)", borderRadius: 4, padding: "0 8px",
       margin: "0 10px 6px", border: "1px solid rgba(255,255,255,0.06)",
     }}>
-      {/* Kind on its own line above the name — the inline chip read as decoration. */}
-      <div style={{ display: "flex", alignItems: "center", marginBottom: 4 }}>
+      <div
+        style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, cursor: "pointer", userSelect: "none", padding: "7px 0" }}
+        onClick={onToggleExpanded}
+        title={expanded ? "Collapse" : "Expand"}
+      >
+        <span style={{ color: "#7a7a7a", fontSize: 10, width: 10, flexShrink: 0 }}>{expanded ? "▾" : "▸"}</span>
         <span style={{
           fontSize: 11, color: "#9dbdff", background: "rgba(80,140,255,0.14)",
           border: "1px solid rgba(80,140,255,0.3)", borderRadius: 3,
-          padding: "2px 8px", letterSpacing: 1, textTransform: "uppercase",
+          padding: "2px 8px", letterSpacing: 1, textTransform: "uppercase", flexShrink: 0,
         }}>{element.kind}</span>
+        <span style={{ color: "#dde3f0", fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {element.label || "(unnamed)"}
+        </span>
+        {!expanded && (
+          <span style={{ color: "#8b94a8", fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {summary}
+          </span>
+        )}
         <span style={{ flex: 1 }} />
-        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666" }} onClick={onRemove}>×</button>
+        <button style={{ ...S.btn(), padding: "3px 6px", color: "#cc6666", flexShrink: 0 }} onClick={(e) => { e.stopPropagation(); onRemove(); }}>×</button>
       </div>
-      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", marginBottom: 4 }}>
-        <F label="Element name" flex={1}>
-          <input
-            style={S.field}
-            placeholder="Label"
-            value={element.label}
-            onChange={(e) => set({ label: e.target.value })}
-          />
-        </F>
+      {expanded && (<div style={{ paddingBottom: 8 }}>
+      <F label="Element name">
+        <input
+          style={S.field}
+          placeholder="Label"
+          value={element.label}
+          onChange={(e) => set({ label: e.target.value })}
+        />
+      </F>
+
+      <UiSectionHead label="Placement" />
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", padding: "4px 0" }}>
+        <UiAnchorGrid value={element.anchor} onChange={(a) => set({ anchor: a })} />
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            {offsetPair("X offset", "offsetX", element.offsetX)}
+            {offsetPair("Y offset", "offsetY", element.offsetY)}
+          </div>
+          <div style={{ color: "#7a7a7a", fontSize: 9, marginTop: 4 }}>{element.anchor}</div>
+        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end", flexWrap: "wrap" }}>
-        <F label="Screen anchor" flex={1}>
-          <select
-            style={S.select}
-            title="Screen anchor"
-            value={element.anchor}
-            onChange={(e) => set({ anchor: e.target.value as UiAnchor })}
-          >
-            {UI_ANCHORS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </F>
-        {numField("X offset", element.offsetX, "16", "offset from the anchored edge (px)", (n) => set({ offsetX: n }))}
-        {numField("Y offset", element.offsetY, "16", "offset from the anchored edge (px)", (n) => set({ offsetY: n }))}
-        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Shown without needing a show_ui action">
+      <UiSectionHead label="Visibility" />
+      <F label="Visible at start">
+        <input
+          type="checkbox" className="wb-switch"
+          title="Shown without needing a show_ui action"
+          checked={!!element.startVisible}
+          onChange={(e) => set({ startVisible: e.target.checked || undefined })}
+        />
+      </F>
+      {element.kind !== "menu" && (
+        <F label="Backdrop behind element">
           <input
             type="checkbox" className="wb-switch"
-            checked={!!element.startVisible}
-            onChange={(e) => set({ startVisible: e.target.checked || undefined })}
+            title="Translucent grey box behind the element — keeps it readable on bright skies"
+            checked={!!element.backdrop}
+            onChange={(e) => set({ backdrop: e.target.checked || undefined })}
           />
-          visible at start
-        </label>
-        {element.kind !== "menu" && (
-          <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "#8b94a8", flexShrink: 0, marginBottom: 3 }} title="Translucent grey box behind the element — keeps it readable on bright skies">
-            <input
-              type="checkbox" className="wb-switch"
-              checked={!!element.backdrop}
-              onChange={(e) => set({ backdrop: e.target.checked || undefined })}
-            />
-            backdrop
-          </label>
-        )}
-      </div>
+        </F>
+      )}
 
       {element.kind === "bar" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
-            <F label="State key" flex={1}>
-              <KeySuggestInput
-                placeholder={"e.g. health"}
-                value={element.stateKey}
-                onChange={(v) => set({ stateKey: v })}
-              />
-            </F>
-            {numField("Full at", element.max, "100", "value at which the bar is full", (n) => set({ max: n }))}
-          </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-            {numField("Width", element.width, "160", "bar width (px)", (n) => set({ width: n }))}
-            {numField("Height", element.height, "14", "bar height (px)", (n) => set({ height: n }))}
-            <F label="Fill">
-              <input
-                type="color"
-                style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
-                title="fill color"
-                value={element.color ?? "#e05555"}
-                onChange={(e) => set({ color: e.target.value })}
-              />
-            </F>
-            <F label="Icon (optional)" flex={1}>
-              <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
-            </F>
-          </div>
+          <UiSectionHead label="Binding" />
+          <F label="State key">
+            <KeySuggestInput
+              placeholder={"e.g. health"}
+              value={element.stateKey}
+              onChange={(v) => set({ stateKey: v })}
+            />
+          </F>
+          {numField("Full at", element.max, "100", "value at which the bar is full", (n) => set({ max: n }))}
+          {numField("Bar width px", element.width, "160", "bar width (px)", (n) => set({ width: n }))}
+          {numField("Bar height px", element.height, "14", "bar height (px)", (n) => set({ height: n }))}
+          <UiSectionHead label="Graphics" />
+          <F label="Fill color">
+            <input
+              type="color"
+              style={{ width: 28, height: 22, padding: 0, border: "none", background: "none", cursor: "pointer", flexShrink: 0 }}
+              title="fill color"
+              value={element.color ?? "#e05555"}
+              onChange={(e) => set({ color: e.target.value })}
+            />
+          </F>
+          <F label="Icon (optional)">
+            <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
+          </F>
         </>
       )}
 
       {element.kind === "counter" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
-            <F label="State key" flex={1}>
-              <KeySuggestInput
-                placeholder={"e.g. coins"}
-                value={element.stateKey}
-                onChange={(v) => set({ stateKey: v })}
-              />
-            </F>
-            <F label="Prefix" flex="0 0 48px">
-              <input
-                style={S.field}
-                placeholder="×"
-                title="text before the number"
-                value={element.prefix ?? ""}
-                onChange={(e) => set({ prefix: e.target.value || undefined })}
-              />
-            </F>
-            {numField("Icon px", element.size, "24", "icon size (px)", (n) => set({ size: n }), 52)}
-          </div>
+          <UiSectionHead label="Binding" />
+          <F label="State key">
+            <KeySuggestInput
+              placeholder={"e.g. coins"}
+              value={element.stateKey}
+              onChange={(v) => set({ stateKey: v })}
+            />
+          </F>
+          <F label="Prefix">
+            <input
+              style={S.field}
+              placeholder="×"
+              title="text before the number"
+              value={element.prefix ?? ""}
+              onChange={(e) => set({ prefix: e.target.value || undefined })}
+            />
+          </F>
+          {numField("Icon size px", element.size, "24", "icon size (px)", (n) => set({ size: n }))}
+          <UiSectionHead label="Graphics" />
           <F label="Icon (optional)">
             <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="icon" onChange={(id) => set({ graphicId: id })} />
           </F>
@@ -5213,35 +5295,34 @@ function UiElementRow({
 
       {element.kind === "icons" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
-            <F label="State key" flex={1}>
-              <KeySuggestInput
-                placeholder={"e.g. health"}
-                value={element.stateKey}
-                onChange={(v) => set({ stateKey: v })}
-              />
-            </F>
-            {numField("Icons", element.count, "3", "how many icons to draw", (n) => set({ count: n }), 44)}
-            {numField("Full at", element.max, "= icons", "state value when every icon is full (blank = 1 per icon)", (n) => set({ max: n }), 52)}
-            {numField("Icon px", element.size, "24", "icon size (px)", (n) => set({ size: n }), 52)}
-          </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-            <F label="Full" flex={1}>
-              <GraphicIdField value={element.fullGraphicId} graphics={graphics} placeholder="full icon" onChange={(id) => set({ fullGraphicId: id ?? "" })} />
-            </F>
-            <F label="Half (optional)" flex={1}>
-              <GraphicIdField value={element.halfGraphicId} graphics={graphics} placeholder="half icon" onChange={(id) => set({ halfGraphicId: id })} />
-            </F>
-            <F label="Empty (optional)" flex={1}>
-              <GraphicIdField value={element.emptyGraphicId} graphics={graphics} placeholder="empty icon" onChange={(id) => set({ emptyGraphicId: id })} />
-            </F>
-          </div>
+          <UiSectionHead label="Binding" />
+          <F label="State key">
+            <KeySuggestInput
+              placeholder={"e.g. health"}
+              value={element.stateKey}
+              onChange={(v) => set({ stateKey: v })}
+            />
+          </F>
+          {numField("Icon count", element.count, "3", "how many icons to draw", (n) => set({ count: n }))}
+          {numField("Full at", element.max, "= count", "state value when every icon is full (blank = 1 per icon)", (n) => set({ max: n }))}
+          {numField("Icon size px", element.size, "24", "icon size (px)", (n) => set({ size: n }))}
+          <UiSectionHead label="Graphics" />
+          <F label="Full icon">
+            <GraphicIdField value={element.fullGraphicId} graphics={graphics} placeholder="full icon" onChange={(id) => set({ fullGraphicId: id ?? "" })} />
+          </F>
+          <F label="Half (optional)">
+            <GraphicIdField value={element.halfGraphicId} graphics={graphics} placeholder="half icon" onChange={(id) => set({ halfGraphicId: id })} />
+          </F>
+          <F label="Empty (optional)">
+            <GraphicIdField value={element.emptyGraphicId} graphics={graphics} placeholder="empty icon" onChange={(id) => set({ emptyGraphicId: id })} />
+          </F>
         </>
       )}
 
       {element.kind === "label" && (
-        <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-          <F label="Text shown on screen" flex={1}>
+        <>
+          <UiSectionHead label="Text" />
+          <F label="Text shown on screen">
             <input
               style={S.field}
               placeholder="Text"
@@ -5249,7 +5330,7 @@ function UiElementRow({
               onChange={(e) => set({ text: e.target.value })}
             />
           </F>
-          {numField("Font px", element.fontSize, "13", "font size", (n) => set({ fontSize: n }), 52)}
+          {numField("Font size px", element.fontSize, "13", "font size", (n) => set({ fontSize: n }))}
           <F label="Color">
             <input
               type="color"
@@ -5259,35 +5340,37 @@ function UiElementRow({
               onChange={(e) => set({ color: e.target.value })}
             />
           </F>
-        </div>
+        </>
       )}
 
       {element.kind === "image" && (
-        <div style={{ display: "flex", gap: 4, alignItems: "flex-end" }}>
-          <F label="Graphic" flex={1}>
+        <>
+          <UiSectionHead label="Image" />
+          <F label="Graphic">
             <GraphicIdField value={element.graphicId} graphics={graphics} placeholder="graphic" onChange={(id) => set({ graphicId: id ?? "" })} />
           </F>
-          {numField("Width", element.width, "auto", "width (px; blank = image size)", (n) => set({ width: n }), 48)}
-          {numField("Height", element.height, "auto", "height (px)", (n) => set({ height: n }), 48)}
-        </div>
+          {numField("Width px", element.width, "auto", "width (px; blank = image size)", (n) => set({ width: n }))}
+          {numField("Height px", element.height, "auto", "height (px)", (n) => set({ height: n }))}
+        </>
       )}
 
       {element.kind === "menu" && (
         <>
-          <div style={{ display: "flex", gap: 4, marginBottom: 4, alignItems: "flex-end" }}>
-            <F label="Menu title (optional)" flex={1}>
-              <input
-                style={S.field}
-                placeholder="Title"
-                value={element.title ?? ""}
-                onChange={(e) => set({ title: e.target.value || undefined })}
-              />
-            </F>
-            <button style={{ ...S.btn(), fontSize: 10 }} onClick={() => setExpanded((v) => !v)}>
-              {expanded ? "▾" : "▸"} {element.options.length} option{element.options.length !== 1 ? "s" : ""}
+          <UiSectionHead label="Menu" />
+          <F label="Menu title (optional)">
+            <input
+              style={S.field}
+              placeholder="Title"
+              value={element.title ?? ""}
+              onChange={(e) => set({ title: e.target.value || undefined })}
+            />
+          </F>
+          <div style={{ padding: "6px 0 2px" }}>
+            <button style={{ ...S.btn(), fontSize: 10 }} onClick={() => setOptionsOpen((v) => !v)}>
+              {optionsOpen ? "▾" : "▸"} {element.options.length} option{element.options.length !== 1 ? "s" : ""}
             </button>
           </div>
-          {expanded && (
+          {optionsOpen && (
             <div style={{ paddingLeft: 6, borderLeft: "2px solid rgba(80,140,255,0.2)" }}>
               {element.options.map((opt, i) => (
                 <UiMenuOptionRow
@@ -5309,6 +5392,7 @@ function UiElementRow({
           )}
         </>
       )}
+      </div>)}
     </div>
   );
 }
