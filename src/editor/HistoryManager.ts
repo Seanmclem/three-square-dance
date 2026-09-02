@@ -69,4 +69,14 @@ export class HistoryManager {
   get canRedo(): boolean { return this._redo.length > 0; }
 
   clear(): void { this._undo = []; this._redo = []; this._onChange?.(); }
+
+  /** Snapshot/restore the stacks (preview hop return, v4.79.67) — the entries
+   *  stay valid because the world is restored to the identical state they
+   *  reference (the first-hop world snapshot). */
+  capture(): { undo: HistoryEntry[]; redo: HistoryEntry[] } {
+    return { undo: [...this._undo], redo: [...this._redo] };
+  }
+  restore(s: { undo: HistoryEntry[]; redo: HistoryEntry[] }): void {
+    this._undo = [...s.undo]; this._redo = [...s.redo]; this._onChange?.();
+  }
 }

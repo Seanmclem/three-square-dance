@@ -256,6 +256,9 @@ export default function App() {
   // the user launched preview from, restored on preview exit (non-destructive round-trip).
   const routingRef = useRef(false);
   const routeReturnSceneRef = useRef<string | null>(null);
+  // First-hop snapshot of the LIVE editing scene (v4.79.67): unsaved edits + undo
+  // stacks — the return path restores these instead of re-reading the disk file.
+  const routeReturnSnapshotRef = useRef<{ snap: SceneFile; history: ReturnType<HistoryManager["capture"]> | null } | null>(null);
   const [, setPlayerSettingsRev]               = useState(0);
   const [dialogueState,   setDialogueState]    = useState<{ speaker: string; lines: string[]; portrait?: string; options?: { text: string; hasNext: boolean }[] } | null>(null);
   const [fadeState,       setFadeState]        = useState<FadeRequest | null>(null);
@@ -719,12 +722,18 @@ export default function App() {
         // non-destructively (nothing was saved to disk during preview).
         const back = routeReturnSceneRef.current;
         routeReturnSceneRef.current = null;
-        if (back && back !== projectRef.current?.sceneId) {
+        const snapRec = routeReturnSnapshotRef.current;
+        routeReturnSnapshotRef.current = null;
+        // Restore when we hopped away — even back to the SAME scene id (a round
+        // trip still reloaded from disk mid-route, so the snapshot is the truth).
+        if (back && (snapRec || back !== projectRef.current?.sceneId)) {
           void (async () => {
             const proj = projectRef.current;
             if (!proj) return;
             try {
-              const file = await proj.store.loadScene(back);
+              // Prefer the first-hop snapshot (unsaved edits + history); the disk
+              // file remains the fallback if the snapshot is somehow missing.
+              const file = snapRec?.snap ?? await proj.store.loadScene(back);
               await handleLoadFromJSON(file);
               worldRef.current!.gameItems       = proj.store.game.items;
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
@@ -732,6 +741,11 @@ export default function App() {
               const next = { ...proj, sceneId: back };
               projectRef.current = next; setProject(next);
               void persistLastProject(proj.store.id, back);
+              if (snapRec) {
+                // world:loaded (inside handleLoadFromJSON) cleared the stacks — put them back.
+                if (snapRec.history) historyRef.current?.restore(snapRec.history);
+                setIsDirty(true);   // the snapshot may carry unsaved edits — keep Save armed
+              }
             } catch (e) { console.error("[preview] restore editing scene failed:", e); }
           })();
         }
@@ -752,6 +766,15 @@ export default function App() {
         void (async () => {
           routingRef.current = true;
           routeReturnSceneRef.current ??= proj.sceneId;        // remember the origin (first hop only)
+          // Snapshot the LIVE world + undo stacks on the first hop (v4.79.67):
+          // returning must restore unsaved edits and history — the on-disk file
+          // silently discarded both (user report 2026-09-02).
+          if (!routeReturnSnapshotRef.current) {
+            const snap = worldRef.current!.toJSON() as SceneFile;
+            const pose = sceneRef.current?.editorCamera?.getPose();
+            if (snap.metadata && pose) snap.metadata.editorCamera = pose;
+            routeReturnSnapshotRef.current = { snap, history: historyRef.current?.capture() ?? null };
+          }
           try {
             // Fade-through (v4.79.65) — same configurable fade as the runtime
             // SceneRouter; the fade-in HOLDS until the arrival fade-out below.
