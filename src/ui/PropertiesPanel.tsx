@@ -6763,7 +6763,9 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
             )}
           </div>
         )}
-        {onWireInteract && (zone?.objects.length ?? 0) > 0 && (
+        {/* Only once a prompt exists — the volume's role in the wiring IS hiding
+            that prompt on press; a promptless volume has nothing to contribute (v4.79.74). */}
+        {onWireInteract && promptElementId && (zone?.objects.length ?? 0) > 0 && (
           <div style={{ marginBottom: 8 }}
                title="Pick the object E acts on — makes it interactable, adds an On Interact script (starting with hide-prompt), and opens it">
             <div style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>PRESS-E TARGET</div>
