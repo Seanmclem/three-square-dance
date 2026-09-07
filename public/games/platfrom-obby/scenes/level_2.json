@@ -1243,7 +1243,42 @@
           },
           "zoneId": "demo",
           "shape": "box",
-          "scripts": []
+          "scripts": [
+            {
+              "id": "scr_e95272ef",
+              "label": "Show Prompt",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "show_ui",
+                  "uiElementId": "ui_a1efbc28"
+                }
+              ],
+              "oneShot": false
+            },
+            {
+              "id": "scr_32b2fedd",
+              "label": "Hide Prompt",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_exit"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "hide_ui",
+                  "uiElementId": "ui_a1efbc28"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
         }
       ],
       "checkpoints": [
