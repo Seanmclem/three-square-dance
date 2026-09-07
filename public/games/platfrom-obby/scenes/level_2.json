@@ -1070,12 +1070,31 @@
           "floor": 0,
           "zoneId": "demo",
           "properties": {
-            "interactable": false,
+            "interactable": true,
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
           },
-          "label": "switch 1"
+          "label": "switch 1",
+          "scripts": [
+            {
+              "id": "scr_eff5f669",
+              "label": "On Interact (E)",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_interact"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "hide_ui",
+                  "uiElementId": "ui_9d0b6351"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
         }
       ],
       "prefabInstances": [
@@ -1229,21 +1248,55 @@
           }
         },
         {
-          "id": "vol_0764b4dd",
-          "label": "switch_1_trigger",
+          "id": "vol_3156c407",
+          "label": "Trigger Volume",
           "position": {
-            "x": -7.9930456221281085,
-            "y": 9.517862953544952,
-            "z": 22.954258706508735
+            "x": -8,
+            "y": 9.511624571992376,
+            "z": 23
           },
           "size": {
-            "x": 1.5,
+            "x": 2,
             "y": 2.5,
-            "z": 1.4000000000000001
+            "z": 1
           },
           "zoneId": "demo",
-          "shape": "box",
-          "scripts": []
+          "scripts": [
+            {
+              "id": "scr_867f0f84",
+              "label": "Show Prompt",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "show_ui",
+                  "uiElementId": "ui_9d0b6351"
+                }
+              ],
+              "oneShot": false
+            },
+            {
+              "id": "scr_d1234e46",
+              "label": "Hide Prompt",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_exit"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "hide_ui",
+                  "uiElementId": "ui_9d0b6351"
+                }
+              ],
+              "oneShot": false
+            }
+          ]
         }
       ],
       "checkpoints": [

@@ -1216,6 +1216,14 @@
       "text": "Press E",
       "anchor": "bottom-center",
       "backdrop": true
+    },
+    {
+      "id": "ui_9d0b6351",
+      "label": "Prompt — Trigger Volume",
+      "kind": "label",
+      "text": "Press E",
+      "anchor": "bottom-center",
+      "backdrop": true
     }
   ],
   "playerSettings": {
