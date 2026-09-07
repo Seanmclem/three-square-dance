@@ -652,6 +652,7 @@ export function ScriptPanel({
         <ScriptEditor
           onCreateUiElement={(el) => onUiElementsChange([...uiElements, el])}
           onUpdateUiElement={(id, changes) => onUiElementsChange(uiElements.map((el) => el.id === id ? { ...el, ...changes } as UiElementDef : el))}
+          onOpenUiTab={() => setTab("ui")}
           stateKeyTypes={stateKeyTypes}
           script={editing}
           help={tabHelp}
@@ -1025,7 +1026,9 @@ function ScriptEditor({
   onDelete,
   onCreateUiElement,
   onUpdateUiElement,
+  onOpenUiTab,
 }: {
+  onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   script: ScriptDef;
@@ -1388,6 +1391,7 @@ function ScriptEditor({
                   owner={owner}
                   onCreateUiElement={onCreateUiElement}
                   onUpdateUiElement={onUpdateUiElement}
+                  onOpenUiTab={onOpenUiTab}
                   onChange={(na) => patchAction(i, na)}
                   onRemove={() => { set("actions", script.actions.filter((_, j) => j !== i)); setOpenAction(null); }}
                   onWrap={a.block ? undefined : () => {
@@ -2460,7 +2464,9 @@ function ActionRow({
   onRemove,
   onCreateUiElement,
   onUpdateUiElement,
+  onOpenUiTab,
 }: {
+  onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
@@ -2570,6 +2576,7 @@ function ActionRow({
             owner={owner}
             onCreateUiElement={onCreateUiElement}
             onUpdateUiElement={onUpdateUiElement}
+            onOpenUiTab={onOpenUiTab}
             onChange={onChange}
           />
           <F label="After (s)" style={{ borderBottom: "none" }}>
@@ -2605,7 +2612,9 @@ function ActionFields({
   onChange,
   onCreateUiElement,
   onUpdateUiElement,
+  onOpenUiTab,
 }: {
+  onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
@@ -3729,6 +3738,20 @@ function ActionFields({
           )}
         </select>
         </F>
+        {(() => {
+          // v4.79.71 — jump straight to the element's full configuration.
+          const el = uiElements.find((e) => e.id === action.uiElementId);
+          if (!el || !onOpenUiTab) return null;
+          return (
+            <button
+              onClick={onOpenUiTab}
+              title={`Open "${el.label}" in the UI tab — anchor, size, color, everything`}
+              style={{ alignSelf: "flex-start", margin: "4px 0 0", padding: "2px 8px", fontSize: 10,
+                       fontFamily: "monospace", cursor: "pointer", background: "rgba(80,140,255,0.1)",
+                       border: "1px solid rgba(80,140,255,0.25)", borderRadius: 3, color: "#80aaff" }}
+            >↗ Configure {el.label}</button>
+          );
+        })()}
         {(() => {
           // v4.79.69 — a selected LABEL's text is editable right here (user:
           // "editing that prompt is still as many clicks away").
