@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -2.8032410001484585,
+        "x": -24.206026189470126,
         "y": 10.580493145796058,
-        "z": 31.166398424696016
+        "z": 20.70198673637004
       },
-      "radius": 29.116168986416696,
-      "phi": 1.0357963267948995,
-      "theta": 22.103009999886876
+      "radius": 27.766168986416687,
+      "phi": 1.3707963267949004,
+      "theta": 26.438009999886862
     }
   },
   "world": {
@@ -51,7 +51,7 @@
     "audio": {},
     "defaultSpawn": {
       "position": {
-        "x": -6.87205980543751,
+        "x": -3.1543352768428194,
         "y": 9.517862953544952,
         "z": 27.32967862906745
       },
@@ -867,6 +867,215 @@
             "instanceId": "pfi_a29012e5",
             "memberKey": "tile_5_3"
           }
+        },
+        {
+          "id": "obj_6bdcb385",
+          "assetId": "plant_large",
+          "position": {
+            "x": 1.5,
+            "y": 9.517862953544952,
+            "z": 21
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_1259ac02",
+          "assetId": "plant_large",
+          "position": {
+            "x": -8,
+            "y": 9.517862953544952,
+            "z": 26.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_88d60ee1",
+          "assetId": "rock_1",
+          "position": {
+            "x": 2.5,
+            "y": 9.517862953544952,
+            "z": 22
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_d728d595",
+          "assetId": "grass_2",
+          "position": {
+            "x": -8.5,
+            "y": 9.517862953544952,
+            "z": 27.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": -40.08955171779861,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          }
+        },
+        {
+          "id": "obj_e4655978",
+          "assetId": "cube_default",
+          "position": {
+            "x": -22.452760876805456,
+            "y": 8.570821636394202,
+            "z": 24
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "movers": [
+            {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "x",
+              "distance": 10.5,
+              "duration": 3.05,
+              "dwell": 1.25,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true,
+              "id": "mvr_32973361"
+            }
+          ],
+          "label": "moving_Cube_1",
+          "scripts": [
+            {
+              "id": "scr_fd1c2c32",
+              "label": "moving_cube_handler",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_state_equals",
+                "targetId": "moving_enabled",
+                "stateValue": true,
+                "entityId": "self"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_sound",
+                  "loop": true,
+                  "sound": "cloth4",
+                  "targetId": "self"
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "stateSchema": {
+            "moving_enabled": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        {
+          "id": "obj_1bbfdece",
+          "assetId": "lever",
+          "position": {
+            "x": -8.5,
+            "y": 9.517862953544956,
+            "z": 23
+          },
+          "rotation": {
+            "x": 180,
+            "y": -88.53084210162906,
+            "z": 180
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "label": "switch 1"
         }
       ],
       "prefabInstances": [
@@ -910,9 +1119,9 @@
           "variables": {},
           "origin": {
             "position": {
-              "x": -3.3998924129020685,
+              "x": -3.1196867949916918,
               "y": 9.517862953544952,
-              "z": 22
+              "z": 21.418291253231853
             },
             "rotationY": 0
           }
@@ -978,9 +1187,9 @@
           "id": "vol_9b266a24",
           "label": "Trigger Volume",
           "position": {
-            "x": -3.3998924129020685,
+            "x": -3.1196867949916918,
             "y": 9.517862953544952,
-            "z": 22
+            "z": 21.418291253231853
           },
           "size": {
             "x": 7,
@@ -1018,6 +1227,23 @@
             "instanceId": "pfi_fb768dc3",
             "memberKey": "vol_2c7cc347"
           }
+        },
+        {
+          "id": "vol_0764b4dd",
+          "label": "swithc_1_trigger",
+          "position": {
+            "x": -7.9930456221281085,
+            "y": 9.517862953544952,
+            "z": 22.954258706508735
+          },
+          "size": {
+            "x": 1.5,
+            "y": 2.5,
+            "z": 1.4000000000000001
+          },
+          "zoneId": "demo",
+          "shape": "box",
+          "scripts": []
         }
       ],
       "checkpoints": [
@@ -1025,7 +1251,7 @@
           "id": "cp_e2711a33",
           "label": "Checkpoint_0",
           "position": {
-            "x": -5.676433136480702,
+            "x": -4.212922841253181,
             "y": 9.517862953544952,
             "z": 27.3708207506472
           },
@@ -1035,9 +1261,9 @@
           "id": "cp_7b2ff346",
           "label": "Checkpoint_1",
           "position": {
-            "x": -3.282015817174913,
+            "x": -3.0018101992645363,
             "y": 9.517862953544952,
-            "z": 20.70423977191233
+            "z": 20.66507069149283
           },
           "facingDeg": 0,
           "prefab": {
