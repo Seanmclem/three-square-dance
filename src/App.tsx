@@ -3179,15 +3179,22 @@ export default function App() {
 
   const handleUiElementsChange = (uiElements: UiElementDef[]): void => {
     const world = worldRef.current;
-    if (!world?.world) return;
     const proj = projectRef.current;
     if (proj) {
+      // Project mode needs no world.world — the old shared guard silently
+      // swallowed registry writes when it was transiently null, leaving scripts
+      // pointing at an element that was never stored (v4.79.70).
       proj.store.game.uiElements = uiElements;
-      world.gameUiElements = uiElements;
+      // Write game.json IMMEDIATELY (prefab-library precedent) — a dirty-only
+      // registry evaporates on reload while the scene's scripts survive,
+      // stranding show_ui actions on "(custom)" dangling ids.
+      void proj.store.writeGame().catch(e => console.warn("[ui] game.json write failed:", e));
+      if (world) world.gameUiElements = uiElements;
       setWorldUiElements(uiElements);
       setIsDirty(true);
       return;
     }
+    if (!world?.world) return;
     world.transaction("edit ui", () => { world.world!.uiElements = uiElements; });
     setWorldUiElements(uiElements);
     syncHistory();
