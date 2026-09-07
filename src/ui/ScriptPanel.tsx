@@ -651,6 +651,7 @@ export function ScriptPanel({
       ) : editing ? (
         <ScriptEditor
           onCreateUiElement={(el) => onUiElementsChange([...uiElements, el])}
+          onUpdateUiElement={(id, changes) => onUiElementsChange(uiElements.map((el) => el.id === id ? { ...el, ...changes } as UiElementDef : el))}
           stateKeyTypes={stateKeyTypes}
           script={editing}
           help={tabHelp}
@@ -1023,7 +1024,9 @@ function ScriptEditor({
   onChange,
   onDelete,
   onCreateUiElement,
+  onUpdateUiElement,
 }: {
+  onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   script: ScriptDef;
   triggerVolumes: TriggerVolume[];
@@ -1384,6 +1387,7 @@ function ScriptEditor({
                   playerModelAssetId={playerModelAssetId}
                   owner={owner}
                   onCreateUiElement={onCreateUiElement}
+                  onUpdateUiElement={onUpdateUiElement}
                   onChange={(na) => patchAction(i, na)}
                   onRemove={() => { set("actions", script.actions.filter((_, j) => j !== i)); setOpenAction(null); }}
                   onWrap={a.block ? undefined : () => {
@@ -2455,7 +2459,9 @@ function ActionRow({
   onChange,
   onRemove,
   onCreateUiElement,
+  onUpdateUiElement,
 }: {
+  onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
   zoneObjects: WorldObject[];
@@ -2563,6 +2569,7 @@ function ActionRow({
             playerModelAssetId={playerModelAssetId}
             owner={owner}
             onCreateUiElement={onCreateUiElement}
+            onUpdateUiElement={onUpdateUiElement}
             onChange={onChange}
           />
           <F label="After (s)" style={{ borderBottom: "none" }}>
@@ -2597,7 +2604,9 @@ function ActionFields({
   owner,
   onChange,
   onCreateUiElement,
+  onUpdateUiElement,
 }: {
+  onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
   zoneObjects: WorldObject[];
@@ -3685,6 +3694,7 @@ function ActionFields({
     case "show_ui":
     case "hide_ui":
       return (
+        <>
         <F label="UI element">
         <select
           style={S.select}
@@ -3719,6 +3729,25 @@ function ActionFields({
           )}
         </select>
         </F>
+        {(() => {
+          // v4.79.69 — a selected LABEL's text is editable right here (user:
+          // "editing that prompt is still as many clicks away").
+          const el = uiElements.find((e) => e.id === action.uiElementId);
+          if (!el || el.kind !== "label" || !onUpdateUiElement) return null;
+          return (
+            <F label="Prompt text">
+              <input
+                style={S.field}
+                key={el.id + el.text}
+                defaultValue={el.text}
+                title="Edits the label element itself (same text everywhere it's shown)"
+                onBlur={(e) => { const t = e.target.value; if (t !== el.text) onUpdateUiElement(el.id, { text: t }); }}
+                onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+              />
+            </F>
+          );
+        })()}
+      </>
       );
 
     case "run_script":
