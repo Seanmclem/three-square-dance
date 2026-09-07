@@ -1211,7 +1211,7 @@
     },
     {
       "id": "ui_7239dfcc",
-      "label": "Prompt — Trigger Volume",
+      "label": "Prompt — Switch1",
       "kind": "label",
       "text": "Press E to switch",
       "anchor": "bottom-center",

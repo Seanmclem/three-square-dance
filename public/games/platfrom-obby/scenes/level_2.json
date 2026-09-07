@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -24.206026189470126,
+        "x": -7.991820816933151,
         "y": 10.580493145796058,
-        "z": 20.70198673637004
+        "z": 23.966492829312678
       },
-      "radius": 27.766168986416687,
-      "phi": 1.3707963267949004,
-      "theta": 26.438009999886862
+      "radius": 26.551091553215304,
+      "phi": 0.9100000000000004,
+      "theta": 26.688009999886866
     }
   },
   "world": {
@@ -1018,36 +1018,7 @@
             }
           ],
           "label": "moving_Cube_1",
-          "scripts": [
-            {
-              "id": "scr_fd1c2c32",
-              "label": "moving_cube_handler",
-              "zoneId": "demo",
-              "enabled": true,
-              "trigger": {
-                "type": "on_state_equals",
-                "targetId": "moving_enabled",
-                "stateValue": true,
-                "entityId": "self"
-              },
-              "conditions": [],
-              "actions": [
-                {
-                  "type": "play_sound",
-                  "loop": true,
-                  "sound": "cloth4",
-                  "targetId": "self"
-                }
-              ],
-              "oneShot": false
-            }
-          ],
-          "stateSchema": {
-            "moving_enabled": {
-              "type": "boolean",
-              "default": false
-            }
-          }
+          "scripts": []
         },
         {
           "id": "obj_1bbfdece",
@@ -1055,7 +1026,7 @@
           "position": {
             "x": -8.5,
             "y": 9.517862953544956,
-            "z": 23
+            "z": 22.285819785611213
           },
           "rotation": {
             "x": 180,
@@ -1070,7 +1041,7 @@
           "floor": 0,
           "zoneId": "demo",
           "properties": {
-            "interactable": true,
+            "interactable": false,
             "npcSpawn": false,
             "lootTableId": null,
             "triggerEventId": null
@@ -1206,7 +1177,7 @@
           "id": "vol_9b266a24",
           "label": "Trigger Volume",
           "position": {
-            "x": -3.1196867949916918,
+            "x": -1.8581789894317704,
             "y": 9.517862953544952,
             "z": 21.418291253231853
           },
@@ -1251,14 +1222,14 @@
           "id": "vol_3156c407",
           "label": "Trigger Volume",
           "position": {
-            "x": -8,
+            "x": -7.75,
             "y": 9.511624571992376,
-            "z": 23
+            "z": 22.835819785611214
           },
           "size": {
-            "x": 2,
+            "x": 2.5,
             "y": 2.5,
-            "z": 1
+            "z": 2.1
           },
           "zoneId": "demo",
           "scripts": [
