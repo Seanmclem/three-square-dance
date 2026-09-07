@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { TargetCombobox, type TargetOpt } from "@/ui/ScriptPanel";
 import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
@@ -6763,20 +6764,14 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
           </div>
         )}
         {onWireInteract && (zone?.objects.length ?? 0) > 0 && (
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 8 }}
+               title="Pick the object E acts on — makes it interactable, adds an On Interact script (starting with hide-prompt), and opens it">
             <div style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>PRESS-E TARGET</div>
-            <select
-              value={wiredTargetId}
-              title="Pick the object E acts on — makes it interactable, adds an On Interact script (starting with hide-prompt), and opens it"
-              onChange={e => { if (e.target.value) onWireInteract({ zoneId: vol.zoneId, objectId: e.target.value, promptElementId }); }}
-              style={{ width: "100%", padding: "4px 6px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
-                       border: "1px solid rgba(255,255,255,0.1)", background: "rgba(46,46,46,0.9)", color: "#c2cadb" }}
-            >
-              <option value="">— pick the object E acts on… —</option>
-              {(zone?.objects ?? []).map(o => (
-                <option key={o.id} value={o.id}>{o.label || o.assetId || o.id} ({o.id.slice(0, 8)})</option>
-              ))}
-            </select>
+            <TargetCombobox
+              targetId={wiredTargetId}
+              opts={((zone?.objects ?? []).map(o => ({ id: o.id, text: `${o.label || o.assetId || o.id} (${o.id.slice(0, 8)})`, group: "Objects" })) as TargetOpt[])}
+              onChange={(objectId) => { if (objectId) onWireInteract({ zoneId: vol.zoneId, objectId, promptElementId }); }}
+            />
           </div>
         )}
         <ScriptListRows
