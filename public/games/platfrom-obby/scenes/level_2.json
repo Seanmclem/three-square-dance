@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -7.991820816933151,
+        "x": -13.400935971467986,
         "y": 10.580493145796058,
-        "z": 23.966492829312678
+        "z": 28.37866857854622
       },
       "radius": 26.551091553215304,
       "phi": 0.9100000000000004,
@@ -1018,7 +1018,48 @@
             }
           ],
           "label": "moving_Cube_1",
-          "scripts": []
+          "scripts": [
+            {
+              "id": "scr_fae5d346",
+              "label": "Mover noise",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_game_start"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "play_sound",
+                  "block": {
+                    "id": "blk_73d0b4b2",
+                    "branch": 0
+                  },
+                  "sound": "chop",
+                  "loop": true,
+                  "targetId": "self"
+                }
+              ],
+              "oneShot": false,
+              "blocks": [
+                {
+                  "id": "blk_73d0b4b2",
+                  "branches": [
+                    {
+                      "conditions": [
+                        {
+                          "type": "state_equals",
+                          "entityId": "self",
+                          "stateKey": "moving",
+                          "stateValue": true
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "obj_1bbfdece",
