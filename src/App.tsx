@@ -3177,6 +3177,51 @@ export default function App() {
     setIsDirty(true);
   };
 
+  /** v4.79.72 — press-E target (plan merry-riding-spark): pick an object → it
+   *  becomes INTERACTABLE, gets an on_interact script seeded with hide_ui of the
+   *  volume's prompt, and the editor opens that script. */
+  const handleWireInteractTarget = (target: { zoneId: string; objectId: string; promptElementId?: string }): void => {
+    const world = worldRef.current;
+    const zone = world?.zones.get(target.zoneId);
+    const obj = zone?.objects.find(o => o.id === target.objectId);
+    if (!world || !zone || !obj) return;
+    const scripts = (obj.scripts ?? []).map(sc => structuredClone(sc));
+    let interact = scripts.find(sc => sc.trigger.type === "on_interact");
+    let changed = false;
+    if (!interact) {
+      interact = {
+        id: `scr_${crypto.randomUUID().slice(0, 8)}`,
+        label: "On Interact (E)", zoneId: target.zoneId, enabled: true,
+        trigger: { type: "on_interact" },   // no targetId — the engine keys entity triggers on the owner
+        conditions: [],
+        actions: target.promptElementId ? [{ type: "hide_ui", uiElementId: target.promptElementId } as ScriptAction] : [],
+        oneShot: false,
+      };
+      scripts.push(interact);
+      changed = true;
+    } else if (target.promptElementId &&
+               !interact.actions.some(a => a.type === "hide_ui" && a.uiElementId === target.promptElementId)) {
+      interact.actions = [{ type: "hide_ui", uiElementId: target.promptElementId } as ScriptAction, ...interact.actions];
+      changed = true;
+    }
+    const payload: Partial<WorldObject> = { scripts };
+    if (!obj.properties.interactable) {
+      // Full spread — updateObject Object.assigns top-level, bare { properties } would clobber.
+      payload.properties = { ...obj.properties, interactable: true };
+      changed = true;
+    }
+    if (changed) {
+      world.transaction("wire press-E target", () => { world.updateObject(target.zoneId, target.objectId, payload); });
+      syncHistory();
+      setIsDirty(true);
+    }
+    // Navigate: select the object, open the Scripts panel on its on_interact script.
+    busRef.current.emit("selection:set", { refs: [{ id: target.objectId, type: "object", zoneId: target.zoneId } as SelectedRef] });
+    setLeftPanel("scripts");
+    const scriptId = interact.id;
+    setTimeout(() => setScriptEditRequest({ scriptId, n: Date.now() }), 0);   // after the selection's props propagate
+  };
+
   const handleUiElementsChange = (uiElements: UiElementDef[]): void => {
     const world = worldRef.current;
     const proj = projectRef.current;
@@ -3767,6 +3812,7 @@ export default function App() {
         onWorldItemsChange={handleWorldItemsChange}
         projectSceneIds={project ? project.store.sceneIds : undefined}
         uiElements={worldUiElements}
+        onWireInteract={(objectId: string, promptElementId?: string) => { const z = worldRef.current?.activeZoneId; if (z) handleWireInteractTarget({ zoneId: z, objectId, promptElementId }); }}
         onUiElementsChange={handleUiElementsChange}
         decalTextures={decalTextures}
         selectedDecalId={selectedDecalId}
@@ -3902,6 +3948,7 @@ export default function App() {
         onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
         onCreatePrefab={handleCreatePrefab}
         onAddPressPrompt={handleAddPressPrompt}
+        onWireInteract={handleWireInteractTarget}
       />
       <CoordinateDisplay coords={coords} />
       </>}

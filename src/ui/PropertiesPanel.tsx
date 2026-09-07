@@ -472,6 +472,7 @@ interface PropertiesPanelProps {
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
   onAddPressPrompt?:        (target: { id: string; zoneId: string; kind: "volume" | "object" }) => void;   // v4.79.68 press-prompt wizard
+  onWireInteract?:          (target: { zoneId: string; objectId: string; promptElementId?: string }) => void;   // v4.79.72 press-E target
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onPrefabReexpand?:        () => void;
@@ -505,6 +506,7 @@ export function PropertiesPanel({
   prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabPushToPrefab, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   onAddPressPrompt,
+  onWireInteract,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
 }: PropertiesPanelProps) {
@@ -850,6 +852,7 @@ export function PropertiesPanel({
             onScriptsChange={onVolumeScriptsChange}
             onEditScript={onEditScript}
             onAddPressPrompt={onAddPressPrompt ? () => onAddPressPrompt({ id: selected.id, zoneId: selected.zoneId, kind: "volume" }) : undefined}
+            onWireInteract={onWireInteract}
             groups={groups}
             groupsOpen={groupsOpen}
             onToggleGroups={() => setGroupsOpen(v => !v)}
@@ -6500,11 +6503,12 @@ function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone, onCreatePrefab, onAddPressPrompt }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone, onCreatePrefab, onAddPressPrompt, onWireInteract }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onCreatePrefab?:  () => void;   // v4.79.57 — single-volume capture (absent when already a prefab member)
   onAddPressPrompt?: () => void;  // v4.79.68 — one-click Press-E prompt wiring
+  onWireInteract?:   (target: { zoneId: string; objectId: string; promptElementId?: string }) => void;   // v4.79.72 press-E target
   onScriptsChange?: (scripts: ScriptDef[]) => void;
   onEditScript?:    (scriptId: string) => void;
   groups:           GroupDef[];
@@ -6596,6 +6600,12 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
     onScriptsChange(scripts.filter(s => s.id !== id));
   }
 
+  // v4.79.72 — press-E target: this volume's prompt element + the already-wired object.
+  const promptElementId = scripts.flatMap(sc => sc.actions).find(ac => ac.type === "show_ui" && ac.uiElementId)?.uiElementId;
+  const wiredTargetId = promptElementId
+    ? ((zone?.objects ?? []).find(o => (o.scripts ?? []).some(sc =>
+        sc.trigger.type === "on_interact" && sc.actions.some(ac => ac.type === "hide_ui" && ac.uiElementId === promptElementId)))?.id ?? "")
+    : "";
   const fmt = (n: number) => Math.round(n * 10) / 10;
   const rotYNow = vol.rotation?.y ?? 0;
   const geoSummary = `${shape} · ${shape === "box" ? `${fmt(vol.size.x)}×${fmt(vol.size.y)}×${fmt(vol.size.z)}`
@@ -6750,6 +6760,23 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
                          borderRadius: 3, color: "#80aaff" }}
               >⌨ Prompt</button>
             )}
+          </div>
+        )}
+        {onWireInteract && (zone?.objects.length ?? 0) > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 1, marginBottom: 2 }}>PRESS-E TARGET</div>
+            <select
+              value={wiredTargetId}
+              title="Pick the object E acts on — makes it interactable, adds an On Interact script (starting with hide-prompt), and opens it"
+              onChange={e => { if (e.target.value) onWireInteract({ zoneId: vol.zoneId, objectId: e.target.value, promptElementId }); }}
+              style={{ width: "100%", padding: "4px 6px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
+                       border: "1px solid rgba(255,255,255,0.1)", background: "rgba(46,46,46,0.9)", color: "#c2cadb" }}
+            >
+              <option value="">— pick the object E acts on… —</option>
+              {(zone?.objects ?? []).map(o => (
+                <option key={o.id} value={o.id}>{o.label || o.assetId || o.id} ({o.id.slice(0, 8)})</option>
+              ))}
+            </select>
           </div>
         )}
         <ScriptListRows
