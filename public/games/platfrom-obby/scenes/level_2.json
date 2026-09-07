@@ -1013,7 +1013,7 @@
               "mode": "loop",
               "phase": 0,
               "speed": 45,
-              "autoStart": true,
+              "autoStart": false,
               "id": "mvr_32973361"
             }
           ],
@@ -1025,7 +1025,9 @@
               "zoneId": "demo",
               "enabled": true,
               "trigger": {
-                "type": "on_game_start"
+                "type": "on_state_changed",
+                "targetId": "moving",
+                "entityId": "self"
               },
               "conditions": [],
               "actions": [
@@ -1035,9 +1037,17 @@
                     "id": "blk_73d0b4b2",
                     "branch": 0
                   },
-                  "sound": "chop",
+                  "sound": "lowrandom",
                   "loop": true,
                   "targetId": "self"
+                },
+                {
+                  "type": "stop_sound",
+                  "block": {
+                    "id": "blk_73d0b4b2",
+                    "branch": -1
+                  },
+                  "sound": "lowrandom"
                 }
               ],
               "oneShot": false,
@@ -1055,7 +1065,8 @@
                         }
                       ]
                     }
-                  ]
+                  ],
+                  "else": true
                 }
               ]
             }
@@ -1286,10 +1297,31 @@
               "actions": [
                 {
                   "type": "show_ui",
-                  "uiElementId": "ui_7239dfcc"
+                  "uiElementId": "ui_7239dfcc",
+                  "block": {
+                    "id": "blk_2a54360a",
+                    "branch": 0
+                  }
                 }
               ],
-              "oneShot": false
+              "oneShot": false,
+              "blocks": [
+                {
+                  "id": "blk_2a54360a",
+                  "branches": [
+                    {
+                      "conditions": [
+                        {
+                          "type": "state_equals",
+                          "entityId": "self",
+                          "stateKey": "switch-flipped",
+                          "stateValue": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
             {
               "id": "scr_ce3a7bcc",
@@ -1327,11 +1359,27 @@
                   "targetId": "obj_1bbfdece",
                   "animation": "Lever_On",
                   "animationHold": true
+                },
+                {
+                  "type": "start_mover",
+                  "targetId": "obj_e4655978"
+                },
+                {
+                  "type": "set_state",
+                  "targetId": "self",
+                  "stateKey": "switch-flipped",
+                  "stateValue": true
                 }
               ],
               "oneShot": true
             }
-          ]
+          ],
+          "stateSchema": {
+            "switch-flipped": {
+              "type": "boolean",
+              "default": false
+            }
+          }
         }
       ],
       "checkpoints": [
