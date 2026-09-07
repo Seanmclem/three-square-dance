@@ -1210,18 +1210,10 @@
       "startVisible": true
     },
     {
-      "id": "ui_a1efbc28",
-      "label": "Prompt — switch_1_trigger",
-      "kind": "label",
-      "text": "Press E",
-      "anchor": "bottom-center",
-      "backdrop": true
-    },
-    {
-      "id": "ui_9d0b6351",
+      "id": "ui_7239dfcc",
       "label": "Prompt — Trigger Volume",
       "kind": "label",
-      "text": "Press E",
+      "text": "Press E to switch",
       "anchor": "bottom-center",
       "backdrop": true
     }

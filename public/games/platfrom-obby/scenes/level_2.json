@@ -1263,7 +1263,7 @@
           "zoneId": "demo",
           "scripts": [
             {
-              "id": "scr_867f0f84",
+              "id": "scr_82b9e56e",
               "label": "Show Prompt",
               "zoneId": "demo",
               "enabled": true,
@@ -1274,13 +1274,13 @@
               "actions": [
                 {
                   "type": "show_ui",
-                  "uiElementId": "ui_9d0b6351"
+                  "uiElementId": "ui_7239dfcc"
                 }
               ],
               "oneShot": false
             },
             {
-              "id": "scr_d1234e46",
+              "id": "scr_ce3a7bcc",
               "label": "Hide Prompt",
               "zoneId": "demo",
               "enabled": true,
@@ -1291,10 +1291,33 @@
               "actions": [
                 {
                   "type": "hide_ui",
-                  "uiElementId": "ui_9d0b6351"
+                  "uiElementId": "ui_7239dfcc"
                 }
               ],
               "oneShot": false
+            },
+            {
+              "id": "scr_d78ac10b",
+              "label": "On Press (interact)",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_interact"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "hide_ui",
+                  "uiElementId": "ui_7239dfcc"
+                },
+                {
+                  "type": "play_animation",
+                  "targetId": "obj_1bbfdece",
+                  "animation": "Lever_On",
+                  "animationHold": true
+                }
+              ],
+              "oneShot": true
             }
           ]
         }
