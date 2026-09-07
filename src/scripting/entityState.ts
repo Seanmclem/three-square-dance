@@ -1,6 +1,7 @@
 import type { WorldState } from "@/world/WorldState";
 import { gameState } from "./GameState";
 import { INV_PREFIX } from "./inventory";
+import { hasEnabledMover } from "@/world/moverDefs";
 
 /**
  * Per-entity state (Phase 60) — the facade convention, spelled out in ONE place.
@@ -40,8 +41,13 @@ export function registerEntityStateSchemas(world: WorldState): void {
     const lists: { id: string; stateSchema?: Record<string, import("@/types").StateSchema> }[][] =
       [zone.objects, zone.triggerVolumes ?? []];
     for (const arr of lists)
-      for (const e of arr)
+      for (const e of arr) {
         for (const [key, schema] of Object.entries(e.stateSchema ?? {}))
           gameState.register(entKey(e.id, key), schema);
+        // v4.79.77 — the auto "moving" key for mover-carrying entities (maintained
+        // dwell-aware by MoverSystem): registered so reset/Continue behave like any key.
+        if (hasEnabledMover(e as { movers?: import("@/types").MoverDef[]; mover?: import("@/types").MoverDef }))
+          gameState.register(entKey(e.id, "moving"), { type: "boolean", default: false });
+      }
   }
 }

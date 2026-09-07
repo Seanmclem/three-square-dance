@@ -3,6 +3,8 @@ import type RAPIER from "@dimforge/rapier3d-compat";
 import type { EventBus } from "@/core/EventBus";
 import type { MoverDef, Vec3 } from "@/types";
 import { reportTransformWrite } from "@/world/transformWatchdog";
+import { gameState } from "@/scripting/GameState";
+import { entKey } from "@/scripting/entityState";
 
 // Scratch objects — update() runs per mover per frame, so no allocations here.
 const _axis     = new THREE.Vector3();
@@ -49,6 +51,7 @@ interface MoverEntry {
   // carry: where the body was told to be last frame → per-frame world delta
   prevPos:    THREE.Vector3;
   delta:      THREE.Vector3;
+  wasMoving:  boolean;        // v4.79.77 — last written __ent.<id>.moving value
 }
 
 /**
@@ -107,6 +110,7 @@ export class MoverSystem {
       aiDriven,
       prevPos: new THREE.Vector3(origin.x, origin.y, origin.z),
       delta:   new THREE.Vector3(),
+      wasMoving: false,
     };
     this._entries.set(entityId, entry);
     if (body) this._byHandle.set(body.handle, entry);
@@ -183,10 +187,19 @@ export class MoverSystem {
   update(dt: number): void {
     if (!this._active || this._entries.size === 0) return;
     for (const [id, e] of this._entries) {
-      if (!e.subs.some(s => s.running)) continue;
+      if (!e.subs.some(s => s.running)) {
+        // a just-finished entry writes its final moving=false (once-mode ends here)
+        if (e.wasMoving) { e.wasMoving = false; gameState.set(entKey(id, "moving"), false); }
+        continue;
+      }
       for (const s of e.subs) if (s.running) this._advance(s, dt);
       reportTransformWrite(id, "MoverSystem");
       this._applyPose(e);
+      // v4.79.77 — auto entity state: __ent.<id>.moving, true only while some
+      // mover is actually displacing (dwell-aware). Scripts target it like any
+      // entity state key ("Whose state" → the entity → moving).
+      const moving = e.subs.some(sub => this._subMoving(sub));
+      if (moving !== e.wasMoving) { e.wasMoving = moving; gameState.set(entKey(id, "moving"), moving); }
       // Every sub stopped this frame (a "once" slide reached an end): the final
       // pose is applied above; kill the residual delta so a rider stops being carried.
       if (!e.subs.some(s => s.running)) e.delta.set(0, 0, 0);
@@ -194,6 +207,20 @@ export class MoverSystem {
   }
 
   // ── internals ─────────────────────────────────────────────────────────────
+
+  /** Dwell-aware "is this sub actively displacing right now?" (v4.79.77). */
+  private _subMoving(s: MoverSub): boolean {
+    if (!s.running) return false;
+    const d = s.def;
+    if (d.kind === "spin") return true;                    // spins have no dwell
+    if ((d.mode ?? "loop") === "once") return true;        // once: running == moving
+    const duration = Math.max(d.duration ?? 2, 0.05);
+    const dwell    = Math.max(d.dwell ?? 0, 0);
+    if (dwell <= 0) return true;
+    const period = 2 * (duration + dwell);
+    const tt = (s.t + (d.phase ?? 0) * period) % period;
+    return tt < duration || (tt >= duration + dwell && tt < 2 * duration + dwell);
+  }
 
   private _advance(s: MoverSub, dt: number): void {
     const d = s.def;
@@ -274,6 +301,9 @@ export class MoverSystem {
   }
 
   private _resetAll(): void {
+    for (const [id, e] of this._entries) {
+      if (e.wasMoving) { e.wasMoving = false; gameState.set(entKey(id, "moving"), false); }
+    }
     for (const e of this._entries.values()) {
       // aiDriven entries register no subs (the floating-crab fix, kept by
       // construction): there is nothing here to re-arm.

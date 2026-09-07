@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from "react";
+import { hasEnabledMover } from "@/world/moverDefs";
 import { gameState } from "@/scripting/GameState";
 import type {
   ScriptDef,
@@ -1777,6 +1778,7 @@ function entityStateKeys(
   const keys = new Set<string>();
   for (const e of resolveStateEntities(targetId, ownerId, zoneObjects, triggerVolumes)) {
     for (const k of Object.keys(e.stateSchema ?? {})) keys.add(k);
+    if (hasEnabledMover(e as { movers?: MoverDef[]; mover?: MoverDef })) keys.add("moving");   // v4.79.77 auto mover state
   }
   return [...keys];
 }
@@ -2678,6 +2680,9 @@ function ActionFields({
       const t = e.stateSchema?.[action.stateKey ?? ""]?.type;
       if (t) return t;   // group scope: first member schema carrying the key wins
     }
+    // v4.79.77 — the auto mover state is boolean (not in any authored schema).
+    if (targets.length && (action.stateKey ?? "") === "moving" &&
+        targets.some(e => hasEnabledMover(e as { movers?: MoverDef[]; mover?: MoverDef }))) return "boolean";
     // Entity scopes never fall back to the global schema (entity keys are their own
     // namespace); only the global scope reads the merged scene/game map.
     return targets.length ? undefined : stateKeyTypes?.[action.stateKey ?? ""];

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hasEnabledMover } from "@/world/moverDefs";
 import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import type {
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
@@ -6303,9 +6304,10 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
 // Per-entity state keys: schema rows (key / type / default / min-max) stored on
 // the entity's `stateSchema`; values live namespaced in the global GameState and
 // are shown here live during preview. The raw `__ent.` keys are never displayed.
-function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus, heading }: {
+function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus, heading, builtinMovingState }: {
   entityId: string;
   heading?: string;   // Phase 69 — the trigger view passes a short heading (its Section is titled State)
+  builtinMovingState?: boolean;   // v4.79.77 — show the auto mover 'moving' row
   stateSchema?: Record<string, StateSchema>;
   onObjectUpdate?: (changes: Partial<WorldObject>) => void;
   bus?: EventBus;
@@ -6333,6 +6335,17 @@ function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus, headin
           text={`Keys this ${entityId.startsWith("vol_") ? "volume" : "object"} tracks for itself (health, open, mood…) — every copy and prefab instance gets its own values. Scripts read/write them via the “Whose state” scope. Live values show while playing.`}
         />
       </div>
+      {builtinMovingState && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", marginBottom: 6,
+                      background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: 4 }}
+             title={'Maintained automatically by this entity\'s movers: true while actually moving, false while dwelling or stopped. Target it from scripts ("Whose state" → this entity → moving) — e.g. play a sound while moving.'}>
+          <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace", flex: 1 }}>moving</span>
+          {gameState.get(entKey(entityId, "moving")) !== undefined && (
+            <span title="live value (playing)" style={{ color: "#7fd0a0", fontSize: 10, fontFamily: "monospace" }}>▶ {String(gameState.get(entKey(entityId, "moving")))}</span>
+          )}
+          <span style={{ color: "#8b94a8", fontSize: 9, fontFamily: "monospace" }}>auto · bool</span>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: entries.length ? 6 : 0 }}>
       {entries.map(([key, s]) => {
         const live = gameState.get(entKey(entityId, key));
@@ -6480,7 +6493,7 @@ function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObject
           on_player_enter / on_player_exit, add a Sensor collider (Colliders screen).
         </div>
       )}
-      <EntityStateSection entityId={obj.id} stateSchema={obj.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus} />
+      <EntityStateSection entityId={obj.id} stateSchema={obj.stateSchema} onObjectUpdate={onObjectUpdate} bus={bus} builtinMovingState={hasEnabledMover(obj)} />
     </div>
   );
 }
