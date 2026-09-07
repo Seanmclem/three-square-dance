@@ -88,7 +88,7 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary, writeAssetFile, removeAssetFiles, removeEntries, updateEntries, upsertEntry } from "@/assets/assetLibrary";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
+import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -3136,6 +3136,47 @@ export default function App() {
   // Custom GUI registry (Phase 49) — the UI tab. Same scoping as items: project
   // open → the shared game.json registry (written on Save; not undoable), else
   // the scene's own WorldConfig.uiElements.
+  /** v4.79.68 — one-click press-prompt: a "Press E" Label element + On Enter
+   *  show_ui / On Exit hide_ui scripts on the entity; objects also get hide_ui
+   *  prepended to their on_interact script so the prompt vanishes when used. */
+  const handleAddPressPrompt = (target: { id: string; zoneId: string; kind: "volume" | "object" }): void => {
+    const world = worldRef.current;
+    const zone = world?.zones.get(target.zoneId);
+    if (!world || !zone) return;
+    const ent = target.kind === "volume"
+      ? zone.triggerVolumes?.find(v => v.id === target.id)
+      : zone.objects.find(o => o.id === target.id);
+    if (!ent) return;
+    const entLabel = (ent as { label?: string }).label || target.id.slice(0, 8);
+    const el: UiElementDef = {
+      id: `ui_${crypto.randomUUID().slice(0, 8)}`,
+      label: `Prompt — ${entLabel}`,
+      kind: "label", text: "Press E",
+      anchor: "bottom-center", backdrop: true,
+    };
+    handleUiElementsChange([...(worldUiElements ?? []), el]);
+    const mk = (type: "on_player_enter" | "on_player_exit", label: string, actions: ScriptAction[]): ScriptDef => ({
+      id: `scr_${crypto.randomUUID().slice(0, 8)}`,
+      label, zoneId: target.zoneId, enabled: true,
+      trigger: { type }, conditions: [], actions, oneShot: false,
+    });
+    const scripts = (ent.scripts ?? []).map(sc => structuredClone(sc));
+    if (target.kind === "object") {
+      const it = scripts.find(sc => sc.trigger.type === "on_interact");
+      if (it) it.actions = [{ type: "hide_ui", uiElementId: el.id } as ScriptAction, ...it.actions];
+    }
+    scripts.push(
+      mk("on_player_enter", "Show Prompt", [{ type: "show_ui", uiElementId: el.id } as ScriptAction]),
+      mk("on_player_exit",  "Hide Prompt", [{ type: "hide_ui", uiElementId: el.id } as ScriptAction]),
+    );
+    world.transaction("add press prompt", () => {
+      if (target.kind === "volume") world.updateTriggerVolume(target.zoneId, target.id, { scripts });
+      else world.updateObject(target.zoneId, target.id, { scripts });
+    });
+    syncHistory();
+    setIsDirty(true);
+  };
+
   const handleUiElementsChange = (uiElements: UiElementDef[]): void => {
     const world = worldRef.current;
     if (!world?.world) return;
@@ -3853,6 +3894,7 @@ export default function App() {
         onPrefabUnlink={() => setPrefabConfirm("unlink")}
         onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
         onCreatePrefab={handleCreatePrefab}
+        onAddPressPrompt={handleAddPressPrompt}
       />
       <CoordinateDisplay coords={coords} />
       </>}

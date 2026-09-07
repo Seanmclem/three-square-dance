@@ -650,6 +650,7 @@ export function ScriptPanel({
         })()
       ) : editing ? (
         <ScriptEditor
+          onCreateUiElement={(el) => onUiElementsChange([...uiElements, el])}
           stateKeyTypes={stateKeyTypes}
           script={editing}
           help={tabHelp}
@@ -1021,7 +1022,9 @@ function ScriptEditor({
   onBack,
   onChange,
   onDelete,
+  onCreateUiElement,
 }: {
+  onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   script: ScriptDef;
   triggerVolumes: TriggerVolume[];
   zoneObjects: WorldObject[];
@@ -1380,6 +1383,7 @@ function ScriptEditor({
                   projectSceneIds={projectSceneIds}
                   playerModelAssetId={playerModelAssetId}
                   owner={owner}
+                  onCreateUiElement={onCreateUiElement}
                   onChange={(na) => patchAction(i, na)}
                   onRemove={() => { set("actions", script.actions.filter((_, j) => j !== i)); setOpenAction(null); }}
                   onWrap={a.block ? undefined : () => {
@@ -2450,7 +2454,9 @@ function ActionRow({
   onDuplicate,
   onChange,
   onRemove,
+  onCreateUiElement,
 }: {
+  onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -2556,6 +2562,7 @@ function ActionRow({
             projectSceneIds={projectSceneIds}
             playerModelAssetId={playerModelAssetId}
             owner={owner}
+            onCreateUiElement={onCreateUiElement}
             onChange={onChange}
           />
           <F label="After (s)" style={{ borderBottom: "none" }}>
@@ -2589,7 +2596,9 @@ function ActionFields({
   playerModelAssetId,
   owner,
   onChange,
+  onCreateUiElement,
 }: {
+  onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
   action: ScriptAction;
   zoneObjects: WorldObject[];
   zonePlatforms: PlatformDef[];
@@ -3680,9 +3689,26 @@ function ActionFields({
         <select
           style={S.select}
           value={action.uiElementId ?? ""}
-          onChange={(e) => set({ uiElementId: e.target.value || undefined })}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "__new_prompt_label__" && onCreateUiElement) {
+              // v4.79.68 — create a sensible press-prompt Label right here and select it.
+              const n = uiElements.filter((el) => el.kind === "label" && /^Press prompt/.test(el.label)).length;
+              const el: UiElementDef = {
+                id: `ui_${crypto.randomUUID().slice(0, 8)}`,
+                label: n ? `Press prompt ${n + 1}` : "Press prompt",
+                kind: "label", text: "Press E",
+                anchor: "bottom-center", backdrop: true,
+              };
+              onCreateUiElement(el);
+              set({ uiElementId: el.id });
+              return;
+            }
+            set({ uiElementId: v || undefined });
+          }}
         >
           <option value="">— UI element (SCRIPTS → UI tab) —</option>
+          {onCreateUiElement && <option value="__new_prompt_label__">＋ New prompt label…</option>}
           {uiElements.map((el) => (
             <option key={el.id} value={el.id}>
               {el.label} ({el.kind})

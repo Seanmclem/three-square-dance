@@ -471,6 +471,7 @@ interface PropertiesPanelProps {
   onSelectInstance?:        () => void;                   // header "all N" — select the whole instance
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
+  onAddPressPrompt?:        (target: { id: string; zoneId: string; kind: "volume" | "object" }) => void;   // v4.79.68 press-prompt wizard
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
   onPrefabReexpand?:        () => void;
@@ -503,6 +504,7 @@ export function PropertiesPanel({
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabPushToPrefab, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
+  onAddPressPrompt,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
 }: PropertiesPanelProps) {
@@ -847,6 +849,7 @@ export function PropertiesPanel({
               : undefined}
             onScriptsChange={onVolumeScriptsChange}
             onEditScript={onEditScript}
+            onAddPressPrompt={onAddPressPrompt ? () => onAddPressPrompt({ id: selected.id, zoneId: selected.zoneId, kind: "volume" }) : undefined}
             groups={groups}
             groupsOpen={groupsOpen}
             onToggleGroups={() => setGroupsOpen(v => !v)}
@@ -972,7 +975,8 @@ export function PropertiesPanel({
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
-          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} onObjectUpdate={onObjectUpdate} bus={bus} />
+          <ObjectScriptsScreen selected={selected} onScriptsChange={onVolumeScriptsChange} onEditScript={onEditScript} onObjectUpdate={onObjectUpdate} bus={bus}
+            onAddPressPrompt={onAddPressPrompt ? () => onAddPressPrompt({ id: selected.id, zoneId: selected.zoneId, kind: "object" }) : undefined} />
         ) : currentScreen === "ai" ? (
           <EnemyAIScreen selected={selected} assets={assets} onObjectUpdate={onObjectUpdate} bus={bus} />
         ) : null}
@@ -6402,12 +6406,13 @@ function EntityStateSection({ entityId, stateSchema, onObjectUpdate, bus, headin
   );
 }
 
-function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObjectUpdate, bus }: {
+function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObjectUpdate, bus, onAddPressPrompt }: {
   selected: SelectedObjectPayload;
   onScriptsChange?: (scripts: ScriptDef[]) => void;
   onEditScript?: (scriptId: string) => void;
   onObjectUpdate?: (changes: Partial<WorldObject>) => void;
   bus?: EventBus;
+  onAddPressPrompt?: () => void;  // v4.79.68 — one-click Press-E prompt wiring
 }) {
   const obj = selected.data as WorldObject | null;
   if (!obj) return null;
@@ -6444,6 +6449,15 @@ function ObjectScriptsScreen({ selected, onScriptsChange, onEditScript, onObject
                      background: "rgba(0,255,200,0.1)", border: "1px solid rgba(0,255,200,0.25)",
                      borderRadius: 3, color: "#44ccaa" }}
           >+ Add</button>
+        )}
+        {onAddPressPrompt && (
+          <button
+            onClick={onAddPressPrompt}
+            title={'One click: creates a "Press E" label plus On Enter show_ui / On Exit hide_ui scripts (needs a Sensor collider to fire); an on_interact script also gets hide_ui prepended'}
+            style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                     background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.25)",
+                     borderRadius: 3, color: "#80aaff", marginLeft: 4 }}
+          >⌨ Prompt</button>
         )}
       </div>
       <div>
@@ -6486,10 +6500,11 @@ function blankVolumeScript(zoneId: string, type: "on_player_enter" | "on_player_
 // several volumes doesn't need re-toggling per selection; resets to MOVE on reload.
 let TRIGGER_EDIT_MODE: "move" | "resize" = "move";
 
-function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone, onCreatePrefab }: {
+function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, groups, groupsOpen, onToggleGroups, onObjectUpdate, onSelectGroup, bus, prefabSection, zone, onCreatePrefab, onAddPressPrompt }: {
   selected:         SelectedObjectPayload;
   onDelete?:        () => void;
   onCreatePrefab?:  () => void;   // v4.79.57 — single-volume capture (absent when already a prefab member)
+  onAddPressPrompt?: () => void;  // v4.79.68 — one-click Press-E prompt wiring
   onScriptsChange?: (scripts: ScriptDef[]) => void;
   onEditScript?:    (scriptId: string) => void;
   groups:           GroupDef[];
@@ -6726,6 +6741,15 @@ function TriggerVolumeView({ selected, onDelete, onScriptsChange, onEditScript, 
                        background: "rgba(255,200,0,0.1)", border: "1px solid rgba(255,200,0,0.25)",
                        borderRadius: 3, color: "#ccaa44" }}
             >+ Exit</button>
+            {onAddPressPrompt && (
+              <button
+                onClick={onAddPressPrompt}
+                title={'One click: creates a "Press E" label (SCRIPTS → UI) plus On Enter show_ui / On Exit hide_ui scripts wired to it'}
+                style={{ padding: "2px 7px", fontSize: 10, fontFamily: "monospace", cursor: "pointer",
+                         background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.25)",
+                         borderRadius: 3, color: "#80aaff" }}
+              >⌨ Prompt</button>
+            )}
           </div>
         )}
         <ScriptListRows
