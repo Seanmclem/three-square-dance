@@ -1208,6 +1208,14 @@
       "halfGraphicId": "heart_half_icon",
       "emptyGraphicId": "heart_outline_icon",
       "startVisible": true
+    },
+    {
+      "id": "ui_a1efbc28",
+      "label": "Prompt — switch_1_trigger",
+      "kind": "label",
+      "text": "Press E",
+      "anchor": "bottom-center",
+      "backdrop": true
     }
   ],
   "playerSettings": {
