@@ -194,6 +194,7 @@ export class ScriptEngine {
       this.fire("on_player_exit", volumeId);
     });
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
+    sub("trigger:volume-interact", ({ volumeId }) => this.fire("on_interact",     volumeId));   // v4.79.76 — volume on_interact
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
     sub("state:changed",         ({ key, value }) => {
       this.fire("on_state_changed", key);

@@ -312,6 +312,7 @@ export interface BusEvents {
   "camera:jump":           { x: number; z: number };
   "camera:topdown":        Record<string, never>;
   "character:interact":       { objectId: string };
+  "character:interact-pressed": Record<string, never>;   // v4.79.76 — every interact press (volumes listen)
   "character:interact-range": { objectId: string; label: string } | null;
   "character:teleport":    { position: Vec3; facing?: number };
   "character:save-position": { key: string };
@@ -399,6 +400,7 @@ export interface BusEvents {
   "trigger:volume-enter":  { volumeId: string };
   "trigger:volume-stay":   { volumeId: string };   // per-frame while inside (v4.76.3 — mid-occupancy condition retry)
   "trigger:volume-exit":   { volumeId: string };
+  "trigger:volume-interact": { volumeId: string };   // v4.79.76 — interact pressed while inside
   "triggervolume:added":   { zoneId: string; volume: TriggerVolume };
   "triggervolume:updated": { zoneId: string; id: string; changes: Partial<TriggerVolume> };
   "triggervolume:removed": { zoneId: string; id: string };

@@ -344,7 +344,6 @@ export interface ScriptPanelProps {
   graphics: GraphicDef[];
   uiElements: UiElementDef[];
   onUiElementsChange: (uiElements: UiElementDef[]) => void;
-  onWireInteract?: (objectId: string, promptElementId?: string) => void;   // v4.79.72 press-E target
   // Avatar model asset id (player settings) — clip list for play_animation target "player".
   playerModelAssetId?: string;
 }
@@ -385,7 +384,6 @@ export function ScriptPanel({
   graphics,
   uiElements,
   onUiElementsChange,
-  onWireInteract,
   playerModelAssetId,
 }: ScriptPanelProps) {
   const [tab, setTab] = useState<TabId>("level");
@@ -655,7 +653,6 @@ export function ScriptPanel({
           onCreateUiElement={(el) => onUiElementsChange([...uiElements, el])}
           onUpdateUiElement={(id, changes) => onUiElementsChange(uiElements.map((el) => el.id === id ? { ...el, ...changes } as UiElementDef : el))}
           onOpenUiTab={() => setTab("ui")}
-          onWireInteract={onWireInteract}
           stateKeyTypes={stateKeyTypes}
           script={editing}
           help={tabHelp}
@@ -1030,9 +1027,7 @@ function ScriptEditor({
   onCreateUiElement,
   onUpdateUiElement,
   onOpenUiTab,
-  onWireInteract,
 }: {
-  onWireInteract?: (objectId: string, promptElementId?: string) => void;   // v4.79.72 press-E target
   onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
@@ -1397,7 +1392,6 @@ function ScriptEditor({
                   onCreateUiElement={onCreateUiElement}
                   onUpdateUiElement={onUpdateUiElement}
                   onOpenUiTab={onOpenUiTab}
-            onWireInteract={onWireInteract}
                   onChange={(na) => patchAction(i, na)}
                   onRemove={() => { set("actions", script.actions.filter((_, j) => j !== i)); setOpenAction(null); }}
                   onWrap={a.block ? undefined : () => {
@@ -1803,9 +1797,9 @@ interface ConditionScope {
 // or id; the list opens on focus, mousedown picks (fires before blur), Enter
 // picks the first match, Escape closes.
 
-export interface TargetOpt { id: string; text: string; group: string }
+interface TargetOpt { id: string; text: string; group: string }
 
-export function TargetCombobox({
+function TargetCombobox({
   targetId,
   opts,
   onChange,
@@ -2471,9 +2465,7 @@ function ActionRow({
   onCreateUiElement,
   onUpdateUiElement,
   onOpenUiTab,
-  onWireInteract,
 }: {
-  onWireInteract?: (objectId: string, promptElementId?: string) => void;   // v4.79.72 press-E target
   onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
@@ -2585,7 +2577,6 @@ function ActionRow({
             onCreateUiElement={onCreateUiElement}
             onUpdateUiElement={onUpdateUiElement}
             onOpenUiTab={onOpenUiTab}
-            onWireInteract={onWireInteract}
             onChange={onChange}
           />
           <F label="After (s)" style={{ borderBottom: "none" }}>
@@ -2622,9 +2613,7 @@ function ActionFields({
   onCreateUiElement,
   onUpdateUiElement,
   onOpenUiTab,
-  onWireInteract,
 }: {
-  onWireInteract?: (objectId: string, promptElementId?: string) => void;   // v4.79.72 press-E target
   onOpenUiTab?: () => void;   // v4.79.71 — jump to SCRIPTS → UI to configure the selected element
   onUpdateUiElement?: (id: string, changes: Partial<UiElementDef>) => void;   // v4.79.69 — inline prompt-text editing
   onCreateUiElement?: (el: UiElementDef) => void;   // v4.79.68 — '+ New prompt label…' in show_ui/hide_ui
@@ -3763,20 +3752,7 @@ function ActionFields({
             >↗ Configure {el.label}</button>
           );
         })()}
-        {action.type === "show_ui" && owner?.kind !== "object" && onWireInteract && (() => {
-          // v4.79.73 — searchable + shows the CURRENTLY wired object (the one whose
-          // on_interact hides this element), so the wiring is inspectable/editable.
-          const wired = zoneObjects.find((o) =>
-            (o.scripts ?? []).some((sc) => sc.trigger.type === "on_interact" &&
-              sc.actions.some((ac) => ac.type === "hide_ui" && ac.uiElementId === action.uiElementId)))?.id ?? "";
-          const opts: TargetOpt[] = zoneObjects.map((o) => ({ id: o.id, text: `${o.label || o.assetId || o.id} (${o.id.slice(0, 8)})`, group: "Objects" }));
-          return (
-            <F label="Press-E object">
-              <TargetCombobox targetId={wired} opts={opts} onChange={(id) => { if (id) onWireInteract(id, action.uiElementId); }} />
-            </F>
-          );
-        })()}
-        {(() => {
+                {(() => {
           // v4.79.69 — a selected LABEL's text is editable right here (user:
           // "editing that prompt is still as many clicks away").
           const el = uiElements.find((e) => e.id === action.uiElementId);

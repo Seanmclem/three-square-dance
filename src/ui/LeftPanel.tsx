@@ -84,7 +84,6 @@ interface LeftPanelProps {
   onWorldItemsChange:   (items: ItemDef[]) => void;
   uiElements:           UiElementDef[];
   onUiElementsChange:   (uiElements: UiElementDef[]) => void;
-  onWireInteract?:      (objectId: string, promptElementId?: string) => void;   // v4.79.72 press-E target (show_ui card)
   // decals panel
   decalTextures:   DecalTexDef[];
   selectedDecalId: string | null;
@@ -116,7 +115,7 @@ export function LeftPanel({
   activeZoneId, triggerVolumes, zoneObjects, zonePlatforms, zoneShapes, zoneLights, zoneStairs, zoneWalls, zoneFloors, zoneCheckpoints,
   onZoneScriptsChange, onZoneDialoguesChange, onObjectScriptsChange,
   stateSchema, onStateSchemaChange, gameStateSchema, onGameStateSchemaChange, isPreviewing, scriptEditRequest,
-  worldItems, onWorldItemsChange, projectSceneIds, uiElements, onUiElementsChange, onWireInteract,
+  worldItems, onWorldItemsChange, projectSceneIds, uiElements, onUiElementsChange,
   decalTextures, selectedDecalId, onDecalSelect,
   prefabs, prefabInstanceCounts, onPlacePrefab, onPlaceGenerator, onPrefabRename, onPrefabDelete, onPrefabEdit,
   onPrefabCreateFromSelection, prefabSelectionHint, prefabRenameRequestId, onPrefabRenameRequestHandled,
@@ -315,7 +314,6 @@ export function LeftPanel({
                 onWorldItemsChange={onWorldItemsChange}
                 graphics={graphics}
                 uiElements={uiElements}
-                onWireInteract={onWireInteract}
                 onUiElementsChange={onUiElementsChange}
                 playerModelAssetId={playerModelAssetId}
               />

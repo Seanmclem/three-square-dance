@@ -280,6 +280,9 @@ export class CharacterController {
       this._desiredDist = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this._desiredDist + actions.zoomDelta));
     }
     if (actions.interactPressed) {
+      // v4.79.76 — volumes hear every interact press (TriggerSystem fans out to
+      // the volumes the player is inside); device-neutral (E / LB / touch).
+      this._bus.emit("character:interact-pressed", {});
       if (this._interactLadder) this._mount(this._interactLadder, true);   // "Climb down" prompt (top mount)
       else if (this._interactTargetId) this._bus.emit("character:interact", { objectId: this._interactTargetId });
     }

@@ -21,7 +21,21 @@ export class TriggerSystem {
   constructor(
     private readonly _doorSensors: ReadonlyMap<number, string>,
     private readonly _bus: EventBus,
-  ) {}
+  ) {
+    // v4.79.76 — "player presses INTERACT inside this volume": fan the press out
+    // to every currently-occupied volume. PreviewController builds a fresh
+    // TriggerSystem per preview session — dispose() releases the listener.
+    this._offInteract = this._bus.on("character:interact-pressed", () => {
+      for (const h of this._insideVolumes) {
+        const volumeId = this._volumeSensors.get(h);
+        if (volumeId) this._bus.emit("trigger:volume-interact", { volumeId });
+      }
+    });
+  }
+
+  private _offInteract: (() => void) | null = null;
+
+  dispose(): void { this._offInteract?.(); this._offInteract = null; }
 
   setCharacterCollider(c: RAPIER.Collider): void { this._characterCollider = c; }
 

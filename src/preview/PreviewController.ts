@@ -278,6 +278,7 @@ export class PreviewController {
       this._onCanvasMouseDown = null;
     }
     this._controller = null;
+    this._triggers?.dispose();   // v4.79.76 — release the interact-pressed listener
     this._triggers   = null;
     this._input      = null;
 
