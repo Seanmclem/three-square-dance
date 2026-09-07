@@ -3598,10 +3598,15 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
           />
           <span style={{ fontSize: 10, color: "#9090a0" }}>Enable</span>
         </label>
-        {objData?.properties.interactable && (
+        {objData?.properties.interactable && (<>
+          <div style={{ color: "#8b94a8", fontSize: 9, letterSpacing: 0.5, margin: "6px 0 2px" }}
+               title={'The built-in in-range hint under the crosshair reads "[E] <this text>". Separate from any authored prompt label.'}>
+            HUD HINT — [E] …
+          </div>
           <input
             type="text"
-            placeholder="Interact"
+            placeholder="Interact (default)"
+            title={'Shown as "[E] <this text>" under the crosshair when the player is in interact range. Blank = "Interact".'}
             defaultValue={objData.properties.interactLabel ?? ""}
             key={objData.id + "-label"}
             onBlur={e => onObjectUpdate({ properties: { ...objData.properties, interactLabel: e.target.value } } as Partial<WorldObject>)}
@@ -3612,7 +3617,7 @@ function ObjectGeoView({ selected, onObjectUpdate }: { selected: SelectedObjectP
               fontSize: 10, fontFamily: "monospace", padding: "3px 6px", outline: "none",
             }}
           />
-        )}
+        </>)}
       </div>
 
       <div>
