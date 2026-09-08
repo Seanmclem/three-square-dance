@@ -1369,6 +1369,11 @@
                   "targetId": "self",
                   "stateKey": "switch-flipped",
                   "stateValue": true
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "switch_flick",
+                  "targetId": "obj_1bbfdece"
                 }
               ],
               "oneShot": true

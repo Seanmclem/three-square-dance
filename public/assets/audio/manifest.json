@@ -6529,6 +6529,21 @@
         "author": "Olivia",
         "license": "CC0"
       }
+    },
+    {
+      "id": "switch_flick",
+      "label": "switch flick",
+      "category": "SFX",
+      "path": "/assets/audio/switch_flick.wav",
+      "loop": false,
+      "spatial": false,
+      "tags": [
+        "self-record"
+      ],
+      "dateAdded": "2026-09-08",
+      "attribution": {
+        "author": "Olivia"
+      }
     }
   ]
 }
