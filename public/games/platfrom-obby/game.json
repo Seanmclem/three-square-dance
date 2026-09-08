@@ -1183,6 +1183,109 @@
         }
       ],
       "dateAdded": "2026-08-31"
+    },
+    {
+      "id": "pfb_dcde1ad7",
+      "name": "Heart Health",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "obj_0ba81ec8",
+          "type": "object",
+          "def": {
+            "id": "obj_0ba81ec8",
+            "assetId": "heart",
+            "position": {
+              "x": 0,
+              "y": 0,
+              "z": 0
+            },
+            "rotation": {
+              "x": 0,
+              "y": 90,
+              "z": 0
+            },
+            "scale": {
+              "x": 0.9,
+              "y": 0.9,
+              "z": 0.9
+            },
+            "floor": 0,
+            "zoneId": "__prefab_edit__",
+            "properties": {
+              "interactable": false,
+              "npcSpawn": false,
+              "lootTableId": null,
+              "triggerEventId": null
+            },
+            "scripts": [
+              {
+                "id": "scr_5323e0ba",
+                "label": "On Enter",
+                "zoneId": "demo",
+                "enabled": true,
+                "trigger": {
+                  "type": "on_player_enter"
+                },
+                "conditions": [],
+                "actions": [
+                  {
+                    "type": "adjust_number",
+                    "stateKey": "Hearts",
+                    "numberDelta": 1
+                  },
+                  {
+                    "type": "play_sound",
+                    "sound": "powerup7"
+                  },
+                  {
+                    "type": "despawn_object",
+                    "targetId": "self",
+                    "fadeDuration": 0.4
+                  }
+                ],
+                "oneShot": false
+              }
+            ],
+            "colliders": [
+              {
+                "id": "col_58affb98",
+                "shape": "box",
+                "offset": {
+                  "x": 0,
+                  "y": 0.6210322976112366,
+                  "z": 0
+                },
+                "size": {
+                  "x": 1.4801210165023804,
+                  "y": 1.2420645952224731,
+                  "z": 0.7542058825492859
+                },
+                "isSensor": true
+              }
+            ],
+            "label": "heart1",
+            "movers": [
+              {
+                "enabled": true,
+                "kind": "slide",
+                "axis": "y",
+                "distance": 0.5,
+                "duration": 1,
+                "dwell": 0,
+                "mode": "loop",
+                "phase": 0,
+                "speed": 45,
+                "autoStart": true,
+                "id": "mvr_0a038af1"
+              }
+            ]
+          }
+        }
+      ],
+      "dateAdded": "2026-09-08"
     }
   ],
   "uiElements": [

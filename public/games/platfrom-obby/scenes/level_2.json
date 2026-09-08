@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -28.142426207268176,
+        "x": -8.861252537262141,
         "y": 10.580493145796058,
-        "z": 25.8195007691926
+        "z": 26.95430142127765
       },
       "radius": 24.25109155321527,
       "phi": 0.940000000000002,
@@ -1078,7 +1078,7 @@
           "position": {
             "x": -8.5,
             "y": 9.517862953544956,
-            "z": 22.285819785611213
+            "z": 21.697686834082944
           },
           "rotation": {
             "x": 180,
@@ -1417,7 +1417,7 @@
           }
         },
         {
-          "id": "obj_0ba81ec8",
+          "id": "obj_5a93e928",
           "assetId": "heart",
           "position": {
             "x": -28,
@@ -1430,9 +1430,9 @@
             "z": 0
           },
           "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
+            "x": 0.9,
+            "y": 0.9,
+            "z": 0.9
           },
           "floor": 0,
           "zoneId": "demo",
@@ -1444,7 +1444,7 @@
           },
           "scripts": [
             {
-              "id": "scr_5323e0ba",
+              "id": "script_a0388cc0",
               "label": "On Enter",
               "zoneId": "demo",
               "enabled": true,
@@ -1455,7 +1455,7 @@
               "actions": [
                 {
                   "type": "adjust_number",
-                  "stateKey": "health",
+                  "stateKey": "Hearts",
                   "numberDelta": 1
                 },
                 {
@@ -1465,7 +1465,7 @@
                 {
                   "type": "despawn_object",
                   "targetId": "self",
-                  "fadeDuration": 0.8
+                  "fadeDuration": 0.4
                 }
               ],
               "oneShot": false
@@ -1487,7 +1487,28 @@
               },
               "isSensor": true
             }
-          ]
+          ],
+          "label": "heart1",
+          "movers": [
+            {
+              "enabled": true,
+              "kind": "slide",
+              "axis": "y",
+              "distance": 0.5,
+              "duration": 1,
+              "dwell": 0,
+              "mode": "loop",
+              "phase": 0,
+              "speed": 45,
+              "autoStart": true,
+              "id": "mvr_0a038af1"
+            }
+          ],
+          "prefab": {
+            "prefabId": "pfb_dcde1ad7",
+            "instanceId": "pfi_ce0a6afe",
+            "memberKey": "obj_0ba81ec8"
+          }
         }
       ],
       "prefabInstances": [
@@ -1553,6 +1574,20 @@
               "x": -28.126784116097024,
               "y": 8.564066568171512,
               "z": 23.933949627232668
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_ce0a6afe",
+          "prefabId": "pfb_dcde1ad7",
+          "version": 2,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -28,
+              "y": 9.56002286986066,
+              "z": 23.897059593198016
             },
             "rotationY": 0
           }
@@ -1665,7 +1700,7 @@
           "position": {
             "x": -7.75,
             "y": 9.511624571992376,
-            "z": 22.835819785611214
+            "z": 22.247686834082945
           },
           "size": {
             "x": 2.5,
