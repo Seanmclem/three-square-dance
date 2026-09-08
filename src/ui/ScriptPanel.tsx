@@ -287,7 +287,7 @@ function blankItem(): ItemDef {
 }
 
 const UI_KINDS = ["bar", "counter", "icons", "label", "image", "menu"] as const;
-const UI_ANCHORS: UiAnchor[] = ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"];
+const UI_ANCHORS: UiAnchor[] = ["top-left", "top-center", "top-right", "middle-left", "middle-center", "middle-right", "bottom-left", "bottom-center", "bottom-right"];
 
 function blankUiElement(kind: (typeof UI_KINDS)[number]): UiElementDef {
   const base = { id: `ui_${crypto.randomUUID().slice(0, 8)}`, anchor: "top-left" as UiAnchor };

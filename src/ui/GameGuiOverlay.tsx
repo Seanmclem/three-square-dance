@@ -30,10 +30,18 @@ interface Props {
 
 const ANCHOR_STYLE = (anchor: UiAnchor, ox: number, oy: number): React.CSSProperties => {
   const s: React.CSSProperties = { position: "absolute" };
-  if (anchor.startsWith("top")) s.top = oy; else s.bottom = oy;
+  const centerX = anchor.endsWith("center");
+  // v4.79.79 — middle row: vertically centered, oy shifts from center (down-positive).
+  if (anchor.startsWith("middle")) {
+    s.top = `calc(50% + ${oy}px)`;
+    s.transform = centerX ? "translate(-50%, -50%)" : "translateY(-50%)";
+  } else {
+    if (anchor.startsWith("top")) s.top = oy; else s.bottom = oy;
+    if (centerX) s.transform = "translateX(-50%)";
+  }
   if (anchor.endsWith("left"))       s.left = ox;
   else if (anchor.endsWith("right")) s.right = ox;
-  else { s.left = "50%"; s.transform = "translateX(-50%)"; }
+  else s.left = "50%";
   return s;
 };
 

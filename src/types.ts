@@ -1528,6 +1528,7 @@ export interface ScriptDef {
 // re-render live via `state:changed`.
 
 export type UiAnchor = 'top-left' | 'top-center' | 'top-right'
+                     | 'middle-left' | 'middle-center' | 'middle-right'   // v4.79.79 — center row
                      | 'bottom-left' | 'bottom-center' | 'bottom-right';
 
 interface UiElementBase {
