@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -13.400935971467986,
+        "x": -28.142426207268176,
         "y": 10.580493145796058,
-        "z": 28.37866857854622
+        "z": 25.8195007691926
       },
       "radius": 24.25109155321527,
-      "phi": 0.9100000000000004,
-      "theta": 26.688009999886866
+      "phi": 0.940000000000002,
+      "theta": 26.644749999908253
     }
   },
   "world": {
@@ -1118,6 +1118,376 @@
               "oneShot": false
             }
           ]
+        },
+        {
+          "id": "obj_86d025ba",
+          "label": "Tile 0,0",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -30.126784116097024,
+            "y": 8.564066568171512,
+            "z": 21.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_0_0"
+          }
+        },
+        {
+          "id": "obj_13ab0829",
+          "label": "Tile 0,1",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -30.126784116097024,
+            "y": 8.564066568171512,
+            "z": 23.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": -90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_0_1"
+          }
+        },
+        {
+          "id": "obj_9cb3ce52",
+          "label": "Tile 0,2",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -30.126784116097024,
+            "y": 8.564066568171512,
+            "z": 25.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_0_2"
+          }
+        },
+        {
+          "id": "obj_b48b4a3e",
+          "label": "Tile 1,0",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -28.126784116097024,
+            "y": 8.564066568171512,
+            "z": 21.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_1_0"
+          }
+        },
+        {
+          "id": "obj_2426883f",
+          "label": "Tile 1,1",
+          "assetId": "platform_grass_center",
+          "position": {
+            "x": -28.126784116097024,
+            "y": 8.564066568171512,
+            "z": 23.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_1_1"
+          }
+        },
+        {
+          "id": "obj_a727037e",
+          "label": "Tile 1,2",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -28.126784116097024,
+            "y": 8.564066568171512,
+            "z": 25.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_1_2"
+          }
+        },
+        {
+          "id": "obj_0cbec881",
+          "label": "Tile 2,0",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -26.126784116097024,
+            "y": 8.564066568171512,
+            "z": 21.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_2_0"
+          }
+        },
+        {
+          "id": "obj_a09e58aa",
+          "label": "Tile 2,1",
+          "assetId": "platform_grass_side",
+          "position": {
+            "x": -26.126784116097024,
+            "y": 8.564066568171512,
+            "z": 23.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_2_1"
+          }
+        },
+        {
+          "id": "obj_d3afd920",
+          "label": "Tile 2,2",
+          "assetId": "platform_grass_corner",
+          "position": {
+            "x": -26.126784116097024,
+            "y": 8.564066568171512,
+            "z": 25.933949627232668
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "zoneId": "demo",
+          "prefab": {
+            "prefabId": "pfb_a15c07b6",
+            "instanceId": "pfi_abc6f441",
+            "memberKey": "tile_2_2"
+          }
+        },
+        {
+          "id": "obj_0ba81ec8",
+          "assetId": "heart",
+          "position": {
+            "x": -28,
+            "y": 9.56002286986066,
+            "z": 23.897059593198016
+          },
+          "rotation": {
+            "x": 0,
+            "y": 90,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
+          },
+          "scripts": [
+            {
+              "id": "scr_5323e0ba",
+              "label": "On Enter",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_enter"
+              },
+              "conditions": [],
+              "actions": [
+                {
+                  "type": "adjust_number",
+                  "stateKey": "health",
+                  "numberDelta": 1
+                },
+                {
+                  "type": "play_sound",
+                  "sound": "powerup7"
+                },
+                {
+                  "type": "despawn_object",
+                  "targetId": "self",
+                  "fadeDuration": 0.8
+                }
+              ],
+              "oneShot": false
+            }
+          ],
+          "colliders": [
+            {
+              "id": "col_58affb98",
+              "shape": "box",
+              "offset": {
+                "x": 0,
+                "y": 0.6210322976112366,
+                "z": 0
+              },
+              "size": {
+                "x": 1.4801210165023804,
+                "y": 1.2420645952224731,
+                "z": 0.7542058825492859
+              },
+              "isSensor": true
+            }
+          ]
         }
       ],
       "prefabInstances": [
@@ -1164,6 +1534,25 @@
               "x": -3.1196867949916918,
               "y": 9.517862953544952,
               "z": 21.418291253231853
+            },
+            "rotationY": 0
+          }
+        },
+        {
+          "id": "pfi_abc6f441",
+          "prefabId": "pfb_a15c07b6",
+          "version": 1,
+          "variables": {
+            "width": 3,
+            "depth": 3,
+            "height": 1,
+            "tileSet": "grass"
+          },
+          "origin": {
+            "position": {
+              "x": -28.126784116097024,
+              "y": 8.564066568171512,
+              "z": 23.933949627232668
             },
             "rotationY": 0
           }

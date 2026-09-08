@@ -1118,7 +1118,7 @@
     },
     {
       "id": "pfb_5c1695b8",
-      "name": "Checkpoint Test",
+      "name": "Checkpoint",
       "kind": "snapshot",
       "version": 2,
       "variables": [],
@@ -1214,7 +1214,7 @@
       "label": "Prompt — Switch1",
       "kind": "label",
       "text": "Press E to switch",
-      "anchor": "bottom-center",
+      "anchor": "middle-center",
       "backdrop": true
     }
   ],
