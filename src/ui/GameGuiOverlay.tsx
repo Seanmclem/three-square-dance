@@ -25,6 +25,7 @@ import { assetManager } from "@/core/AssetManager";
 interface Props {
   bus:   EventBus;
   world: WorldState;
+  interactName?: string;   // v4.79.78 — resolves the {interact} token in label text
 }
 
 const ANCHOR_STYLE = (anchor: UiAnchor, ox: number, oy: number): React.CSSProperties => {
@@ -45,7 +46,7 @@ const BACKDROP: React.CSSProperties = {
   borderRadius: 6, padding: "4px 10px",
 };
 
-export function GameGuiOverlay({ bus, world }: Props) {
+export function GameGuiOverlay({ bus, world, interactName }: Props) {
   // One rev bump per gameState change re-renders the whole overlay (a handful
   // of DOM nodes — no per-element subscriptions needed).
   const [, setRev] = useState(0);
@@ -184,7 +185,7 @@ export function GameGuiOverlay({ bus, world }: Props) {
               <div key={el.id} style={{ ...style, color: el.color ?? "#dde3f0",
                 fontSize: el.fontSize ?? 13, textShadow: "0 1px 3px rgba(0,0,0,0.8)",
                 whiteSpace: "pre-wrap", maxWidth: 360, ...(el.backdrop ? BACKDROP : {}) }}>
-                {el.text}
+                {interactName ? el.text.replace(/\{interact\}/gi, interactName) : el.text}
               </div>
             );
           case "image": {

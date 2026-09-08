@@ -8,7 +8,7 @@ import type { MoverSystem } from "@/world/MoverSystem";
 import { CharacterController, effectiveCharacterScale } from "./CharacterController";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
-import { loadBindings } from "@/input/bindings";
+import { loadBindings, resolveGameBindings } from "@/input/bindings";
 import { zeroActionState } from "@/input/actions";
 import { isGameplayMode, type PreviewMode } from "@/types";
 
@@ -108,7 +108,7 @@ export class PreviewController {
       spawnPos = new THREE.Vector3(0, 1.5, 0);
     }
 
-    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, loadBindings());
+    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, resolveGameBindings(loadBindings(), this._world.gameInput));
     input.init();
 
     const controller = new CharacterController(settings, this._scene.scene, this._bus, input, this._movers,

@@ -39,6 +39,7 @@ export class WorldState {
   sceneOwnsAudioMix = false;
   gameStateSchema?: Record<string, StateSchema>;
   gameUiElements?:  UiElementDef[];
+  gameInput?:       import("@/types").GameConfig["input"];   // v4.79.78 — per-game interact binding
   // Prefab library (Phase 44) — session-only mirror of the App's library state
   // (game.json prefabs when a project is open, else the localStorage session
   // library). Same non-serialized contract as gameItems.

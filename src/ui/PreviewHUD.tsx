@@ -15,9 +15,9 @@ const EXIT_HINT:       Record<Scheme, string | null> = {
 
 // mode is optional so the runtime shell (which also renders this HUD) needs no edit.
 // showCrosshair likewise defaults on — only the editor's global toggle passes it.
-interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme; mode?: PreviewMode; showCrosshair?: boolean }
+interface Props { bus: EventBus; activeZoneName?: string; scheme: Scheme; mode?: PreviewMode; showCrosshair?: boolean; interactName?: string }
 
-export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game", showCrosshair = true }: Props) {
+export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game", showCrosshair = true, interactName }: Props) {
   const [zoneName,      setZoneName]      = useState<string | null>(null);
   const [interactLabel, setInteractLabel] = useState<string | null>(null);
   // Phase 28 — occlusion-test badge state (defaults match PreviewController's enter state,
@@ -100,7 +100,7 @@ export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game", showCro
           fontFamily: "monospace", letterSpacing: 1,
           background: "rgba(0,0,0,0.45)", borderRadius: 4, padding: "2px 8px",
         }}>
-          {INTERACT_PREFIX[scheme]} {interactLabel}
+          {interactName ? (scheme === "touch" ? "Tap ·" : `[${interactName}]`) : INTERACT_PREFIX[scheme]} {interactLabel}
         </div>
       )}
 

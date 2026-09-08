@@ -64,7 +64,7 @@ import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
 import { BagOverlay } from "@/ui/BagOverlay";
 import { GameGuiOverlay } from "@/ui/GameGuiOverlay";
-import { DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
+import { resolveGameBindings, interactDisplay, DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
@@ -88,7 +88,8 @@ import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary, writeAssetFile, removeAssetFiles, removeEntries, updateEntries, upsertEntry } from "@/assets/assetLibrary";
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
-import type { ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
+import type {
+  GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
 import { isGameplayMode } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other"];
@@ -244,6 +245,12 @@ export default function App() {
   const [lastAutosaveAt,  setLastAutosaveAt]   = useState<number | null>(null);
   const [isPreview,       setIsPreview]        = useState(false);
   const [previewScheme,   setPreviewScheme]    = useState<"kbm" | "gamepad" | "touch">("kbm");
+  const [gameInputRev,    setGameInputRev]     = useState(0);   // v4.79.78 — bumps when the per-game interact binding changes
+  // Effective interact display for the active device — resolved once per
+  // scheme/binding change, consumed by the HUD pill + {interact} label token.
+  const interactName = useMemo(
+    () => interactDisplay(previewScheme, resolveGameBindings(loadBindings(), worldRef.current?.gameInput)),
+    [previewScheme, gameInputRev, isPreview]);   // eslint-disable-line react-hooks/exhaustive-deps
   const dialogueOpenRef = useRef(false);   // bus handlers need the current value, not a stale closure
   const [pauseOpen, setPauseOpen] = useState(false);
   const pauseOpenRef = useRef(false);
@@ -627,6 +634,7 @@ export default function App() {
           world.gameItems       = store.game.items;
           world.gameStateSchema = store.game.stateSchema;
           world.gameUiElements  = store.game.uiElements;
+          world.gameInput  = store.game.input;
           setWorldItems(store.game.items ?? []);
           setWorldUiElements(store.game.uiElements ?? []);
           setGameSchema(store.game.stateSchema ?? {});
@@ -738,6 +746,7 @@ export default function App() {
               worldRef.current!.gameItems       = proj.store.game.items;
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
               worldRef.current!.gameUiElements  = proj.store.game.uiElements;
+              worldRef.current!.gameInput  = proj.store.game.input;
               const next = { ...proj, sceneId: back };
               projectRef.current = next; setProject(next);
               void persistLastProject(proj.store.id, back);
@@ -791,6 +800,7 @@ export default function App() {
             world.gameItems       = proj.store.game.items;
             world.gameStateSchema = proj.store.game.stateSchema;
             world.gameUiElements  = proj.store.game.uiElements;
+            world.gameInput  = proj.store.game.input;
             // Keep proj.sceneId in lockstep with the loaded world so any save targets the right file.
             const next = { ...projectRef.current!, sceneId };
             projectRef.current = next; setProject(next);
@@ -1336,6 +1346,7 @@ export default function App() {
       worldRef.current.gameItems = undefined;
       worldRef.current.gameStateSchema = undefined;
       worldRef.current.gameUiElements = undefined;
+      worldRef.current.gameInput = undefined;
       worldRef.current.prefabLibrary = loadSessionPrefabs();
       setPrefabs(worldRef.current.prefabLibrary);
     }
@@ -1431,6 +1442,7 @@ export default function App() {
       worldRef.current.gameItems       = store.game.items;
       worldRef.current.gameStateSchema = store.game.stateSchema;
       worldRef.current.gameUiElements  = store.game.uiElements;
+      worldRef.current.gameInput  = store.game.input;
       worldRef.current.prefabLibrary   = store.game.prefabs;
     }
     // Phase 68 — seed game-wide player settings on first contact: the game
@@ -1518,6 +1530,7 @@ export default function App() {
       world.gameItems       = proj.store.game.items;
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
+      world.gameInput  = proj.store.game.input;
       world.setGamePlayerSettings(proj.store.game.playerSettings);
       world.setGameLighting(proj.store.game.lighting);
       world.setGameAudioMix(proj.store.game.audio?.mix);
@@ -3151,7 +3164,7 @@ export default function App() {
     const el: UiElementDef = {
       id: `ui_${crypto.randomUUID().slice(0, 8)}`,
       label: `Prompt — ${entLabel}`,
-      kind: "label", text: "Press E",
+      kind: "label", text: "Press {interact}",
       anchor: "bottom-center", backdrop: true,
     };
     handleUiElementsChange([...(worldUiElements ?? []), el]);
@@ -3179,6 +3192,18 @@ export default function App() {
       else world.updateObject(target.zoneId, target.id, { scripts });
     });
     syncHistory();
+    setIsDirty(true);
+  };
+
+  /** v4.79.78 — per-game interact binding (GAME INPUT section). Immediate
+   *  game.json write (registry precedent); a device/player rebind still wins. */
+  const handleGameInputChange = (input: GameConfig["input"]): void => {
+    const proj = projectRef.current;
+    if (!proj) return;
+    proj.store.game.input = input;
+    void proj.store.writeGame().catch(e => console.warn("[input] game.json write failed:", e));
+    if (worldRef.current) worldRef.current.gameInput = input;
+    setGameInputRev(v => v + 1);
     setIsDirty(true);
   };
 
@@ -3834,6 +3859,8 @@ export default function App() {
         showCrosshair={showCrosshair}
         onToggleCrosshair={handleToggleCrosshair}
         showGridFloor={showGridFloor}
+        gameInput={project ? projectRef.current?.store.game.input : undefined}
+        onGameInputChange={project ? handleGameInputChange : undefined}
         onToggleGridFloor={handleToggleGridFloor}
         onObjectUpdate={handleObjectUpdate}
         onSegmentUpdate={handleSegmentUpdate}
@@ -3972,13 +3999,14 @@ export default function App() {
           bus={busRef.current}
           activeZoneName={zones.find(z => z.id === activeZoneId)?.name}
           scheme={previewScheme}
+          interactName={interactName}
           mode={previewMode ?? "game"}
           showCrosshair={showCrosshair}
         />
       )}
 
       {isPreview && worldRef.current && (
-        <GameGuiOverlay bus={busRef.current} world={worldRef.current} />
+        <GameGuiOverlay bus={busRef.current} world={worldRef.current} interactName={interactName} />
       )}
 
       {isPreview && previewScheme === "touch" && previewRef.current?.input && (

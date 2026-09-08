@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
+import { loadBindings, resolveGameBindings, interactDisplay } from "@/input/bindings";
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { assetManager } from "@/core/AssetManager";
@@ -57,6 +58,11 @@ export default function RuntimeApp() {
   const [error, setError]           = useState<string>("");
   const [manifest, setManifest]     = useState<LoadedManifest | null>(null);
   const [previewScheme, setPreviewScheme] = useState<Scheme>("kbm");
+  // v4.79.78 — effective interact display for the active device (HUD pill +
+  // {interact} label token); re-resolved on scheme change / scene load.
+  const interactName = useMemo(
+    () => interactDisplay(previewScheme, resolveGameBindings(loadBindings(), worldRef.current?.gameInput)),
+    [previewScheme, shell]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [dialogueState, setDialogueState] = useState<DialogueOverlayProps["dialogue"]>(null);
   const [fadeState, setFadeState]   = useState<FadeRequest | null>(null);
   const [flashState, setFlashState] = useState<FlashRequest | null>(null);
@@ -358,11 +364,11 @@ export default function RuntimeApp() {
       )}
 
       {shell === "playing" && (
-        <PreviewHUD bus={busRef.current} activeZoneName={zoneName} scheme={previewScheme} />
+        <PreviewHUD bus={busRef.current} activeZoneName={zoneName} scheme={previewScheme} interactName={interactName} />
       )}
 
       {shell === "playing" && worldRef.current && (
-        <GameGuiOverlay bus={busRef.current} world={worldRef.current} />
+        <GameGuiOverlay bus={busRef.current} world={worldRef.current} interactName={interactName} />
       )}
 
       {shell === "playing" && previewScheme === "touch" && input && (

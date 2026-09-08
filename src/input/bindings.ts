@@ -97,3 +97,48 @@ export function saveBindings(b: BindingsConfig): void {
 export function resetBindings(): void {
   localStorage.removeItem(BINDINGS_KEY);
 }
+
+// ── Per-game interact binding + display names (v4.79.78) ─────────────────────
+
+export type GameInputConfig = { interact?: { kbm?: string[]; gamepadButtons?: number[] } };
+
+const KEY_PRETTY: Record<string, string> = {
+  Space: "Space", Enter: "Enter", Tab: "Tab", Escape: "Esc",
+  ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
+  ShiftLeft: "Shift", ShiftRight: "Shift", ControlLeft: "Ctrl", ControlRight: "Ctrl",
+  AltLeft: "Alt", AltRight: "Alt", Backquote: "`", Minus: "-", Equal: "=",
+  Comma: ",", Period: ".", Slash: "/", Semicolon: ";", Quote: "'",
+  BracketLeft: "[", BracketRight: "]", Backslash: "\\",
+};
+export function prettyKey(code: string): string {
+  if (KEY_PRETTY[code]) return KEY_PRETTY[code];
+  if (code.startsWith("Key"))   return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  return code;
+}
+
+export const GAMEPAD_BUTTON_NAMES: Record<number, string> = {
+  0: "A", 1: "B", 2: "X", 3: "Y", 4: "LB", 5: "RB", 6: "LT", 7: "RT",
+  8: "Back", 9: "Start", 10: "LS", 11: "RS", 12: "DPad ↑", 13: "DPad ↓", 14: "DPad ←", 15: "DPad →",
+};
+export const gamepadButtonName = (i: number): string => GAMEPAD_BUTTON_NAMES[i] ?? `B${i}`;
+
+/** Apply the game's interact default UNDER any player-explicit rebind: a stored
+ *  binding that differs from stock means the player chose it — it wins. */
+export function resolveGameBindings(base: BindingsConfig, game?: GameInputConfig | null): BindingsConfig {
+  if (!game?.interact) return base;
+  const b = structuredClone(base);
+  const playerKbm = JSON.stringify(base.kbm.interact) !== JSON.stringify(DEFAULT_BINDINGS.kbm.interact);
+  const playerPad = JSON.stringify(base.gamepad.buttons.interact) !== JSON.stringify(DEFAULT_BINDINGS.gamepad.buttons.interact);
+  if (game.interact.kbm?.length && !playerKbm)            b.kbm.interact = [...game.interact.kbm];
+  if (game.interact.gamepadButtons?.length && !playerPad) b.gamepad.buttons.interact = [...game.interact.gamepadButtons];
+  return b;
+}
+
+/** The active scheme's display name for the effective interact control —
+ *  resolve ONCE per scheme/binding change; cheap string, no per-frame work. */
+export function interactDisplay(scheme: "kbm" | "gamepad" | "touch", b: BindingsConfig): string {
+  if (scheme === "touch")   return "Tap";
+  if (scheme === "gamepad") return gamepadButtonName(b.gamepad.buttons.interact[0] ?? 4);
+  return prettyKey(b.kbm.interact[0] ?? "KeyE");
+}

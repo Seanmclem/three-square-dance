@@ -1398,6 +1398,9 @@ export interface GameConfig {
   lightingQuality?: "fancy" | "fast";   // game-wide default; a scene's own setting wins
   prefabs?:     PrefabDef[];   // cross-scene prefab library (Phase 44)
   uiElements?:  UiElementDef[]; // cross-scene custom GUI registry (Phase 49)
+  // v4.79.78 — per-game default for the interact control (dev-authored; a
+  // device/player override still wins; prompts use the {interact} token).
+  input?: { interact?: { kbm?: string[]; gamepadButtons?: number[] } };
 }
 
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */

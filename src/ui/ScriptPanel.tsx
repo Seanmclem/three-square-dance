@@ -3721,7 +3721,7 @@ function ActionFields({
               const el: UiElementDef = {
                 id: `ui_${crypto.randomUUID().slice(0, 8)}`,
                 label: n ? `Press prompt ${n + 1}` : "Press prompt",
-                kind: "label", text: "Press E",
+                kind: "label", text: "Press {interact}",
                 anchor: "bottom-center", backdrop: true,
               };
               onCreateUiElement(el);

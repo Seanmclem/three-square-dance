@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { prettyKey, GAMEPAD_BUTTON_NAMES } from "@/input/bindings";
 import { hasEnabledMover } from "@/world/moverDefs";
 import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import type {
+  GameConfig,
   ToolId, SelectedObjectPayload, SelectedRef, WorldObject, Vec3,
   FloorDef, WallDef, Opening, MaterialDef, MaterialOverrides, QualityScale,
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, EnemyAIDef, ScriptDef, MoverDef, LightDef,
@@ -472,6 +474,8 @@ interface PropertiesPanelProps {
   onSelectInstance?:        () => void;                   // header "all N" — select the whole instance
   // Capture the multi-selection as a snapshot prefab (Phase 46).
   onCreatePrefab?:          (refs: SelectedRef[]) => void;
+  gameInput?:               GameConfig["input"];                          // v4.79.78 per-game interact binding
+  onGameInputChange?:       (input: GameConfig["input"]) => void;
   onAddPressPrompt?:        (target: { id: string; zoneId: string; kind: "volume" | "object" }) => void;   // v4.79.68 press-prompt wizard
   onPrefabVariablesChange?: (vars: Record<string, PrefabVarValue>) => void;
   onPrefabOriginChange?:    (origin: { position: Vec3; rotationY: number }) => void;
@@ -505,6 +509,8 @@ export function PropertiesPanel({
   decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabPushToPrefab, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
+  gameInput,
+  onGameInputChange,
   onAddPressPrompt,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
@@ -835,6 +841,7 @@ export function PropertiesPanel({
               : null
           ) : (
             <ToolView activeTool={activeTool} onShowCredits={() => setShowCredits(true)}
+              gameInput={gameInput} onGameInputChange={onGameInputChange}
               lightCount={zoneLights.length} onOpenLights={() => push("lights")}
               onOpenAudio={() => push("audio")}
               showPerfCounter={showPerfCounter} onTogglePerfCounter={onTogglePerfCounter}
@@ -7602,9 +7609,71 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   );
 }
 
+/** v4.79.78 — per-game interact binding editor (GAME INPUT on the no-selection view). */
+function GameInputSection({ gameInput, onChange }: {
+  gameInput?: GameConfig["input"];
+  onChange:   (input: GameConfig["input"]) => void;
+}) {
+  const [capturing, setCapturing] = useState(false);
+  const kbm = gameInput?.interact?.kbm?.[0];
+  const pad = gameInput?.interact?.gamepadButtons?.[0];
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent): void => {
+      e.preventDefault(); e.stopPropagation();
+      setCapturing(false);
+      if (e.code === "Escape") return;
+      onChange({ ...gameInput, interact: { ...gameInput?.interact, kbm: [e.code] } });
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const BTN: React.CSSProperties = {
+    padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "monospace",
+    background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#c2cadb",
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>INTERACT KEY</span>
+        <button
+          onClick={() => setCapturing(c => !c)}
+          title="Click, then press the key this game uses for interact (Esc cancels). Default: E."
+          style={{ ...BTN, ...(capturing ? { borderColor: "rgba(80,140,255,0.6)", color: "#80aaff" } : {}) }}
+        >{capturing ? "press a key…" : `${prettyKey(kbm ?? "KeyE")}${kbm ? "" : " (default)"}`}</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>GAMEPAD BUTTON</span>
+        <select
+          value={pad ?? ""}
+          onChange={e => onChange({ ...gameInput, interact: { ...gameInput?.interact,
+            gamepadButtons: e.target.value === "" ? undefined : [Number(e.target.value)] } })}
+          style={{ ...BTN, cursor: "pointer" }}
+        >
+          <option value="">LB (default)</option>
+          {Object.entries(GAMEPAD_BUTTON_NAMES).map(([i, name]) => (
+            <option key={i} value={i}>{name}</option>
+          ))}
+        </select>
+      </div>
+      {(kbm || pad != null) && (
+        <button onClick={() => onChange({ ...gameInput, interact: undefined })}
+          style={{ ...BTN, alignSelf: "flex-start", color: "#9090a0" }}>Reset to defaults</button>
+      )}
+      <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.5 }}>
+        The game&apos;s default interact control. A player&apos;s own rebind (or switching
+        device) still wins — write prompts as &quot;Press {"{interact}"}&quot; and they
+        re-resolve to the live control automatically.
+      </div>
+    </div>
+  );
+}
+
 function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio,
   showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
-  showGridFloor, onToggleGridFloor }: {
+  showGridFloor, onToggleGridFloor, gameInput, onGameInputChange }: {
+  gameInput?:         GameConfig["input"];
+  onGameInputChange?: (input: GameConfig["input"]) => void;
   activeTool: ToolId;
   onShowCredits?: () => void;
   lightCount?:   number;
@@ -7641,6 +7710,15 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
           summary="mixer · ambient · music"
           onPress={onOpenAudio}
         />
+      )}
+      {/* GAME INPUT (v4.79.78) — the per-game default for the interact control.
+          Shown with a project open; a device/player rebind still wins, and
+          prompts written as "Press {interact}" re-resolve automatically. */}
+      {activeTool === "select" && onGameInputChange && (
+        <div style={{ margin: "10px 16px 0", paddingTop: 2, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <div style={{ ...LABEL, marginBottom: 6 }}>GAME INPUT</div>
+          <GameInputSection gameInput={gameInput} onChange={onGameInputChange} />
+        </div>
       )}
       {/* Home for global editor settings/links — grows over time; credits first. */}
       {activeTool === "select" && onShowCredits && (
