@@ -715,7 +715,7 @@
                 "id": "col_172f13ec",
                 "shape": "box",
                 "offset": {
-                  "x": -5.960464477539063e-08,
+                  "x": -5.960464477539063e-8,
                   "y": 0.751679808832705,
                   "z": 0.01855784778791364
                 },
@@ -1211,7 +1211,7 @@
     },
     {
       "id": "ui_7239dfcc",
-      "label": "Prompt \u2014 Switch1",
+      "label": "Prompt — Switch1",
       "kind": "label",
       "text": "Press E to switch",
       "anchor": "bottom-center",
