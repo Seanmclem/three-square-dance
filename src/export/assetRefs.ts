@@ -225,7 +225,7 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
 }
 
 export interface ResolvedFiles {
-  files: Array<{ kind: AssetKind; rel: string }>;
+  files: Array<{ kind: AssetKind; rel: string; optional?: boolean }>;   // optional = disabled-map-slot file: ship if present, silent if missing
   /** Same JSON shape as the source manifests, entries filtered to referenced ids. */
   prunedManifests: Record<AssetKind, unknown>;
   /** Referenced ids/paths with no manifest entry (or malformed paths) — reported, never thrown. */
@@ -247,11 +247,11 @@ const QUALITY_TIERS = ["low", "medium", "high"] as const;
  *  manifest down to the referenced entries. Unknown ids land in `missing`. */
 export function resolveAssetFiles(refs: AssetRefs, manifests: ManifestSet): ResolvedFiles {
   const missing: string[] = [];
-  const files = new Map<string, { kind: AssetKind; rel: string }>();
+  const files = new Map<string, { kind: AssetKind; rel: string; optional?: boolean }>();
 
   // Manifest paths look like "/assets/<kind>/<rel>". Register the file, or
   // report a path that doesn't live under the kind's tree.
-  const addPath = (kind: AssetKind, path: string | undefined): void => {
+  const addPath = (kind: AssetKind, path: string | undefined, optional = false): void => {
     if (!path) return;
     const prefix = `/assets/${kind}/`;
     if (!path.startsWith(prefix) || path.includes("..")) {
@@ -259,16 +259,18 @@ export function resolveAssetFiles(refs: AssetRefs, manifests: ManifestSet): Reso
       return;
     }
     const rel = path.slice(prefix.length);
-    files.set(`${kind}/${rel}`, { kind, rel });
+    const prev = files.get(`${kind}/${rel}`);
+    // required wins over optional if the same file is referenced both ways
+    files.set(`${kind}/${rel}`, { kind, rel, optional: optional && (prev?.optional ?? true) });
   };
 
   // Texture map paths carry a {quality} token — expand to all three tiers
   // (the player can switch quality at runtime).
-  const addTexturePath = (path: string): void => {
+  const addTexturePath = (path: string, optional = false): void => {
     if (path.includes("{quality}")) {
-      for (const q of QUALITY_TIERS) addPath("textures", path.replace("{quality}", q));
+      for (const q of QUALITY_TIERS) addPath("textures", path.replace("{quality}", q), optional);
     } else {
-      addPath("textures", path);
+      addPath("textures", path, optional);
     }
   };
 
@@ -283,7 +285,12 @@ export function resolveAssetFiles(refs: AssetRefs, manifests: ManifestSet): Reso
   for (const id of refs.textures) if (!materialEntries.some(m => m.id === id)) missing.push(`textures: ${id}`);
   for (const m of materialEntries) {
     for (const key of Object.keys(m.maps) as Array<keyof MaterialDef["maps"]>) {
-      addTexturePath(m.maps[key].path);
+      // Disabled slots still ship WHEN the file exists (a scene override can
+      // re-enable them) — but a missing file for a disabled slot is not an
+      // export problem (stock manifests declare placeholder paths, e.g.
+      // metalness.jpg files that never shipped), so mark it optional and the
+      // copier skips it silently (v4.79.80).
+      addTexturePath(m.maps[key].path, !m.maps[key].enabled);
     }
   }
 

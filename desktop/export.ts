@@ -159,7 +159,9 @@ export async function exportGameBundle(
 
   // Referenced asset files + pruned per-kind manifests.
   for (const f of files) {
-    if (!(await copyOverlay(`assets/${f.kind}/${f.rel}`))) missing.push(`${f.kind}: file not found "${f.rel}"`);
+    const copied = await copyOverlay(`assets/${f.kind}/${f.rel}`);
+    // optional = a disabled map slot's file: ship when present, silent when not.
+    if (!copied && !f.optional) missing.push(`${f.kind}: file not found "${f.rel}"`);
   }
   for (const kind of ASSET_KINDS) {
     await writeText(`assets/${kind}/manifest.json`, JSON.stringify(prunedManifests[kind], null, 2));
