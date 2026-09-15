@@ -48,7 +48,7 @@ export function PreviewHUD({ bus, activeZoneName, scheme, mode = "game", showCro
   const isOcclusion = mode === "occlusion";
 
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50 }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 50, userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
 
       {/* Top-left: current zone name */}
       {activeZoneName && (

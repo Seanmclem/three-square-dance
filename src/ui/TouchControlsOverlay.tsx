@@ -90,7 +90,7 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
       onPointerMove={onPointerMove}
       onPointerUp={onPointerEnd}
       onPointerCancel={onPointerEnd}
-      style={{ position: "absolute", inset: 0, zIndex: 60, touchAction: "none", overscrollBehavior: "none" }}
+      style={{ position: "absolute", inset: 0, zIndex: 60, touchAction: "none", overscrollBehavior: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
     >
       {/* Joystick — ghost hint when idle, live base+knob while a thumb is down */}
       {joyOrigin ? (

@@ -124,7 +124,7 @@ export function GameGuiOverlay({ bus, world, interactName }: Props) {
   };
 
   return (
-    <div style={{ position: "absolute", inset: 0, zIndex: 90, pointerEvents: "none", fontFamily: "monospace" }}>
+    <div style={{ position: "absolute", inset: 0, zIndex: 90, pointerEvents: "none", fontFamily: "monospace", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
       {visible.map(el => {
         const style = ANCHOR_STYLE(el.anchor, el.offsetX ?? 16, el.offsetY ?? 16);
         switch (el.kind) {
