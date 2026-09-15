@@ -38,6 +38,7 @@ import { tick, MAX_VERTICAL_GAP, OVER_TOP_SLACK, type BrainMem, type BrainSenses
 
 // Decision constants + machine live in enemyBrain.ts (pure, headlessly
 // testable — Phase 62). The constants below are ADAPTER-physical only.
+let _lastRiseWarn = 0;   // v4.79.82 — rise-warn throttle
 const GROUND_RAY_UP    = 1.5;  // ray origin height above current feet
 const GROUND_RAY_LEN   = 5.0;
 const WALL_PROBE_DIST  = 0.6;
@@ -348,7 +349,15 @@ export class EnemyAI {
       const g = globalThis as unknown as { __aiRises?: unknown[] };
       (g.__aiRises ??= []).push(evt);
       if (g.__aiRises.length > 20) g.__aiRises.shift();
-      console.warn("[EnemyAI] RISE", JSON.stringify(evt));
+      // v4.79.82 — the tripwire could fire PER CRAB PER FRAME (e.g. clustered
+      // crabs snapping onto each other's bodies while a player bounces on them),
+      // and per-frame console.warn+stringify was a real slowdown (user report,
+      // desktop AND mobile). Throttle the warn; the ring buffer keeps everything.
+      const now = performance.now();
+      if (now - _lastRiseWarn > 2000) { _lastRiseWarn = now; console.warn("[EnemyAI] RISE", JSON.stringify(evt)); }
+      // And REFUSE the step: a >0.4m snap-up in one ~4cm step is never terrain —
+      // it IS the floating-crab class the tripwire hunts. Treat it like a ledge.
+      return false;
     }
     rec.pos.copy(this._cand);
     return true;
