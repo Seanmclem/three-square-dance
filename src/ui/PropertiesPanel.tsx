@@ -5535,7 +5535,7 @@ function SpawnSettingsView({
         "How far behind the character the camera sits (metres). Larger = pulled further back. A wall behind you can pull it in closer automatically.")}
       {numField("CAMERA HEIGHT", "thirdPersonHeight", 0.5, undefined,
         "Height of the camera's aim point above the player (metres). This is CAMERA framing, not the character's size. Higher = the camera sits higher and frames the head/above (character appears lower, seen more from above); lower = aims toward the feet. To resize the character itself, use Character Scale.")}
-      {numField("CAMERA ANGLE", "thirdPersonPitch", 1, 0,
+      {numField("CAMERA ANGLE/PITCH", "thirdPersonPitch", 1, 0,
         "How many degrees the camera STARTS tilted down toward the character (0 = level, straight ahead). Raising it lifts the camera up and aims it down, keeping the character and the ground ahead both in view — try 15–25 for a platformer. Players can still look around; this is just the angle after spawns.")}
       <div style={BLURB}>
         Both groups are saved with the world; CAMERA MODE picks which one plays.
