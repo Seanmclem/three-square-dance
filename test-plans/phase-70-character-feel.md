@@ -39,6 +39,7 @@ it is deterministic and repeatable. Game: platfrom-obby (`jumpHeight 3.5`,
 | 15 | Crab stomp, landing 0.55m off-centre | fired (launch 8) with the feet still 0.69m up, before reaching the back at 0.76m; despawn dispatched to the level_3 crab's own id; crab gone |
 | 16 | Kill floor | hub checkpoint key set on spawn; after a fall the player respawns at (0, 10, 2) |
 | 17 | `npm run typecheck`, console | clean (only the known Rapier deprecation warning) |
+| 18 | Real shell window (computer-use), editor preview on level_2, real key presses | landing disc clearly visible under a mid-air player; readout showed "up 1.66m across 0.44m 0.73s landed level" for a 0.35s press (hold for height working with a physical-style key event); 120 FPS, 9 to 10ms worst frame, 82 draw calls (unchanged from the pre-phase baseline) |
 
 ## By hand (feel cannot be automated)
 
@@ -64,8 +65,7 @@ it is deterministic and repeatable. Game: platfrom-obby (`jumpHeight 3.5`,
 
 - Touch and gamepad were not exercised (the jump button reports held/released
   the same way on all three, so hold-for-height should behave identically).
-- The shadow, squash and lean were checked by numbers and by single
-  screenshots, not by watching motion in the shell window.
+- Squash and lean were checked by numbers, not by watching motion.
 - level_3 was verified in the standalone runtime page only, not opened in the
   editor (an editor tab would have restored the user's autosave and written
   scene files on a scene switch).
