@@ -1084,3 +1084,12 @@ game.json merging against the committed fixture
   reload their window, clear the autosave (`/api/clearAutosave`), reload again,
   and confirm the new content is showing. Only safe when a structural diff shows
   the autosave holds nothing the file lacks.
+- **(v4.81.1) Drive input in the ORDER a player would.** The run test pressed W and
+  Shift in the same frame (idle to run) and passed; the user walks first and then
+  holds Shift (walk to run), which hit a self-crossfade and a bind pose. For any
+  state machine, test each transition a player can make, not just each end state.
+- **Animation probes:** sum `getEffectiveWeight()` over `mixer._actions` every
+  frame and track the MINIMUM; a dip to 0 is a bind pose even if the end state
+  looks right. Filter by `isRunning()`: a force-stopped action keeps a stale
+  cached weight. And check `settings.animClips` first: an author override can map
+  two slots to one clip.

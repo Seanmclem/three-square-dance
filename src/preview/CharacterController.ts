@@ -1040,16 +1040,29 @@ export class CharacterController {
     if (intent === this._currentClip || !this._mixer) return;
     const clip = this._clipFor(intent);
     if (!clip) return;
-    const next = this._mixer.clipAction(clip);
-    next.reset();
+    this._crossfadeTo(this._mixer.clipAction(clip), loop, speed);
+    this._currentClipObj = clip;
+    this._currentClip    = intent;
+  }
+
+  /**
+   * Crossfade the avatar to `next`. `mixer.clipAction(clip)` returns ONE action per
+   * clip, so two intents that resolve to the same clip share it (platfrom-obby maps
+   * WALK to the "Run" clip, and RUN auto-matches "Run" too). Crossfading an action
+   * with ITSELF fades it in and straight back out: weight 0, nothing playing, the
+   * skeleton drops to its bind pose (user report, v4.81.1). Same action = keep it
+   * playing and only retime/reloop it (restarting it if it was a finished one-shot).
+   */
+  private _crossfadeTo(next: THREE.AnimationAction, loop: boolean, speed: number): void {
+    const same = next === this._currentAction;
+    if (!same || !next.isRunning()) next.reset();
     next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
     next.clampWhenFinished = !loop;
     next.timeScale = speed;
+    if (same) { next.play(); return; }
     next.fadeIn(0.15).play();
     this._currentAction?.fadeOut(0.15);
-    this._currentAction  = next;
-    this._currentClipObj = clip;
-    this._currentClip    = intent;
+    this._currentAction = next;
   }
 
   // Has the current one-shot reached its end? (Only meaningful for a clamped LoopOnce.)
@@ -1070,14 +1083,7 @@ export class CharacterController {
       this._scriptAnim = null;
       return;
     }
-    const next = this._mixer.clipAction(clip);
-    next.reset();
-    next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
-    next.clampWhenFinished = !loop;
-    next.timeScale = 1;
-    next.fadeIn(0.15).play();
-    this._currentAction?.fadeOut(0.15);
-    this._currentAction  = next;
+    this._crossfadeTo(this._mixer.clipAction(clip), loop, 1);
     this._currentClipObj = clip;
     this._currentClip    = `script:${clip.name}`;   // never collides with locomotion intents
   }
@@ -1133,7 +1139,7 @@ export class CharacterController {
     switch (this._animPhase) {
       case "ground":
         if (airborne) this._enterJump();
-        else this._play(this._groundClip(isMoving, running), true);
+        else this._playGround(isMoving, running);
         break;
       case "jump":                                        // takeoff one-shot
         if (!airborne) this._enterLand();
@@ -1148,7 +1154,7 @@ export class CharacterController {
       case "land":                                        // landing one-shot
         if (airborne) this._enterJump();                  // jumped again mid-landing
         else if (this._animDone()) {
-          this._play(this._groundClip(isMoving, running), true);
+          this._playGround(isMoving, running);
           this._animPhase = "ground";
         }
         break;
@@ -1161,6 +1167,19 @@ export class CharacterController {
   /** Ground locomotion intent — `run` only when the model actually has a run clip (else walk). */
   private _groundClip(isMoving: boolean, running: boolean): string {
     return !isMoving ? "idle" : running && this._has("run") ? "run" : "walk";
+  }
+
+  /** Play idle/walk/run. When RUN resolves to the very clip WALK uses (an author's WALK
+   *  override, or a model with no run clip), play it faster by the run multiplier so
+   *  running still reads as running. */
+  private _playGround(isMoving: boolean, running: boolean): void {
+    const intent = this._groundClip(isMoving, running);
+    const sameAsWalk = running && this._clipFor(intent) === this._clipFor("walk");
+    const speed = sameAsWalk ? (this._settings.runMultiplier ?? 1) : 1;
+    this._play(intent, true, speed);
+    // _play no-ops when the intent is unchanged (a model with no run clip stays on "walk"
+    // through a walk → run change), so retime the live loop here.
+    if (this._currentAction && this._currentClip === intent) this._currentAction.timeScale = speed;
   }
 
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }

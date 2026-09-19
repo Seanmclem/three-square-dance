@@ -30,6 +30,20 @@ with synthetic key events (TESTING.md section 3).
 | 10 | Run DISABLED (multiplier unset) | stick 50% = 3.0, 90% = 5.4, 100% = 6.0; keyboard Shift = 6.0 (no effect): identical to pre-phase behavior |
 | 11 | `npm run typecheck`, console | clean |
 
+## Regression found by the user, fixed in v4.81.1
+
+"The run animation is just like a bare pose like a t-pose almost." platfrom-obby maps
+WALK to the "Run" clip, so walk and run share one three.js action, and the crossfade
+faded it in and straight back out (total mixer weight 0 = bind pose). Checks 1 and 2
+above pressed W and Shift TOGETHER and so never exercised walk to run.
+
+| # | Check (the real sequence: walk first, THEN hold Shift) | Result |
+|---|---|---|
+| 12 | Before the fix | after Shift: no live action, total mixer weight 0 |
+| 13 | After: idle, walk, +Shift, -Shift, stop | `Idle`, `Run x1`, `Run x1.4`, `Run x1`, `Idle`; total weight never below 1 |
+| 14 | Rapid Shift tapping while walking | total weight never below 1 |
+| 15 | Screenshot mid-run | a posed running stride, not the bind pose |
+
 ## By hand
 
 1. level_3, editor preview, jump readout on. Walk the lane: 5m is the edge of
