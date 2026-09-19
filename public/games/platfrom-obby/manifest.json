@@ -6,7 +6,8 @@
   "entryScene": "level_1",
   "scenes": {
     "level_1": "scenes/level_1.json",
-    "level_2": "scenes/level_2.json"
+    "level_2": "scenes/level_2.json",
+    "level_3": "scenes/level_3.json"
   },
   "assetsBase": "/",
   "game": "game.json"

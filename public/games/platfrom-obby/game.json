@@ -769,13 +769,13 @@
             "label": "Trigger Volume",
             "position": {
               "x": -0.002003167947563611,
-              "y": 0.5029610540915925,
+              "y": 0.7529610540915925,
               "z": 0.010803113131728992
             },
             "size": {
-              "x": 1.2000000000000002,
-              "y": 0.5,
-              "z": 0.9
+              "x": 1.5,
+              "y": 1,
+              "z": 1.1
             },
             "zoneId": "__prefab_edit__",
             "editorTint": {
@@ -1325,12 +1325,12 @@
     "cameraMode": "thirdperson",
     "moveSpeed": 6,
     "jumpHeight": 3.5,
-    "fov": 75,
-    "thirdPersonDistance": 3.4,
+    "fov": 60,
+    "thirdPersonDistance": 5.5,
     "thirdPersonHeight": 0.8,
     "jumpAnimSpeed": 1.2,
     "characterScale": 0.9,
-    "thirdPersonPitch": 18,
+    "thirdPersonPitch": 25,
     "modelAssetId": "character",
     "footstepDistance": 2,
     "footstepSound": "footstep_carpet_000",
