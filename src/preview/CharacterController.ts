@@ -60,6 +60,38 @@ const JUMP_BUFFER_SEC = 0.15;  // a press is remembered this long (fires on land
 const COYOTE_SEC      = 0.12;  // recently-grounded still counts (ledge walk-offs, flag flicker)
 const GROUND_STICK    = 0.5;   // m/s downward bias while grounded — keeps computedGrounded stable (SUPPRESSED on movers, see below)
 
+// ── Character feel (Phase 70) ─────────────────────────────────────────────────
+// Rule: fixed rules, lively presentation. Everything below either leaves the
+// landing point alone (shadow, squash, lean) or is tuned so existing levels stay
+// valid (the jump reshape keeps the legacy PEAK and AIR TIME).
+const LEGACY_GRAVITY = 20;      // m/s² — launches + walk-off falls (every existing spring keeps its arc)
+// A JUMP rises under lighter gravity and falls under heavier. With rise fraction
+// `a` of the legacy air time, gRise = g/(4a²) and gFall = g/(4(1-a)²) reproduce
+// the legacy peak and total air time for ANY jumpHeight (a = 0.5 → 20/20).
+const JUMP_RISE_FRAC = 0.56;
+const GRAVITY_RISE   = LEGACY_GRAVITY / (4 * JUMP_RISE_FRAC ** 2);         // ≈ 15.9
+const GRAVITY_FALL   = LEGACY_GRAVITY / (4 * (1 - JUMP_RISE_FRAC) ** 2);   // ≈ 25.8
+const JUMP_CUT_MULT  = 3;       // × GRAVITY_RISE once jump is released while still rising (hold for height)
+// Horizontal ramps as TIMES (so they scale with moveSpeed): seconds from rest to
+// full speed / full speed to rest. Air stays strongly steerable — landing
+// precision needs it — but can no longer reverse in a single frame.
+const GROUND_ACCEL_SEC = 0.08;
+const GROUND_DECEL_SEC = 0.08;  // ≈ 0.25m stop slide at speed 6
+const AIR_ACCEL_SEC    = 0.2;
+// Landing shadow — a soft disc straight under the player (the "where will I land" cue).
+const SHADOW_MAX_DROP = 40;     // m — ray length; no ground within this = no disc
+const SHADOW_LIFT     = 0.03;   // m above the hit surface (z-fight guard, with polygonOffset)
+// Squash & stretch — a damped spring on the avatar root's Y scale (1 = rest).
+const SQUASH_STIFFNESS = 180;   // 1/s²
+const SQUASH_DAMPING   = 14;    // 1/s (ζ ≈ 0.52 — one visible overshoot, then settles)
+const SQUASH_TAKEOFF   = 3;     // spring velocity kick toward stretch at takeoff/launch
+const SQUASH_LAND_GAIN = 0.35;  // kick toward squash per m/s of impact speed…
+const SQUASH_LAND_MAX  = 4.5;   // …capped
+const LEAN_FORWARD = 0.10;      // rad of forward tilt at full speed (≈ 6°)
+const LEAN_ROLL    = 0.04;      // rad of roll per rad/s of avatar turn rate…
+const LEAN_ROLL_MAX = 0.2;      // …capped (≈ 11°)
+const LEAN_RATE    = 10;        // 1/s exp smoothing of both
+
 /**
  * Character scale is per camera mode (Phase 34 follow-up): third-person uses
  * characterScale (avatar + capsule), FPS uses fpsCharacterScale (capsule/eye
@@ -80,6 +112,8 @@ const _tmpWp      = new THREE.Vector3();
 const _tmpDir     = new THREE.Vector3();
 const _tmpPivot   = new THREE.Vector3();
 const _tmpBack    = new THREE.Vector3();
+const _tmpNormal  = new THREE.Vector3();
+const _AXIS_Z      = new THREE.Vector3(0, 0, 1);   // CircleGeometry's facing — rotated onto the ground normal
 
 export class CharacterController {
   private readonly _body: CharacterBody;   // built in the constructor (needs _settings scale)
@@ -94,6 +128,30 @@ export class CharacterController {
   private _jumpArmed = true;
   private _jumpBuffer = 0;   // s left on a buffered jump press
   private _coyote = 0;       // s since last grounded that still counts as grounded
+  // Phase 70 — horizontal velocity, ramped toward input × moveSpeed (see *_SEC above).
+  private _velX = 0;
+  private _velZ = 0;
+  // True from a JUMP takeoff until landing: selects the reshaped rise/fall gravity
+  // (launches and walk-off falls stay on LEGACY_GRAVITY).
+  private _jumpArc = false;
+  private _lastAirVelY = 0;   // vertical speed on the last airborne frame (landing impact)
+  // Squash & stretch spring + lean — presentation only, never touches the capsule.
+  private _squash = 1;
+  private _squashVel = 0;
+  private _modelBaseScale = 1;
+  private _leanPitch = 0;
+  private _leanRoll = 0;
+  private _prevModelYaw = 0;
+  // Landing shadow disc (third person).
+  private _shadow: THREE.Mesh | null = null;
+  private readonly _shadowRay = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
+  // Jump readout — measured over each airborne stretch, emitted on landing.
+  private _airStartX = 0;
+  private _airStartY = 0;
+  private _airStartZ = 0;
+  private _airPeakY = 0;
+  // A landing's stats wait a few frames for the capsule to settle before they are emitted (see the landing block).
+  private _statsPending: { height: number; distance: number; airTime: number; startY: number; frames: number } | null = null;
   // Mover body under the player (carry target) — cached across grounded-flicker
   // frames via the coyote window (v4.29.9).
   private _moverGroundHandle: number | null = null;
@@ -184,6 +242,7 @@ export class CharacterController {
     this._yaw = THREE.MathUtils.degToRad(facingDeg);
     this._body.init(spawnPos);
     this._stepPrevX = spawnPos.x; this._stepPrevZ = spawnPos.z;   // seed footstep travel
+    this._buildShadow();
     // Distance from the capsule CENTER (body origin) down to the feet. Stored positions
     // (checkpoints, saved poses, literal teleport coords) are all foot/floor level — where
     // a marker sits — so teleport adds this to land the FEET on the target, and save stores
@@ -196,6 +255,10 @@ export class CharacterController {
       this._exitClimb();   // never carry the climb lock through a warp (soft-lock guard)
       this._body.teleport(new THREE.Vector3(position.x, position.y + capsuleBottom, position.z));
       this._velY = 0;
+      this._velX = this._velZ = 0;         // …nor run momentum (Phase 70)
+      this._jumpArc = false;
+      this._airPeakY = Number.NaN;         // a warp is not a jump — no readout for this stretch
+      this._statsPending = null;
       this._extVelX = this._extVelZ = 0;   // don't carry a launch shove through a warp
       this._clearScriptAnim();             // a warp (e.g. respawn) ends a scripted pose
       this._snapAnimToIdle();              // …and HARD-resets the pose: no crossfade out of
@@ -221,6 +284,8 @@ export class CharacterController {
     this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg, relativeToPlayer }) => {
       this._exitClimb();
       this._velY = Math.max(this._velY, speed);
+      this._jumpArc = false;               // a launch flies on LEGACY_GRAVITY — springs keep their authored arc
+      this._squashVel += SQUASH_TAKEOFF;   // stretch off the pad
       // Optional horizontal shove — dirDeg uses the spawn-facing compass (0 = -Z),
       // replacing (not stacking) any prior shove so repeat pads feel consistent.
       if (hSpeed) {
@@ -291,13 +356,25 @@ export class CharacterController {
     // move is unit-clamped; magnitude < 1 (analog stick/joystick) scales walk speed
     const dir   = _tmpDir.set(actions.move.x, 0, -actions.move.y);
     const isMoving = dir.lengthSq() > 0;
-    if (isMoving) dir.multiplyScalar(speed * dt);
+    if (isMoving) dir.multiplyScalar(speed);   // the WANTED velocity (m/s), world-space after the yaw below
     dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
     // Avatar facing uses the INPUT direction only — captured here, before gravity /
     // launch shove / mover carry join `dir`. Aiming at the full displacement made
     // the model wobble while a launch tail decayed (worst moving backwards, where
     // the shortest-turn side flips at 180°).
     const faceX = dir.x, faceZ = dir.z;
+
+    // Phase 70 — ramp the held velocity toward the wanted one at a limited rate
+    // (was: wanted × dt straight into the move = full speed on frame one, dead
+    // stop on release, instant mid-air reversal). `_coyote > 0` is the stable
+    // "on the ground" read — raw isGrounded flickers while walking.
+    const rampSec = this._coyote > 0 ? (isMoving ? GROUND_ACCEL_SEC : GROUND_DECEL_SEC) : AIR_ACCEL_SEC;
+    const maxStep = speed / rampSec * dt;
+    const dvx = dir.x - this._velX, dvz = dir.z - this._velZ;
+    const dLen = Math.hypot(dvx, dvz);
+    if (dLen <= maxStep) { this._velX = dir.x; this._velZ = dir.z; }
+    else { this._velX += dvx / dLen * maxStep; this._velZ += dvz / dLen * maxStep; }
+    dir.set(this._velX * dt, 0, this._velZ * dt);
 
     const jumpHeld = actions.jump;
     if (!jumpHeld) this._jumpArmed = true;   // re-arm on release
@@ -310,6 +387,8 @@ export class CharacterController {
     }
 
     if (this._climbLadder) {
+      this._velX = this._velZ = 0;
+      this._airPeakY = Number.NaN;   // a climb is not a jump — no readout for this airborne stretch
       this._updateClimb(dt, jumpHeld, actions.move.y, actions.move.x);
     } else {
       // Jump reliability (v4.28.14). `computedGrounded()` is only true when the KCC
@@ -332,14 +411,28 @@ export class CharacterController {
       if (!this._body.isGrounded && this._velY < -2.5) this._fellAt = performance.now();
 
       if (this._jumpBuffer > 0 && this._coyote > 0) {
-        this._velY = Math.sqrt(2 * 9.81 * this._settings.jumpHeight);
+        // Legacy mapping kept on purpose: peak = jumpHeight × 9.81/20 (the label
+        // mismatch is a known, deferred item — fixing it would resize every jump).
+        const peak = this._settings.jumpHeight * 9.81 / LEGACY_GRAVITY;
+        this._velY = Math.sqrt(2 * GRAVITY_RISE * peak);
+        this._jumpArc = true;
+        this._squashVel += SQUASH_TAKEOFF;   // stretch off the ground
         this._jumpBuffer = 0;
         this._coyote = 0;
         this._emitSound(this._settings.jumpSound, this._settings.jumpVolume);   // jump takeoff
       } else if (this._body.isGrounded && this._velY <= 0) {
         this._velY = 0;
+        this._jumpArc = false;
       } else {
-        this._velY -= 20 * dt;
+        // A JUMP rises light and falls heavy (same peak + air time as the legacy
+        // 20/20 arc); releasing jump while still rising cuts the rise short (hold
+        // for height). Launches and walk-off falls stay on LEGACY_GRAVITY.
+        let g = LEGACY_GRAVITY;
+        if (this._jumpArc) {
+          if (this._velY <= 0) g = GRAVITY_FALL;
+          else g = (jumpHeld || this._settings.variableJump === false) ? GRAVITY_RISE : GRAVITY_RISE * JUMP_CUT_MULT;
+        }
+        this._velY -= g * dt;
       }
       dir.y = this._velY * dt;
 
@@ -394,15 +487,53 @@ export class CharacterController {
       this._body.move(dir);
     }
     const pos = this._body.position;
+    this._updateShadow(pos);
 
     // Land sound (Phase 36 follow-up) — physics-based so it works without an animated
     // model. Gate on air TIME (> COYOTE) so brief grounded-flicker while walking on the
     // ground-stick doesn't count as a landing.
-    if (this._body.isGrounded) {
-      if (this._airTime > COYOTE_SEC) this._emitSound(this._settings.landSound, this._settings.landVolume);
+    const feetY = pos.y - (this._body.capsuleHalfHeight + this._body.capsuleRadius);
+    // `_velY <= 0`: rising past a ledge, the capsule's round bottom grazes the lip and
+    // isGrounded flickers true for a frame (measured twice on one 1m step-up). That is
+    // not a landing — without the gate it reset the air timer and the takeoff point mid-jump.
+    if (this._body.isGrounded && this._velY <= 0) {
+      if (this._airTime > COYOTE_SEC) {
+        this._emitSound(this._settings.landSound, this._settings.landVolume);
+        // Phase 70 — squash on impact, and report the airborne stretch that just ended.
+        this._squashVel -= Math.min(SQUASH_LAND_MAX, -this._lastAirVelY * SQUASH_LAND_GAIN);
+        // `drop` is NOT read here: isGrounded turns true ~2 frames before the capsule
+        // finishes settling (≈0.1m high after a full jump), and on a ledge lip it
+        // turns true before the player is even over the higher surface. The feet
+        // are read a few frames later, below.
+        if (!Number.isNaN(this._airPeakY)) {
+          this._statsPending = {
+            height:   this._airPeakY - (pos.y - feetY) - this._airStartY,
+            distance: Math.hypot(pos.x - this._airStartX, pos.z - this._airStartZ),
+            airTime:  this._airTime,
+            startY:   this._airStartY,
+            frames:   6,
+          };
+        }
+      }
       this._airTime = 0;
+      this._lastAirVelY = 0;
+      const pend = this._statsPending;
+      if (pend && --pend.frames <= 0) {
+        this._bus.emit("character:jump-stats", { height: pend.height, distance: pend.distance, airTime: pend.airTime, drop: feetY - pend.startY });
+        this._statsPending = null;
+      }
+      // Last grounded spot = the takeoff point (FEET height — settled while standing/running).
+      this._airStartX = pos.x; this._airStartZ = pos.z; this._airStartY = feetY;
+      this._airPeakY = pos.y;
     } else {
+      if (this._statsPending) {
+        const pend = this._statsPending;
+        this._bus.emit("character:jump-stats", { height: pend.height, distance: pend.distance, airTime: pend.airTime, drop: this._airStartY - pend.startY });
+        this._statsPending = null;
+      }
       this._airTime += dt;
+      this._lastAirVelY = this._velY;
+      this._airPeakY = Math.max(this._airPeakY, pos.y);   // stays NaN if this stretch was invalidated
     }
 
     // Footsteps (Phase 36 follow-up) — emit every footstepDistance metres of ACTUAL
@@ -467,7 +598,7 @@ export class CharacterController {
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));   // wrap to [-π, π]
         this._modelYaw += delta * Math.min(1, dt * 10);
       }
-      this._modelRoot.rotation.y = this._modelYaw + MODEL_FORWARD_OFFSET;
+      this._updatePresentation(dt);   // yaw + lean + squash on the root
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
       this._updateAnim(!this._body.isGrounded, isMoving);
@@ -570,6 +701,8 @@ export class CharacterController {
     this._climbLadder = def;
     this._climbHoldInvert = fromTop;   // held forward = descend until released (see field comment)
     this._velY = 0;
+    this._velX = this._velZ = 0;
+    this._jumpArc = false;
     this._extVelX = this._extVelZ = 0;   // grabbing a ladder kills launch momentum
     this._scriptAnim = null;             // climb owns the animation from here
     // Wide ladders keep the grab-point lateral position; narrow ones center.
@@ -714,7 +847,8 @@ export class CharacterController {
       this._modelAnimations = gltf.animations ?? [];
       this._modelRoot = root;
       this._mixer = new THREE.AnimationMixer(root);
-      root.scale.setScalar(effectiveCharacterScale(this._settings));
+      this._modelBaseScale = effectiveCharacterScale(this._settings);   // squash multiplies this
+      root.scale.setScalar(this._modelBaseScale);
       this._scene.add(root);
       this._modelYaw = this._yaw;
       this._play("idle", true);
@@ -768,6 +902,90 @@ export class CharacterController {
       (e.mat as THREE.MeshStandardMaterial).emissiveIntensity = e.intensity + k * 2;
     }
     if (done) this._flash = null;
+  }
+
+  /**
+   * Phase 70 — avatar yaw + lean + squash, all on the model ROOT. Presentation
+   * only: the capsule, the camera and the landing point never see any of it.
+   * The root's origin is at the feet, so squash anchors to the ground.
+   */
+  private _updatePresentation(dt: number): void {
+    const root = this._modelRoot!;
+    const h = Math.min(dt, 1 / 30);   // spring stability across a frame hitch
+    // Squash & stretch: damped spring back to 1, kicked at takeoff / launch / landing.
+    this._squashVel += (-SQUASH_STIFFNESS * (this._squash - 1) - SQUASH_DAMPING * this._squashVel) * h;
+    this._squash = Math.max(0.6, Math.min(1.35, this._squash + this._squashVel * h));
+    const sy = this._squash, sxz = 1 / Math.sqrt(sy);   // volume-preserving
+    root.scale.set(this._modelBaseScale * sxz, this._modelBaseScale * sy, this._modelBaseScale * sxz);
+
+    // Lean: forward with speed, roll into the turn (from the avatar's own turn rate).
+    let pitch = 0, roll = 0;
+    if (!this._climbLadder && dt > 0) {
+      pitch = Math.min(1, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1)) * LEAN_FORWARD;
+      let dYaw = this._modelYaw - this._prevModelYaw;
+      dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
+      if (Math.abs(dYaw) > 1) dYaw = 0;   // a snap (teleport facing, ladder mount), not a turn
+      // The model faces +Z, so its right hand is −X and a positive Z-roll tips it
+      // RIGHT; turning right is a DEcreasing yaw → negate.
+      roll = Math.max(-LEAN_ROLL_MAX, Math.min(LEAN_ROLL_MAX, -(dYaw / dt) * LEAN_ROLL));
+    }
+    this._prevModelYaw = this._modelYaw;
+    const k = Math.min(1, dt * LEAN_RATE);
+    this._leanPitch += (pitch - this._leanPitch) * k;
+    this._leanRoll  += (roll  - this._leanRoll)  * k;
+    root.rotation.set(this._leanPitch, this._modelYaw + MODEL_FORWARD_OFFSET, this._leanRoll, "YXZ");
+  }
+
+  /** Phase 70 — the landing shadow: a soft dark disc, built once per controller. */
+  private _buildShadow(): void {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d")!;
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0,   "rgba(0,0,0,1)");
+    grad.addColorStop(0.6, "rgba(0,0,0,0.7)");
+    grad.addColorStop(1,   "rgba(0,0,0,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),   // unit radius — scaled per frame
+      new THREE.MeshBasicMaterial({
+        map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, toneMapped: false,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      }),
+    );
+    mesh.raycast = NO_RAYCAST;
+    mesh.visible = false;
+    this._shadow = mesh;
+    this._scene.add(mesh);
+  }
+
+  /**
+   * Lay the disc on whatever is straight under the player: ONE Rapier ray per
+   * frame (not a scene raycast — see PROFILING.md), sensors and the player's own
+   * capsule excluded. Enemies are solid colliders, so over a crab the disc sits
+   * on its back — the stomp aiming cue. Shrinks + fades a little with height.
+   */
+  private _updateShadow(pos: THREE.Vector3): void {
+    const sh = this._shadow;
+    if (!sh) return;
+    if (this._settings.cameraMode !== "thirdperson") { sh.visible = false; return; }
+    this._shadowRay.origin = pos;
+    const hit = physicsWorld.world.castRayAndGetNormal(
+      this._shadowRay, SHADOW_MAX_DROP, true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._body.collider,
+    );
+    if (!hit) { sh.visible = false; return; }
+    const n = _tmpNormal.set(hit.normal.x, hit.normal.y, hit.normal.z);
+    if (n.lengthSq() < 0.5) n.set(0, 1, 0);   // ray began inside a collider — no usable normal
+    const drop = hit.timeOfImpact;
+    sh.position.set(pos.x + n.x * SHADOW_LIFT, pos.y - drop + n.y * SHADOW_LIFT, pos.z + n.z * SHADOW_LIFT);
+    sh.quaternion.setFromUnitVectors(_AXIS_Z, n);
+    const feetUp = Math.max(0, drop - (this._body.capsuleHalfHeight + this._body.capsuleRadius));
+    const r = this._body.capsuleRadius * 1.7 * (1 - 0.35 * Math.min(1, feetUp / 6));
+    sh.scale.set(r, r, 1);
+    (sh.material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - 0.5 * Math.min(1, feetUp / 10));
+    sh.visible = true;
   }
 
   private _buildCapsule(): void {
@@ -964,6 +1182,12 @@ export class CharacterController {
     this._offLadderGone?.();  this._offLadderGone  = null;
     this._offLadderMoved?.(); this._offLadderMoved = null;
     if (this._modelRoot) this._scene.remove(this._modelRoot);
+    if (this._shadow) {
+      this._scene.remove(this._shadow);
+      const m = this._shadow.material as THREE.MeshBasicMaterial;
+      m.map?.dispose(); m.dispose(); this._shadow.geometry.dispose();
+      this._shadow = null;
+    }
     this._mixer?.stopAllAction();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);
     this._body.dispose();

@@ -68,6 +68,7 @@ import { resolveGameBindings, interactDisplay, DEFAULT_BINDINGS, loadBindings, s
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
+import { JumpReadout } from "@/ui/JumpReadout";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
@@ -197,6 +198,7 @@ export default function App() {
   );
   // Global preview-overlay toggles (EDITOR section of the panel) — persisted like editorQuality.
   const [showPerfCounter, setShowPerfCounter] = useState(() => localStorage.getItem('editorShowPerf') !== '0');
+  const [showJumpStats,   setShowJumpStats]   = useState(() => localStorage.getItem('editorShowJumpStats') === '1');   // opt-in (Phase 70)
   const [showCrosshair,   setShowCrosshair]   = useState(() => localStorage.getItem('editorShowCrosshair') !== '0');
   const [showGridFloor,   setShowGridFloor]   = useState(() => localStorage.getItem('editorShowGrid') !== '0');
   const [autoFloorPrompt, setAutoFloorPrompt] = useState<{ zoneId: string; level: number; points: Vec2[]; nodeIds: string[] } | null>(null);
@@ -1194,6 +1196,9 @@ export default function App() {
 
   const handleTogglePerfCounter = (): void =>
     setShowPerfCounter(v => { localStorage.setItem('editorShowPerf', v ? '0' : '1'); return !v; });
+
+  const handleToggleJumpStats = (): void =>
+    setShowJumpStats(v => { localStorage.setItem('editorShowJumpStats', v ? '0' : '1'); return !v; });
 
   const handleToggleCrosshair = (): void =>
     setShowCrosshair(v => { localStorage.setItem('editorShowCrosshair', v ? '0' : '1'); return !v; });
@@ -3856,6 +3861,8 @@ export default function App() {
         quality={quality}
         showPerfCounter={showPerfCounter}
         onTogglePerfCounter={handleTogglePerfCounter}
+        showJumpStats={showJumpStats}
+        onToggleJumpStats={handleToggleJumpStats}
         showCrosshair={showCrosshair}
         onToggleCrosshair={handleToggleCrosshair}
         showGridFloor={showGridFloor}
@@ -4062,6 +4069,7 @@ export default function App() {
       )}
 
       {isPreview && showPerfCounter && <FpsCounter getInfo={getRenderInfo} />}
+      {isPreview && showJumpStats && <JumpReadout bus={busRef.current} />}
 
       {!isGame && (
         <div style={{

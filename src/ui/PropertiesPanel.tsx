@@ -486,6 +486,8 @@ interface PropertiesPanelProps {
   // Global editor overlay toggles (EDITOR section, nothing-selected view).
   showPerfCounter?:         boolean;
   onTogglePerfCounter?:     () => void;
+  showJumpStats?:           boolean;
+  onToggleJumpStats?:       () => void;
   showCrosshair?:           boolean;
   onToggleCrosshair?:       () => void;
   showGridFloor?:           boolean;
@@ -512,7 +514,7 @@ export function PropertiesPanel({
   gameInput,
   onGameInputChange,
   onAddPressPrompt,
-  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
+  showPerfCounter, onTogglePerfCounter, showJumpStats, onToggleJumpStats, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
@@ -845,6 +847,7 @@ export function PropertiesPanel({
               lightCount={zoneLights.length} onOpenLights={() => push("lights")}
               onOpenAudio={() => push("audio")}
               showPerfCounter={showPerfCounter} onTogglePerfCounter={onTogglePerfCounter}
+              showJumpStats={showJumpStats} onToggleJumpStats={onToggleJumpStats}
               showCrosshair={showCrosshair} onToggleCrosshair={onToggleCrosshair}
               showGridFloor={showGridFloor} onToggleGridFloor={onToggleGridFloor} />
           )
@@ -5514,6 +5517,13 @@ function SpawnSettingsView({
     <div style={PAGE}>
       {numField("MOVE SPEED", "moveSpeed", 0.5)}
       {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+        title="On: tap jump for a short hop, hold it for the full height (a full hold is always the same height). Off: every jump is the full height, however briefly the button is pressed.">
+        <input type="checkbox" checked={settings.variableJump !== false}
+          onChange={e => onChange({ variableJump: e.target.checked })}
+          style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+        <span style={{ color: "#c2cadb", fontSize: 11 }}>Hold jump to go higher (tap = short hop)</span>
+      </label>
       {numField("CLIMB SPEED", "climbSpeed", 0.5, 2,
         "Vertical speed on ladders (metres/second). W climbs up, S climbs down, jump lets go.")}
       <div style={BLURB}>
@@ -7670,7 +7680,7 @@ function GameInputSection({ gameInput, onChange }: {
 }
 
 function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio,
-  showPerfCounter, onTogglePerfCounter, showCrosshair, onToggleCrosshair,
+  showPerfCounter, onTogglePerfCounter, showJumpStats, onToggleJumpStats, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor, gameInput, onGameInputChange }: {
   gameInput?:         GameConfig["input"];
   onGameInputChange?: (input: GameConfig["input"]) => void;
@@ -7681,6 +7691,8 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
   onOpenAudio?:  () => void;
   showPerfCounter?:     boolean;
   onTogglePerfCounter?: () => void;
+  showJumpStats?:       boolean;
+  onToggleJumpStats?:   () => void;
   showCrosshair?:       boolean;
   onToggleCrosshair?:   () => void;
   showGridFloor?:       boolean;
@@ -7741,6 +7753,13 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
               <input type="checkbox" checked={showPerfCounter ?? true} onChange={onTogglePerfCounter}
                 style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
               <span style={{ color: "#c2cadb", fontSize: 11 }}>Perf counter while playing (FPS · draw calls, top-left)</span>
+            </label>
+          )}
+          {onToggleJumpStats && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
+              <input type="checkbox" checked={showJumpStats ?? false} onChange={onToggleJumpStats}
+                style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+              <span style={{ color: "#c2cadb", fontSize: 11 }}>Jump readout while playing (last jump: height · distance · air time)</span>
             </label>
           )}
           {onToggleCrosshair && (

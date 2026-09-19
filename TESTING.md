@@ -1048,3 +1048,24 @@ game.json merging against the committed fixture
   editor camera focus; landing on a prop (a corner bush here) shows a slow
   downward creep as the capsule slides off its collider. Teleport onto a flat
   tile center before judging vertical drift (0mm over 15s is the healthy result).
+- **(Phase 70 session, same day) Test content in the RUNTIME page, not an editor tab.**
+  Switching scenes in the editor write-through-saves the current scene, and any
+  editor tab restores the workspace autosave, so an editor tab can rewrite
+  `public/games/**` just by looking around. `runtime.html?manifest=...` plus
+  `__runtime.router.go("<scene>")` never writes scene files. Clear
+  `runtime_gamesave:<id>` before a clean run: Continue resumes the last scene
+  and carries game state (a stale `checkpoint` key sent a respawn to another
+  level's coordinates).
+- **Step the TriggerSystem too when a test needs volumes:**
+  `__preview._triggers.update()` at the end of the manual loop (stomp zones,
+  kill floors, checkpoints).
+- **Timers and fades need wall-clock time.** Script `delay`s are `setTimeout`
+  and mesh fades are rAF tweens: neither advances inside one synchronous
+  stepping loop, and rAF never runs in a hidden tab. Put a Bash `sleep` between
+  tool calls for timers, and take a `screenshot` to let a fade finish.
+- **A platform's `position.y` is its BOTTOM** (top = y + thickness), even though
+  the mesh code builds the slab around its own origin. Measure with a ray before
+  generating content from numbers.
+- **`isGrounded` is not "has landed".** It turns true about 2 frames before the
+  capsule settles, and it flickers true for single frames while RISING past a
+  ledge lip. Gate landing logic on `velY <= 0` and read heights a few frames later.

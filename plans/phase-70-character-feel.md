@@ -119,3 +119,50 @@ update loop by hand at dt 1/120 with synthetic key events (TESTING.md section 3)
    built gaps, the kill floor respawns, the crab can be stomped.
 7. `npm run typecheck`, console clean, framerate in the shell window unchanged
    (one extra Rapier ray per frame).
+
+## As built (2026-09-19): what changed from the plan, and what the test room found
+
+Deviations:
+
+- **Readout measurement.** The plan said the controller "measures every
+  airborne stretch and emits on landing". Two traps forced a different shape:
+  `isGrounded` turns true about 2 frames before the capsule finishes settling
+  (0.11m high after a full jump), and while rising past a ledge the capsule's
+  round bottom grazes the lip and `isGrounded` flickers true for single frames.
+  So the landing block is gated on `_velY <= 0`, and `drop` is read from the
+  settled feet 6 frames after landing.
+- **level_3 needed a hub checkpoint volume.** The kill floor respawns at the
+  `checkpoint` state key, which only a checkpoint gate sets. Without one, a
+  fall in level_3 respawned at level_1's coordinates (measured). The hub volume
+  stores the hub checkpoint on every entry (not one-shot).
+- **A platform's `position.y` is its BOTTOM** (top = y + thickness). The first
+  generated staircase was too tall because the mesh code reads as if it were
+  the center. Measured in-engine, then fixed in the generator.
+- Stock defaults landed at distance 5.5 / angle 20 (FOV left at 75: it is
+  shared with FPS mode).
+
+Measured in the Jump Lab (full-hold jump, `jumpHeight 3.5`, `moveSpeed 6`):
+
+| Obstacle | Result |
+|---|---|
+| Gaps 2, 3, 4m | clear from an edge takeoff (readout: across 5.00m) |
+| Gap 5m | exactly the jump distance: fails from the edge, needs a late (coyote) takeoff |
+| Gap 6m | impossible |
+| Steps 0.5, 1.0, 1.5m | climbable |
+| Step 2.0m | ALSO climbable, although the jump peaks at 1.75m (see below) |
+
+Pre-existing behaviors found, reported to the user, deliberately not changed:
+
+1. **Effective ledge reach is about jump height + capsule radius** (2.0m here).
+   The capsule's round bottom catches the lip and forward input rolls it over,
+   like a wheel over a curb. Build "unreachable" ledges at 2.3m or more.
+2. **A lip graze while rising refreshes the coyote window**, so a second jump
+   is possible for 0.12s next to a ledge.
+3. **The `checkpoint` state key is game-wide.** Entering a new level and
+   falling before its first checkpoint gate respawns at the previous level's
+   coordinates. level_2's spawn sits before its first gate, so it has this
+   hazard today. A per-level "store checkpoint at spawn" volume (as in
+   level_3) is the content-side fix.
+4. The old crab stomp volume (top 0.75m) sat below the crab's back (0.76m): a
+   player landing squarely on the crab could never enter it. Only glancing
+   side hits registered. This was the main cause of "jumping on enemies".

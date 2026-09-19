@@ -5,7 +5,9 @@ import type { PlayerSettings } from "@/types";
  *  repeated in WorldState's seed blocks. */
 export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   cameraMode: "fps", moveSpeed: 6, jumpHeight: 1.2, fov: 75,
-  thirdPersonDistance: 4, thirdPersonHeight: 2, jumpAnimSpeed: 1, characterScale: 1,
+  // Phase 70 — third-person framing pulled back + tilted down (was 4 / level): the
+  // close, level camera hid the ground being jumped toward.
+  thirdPersonDistance: 5.5, thirdPersonHeight: 2, thirdPersonPitch: 20, jumpAnimSpeed: 1, characterScale: 1,
 };
 
 /** Phase 68 — the per-PAGE override groups. A scene "overrides" a page iff any
@@ -13,7 +15,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
  *  override switch copies the page's effective values in (ON) or deletes them
  *  (OFF). The Controls page is device-local and has no fields here. */
 export const SETTINGS_PAGES = {
-  movement:  ["moveSpeed", "jumpHeight", "climbSpeed"],
+  movement:  ["moveSpeed", "jumpHeight", "variableJump", "climbSpeed"],
   camera:    ["cameraMode", "fov", "fpsEyeHeight", "thirdPersonDistance", "thirdPersonHeight", "thirdPersonPitch"],
   character: ["modelAssetId", "characterScale", "fpsCharacterScale", "jumpAnimSpeed", "animClips", "bagStyle"],
   sounds:    ["jumpSound", "landSound", "footstepSound", "footstepDistance", "jumpVolume", "landVolume", "footstepVolume"],

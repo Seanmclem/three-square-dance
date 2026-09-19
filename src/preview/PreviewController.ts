@@ -17,8 +17,9 @@ const DEFAULT_SETTINGS = {
   moveSpeed:           6,
   jumpHeight:          1.2,
   fov:                 75,
-  thirdPersonDistance: 4,
+  thirdPersonDistance: 5.5,
   thirdPersonHeight:   2,
+  thirdPersonPitch:    20,
   jumpAnimSpeed:       1,
   characterScale:      1,
 };

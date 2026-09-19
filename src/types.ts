@@ -389,6 +389,9 @@ export interface BusEvents {
   // rings for one object; objectId null clears them. leash null = free roam.
   "ai:range-preview":      { objectId: string | null; ranges?: { detect: number; giveUp: number; attack: number; leash: number | null } };
   "object:spawn":          { id: string; fade?: number };   // re-show a despawned/hidden entity; fade = seconds to fade in
+  // Phase 70 — every airborne stretch, measured and emitted on landing (the Jump readout overlay).
+  // height = peak above the takeoff point, distance = horizontal, drop = landing Y − takeoff Y (metres, seconds).
+  "character:jump-stats":  { height: number; distance: number; airTime: number; drop: number };
   "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number; relativeToPlayer?: boolean };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass; relativeToPlayer = CharacterController adds its own look yaw, which only it knows)
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
@@ -602,6 +605,9 @@ export interface PlayerSettings {
   cameraMode:          CameraMode;
   moveSpeed:           number;
   jumpHeight:          number;
+  // Phase 70 — hold jump for height (tap = short hop, full hold = always the same peak).
+  // Absent/true = on; false = every jump is the full, fixed height (obby-style).
+  variableJump?:       boolean;
   fov:                 number;
   thirdPersonDistance: number;
   thirdPersonHeight:   number;
