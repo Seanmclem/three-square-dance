@@ -171,7 +171,7 @@ export class PreviewController {
     // Pointer lock is a kbm concern — touch has no pointer to lock (the call
     // throws on most mobile browsers) and gamepad doesn't need one.
     const canvas = this._scene.renderer.domElement;
-    if (input.activeScheme === "kbm" && this._wantsLock()) canvas.requestPointerLock?.();
+    if (input.activeScheme === "kbm" && this._wantsLock()) this._lockPointer();
     // Live scheme switches: leaving kbm releases the lock; re-entering kbm
     // can't re-lock from a key press alone (needs a gesture), so the next
     // canvas mousedown re-acquires it.
@@ -186,11 +186,11 @@ export class PreviewController {
         if (document.pointerLockElement) document.exitPointerLock?.();
       }),
       this._bus.on("pause:closed", () => {
-        if (input.activeScheme === "kbm" && this._wantsLock()) canvas.requestPointerLock?.();
+        if (input.activeScheme === "kbm" && this._wantsLock()) this._lockPointer();
       }),
     );
     this._onCanvasMouseDown = () => {
-      if (input.activeScheme === "kbm" && !document.pointerLockElement && this._wantsLock()) canvas.requestPointerLock?.();
+      if (input.activeScheme === "kbm" && !document.pointerLockElement && this._wantsLock()) this._lockPointer();
     };
     canvas.addEventListener("mousedown", this._onCanvasMouseDown);
 
@@ -216,6 +216,15 @@ export class PreviewController {
     return this._mode !== "occlusion" || this._subMode === "player";
   }
 
+  /** Best-effort lock (v4.79.83). Chrome returns a promise that REJECTS when the
+   *  lock is refused (unfocused window, no user activation — e.g. a scene
+   *  transition while alt-tabbed); uncaught, that surfaces as a WrongDocumentError
+   *  exception. The canvas-mousedown handler re-acquires. Older Safari returns
+   *  undefined, iOS lacks the method entirely. */
+  private _lockPointer(): void {
+    this._scene.renderer.domElement.requestPointerLock?.()?.catch(() => {});
+  }
+
   private _setSubMode(m: "player" | "camera"): void {
     if (this._subMode === m || this._mode !== "occlusion") return;
     this._subMode = m;
@@ -223,7 +232,7 @@ export class PreviewController {
     if (m === "player") {
       if (editorCamera) editorCamera.enabled = false;
       // Synchronous inside the Tab keydown = valid user activation for the lock.
-      if (this._input?.activeScheme === "kbm") this._scene.renderer.domElement.requestPointerLock?.();
+      if (this._input?.activeScheme === "kbm") this._lockPointer();
     } else {
       if (document.pointerLockElement) document.exitPointerLock?.();
       if (editorCamera) editorCamera.enabled = true;

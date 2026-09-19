@@ -1011,3 +1011,40 @@ game.json merging against the committed fixture
   (`__world.activeZoneId === "__prefab_edit__"`), `toJSON().zones` must never
   contain the staging zone, and a dispatched `beforeunload` must leave
   `worldeditor_autosave` byte-identical (the gate test).
+
+---
+
+## 11. Lessons from the restart + full pass (2026-09-19)
+
+- **"Extension not connected" can just mean Chrome is closed.** Check
+  `pgrep -lf "Google Chrome.app/Contents/MacOS/Google Chrome"`; if empty, run
+  `open -a "Google Chrome"`, wait ~8s, and retry `tabs_context_mcp`. No `/chrome`
+  reconnect was needed.
+- **A restart is a new origin.** The shell port is dynamic, so after a restart the
+  tab's `localStorage` starts empty (prefs, gamesaves, bindings all gone). Do not
+  read an empty `localStorage` as data loss, and do not expect §3 snapshot keys to
+  carry across restarts.
+- **A test tab that mutates the world writes the workspace autosave**
+  (`.worldbuilder/autosave/latest.json`), even after `__test.cleanup()`: the
+  add-shape path lazily creates `zone.shapes`, so spawn + cleanup leaves
+  `"shapes":[]` and the content-compared autosave gate sees a change. Harmless
+  content, but the user's shell window would offer it on next load. Session end
+  order: close the test tab FIRST (its unload flushes once more), confirm the
+  file holds none of your test ids, then
+  `curl -X POST -H "content-type: application/json" -d '[]' http://127.0.0.1:<port>/api/clearAutosave`.
+  Only do this when the autosave folder was empty at session start (check in
+  preflight); otherwise the autosave is the user's and must be left alone.
+- **Computer-use Escape does not reach the page in the CEF window.** With
+  preview running in the shell window, synthetic `escape` presses released the
+  pointer lock but never fired the app's Escape keydown (three tries), while
+  `return` arrived fine and opened the pause menu. Exit preview with
+  `return` then click **Exit**. Not yet checked with a physical keyboard.
+- **Framerate can only be read in the shell window.** A Chrome automation tab
+  stays `document.hidden`, rAF is frozen, and the counter shows "0 FPS / 3000ms":
+  meaningless. Use computer-use on the shell window: bottom-left green ▶ (no disk
+  writes), `zoom` on the top-left counter. Baseline this day, `level_2`:
+  120 FPS, 9-10ms worst frame, 102 draw calls, 6k triangles.
+- **Spawn point matters when checking for "sinking".** Preview spawns at the
+  editor camera focus; landing on a prop (a corner bush here) shows a slow
+  downward creep as the capsule slides off its collider. Teleport onto a flat
+  tile center before judging vertical drift (0mm over 15s is the healthy result).
