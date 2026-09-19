@@ -82,6 +82,15 @@ const AIR_ACCEL_SEC    = 0.2;
 // Landing shadow — a soft disc straight under the player (the "where will I land" cue).
 const SHADOW_MAX_DROP = 40;     // m — ray length; no ground within this = no disc
 const SHADOW_LIFT     = 0.03;   // m above the hit surface (z-fight guard, with polygonOffset)
+// The disc shrinks + fades as the player rises — the height cue (a blob-shadow convention,
+// not physics: a sun shadow would not shrink). Both bottom out at a floor so the disc still
+// marks the landing spot on a long fall. v4.81.0 shrank only 35% over 6m (≈10% at the top of
+// a 1.75m jump — invisible); now ≈26% smaller at that peak.
+const SHADOW_SHRINK        = 0.45;  // fraction of the radius lost at SHADOW_SHRINK_HEIGHT and above
+const SHADOW_SHRINK_HEIGHT = 3;     // m of feet-above-surface over which it shrinks
+const SHADOW_OPACITY       = 0.55;  // on the ground
+const SHADOW_FADE          = 0.45;  // fraction of the opacity lost at SHADOW_FADE_HEIGHT and above
+const SHADOW_FADE_HEIGHT   = 6;     // m
 // Squash & stretch — a damped spring on the avatar root's Y scale (1 = rest).
 const SQUASH_STIFFNESS = 180;   // 1/s²
 const SQUASH_DAMPING   = 14;    // 1/s (ζ ≈ 0.52 — one visible overshoot, then settles)
@@ -976,7 +985,7 @@ export class CharacterController {
    * Lay the disc on whatever is straight under the player: ONE Rapier ray per
    * frame (not a scene raycast — see PROFILING.md), sensors and the player's own
    * capsule excluded. Enemies are solid colliders, so over a crab the disc sits
-   * on its back — the stomp aiming cue. Shrinks + fades a little with height.
+   * on its back — the stomp aiming cue. Shrinks + fades with height (see SHADOW_* above).
    */
   private _updateShadow(pos: THREE.Vector3): void {
     const sh = this._shadow;
@@ -994,9 +1003,9 @@ export class CharacterController {
     sh.position.set(pos.x + n.x * SHADOW_LIFT, pos.y - drop + n.y * SHADOW_LIFT, pos.z + n.z * SHADOW_LIFT);
     sh.quaternion.setFromUnitVectors(_AXIS_Z, n);
     const feetUp = Math.max(0, drop - (this._body.capsuleHalfHeight + this._body.capsuleRadius));
-    const r = this._body.capsuleRadius * 1.7 * (1 - 0.35 * Math.min(1, feetUp / 6));
+    const r = this._body.capsuleRadius * 1.7 * (1 - SHADOW_SHRINK * Math.min(1, feetUp / SHADOW_SHRINK_HEIGHT));
     sh.scale.set(r, r, 1);
-    (sh.material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - 0.5 * Math.min(1, feetUp / 10));
+    (sh.material as THREE.MeshBasicMaterial).opacity = SHADOW_OPACITY * (1 - SHADOW_FADE * Math.min(1, feetUp / SHADOW_FADE_HEIGHT));
     sh.visible = true;
   }
 

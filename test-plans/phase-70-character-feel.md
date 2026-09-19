@@ -40,6 +40,8 @@ it is deterministic and repeatable. Game: platfrom-obby (`jumpHeight 3.5`,
 | 16 | Kill floor | hub checkpoint key set on spawn; after a fall the player respawns at (0, 10, 2) |
 | 17 | `npm run typecheck`, console | clean (only the known Rapier deprecation warning) |
 | 18 | Real shell window (computer-use), editor preview on level_2, real key presses | landing disc clearly visible under a mid-air player; readout showed "up 1.66m across 0.44m 0.73s landed level" for a 0.35s press (hold for height working with a physical-style key event); 120 FPS, 9 to 10ms worst frame, 82 draw calls (unchanged from the pre-phase baseline) |
+| 19 | v4.81.2 shadow shrink with height (disc size vs on the ground) | 86% at 0.9m, 74% at the 1.75m jump peak, 55% at 3m, 6m and 15m (floor); opacity 0.55 to 0.30; always 0.03m above the surface |
+| 20 | v4.81.2 cost of the shadow ray, 20,000 casts | 8.5 microseconds in level_3 (63 colliders), 4 microseconds in level_1 (353 colliders): 0.05 to 0.1% of a 120Hz frame |
 
 ## By hand (feel cannot be automated)
 
