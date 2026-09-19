@@ -3,8 +3,8 @@
     "name": "Jump Lab",
     "version": "1.0",
     "author": "",
-    "created": "2026-09-19T22:23:38.000Z",
-    "lastModified": "2026-09-19T22:23:38.000Z",
+    "created": "2026-09-19T23:26:13.000Z",
+    "lastModified": "2026-09-19T23:26:13.000Z",
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
@@ -38,7 +38,9 @@
     "skybox": "sky",
     "fogColor": "#1a1f2e",
     "fogDensity": 0.012,
-    "playerSettings": {},
+    "playerSettings": {
+      "runMultiplier": 1.4
+    },
     "lightingFromGame": true,
     "stateSchema": {
       "health": {
@@ -531,6 +533,312 @@
             "x": -1.75,
             "y": 10,
             "z": -42.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000060",
+          "label": "after a 7m gap",
+          "position": {
+            "x": 0,
+            "y": 9.5,
+            "z": -53
+          },
+          "size": {
+            "width": 4,
+            "depth": 4
+          },
+          "thickness": 0.5,
+          "material": "concrete_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000061",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -51.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000062",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -51.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000063",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -52.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000064",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -52.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000065",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -53.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000066",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -53.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000067",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -54.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000070",
+          "label": "after a 8m gap",
+          "position": {
+            "x": 0,
+            "y": 9.5,
+            "z": -65
+          },
+          "size": {
+            "width": 4,
+            "depth": 4
+          },
+          "thickness": 0.5,
+          "material": "concrete_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000071",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -63.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000072",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -63.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000073",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -64.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000074",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -64.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000075",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -65.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000076",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -65.9
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000077",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -66.4
+          },
+          "size": {
+            "width": 0.25,
+            "depth": 0.25
+          },
+          "thickness": 0.5999999999999996,
+          "material": "brick_01",
+          "hasRailing": false,
+          "railingHeight": 1,
+          "floorLevel": 0
+        },
+        {
+          "id": "plat_70000078",
+          "label": "marker post",
+          "position": {
+            "x": -1.75,
+            "y": 10,
+            "z": -66.9
           },
           "size": {
             "width": 0.25,
