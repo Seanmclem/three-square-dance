@@ -1093,3 +1093,10 @@ game.json merging against the committed fixture
   looks right. Filter by `isRunning()`: a force-stopped action keeps a stale
   cached weight. And check `settings.animClips` first: an author override can map
   two slots to one clip.
+- **(v4.81.3) Summing mixer weights: use the mixer's ACTIVE set.**
+  `mixer._actions.filter(a => mixer._isActiveAction(a))`. `isRunning()` excludes a
+  clamped, finished one-shot that is still holding the pose (false dips to 0.1-0.2),
+  while an unfiltered sum includes stale cached weights of force-stopped actions.
+- **Measure animation stalls as frames from an event to a clip**, e.g. touchdown
+  (first frame out of the jump/airidle phases) to `_currentClip === "walk"`. The
+  frozen-legs-after-landing report was 44 frames by that measure and 0 after the fix.

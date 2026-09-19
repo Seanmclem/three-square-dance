@@ -1151,18 +1151,18 @@ export class CharacterController {
         else this._playGround(isMoving, running);
         break;
       case "jump":                                        // takeoff one-shot
-        if (!airborne) this._enterLand();
+        if (!airborne) this._enterLand(isMoving, running);
         else if (this._animDone() && this._has("jump_idle")) {
           this._play("jump_idle", true, this._jumpSpeed()); // still airborne past takeoff → loop air pose
           this._animPhase = "airidle";
         }
         break;
       case "airidle":
-        if (!airborne) this._enterLand();
+        if (!airborne) this._enterLand(isMoving, running);
         break;
       case "land":                                        // landing one-shot
         if (airborne) this._enterJump();                  // jumped again mid-landing
-        else if (this._animDone()) {
+        else if (isMoving || this._animDone()) {            // moving cuts the landing short (see _enterLand)
           this._playGround(isMoving, running);
           this._animPhase = "ground";
         }
@@ -1205,10 +1205,14 @@ export class CharacterController {
     else                             { this._animPhase = "airidle"; }   // no jump clips: keep current
   }
 
-  private _enterLand(): void {
+  private _enterLand(isMoving: boolean, running: boolean): void {
     // Land SOUND is driven physics-side in update() (mixer-independent), not here.
-    if (this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed()); this._animPhase = "land"; }
-    else                        { this._animPhase = "ground"; }         // resolves to walk/idle next frame
+    // The landing one-shot is for STANDING landings only. Landing with a direction held
+    // used to play it to the end first — 0.37s of frozen legs while travelling 2.2m at
+    // walk speed (user report, v4.81.3). Moving = straight back to walk/run; the Phase 70
+    // squash still marks the impact.
+    if (!isMoving && this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed()); this._animPhase = "land"; }
+    else                                     { this._playGround(isMoving, running); this._animPhase = "ground"; }
   }
 
   dispose(): void {

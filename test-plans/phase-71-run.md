@@ -44,6 +44,20 @@ above pressed W and Shift TOGETHER and so never exercised walk to run.
 | 14 | Rapid Shift tapping while walking | total weight never below 1 |
 | 15 | Screenshot mid-run | a posed running stride, not the bind pose |
 
+## Second user-found regression, fixed in v4.81.3
+
+"When you jump while walking and keep walking... the walking animation briefly does not
+play after landing. Running too." The `jump_land` one-shot always played to its end
+(0.37s at this game's jump animation speed) before walk/run resumed.
+
+| # | Check | Before | After |
+|---|---|---|---|
+| 16 | Walk, tap jump, keep holding W: frames from touchdown to the walk clip | 44 (0.37s, 2.2m travelled in the landing pose) | 0 |
+| 17 | Same while running | same stall | 0 |
+| 18 | Standing jump | plays `Jump_Land`, ends in `Idle` | unchanged |
+| 19 | Standing jump, press W 10 frames after touchdown | waits for the landing clip to end | `walk` 1 frame after the key press |
+| 20 | Total active mixer weight across tap, full and standing jumps | | never below 1.0 |
+
 ## By hand
 
 1. level_3, editor preview, jump readout on. Walk the lane: 5m is the edge of
