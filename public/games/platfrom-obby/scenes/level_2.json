@@ -43,7 +43,7 @@
       "fov": 60,
       "thirdPersonDistance": 5.5,
       "thirdPersonHeight": 0.8,
-      "thirdPersonPitch": 18
+      "thirdPersonPitch": 25
     },
     "lightingFromGame": true,
     "stateSchema": {
