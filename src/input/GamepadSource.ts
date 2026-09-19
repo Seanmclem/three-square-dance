@@ -1,4 +1,5 @@
 import type { ActionState, InputSource } from "./actions";
+import { RUN_STICK_THRESHOLD } from "./actions";
 import type { BindingsConfig } from "./bindings";
 
 // Standard-mapping indices (https://w3c.github.io/gamepad/#remapping)
@@ -62,6 +63,7 @@ export class GamepadSource implements InputSource {
     if (move.x !== 0 || move.y !== 0) this._activity = true;
     state.move.x += move.x;
     state.move.y += -move.y;
+    if (Math.hypot(move.x, move.y) >= RUN_STICK_THRESHOLD) state.run = true;   // full push = run (Phase 71)
 
     // Right stick → look, rate-based (rad/s at full deflection).
     const look = this._deadzoned(pad.axes[AXIS_RX] ?? 0, pad.axes[AXIS_RY] ?? 0, b.deadzone);

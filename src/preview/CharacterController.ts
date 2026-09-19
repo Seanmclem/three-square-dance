@@ -5,6 +5,7 @@ import { enablePaddedSkinnedCulling } from "./skinnedCulling";
 import type { PlayerSettings, LocomotionState, LadderDef } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import type { ControlSchemeManager } from "@/input/ControlSchemeManager";
+import { RUN_STICK_THRESHOLD } from "@/input/actions";
 import { CharacterBody } from "./CharacterBody";
 import { resolveLadderParams } from "@/builders/LadderBuilder";
 import type { MoverSystem } from "@/world/MoverSystem";
@@ -352,11 +353,21 @@ export class CharacterController {
       else if (this._interactTargetId) this._bus.emit("character:interact", { objectId: this._interactTargetId });
     }
 
-    const speed = this._settings.moveSpeed;
     // move is unit-clamped; magnitude < 1 (analog stick/joystick) scales walk speed
     const dir   = _tmpDir.set(actions.move.x, 0, -actions.move.y);
-    const isMoving = dir.lengthSq() > 0;
-    if (isMoving) dir.multiplyScalar(speed);   // the WANTED velocity (m/s), world-space after the yaw below
+    const mag = dir.length();
+    const isMoving = mag > 0;
+    // Run (Phase 71): opt-in per game (runMultiplier > 1). Held Shift, or the move
+    // stick pushed to RUN_STICK_THRESHOLD. With run enabled the stick's 0..threshold
+    // span maps onto 0..full WALK speed (full walk is reached where run takes over);
+    // keyboard input is magnitude 1 and is unaffected. With run disabled: as always.
+    const runMult = this._settings.runMultiplier ?? 1;
+    const running = runMult > 1 && actions.run && isMoving;
+    const speed = this._settings.moveSpeed * (running ? runMult : 1);
+    if (isMoving) {
+      const k = runMult > 1 ? (running ? 1 : Math.min(1, mag / RUN_STICK_THRESHOLD)) : mag;
+      dir.multiplyScalar(speed * k / mag);   // the WANTED velocity (m/s), world-space after the yaw below
+    }
     dir.applyEuler(_tmpEuler.set(0, this._yaw, 0, "YXZ"));
     // Avatar facing uses the INPUT direction only — captured here, before gravity /
     // launch shove / mover carry join `dir`. Aiming at the full displacement made
@@ -601,7 +612,7 @@ export class CharacterController {
       this._updatePresentation(dt);   // yaw + lean + squash on the root
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
       this._mixer?.update(dt);
-      this._updateAnim(!this._body.isGrounded, isMoving);
+      this._updateAnim(!this._body.isGrounded, isMoving, running);
       if (this._flash) this._updateFlash(dt);
     }
 
@@ -921,7 +932,8 @@ export class CharacterController {
     // Lean: forward with speed, roll into the turn (from the avatar's own turn rate).
     let pitch = 0, roll = 0;
     if (!this._climbLadder && dt > 0) {
-      pitch = Math.min(1, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1)) * LEAN_FORWARD;
+      const leanMax = Math.max(1, this._settings.runMultiplier ?? 1);   // a little more lean while running
+      pitch = Math.min(leanMax, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1)) * LEAN_FORWARD;
       let dYaw = this._modelYaw - this._prevModelYaw;
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
       if (Math.abs(dYaw) > 1) dYaw = 0;   // a snap (teleport facing, ladder mount), not a turn
@@ -1106,7 +1118,7 @@ export class CharacterController {
 
   // Locomotion state machine: ground (idle/walk) → jump takeoff → air-idle loop → land → ground.
   // Each stage falls back gracefully if the model lacks that clip.
-  private _updateAnim(airborne: boolean, isMoving: boolean): void {
+  private _updateAnim(airborne: boolean, isMoving: boolean, running = false): void {
     if (!this._mixer) return;
     // Script override. LOOPING clips (ambient emotes) cancel the moment the player
     // moves — no moonwalking. One-shots and holds play through movement: they're
@@ -1121,7 +1133,7 @@ export class CharacterController {
     switch (this._animPhase) {
       case "ground":
         if (airborne) this._enterJump();
-        else this._play(isMoving ? "walk" : "idle", true);
+        else this._play(this._groundClip(isMoving, running), true);
         break;
       case "jump":                                        // takeoff one-shot
         if (!airborne) this._enterLand();
@@ -1136,7 +1148,7 @@ export class CharacterController {
       case "land":                                        // landing one-shot
         if (airborne) this._enterJump();                  // jumped again mid-landing
         else if (this._animDone()) {
-          this._play(isMoving ? "walk" : "idle", true);
+          this._play(this._groundClip(isMoving, running), true);
           this._animPhase = "ground";
         }
         break;
@@ -1144,6 +1156,11 @@ export class CharacterController {
         this._play("climb", true);                        // no-op once playing; retries if the model loaded late
         break;
     }
+  }
+
+  /** Ground locomotion intent — `run` only when the model actually has a run clip (else walk). */
+  private _groundClip(isMoving: boolean, running: boolean): string {
+    return !isMoving ? "idle" : running && this._has("run") ? "run" : "walk";
   }
 
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }

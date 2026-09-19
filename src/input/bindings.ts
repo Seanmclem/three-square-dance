@@ -10,6 +10,7 @@ export interface BindingsConfig {
     // KeyboardEvent.code lists
     move: { forward: string[]; back: string[]; left: string[]; right: string[] };
     jump:     string[];
+    run:      string[];        // held (Phase 71)
     interact: string[];
     confirm:  string[];        // dialogue advance / menu activate (menu mode only)
     cancel:   string[];        // pause-menu toggle (Esc keeps its direct-exit path in App.tsx)
@@ -40,6 +41,7 @@ export const DEFAULT_BINDINGS: BindingsConfig = {
       right:   ["KeyD", "ArrowRight"],
     },
     jump:     ["Space"],
+    run:      ["ShiftLeft", "ShiftRight"],
     interact: ["KeyE"],
     confirm:  ["KeyE", "Space", "Enter"],   // the keys DialogueOverlay historically accepted
     // Enter is BOTH confirm and cancel: in menu mode confirm wins (the manager

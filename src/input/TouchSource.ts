@@ -1,4 +1,5 @@
 import type { ActionState, InputSource } from "./actions";
+import { RUN_STICK_THRESHOLD } from "./actions";
 import type { BindingsConfig } from "./bindings";
 
 /**
@@ -51,6 +52,7 @@ export class TouchSource implements InputSource {
     const s = this.shared;
     state.move.x += s.move.x;
     state.move.y += s.move.y;
+    if (Math.hypot(s.move.x, s.move.y) >= RUN_STICK_THRESHOLD) state.run = true;   // full push = run (Phase 71)
     const sens = this._bindings.touch.lookSensitivity;
     state.look.x += s.lookPx.x * sens;
     state.look.y += s.lookPx.y * sens;

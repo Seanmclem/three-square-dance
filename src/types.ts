@@ -599,7 +599,7 @@ export interface LightDef {
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
-export type LocomotionState = "idle" | "walk" | "jump" | "jump_idle" | "jump_land" | "climb";
+export type LocomotionState = "idle" | "walk" | "run" | "jump" | "jump_idle" | "jump_land" | "climb";
 
 export interface PlayerSettings {
   cameraMode:          CameraMode;
@@ -608,6 +608,9 @@ export interface PlayerSettings {
   // Phase 70 — hold jump for height (tap = short hop, full hold = always the same peak).
   // Absent/true = on; false = every jump is the full, fixed height (obby-style).
   variableJump?:       boolean;
+  // Phase 71 — run: moveSpeed × this while run is held (Shift / move stick pushed past 85%).
+  // Absent or ≤ 1 = no run (the default — existing levels play exactly as before).
+  runMultiplier?:      number;
   fov:                 number;
   thirdPersonDistance: number;
   thirdPersonHeight:   number;

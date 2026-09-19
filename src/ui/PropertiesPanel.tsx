@@ -5431,6 +5431,7 @@ function SpawnSettingsView({
   const animSlots: { slot: LocomotionState; label: string }[] = [
     { slot: "idle",      label: "IDLE" },
     { slot: "walk",      label: "WALK" },
+    { slot: "run",       label: "RUN (falls back to WALK)" },
     { slot: "jump",      label: "JUMP (takeoff)" },
     { slot: "jump_idle", label: "JUMP IDLE (in air)" },
     { slot: "jump_land", label: "JUMP LAND" },
@@ -5516,6 +5517,8 @@ function SpawnSettingsView({
   if (screen === "spawn-movement") return (
     <div style={PAGE}>
       {numField("MOVE SPEED", "moveSpeed", 0.5)}
+      {numField("RUN SPEED ×", "runMultiplier", 0.1, 1,
+        "Running multiplies MOVE SPEED by this while the player holds Shift, or pushes the move stick (gamepad / touch) nearly all the way. 1 = no running (the default). Try 1.4. Jump HEIGHT does not change, but a running jump travels further (same air time, more speed), so gaps must be built for one or the other.")}
       {numField("JUMP HEIGHT", "jumpHeight", 0.1)}
       <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
         title="On: tap jump for a short hop, hold it for the full height (a full hold is always the same height). Off: every jump is the full height, however briefly the button is pressed.">

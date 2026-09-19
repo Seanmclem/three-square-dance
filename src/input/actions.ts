@@ -16,6 +16,8 @@ export interface ActionState {
   zoomDelta: number;
   /** Held — edge detection stays in CharacterController (_jumpArmed). */
   jump: boolean;
+  /** Held (Phase 71): Shift on keyboard; the move stick at/past RUN_STICK_THRESHOLD on gamepad + touch. */
+  run: boolean;
   /** Edge: true for exactly one frame after actuation. */
   interactPressed: boolean;
   confirmPressed:  boolean;
@@ -25,12 +27,17 @@ export interface ActionState {
   menuNav: -1 | 0 | 1;
 }
 
+/** Analog run trigger (Phase 71): fraction of full stick travel at which walking becomes running.
+ *  With run enabled, the controller maps 0..threshold onto 0..full walk speed. */
+export const RUN_STICK_THRESHOLD = 0.85;
+
 export function createActionState(): ActionState {
   return {
     move: { x: 0, y: 0 },
     look: { x: 0, y: 0 },
     zoomDelta: 0,
     jump: false,
+    run: false,
     interactPressed: false,
     confirmPressed:  false,
     cancelPressed:   false,
@@ -45,6 +52,7 @@ export function zeroActionState(s: ActionState): void {
   s.look.x = s.look.y = 0;
   s.zoomDelta = 0;
   s.jump = false;
+  s.run = false;
   s.interactPressed = s.confirmPressed = s.cancelPressed = s.bagPressed = false;
   s.menuNav = 0;
 }

@@ -15,7 +15,7 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
  *  override switch copies the page's effective values in (ON) or deletes them
  *  (OFF). The Controls page is device-local and has no fields here. */
 export const SETTINGS_PAGES = {
-  movement:  ["moveSpeed", "jumpHeight", "variableJump", "climbSpeed"],
+  movement:  ["moveSpeed", "runMultiplier", "jumpHeight", "variableJump", "climbSpeed"],
   camera:    ["cameraMode", "fov", "fpsEyeHeight", "thirdPersonDistance", "thirdPersonHeight", "thirdPersonPitch"],
   character: ["modelAssetId", "characterScale", "fpsCharacterScale", "jumpAnimSpeed", "animClips", "bagStyle"],
   sounds:    ["jumpSound", "landSound", "footstepSound", "footstepDistance", "jumpVolume", "landVolume", "footstepVolume"],

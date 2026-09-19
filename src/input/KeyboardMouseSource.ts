@@ -90,6 +90,7 @@ export class KeyboardMouseSource implements InputSource {
     if (this._anyDown(b.move.left))    state.move.x -= 1;
     if (this._anyDown(b.move.right))   state.move.x += 1;
     if (this._anyDown(b.jump))         state.jump = true;
+    if (this._anyDown(b.run))          state.run = true;
 
     state.look.x  += this._lookPx.x * b.lookSensitivity;
     state.look.y  += this._lookPx.y * b.lookSensitivity;
