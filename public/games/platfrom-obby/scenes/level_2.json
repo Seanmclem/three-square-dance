@@ -38,7 +38,13 @@
     "skybox": "sky",
     "fogColor": "#1a1f2e",
     "fogDensity": 0.012,
-    "playerSettings": {},
+    "playerSettings": {
+      "cameraMode": "thirdperson",
+      "fov": 60,
+      "thirdPersonDistance": 5.5,
+      "thirdPersonHeight": 0.8,
+      "thirdPersonPitch": 18
+    },
     "lightingFromGame": true,
     "stateSchema": {
       "health": {
