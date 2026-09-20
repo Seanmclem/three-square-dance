@@ -69,6 +69,7 @@ import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
 import { JumpReadout } from "@/ui/JumpReadout";
+import { ViewportContextMenu } from "@/ui/ViewportContextMenu";
 import { LeftPanel } from "@/ui/LeftPanel";
 import { ModelImporterModal } from "@/ui/ModelImporterModal";
 import { MaterialImporterModal } from "@/ui/MaterialImporterModal";
@@ -4083,6 +4084,8 @@ export default function App() {
 
       {isPreview && showPerfCounter && <FpsCounter getInfo={getRenderInfo} />}
       {isPreview && showJumpStats && <JumpReadout bus={busRef.current} />}
+      <ViewportContextMenu bus={busRef.current} enabled={!isPreview && isSelectMode(activeTool)}
+        hasSpawn={!!worldRef.current?.world?.defaultSpawn} />
 
       {!isGame && (
         <div style={{

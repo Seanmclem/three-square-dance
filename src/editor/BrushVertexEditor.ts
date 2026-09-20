@@ -123,9 +123,9 @@ export class BrushVertexEditor implements IEditorModule {
       this._bus.on("input:mouseup", ({ button }) => {
         if (button === 0 && this._state === "DRAG") this._commitDrag();
       }),
-      this._bus.on("input:rightclick", ({ screenPos }) => {
+      this._bus.on("input:rightclick", (e) => {
         if (!this._shouldShow() || this._state === "DRAG") return;
-        this._onDeleteCorner(screenPos);
+        if (this._onDeleteCorner(e.screenPos)) e.handled = true;   // a corner was under the cursor — not a context-menu click
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (code === "AltLeft" || code === "AltRight") { this._altDown = true; this._controls?.setTranslationSnap(null); }
@@ -372,20 +372,22 @@ export class BrushVertexEditor implements IEditorModule {
   // ── Delete corners ──────────────────────────────────────────────────────────
 
   /** Right-click a handle: remove that corner (keep at least MIN_VERTS). */
-  private _onDeleteCorner(screenPos: ScreenPos): void {
+  /** True when a corner handle was under the cursor (whether or not it could be deleted). */
+  private _onDeleteCorner(screenPos: ScreenPos): boolean {
     const idx = this._castHandles(screenPos);
-    if (idx === null) return;
+    if (idx === null) return false;
     const shape = this._selectedShape();
-    if (!shape || !this._zoneId || !this._selectedId) return;
+    if (!shape || !this._zoneId || !this._selectedId) return true;
     // Face-brushes: deleting a vertex would reindex the array and orphan face loops
     // (Phase 23 v1 restriction — use split/extrude instead).
-    if ((shape.mesh?.faces?.length ?? 0) > 0) return;
-    if (shape.mesh!.vertices.length <= MIN_VERTS) return;
+    if ((shape.mesh?.faces?.length ?? 0) > 0) return true;
+    if (shape.mesh!.vertices.length <= MIN_VERTS) return true;
     this._world.transaction("delete brush corner", () => {
       this._world.updateShape(this._zoneId!, this._selectedId!, {
         mesh: { ...shape.mesh!, vertices: shape.mesh!.vertices.filter((_, i) => i !== idx) },
       });
     });
     this._sync();
+    return true;
   }
 }

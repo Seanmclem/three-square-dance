@@ -30,6 +30,11 @@ export class SpawnPointTool {
         // placing mode after setting it, so the next click doesn't re-place.
         this._bus.emit("spawn:placed", {});
       }),
+      // Phase 76 — the viewport right-click menu's "Move initial spawn here". Unlike a Spawn-tool
+      // click (which places a fresh spawn facing 0°), a MOVE keeps the facing already authored.
+      this._bus.on("spawn:move-to", ({ position }) => {
+        this._placeMarker(position.x, position.y, position.z, true, this._world.world?.defaultSpawn?.facingDeg ?? 0, "move spawn point");
+      }),
       this._bus.on("preview:start", () => {
         if (this._marker) this._marker.visible = false;
       }),
@@ -55,7 +60,7 @@ export class SpawnPointTool {
     else this._removeMarker();
   }
 
-  private _placeMarker(x: number, y: number, z: number, persist = true, facingDeg = 0): void {
+  private _placeMarker(x: number, y: number, z: number, persist = true, facingDeg = 0, label = "place spawn point"): void {
     this._removeMarker();
 
     // Parent group at the spawn foot; rotation.y is the facing yaw (0° = looking toward -Z,
@@ -103,7 +108,7 @@ export class SpawnPointTool {
     this._marker = group;
 
     if (persist) {
-      this._world.transaction("place spawn point", () => {
+      this._world.transaction(label, () => {
         this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg });
       });
     }

@@ -341,7 +341,9 @@ export interface BusEvents {
   "selection:toggle-ref":  { ref: SelectedRef };
   "input:dblclick":        { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
   // Stationary right-click (RMB press+release under the drag threshold — orbit drags never fire this).
-  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null };
+  // `handled` (Phase 76): set by a listener that ACTED on this right-click (wall split, brush-corner
+  // delete) so the viewport context menu stays closed. Listeners run synchronously inside emit().
+  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; handled?: boolean };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
@@ -437,6 +439,7 @@ export interface BusEvents {
   "world:lighting":        { ambient: { color: string; intensity: number }; sun: { color: string; intensity: number }; envIntensity?: number; quality?: "fancy" | "fast" };
   "spawn:mode":            { mode: "initial" | "checkpoint" };
   "spawn:placed":          Record<string, never>;
+  "spawn:move-to":         { position: Vec3 };   // Phase 76 — relocate the initial spawn, KEEPING its facing (one undo step)
   "group:added":           { group: GroupDef };
   "group:removed":         { id: string };
   "group:updated":         { id: string; name: string };
