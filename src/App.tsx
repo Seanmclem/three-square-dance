@@ -111,6 +111,7 @@ import { desktop, detectDesktop, isDesktop, isDesktopDev } from "@/shared/deskto
 import { startPerfReporter } from "@/dev/perfReporter";
 import { NewProjectModal } from "@/ui/NewProjectModal";
 import { OpenProjectModal } from "@/ui/OpenProjectModal";
+import { PublishModal } from "@/ui/PublishModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 
 const DEMO_ZONE_ID = "demo";
@@ -306,6 +307,7 @@ export default function App() {
   const projectRef = useRef<ProjectCtx | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [openProjectOpen, setOpenProjectOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
   const [triggerVolumes,  setTriggerVolumes]   = useState<TriggerVolume[]>([]);
   const [checkpoints,     setCheckpoints]      = useState<CheckpointDef[]>([]);
   const [zoneLights,      setZoneLights]       = useState<LightDef[]>([]);
@@ -3850,6 +3852,7 @@ export default function App() {
         onProjectClose={() => void handleProjectClose()}
         onProjectPlay={() => void handleProjectPlay()}
         onProjectExport={isDesktop() ? () => void handleProjectExport() : undefined}
+        onProjectPublish={isDesktop() ? () => setPublishOpen(true) : undefined}
         onSceneSwitch={id => void handleProjectSceneSwitch(id)}
         onSceneAdd={() => void handleProjectSceneAdd()}
         onSceneDelete={id => void handleProjectSceneDelete(id)}
@@ -4054,6 +4057,15 @@ export default function App() {
         <OpenProjectModal
           onCancel={() => setOpenProjectOpen(false)}
           onConfirm={id => void handleProjectOpenPick(id)}
+        />
+      )}
+
+      {publishOpen && projectRef.current && (
+        <PublishModal
+          projectId={projectRef.current.store.id}
+          projectName={projectRef.current.store.name}
+          onBeforePublish={handleSave}   // the export reads the game from disk — must see the latest
+          onClose={() => setPublishOpen(false)}
         />
       )}
 

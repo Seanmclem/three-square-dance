@@ -22,6 +22,7 @@ interface TopBarProps {
   onProjectClose?:     () => void;
   onProjectPlay?:      () => void;
   onProjectExport?:    () => void;
+  onProjectPublish?:   () => void;
   onSceneSwitch?:      (id: string) => void;
   onSceneAdd?:         () => void;
   onSceneDelete?:      (id: string) => void;
@@ -72,6 +73,7 @@ function Ic({ name, size = 14 }: { name: string; size?: number }) {
     case "star":   return <svg {...p}><path d="M8 2.5l1.7 3.6 3.9.5-2.8 2.7.7 3.9L8 11.3l-3.5 1.9.7-3.9L2.4 6.6l3.9-.5z" fill="currentColor" stroke="none" /></svg>;
     case "chev":   return <svg {...p}><path d="M4.5 6.5 8 10l3.5-3.5" /></svg>;
     case "export": return <svg {...p}><path d="M8 10V3M5 6l3-3 3 3" /><path d="M3 10v3h10v-3" /></svg>;
+    case "globe":  return <svg {...p}><circle cx="8" cy="8" r="5.5" /><path d="M2.5 8h11M8 2.5c2 2 2 9 0 11M8 2.5c-2 2-2 9 0 11" /></svg>;
     case "x":      return <svg {...p}><path d="M4 4l8 8M12 4l-8 8" /></svg>;
     case "close":  return <svg {...p}><path d="M3 3h10v10H3z" /><path d="M6 6l4 4M10 6l-4 4" /></svg>;
     default:       return null;
@@ -130,7 +132,7 @@ function Popover({ open, onClose, align = "left", children }: { open: boolean; o
 const SEP = <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />;
 
 export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
-  project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport,
+  project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport, onProjectPublish,
   onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const savedLabel = useSavedLabel(lastAutosaveAt);
@@ -214,6 +216,12 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
               <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectExport(); }}
                 onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
                 <Ic name="export" size={12} /> Export game…
+              </button>
+            )}
+            {project && onProjectPublish && (
+              <button style={popBtn} onClick={() => { setProjMenuOpen(false); onProjectPublish(); }}
+                onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
+                <Ic name="globe" size={12} /> Publish…
               </button>
             )}
             {project && onProjectClose && (
@@ -368,6 +376,12 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
             <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectExport(); }}
               onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
               <Ic name="export" size={12} /> Export game…
+            </button>
+          )}
+          {project && onProjectPublish && (
+            <button style={popBtn} onClick={() => { setMoreMenuOpen(false); onProjectPublish(); }}
+              onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
+              <Ic name="globe" size={12} /> Publish…
             </button>
           )}
           {(project || onNew) && <div style={popHr} />}

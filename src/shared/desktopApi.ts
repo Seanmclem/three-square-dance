@@ -23,11 +23,26 @@ export interface AutosavePayload {
   json: string;
 }
 
+// Publish to Netlify (phase 75) — mirrors desktop/netlify.ts + deploy.ts.
+export interface NetlifyUser { name: string; email: string }
+export interface NetlifyAccount { slug: string; name: string }
+export interface NetlifySite { id: string; name: string; url: string; accountSlug: string; updatedAt: string }
+export interface PublishLink { provider: "netlify"; siteId: string; siteName: string; url: string }
+export interface LastPublish { at: string; siteId: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
+export interface PublishStatus {
+  phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "done" | "error";
+  done: number; total: number; bytesDone: number; bytesTotal: number;
+  url?: string; deployUrl?: string; fileCount?: number; uploadedCount?: number; uploadedBytes?: number;
+  missing?: string[];
+  error?: string;
+}
+
 export interface DesktopApi {
   // shell
   getAppInfo(): Promise<{ version: string; platform: string; contentDir: string; stateDir: string; serveOrigin: string; dev: boolean }>;
   openRuntimeWindow(opts: { manifestUrl: string; title?: string }): Promise<{ url: string }>;
   revealPath(path: string): Promise<void>;
+  openExternal(url: string): Promise<void>;   // https only — window.open is a no-op in the webview
   getPref(key: string): Promise<string | null>;
   setPref(key: string, value: string | null): Promise<void>;
 
@@ -51,6 +66,17 @@ export interface DesktopApi {
 
   // self-contained game export: runtime shell + project JSON + referenced assets
   exportGameBundle(opts: { projectId: string; format?: "folder" }): Promise<{ outputPath: string; fileCount: number; totalBytes: number; missing: string[] }>;
+
+  // publish to Netlify. The API key only ever travels INTO the backend.
+  netlifyStatus(): Promise<{ connected: boolean; user?: NetlifyUser; error?: string }>;
+  netlifySetKey(key: string): Promise<{ user: NetlifyUser }>;
+  netlifyClearKey(): Promise<void>;
+  netlifyListSites(): Promise<{ sites: NetlifySite[]; accounts: NetlifyAccount[] }>;
+  netlifyCreateSite(opts: { name: string; accountSlug?: string }): Promise<NetlifySite>;
+  getPublishLink(projectId: string): Promise<{ link: PublishLink | null; lastPublish: LastPublish | null }>;
+  setPublishLink(projectId: string, link: PublishLink | null): Promise<void>;
+  startPublish(projectId: string): Promise<{ jobId: string }>;
+  getPublishStatus(jobId: string): Promise<PublishStatus>;
 
   // asset library (binary file uploads use uploadAssetFile below — the JSON
   // api can't carry bytes)

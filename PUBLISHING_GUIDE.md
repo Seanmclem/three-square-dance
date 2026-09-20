@@ -21,7 +21,10 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 > assets the game references* (pruned manifests included) — into the
 > workspace `exports/` folder. Drop that folder on any host in §4 and it
 > plays; `assetsBase` is already `"./"`, so no asset hosting decisions and
-> no CORS in the common case. The manual steps below remain valid as the
+> no CORS in the common case. **For Netlify you can skip the folder entirely:
+> PROJ ▾ → Publish… (Phase 75) uploads the bundle for you**: paste a Netlify
+> personal access token once, pick or create a site once, and every later
+> Publish goes to that same site, uploading only the files that changed. The manual steps below remain valid as the
 > by-hand appendix and for understanding what the editor generates.
 
 The dev server already serves everything the runtime needs. The whole loop is:
@@ -257,6 +260,11 @@ GitHub Pages already serves `Access-Control-Allow-Origin: *` on everything.
 Nothing else to do. This is the easiest host for a first publish.
 
 ### Netlify — add a `_headers` file
+
+> Publishing a whole game from the desktop app? Use **PROJ ▾ → Publish…**
+> instead of this recipe: the exported bundle is self-contained, so it needs
+> no `_headers` file. The steps below are for hosting scenes or assets on a
+> DIFFERENT origin than the runtime shell.
 
 Netlify sends no CORS headers by default. Add a file named `_headers` at the
 deploy root:

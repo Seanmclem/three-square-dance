@@ -135,3 +135,30 @@ export async function setPref(ws: Workspace, key: string, value: string | null):
   else s.prefs[key] = value;
   await writeSettings(ws, s);
 }
+
+// ── secrets.json (API keys) ─────────────────────────────────────────────────
+// Kept apart from settings.json: that file is rewritten on every scene switch
+// and is fair game to paste into a bug report; this one holds credentials,
+// lives only in stateDir (never under contentDir, which is committed), and is
+// readable by the owner alone.
+
+async function readSecrets(ws: Workspace): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await Deno.readTextFile(`${ws.stateDir}/secrets.json`)) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+export async function readSecret(ws: Workspace, key: string): Promise<string | null> {
+  return (await readSecrets(ws))[key] ?? null;
+}
+
+export async function writeSecret(ws: Workspace, key: string, value: string | null): Promise<void> {
+  const s = await readSecrets(ws);
+  if (value === null) delete s[key];
+  else s[key] = value;
+  const path = `${ws.stateDir}/secrets.json`;
+  await atomicWriteText(path, JSON.stringify(s, null, 2));
+  if (Deno.build.os !== "windows") await Deno.chmod(path, 0o600);
+}

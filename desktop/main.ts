@@ -30,6 +30,7 @@ const bootPage = Deno.env.get("WORLDBUILDER_BOOT");
 import * as P from "./projects.ts";
 import * as A from "./assets.ts";
 import { exportGameBundle } from "./export.ts";
+import * as D from "./deploy.ts";
 import { getLastSession, getPref, setLastSession, setPref } from "./workspace.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -37,6 +38,7 @@ const apiMethods: Record<string, (...args: any[]) => unknown> = {
   getAppInfo: () => appInfo(),
   openRuntimeWindow: (opts: { manifestUrl: string; title?: string }) => openRuntimeWindow(opts),
   revealPath: (path: string) => revealPath(path),
+  openExternal: (url: string) => openExternal(url),
   getPref: (key: string) => getPref(ws, key),
   setPref: (key: string, value: string | null) => setPref(ws, key, value),
   listProjects: () => P.listProjects(ws),
@@ -52,6 +54,16 @@ const apiMethods: Record<string, (...args: any[]) => unknown> = {
   clearAutosave: () => P.clearAutosave(ws),
   writeExportFile: (name: string, text: string) => P.writeExportFile(ws, name, text),
   exportGameBundle: (opts: { projectId: string; format?: "folder" }) => exportGameBundle(ws, distDir, opts),
+  // Publish to Netlify (phase 75). The API key goes in via netlifySetKey and is never returned.
+  netlifyStatus: () => D.netlifyStatus(ws),
+  netlifySetKey: (key: string) => D.netlifySetKey(ws, key),
+  netlifyClearKey: () => D.netlifyClearKey(ws),
+  netlifyListSites: () => D.netlifyListSites(ws),
+  netlifyCreateSite: (opts: { name: string; accountSlug?: string }) => D.netlifyCreateSite(ws, opts),
+  getPublishLink: (projectId: string) => D.getPublishLink(ws, projectId),
+  setPublishLink: (projectId: string, link: P.PublishLink | null) => D.setPublishLink(ws, projectId, link),
+  startPublish: (projectId: string) => D.startPublish(ws, distDir, projectId),
+  getPublishStatus: (jobId: string) => D.getPublishStatus(jobId),
   writeAssetManifest: (kind: string, json: string) => A.writeAssetManifest(ws, kind, json),
   deleteAssetFiles: (kind: string, rels: string[]) => A.deleteAssetFiles(ws, kind, rels),
 };
@@ -175,6 +187,18 @@ async function revealPath(path: string): Promise<void> {
     : Deno.build.os === "windows"
     ? new Deno.Command("explorer", { args: [`/select,${path}`] })
     : new Deno.Command("xdg-open", { args: [path.slice(0, path.lastIndexOf("/"))] });
+  await cmd.output();
+}
+
+/** Open a web page in the user's real browser (window.open is a no-op in the webview). https only. */
+async function openExternal(url: string): Promise<void> {
+  if (new URL(url).protocol !== "https:") throw new Error("only https links can be opened");
+  const cmd = Deno.build.os === "darwin"
+    ? new Deno.Command("open", { args: [url] })
+    : Deno.build.os === "windows"
+    // not `cmd /c start`: cmd would re-parse & in the URL
+    ? new Deno.Command("rundll32", { args: ["url.dll,FileProtocolHandler", url] })
+    : new Deno.Command("xdg-open", { args: [url] });
   await cmd.output();
 }
 

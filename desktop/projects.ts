@@ -130,3 +130,35 @@ export async function writeExportFile(ws: Workspace, name: string, text: string)
   return { path };
 }
 
+
+// ── publish link (which hosted site a game publishes to) ────────────────────
+// games/<id>/publish.json — committed with the game so the link survives a
+// fresh clone. Holds NO credentials, and exportGameBundle never copies it, so
+// it is not served to players. Written only when the link changes (the
+// per-publish record lives in stateDir) so publishing never dirties the game.
+
+export interface PublishLink {
+  provider: "netlify";
+  siteId: string;
+  siteName: string;
+  url: string;
+}
+
+export async function readPublishLink(ws: Workspace, projectId: string): Promise<PublishLink | null> {
+  assertSafeId(projectId);
+  try {
+    const link = JSON.parse(await Deno.readTextFile(`${gamesDir(ws)}/${projectId}/publish.json`)) as PublishLink;
+    return link?.provider === "netlify" && link.siteId ? link : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writePublishLink(ws: Workspace, projectId: string, link: PublishLink | null): Promise<void> {
+  assertSafeId(projectId);
+  const path = `${gamesDir(ws)}/${projectId}/publish.json`;
+  if (link === null) { await trashFile(ws, path).catch(() => {}); return; }
+  await Deno.stat(`${gamesDir(ws)}/${projectId}/manifest.json`);   // refuse to create a stray game folder
+  const { provider, siteId, siteName, url } = link;                // whitelist: nothing else lands in a committed file
+  await atomicWriteText(path, JSON.stringify({ provider, siteId, siteName, url }, null, 2));
+}
