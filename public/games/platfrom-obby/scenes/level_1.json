@@ -15033,7 +15033,20 @@
                 {
                   "type": "set_footstep",
                   "sound": "footstep_concrete_000"
-                },
+                }
+              ],
+              "oneShot": false
+            },
+            {
+              "id": "scr_76f00e01",
+              "label": "On Exit",
+              "zoneId": "demo",
+              "enabled": true,
+              "trigger": {
+                "type": "on_player_exit"
+              },
+              "conditions": [],
+              "actions": [
                 {
                   "type": "set_footstep"
                 }
