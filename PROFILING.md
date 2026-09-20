@@ -33,6 +33,10 @@ on battery at 18 to 19% with Low Power Mode on, the shell was capped at exactly
   applies the cap (macOS Low Power Mode, or Chromium's battery saver at about 20%
   charge inside the CEF runtime) was not pinned down; an exact 30 rather than 60
   points at Chromium.
+- **Follow-up datapoint (2026-09-20):** with Low Power Mode STILL ON but the battery back at 80%,
+  the shell ran at 120 FPS (idle and in preview). So Low Power Mode alone does not cap it; the
+  cap tracked LOW CHARGE (it began near 20%), which points at Chromium's battery saver inside
+  the CEF runtime. Plugging in is what lifts it.
 - Also check `ps -Ao pid,pcpu,comm -r | head`: a runaway system process (that day,
   the System Settings Storage pane at 80% of a core) drains the battery faster.
 
