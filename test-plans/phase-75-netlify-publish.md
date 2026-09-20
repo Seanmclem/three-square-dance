@@ -72,6 +72,13 @@ was left alone: no second shell, no restart of the user's window.)
 
 ## Manual (user): the part that needs a real Netlify key
 
+**Confirmed by the user 2026-09-20 ("it worked perfectly"):** real key, site
+`platfrom-obby` (https://platfrom-obby.netlify.app), publish went live; the
+record shows 13 of 107 files uploaded. On disk afterwards: `publish.json` holds
+only provider / siteId / siteName / url, `secrets.json` is `-rw-------` and
+gitignored. The republish-after-edit and Change site… steps below were not
+reported on.
+
 - [ ] Restart the dev shell, open a project, PROJ ▾ → Publish….
 - [ ] Paste a Netlify personal access token (Netlify → User settings →
       Applications → Personal access tokens). Expect "Connected as <you>".
