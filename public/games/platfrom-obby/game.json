@@ -648,7 +648,7 @@
       "id": "pfb_ac09927f",
       "name": "Crab 1",
       "kind": "snapshot",
-      "version": 2,
+      "version": 3,
       "variables": [],
       "template": [
         {
@@ -658,9 +658,9 @@
             "id": "obj_e043c8bb",
             "assetId": "crab",
             "position": {
-              "x": 0.0020031679475565056,
+              "x": 0,
               "y": 0,
-              "z": -0.010803113131743203
+              "z": 0
             },
             "rotation": {
               "x": 0,
@@ -673,7 +673,7 @@
               "z": 0.5
             },
             "floor": 0,
-            "zoneId": "__prefab_edit__",
+            "zoneId": "demo",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
@@ -683,7 +683,7 @@
             "autoPlayAnimation": "Idle",
             "scripts": [
               {
-                "id": "scr_crabbite61",
+                "id": "script_d9a06f09",
                 "label": "Bite juice (Phase 61 example)",
                 "zoneId": "demo",
                 "enabled": true,
@@ -768,23 +768,23 @@
             "id": "vol_50dfd99c",
             "label": "Trigger Volume",
             "position": {
-              "x": -0.002003167947563611,
-              "y": 0.7529610540915925,
-              "z": 0.010803113131728992
+              "x": -0.004006,
+              "y": 0.752961,
+              "z": 0.021606
             },
             "size": {
               "x": 1.5,
               "y": 1,
               "z": 1.1
             },
-            "zoneId": "__prefab_edit__",
+            "zoneId": "demo",
             "editorTint": {
               "color": "#ff0000",
               "opacity": 0.12
             },
             "scripts": [
               {
-                "id": "scr_b3711c22",
+                "id": "script_5597d375",
                 "label": "crab stomp",
                 "zoneId": "demo",
                 "enabled": true,
@@ -1328,9 +1328,9 @@
     "fov": 60,
     "thirdPersonDistance": 5.5,
     "thirdPersonHeight": 0.8,
+    "thirdPersonPitch": 25,
     "jumpAnimSpeed": 1.2,
     "characterScale": 0.9,
-    "thirdPersonPitch": 25,
     "modelAssetId": "character",
     "footstepDistance": 2,
     "footstepSound": "footstep_carpet_000",
@@ -1341,7 +1341,8 @@
     "footstepVolume": 0.1,
     "jumpVolume": 0.1,
     "landSound": "footstep_grass_001",
-    "landVolume": 0.1
+    "landVolume": 0.1,
+    "runMultiplier": 1.4
   },
   "lighting": {
     "ambientLight": {

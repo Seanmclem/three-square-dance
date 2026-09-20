@@ -8,9 +8,9 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": 0,
+        "x": -10.850856197241214,
         "y": 10,
-        "z": -8
+        "z": -4.770204688483393
       },
       "radius": 24.25109155321527,
       "phi": 0.940000000000002,
@@ -38,9 +38,7 @@
     "skybox": "sky",
     "fogColor": "#1a1f2e",
     "fogDensity": 0.012,
-    "playerSettings": {
-      "runMultiplier": 1.4
-    },
+    "playerSettings": {},
     "lightingFromGame": true,
     "stateSchema": {
       "health": {
@@ -862,7 +860,7 @@
             "width": 3,
             "depth": 4
           },
-          "thickness": 1.0,
+          "thickness": 1,
           "material": "wood_planks_01",
           "hasRailing": false,
           "railingHeight": 1,
@@ -898,7 +896,7 @@
             "width": 3,
             "depth": 4
           },
-          "thickness": 2.0,
+          "thickness": 2,
           "material": "wood_planks_01",
           "hasRailing": false,
           "railingHeight": 1,
@@ -963,7 +961,7 @@
           "label": "marker post",
           "position": {
             "x": 11.4,
-            "y": 13.0,
+            "y": 13,
             "z": 1.75
           },
           "size": {
@@ -981,7 +979,7 @@
           "label": "marker post",
           "position": {
             "x": 11.4,
-            "y": 13.0,
+            "y": 13,
             "z": 1.25
           },
           "size": {
@@ -999,7 +997,7 @@
           "label": "marker post",
           "position": {
             "x": 11.4,
-            "y": 13.0,
+            "y": 13,
             "z": 0.75
           },
           "size": {
@@ -1035,7 +1033,7 @@
           "label": "marker post",
           "position": {
             "x": 14.4,
-            "y": 15.0,
+            "y": 15,
             "z": 1.75
           },
           "size": {
@@ -1053,7 +1051,7 @@
           "label": "marker post",
           "position": {
             "x": 14.4,
-            "y": 15.0,
+            "y": 15,
             "z": 1.25
           },
           "size": {
@@ -1071,7 +1069,7 @@
           "label": "marker post",
           "position": {
             "x": 14.4,
-            "y": 15.0,
+            "y": 15,
             "z": 0.75
           },
           "size": {
@@ -1089,7 +1087,7 @@
           "label": "marker post",
           "position": {
             "x": 14.4,
-            "y": 15.0,
+            "y": 15,
             "z": 0.25
           },
           "size": {
@@ -1152,7 +1150,7 @@
           "autoPlayAnimation": "Idle",
           "scripts": [
             {
-              "id": "script_70c4ab00",
+              "id": "script_22542d50",
               "label": "Bite juice (Phase 61 example)",
               "zoneId": "demo",
               "enabled": true,
@@ -1253,7 +1251,7 @@
         {
           "id": "pfi_70c4ab01",
           "prefabId": "pfb_ac09927f",
-          "version": 2,
+          "version": 3,
           "variables": {},
           "origin": {
             "position": {
@@ -1365,9 +1363,9 @@
           "id": "vol_70c4ab01",
           "label": "Trigger Volume",
           "position": {
-            "x": -10.00400633589512,
-            "y": 10.752961054091593,
-            "z": 0.021606226263472195
+            "x": -10.004006,
+            "y": 10.752960999999999,
+            "z": 0.021606
           },
           "size": {
             "x": 1.5,
@@ -1381,7 +1379,7 @@
           },
           "scripts": [
             {
-              "id": "script_70c4ab01",
+              "id": "script_9cc86226",
               "label": "crab stomp",
               "zoneId": "demo",
               "enabled": true,
@@ -1434,7 +1432,7 @@
           "id": "cp_e2711a33",
           "label": "Checkpoint_0",
           "position": {
-            "x": 0,
+            "x": -1.3178127106365567,
             "y": 10,
             "z": 2
           },
