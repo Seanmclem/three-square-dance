@@ -15022,7 +15022,8 @@
             {
               "type": "respawn_player",
               "positionKey": "checkpoint",
-              "delay": 1.9
+              "delay": 1.9,
+              "restoreHealth": true
             },
             {
               "type": "play_animation",
