@@ -22,6 +22,19 @@ Served the bundle with a plain `python3 -m http.server`, loaded in Chrome:
 - Pressed Start: **in-game** (HUD showing zone name + controls), 56 resources
   loaded, zero failed asset requests (only `favicon.ico` 404s — cosmetic).
 
+## Automated (v4.83.2, executed 2026-09-20): no editor code in the bundle
+
+Scripted `exportGameBundle` of platfrom-obby, then served with
+`python3 -m http.server` and played in Chrome:
+- Bundle `assets/*.js` is exactly `runtime`, `WorldLoader`, `GLTFLoader`,
+  `OBJLoader`, `MTLLoader`, `RGBELoader`. **No `main-*.js` (the editor) and no
+  `testHelpers-*.js`**, both of which the old copy-everything loop shipped
+  (supersedes "all 7 Vite chunks" above).
+- Title screen, Start, in-game all work; zero failed chunk requests (404s are
+  only `favicon.ico` and the `/api/getAppInfo` desktop probe).
+- Re-check after adding editor utilities: `ls <bundle>/assets/*.js` must not
+  list `main-*`, and the editor utility's strings must not grep in any of them.
+
 ## Checks
 
 `deno check` (main/export/deploy) clean; `tsc --noEmit` clean;

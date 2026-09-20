@@ -7,7 +7,7 @@
 //   runtime.html               copied from dist ("/assets/" script refs → "./assets/")
 //   manifest.json              game manifest, assetsBase rewritten to "./"
 //   game.json + scenes/*.json  the project's JSON, paths preserved
-//   assets/*.js                Vite's hashed chunks (depth-1 dist/assets files only)
+//   assets/*.js                Vite's hashed chunks reachable from runtime.html (never the editor's)
 //   assets/<kind>/manifest.json  pruned to the referenced entries
 //   assets/<kind>/<rel>          referenced files, workspace-first with dist fallback
 
@@ -21,6 +21,11 @@ import {
 import type { GameConfig, SceneFile } from "../src/types.ts";
 
 const ASSET_KINDS: AssetKind[] = ["models", "textures", "audio", "skyboxes", "graphics", "decals"];
+
+// The runtime chunk lazy-imports @/dev/testHelpers (which pulls editor code) behind
+// isDesktopDev() — false on any static host, so exports never fetch it. Skipped, and
+// not crawled through, so nothing only IT reaches ships either.
+const DEV_ONLY_CHUNK = /^testHelpers-/;
 
 interface ProjectManifest {
   manifestVersion: number;
@@ -137,11 +142,27 @@ export async function exportGameBundle(
 
   // Vite's hashed js/css chunks: depth-1 files of dist/assets only — the
   // SUBDIRS there are the full copied asset library, which this export prunes.
+  // Ship only the chunks reachable from runtime.html: the editor's entry chunk
+  // (main-*) sits in the same folder and must never ride along. Hashed names are
+  // unique, so "this chunk's text mentions that file name" is the import edge
+  // (covers static imports, dynamic imports, and css/preload dep lists alike).
+  const chunkNames: string[] = [];
   for await (const e of Deno.readDir(`${distDir}/assets`)) {
-    if (!e.isFile) continue;
-    const stat = await Deno.stat(`${distDir}/assets/${e.name}`);
+    if (e.isFile) chunkNames.push(e.name);
+  }
+  const reachable = new Set<string>();
+  const visit = async (text: string): Promise<void> => {
+    for (const name of chunkNames) {
+      if (reachable.has(name) || DEV_ONLY_CHUNK.test(name) || !text.includes(name)) continue;
+      reachable.add(name);
+      if (/\.(js|css)$/.test(name)) await visit(await Deno.readTextFile(`${distDir}/assets/${name}`));
+    }
+  };
+  await visit(runtimeHtml);
+  for (const name of reachable) {
+    const stat = await Deno.stat(`${distDir}/assets/${name}`);
     await Deno.mkdir(`${outDir}/assets`, { recursive: true });
-    await Deno.copyFile(`${distDir}/assets/${e.name}`, `${outDir}/assets/${e.name}`);
+    await Deno.copyFile(`${distDir}/assets/${name}`, `${outDir}/assets/${name}`);
     fileCount++;
     totalBytes += stat.size;
   }
