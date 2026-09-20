@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
+import type { AssetKind } from "@/export/assetRefs";
 import type { MaterialDef, MaterialManifest, MaterialOverrides, QualityScale, AssetDef, AssetManifest, DecalTexDef, DecalManifest, SoundDef, SoundManifest, SkyboxDef, SkyboxManifest, GraphicDef, GraphicsManifest } from "@/types";
 
 export type { MaterialDef };
@@ -29,6 +30,19 @@ export class AssetManager {
   private _fallbackMat: THREE.MeshStandardMaterial | null = null;
   private _quality: QualityScale = 'high';
   private _baseUrl: string | null = null;
+  /** Loads still in flight, by cache key. The caches below only hold FINISHED
+   *  results, so without this two concurrent calls for one asset (a level build
+   *  starting while the runtime preloader is mid-download) would each fetch +
+   *  decode it. Callers for the same key share one promise instead. */
+  private readonly _inflight = new Map<string, Promise<unknown>>();
+
+  private _once<T>(key: string, load: () => Promise<T>): Promise<T> {
+    const pending = this._inflight.get(key) as Promise<T> | undefined;
+    if (pending) return pending;
+    const p = load().finally(() => this._inflight.delete(key));
+    this._inflight.set(key, p);
+    return p;
+  }
 
   /** Call once after renderer is created so anisotropy uses hardware max. */
   init(renderer: THREE.WebGLRenderer): void {
@@ -236,9 +250,12 @@ export class AssetManager {
     const def = this._soundRegistry[id];
     if (!def) throw new Error(`AssetManager: unknown sound "${id}"`);
     if (!this._audioLoader) this._audioLoader = new THREE.AudioLoader();
-    const buffer = await this._audioLoader.loadAsync(this._resolve(def.path));
-    this._audioBufferCache.set(id, buffer);
-    return buffer;
+    const loader = this._audioLoader;
+    return this._once(`sound:${id}`, async () => {
+      const buffer = await loader.loadAsync(this._resolve(def.path));
+      this._audioBufferCache.set(id, buffer);
+      return buffer;
+    });
   }
 
   // ─── 2D graphics (Phase 48) — mirrors initDecals ─────────────────────────────
@@ -343,6 +360,10 @@ export class AssetManager {
     if (cached) return cached;
     const def = this._skyboxRegistry[id];
     if (!def) throw new Error(`AssetManager: unknown skybox "${id}"`);
+    return this._once(`skybox:${id}`, () => this._loadSkyboxUncached(id, def));
+  }
+
+  private async _loadSkyboxUncached(id: string, def: SkyboxDef): Promise<THREE.Texture> {
     let tex: THREE.Texture;
     if (def.format === 'hdr') {
       if (!this._rgbeLoader) {
@@ -410,6 +431,10 @@ export class AssetManager {
     const key = `${url}:${colorSpace}`;
     const cached = this._textureCache.get(key);
     if (cached) return cached;
+    return this._once(`tex:${key}`, () => this._loadTextureUncached(key, url, colorSpace));
+  }
+
+  private async _loadTextureUncached(key: string, url: string, colorSpace: THREE.ColorSpace): Promise<THREE.Texture> {
     const tex = await this._textureLoader.loadAsync(this._resolve(url));
     tex.wrapS      = THREE.RepeatWrapping;
     tex.wrapT      = THREE.RepeatWrapping;
@@ -436,14 +461,16 @@ export class AssetManager {
     const def = this._materialRegistry[materialId];
     if (!def) return this._fallbackMaterial();   // missing-file or unknown id
 
-    try {
-      const mat = await this._buildMaterial(def, undefined);
-      this._materialCache.set(cacheKey, mat);
-      return mat;
-    } catch (err) {
-      console.warn(`AssetManager: failed to build material "${materialId}"`, err);
-      return this._fallbackMaterial();
-    }
+    return this._once(`mat:${cacheKey}`, async () => {
+      try {
+        const mat = await this._buildMaterial(def, undefined);
+        this._materialCache.set(cacheKey, mat);
+        return mat;
+      } catch (err) {
+        console.warn(`AssetManager: failed to build material "${materialId}"`, err);
+        return this._fallbackMaterial();
+      }
+    });
   }
 
   /** Build an uncached material applying per-instance overrides. */
@@ -552,7 +579,11 @@ export class AssetManager {
   private async _loadOBJ(assetId: string, path: string, mtlPath?: string): Promise<THREE.Object3D> {
     const cached = this._gltfCache.get(`obj:${assetId}`);
     if (cached) return (cached as THREE.Object3D).clone();
+    const source = await this._once(`obj:${assetId}`, () => this._loadOBJUncached(assetId, path, mtlPath));
+    return source.clone();
+  }
 
+  private async _loadOBJUncached(assetId: string, path: string, mtlPath?: string): Promise<THREE.Object3D> {
     const { OBJLoader } = await import("three/addons/loaders/OBJLoader.js");
     const loader = new OBJLoader();
 
@@ -587,7 +618,7 @@ export class AssetManager {
       child.material = Array.isArray(child.material) ? converted : converted[0]!;
     });
     this._gltfCache.set(`obj:${assetId}`, obj);
-    return obj.clone();
+    return obj;
   }
 
   async loadGLTF(assetId: string): Promise<unknown> {
@@ -601,9 +632,48 @@ export class AssetManager {
     const def  = this._assetRegistry[assetId];
     const url  = def?.path ?? `/assets/models/${assetId}.glb`;
     const v    = this._modelVersion.get(assetId);
-    const gltf = await loader.loadAsync(this._resolve(v ? `${url}?v=${v}` : url));
-    this._gltfCache.set(assetId, gltf);
-    return gltf;
+    const full = this._resolve(v ? `${url}?v=${v}` : url);
+    // Keyed on the versioned URL: a load begun before evictModel() must not be
+    // handed to callers asking for the rewritten file.
+    return this._once(`gltf:${full}`, async () => {
+      const gltf = await loader.loadAsync(full);
+      if ((this._modelVersion.get(assetId) ?? 0) === (v ?? 0)) this._gltfCache.set(assetId, gltf);
+      return gltf;
+    });
+  }
+
+  /** Warm the model cache without handing out a clone (runtime preloader). */
+  async preloadModel(assetId: string): Promise<void> {
+    const def  = this._assetRegistry[assetId];
+    const path = def?.path ?? `/assets/models/${assetId}.glb`;
+    if (/\.obj$/i.test(path)) {
+      if (!this._gltfCache.has(`obj:${assetId}`)) await this._once(`obj:${assetId}`, () => this._loadOBJUncached(assetId, path, def?.mtlPath));
+    } else {
+      await this.loadGLTF(assetId);
+    }
+  }
+
+  /**
+   * Resolved URLs of the files an asset id loads at the CURRENT quality (enabled
+   * map slots only) — the runtime preloader's download-only tier, which warms the
+   * browser's HTTP cache without decoding anything. Unknown ids yield [] (the
+   * real load reports them; a speculative 404 would only be console noise).
+   */
+  fileUrls(kind: AssetKind, id: string): string[] {
+    const paths: Array<string | undefined> = [];
+    switch (kind) {
+      case "models":   { const d = this._assetRegistry[id];  paths.push(d?.path, d?.mtlPath); break; }
+      case "audio":    paths.push(this._soundRegistry[id]?.path); break;
+      case "skyboxes": paths.push(this._skyboxRegistry[id]?.path); break;
+      case "graphics": paths.push(this._graphicsRegistry[id]?.path); break;
+      case "decals":   { const d = this._decalRegistry[id];  paths.push(d?.path, d?.maps?.normal, d?.maps?.roughness); break; }
+      case "textures": {
+        const d = this._materialRegistry[id];
+        for (const m of Object.values(d?.maps ?? {})) if (m.enabled) paths.push(this._resolveQualityPath(m.path));
+        break;
+      }
+    }
+    return paths.filter((p): p is string => !!p).map(p => this._resolve(p));
   }
 
   /** Bust the cached Three.js material so next getMaterial() reloads. */

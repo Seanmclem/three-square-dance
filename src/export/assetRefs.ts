@@ -24,13 +24,16 @@ export interface AssetRefs {
   /** Raw /assets/** paths used directly as <img src> (item icons, dialogue
    *  portraits) — matched back to manifest entries by path at resolve time. */
   rawPaths: Set<string>;
+  /** load_scene targets (runtime-manifest scene ids) — not files: the runtime
+   *  preloader's "which level comes next" links. The export ignores them. */
+  scenes:   Set<string>;
 }
 
 function newRefs(): AssetRefs {
   return {
     models: new Set(), textures: new Set(), audio: new Set(),
     skyboxes: new Set(), graphics: new Set(), decals: new Set(),
-    rawPaths: new Set(),
+    rawPaths: new Set(), scenes: new Set(),
   };
 }
 
@@ -47,6 +50,7 @@ function collectActions(refs: AssetRefs, actions: ScriptAction[] | undefined): v
     add(refs.audio, a.music);            // play_music: SoundDef id
     add(refs.textures, a.material);      // change_material: MaterialDef id
     add(refs.rawPaths, a.dialogue?.portrait);  // legacy inline dialogue portrait (<img src> path)
+    if (a.type === "load_scene") add(refs.scenes, a.sceneId);   // next-level link
   }
 }
 

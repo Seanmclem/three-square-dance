@@ -27,6 +27,7 @@ import { FlashOverlay, type FlashRequest } from "@/preview/FlashOverlay";
 import { detectDesktop, isDesktopDev } from "@/shared/desktopApi";
 import { loadManifest, type LoadedManifest } from "./manifest";
 import { SceneRouter } from "./SceneRouter";
+import { ScenePreloader } from "./ScenePreloader";
 import { writeRuntimeSave, loadRuntimeSave, clearRuntimeSave, type RuntimeSave } from "./saveGame";
 import { MainMenu } from "./ui/MainMenu";
 import { LoadingScreen } from "./ui/LoadingScreen";
@@ -46,6 +47,7 @@ export default function RuntimeApp() {
   const busRef     = useRef<EventBus>(new EventBus());
   const previewRef = useRef<PreviewController | null>(null);
   const routerRef  = useRef<SceneRouter | null>(null);
+  const preloaderRef = useRef<ScenePreloader | null>(null);
   const sceneRef   = useRef<SceneManager | null>(null);
   const dialogueOpenRef = useRef(false);
   const pauseOpenRef    = useRef(false);
@@ -269,10 +271,10 @@ export default function RuntimeApp() {
       // cross-origin HEAD checks 405 on some hosts and would hide every asset.
       const materialsReady = assetManager.initMaterials({ verifyFiles: false })
         .catch(err => console.error("initMaterials failed:", err));
-      assetManager.initAssets({ verifyFiles: false }).catch(err => console.error("initAssets failed:", err));
-      assetManager.initDecals({ verifyFiles: false }).catch(err => console.error("initDecals failed:", err));
-      assetManager.initAudio({ verifyFiles: false }).catch(err => console.error("initAudio failed:", err));
-      assetManager.initGraphics({ verifyFiles: false }).catch(err => console.error("initGraphics failed:", err));
+      const assetsReady   = assetManager.initAssets({ verifyFiles: false }).catch(err => console.error("initAssets failed:", err));
+      const decalsReady   = assetManager.initDecals({ verifyFiles: false }).catch(err => console.error("initDecals failed:", err));
+      const audioReady    = assetManager.initAudio({ verifyFiles: false }).catch(err => console.error("initAudio failed:", err));
+      const graphicsReady = assetManager.initGraphics({ verifyFiles: false }).catch(err => console.error("initGraphics failed:", err));
       // Awaited below so the skybox registry is populated before the scene's world:sky
       // fires (SceneManager._applySkybox needs the SkyboxDef to load its image).
       const skyboxesReady = assetManager.initSkyboxes({ verifyFiles: false })
@@ -283,8 +285,15 @@ export default function RuntimeApp() {
       if (!devGlobalsInstalled && isDesktopDev()) installDevGlobals(); // dev shell serves prod dist
 
       if (loaded) {
+        // Boot doesn't wait on the model/decal/audio/graphics registries, but the
+        // preloader can't map ids to files without them.
+        const preloader = new ScenePreloader({
+          assets: assetManager, manifest: loaded,
+          ready: Promise.all([materialsReady, skyboxesReady, assetsReady, decalsReady, audioReady, graphicsReady]),
+        });
+        preloaderRef.current = preloader;
         const router = new SceneRouter({
-          bus, world, zones, preview, scriptEngine, manifest: loaded,
+          bus, world, zones, preview, scriptEngine, manifest: loaded, preloader,
           onLoading: () => setShell("loading"),
           onPlaying: () => setShell("playing"),
           onError:   msg => { setError(msg); setShell("error"); },
@@ -296,9 +305,16 @@ export default function RuntimeApp() {
         document.title = loaded.manifest.name;
         if (devGlobalsInstalled) {
           const rt = (window as unknown as Record<string, unknown>).__runtime as Record<string, unknown>;
-          rt.router = router; rt.manifest = loaded;
+          rt.router = router; rt.manifest = loaded; rt.preloader = preloader;
         }
         setShell("menu");
+        // While the player reads the menu: fully load the scene the likelier
+        // button opens (Continue when a save exists, else Start), and just
+        // download the other one.
+        const entry = loaded.manifest.entryScene;
+        const saved = loadRuntimeSave(loaded.manifest.id)?.sceneId;
+        const likely = saved && saved in loaded.manifest.scenes ? saved : entry;
+        void preloader.warm(likely).then(() => { if (likely !== entry) return preloader.prefetch(entry); });
       } else if (!param) {
         setShell("menu"); // no manifest param — menu shows the URL input
       }
@@ -311,6 +327,8 @@ export default function RuntimeApp() {
       window.removeEventListener("keydown", onKeyDown);
       routerRef.current?.dispose();
       routerRef.current = null;
+      preloaderRef.current?.dispose();
+      preloaderRef.current = null;
       doSaveRef.current = null;
       preview.exit();
       audio.dispose();

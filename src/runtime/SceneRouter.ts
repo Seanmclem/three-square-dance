@@ -9,6 +9,7 @@ import { seedStartingInventory } from "@/scripting/inventory";
 import { registerEntityStateSchemas } from "@/scripting/entityState";
 import { migrateWallNodes, migrateUVs, migrateDialogues, pruneOrphanNodes, migrateWorldLighting } from "@/world/WorldLoader";
 import type { LoadedManifest } from "./manifest";
+import type { ScenePreloader } from "./ScenePreloader";
 
 export interface SceneRouterDeps {
   bus:          EventBus;
@@ -17,6 +18,9 @@ export interface SceneRouterDeps {
   preview:      PreviewController;
   scriptEngine: ScriptEngine;
   manifest:     LoadedManifest;
+  /** Optional: told when a transition starts (stop speculating — the build
+   *  takes over) and when a scene is up (download its next levels). */
+  preloader?:   ScenePreloader;
   /** Shell callbacks — keep the router UI-agnostic. */
   onLoading?: () => void;
   onPlaying?: () => void;
@@ -77,6 +81,7 @@ export class SceneRouter {
     }
 
     this._transitioning = true;
+    this.deps.preloader?.stop();
     try {
       this.deps.onLoading?.();
       if (preview.isActive) {
@@ -170,6 +175,7 @@ export class SceneRouter {
       scriptEngine.fire("on_level_load", world.activeZoneId);
 
       this.deps.onPlaying?.();
+      this.deps.preloader?.sceneEntered(sceneId, file);
       // The fade-in at the top now HOLDS (Phase 53) — release it so arrival is
       // a real fade-through-black instead of the old hard cut (which also left
       // input suppressed: fade-in mutes it and only fade-out un-mutes).
