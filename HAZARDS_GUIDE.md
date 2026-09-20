@@ -99,6 +99,13 @@ included, fall speed zeroed) → optionally restore health → fade back in.
 
 > Check **Restore health to its default** on the action — otherwise the
 > player respawns at 0 health and instantly dies again.
+>
+> **Which key is "health"?** (v4.81.4) It used to be the literal key `health`, so a
+> game that calls it `Hearts` restored nothing. Now, in order: the action's
+> **Health key** field if you fill it in; a key named `health`; the key the
+> script's own trigger watches (a death script on `Hearts == 0` restores `Hearts`);
+> the key this scene's enemies damage (covers a kill floor). If none of those
+> resolve, the console warns instead of silently doing nothing.
 
 ### Testing the loop
 
@@ -296,6 +303,14 @@ Hook effects with three triggers on the enemy's own scripts:
 `on_player_detected` (alert bark, music sting), `on_player_lost`, and
 `on_enemy_attack` (fires when a bite LANDS — add `flash_player` +
 `launch_player` for hit juice; "★ this object" works inside all three).
+
+> **Knockback: set the launch's RELATIVE TO to `Away`, angle 0** (v4.81.4). `Away`
+> pushes the player straight away from the enemy that hit them, using the enemy's
+> LIVE position. Do not use `Player` / 180 for this: "backwards" there means
+> backwards from where the CAMERA looks, so when the player is looking away from
+> the enemy (being chased) the bite throws them INTO it, the hop lands them on its
+> back, and every following bite whiffs (bites cannot reach a player standing on
+> top). Measured on the stock crab: 13 bites, 1 landed, 29.5s standing on its back.
 
 - **Killable enemy**: give it its own STATE (`health`, Phase 60), hurt it
   with your stomp/sword volumes (`adjust_number` on ★ this object), and a

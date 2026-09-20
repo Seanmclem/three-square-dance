@@ -291,7 +291,7 @@ export class CharacterController {
     // so a positive velocity lifts off next frame. max() lets a spring cancel a
     // fast fall without ever slowing an even faster existing rise; coyote/jump
     // buffer are cleared so a buffered press can't double-boost the launch.
-    this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg, relativeToPlayer }) => {
+    this._offLaunch = this._bus.on("character:launch", ({ speed, hSpeed, dirDeg, relativeToPlayer, awayFrom }) => {
       this._exitClimb();
       this._velY = Math.max(this._velY, speed);
       this._jumpArc = false;               // a launch flies on LEGACY_GRAVITY — springs keep their authored arc
@@ -302,7 +302,15 @@ export class CharacterController {
         // Player-relative: the engine can't know the look yaw, so it sends a flag and
         // we add it here. Same compass — `(0,0,-1)` rotated by _yaw IS (-sin, -cos),
         // so 0 = the way they're looking and 180 = knocked backwards.
-        const base = relativeToPlayer ? THREE.MathUtils.radToDeg(this._yaw) : 0;
+        let base = relativeToPlayer ? THREE.MathUtils.radToDeg(this._yaw) : 0;
+        // "away" frame: 0 = straight away from the attacker. A compass angle θ points
+        // along (-sin θ, -cos θ), so the angle of vector v is atan2(-v.x, -v.z). Directly
+        // on top of it (no horizontal direction) falls back to "backwards from the look".
+        if (awayFrom) {
+          const p = this._body.position, vx = p.x - awayFrom.x, vz = p.z - awayFrom.z;
+          base = Math.hypot(vx, vz) > 0.05 ? THREE.MathUtils.radToDeg(Math.atan2(-vx, -vz))
+                                           : THREE.MathUtils.radToDeg(this._yaw) + 180;
+        }
         const rad = THREE.MathUtils.degToRad((dirDeg ?? 0) + base);
         this._extVelX = -Math.sin(rad) * hSpeed;
         this._extVelZ = -Math.cos(rad) * hSpeed;

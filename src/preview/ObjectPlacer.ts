@@ -176,6 +176,12 @@ export class ObjectPlacer {
     }
   }
 
+  /** Where the object's mesh IS right now (an AI enemy walks away from its authored position). */
+  getLivePosition(objectId: string): { x: number; z: number } | null {
+    const p = this._meshes.get(objectId)?.position;
+    return p ? { x: p.x, z: p.z } : null;
+  }
+
   /** Model-local AABB stashed at build time (null until the mesh has been built). */
   getLocalAABB(objectId: string): { center: Vec3; size: Vec3 } | null {
     const aabb = this._meshes.get(objectId)?.userData["localAABB"];

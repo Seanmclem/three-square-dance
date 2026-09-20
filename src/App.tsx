@@ -50,7 +50,7 @@ import { WallSplitter } from "@/editor/WallSplitter";
 import { SegmentHighlighter } from "@/editor/SegmentHighlighter";
 import { defaultColliderFromAABB } from "@/physics/attachedColliderMath";
 import { StairCutterResizer } from "@/editor/StairCutterResizer";
-import { ScriptEngine, setPlayerMotionProvider } from "@/scripting/ScriptEngine";
+import { ScriptEngine, setPlayerMotionProvider, setLivePositionProvider } from "@/scripting/ScriptEngine";
 import { gameState, GAMESAVE_KEY, DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 import { DialogueOverlay } from "@/ui/DialogueOverlay";
 import { FadeOverlay, type FadeRequest } from "@/preview/FadeOverlay";
@@ -656,6 +656,7 @@ export default function App() {
     const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
     enemyAI.init();
     setPlayerMotionProvider(() => preview.playerMotion);   // player_falling condition
+    setLivePositionProvider(id => objectPlacer.getLivePosition(id));   // launch_player "away" frame
     enemyAIRef.current = enemyAI;
     // vite-DEV installed globals before this line existed — patch it in.
     const gAny = window as unknown as Record<string, unknown>;

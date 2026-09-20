@@ -13,7 +13,7 @@ import { InstancedObjectPool } from "@/world/InstancedObjectPool";
 import { PreviewController } from "@/preview/PreviewController";
 import { EnemyAI } from "@/preview/EnemyAI";
 import { AudioSystem } from "@/audio/AudioSystem";
-import { ScriptEngine, setPlayerMotionProvider } from "@/scripting/ScriptEngine";
+import { ScriptEngine, setPlayerMotionProvider, setLivePositionProvider } from "@/scripting/ScriptEngine";
 import { gameState } from "@/scripting/GameState";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { DialogueOverlay, type DialogueOverlayProps } from "@/ui/DialogueOverlay";
@@ -106,6 +106,7 @@ export default function RuntimeApp() {
     const enemyAI = new EnemyAI(world, bus, movers, objectPlacer, preview, scriptEngine);
     enemyAI.init();
     setPlayerMotionProvider(() => preview.playerMotion);   // player_falling condition
+    setLivePositionProvider(id => objectPlacer.getLivePosition(id));   // launch_player "away" frame
     scene.onUpdate(dt => enemyAI.update(dt));
     scene.onUpdate(dt => physicsWorld.step(dt));
     scene.onUpdate(dt => objectPlacer.update(dt));

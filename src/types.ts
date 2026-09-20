@@ -392,7 +392,7 @@ export interface BusEvents {
   // Phase 70 — every airborne stretch, measured and emitted on landing (the Jump readout overlay).
   // height = peak above the takeoff point, distance = horizontal, drop = landing Y − takeoff Y (metres, seconds).
   "character:jump-stats":  { height: number; distance: number; airTime: number; drop: number };
-  "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number; relativeToPlayer?: boolean };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass; relativeToPlayer = CharacterController adds its own look yaw, which only it knows)
+  "character:launch":      { speed: number; hSpeed?: number; dirDeg?: number; relativeToPlayer?: boolean; awayFrom?: { x: number; z: number } };   // spring/bouncer impulse — vertical velocity + optional horizontal shove (dirDeg = spawn-facing compass; relativeToPlayer = CharacterController adds its own look yaw, which only it knows)
   // Custom GUI (Phase 49). Visibility itself lives in gameState (`__ui.<id>`) so
   // it survives scene transitions and saves; these events cover menu interaction:
   // overlay → engine on option select, and overlay → ControlSchemeManager for
@@ -1478,7 +1478,7 @@ export interface ScriptAction {
   flashColor?:    string;     // flash_player: tint/overlay color (default "#ff0000")
   flashDuration?: number;     // flash_player: seconds the pulse lasts (default 1)
   launchRelative?: boolean;   // @deprecated launch_player — superseded by launchRelativeTo; still READ as a fallback (true = 'entity') so pre-v4.63.3 scenes keep working
-  launchRelativeTo?: 'world' | 'entity' | 'player'; // launch_player: what launchDirDeg is measured from — world compass, the owning entity's Y rotation (0 = its front), or the player's facing (180 = always knocked backwards)
+  launchRelativeTo?: 'world' | 'entity' | 'player' | 'away'; // launch_player: what launchDirDeg is measured from — world compass, the owning entity's Y rotation (0 = its front), or the player's facing (180 = always knocked backwards)
   // set_state / adjust_number / delete_state / store_position (destination key).
   // Phase 60: on the three state actions (and give_item/take_item), `targetId`
   // doubles as the ENTITY SCOPE — absent = global key; "self" = owning entity
@@ -1499,7 +1499,10 @@ export interface ScriptAction {
   // the player's (global) inventory; "self" = owning entity; else an entity id.
   fromId?:       string;
   toId?:         string;
-  restoreHealth?: boolean;    // respawn_player: re-seed 'health' to its schema default after the teleport
+  restoreHealth?: boolean;    // respawn_player: re-seed the game's health key to its schema default after the teleport
+  // v4.81.4 — WHICH key restoreHealth re-seeds. Absent = auto (see ScriptEngine._healthKey): it was
+  // hardcoded to the literal key "health", so a game whose health is "Hearts" silently restored nothing.
+  healthKey?:     string;
 }
 
 // Phase 65 — if-blocks. Actions stay a FLAT array (every consumer keeps working);

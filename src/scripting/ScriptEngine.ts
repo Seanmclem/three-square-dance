@@ -40,6 +40,16 @@ function compareNum(a: number, op: CompareOp, b: number): boolean {
  * playerMotion accessor; null result (not playing) fails the condition closed.
  */
 let _playerMotion: (() => { grounded: boolean; velY: number; fellMsAgo: number } | null) | null = null;
+/**
+ * LIVE world position of an entity (v4.81.4) — launch_player's "away" frame needs where
+ * the attacker IS, and WorldState only knows where it was AUTHORED (an AI enemy walks).
+ * Wired by the shells to ObjectPlacer; null = unknown (falls back to the authored pose).
+ */
+let _livePosition: ((id: string) => { x: number; z: number } | null) | null = null;
+export function setLivePositionProvider(fn: ((id: string) => { x: number; z: number } | null) | null): void {
+  _livePosition = fn;
+}
+
 export function setPlayerMotionProvider(fn: (() => { grounded: boolean; velY: number; fellMsAgo: number } | null) | null): void {
   _playerMotion = fn;
 }
@@ -419,23 +429,27 @@ export class ScriptEngine {
     const ownerId = (t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact"
       || t.type === "on_player_detected" || t.type === "on_player_lost" || t.type === "on_enemy_attack")
       ? t.targetId : undefined;
+    // A GLOBAL state trigger names a key ("on_state_equals Hearts 0" = a death script).
+    // Threaded through so respawn_player can tell which key is the health (see _healthKey).
+    const triggerKey = (t.type === "on_state_equals" || t.type === "on_state_changed") && !t.entityId
+      ? t.targetId : undefined;
     // Phase 65 — if-blocks pick their branch here: after the trigger delay,
     // before per-action delays.
-    this.runActions(selectBlockActions(s, ownerId), ownerId);
+    this.runActions(selectBlockActions(s, ownerId), ownerId, triggerKey);
   }
 
   /** Public so DialogueRunner can dispatch a chosen option's effects (no owner there). */
-  runActions(actions: ScriptAction[], ownerId?: string): void {
+  runActions(actions: ScriptAction[], ownerId?: string, triggerKey?: string): void {
     for (const action of actions) {
       // Per-action delay: offset from when the script's actions start (i.e. after
       // any trigger-level delay). Lets one script sequence its effects — e.g.
       // play_animation Chest_Open now, despawn_object 0.8s later — without a
       // second delayed script. Timers die with deactivate(), same as trigger delays.
       if (action.delay && action.delay > 0) {
-        const t = setTimeout(() => this._dispatch(action, ownerId), action.delay * 1000);
+        const t = setTimeout(() => this._dispatch(action, ownerId, triggerKey), action.delay * 1000);
         this._timers.push(t);
       } else {
-        this._dispatch(action, ownerId);
+        this._dispatch(action, ownerId, triggerKey);
       }
     }
   }
@@ -464,7 +478,28 @@ export class ScriptEngine {
     return this._resolveTargets(tid).map(id => entKey(id, bare));
   }
 
-  private _dispatch(action: ScriptAction, ownerId?: string): void {
+  /**
+   * Which state key is "the health" for respawn_player's restoreHealth (v4.81.4). It was
+   * hardcoded to the literal key "health", so a game that calls it "Hearts" restored
+   * nothing, silently. In order: the action's explicit `healthKey`; a registered
+   * "health"; the key the OWNING script's state trigger watches (a death script fires on
+   * `Hearts == 0`); the key this scene's enemies damage (`ai.damageKey` — covers a kill
+   * floor, whose trigger names no key). Undefined = nothing sensible to restore.
+   */
+  private _healthKey(action: ScriptAction, triggerKey?: string): string | undefined {
+    if (action.healthKey) return action.healthKey;
+    if (gameState.hasDefault("health")) return "health";
+    if (triggerKey && gameState.hasDefault(triggerKey)) return triggerKey;
+    for (const z of this._state.zones.values()) {
+      for (const o of z.objects ?? []) {
+        const k = o.ai?.damageKey;
+        if (k && gameState.hasDefault(k)) return k;
+      }
+    }
+    return undefined;
+  }
+
+  private _dispatch(action: ScriptAction, ownerId?: string, triggerKey?: string): void {
     // Per-action guard, evaluated HERE — i.e. after the action's delay — so a
     // delayed action reads the world as it is when it actually fires.
     if (action.conditions?.length && !checkScriptConditions(action.conditions, ownerId)) return;
@@ -587,7 +622,11 @@ export class ScriptEngine {
           }
           if (dest) this._bus.emit("character:teleport", { position: dest, facing });
           else console.warn("[ScriptEngine] respawn_player: no destination (empty stored key, no checkpoint, no default spawn)");
-          if (action.restoreHealth) gameState.resetKey("health");
+          if (action.restoreHealth) {
+            const key = this._healthKey(action, triggerKey);
+            if (key) gameState.resetKey(key);
+            else console.warn("[ScriptEngine] respawn_player: \"restore health\" found no health key (set one on the action — no \"health\" key, no state trigger, no enemy damageKey)");
+          }
           this._bus.emit("overlay:fade-out", { duration: dur });
         }, dur * 1000);
         this._timers.push(t);
@@ -607,12 +646,22 @@ export class ScriptEngine {
           const pose = this._resolveObjectPose(ownerId);
           if (pose) dirDeg = (dirDeg ?? 0) + pose.facing;
         }
+        // "away" (v4.81.4): straight away from the owning entity, wherever the player or
+        // the camera is facing — the hit-knockback frame. dirDeg is an offset from that line.
+        // (The Phase 61 "Bite juice" used player/180 = "backwards from where the CAMERA
+        // looks": looking away from the crab, it knocked you INTO it and onto its back.)
+        let awayFrom: { x: number; z: number } | undefined;
+        if (relativeTo === "away" && ownerId) {
+          const live = _livePosition?.(ownerId) ?? this._resolveObjectPose(ownerId);
+          if (live) awayFrom = { x: live.x, z: live.z };
+        }
         this._bus.emit("character:launch", {
           speed: action.launchSpeed ?? 12,
           hSpeed: action.launchHSpeed,
           dirDeg,
           // The player's look yaw lives in CharacterController — it adds its own.
           relativeToPlayer: relativeTo === "player",
+          awayFrom,
         });
         break;
       }

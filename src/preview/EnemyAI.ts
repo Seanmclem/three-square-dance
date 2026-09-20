@@ -44,6 +44,15 @@ const GROUND_RAY_LEN   = 5.0;
 const WALL_PROBE_DIST  = 0.6;
 const WALL_PROBE_UP    = 0.5;  // probe height above feet
 const TURN_RATE        = 7;    // rad/s toward the desired facing
+// ── Enemy feel (Phase 72) — presentation only: the collider, the brain and the bite/stomp
+// tests never see any of it (same rule as the player's Phase 70 squash + lean). ──
+const FEEL_STIFFNESS   = 160;  // 1/s² — squash spring on the mesh's Y scale (1 = rest)
+const FEEL_DAMPING     = 11;   // 1/s (one visible rebound, then settles)
+const FEEL_STOMP_KICK  = 7;    // spring velocity toward squash when the player lands on it (≈ -35%)
+const FEEL_LEAN        = 0.17; // rad (≈ 10°) forward tilt while actually moving
+const FEEL_LEAN_RATE   = 8;    // 1/s exp smoothing
+const STOMP_RADIUS     = 0.95; // m, XZ — "the player is over me"
+const STOMP_MAX_ABOVE  = 1.9;  // m, player CENTRE above the enemy's top — close enough to be a landing
 
 interface Resolved {
   detectRadius: number; giveUpRadius: number; attackRange: number;
@@ -71,6 +80,10 @@ interface AiRec extends BrainMem {
   currentClip:   string | null;
   walkSoundOn:   boolean;  // the keyed walk loop is currently playing
   walkQuietSec:  number;   // consecutive not-moving time (hysteresis before stopping the loop)
+  // Phase 72 feel — see FEEL_* above
+  squash: number; squashVel: number; lean: number;
+  stompArmed: boolean;               // re-arms once the player is no longer over the enemy
+  baseScales: THREE.Vector3[];       // authored mesh scales (index-aligned with the mover entry's meshes)
 }
 
 function hash(id: string): number {
@@ -98,6 +111,8 @@ export class EnemyAI {
   private readonly _quat     = new THREE.Quaternion();
   private readonly _offset   = new THREE.Vector3();
   private readonly _up       = new THREE.Vector3(0, 1, 0);
+  private readonly _leanQ    = new THREE.Quaternion();   // Phase 72 feel scratch
+  private readonly _axis     = new THREE.Vector3();
 
   constructor(
     private readonly _world:   WorldState,
@@ -117,6 +132,11 @@ export class EnemyAI {
       }),
       this._bus.on("preview:stop", () => {
         this._active = false;
+        // MoverSystem's reset snaps position + rotation back; SCALE is ours (Phase 72 squash).
+        for (const rec of this._recs.values()) {
+          const entry = this._movers.entryFor(rec.id);
+          entry?.meshes.forEach((m, i) => { const b = rec.baseScales[i]; if (b) m.obj.scale.copy(b); });
+        }
         this._recs.clear();          // MoverSystem's reset snaps poses back
         this._clock = 0;
       }),
@@ -166,6 +186,8 @@ export class EnemyAI {
           attackNum: 0,
           currentClip: null,
           walkSoundOn: false, walkQuietSec: 0,
+          squash: 1, squashVel: 0, lean: 0, stompArmed: true,
+          baseScales: entry.meshes.map(m => m.obj.scale.clone()),
         };
         this._resolveClips(rec);
         this._recs.set(obj.id, rec);
@@ -214,12 +236,19 @@ export class EnemyAI {
       // locomotion RE-ISSUES its clip when the interlude ends — stopPreview
       // reverts the mixer to the auto-play clip, and stale "already playing
       // Walk" bookkeeping left the enemy drifting in its idle pose.
-      if (this._placer.hasScriptClip(rec.id)) { this._stopWalkSound(rec); rec.currentClip = null; continue; }
-      if (!rec.p.clipsResolved) this._resolveClips(rec);
       if (rec.p.heightY == null) {
         const aabb = this._placer.getLocalAABB(rec.id);
         if (aabb) rec.p.heightY = aabb.size.y * rec.scaleY;
       }
+      this._stompCheck(rec, player);
+      // The stomp script's Death pose freezes the AI on the very frame of the stomp, so the
+      // squash spring has to keep running here too (the pose itself is unchanged).
+      if (this._placer.hasScriptClip(rec.id)) {
+        this._stopWalkSound(rec); rec.currentClip = null;
+        this._feel(rec, dt, false); this._applyPose(rec, entry);
+        continue;
+      }
+      if (!rec.p.clipsResolved) this._resolveClips(rec);
 
       // ── senses in, intents out (the pure brain decides; we execute) ──
       const dx = player.x - rec.pos.x, dz = player.z - rec.pos.z;
@@ -258,6 +287,7 @@ export class EnemyAI {
         // face the player throughout the bite; no locomotion
         this._stopWalkSound(rec);
         this._turnToward(rec, Math.atan2(dx, dz), dt);
+        this._feel(rec, dt, false);
         this._applyPose(rec, entry);
         continue;
       }
@@ -299,6 +329,7 @@ export class EnemyAI {
         if (this._placer.aiPlay(rec.id, want, { loop: true })) rec.currentClip = want;
       }
 
+      this._feel(rec, dt, moved);
       this._applyPose(rec, entry);
     }
   }
@@ -384,10 +415,39 @@ export class EnemyAI {
     // yaw delta relative to the authored rest yaw, applied about the origin
     const restYaw = new THREE.Euler().setFromQuaternion(entry.originQuat, "YXZ").y;
     const dq = new THREE.Quaternion().setFromAxisAngle(this._up, rec.yaw - restYaw);
-    for (const m of entry.meshes) {
+    // Phase 72 feel: lean about the enemy's own right axis (the model faces +Z, so its
+    // right is X turned by yaw, and a positive angle tips the top forward), then squash
+    // (volume-preserving, anchored at the origin = the feet).
+    this._leanQ.setFromAxisAngle(this._axis.set(Math.cos(rec.yaw), 0, -Math.sin(rec.yaw)), rec.lean);
+    const sy = rec.squash, sxz = 1 / Math.sqrt(sy);
+    for (let i = 0; i < entry.meshes.length; i++) {
+      const m = entry.meshes[i];
       this._offset.copy(m.pos).sub(entry.origin).applyQuaternion(dq);
+      this._offset.y *= sy;
+      this._offset.applyQuaternion(this._leanQ);
       m.obj.position.copy(rec.pos).add(this._offset);
-      m.obj.quaternion.copy(dq).multiply(m.quat);
+      m.obj.quaternion.copy(this._leanQ).multiply(dq).multiply(m.quat);
+      const b = rec.baseScales[i];
+      if (b) m.obj.scale.set(b.x * sxz, b.y * sy, b.z * sxz);
     }
+  }
+
+  /** Squash when the player LANDS on the enemy: over it, close above its top, and falling.
+   *  Physical, not scripted — any enemy the player drops onto squashes, stomp script or not.
+   *  One kick per landing (re-arms when the player is no longer over it). */
+  private _stompCheck(rec: AiRec, player: THREE.Vector3): void {
+    const over = Math.hypot(player.x - rec.pos.x, player.z - rec.pos.z) < STOMP_RADIUS
+      && player.y > rec.pos.y + (rec.p.heightY ?? 1);
+    if (!over) { rec.stompArmed = true; return; }
+    if (!rec.stompArmed || player.y - rec.pos.y - (rec.p.heightY ?? 1) > STOMP_MAX_ABOVE) return;
+    const m = this._preview.playerMotion;   // allocates — only reached while the player is right over an enemy
+    if (m && (m.velY < -1 || m.fellMsAgo < 120)) { rec.squashVel -= FEEL_STOMP_KICK; rec.stompArmed = false; }
+  }
+
+  /** Advance the squash spring and the chase lean. */
+  private _feel(rec: AiRec, dt: number, moved: boolean): void {
+    rec.squashVel += (-FEEL_STIFFNESS * (rec.squash - 1) - FEEL_DAMPING * rec.squashVel) * dt;
+    rec.squash = Math.max(0.5, Math.min(1.3, rec.squash + rec.squashVel * dt));
+    rec.lean += ((moved ? FEEL_LEAN : 0) - rec.lean) * Math.min(1, dt * FEEL_LEAN_RATE);
   }
 }

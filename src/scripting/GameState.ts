@@ -33,6 +33,9 @@ export class GameState {
    *  like any normal write (respawn_player's health refill). No-op for keys
    *  without a schema default. Unlike reset(), this DOES fire state triggers —
    *  New Game seeding stays silent by design. */
+  /** True when `key` has a registered schema default (i.e. resetKey would do something). */
+  hasDefault(key: string): boolean { return this._schema.get(key)?.default !== undefined; }
+
   resetKey(key: string): void {
     const d = this._schema.get(key)?.default;
     if (d !== undefined) this.set(key, d);

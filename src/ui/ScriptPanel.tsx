@@ -3628,6 +3628,15 @@ function ActionFields({
             />
             Restore health to its default
           </label>
+          {action.restoreHealth && (
+            <F label="Health key (blank = auto)">
+              <KeySuggestInput
+                placeholder="auto: health, this script's state key, or what enemies damage"
+                value={action.healthKey ?? ""}
+                onChange={(v) => set({ healthKey: v || undefined })}
+              />
+            </F>
+          )}
         </div>
       );
     }
@@ -3677,7 +3686,8 @@ function ActionFields({
               {([
                 ["world",  "World", "Fixed compass — 0 is the way a fresh spawn faces, regardless of the player or this entity"],
                 ...(owner ? [["entity", `This ${owner.kind}`, `0 launches out of the ${owner.kind}'s front (its −Z face before rotating); turning its ROTATION (Y°) turns the launch with it`] as const] : []),
-                ["player", "Player", "0 shoves them the way they're looking; 180 always knocks them backwards, whichever way they came in"],
+                ["player", "Player", "0 shoves them the way they're LOOKING (the camera); 180 knocks them backwards from that. For a hit knockback use Away instead — looking away from an enemy, 'backwards' is toward it"],
+                ...(owner ? [["away", "Away", `0 knocks them straight away from this ${owner.kind}, wherever they or the camera are facing — the hit-knockback frame (an enemy's live position, not where it was placed)`] as const] : []),
               ] as const).map(([k, lbl, tip]) => {
                 const active = relativeTo === k;
                 return (
