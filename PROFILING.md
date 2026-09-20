@@ -10,6 +10,35 @@ are worth keeping.
 
 ---
 
+## 0. FIRST: is it a frame-rate CAP, not a regression? (2026-09-19)
+
+Before profiling anything, rule out the machine. A "sudden, awful" slowdown was
+reported right after a run of character-controller changes; it was the laptop:
+on battery at 18 to 19% with Low Power Mode on, the shell was capped at exactly
+30 FPS. The tells, all readable without touching the app:
+
+- **The shape of the drop.** A cap is a single step to a round number with a
+  flat frame time: `avgFps 30, worstMs 34.4` (or 60 / 16.7), identical sample
+  after sample, on a TRIVIAL scene (the idle editor is 9 draw calls, 72
+  triangles). A code regression scales with load and jitters.
+- **The perf log.** The dev shell appends a sample every 5s to
+  `<stateDir>/perf-report.jsonl` (`src/dev/perfReporter.ts`): `ts, page, size,
+  visible, avgFps, worstMs, draws, tris`. Bucket it by time to find the exact
+  second of the drop, and check what the in-preview samples (draws of 40 or more)
+  read just before it. Here: 120 FPS / 9.4ms in preview at 19:52, capped at 19:53:57.
+- **History.** Search the whole log for the same signature on earlier days. This
+  one appears on eight days back to 2026-08-12 (87 minutes on 08-30), so it
+  could not be caused by that day's code.
+- **Power state:** `pmset -g | grep lowpowermode`, `pmset -g batt`. Which layer
+  applies the cap (macOS Low Power Mode, or Chromium's battery saver at about 20%
+  charge inside the CEF runtime) was not pinned down; an exact 30 rather than 60
+  points at Chromium.
+- Also check `ps -Ao pid,pcpu,comm -r | head`: a runaway system process (that day,
+  the System Settings Storage pane at 80% of a core) drains the battery faster.
+
+Fix: plug in or turn Low Power Mode off, then confirm in the log. A hidden
+automation tab cannot measure this (rAF never runs there); use the log.
+
 ## 1. Quick gauge — the in-app counter
 
 `src/ui/FpsCounter.tsx` draws a small readout top-left of the canvas: **avg FPS** and the
