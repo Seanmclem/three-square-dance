@@ -35,6 +35,16 @@ Scripted `exportGameBundle` of platfrom-obby, then served with
 - Re-check after adding editor utilities: `ls <bundle>/assets/*.js` must not
   list `main-*`, and the editor utility's strings must not grep in any of them.
 
+## Automated (v4.83.3, executed 2026-09-20): unplaced prefabs ship nothing
+
+- Re-exported platfrom-obby after removing the prefab-library walk and diffed
+  the bundle file list against the previous export: exactly `pipe_90.gltf` and
+  `pipe_straight.gltf` dropped (the never-placed "Pipe base and corner"
+  prefab), nothing added, `missing` empty, 109 -> 107 files.
+- Served and played in Chrome: title screen requests no scene file; Start
+  fetches only `scenes/level_1.json` (level_2/level_3 untouched), 39 models,
+  zero failed asset requests.
+
 ## Checks
 
 `deno check` (main/export/deploy) clean; `tsc --noEmit` clean;

@@ -9,7 +9,7 @@ import type {
   UiElementDef, ItemDef, DialogueTreeDef, PlayerSettings, WorldObject,
   PlatformDef, ShapeDef, StairDef, LadderDef, FloorDef, WallDef, TriggerVolume,
   AttachedSound, AssetManifest, MaterialManifest, SoundManifest, SkyboxManifest,
-  GraphicsManifest, DecalManifest, MaterialDef, PrefabTemplateEntity,
+  GraphicsManifest, DecalManifest, MaterialDef,
 } from "../types.ts";
 
 export type AssetKind = "models" | "textures" | "audio" | "skyboxes" | "graphics" | "decals";
@@ -152,21 +152,6 @@ function collectTriggerVolume(refs: AssetRefs, v: TriggerVolume): void {
   collectScripts(refs, v.scripts);           // visual fill is a shader gradient — no textures
 }
 
-/** Prefab template members are full entity defs — route by declared type. */
-function collectPrefabTemplate(refs: AssetRefs, template: PrefabTemplateEntity[] | undefined): void {
-  for (const m of template ?? []) {
-    switch (m.type) {
-      case "object":         collectObject(refs, m.def as WorldObject); break;
-      case "shape":          collectShape(refs, m.def as ShapeDef); break;
-      case "stair":          collectStair(refs, m.def as StairDef); break;
-      case "ladder":         collectLadder(refs, m.def as LadderDef); break;
-      case "platform":       collectPlatform(refs, m.def as PlatformDef); break;
-      case "trigger-volume": collectTriggerVolume(refs, m.def as TriggerVolume); break;
-      default: break;   // walls/floors/etc. can't be prefab members today
-    }
-  }
-}
-
 function collectPlayerSettings(refs: AssetRefs, ps: PlayerSettings | undefined): void {
   if (!ps) return;
   add(refs.models, ps.modelAssetId);         // third-person avatar model
@@ -220,7 +205,9 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
     if (game.lighting?.skybox && game.lighting.skybox !== "sky") add(refs.skyboxes, game.lighting.skybox);  // game-default sky
     collectItems(refs, game.items);                // game-wide item registry (icons)
     collectUiElements(refs, game.uiElements);      // game-wide GUI registry
-    for (const p of game.prefabs ?? []) collectPrefabTemplate(refs, p.template);  // prefab library templates
+    // game.prefabs (the prefab library) is deliberately NOT walked: placed instances are
+    // real entities in the scenes above, and the runtime never reads templates — an
+    // unplaced prefab must not drag its assets into the bundle.
   }
 
   return refs;
