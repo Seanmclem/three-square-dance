@@ -18,7 +18,7 @@ export const SETTINGS_PAGES = {
   movement:  ["moveSpeed", "runMultiplier", "jumpHeight", "variableJump", "climbSpeed"],
   camera:    ["cameraMode", "fov", "fpsEyeHeight", "thirdPersonDistance", "thirdPersonHeight", "thirdPersonPitch"],
   character: ["modelAssetId", "characterScale", "fpsCharacterScale", "jumpAnimSpeed", "animClips", "bagStyle"],
-  sounds:    ["jumpSound", "landSound", "footstepSound", "footstepVariants", "footstepDistance", "jumpVolume", "landVolume", "footstepVolume"],
+  sounds:    ["jumpSound", "landSound", "footstepSound", "footstepVariants", "footstepPitchWobble", "footstepDistance", "jumpVolume", "landVolume", "footstepVolume"],
 } as const satisfies Record<string, readonly (keyof PlayerSettings)[]>;
 
 export type SettingsPage = keyof typeof SETTINGS_PAGES;

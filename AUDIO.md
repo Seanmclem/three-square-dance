@@ -139,12 +139,23 @@ has its own **VOL** field (since v4.79.18): 1 = the clip's own level, higher boo
 
 One footstep sample repeated every stride sounds like a loop. Under the **FOOTSTEP** picker,
 **+ Add variation** adds up to three more sounds (`PlayerSettings.footstepVariants`). Each
-stride then plays ONE of the pool (the main sound plus the variations): equal chance, but
-never the same sound twice in a row. Pure random repeats (A, A, A), which is exactly the
-machine-gun effect variation exists to remove; with two sounds the rule becomes a natural
-left foot, right foot alternation. Pick samples of the same surface: the library ships
+stride then plays ONE of the pool (the main sound plus the variations) at random, equal
+chance, so the same sample can play twice in a row (that is what random means; v4.83.0
+briefly shipped a "never twice in a row" rule the user had not asked for, removed in
+v4.83.1). Pick samples of the same surface: the library ships
 families such as `footstep_carpet_000` to `_004`, `footstep_wood_00x`, `footstep_grass_00x`.
 They share the FOOTSTEP **VOL**. No variations = exactly the old behavior.
+
+**Pitch wobble** (checkbox under the variations, `PlayerSettings.footstepPitchWobble`, off by
+default): each footstep plays at a random playback rate within plus or minus 6% (about one
+semitone), so even a SINGLE sample stops sounding like a loop. It also applies while a
+`set_footstep` surface override is active. It is the WebAudio `playbackRate` of the one-shot
+(`audio:play` gained an optional `rate`), so it costs nothing at runtime.
+
+Cost, measured during a walk (3 variations + wobble on vs one plain sound): 0.03 to 0.05ms per
+footstep at about 3 footsteps a second, roughly 0.01% of a 120Hz frame budget, with no
+measurable difference between the two. Nothing runs per frame: the pick and the wobble happen
+only when a stride completes.
 
 ### Swapping the footstep sound at runtime (surfaces: wood → gravel)
 

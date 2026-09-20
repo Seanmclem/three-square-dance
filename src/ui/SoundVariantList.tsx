@@ -3,7 +3,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 /**
  * Extra sounds for a "one of these, at random" slot (Phase 73 footstep variation).
  * Sits under the slot's main SoundPicker: the main sound plus these form the pool,
- * and each play picks one — equal chance, never the same twice in a row. Used by
+ * and each play picks one at random (equal chance). Used by
  * the character Sounds page (PlayerSettings.footstepVariants) and the set_footstep
  * script action (ScriptAction.soundVariants), so the two can't drift.
  */
@@ -32,7 +32,7 @@ export function SoundVariantList({ values, onChange, previewVolume, max = 3, dis
       ))}
       {list.length < max && (
         <button disabled={disabled} onClick={() => commit([...list, ""])}
-          title={disabled ? "Pick the main sound first" : "Add another sound — each step plays one at random, never the same twice in a row"}
+          title={disabled ? "Pick the main sound first" : "Add another sound — each step plays one of them at random (equal chance)"}
           style={{ alignSelf: "flex-start", background: "rgba(77,140,255,0.12)", border: "1px solid rgba(77,140,255,0.35)",
                    borderRadius: 4, color: "#dde3f0", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.45 : 1,
                    fontSize: 10, padding: "4px 8px" }}>

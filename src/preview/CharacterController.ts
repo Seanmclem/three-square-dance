@@ -59,6 +59,7 @@ const CLIMB_X_MARGIN     = 0.25; // lateral clamp inset from the ladder's edges
 // ── Jump reliability (v4.28.14) ───────────────────────────────────────────────
 const JUMP_BUFFER_SEC = 0.15;  // a press is remembered this long (fires on landing)
 const COYOTE_SEC      = 0.12;  // recently-grounded still counts (ledge walk-offs, flag flicker)
+const FOOTSTEP_WOBBLE = 0.06;  // ± playback-rate spread of the footstep pitch wobble (≈ ±1 semitone)
 const GROUND_STICK    = 0.5;   // m/s downward bias while grounded — keeps computedGrounded stable (SUPPRESSED on movers, see below)
 
 // ── Character feel (Phase 70) ─────────────────────────────────────────────────
@@ -193,12 +194,11 @@ export class CharacterController {
   private _stepPrevX = 0;
   private _stepPrevZ = 0;
   private _airTime   = 0;    // seconds airborne — a real fall vs grounded-flicker (land sound gate)
-  // Footstep POOLS (Phase 73): [sound, ...variants]. One is picked per step — equal chance,
-  // never the same twice in a row (pure random repeats A-A-A, the very machine-gun effect
-  // variation exists to remove; with two sounds this is a natural left/right alternation).
+  // Footstep POOLS (Phase 73): [sound, ...variants]. One is picked per step, plain random with
+  // equal chance — the user's spec (v4.83.0 shipped a "never twice in a row" rule they had not
+  // asked for; removed in v4.83.1).
   private _footstepOverride: string[] | null = null;   // runtime surface swap (set_footstep action); null = authored default
   private readonly _footstepDefault: string[];         // from PlayerSettings, fixed for the session
-  private _lastFootstep = "";
   private _offFootstep: (() => void) | null = null;
 
   // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
@@ -587,15 +587,11 @@ export class CharacterController {
       this._stepAccum += Math.sqrt(dx * dx + dz * dz);
       if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
         this._stepAccum = 0;
-        // Equal chance among the OTHER sounds: roll n-1 slots and skip the last one played.
-        let i = 0;
-        if (steps.length > 1) {
-          const last = steps.indexOf(this._lastFootstep);
-          i = Math.floor(Math.random() * (last < 0 ? steps.length : steps.length - 1));
-          if (last >= 0 && i >= last) i++;
-        }
-        this._lastFootstep = steps[i];
-        this._emitSound(steps[i], this._settings.footstepVolume);
+        const id = steps.length > 1 ? steps[Math.floor(Math.random() * steps.length)] : steps[0];
+        // Pitch wobble (opt-in): ±FOOTSTEP_WOBBLE of playback rate, so even ONE sample stops
+        // sounding like a loop. Applies to surface overrides too (same path).
+        const rate = this._settings.footstepPitchWobble ? 1 + (Math.random() * 2 - 1) * FOOTSTEP_WOBBLE : undefined;
+        this._emitSound(id, this._settings.footstepVolume, rate);
       }
     } else {
       this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant
@@ -1224,8 +1220,8 @@ export class CharacterController {
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
 
   /** Fire a locomotion one-shot (jump/land/footstep) — a non-positional SFX-bus sound. */
-  private _emitSound(id?: string, volume?: number): void {
-    if (id) this._bus.emit("audio:play", { id, volume });
+  private _emitSound(id?: string, volume?: number, rate?: number): void {
+    if (id) this._bus.emit("audio:play", { id, volume, rate });
   }
 
   private _enterJump(): void {

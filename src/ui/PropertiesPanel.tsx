@@ -7195,6 +7195,13 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
         <SoundVariantList values={playerSettings.footstepVariants} previewVolume={playerSettings.footstepVolume}
           disabled={!playerSettings.footstepSound}
           onChange={next => onPlayerSettingsChange({ footstepVariants: next })} />
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}
+          title="Each footstep plays slightly higher or lower in pitch (about ±1 semitone), so even a single sample stops sounding like a loop. Also applies while a set_footstep surface override is active. No performance cost.">
+          <input type="checkbox" checked={playerSettings.footstepPitchWobble ?? false}
+            onChange={e => onPlayerSettingsChange({ footstepPitchWobble: e.target.checked || undefined })}
+            style={{ accentColor: "#4d8cff", cursor: "pointer" }} />
+          <span style={{ color: "#c2cadb", fontSize: 11 }}>Pitch wobble (each step slightly higher or lower)</span>
+        </label>
       </div>
       {soundRow("JUMP", "jumpSound", "jumpVolume")}
       {soundRow("LAND", "landSound", "landVolume")}
@@ -7207,7 +7214,7 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
         STRIDE LENGTH metres while walking on the ground. Add variations to the footstep
-        and each step plays one of them at random (never the same twice in a row). VOL 1
+        and each step plays one of them at random. VOL 1
         plays the clip at its own level; higher values boost it (up to 4).
       </div>
     </div>

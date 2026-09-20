@@ -360,13 +360,13 @@ export interface BusEvents {
   "leftpanel:close":       Record<string, never>;
   // Audio (Phase 36) — consumed by AudioSystem. `id` is a SoundDef id; a positional
   // one-shot passes `position`. `key` lets a looped emit be stopped later by audio:stop.
-  "audio:play":            { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string };
+  "audio:play":            { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string; rate?: number };   // rate = playback speed/pitch (1 = as recorded)
   "audio:stop":            { id?: string; key?: string };   // no id/key ⇒ stop all one-shots
   "music:play":            { soundId: string; volume?: number; loop?: boolean; fade?: number };
   "music:stop":            { fade?: number };
   // Override the live footstep sound (surface swap). Empty/absent = revert to the
   // authored PlayerSettings.footstepSound. Runtime-only, resets when preview restarts.
-  // `variants` (Phase 73) = extra sounds; each step picks one of [sound, ...variants] at random.
+  // `variants` (Phase 73) = extra sounds; each step picks one of [sound, ...variants] at random (equal chance).
   "character:set-footstep": { sound?: string; variants?: string[] };
   // Authored scene mix / ambient / music changed (editor) — mirrors "world:lighting".
   "world:audio":           { audio: WorldAudio };
@@ -639,9 +639,11 @@ export interface PlayerSettings {
   jumpSound?:          string;             // on jump takeoff
   landSound?:          string;             // on landing
   footstepSound?:      string;             // every footstepDistance metres while grounded + moving
-  // Phase 73 — extra footstep sounds. Each step plays one of [footstepSound, ...footstepVariants],
-  // equal chance, never the same one twice in a row. Absent/empty = the single sound, as before.
+  // Phase 73 — extra footstep sounds. Each step plays one of [footstepSound, ...footstepVariants]
+  // at random, equal chance (the same one CAN repeat). Absent/empty = the single sound, as before.
   footstepVariants?:   string[];
+  // Each footstep plays slightly higher or lower in pitch (±6%). Off unless true.
+  footstepPitchWobble?: boolean;
   footstepDistance?:   number;             // stride length in metres (default 1.8)
   // Per-sound gain (default 1; >1 boosts, runtime-capped at 4).
   jumpVolume?:         number;

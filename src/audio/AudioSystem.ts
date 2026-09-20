@@ -263,7 +263,7 @@ export class AudioSystem {
 
   // ── Event handlers ───────────────────────────────────────────────────────────
 
-  private _onPlay(p: { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string }): void {
+  private _onPlay(p: { id: string; position?: Vec3; entityId?: string; volume?: number; loop?: boolean; key?: string; rate?: number }): void {
     if (!this._active || !p.id) return;
     const def = assetManager.getSoundDef(p.id);
     const bus = catToBus(def?.category ?? "SFX");
@@ -283,7 +283,7 @@ export class AudioSystem {
     if (p.entityId) {
       const mesh = this._findEntityMesh(p.entityId);
       if (mesh) {
-        void this._makeSound(p.id, true, bus, base, loop, mesh, false, { ref: 1, max: 20 }).then(registerKeyed);
+        void this._makeSound(p.id, true, bus, base, loop, mesh, false, { ref: 1, max: 20 }, undefined, p.rate).then(registerKeyed);
         return;
       }
       // mesh not built (yet) — fall through to position / non-positional
@@ -298,9 +298,9 @@ export class AudioSystem {
       // which is ~1/distance: already 4× quieter at the 3rd-person camera's ~4m,
       // so positional play_sound actions sounded far quieter than emitters or the
       // editor preview at the same authored volume.
-      void this._makeSound(p.id, true, bus, base, loop, holder, false, { ref: 1, max: 20 }).then(registerKeyed);
+      void this._makeSound(p.id, true, bus, base, loop, holder, false, { ref: 1, max: 20 }, undefined, p.rate).then(registerKeyed);
     } else {
-      void this._makeSound(p.id, false, bus, base, loop, null).then(registerKeyed);
+      void this._makeSound(p.id, false, bus, base, loop, null, false, undefined, undefined, p.rate).then(registerKeyed);
     }
   }
 
@@ -464,6 +464,7 @@ export class AudioSystem {
     parent: THREE.Object3D | null, startSilent = false,
     dist?: { ref: number; max: number },
     onDone?: () => void,   // fired when a non-looping sound finishes (AFTER its disposal)
+    rate = 1,              // playback speed = pitch (footstep wobble); a native WebAudio param, free at runtime
   ): Promise<AnyAudio | null> {
     let buffer: AudioBuffer;
     try {
@@ -477,6 +478,7 @@ export class AudioSystem {
     const sound = positional ? new THREE.PositionalAudio(this._listener) : new THREE.Audio(this._listener);
     sound.setBuffer(buffer);
     sound.setLoop(loop);
+    if (rate !== 1) sound.setPlaybackRate(rate);
     if (sound instanceof THREE.PositionalAudio && dist) {
       sound.setRefDistance(dist.ref);
       sound.setMaxDistance(dist.max);
