@@ -12,6 +12,7 @@ import type {
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
+import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
 import { facesFromCloud, splitFaceQuad, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
@@ -7189,7 +7190,12 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      {soundRow("FOOTSTEP", "footstepSound", "footstepVolume")}
+      <div>
+        {soundRow("FOOTSTEP", "footstepSound", "footstepVolume")}
+        <SoundVariantList values={playerSettings.footstepVariants} previewVolume={playerSettings.footstepVolume}
+          disabled={!playerSettings.footstepSound}
+          onChange={next => onPlayerSettingsChange({ footstepVariants: next })} />
+      </div>
       {soundRow("JUMP", "jumpSound", "jumpVolume")}
       {soundRow("LAND", "landSound", "landVolume")}
       <div>
@@ -7200,8 +7206,9 @@ function CharacterSoundsPage({ playerSettings, onPlayerSettingsChange }: {
       </div>
       <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace", lineHeight: 1.4 }}>
         The player's own footstep / jump / land sounds (SFX bus). Footsteps fire every
-        STRIDE LENGTH metres while walking on the ground. VOL 1 plays the clip at its
-        own level; higher values boost it (up to 4).
+        STRIDE LENGTH metres while walking on the ground. Add variations to the footstep
+        and each step plays one of them at random (never the same twice in a row). VOL 1
+        plays the clip at its own level; higher values boost it (up to 4).
       </div>
     </div>
   );

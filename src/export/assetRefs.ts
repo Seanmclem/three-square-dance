@@ -43,6 +43,7 @@ const add = (set: Set<string>, id: string | null | undefined): void => {
 function collectActions(refs: AssetRefs, actions: ScriptAction[] | undefined): void {
   for (const a of actions ?? []) {
     add(refs.audio, a.sound);            // play_sound / stop_sound / set_footstep: SoundDef id
+    for (const v of a.soundVariants ?? []) add(refs.audio, v);   // set_footstep variations (Phase 73)
     add(refs.audio, a.music);            // play_music: SoundDef id
     add(refs.textures, a.material);      // change_material: MaterialDef id
     add(refs.rawPaths, a.dialogue?.portrait);  // legacy inline dialogue portrait (<img src> path)
@@ -172,6 +173,7 @@ function collectPlayerSettings(refs: AssetRefs, ps: PlayerSettings | undefined):
   add(refs.audio, ps.jumpSound);             // locomotion one-shots
   add(refs.audio, ps.landSound);
   add(refs.audio, ps.footstepSound);
+  for (const v of ps.footstepVariants ?? []) add(refs.audio, v);   // Phase 73
 }
 
 function collectZone(refs: AssetRefs, z: ZoneDef): void {

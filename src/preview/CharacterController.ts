@@ -108,6 +108,13 @@ const LEAN_RATE    = 10;        // 1/s exp smoothing of both
  * height, default 1) — a small third-person avatar no longer shrinks the FPS
  * viewpoint. Mode is a per-world author setting, so collision is stable in play.
  */
+/** [sound, ...variants] with blanks and duplicates dropped (Phase 73 footstep variation). */
+function footstepPool(sound: string | undefined, variants: string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const s of [sound, ...(variants ?? [])]) if (s && !out.includes(s)) out.push(s);
+  return out;
+}
+
 export function effectiveCharacterScale(s: PlayerSettings): number {
   return s.cameraMode === "thirdperson" ? (s.characterScale ?? 1) : (s.fpsCharacterScale ?? 1);
 }
@@ -186,7 +193,12 @@ export class CharacterController {
   private _stepPrevX = 0;
   private _stepPrevZ = 0;
   private _airTime   = 0;    // seconds airborne — a real fall vs grounded-flicker (land sound gate)
-  private _footstepOverride: string | null = null;   // runtime surface swap (set_footstep action); null = authored default
+  // Footstep POOLS (Phase 73): [sound, ...variants]. One is picked per step — equal chance,
+  // never the same twice in a row (pure random repeats A-A-A, the very machine-gun effect
+  // variation exists to remove; with two sounds this is a natural left/right alternation).
+  private _footstepOverride: string[] | null = null;   // runtime surface swap (set_footstep action); null = authored default
+  private readonly _footstepDefault: string[];         // from PlayerSettings, fixed for the session
+  private _lastFootstep = "";
   private _offFootstep: (() => void) | null = null;
 
   // ── Ladder climbing (Phase 34) ──────────────────────────────────────────────
@@ -239,6 +251,7 @@ export class CharacterController {
     );
 
     this._body = new CharacterBody(effectiveCharacterScale(_settings));
+    this._footstepDefault = footstepPool(_settings.footstepSound, _settings.footstepVariants);
     this._desiredDist = _settings.thirdPersonDistance;
     // Authored starting tilt: degrees down → negative pitch (looking down raises
     // the spring-arm camera above the pivot and aims it down at the character).
@@ -336,8 +349,9 @@ export class CharacterController {
       this._flash = { t: 0, dur: Math.max(0.05, duration), color: new THREE.Color(color) };
     });
     // Runtime footstep surface swap (set_footstep action). Empty = revert to authored default.
-    this._offFootstep = this._bus.on("character:set-footstep", ({ sound }) => {
-      this._footstepOverride = sound || null;
+    this._offFootstep = this._bus.on("character:set-footstep", ({ sound, variants }) => {
+      const pool = footstepPool(sound, variants);
+      this._footstepOverride = pool.length ? pool : null;
     });
     // Ladder proximity + lifecycle (Phase 34). A rebuilt/deleted ladder force-exits
     // the climb — its colliders (and sensor handles) are gone.
@@ -567,13 +581,21 @@ export class CharacterController {
     // Footsteps (Phase 36 follow-up) — emit every footstepDistance metres of ACTUAL
     // horizontal travel while grounded and moving (so a treadmill/wall makes no steps).
     // The override (set_footstep action) wins over the authored default — surface swaps.
-    const footstep = this._footstepOverride ?? this._settings.footstepSound;
-    if (footstep && this._body.isGrounded && isMoving && !this._climbLadder) {
+    const steps = this._footstepOverride ?? this._footstepDefault;
+    if (steps.length && this._body.isGrounded && isMoving && !this._climbLadder) {
       const dx = pos.x - this._stepPrevX, dz = pos.z - this._stepPrevZ;
       this._stepAccum += Math.sqrt(dx * dx + dz * dz);
       if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
         this._stepAccum = 0;
-        this._emitSound(footstep, this._settings.footstepVolume);
+        // Equal chance among the OTHER sounds: roll n-1 slots and skip the last one played.
+        let i = 0;
+        if (steps.length > 1) {
+          const last = steps.indexOf(this._lastFootstep);
+          i = Math.floor(Math.random() * (last < 0 ? steps.length : steps.length - 1));
+          if (last >= 0 && i >= last) i++;
+        }
+        this._lastFootstep = steps[i];
+        this._emitSound(steps[i], this._settings.footstepVolume);
       }
     } else {
       this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant

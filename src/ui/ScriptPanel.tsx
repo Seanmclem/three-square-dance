@@ -35,6 +35,7 @@ import type {
   UiAnchor,
 } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
+import { SoundVariantList } from "@/ui/SoundVariantList";
 import { GraphicPickerPopover } from "@/ui/GraphicsBrowser";
 import { assetManager } from "@/core/AssetManager";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2126,7 +2127,13 @@ function describeAction(a: ScriptAction, ctx: NameCtx): { title: string; sub: st
   let noun = ""; const tail: string[] = [];
   switch (a.type) {
     case "play_sound": noun = soundName(a.sound); if (a.volume != null) tail.push(`vol ${a.volume}`); if (tgt) tail.push(`at ${tgt}`); else if (a.position) tail.push(`at ${fmtVec(a.position)}`); if (a.loop) tail.push("loop"); break;
-    case "stop_sound": case "set_footstep": noun = soundName(a.sound); break;
+    case "stop_sound": noun = soundName(a.sound); break;
+    case "set_footstep": {
+      noun = soundName(a.sound);
+      const extra = (a.soundVariants ?? []).filter(Boolean).length;
+      if (extra) tail.push(`+${extra} variation${extra > 1 ? "s" : ""}`);
+      break;
+    }
     case "play_music": noun = soundName(a.music ?? a.sound); if (a.volume != null) tail.push(`vol ${a.volume}`); if (a.loop === false) tail.push("no loop"); if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
     case "stop_music": noun = "music"; if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
     case "show_dialogue": noun = ctx.zoneDialogues?.find(d => d.id === a.dialogueId)?.label ?? a.dialogueId ?? ""; break;
@@ -2954,11 +2961,15 @@ function ActionFields({
       return (
         <>
           <F label="Footstep sound">
-            <SoundPicker value={action.sound} onChange={(id) => set({ sound: id })} allowNone />
+            <SoundPicker value={action.sound}
+              onChange={(id) => set(id ? { sound: id } : { sound: id, soundVariants: undefined })} allowNone />
+            <SoundVariantList values={action.soundVariants} disabled={!action.sound}
+              onChange={(next) => set({ soundVariants: next })} />
           </F>
           <div style={{ color: "#98a2b8", fontSize: 11, fontStyle: "italic", padding: "4px 0 0" }}>
-            Overrides the player's walking sound (e.g. wood → gravel). Leave empty to revert
-            to the default. Pair on_player_enter / on_player_exit on a trigger volume.
+            Overrides the player's walking sound (e.g. wood → gravel). Add variations and each
+            step plays one at random. Leave empty to revert to the default. Pair
+            on_player_enter / on_player_exit on a trigger volume.
           </div>
         </>
       );

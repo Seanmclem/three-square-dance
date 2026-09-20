@@ -537,7 +537,7 @@ export class ScriptEngine {
 
       case "set_footstep":
         // Empty sound → revert to the authored default (CharacterController clears the override).
-        this._bus.emit("character:set-footstep", { sound: action.sound });
+        this._bus.emit("character:set-footstep", { sound: action.sound, variants: action.soundVariants });
         break;
 
       case "show_dialogue": {

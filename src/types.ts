@@ -366,7 +366,8 @@ export interface BusEvents {
   "music:stop":            { fade?: number };
   // Override the live footstep sound (surface swap). Empty/absent = revert to the
   // authored PlayerSettings.footstepSound. Runtime-only, resets when preview restarts.
-  "character:set-footstep": { sound?: string };
+  // `variants` (Phase 73) = extra sounds; each step picks one of [sound, ...variants] at random.
+  "character:set-footstep": { sound?: string; variants?: string[] };
   // Authored scene mix / ambient / music changed (editor) — mirrors "world:lighting".
   "world:audio":           { audio: WorldAudio };
   // Player-preference mix from the PauseMenu sliders (multiplies over authored mix).
@@ -638,6 +639,9 @@ export interface PlayerSettings {
   jumpSound?:          string;             // on jump takeoff
   landSound?:          string;             // on landing
   footstepSound?:      string;             // every footstepDistance metres while grounded + moving
+  // Phase 73 — extra footstep sounds. Each step plays one of [footstepSound, ...footstepVariants],
+  // equal chance, never the same one twice in a row. Absent/empty = the single sound, as before.
+  footstepVariants?:   string[];
   footstepDistance?:   number;             // stride length in metres (default 1.8)
   // Per-sound gain (default 1; >1 boosts, runtime-capped at 4).
   jumpVolume?:         number;
@@ -1458,6 +1462,7 @@ export interface ScriptAction {
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
   sound?:        string;       // play_sound / stop_sound: SoundDef id
+  soundVariants?: string[];    // set_footstep (Phase 73): extra sounds for the override — same random pick as PlayerSettings.footstepVariants
   music?:        string;       // play_music: SoundDef id
   volume?:       number;       // play_sound / play_music: 0..1 gain override
   loop?:         boolean;      // play_sound / play_music: loop override

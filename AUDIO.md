@@ -135,6 +135,17 @@ has its own **VOL** field (since v4.79.18): 1 = the clip's own level, higher boo
   walking bumps never false-trigger it.
 - These play on the **SFX** bus.
 
+### Footstep variation (v4.83.0)
+
+One footstep sample repeated every stride sounds like a loop. Under the **FOOTSTEP** picker,
+**+ Add variation** adds up to three more sounds (`PlayerSettings.footstepVariants`). Each
+stride then plays ONE of the pool (the main sound plus the variations): equal chance, but
+never the same sound twice in a row. Pure random repeats (A, A, A), which is exactly the
+machine-gun effect variation exists to remove; with two sounds the rule becomes a natural
+left foot, right foot alternation. Pick samples of the same surface: the library ships
+families such as `footstep_carpet_000` to `_004`, `footstep_wood_00x`, `footstep_grass_00x`.
+They share the FOOTSTEP **VOL**. No variations = exactly the old behavior.
+
 ### Swapping the footstep sound at runtime (surfaces: wood → gravel)
 
 The **`set_footstep`** script action overrides the live footstep sound. Empty = revert to
@@ -145,6 +156,10 @@ the authored default. The canonical pattern is a surface zone:
    pick the gravel sound.
 3. **+ New**, trigger `on_player_exit`, action **`set_footstep`** → leave the sound
    **empty** (reverts to the authored default — the "wood").
+
+The `set_footstep` action has the same **+ Add variation** list (`soundVariants`), so a
+surface zone can swap to several gravel samples at once; the exit script still just leaves the
+sound empty, which clears the whole override (variations included).
 
 Now walking onto the patch swaps footsteps to gravel; walking off reverts. The override is
 runtime-only and resets when Preview restarts. (Only footsteps swap today; jump/land don't
