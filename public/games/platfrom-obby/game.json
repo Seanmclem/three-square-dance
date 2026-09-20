@@ -648,7 +648,7 @@
       "id": "pfb_ac09927f",
       "name": "Crab 1",
       "kind": "snapshot",
-      "version": 3,
+      "version": 5,
       "variables": [],
       "template": [
         {
@@ -673,7 +673,7 @@
               "z": 0.5
             },
             "floor": 0,
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "properties": {
               "interactable": false,
               "npcSpawn": false,
@@ -768,16 +768,16 @@
             "id": "vol_50dfd99c",
             "label": "Trigger Volume",
             "position": {
-              "x": -0.004006,
+              "x": 0.0032751353526231375,
               "y": 0.752961,
-              "z": 0.021606
+              "z": 0.02160600000000007
             },
             "size": {
-              "x": 1.5,
-              "y": 1,
-              "z": 1.1
+              "x": 1.4000000000000001,
+              "y": 0.747039,
+              "z": 0.9
             },
-            "zoneId": "demo",
+            "zoneId": "__prefab_edit__",
             "editorTint": {
               "color": "#ff0000",
               "opacity": 0.12
