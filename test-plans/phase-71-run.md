@@ -71,6 +71,21 @@ play after landing. Running too." The `jump_land` one-shot always played to its 
 | 27 | Running 90 degree turn | no skid |
 | 28 | Side-on screenshot mid-skid | the character is visibly tilted back against the slide |
 
+v4.87.1 (the skid could not be triggered by hand; fixed):
+
+| # | Check, with HUMAN key timing, 8.8m from the crab | Result |
+|---|---|---|
+| 29 | Before the fix: 25 to 100ms overlap of both keys, or a 25 to 50ms gap | zero skid (only a same-frame key swap skidded) |
+| 30 | After: overlaps of 8, 25, 50, 75, 100, 150ms | full skid every time: 0.225s, 0.96m, 12.3 degrees back |
+| 31 | After: gaps of 25 / 50 / 75 / 100ms | 0.175s / 0.125s / 0.075s / none |
+| 32 | Analog stick flicked through centre over 4 frames | 0.14s skid |
+| 33 | WALKING reversal, 50ms overlap and 50ms gap | no skid |
+| 34 | Hold W, add S, then release S | moves backward at once, then forward again (last key pressed wins) |
+
+How to trigger it: run is on game-wide now (RUN SPEED x 1.4 in the game defaults). Hold Shift
+and a direction until you are at full run, then press the OPPOSITE direction. You do not need
+to time the release of the first key.
+
 By hand: in level_3 hold Shift and run, then slam the opposite direction. You should slide
 for a beat facing the old way and leaning back, then whip round. Walking reversals should feel
 exactly as before. Try it near a platform edge: the run reversal carries about 0.6m further.

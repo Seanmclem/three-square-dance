@@ -1100,3 +1100,13 @@ game.json merging against the committed fixture
 - **Measure animation stalls as frames from an event to a clip**, e.g. touchdown
   (first frame out of the jump/airidle phases) to `_currentClip === "walk"`. The
   frozen-legs-after-landing report was 44 frames by that measure and 0 after the fix.
+- **(v4.87.1) Synthetic key swaps are frame-perfect; people are not.** A reversal
+  test that does `keyup W` and `keydown S` in the same frame passed while the feature
+  was untriggerable by hand. Real fingers overlap the two keys by 25 to 100ms or leave
+  a small gap. When testing any direction change, sweep BOTH: hold the new key for N
+  frames before releasing the old one, and release first then press after N frames
+  (N = 1, 3, 6, 12). For analog, step the stick through centre over several frames.
+- **A non-monotonic result means contamination, not physics.** 25ms and 100ms
+  overlaps skidded while 50ms did not: a crab bite's knockback had landed in that one
+  run. Count `character:launch` events during movement tests and stay outside every
+  enemy's detect radius (the hub's far side in level_3 is 8.8m from the crab).

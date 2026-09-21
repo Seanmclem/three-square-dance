@@ -87,6 +87,11 @@ const AIR_ACCEL_SEC    = 0.2;
 const RUN_SKID_SEC     = 0.22;  // run speed → 0 (≈ 0.9m of slide at 8.4 m/s; was ≈ 0.34m)
 const RUN_SKID_MIN     = 1.15;  // × moveSpeed — faster than this when the reversal starts = a skid
 const SKID_LEAN        = -0.25; // rad — lean BACK against the slide (≈ 14°)
+// A reversal is never frame-perfect: keys overlap or gap by 25–100ms and an analog stick passes
+// through centre, and in that moment the normal brake (75 m/s²) drops the speed below
+// RUN_SKID_MIN before the opposing input registers. So eligibility REMEMBERS a recent run.
+const RUN_SKID_MEMORY  = 0.15;  // s a faster-than-RUN_SKID_MIN speed still counts
+const RUN_SKID_FLOOR   = 0.3;   // × moveSpeed — below this there is nothing left to skid with
 // Landing shadow — a soft disc straight under the player (the "where will I land" cue).
 const SHADOW_MAX_DROP = 40;     // m — ray length; no ground within this = no disc
 const SHADOW_LIFT     = 0.03;   // m above the hit surface (z-fight guard, with polygonOffset)
@@ -177,6 +182,7 @@ export class CharacterController {
   private _prevVelX = 0;   // last frame's held velocity — the acceleration lean differences it
   private _prevVelZ = 0;
   private _skidding = false;   // run-reversal skid in progress: slow brake, facing held, lean back
+  private _ranRecently = 0;    // s left in which a reversal still counts as "from a run"
   // Landing shadow disc (third person).
   private _shadow: THREE.Mesh | null = null;
   private readonly _shadowRay = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
@@ -431,7 +437,10 @@ export class CharacterController {
     // ground; lasts until the old motion is spent (or the player lets go / leaves the ground).
     const vLen = Math.hypot(this._velX, this._velZ);
     const against = isMoving && vLen > 0.01 && (this._velX * dir.x + this._velZ * dir.z) < -0.5 * vLen * Math.hypot(dir.x, dir.z);
-    if (!this._skidding && against && this._coyote > 0 && vLen > this._settings.moveSpeed * RUN_SKID_MIN) this._skidding = true;
+    if (vLen > this._settings.moveSpeed * RUN_SKID_MIN) this._ranRecently = RUN_SKID_MEMORY;
+    else this._ranRecently = Math.max(0, this._ranRecently - dt);
+    if (!this._skidding && against && this._coyote > 0 && this._ranRecently > 0
+        && vLen > this._settings.moveSpeed * RUN_SKID_FLOOR) this._skidding = true;
     else if (this._skidding && (!against || this._coyote <= 0)) this._skidding = false;
     const rampSec = this._skidding ? RUN_SKID_SEC
       : this._coyote > 0 ? (isMoving ? GROUND_ACCEL_SEC : GROUND_DECEL_SEC) : AIR_ACCEL_SEC;

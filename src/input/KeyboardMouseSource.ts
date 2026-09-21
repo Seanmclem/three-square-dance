@@ -11,6 +11,11 @@ const ZOOM_PER_DELTA = 0.005;
  */
 export class KeyboardMouseSource implements InputSource {
   private readonly _keys = new Set<string>();
+  // Press ORDER of the held keys (v4.87.1). Opposite movement keys resolve to the one pressed
+  // LAST instead of cancelling to zero: a person reversing direction presses the new key a few
+  // frames before lifting the old one, and W+S = 0 turned every reversal into a dead stop first.
+  private readonly _pressSeq = new Map<string, number>();
+  private _seq = 0;
   private _lookPx  = { x: 0, y: 0 };   // accumulated mouse movement since last apply()
   private _wheel   = 0;                 // accumulated deltaY since last apply()
   private _interactQueued = false;      // latched on keydown, consumed by apply()
@@ -38,6 +43,7 @@ export class KeyboardMouseSource implements InputSource {
     this._onKeyDown = e => {
       if (this._isTypingTarget(e)) return;
       this._keys.add(e.code);
+      if (!e.repeat) this._pressSeq.set(e.code, ++this._seq);   // auto-repeat must not reorder a held key
       if (this._bindings.kbm.interact.includes(e.code)) this._interactQueued = true;
       if (this._bindings.kbm.confirm.includes(e.code))  this._confirmQueued  = true;
       if (this._bindings.kbm.cancel.includes(e.code))   this._cancelQueued   = true;
@@ -49,7 +55,7 @@ export class KeyboardMouseSource implements InputSource {
       if (this._bindings.kbm.menuNav.down.includes(e.code)) this._menuNavQueued =  1;
       this._activity = true;
     };
-    this._onKeyUp = e => this._keys.delete(e.code);
+    this._onKeyUp = e => { this._keys.delete(e.code); this._pressSeq.delete(e.code); };
     // A real mouse press (touch also synthesizes MouseEvents, so gate on
     // pointerType) claims the scheme — it's also the gesture pointer-lock
     // re-entry piggybacks on.
@@ -71,6 +77,7 @@ export class KeyboardMouseSource implements InputSource {
     document.removeEventListener("wheel",       this._onWheel);
     document.removeEventListener("pointerdown", this._onPointerDown);
     this._keys.clear();
+    this._pressSeq.clear();
     this._lookPx.x = this._lookPx.y = 0;
     this._wheel = 0;
     this._interactQueued = this._confirmQueued = this._cancelQueued = this._bagQueued = this._activity = false;
@@ -85,10 +92,8 @@ export class KeyboardMouseSource implements InputSource {
 
   apply(state: ActionState, _dt: number): void {
     const b = this._bindings.kbm;
-    if (this._anyDown(b.move.forward)) state.move.y += 1;
-    if (this._anyDown(b.move.back))    state.move.y -= 1;
-    if (this._anyDown(b.move.left))    state.move.x -= 1;
-    if (this._anyDown(b.move.right))   state.move.x += 1;
+    state.move.y += this._axis(b.move.back, b.move.forward);
+    state.move.x += this._axis(b.move.left, b.move.right);
     if (this._anyDown(b.jump))         state.jump = true;
     if (this._anyDown(b.run))          state.run = true;
 
@@ -118,6 +123,19 @@ export class KeyboardMouseSource implements InputSource {
       state.menuNav = this._menuNavQueued;
       this._menuNavQueued = 0;
     }
+  }
+
+  /** −1 / 0 / +1 for an opposing pair of bindings; both held → the one pressed LAST wins. */
+  private _axis(neg: string[], pos: string[]): number {
+    const n = this._latestPress(neg), p = this._latestPress(pos);
+    return n === 0 && p === 0 ? 0 : p > n ? 1 : -1;
+  }
+
+  /** Newest press sequence among the held keys of a binding (0 = none held). */
+  private _latestPress(codes: string[]): number {
+    let m = 0;
+    for (const c of codes) if (this._keys.has(c)) m = Math.max(m, this._pressSeq.get(c) ?? 1);
+    return m;
   }
 
   private _anyDown(codes: string[]): boolean {
