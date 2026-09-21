@@ -58,6 +58,23 @@ play after landing. Running too." The `jump_land` one-shot always played to its 
 | 19 | Standing jump, press W 10 frames after touchdown | waits for the landing clip to end | `walk` 1 frame after the key press |
 | 20 | Total active mixer weight across tap, full and standing jumps | | never below 1.0 |
 
+## v4.87.0: lean and the run skid
+
+| # | Check | Result |
+|---|---|---|
+| 21 | Start walking | forward kick to 8.0 degrees, settles at 5.8 |
+| 22 | Stop from a walk | leans back 2.3 degrees, settles at 0 |
+| 23 | 90 degree turn, roll peak | 8.5 degrees walking, 10.5 running |
+| 24 | WALKING reversal (must be unchanged) | 0.27m slide, 0.09s to stop, no skid, facing not held |
+| 25 | RUNNING reversal | 0.96m slide (was about 0.34m), 0.23s to stop, skid 0.225s, facing held 0.225s, lean back -12.3 degrees, then full speed the other way at 0.32s |
+| 26 | Running, let go of the keys | no skid (0.51m normal stop) |
+| 27 | Running 90 degree turn | no skid |
+| 28 | Side-on screenshot mid-skid | the character is visibly tilted back against the slide |
+
+By hand: in level_3 hold Shift and run, then slam the opposite direction. You should slide
+for a beat facing the old way and leaning back, then whip round. Walking reversals should feel
+exactly as before. Try it near a platform edge: the run reversal carries about 0.6m further.
+
 ## By hand
 
 1. level_3, editor preview, jump readout on. Walk the lane: 5m is the edge of

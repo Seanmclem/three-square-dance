@@ -80,6 +80,13 @@ const JUMP_CUT_MULT  = 3;       // × GRAVITY_RISE once jump is released while s
 const GROUND_ACCEL_SEC = 0.08;
 const GROUND_DECEL_SEC = 0.08;  // ≈ 0.25m stop slide at speed 6
 const AIR_ACCEL_SEC    = 0.2;
+// Run skid (v4.87.0): reversing direction while RUNNING brakes over this long instead of
+// GROUND_DECEL_SEC, so there is time for a skid to read (a 0.16s reversal is over before any
+// pose can). Only reachable above walk speed, i.e. only in games that turned run on — walking
+// physics, and every level built around them, are untouched.
+const RUN_SKID_SEC     = 0.22;  // run speed → 0 (≈ 0.9m of slide at 8.4 m/s; was ≈ 0.34m)
+const RUN_SKID_MIN     = 1.15;  // × moveSpeed — faster than this when the reversal starts = a skid
+const SKID_LEAN        = -0.25; // rad — lean BACK against the slide (≈ 14°)
 // Landing shadow — a soft disc straight under the player (the "where will I land" cue).
 const SHADOW_MAX_DROP = 40;     // m — ray length; no ground within this = no disc
 const SHADOW_LIFT     = 0.03;   // m above the hit surface (z-fight guard, with polygonOffset)
@@ -102,6 +109,13 @@ const LEAN_FORWARD = 0.10;      // rad of forward tilt at full speed (≈ 6°)
 const LEAN_ROLL    = 0.04;      // rad of roll per rad/s of avatar turn rate…
 const LEAN_ROLL_MAX = 0.2;      // …capped (≈ 11°)
 const LEAN_RATE    = 10;        // 1/s exp smoothing of both
+// Acceleration lean (v4.87.0): tilt along the avatar's own forward axis by how hard it is
+// speeding up (+, leans in) or braking (−, leans back). On a full reversal at a run the avatar
+// is still facing the OLD way while the velocity is being thrown into reverse, so it leans
+// BACK against the slide, swings round, then leans INTO the new direction — a skid turn, with
+// no change to where the player goes. Also gives starts and stops a little weight.
+const LEAN_ACCEL     = 0.0025;  // rad per m/s² of forward acceleration
+const LEAN_ACCEL_MAX = 0.3;     // rad cap on that term (≈ 17°)
 
 /**
  * Character scale is per camera mode (Phase 34 follow-up): third-person uses
@@ -160,6 +174,9 @@ export class CharacterController {
   private _leanPitch = 0;
   private _leanRoll = 0;
   private _prevModelYaw = 0;
+  private _prevVelX = 0;   // last frame's held velocity — the acceleration lean differences it
+  private _prevVelZ = 0;
+  private _skidding = false;   // run-reversal skid in progress: slow brake, facing held, lean back
   // Landing shadow disc (third person).
   private _shadow: THREE.Mesh | null = null;
   private readonly _shadowRay = new RAPIER.Ray(new THREE.Vector3(), new THREE.Vector3(0, -1, 0));
@@ -410,7 +427,14 @@ export class CharacterController {
     // (was: wanted × dt straight into the move = full speed on frame one, dead
     // stop on release, instant mid-air reversal). `_coyote > 0` is the stable
     // "on the ground" read — raw isGrounded flickers while walking.
-    const rampSec = this._coyote > 0 ? (isMoving ? GROUND_ACCEL_SEC : GROUND_DECEL_SEC) : AIR_ACCEL_SEC;
+    // Run skid: starts when the wanted direction opposes a faster-than-walk velocity on the
+    // ground; lasts until the old motion is spent (or the player lets go / leaves the ground).
+    const vLen = Math.hypot(this._velX, this._velZ);
+    const against = isMoving && vLen > 0.01 && (this._velX * dir.x + this._velZ * dir.z) < -0.5 * vLen * Math.hypot(dir.x, dir.z);
+    if (!this._skidding && against && this._coyote > 0 && vLen > this._settings.moveSpeed * RUN_SKID_MIN) this._skidding = true;
+    else if (this._skidding && (!against || this._coyote <= 0)) this._skidding = false;
+    const rampSec = this._skidding ? RUN_SKID_SEC
+      : this._coyote > 0 ? (isMoving ? GROUND_ACCEL_SEC : GROUND_DECEL_SEC) : AIR_ACCEL_SEC;
     const maxStep = speed / rampSec * dt;
     const dvx = dir.x - this._velX, dvz = dir.z - this._velZ;
     const dLen = Math.hypot(dvx, dvz);
@@ -638,7 +662,7 @@ export class CharacterController {
       this._modelRoot.position.set(pos.x, feetY, pos.z);
       // While climbing the avatar stays chest-to-the-ladder — the movement-facing
       // rule would spin it to face outward on the way down (input points away).
-      if (isMoving && !this._climbLadder) {
+      if (isMoving && !this._climbLadder && !this._skidding) {   // a skid holds the old facing, then whips round
         const targetYaw = Math.atan2(-faceX, -faceZ);
         let delta = targetYaw - this._modelYaw;
         delta = Math.atan2(Math.sin(delta), Math.cos(delta));   // wrap to [-π, π]
@@ -968,15 +992,25 @@ export class CharacterController {
     let pitch = 0, roll = 0;
     if (!this._climbLadder && dt > 0) {
       const leanMax = Math.max(1, this._settings.runMultiplier ?? 1);   // a little more lean while running
-      pitch = Math.min(leanMax, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1)) * LEAN_FORWARD;
+      const speedK = Math.min(leanMax, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1));
+      pitch = speedK * LEAN_FORWARD;
+      // Acceleration along the avatar's forward. The avatar faces the compass angle _modelYaw,
+      // i.e. along (−sin, −cos) — the same convention the launch handler uses.
+      const ax = (this._velX - this._prevVelX) / dt, az = (this._velZ - this._prevVelZ) / dt;
+      const fwdAccel = ax * -Math.sin(this._modelYaw) + az * -Math.cos(this._modelYaw);
+      pitch += Math.max(-LEAN_ACCEL_MAX, Math.min(LEAN_ACCEL_MAX, fwdAccel * LEAN_ACCEL));
+      if (this._skidding) pitch = SKID_LEAN;   // planted, leaning back against the slide
       let dYaw = this._modelYaw - this._prevModelYaw;
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
       if (Math.abs(dYaw) > 1) dYaw = 0;   // a snap (teleport facing, ladder mount), not a turn
       // The model faces +Z, so its right hand is −X and a positive Z-roll tips it
       // RIGHT; turning right is a DEcreasing yaw → negate.
-      roll = Math.max(-LEAN_ROLL_MAX, Math.min(LEAN_ROLL_MAX, -(dYaw / dt) * LEAN_ROLL));
+      // Turning at a run leans more than the same turn at a walk (roll ∝ turn rate × speed).
+      const rollMax = LEAN_ROLL_MAX * Math.max(1, speedK);
+      roll = Math.max(-rollMax, Math.min(rollMax, -(dYaw / dt) * LEAN_ROLL * Math.max(0.5, speedK)));
     }
     this._prevModelYaw = this._modelYaw;
+    this._prevVelX = this._velX; this._prevVelZ = this._velZ;
     const k = Math.min(1, dt * LEAN_RATE);
     this._leanPitch += (pitch - this._leanPitch) * k;
     this._leanRoll  += (roll  - this._leanRoll)  * k;
