@@ -1150,7 +1150,7 @@
           "autoPlayAnimation": "Idle",
           "scripts": [
             {
-              "id": "script_22542d50",
+              "id": "script_142bd81b",
               "label": "Bite juice (Phase 61 example)",
               "zoneId": "demo",
               "enabled": true,
@@ -1251,7 +1251,7 @@
         {
           "id": "pfi_70c4ab01",
           "prefabId": "pfb_ac09927f",
-          "version": 3,
+          "version": 5,
           "variables": {},
           "origin": {
             "position": {
@@ -1363,14 +1363,14 @@
           "id": "vol_70c4ab01",
           "label": "Trigger Volume",
           "position": {
-            "x": -10.004006,
+            "x": -9.996724864647376,
             "y": 10.752960999999999,
-            "z": 0.021606
+            "z": 0.02160600000000007
           },
           "size": {
-            "x": 1.5,
-            "y": 1,
-            "z": 1.1
+            "x": 1.4000000000000001,
+            "y": 0.747039,
+            "z": 0.9
           },
           "zoneId": "demo",
           "editorTint": {
@@ -1379,7 +1379,7 @@
           },
           "scripts": [
             {
-              "id": "script_9cc86226",
+              "id": "script_c1749126",
               "label": "crab stomp",
               "zoneId": "demo",
               "enabled": true,
