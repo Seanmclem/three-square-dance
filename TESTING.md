@@ -1124,3 +1124,14 @@ game.json merging against the committed fixture
 - **Rapier autostep lifts gradually, over several frames**, not in one. Any per-frame
   condition that can flip mid-climb (a short ground probe, a grounded flag) will cancel the
   climb halfway. Log feet height per frame while walking into a step to see it.
+- **(v4.88.1) Inspect KCC contacts when "grounded" looks wrong.** Mid-symptom, read
+  `kcc.numComputedCollisions()` / `kcc.computedCollision(i)`: `normal1` points from the obstacle
+  TOWARD the character (its Y is how much that contact holds the capsule up), `normal2` is its
+  negation. A ledge-lip hang showed one contact `(-0.98, +0.19, 0)` with `computedGrounded()`
+  true. Check the sign empirically before relying on it: the first attempt read `normal2`.
+- **"Still pushing" is a test condition.** The lip hang only existed while forward was held; a
+  test that releases the key after the jump (as most of mine did) passes. For anything involving
+  walls or ledges, hold the input for seconds after contact and sample the position.
+- **To compare old vs new physics in one tab**, shadow a getter on the instance
+  (`Object.defineProperty(body, "isGrounded", { get: ..., configurable: true })`), run the
+  sweep, then `delete body.isGrounded` to fall back to the class getter.
