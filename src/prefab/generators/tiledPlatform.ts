@@ -17,6 +17,11 @@ import type { PrefabGenerator } from "@/prefab/generators";
 // Tile orientation (measured from the models): at rotY 0 a Corner's outward
 // skirt faces are −X and +Z; a Side's outward face is +Z. Rotations below point
 // each tile's skirt out of the platform.
+//
+// Rounded corners: each grid corner can swap to its `_corner_round` twin (built
+// by scripts/make-round-corners.mjs — the side tile's profile swept a quarter
+// turn, same orientation as the square corner, so rotations are shared). All
+// four on a 2×2 make a radius-2 circle. Off = the legacy output, unchanged.
 
 const PITCH = 2;
 const LAYER = 2;   // vertical pitch — every kit piece spans 2m of height
@@ -34,7 +39,8 @@ type Band = "single" | "top" | "middle" | "bottom";
  *  shadow gap at every layer boundary. The interior cap is likewise a flat sheet
  *  (`platform_dirt_center`), not the `_tall` side-band piece — whose Dirt_1 is
  *  20% darker than every other tile in the kit and left a dark square mid-platform. */
-function assetFor(set: "grass" | "dirt", role: "corner" | "side" | "center", band: Band): string | null {
+function assetFor(set: "grass" | "dirt", role: "corner" | "corner-round" | "side" | "center", band: Band): string | null {
+  if (role === "corner-round") return assetFor(set, "corner", band)!.replace("_corner", "_corner_round");
   if (band === "single") return `platform_${set}_${role}`;
   if (set === "dirt") {
     if (role === "center") {
@@ -78,19 +84,30 @@ export const tiledPlatform: PrefabGenerator = {
     { name: "depth",   label: "Depth (tiles)",   type: "number", default: 3, min: 2, max: 32, step: 1 },
     { name: "height",  label: "Height (layers)", type: "number", default: 1, min: 1, max: 8,  step: 1 },
     { name: "tileSet", label: "Tile set",        type: "choice", default: "grass", options: ["grass", "dirt"] },
+    // Named for the platform's own axes (left = −X, front = +Z), in tileRole's corner order.
+    { name: "roundFrontLeft",  label: "Round front-left corner",  type: "boolean", default: false },
+    { name: "roundFrontRight", label: "Round front-right corner", type: "boolean", default: false },
+    { name: "roundBackRight",  label: "Round back-right corner",  type: "boolean", default: false },
+    { name: "roundBackLeft",   label: "Round back-left corner",   type: "boolean", default: false },
   ],
   expand(vars: Record<string, PrefabVarValue>): PrefabTemplateEntity[] {
     const w   = Math.max(2, Math.min(32, Math.round(Number(vars.width ?? 3))));
     const d   = Math.max(2, Math.min(32, Math.round(Number(vars.depth ?? 3))));
     const h   = Math.max(1, Math.min(8,  Math.round(Number(vars.height ?? 1))));
     const set = vars.tileSet === "dirt" ? "dirt" : "grass";
+    const round: Record<number, boolean> = {   // keyed by the corner's rotY
+      0:   vars.roundFrontLeft  === true,
+      90:  vars.roundFrontRight === true,
+      180: vars.roundBackRight  === true,
+      [-90]: vars.roundBackLeft === true,
+    };
     const out: PrefabTemplateEntity[] = [];
     for (let k = 0; k < h; k++) {
       const band: Band = h === 1 ? "single" : k === 0 ? "top" : k === h - 1 ? "bottom" : "middle";
       for (let i = 0; i < w; i++) {
         for (let j = 0; j < d; j++) {
           const { role, rotY } = tileRole(i, j, w, d);
-          const assetId = assetFor(set, role, band);
+          const assetId = assetFor(set, role === "corner" && round[rotY] ? "corner-round" : role, band);
           if (!assetId) continue;   // hollow interior band
           // Top layer keeps the legacy key so height edits diff-update in place.
           const key = k === 0 ? `tile_${i}_${j}` : `tile_${i}_${j}_L${k}`;

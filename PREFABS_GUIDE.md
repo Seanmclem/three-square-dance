@@ -28,7 +28,7 @@ Two kinds of prefab:
 
 | Kind | Where it comes from | What it contains |
 |---|---|---|
-| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/height/tile-set in, a box of kit tiles out. Height (layers) grows *downward* — the walk surface stays put and extra 2m bands stack below it (repeating middle pieces + a bottom cap). |
+| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/height/tile-set in, a box of kit tiles out. Height (layers) grows *downward* — the walk surface stays put and extra 2m bands stack below it (repeating middle pieces + a bottom cap). Four **Round ... corner** checkboxes swap any of the corners for a rounded one. |
 | **Snapshot** (⬡) | **You**, by capturing a selection | A frozen copy of the entities you selected — models, trigger volumes, shapes, stairs, ladders, with their scripts. The door case: model + trigger + open script, captured once, placed everywhere. |
 
 Under the hood an instance is real entities plus a small link record — the
@@ -179,6 +179,18 @@ the editor re-infers the generator from the instance's settings and relinks
 (recreating the library entry if needed).
 
 ## Kit-tile fine print (Tiled Platform)
+
+**Rounded corners.** Each corner has its own checkbox (front-left, front-right,
+back-right, back-left, named for the platform's own axes: left is -X, front is
++Z, so they turn with the instance). Any mix works: a rounded corner lines up
+with a straight side or a square corner next to it. Tick all four on a 2 x 2
+platform and you get a circle, 4m across; on anything bigger you get a
+rounded rectangle (the curve always has a 2m radius, one tile). Works with both
+tile sets and any height. You can only walk on the curved part, not the
+missing square tip. The pieces are ordinary assets (`Platform Grass Corner
+Round` and friends, tagged `rounded`), so you can also place them by hand.
+They are generated from the straight side tiles by
+`node scripts/make-round-corners.mjs`; re-run it if a side tile ever changes.
 
 The platformer-kit tiles are **hollow, double-sided shells** (grass lid + dirt
 skirt, no bottom or interior), and interior tiles are a flat sheet. Flush, a

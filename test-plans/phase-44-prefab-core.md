@@ -49,3 +49,30 @@ Automated checks marked [x] were run via Chrome MCP on 2026-07-21 (see
 - [x] `npm run typecheck` → 0 errors.
 - [x] Console clean of prefab-related errors during the whole flow.
 - [ ] Object/Decal placement, groups, copy/paste unaffected (spot-check).
+
+## Rounded corners (v4.88.0)
+
+Checked without the editor (script output + an isolated three.js viewer on the
+real generator output and files):
+
+- [x] `node scripts/make-round-corners.mjs` twice gives identical bytes.
+- [x] Every triangle's winding agrees with its normals; both end rings of each
+      round corner equal its side tile's profile exactly.
+- [x] All four checkboxes off: output identical to the previous generator.
+- [x] All 16 corner combinations, both tile sets, heights 1/2/3/5: every emitted
+      asset id exists in the manifest; one round tile per ticked corner per layer.
+- [x] By eye: 2 x 2 all-round is a circle (1 and 4 layers); 4 x 3 with two
+      opposite corners rounded sits cleanly beside two square corners; dirt set
+      matches; stripes and grass lip continuous through the seams.
+
+Still to do in the editor:
+
+- [ ] Select an existing Tiled Platform: the four "Round ... corner" checkboxes
+      show, all unticked, and the platform is unchanged.
+- [ ] Tick each one: the matching corner (and only it) goes round on every
+      layer; untick restores it; each is one undo step.
+- [ ] Preview: walk the curved edge. You stay on over the curve and fall where
+      the square tip used to be (no invisible floor at the diagonal).
+- [ ] Rotate the instance 90 degrees: the rounded corners turn with it.
+- [ ] Asset browser: the six `... Corner Round` pieces are listed under Pieces;
+      re-stage a thumbnail for each (Manage mode, camera button).
