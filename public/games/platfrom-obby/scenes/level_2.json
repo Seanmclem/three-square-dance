@@ -13,7 +13,7 @@
         "z": 26.95430142127765
       },
       "radius": 24.20109155321527,
-      "phi": 1.0557963267949015,
+      "phi": 0.6807963267949018,
       "theta": 25.54474999990828
     }
   },
@@ -1640,6 +1640,33 @@
             "prefabId": "pfb_a15c07b6",
             "instanceId": "pfi_38c4d3b6",
             "memberKey": "tile_1_1"
+          }
+        },
+        {
+          "id": "obj_489b6fb2",
+          "assetId": "character",
+          "position": {
+            "x": -4.5,
+            "y": 9.517862953544952,
+            "z": 24.5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "floor": 0,
+          "zoneId": "demo",
+          "properties": {
+            "interactable": false,
+            "npcSpawn": false,
+            "lootTableId": null,
+            "triggerEventId": null
           }
         }
       ],
