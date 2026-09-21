@@ -153,7 +153,9 @@ Measured in the Jump Lab (full-hold jump, `jumpHeight 3.5`, `moveSpeed 6`):
 
 Pre-existing behaviors found, reported to the user, deliberately not changed:
 
-1. **Effective ledge reach is about jump height + capsule radius** (2.0m here).
+1. **(Superseded by v4.88.0: the cause was Rapier autostep firing mid-jump, reach was
+   really 2.2m, and it is now 1.95m. See the architecture changelog.)** Original note:
+   **Effective ledge reach is about jump height + capsule radius** (2.0m here).
    The capsule's round bottom catches the lip and forward input rolls it over,
    like a wheel over a curb. Build "unreachable" ledges at 2.3m or more.
 2. **A lip graze while rising refreshes the coyote window**, so a second jump

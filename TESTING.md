@@ -1110,3 +1110,17 @@ game.json merging against the committed fixture
   overlaps skidded while 50ms did not: a crab bite's knockback had landed in that one
   run. Count `character:launch` events during movement tests and stay outside every
   enemy's detect radius (the hub's far side in level_3 is 8.8m from the crab).
+- **(v4.88.0) Take enemies out of the simulation for movement tests, do not just keep
+  your distance.** The level_3 crab chases up to its 12m leash: over a few runs it walked
+  out of its pen, across the hub and into the test lanes, and bit the test player mid-walk.
+  Symptoms that looked like bugs: phantom "airborne" frames while walking, a 0.2m step
+  "failing", a 50ms key overlap behaving differently from 25ms and 100ms. In a runtime test
+  tab, first run `(__enemyAI.recs ?? __enemyAI._recs).clear()` (in-memory only) and count
+  `character:launch` events; zero is the pass condition for a clean run.
+- **Temporary test geometry, without touching any file:** in a RUNTIME tab,
+  `__runtime.world.addPlatform("demo", {...})` and `updatePlatform(..., { thickness })` build
+  real meshes and colliders. A row of blocks at stepped heights finds a reach limit to the
+  centimetre (this is how jump reach was measured at 2.2m before and 1.95m after).
+- **Rapier autostep lifts gradually, over several frames**, not in one. Any per-frame
+  condition that can flip mid-climb (a short ground probe, a grounded flag) will cancel the
+  climb halfway. Log feet height per frame while walking into a step to see it.

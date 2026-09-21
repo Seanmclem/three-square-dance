@@ -559,6 +559,13 @@ export class CharacterController {
       // mover, grounded-flicker robustness comes from the coyote window instead.
       if (this._body.isGrounded && this._velY === 0 && !onMover) dir.y = -GROUND_STICK * dt;
 
+      // Stair-stepping is for WALKING; otherwise it is off (see CharacterBody.setAirborne — the
+      // round capsule still gives ≈ 0.14m of lip forgiveness). "Walking" is decided physically:
+      // real ground under the centre AND not moving upward. NOT from isGrounded/_coyote — both
+      // were tried and both lie here: pressing into a ledge face mid-jump grazes its lip and
+      // flickers isGrounded TRUE (a 1.75m jump still climbed 2.0m), while pushing into a tall
+      // stair drops it FALSE long enough to expire coyote (walking up 0.44m stopped working).
+      this._body.setAirborne(this._velY > 0 || !this._body.hasGroundBelow());
       this._body.move(dir);
     }
     const pos = this._body.position;

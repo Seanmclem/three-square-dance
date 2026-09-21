@@ -6,6 +6,8 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 // only guards against explosive ejection from a deep overlap (e.g. after a teleport).
 const MAX_PUSH_PER_FRAME = 0.3;
 
+const AUTOSTEP_GROUND = 0.5;    // × character scale — stairs the character can WALK up
+
 export class CharacterBody {
   readonly capsuleRadius:     number;
   readonly capsuleHalfHeight: number;
@@ -13,6 +15,7 @@ export class CharacterBody {
   private _body!:     RAPIER.RigidBody;
   private _collider!: RAPIER.Collider;
   private _kcc!:      RAPIER.KinematicCharacterController;
+  private _airborne = false;   // which autostep limit is currently configured (see setAirborne)
   private readonly _downRay = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
 
   // ── Moving-geometry push-out (v4.25.1) — persistent callbacks + scratch state so
@@ -76,10 +79,28 @@ export class CharacterBody {
       this._body,
     );
     this._kcc = physicsWorld.world.createCharacterController(0.01);
-    this._kcc.enableAutostep(0.5 * s, 0.2 * s, true);
+    this._kcc.enableAutostep(AUTOSTEP_GROUND * s, 0.2 * s, true);
     this._kcc.enableSnapToGround(0.3 * s);
     this._kcc.setSlideEnabled(true);
     this._kcc.setMaxSlopeClimbAngle(45 * Math.PI / 180);
+  }
+
+  /**
+   * Autostep is a WALKING feature (climb stairs up to AUTOSTEP_GROUND), but Rapier applies it
+   * to any horizontal push into an obstacle — including mid-jump, where it lifted the player up
+   * to 0.45m onto a ledge the jump itself could not reach (measured: a 1.75m jump peaking at
+   * 2.03m against a 2.0m step; reach was jump + 0.45 = 2.2m). Off the ground it is now OFF.
+   * A small lip assist remains on its own: the capsule's round bottom rides over a lip it
+   * clips, worth ≈ 0.14m (measured reach 1.92m from a 1.78m jump). Sweeping an airborne
+   * autostep of 0.03–0.12m only moved that to 1.95–1.97m, so the simple rule won: stair-stepping
+   * is for walking. Only re-configures the KCC when the state actually changes.
+   */
+  setAirborne(airborne: boolean): void {
+    if (airborne === this._airborne) return;
+    this._airborne = airborne;
+    const s = this._scale;
+    if (airborne) this._kcc.disableAutostep();
+    else this._kcc.enableAutostep(AUTOSTEP_GROUND * s, 0.2 * s, true);
   }
 
   move(desired: THREE.Vector3): void {
@@ -98,6 +119,27 @@ export class CharacterBody {
    * downward ray, sensors + self excluded) — how the carry logic identifies a
    * moving platform (Phase 31). Null when airborne or over a parentless collider.
    */
+  /**
+   * Is there a surface directly under the capsule's CENTRE, within standing reach? Stricter
+   * than `isGrounded`: that flag also turns true for a frame when the capsule's round bottom
+   * grazes a ledge lip mid-jump, and stays true while it hangs on a lip by its edge — in both
+   * cases the floor under the centre is a metre or more away. Same short ray as
+   * groundBodyHandle (sensors + self excluded); used to decide which autostep limit applies.
+   */
+  hasGroundBelow(): boolean {
+    const t = this._body.translation();
+    this._downRay.origin.x = t.x; this._downRay.origin.y = t.y; this._downRay.origin.z = t.z;
+    // Reach = the tallest step autostep can climb, plus a margin. Autostep lifts the capsule
+    // GRADUALLY over several frames; with a shorter ray (0.35) the floor dropped out of reach at
+    // 0.32m of lift, autostep switched off mid-climb and the character slid back (walking up
+    // 0.44m broke). A ledge worth blocking has its floor ≥ 1m below, far beyond this.
+    const maxToi = this.capsuleHalfHeight + this.capsuleRadius + (AUTOSTEP_GROUND + 0.1) * this._scale;
+    return physicsWorld.world.castRay(
+      this._downRay, maxToi, true,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS, undefined, this._collider,
+    ) !== null;
+  }
+
   groundBodyHandle(): number | null {
     const t = this._body.translation();
     this._downRay.origin.x = t.x; this._downRay.origin.y = t.y; this._downRay.origin.z = t.z;
