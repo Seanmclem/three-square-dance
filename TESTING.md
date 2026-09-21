@@ -1135,3 +1135,10 @@ game.json merging against the committed fixture
 - **To compare old vs new physics in one tab**, shadow a getter on the instance
   (`Object.defineProperty(body, "isGrounded", { get: ..., configurable: true })`), run the
   sweep, then `delete body.isGrounded` to fall back to the class getter.
+- **(v4.88.2) Measure FEEL regressions, not just outcomes.** v4.88.0 and v4.88.1 passed every
+  "did it reach / did it get stuck" check and were reverted anyway: the user felt jitter mounting
+  a ledge. The metric that showed it: while the capsule is at the lip, count sign reversals of
+  the per-frame vertical delta, frames spent there, `isGrounded` flips and clip changes, and
+  compare versions side by side in one tab (original 1 reversal and 52 frames, the "fix" 6 and
+  62). For any change to grounded, autostep or collision logic, run that comparison BEFORE
+  shipping, holding the input the whole time.

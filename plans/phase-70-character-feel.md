@@ -153,8 +153,9 @@ Measured in the Jump Lab (full-hold jump, `jumpHeight 3.5`, `moveSpeed 6`):
 
 Pre-existing behaviors found, reported to the user, deliberately not changed:
 
-1. **(Superseded by v4.88.0: the cause was Rapier autostep firing mid-jump, reach was
-   really 2.2m, and it is now 1.95m. See the architecture changelog.)** Original note:
+1. **(Corrected: the cause is Rapier autostep firing mid-jump, and reach is really 2.2m.
+   v4.88.0 turned it off in the air and v4.88.2 REVERTED that because mounting a ledge became
+   jittery. 2.2m stands. See the architecture changelog.)** Original note:
    **Effective ledge reach is about jump height + capsule radius** (2.0m here).
    The capsule's round bottom catches the lip and forward input rolls it over,
    like a wheel over a curb. Build "unreachable" ledges at 2.3m or more.
