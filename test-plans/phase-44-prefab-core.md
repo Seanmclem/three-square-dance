@@ -76,3 +76,27 @@ Still to do in the editor:
 - [ ] Rotate the instance 90 degrees: the rounded corners turn with it.
 - [ ] Asset browser: the six `... Corner Round` pieces are listed under Pieces;
       re-stage a thumbnail for each (Manage mode, camera button).
+
+## Corner radius (v4.89.0)
+
+Checked without the editor, same method as above:
+
+- [x] Radius 1 (or absent): output identical to v4.88.0 for every corner mask,
+      grid size and height tried.
+- [x] Radii 1..9, all masks, 7 grid sizes, 3 heights, both sets: every asset id
+      exists; one round piece per ticked corner per layer; top band has
+      w*d - ticked*(r^2 - 1) members; no two members share a cell; radius 9
+      clamps to the grid.
+- [x] By eye: 6 x 6 r3 circle, 10 x 4 r2 dirt pill (2 layers), 8 x 8 r2 soft
+      square (3 layers), 4 x 4 r2 dirt cylinder (4 layers), 9 x 7 with two
+      opposite r3 corners. Seams clean, hull points trace every arc.
+
+Still to do in the editor:
+
+- [ ] Existing Tiled Platform shows **Corner radius (tiles)** = 1, unchanged.
+- [ ] 6 x 6, all four ticked, radius 3: a circle of four pieces. Radius 4 on
+      the same grid stays at 3 (capped). Radius back to 1: four small corners
+      plus sides return, one undo step each way.
+- [ ] Preview: walk the full rim of the 6 x 6 circle. No invisible floor past
+      the curve, no gaps between the four pieces.
+- [ ] Height 3 on the circle: every layer round, underside closed.

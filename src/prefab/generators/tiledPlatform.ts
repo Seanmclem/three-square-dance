@@ -22,6 +22,14 @@ import type { PrefabGenerator } from "@/prefab/generators";
 // by scripts/make-round-corners.mjs — the side tile's profile swept a quarter
 // turn, same orientation as the square corner, so rotations are shared). All
 // four on a 2×2 make a radius-2 circle. Off = the legacy output, unchanged.
+//
+// Corner radius r (tiles, shared by all four): a rounded corner is one
+// `_corner_round<r>` piece (no number for r = 1) filling the r×r block at that
+// grid corner. Its pivot sits at the block's inner corner, which is where the
+// block's innermost tile has its pivot, so the piece is emitted at that tile's
+// cell (and under its memberKey, so radius edits diff-update in place); the
+// block's other cells emit nothing. r is clamped to half the smaller dimension,
+// so blocks never overlap; all four on a 2r×2r make a radius-2r circle.
 
 const PITCH = 2;
 const LAYER = 2;   // vertical pitch — every kit piece spans 2m of height
@@ -39,8 +47,8 @@ type Band = "single" | "top" | "middle" | "bottom";
  *  shadow gap at every layer boundary. The interior cap is likewise a flat sheet
  *  (`platform_dirt_center`), not the `_tall` side-band piece — whose Dirt_1 is
  *  20% darker than every other tile in the kit and left a dark square mid-platform. */
-function assetFor(set: "grass" | "dirt", role: "corner" | "corner-round" | "side" | "center", band: Band): string | null {
-  if (role === "corner-round") return assetFor(set, "corner", band)!.replace("_corner", "_corner_round");
+function assetFor(set: "grass" | "dirt", role: "corner" | "corner-round" | "side" | "center", band: Band, radius = 1): string | null {
+  if (role === "corner-round") return assetFor(set, "corner", band)!.replace("_corner", `_corner_round${radius > 1 ? radius : ""}`);
   if (band === "single") return `platform_${set}_${role}`;
   if (set === "dirt") {
     if (role === "center") {
@@ -89,25 +97,38 @@ export const tiledPlatform: PrefabGenerator = {
     { name: "roundFrontRight", label: "Round front-right corner", type: "boolean", default: false },
     { name: "roundBackRight",  label: "Round back-right corner",  type: "boolean", default: false },
     { name: "roundBackLeft",   label: "Round back-left corner",   type: "boolean", default: false },
+    { name: "cornerRadius",    label: "Corner radius (tiles)",    type: "number",  default: 1, min: 1, max: 8, step: 1 },
   ],
   expand(vars: Record<string, PrefabVarValue>): PrefabTemplateEntity[] {
     const w   = Math.max(2, Math.min(32, Math.round(Number(vars.width ?? 3))));
     const d   = Math.max(2, Math.min(32, Math.round(Number(vars.depth ?? 3))));
     const h   = Math.max(1, Math.min(8,  Math.round(Number(vars.height ?? 1))));
     const set = vars.tileSet === "dirt" ? "dirt" : "grass";
-    const round: Record<number, boolean> = {   // keyed by the corner's rotY
-      0:   vars.roundFrontLeft  === true,
-      90:  vars.roundFrontRight === true,
-      180: vars.roundBackRight  === true,
-      [-90]: vars.roundBackLeft === true,
+    const r   = Math.max(1, Math.min(8, Math.floor(Math.min(w, d) / 2), Math.round(Number(vars.cornerRadius ?? 1))));
+    // Rounded corner blocks, keyed by the corner's rotY: the block's cell range
+    // and its innermost cell (where the piece is emitted).
+    const blocks: Record<number, { on: boolean; i0: number; i1: number; j0: number; j1: number; pi: number; pj: number }> = {
+      0:     { on: vars.roundFrontLeft  === true, i0: 0,     i1: r - 1, j0: d - r, j1: d - 1, pi: r - 1, pj: d - r },
+      90:    { on: vars.roundFrontRight === true, i0: w - r, i1: w - 1, j0: d - r, j1: d - 1, pi: w - r, pj: d - r },
+      180:   { on: vars.roundBackRight  === true, i0: w - r, i1: w - 1, j0: 0,     j1: r - 1, pi: w - r, pj: r - 1 },
+      [-90]: { on: vars.roundBackLeft   === true, i0: 0,     i1: r - 1, j0: 0,     j1: r - 1, pi: r - 1, pj: r - 1 },
+    };
+    const blockAt = (i: number, j: number) => {
+      for (const rotY of [0, 90, 180, -90]) {
+        const b = blocks[rotY];
+        if (b.on && i >= b.i0 && i <= b.i1 && j >= b.j0 && j <= b.j1) return { rotY, inner: i === b.pi && j === b.pj };
+      }
+      return null;
     };
     const out: PrefabTemplateEntity[] = [];
     for (let k = 0; k < h; k++) {
       const band: Band = h === 1 ? "single" : k === 0 ? "top" : k === h - 1 ? "bottom" : "middle";
       for (let i = 0; i < w; i++) {
         for (let j = 0; j < d; j++) {
-          const { role, rotY } = tileRole(i, j, w, d);
-          const assetId = assetFor(set, role === "corner" && round[rotY] ? "corner-round" : role, band);
+          const block = blockAt(i, j);
+          if (block && !block.inner) continue;   // covered by the rounded corner piece
+          const { role, rotY } = block ? { role: "corner-round" as const, rotY: block.rotY } : tileRole(i, j, w, d);
+          const assetId = assetFor(set, role, band, r);
           if (!assetId) continue;   // hollow interior band
           // Top layer keeps the legacy key so height edits diff-update in place.
           const key = k === 0 ? `tile_${i}_${j}` : `tile_${i}_${j}_L${k}`;

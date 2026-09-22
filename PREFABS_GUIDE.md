@@ -28,7 +28,7 @@ Two kinds of prefab:
 
 | Kind | Where it comes from | What it contains |
 |---|---|---|
-| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/height/tile-set in, a box of kit tiles out. Height (layers) grows *downward* — the walk surface stays put and extra 2m bands stack below it (repeating middle pieces + a bottom cap). Four **Round ... corner** checkboxes swap any of the corners for a rounded one. |
+| **Generator** (ƒ) | Built into the editor (currently: **Tiled Platform**) | Code that builds pieces from parameters — width/depth/height/tile-set in, a box of kit tiles out. Height (layers) grows *downward* — the walk surface stays put and extra 2m bands stack below it (repeating middle pieces + a bottom cap). Four **Round ... corner** checkboxes swap any of the corners for a rounded one, and **Corner radius (tiles)** sets how big the curve is. |
 | **Snapshot** (⬡) | **You**, by capturing a selection | A frozen copy of the entities you selected — models, trigger volumes, shapes, stairs, ladders, with their scripts. The door case: model + trigger + open script, captured once, placed everywhere. |
 
 Under the hood an instance is real entities plus a small link record — the
@@ -183,14 +183,20 @@ the editor re-infers the generator from the instance's settings and relinks
 **Rounded corners.** Each corner has its own checkbox (front-left, front-right,
 back-right, back-left, named for the platform's own axes: left is -X, front is
 +Z, so they turn with the instance). Any mix works: a rounded corner lines up
-with a straight side or a square corner next to it. Tick all four on a 2 x 2
-platform and you get a circle, 4m across; on anything bigger you get a
-rounded rectangle (the curve always has a 2m radius, one tile). Works with both
-tile sets and any height. You can only walk on the curved part, not the
-missing square tip. The pieces are ordinary assets (`Platform Grass Corner
-Round` and friends, tagged `rounded`), so you can also place them by hand.
-They are generated from the straight side tiles by
-`node scripts/make-round-corners.mjs`; re-run it if a side tile ever changes.
+with a straight side or a square corner next to it. **Corner radius (tiles)**
+is shared by all four corners: at 1 the curve is one tile (2m radius), at 2 it
+spans a 2 x 2 block of the grid, and so on up to 8. It is capped at half the
+smaller dimension. Tick all four and set the radius to half the size for a
+circle: 2 x 2 at radius 1 is 4m across, 6 x 6 at radius 3 is 12m, 16 x 16 at
+radius 8 is 32m. A 10 x 4 at radius 2 is a pill; an 8 x 8 at radius 2 is a
+square with soft corners. Works with both tile sets and any height. You can
+only walk on the curved part, not the missing square tip. Each rounded corner
+is one piece standing in for the whole block of tiles it covers, so a big
+circle is just four pieces. The pieces are ordinary assets (`Platform Grass
+Corner Round`, `... Round 2` up to `... Round 8`, and the dirt ones, tagged
+`rounded`), so you can also place them by hand. They are generated from the
+straight side tiles by `node scripts/make-round-corners.mjs`; re-run it if a
+side tile ever changes.
 
 The platformer-kit tiles are **hollow, double-sided shells** (grass lid + dirt
 skirt, no bottom or interior), and interior tiles are a flat sheet. Flush, a

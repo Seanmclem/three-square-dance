@@ -11,9 +11,15 @@
 // the pivot is the inner corner (+1, y, -1), the sweep runs from the +X edge
 // (meets a +Z-facing side) to the -Z edge (meets a -X-facing side).
 //
-// Writes platform_<set>_corner_round<band>.gltf next to the sources and upserts
-// their manifest entries (with a quarter-disc hull collider). Re-running
-// regenerates the same bytes.
+// Larger radii (2..MAX_RADIUS tiles): the same sweep with everything past the
+// pivot pushed 2(r-1) m further out, so the flat top/bottom sheets stretch and
+// the lip keeps its shape. The piece then fills an r x r block of the grid
+// (pivot still at local (+1, -1), the block's inner corner) and four of them on
+// a 2r x 2r platform make a circle of radius 2r m.
+//
+// Writes platform_<set>_corner_round[r]<band>.gltf next to the sources (no
+// number for r = 1) and upserts their manifest entries (with a quarter-disc
+// hull collider). Re-running regenerates the same bytes.
 //
 //   node scripts/make-round-corners.mjs
 
@@ -21,7 +27,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const DIR      = "public/assets/models";
 const MANIFEST = `${DIR}/manifest.json`;
-const SEGMENTS = 8;          // per quarter turn (a full circle is a 32-gon)
+const SEGMENTS   = 8;        // per quarter turn at radius 1 (a full circle is a 32-gon); scales with radius
+const MAX_RADIUS = 8;        // tiles; a 32 m circle
 const PIVOT    = { x: 1, z: -1 };
 
 // side tile → the square corner it pairs with (collider + manifest fields mirror it)
@@ -55,19 +62,20 @@ function readAccessor(gltf, bin, index) {
 }
 
 /** Sweep one extruded primitive. Returns { positions, normals, indices }. */
-function sweep(P, N, tris) {
+function sweep(P, N, tris, rad) {
+  const segs = SEGMENTS * rad, grow = 2 * (rad - 1);
   // Profile points = the x=+1 vertices; each x=-1 vertex pairs with the +1
   // vertex sharing its (y, z, normal).
   const key = i => `${r4(P[i][1])},${r4(P[i][2])},${r4(N[i][1])},${r4(N[i][2])}`;
   const profile = [], slot = new Map(), side = [];
   for (let i = 0; i < P.length; i++) {
     const k = key(i);
-    if (!slot.has(k)) { slot.set(k, profile.length); profile.push({ y: P[i][1], r: P[i][2] - PIVOT.z, ny: N[i][1], nr: N[i][2] }); }
+    if (!slot.has(k)) { slot.set(k, profile.length); profile.push({ y: P[i][1], r: P[i][2] - PIVOT.z + (P[i][2] > PIVOT.z + 1e-4 ? grow : 0), ny: N[i][1], nr: N[i][2] }); }
     side.push(P[i][0] > 0 ? 1 : 0);   // 1 = sweep start (angle 0), 0 = sweep end
   }
   const positions = [], normals = [];
-  for (let s = 0; s <= SEGMENTS; s++) {
-    const a = (s / SEGMENTS) * Math.PI / 2, sin = Math.sin(a), cos = Math.cos(a);
+  for (let s = 0; s <= segs; s++) {
+    const a = (s / segs) * Math.PI / 2, sin = Math.sin(a), cos = Math.cos(a);
     for (const p of profile) {
       positions.push([PIVOT.x - p.r * sin, p.y, PIVOT.z + p.r * cos]);
       normals.push([-p.nr * sin, p.ny, p.nr * cos]);
@@ -77,7 +85,7 @@ function sweep(P, N, tris) {
   // its x=+1 corners on ring s and its x=-1 corners on ring s+1. Triangles that
   // collapse at the pivot (r = 0 on both rings) are dropped.
   const indices = [];
-  for (let s = 0; s < SEGMENTS; s++) {
+  for (let s = 0; s < segs; s++) {
     for (const t of tris) {
       const v = t.map(i => (side[i] ? s : s + 1) * profile.length + slot.get(key(i)));
       const at = i => positions[i].map(r4).join(",");
@@ -88,7 +96,7 @@ function sweep(P, N, tris) {
   return { positions, normals, indices };
 }
 
-function build(sideId) {
+function build(sideId, rad) {
   const src = JSON.parse(readFileSync(`${DIR}/${sideId}.gltf`, "utf8"));
   const bin = Buffer.from(src.buffers[0].uri.split(",")[1], "base64");
   const chunks = [], bufferViews = [], accessors = [], primitives = [];
@@ -110,8 +118,8 @@ function build(sideId) {
     const N = readAccessor(src, bin, prim.attributes.NORMAL);
     const I = readAccessor(src, bin, prim.indices).map(r => r[0]);
     const tris = []; for (let i = 0; i < I.length; i += 3) tris.push(I.slice(i, i + 3));
-    const { positions, normals, indices } = sweep(P, N, tris);
-    for (const p of P) { maxR = Math.max(maxR, p[2] - PIVOT.z); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
+    const { positions, normals, indices } = sweep(P, N, tris, rad);
+    for (const p of P) { maxR = Math.max(maxR, p[2] - PIVOT.z + 2 * (rad - 1)); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
     const min = [0, 1, 2].map(c => Math.min(...positions.map(p => p[c])));
     const max = [0, 1, 2].map(c => Math.max(...positions.map(p => p[c])));
     const idx = Buffer.alloc(indices.length * 2);
@@ -123,7 +131,7 @@ function build(sideId) {
     primitives.push({ attributes: { POSITION: a - 3, NORMAL: a - 2 }, indices: a - 1, material: prim.material });
   }
   const data = Buffer.concat(chunks);
-  const name = src.nodes[0].name.replace("_Side", "_Corner_Round");
+  const name = src.nodes[0].name.replace("_Side", `_Corner_Round${rad > 1 ? rad : ""}`);
   const gltf = {
     asset: { generator: "scripts/make-round-corners.mjs", version: "2.0" },
     scene: 0, scenes: [{ name: "Scene", nodes: [0] }],
@@ -136,13 +144,15 @@ function build(sideId) {
   return { gltf, maxR, minY, maxY };
 }
 
-/** Quarter-disc prism: the pivot column plus the arc, at the collider's top and bottom. */
+/** Quarter-disc prism: the pivot column plus the arc, at the collider's top and
+ *  bottom. The arc is coarser than the mesh past radius 2 (16 chords max: under
+ *  2 cm of sag at radius 16 m), which keeps the manifest small. */
 function hullCollider(id, radius, y0, y1) {
-  const points = [];
+  const points = [], segs = Math.min(SEGMENTS * Math.round(radius / 2), 16);
   for (const y of [y0, y1]) {
     points.push({ x: PIVOT.x, y: r4(y), z: PIVOT.z });
-    for (let s = 0; s <= SEGMENTS; s++) {
-      const a = (s / SEGMENTS) * Math.PI / 2;
+    for (let s = 0; s <= segs; s++) {
+      const a = (s / segs) * Math.PI / 2;
       points.push({ x: r4(PIVOT.x - radius * Math.sin(a)), y: r4(y), z: r4(PIVOT.z + radius * Math.cos(a)) });
     }
   }
@@ -154,9 +164,9 @@ function hullCollider(id, radius, y0, y1) {
 }
 
 const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
-for (const [sideId, cornerId] of SOURCES) {
-  const roundId = cornerId.replace("_corner", "_corner_round");
-  const { gltf, maxR, minY, maxY } = build(sideId);
+for (let rad = 1; rad <= MAX_RADIUS; rad++) for (const [sideId, cornerId] of SOURCES) {
+  const roundId = cornerId.replace("_corner", `_corner_round${rad > 1 ? rad : ""}`);
+  const { gltf, maxR, minY, maxY } = build(sideId, rad);
   writeFileSync(`${DIR}/${roundId}.gltf`, JSON.stringify(gltf));
 
   // Collider mirrors the square corner: its hand-set slab where it has one
@@ -166,22 +176,28 @@ for (const [sideId, cornerId] of SOURCES) {
   if (!square) throw new Error(`manifest has no ${cornerId}`);
   const slab = square.colliders?.[0];
   const collider = slab
-    ? hullCollider(`col_${roundId}`, slab.size.x, slab.offset.y - slab.size.y / 2, slab.offset.y + slab.size.y / 2)
+    ? hullCollider(`col_${roundId}`, slab.size.x + 2 * (rad - 1), slab.offset.y - slab.size.y / 2, slab.offset.y + slab.size.y / 2)
     : hullCollider(`col_${roundId}`, maxR, minY, maxY);
 
+  // Upsert keeps what the editor may have added to an existing entry since
+  // (thumbnail, extra tags, dateAdded); geometry-derived fields are regenerated.
+  const at = manifest.assets.findIndex(a => a.id === roundId);
+  const existing = at >= 0 ? manifest.assets[at] : undefined;
   const { thumbnail: _thumbnail, ...rest } = square;
   const entry = {
     ...rest,
     id: roundId,
-    label: square.label.replace("Corner", "Corner Round"),
+    label: square.label.replace("Corner", `Corner Round${rad > 1 ? ` ${rad}` : ""}`),
     path: `/assets/models/${roundId}.gltf`,
-    tags: [...new Set([...square.tags, "rounded"])],
-    dateAdded: manifest.assets.find(a => a.id === roundId)?.dateAdded ?? new Date().toISOString().slice(0, 10),
+    tags: [...new Set([...square.tags, "rounded", ...(existing?.tags ?? [])])],
+    dateAdded: existing?.dateAdded ?? new Date().toISOString().slice(0, 10),
     colliders: [collider],
   };
-  const at = manifest.assets.findIndex(a => a.id === roundId);
-  if (at >= 0) manifest.assets[at] = { ...entry, ...(manifest.assets[at].thumbnail ? { thumbnail: manifest.assets[at].thumbnail } : {}) };
-  else manifest.assets.splice(manifest.assets.findIndex(a => a.id === cornerId) + 1, 0, entry);
+  if (existing) manifest.assets[at] = { ...entry, ...(existing.thumbnail ? { thumbnail: existing.thumbnail } : {}) };
+  else {
+    const prev = rad > 1 ? cornerId.replace("_corner", `_corner_round${rad > 2 ? rad - 1 : ""}`) : cornerId;
+    manifest.assets.splice(manifest.assets.findIndex(a => a.id === prev) + 1, 0, entry);
+  }
   console.log(`${roundId}: ${gltf.accessors.filter((_, i) => i % 3 === 2).reduce((n, a) => n + a.count / 3, 0)} tris, collider r=${collider.size.x} y=${collider.points[0].y}..${collider.points.at(-1).y}`);
 }
 writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2));
