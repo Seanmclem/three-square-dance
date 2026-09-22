@@ -1606,7 +1606,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round2_thumb.png"
     },
     {
       "id": "platform_grass_corner_round3",
@@ -1828,7 +1829,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round3_thumb.png"
     },
     {
       "id": "platform_grass_corner_round4",
@@ -2050,7 +2052,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round4_thumb.png"
     },
     {
       "id": "platform_grass_corner_round5",
@@ -2272,7 +2275,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round5_thumb.png"
     },
     {
       "id": "platform_grass_corner_round6",
@@ -2494,7 +2498,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round6_thumb.png"
     },
     {
       "id": "platform_grass_corner_round7",
@@ -2716,7 +2721,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round7_thumb.png"
     },
     {
       "id": "platform_grass_corner_round8",
@@ -2938,7 +2944,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round8_thumb.png"
     },
     {
       "id": "platform_dirt_center",
@@ -3373,7 +3380,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round2_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round3",
@@ -3595,7 +3603,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round3_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round4",
@@ -3817,7 +3826,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round4_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round5",
@@ -4039,7 +4049,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round5_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round6",
@@ -4261,7 +4272,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round6_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round7",
@@ -4483,7 +4495,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round7_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round8",
@@ -4705,7 +4718,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round8_thumb.png"
     },
     {
       "id": "platform_grass_single",
@@ -5197,7 +5211,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round2_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round3_tall",
@@ -5419,7 +5434,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round3_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round4_tall",
@@ -5641,7 +5657,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round4_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round5_tall",
@@ -5863,7 +5880,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round5_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round6_tall",
@@ -6085,7 +6103,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round6_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round7_tall",
@@ -6307,7 +6326,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round7_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round8_tall",
@@ -6529,7 +6549,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round8_tall_thumb.png"
     },
     {
       "id": "platform_grass_side_tall",
@@ -6981,7 +7002,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round2_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round3_bottom_tall",
@@ -7203,7 +7225,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round3_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round4_bottom_tall",
@@ -7425,7 +7448,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round4_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round5_bottom_tall",
@@ -7647,7 +7671,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round5_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round6_bottom_tall",
@@ -7869,7 +7894,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round6_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round7_bottom_tall",
@@ -8091,7 +8117,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round7_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round8_bottom_tall",
@@ -8313,7 +8340,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round8_bottom_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_center_tall",
@@ -8702,7 +8730,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round2_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round3_center_tall",
@@ -8924,7 +8953,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round3_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round4_center_tall",
@@ -9146,7 +9176,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round4_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round5_center_tall",
@@ -9368,7 +9399,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round5_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round6_center_tall",
@@ -9590,7 +9622,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round6_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round7_center_tall",
@@ -9812,7 +9845,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round7_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_corner_round8_center_tall",
@@ -10034,7 +10068,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_grass_corner_round8_center_tall_thumb.png"
     },
     {
       "id": "platform_grass_side_bottom_tall",
@@ -10526,7 +10561,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round2_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round3_tall",
@@ -10748,7 +10784,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round3_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round4_tall",
@@ -10970,7 +11007,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round4_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round5_tall",
@@ -11192,7 +11230,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round5_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round6_tall",
@@ -11414,7 +11453,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round6_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round7_tall",
@@ -11636,7 +11676,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round7_tall_thumb.png"
     },
     {
       "id": "platform_dirt_corner_round8_tall",
@@ -11858,7 +11899,8 @@
             }
           ]
         }
-      ]
+      ],
+      "thumbnail": "/assets/models/platform_dirt_corner_round8_tall_thumb.png"
     },
     {
       "id": "platform_dirt_side_tall",
