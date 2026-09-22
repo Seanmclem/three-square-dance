@@ -19,6 +19,10 @@ npm run dev          # then open the printed http://localhost:5173/
 - **Left panels** (below the tools in the left bar): **Assets** — a flyout menu with **Models /
   Materials / Decals / Sounds / Skybox** (Models and Decals also arm their placement
   tools) — and **SCRIPTS** (scripting). The Groups panel opens via the Groups tool.
+- **Tidy the model library**: Models → **Manage** → tick tiles → **Edit** → category
+  **Hidden**. Hidden models leave every view (All, tags, packs, search) and only show
+  under the **Hidden** pill (in **More ▾**, last), where you can edit them back. Already
+  placed copies keep rendering; this only declutters the browser.
 - **Play**: the green **▶ Preview** button bottom-left (hotkey **G**), or its dropdown
   caret → **Start Game**. Preview lets you walk around; Start Game also spawns you at the
   level's spawn point and fires `on_game_start`.

@@ -51,6 +51,9 @@ export type QualityScale = 'low' | 'medium' | 'high';
 
 export type ColliderType  = 'box' | 'mesh' | 'none';
 export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'Characters' | 'Vegetation' | 'Other' | (string & {});
+/** Reserved category: assets in it show in the asset browser only while its own
+ *  category pill is selected (not under All, tags, packs or search). */
+export const HIDDEN_CATEGORY = 'Hidden';
 export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'graphics' | 'prefabs' | null;
 
 export interface GroupDef {

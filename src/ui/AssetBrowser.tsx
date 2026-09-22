@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import type { AssetDef, AssetCategory } from "@/types";
+import { HIDDEN_CATEGORY, type AssetDef, type AssetCategory } from "@/types";
 import { IconCamera, IconReorigin } from "@/ui/icons";
 import { buildFacets, matchesFacets, type FacetSpec, type FacetSel } from "@/ui/assetFilters";
 
@@ -68,23 +68,33 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   const toggleCheck = (id: string) =>
     setChecked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  // Drop checks for assets that no longer exist (e.g. just deleted).
-  useEffect(() => {
-    setChecked(prev => {
-      const ids = new Set(assets.map(a => a.id));
-      const next = new Set([...prev].filter(id => ids.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [assets]);
   // Most recently selected named categories, newest last
   const [recent, setRecent] = useState<AssetCategory[]>([]);
 
-  // All categories present in the asset list, sorted: known order first, then custom alphabetically
+  // Hidden assets exist only under their own category pill, and that pill shows
+  // only them: every other view (All, tags, packs, search) is built from the
+  // rest, so they don't leak into tag counts or facet values either.
+  const visible = assets.filter(a => (a.category === HIDDEN_CATEGORY) === (category === HIDDEN_CATEGORY));
+
+  // Drop checks for assets that no longer exist (e.g. just deleted) or just left
+  // the view (moved to/from Hidden) — Edit (n)/Delete (n) must never act on a
+  // tile you can't see.
+  useEffect(() => {
+    setChecked(prev => {
+      const ids = new Set(visible.map(a => a.id));
+      const next = new Set([...prev].filter(id => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [assets, category]);
+
+  // All categories present in the asset list, sorted: known order first, then
+  // custom alphabetically, Hidden last of all.
   const CATEGORIES: AssetCategory[] = [
     ...KNOWN_ORDER.filter(c => assets.some(a => a.category === c)),
     ...[...new Set(assets.map(a => a.category))]
-      .filter(c => !KNOWN_ORDER.includes(c))
+      .filter(c => !KNOWN_ORDER.includes(c) && c !== HIDDEN_CATEGORY)
       .sort(),
+    ...(assets.some(a => a.category === HIDDEN_CATEGORY) ? [HIDDEN_CATEGORY] : []),
   ];
   const popoutRef  = useRef<HTMLDivElement>(null);
   const moreBtnRef = useRef<HTMLButtonElement>(null);
@@ -130,7 +140,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   // Tags, most-used first (frequency is the useful default when there may be dozens;
   // the category strip's recency ordering doesn't transfer — you multi-select tags).
   const tagCounts = new Map<string, number>();
-  for (const a of assets) for (const t of a.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  for (const a of visible) for (const t of a.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
   const ALL_TAGS = [...tagCounts.keys()]
     .sort((a, b) => (tagCounts.get(b)! - tagCounts.get(a)!) || a.localeCompare(b));
 
@@ -148,7 +158,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
   // Pack/Author segments appear only when that field can actually split the library
   // (≥2 distinct values, one of them shared by ≥2 assets) — today: Pack yes (3 kits),
   // Author no (139 of 142 are Quaternius, so the filter would be a no-op).
-  const attrFacets = buildFacets(assets, ATTR_FACETS);
+  const attrFacets = buildFacets(visible, ATTR_FACETS);
   const attrValues = new Map(attrFacets.map(f => [f.key, new Set(f.values.map(v => v.value))]));
   const attrLive: FacetSel = {};
   for (const [k, vs] of Object.entries(attrSel)) {
@@ -178,7 +188,7 @@ export function AssetBrowser({ assets, selectedAssetId, onSelect, onImport, onDe
     )),
   ];
 
-  const filtered = assets.filter(a => {
+  const filtered = visible.filter(a => {
     const matchCat  = category === "All" || a.category === category;
     const matchTags = activeTags.size === 0 || [...activeTags].every(t => a.tags.includes(t));
     const q         = search.toLowerCase();
