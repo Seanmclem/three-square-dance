@@ -853,7 +853,7 @@
           "label": "step up 0.5m",
           "position": {
             "x": 6.5,
-            "y": 9.5,
+            "y": 9.3942478525349,
             "z": 0
           },
           "size": {
@@ -1119,7 +1119,27 @@
           "floorLevel": 0
         }
       ],
-      "stairs": [],
+      "stairs": [
+        {
+          "id": "stair_f843534b",
+          "start": {
+            "x": -1,
+            "y": 10,
+            "z": -2.5
+          },
+          "end": {
+            "x": 5,
+            "y": 14,
+            "z": -2
+          },
+          "width": 2.5,
+          "style": "straight",
+          "material": "concrete_01",
+          "hasRailing": false,
+          "riserUvJitter": 0.5,
+          "treadUvJitter": 0.5
+        }
+      ],
       "objects": [
         {
           "id": "obj_70c4ab01",
