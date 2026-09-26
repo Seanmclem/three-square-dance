@@ -2446,7 +2446,8 @@
       "fullGraphicId": "heart_icon",
       "halfGraphicId": "heart_half_icon",
       "emptyGraphicId": "heart_outline_icon",
-      "startVisible": true
+      "startVisible": true,
+      "size": 32
     },
     {
       "id": "ui_7239dfcc",

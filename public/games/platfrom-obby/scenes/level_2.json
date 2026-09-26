@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -2.4291149711007756,
+        "x": -6.386465939441035,
         "y": 10.580493145796058,
-        "z": 3.9056591326781103
+        "z": 17.16371753619683
       },
       "radius": 19.849540618062058,
-      "phi": 1.2950000000000004,
-      "theta": 25.379749999908356
+      "phi": 1.1657963267948996,
+      "theta": 25.074749999908335
     }
   },
   "world": {
@@ -41,11 +41,11 @@
     "playerSettings": {},
     "lightingFromGame": true,
     "stateSchema": {
-      "health": {
+      "Hearts": {
         "type": "number",
-        "default": 100,
+        "default": 3,
         "min": 0,
-        "max": 100
+        "max": 3
       }
     },
     "audio": {},
@@ -3673,9 +3673,10 @@
               "actions": [
                 {
                   "type": "respawn_player",
-                  "positionKey": "checkpoint",
+                  "positionKey": "checkpoint_0",
                   "fadeDuration": 0.4,
-                  "restoreHealth": true
+                  "restoreHealth": true,
+                  "healthKey": "Hearts"
                 }
               ],
               "oneShot": false
