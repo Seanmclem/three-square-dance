@@ -851,33 +851,6 @@
           }
         },
         {
-          "id": "obj_489b6fb2",
-          "assetId": "character",
-          "position": {
-            "x": -4.5,
-            "y": 9.517862953544952,
-            "z": 24.5
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": {
-            "x": 1,
-            "y": 1,
-            "z": 1
-          },
-          "floor": 0,
-          "zoneId": "demo",
-          "properties": {
-            "interactable": false,
-            "npcSpawn": false,
-            "lootTableId": null,
-            "triggerEventId": null
-          }
-        },
-        {
           "id": "obj_268d8d74",
           "label": "Tile 0,0",
           "assetId": "platform_grass_corner_round",
@@ -3673,7 +3646,7 @@
               "actions": [
                 {
                   "type": "respawn_player",
-                  "positionKey": "checkpoint_0",
+                  "positionKey": "checkpoint",
                   "fadeDuration": 0.4,
                   "restoreHealth": true,
                   "healthKey": "Hearts"
