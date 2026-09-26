@@ -1190,8 +1190,8 @@
                   "type": "launch_player",
                   "launchSpeed": 5,
                   "launchHSpeed": 6,
-                  "launchDirDeg": 180,
-                  "launchRelativeTo": "player"
+                  "launchDirDeg": 0,
+                  "launchRelativeTo": "away"
                 }
               ],
               "oneShot": false
