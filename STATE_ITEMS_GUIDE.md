@@ -129,6 +129,19 @@ With a **project** open, the STATE tab has two scopes:
   for the same key. Use it for scene-specific rules — e.g. a hazard level
   where `health` regenerates to a lower max.
 
+> **Put your health counter in GAME scope.** A key registered under THIS SCENE exists in that
+> scene only; a level made later does not have it, its HUD has nothing to read, and a kill
+> floor's "restore health" has nothing to restore (this is how platfrom-obby ended up with
+> `Hearts` in level 1 and an unused `health` in levels 2 and 3). Register `Hearts` once under
+> GAME and delete the scene copies. Since v4.89.0 a new scene registers no keys of its own and
+> inherits GAME.
+>
+> **State-key fields only suggest registered keys** (v4.89.0). A key that is not registered shows
+> a warning under the field with a one-click **Register**; a position key that no
+> `store_position` writes warns that the respawn will fall back to the default spawn. A
+> checkpoint marker's label (`Checkpoint_0`) is not a key: the key is whatever its gate's
+> `store_position` saves to (usually `checkpoint`).
+
 **When each applies:** New Game seeds all defaults. Entering a scene applies
 the merged rulebook (GAME under SCENE) *without* resetting — keys the player
 already has keep their values; only brand-new keys get seeded. So a scene can

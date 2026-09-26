@@ -1426,7 +1426,12 @@ export default function App() {
       // Phase 68 — a new scene INHERITS: empty settings-override layer, lighting from the game.
       playerSettings: {} as PlayerSettings,
       lightingFromGame: true,
-      stateSchema: DEFAULT_STATE_SCHEMA,
+      // v4.89.0 — a new scene registers NO state of its own: it inherits the game's shared
+      // keys (STATE tab, GAME scope). Seeding DEFAULT_STATE_SCHEMA here planted an unused
+      // `health` key in every new level while the game's real counter (`Hearts`) stayed
+      // scene-local to level 1. The engine's preview/runtime fallback to DEFAULT_STATE_SCHEMA
+      // still applies when a game has no shared keys either.
+      stateSchema: {},
     },
     terrain: null,
     zones: [createDemoZone()],

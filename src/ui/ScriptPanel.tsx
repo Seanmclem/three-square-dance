@@ -498,11 +498,26 @@ export function ScriptPanel({
   const stateKeyTypes: Record<string, StateSchema["type"]> = Object.fromEntries(
     [...Object.entries(gameStateSchema ?? {}), ...Object.entries(stateSchema)].map(([k, v]) => [k, v.type]));
 
-  const knownStateKeys = [...new Set([
+  // v4.89.0 — the suggestion lists offer only keys that EXIST. Keys merely mentioned by
+  // some script (`scriptKeys`) used to be offered everywhere too, so one typo or leftover
+  // was suggested forever as if it were real (user: the lists were "random guesses").
+  // They still feed the type map above and the "not registered" warning below.
+  const registeredStateKeys = [...new Set([
     ...Object.keys(gameStateSchema ?? {}),
     ...Object.keys(stateSchema),
-    ...scriptKeys,
   ])].filter((k) => !worldItems.some((it) => `inv.${it.id}` === k));
+  const numberStateKeys = registeredStateKeys.filter((k) => stateKeyTypes[k] === "number");
+  // Position keys: what a store_position in this zone WRITES, plus every checkpoint label
+  // (a respawn/teleport "at" a key wants one of those, never a health counter).
+  const positionKeys: string[] = [];
+  const harvestPos = (scripts?: ScriptDef[]) => {
+    for (const sc of scripts ?? [])
+      for (const a of sc.actions ?? []) if (a.type === "store_position" && a.stateKey) positionKeys.push(a.stateKey);
+  };
+  harvestPos(zoneScripts);
+  for (const v of triggerVolumes) harvestPos(v.scripts);
+  for (const o of zoneObjects) harvestPos(o.scripts);
+  const positionKeyList = [...new Set(positionKeys)];
 
   // Per-tab description — shown on demand via a (?) in each view's header row.
   const tabHelp =
@@ -522,16 +537,30 @@ export function ScriptPanel({
               ? "Things the player can collect, hold, and spend. Give or take them with the give_item / take_item actions, gate anything on ownership with the has_item condition, and the in-game bag (I / Tab, gamepad Y) shows what the player holds."
               : "Custom in-game UI — health bars, counters, labels, images, and simple menus. Elements start hidden unless 'visible at start' is on; scripts show/hide them with the show_ui / hide_ui actions. Bars and counters bind to a state key and update live; menu options run actions when picked.";
 
+  // "Register" on a KeySuggestInput warning (v4.89.0): add the key to THIS scene's STATE tab.
+  useEffect(() => {
+    const onRegister = (e: Event) => {
+      const { key, type } = (e as CustomEvent<{ key: string; type: StateSchema["type"] }>).detail;
+      if (!key || stateSchema[key] || gameStateSchema?.[key]) return;
+      onStateSchemaChange({ ...stateSchema, [key]: type === "number" ? { type: "number", default: 0 } : { type, default: false } });
+    };
+    window.addEventListener("wb:register-state-key", onRegister);
+    return () => window.removeEventListener("wb:register-state-key", onRegister);
+  }, [stateSchema, gameStateSchema, onStateSchemaChange]);
+
   return (
     <div style={S.root}>
       <datalist id="wb-state-keys">
-        {knownStateKeys.map((k) => (
+        {registeredStateKeys.map((k) => (
           <option key={k} value={k} />
         ))}
         {worldItems.map((it) => (
           <option key={it.id} value={`inv.${it.id}`} label={`${it.label} — item count`} />
         ))}
       </datalist>
+      {/* Scoped lists (v4.89.0): KeySuggestInput reads these by id, so deep fields need no threading. */}
+      <datalist id="wb-number-keys">{numberStateKeys.map((k) => <option key={k} value={k} />)}</datalist>
+      <datalist id="wb-position-keys">{positionKeyList.map((k) => <option key={k} value={k} />)}</datalist>
       {/* Tabs */}
       <div style={S.tabs}>
         {(["level", "object", "dialogue", "state", "items", "ui"] as TabId[]).map((t) => (
@@ -1899,22 +1928,38 @@ function TargetCombobox({
 // row sits near the bottom of the panel). Typing filters; near the bottom the
 // list opens ABOVE the input. No `suggestions` prop = the global key list
 // (read from the #wb-state-keys datalist, so deep fields need no threading).
-function KeySuggestInput({ value, suggestions, placeholder, onChange }: {
+const readList = (id: string): string[] =>
+  [...((document.getElementById(id) as HTMLDataListElement | null)?.options ?? [])].map(o => o.value);
+
+function KeySuggestInput({ value, suggestions, placeholder, onChange, list = "state", expect }: {
   value: string;
   suggestions?: string[];
   placeholder?: string;
   onChange: (v: string) => void;
+  /** Which global list to suggest from (v4.89.0): every registered key, number keys only, or
+   *  position keys (store_position targets + checkpoints). Ignored when `suggestions` is given. */
+  list?: "state" | "number" | "position";
+  /** Validate the typed value and show a marker. "number" / "state" = must be a registered key
+   *  of that kind (offers a one-click Register). "position" = must be a key some store_position
+   *  in this scene writes (no Register: a position key is created by the script that stores it). */
+  expect?: "state" | "number" | "position";
 }) {
   const [open, setOpen] = useState(false);
   const [flipUp, setFlipUp] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-  // undefined = global scope (read the global list); an ARRAY — even empty — is
+  // undefined = global scope (read the chosen list); an ARRAY — even empty — is
   // the scope's exact key set and never falls back.
   const all = suggestions !== undefined
     ? suggestions
-    : [...((document.getElementById("wb-state-keys") as HTMLDataListElement | null)?.options ?? [])].map(o => o.value);
+    : readList(list === "number" ? "wb-number-keys" : list === "position" ? "wb-position-keys" : "wb-state-keys");
   const q = value.trim().toLowerCase();
   const filtered = q ? all.filter(k => k.toLowerCase().includes(q)) : all;
+  const typed = value.trim();
+  const registered = expect ? readList(expect === "number" ? "wb-number-keys" : expect === "position" ? "wb-position-keys" : "wb-state-keys") : [];
+  const isRegisteredAnywhere = expect ? readList("wb-state-keys").includes(typed) : true;
+  const status: "ok" | "wrong-type" | "unregistered" | "no-writer" | null =
+    !expect || !typed ? null : registered.includes(typed) ? "ok"
+    : expect === "position" ? "no-writer" : isRegisteredAnywhere ? "wrong-type" : "unregistered";
   const openAt = () => {
     const r = wrapRef.current?.getBoundingClientRect();
     if (r) setFlipUp(window.innerHeight - r.bottom < 190);
@@ -1927,6 +1972,20 @@ function KeySuggestInput({ value, suggestions, placeholder, onChange }: {
         onBlur={() => setOpen(false)}
         onChange={e => { onChange(e.target.value); openAt(); }}
         onKeyDown={e => { if (e.key === "Escape" || e.key === "Enter") { setOpen(false); (e.target as HTMLInputElement).blur(); } }} />
+      {status && status !== "ok" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, fontSize: 10, color: "#e0b25c" }}>
+          <span>{status === "wrong-type" ? `"${typed}" is registered, but not as a number`
+            : status === "no-writer" ? `no script in this scene stores a position as "${typed}" (checkpoint gates store to their key; a marker's label is not a key), so this falls back to the default spawn`
+            : `"${typed}" is not a registered state key`}</span>
+          {status === "unregistered" && (
+            <button type="button" title="Add it to this scene's STATE tab as a number key (default 0) so scripts and the HUD can rely on it"
+              onMouseDown={(e) => { e.preventDefault(); window.dispatchEvent(new CustomEvent("wb:register-state-key", { detail: { key: typed, type: expect === "number" ? "number" : "boolean" } })); }}
+              style={{ background: "rgba(77,140,255,0.15)", border: "1px solid rgba(77,140,255,0.4)", borderRadius: 3, color: "#dde3f0", cursor: "pointer", fontSize: 10, padding: "1px 6px" }}>
+              Register
+            </button>
+          )}
+        </div>
+      )}
       {open && filtered.length > 0 && (
         <div onMouseDown={(e) => e.preventDefault()} style={{ position: "absolute", left: 0, right: 0, zIndex: 20,
           ...(flipUp ? { bottom: "100%", marginBottom: 2 } : { top: "100%", marginTop: 2 }),
@@ -3023,9 +3082,10 @@ function ActionFields({
         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
           {stateScopePicker}
           <F label="State key" flex={1}>
-            <KeySuggestInput placeholder="State key (e.g. health)"
+            <KeySuggestInput placeholder="State key (e.g. Hearts)"
               value={action.stateKey ?? ""}
               suggestions={scopedStateKeys}
+              expect={scopedStateKeys === undefined ? "number" : undefined}   /* global scope: must be a registered number key */
               onChange={(v) => set({ stateKey: v })}
             />
           </F>
@@ -3437,8 +3497,8 @@ function ActionFields({
           </select>
           {fromKey ? (
             <F label="State key">
-              <KeySuggestInput
-                placeholder={"State key (e.g. checkpoint)"}
+              <KeySuggestInput list="position" expect="position"
+                placeholder={"a stored position (e.g. checkpoint)"}
                 value={action.positionKey ?? ""}
                 onChange={(v) => set({ positionKey: v })}
               />
@@ -3589,8 +3649,8 @@ function ActionFields({
           </select>
           {dest === "key" && (
             <F label="State key">
-              <KeySuggestInput
-                placeholder={"State key (e.g. checkpoint)"}
+              <KeySuggestInput list="position" expect="position"
+                placeholder={"a stored position (e.g. checkpoint)"}
                 value={action.positionKey ?? ""}
                 onChange={(v) => set({ positionKey: v })}
               />
@@ -3641,7 +3701,7 @@ function ActionFields({
           </label>
           {action.restoreHealth && (
             <F label="Health key (blank = auto)">
-              <KeySuggestInput
+              <KeySuggestInput list="number" expect="number"
                 placeholder="auto: health, this script's state key, or what enemies damage"
                 value={action.healthKey ?? ""}
                 onChange={(v) => set({ healthKey: v || undefined })}
