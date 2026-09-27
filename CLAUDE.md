@@ -90,7 +90,7 @@ Only `CLAUDE.md` is auto-loaded. Everything else lives in these docs — read th
 | Desktop shell / Deno backend (`desktop/`) | `DESKTOP_GUIDE.md` |
 | Releases, packaging, export | `PUBLISHING_GUIDE.md` |
 | Performance / framerate | `PROFILING.md` |
-| A specific feature area | Its guide: `AUDIO.md`, `COLLIDERS_GUIDE.md`, `DIALOGUES_GUIDE.md`, `GAMEPLAY_STATE.md`, `GUI_GUIDE.md`, `HAZARDS_GUIDE.md`, `OBJECT_SCRIPTS_GUIDE.md`, `PREFABS_GUIDE.md`, `STATE_ITEMS_GUIDE.md` |
+| A specific feature area | Its guide: `AUDIO.md`, `CHARACTER_GUIDE.md`, `COLLIDERS_GUIDE.md`, `DIALOGUES_GUIDE.md`, `GAMEPLAY_STATE.md`, `GUI_GUIDE.md`, `HAZARDS_GUIDE.md`, `OBJECT_SCRIPTS_GUIDE.md`, `PREFABS_GUIDE.md`, `STATE_ITEMS_GUIDE.md` |
 | Planning a new phase | Existing plans in `plans/` (match their style); `PLAN_UPDATE_GUIDE.md` for the arch-doc update rule |
 
 ---
