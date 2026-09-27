@@ -302,6 +302,7 @@ export default function App() {
   const undoInstanceCtxRef = useRef<{ zoneId: string; instanceId: string; primaryId: string } | null>(null);
   // Project-level (game.json) state schema — the STATE tab's GAME scope mirror.
   const [gameSchema,      setGameSchema]       = useState<Record<string, StateSchema>>({});
+  const [gameScripts,     setGameScripts]      = useState<ScriptDef[]>([]);   // Phase 77 — game.json scripts (project open)
   // Phase 33 — project (multi-scene game folder). null = classic single-scene editing.
   interface ProjectCtx { store: ProjectStore; sceneId: string; rev: number }
   const [project, setProject] = useState<ProjectCtx | null>(null);
@@ -639,10 +640,12 @@ export default function App() {
           world.gameItems       = store.game.items;
           world.gameStateSchema = store.game.stateSchema;
           world.gameUiElements  = store.game.uiElements;
+          world.gameScripts     = store.game.scripts;
           world.gameInput  = store.game.input;
           setWorldItems(store.game.items ?? []);
           setWorldUiElements(store.game.uiElements ?? []);
           setGameSchema(store.game.stateSchema ?? {});
+          setGameScripts(store.game.scripts ?? []);
           if (promoteSessionPrefabs(store.game)) setIsDirty(true);
           world.prefabLibrary = store.game.prefabs;
           setPrefabs(store.game.prefabs ?? []);
@@ -687,6 +690,7 @@ export default function App() {
         const activeZone = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
         scriptEngine.clearIndex();
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
+        scriptEngine.loadGame(world.gameScripts);   // Phase 77
         if (activeZone) scriptEngine.loadZone(activeZone);
         scriptEngine.activate();
         // Apply this level's authored state schema (defaults + clamps) before reset/restore.
@@ -752,6 +756,7 @@ export default function App() {
               worldRef.current!.gameItems       = proj.store.game.items;
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
               worldRef.current!.gameUiElements  = proj.store.game.uiElements;
+              worldRef.current!.gameScripts     = proj.store.game.scripts;
               worldRef.current!.gameInput  = proj.store.game.input;
               const next = { ...proj, sceneId: back };
               projectRef.current = next; setProject(next);
@@ -806,6 +811,8 @@ export default function App() {
             world.gameItems       = proj.store.game.items;
             world.gameStateSchema = proj.store.game.stateSchema;
             world.gameUiElements  = proj.store.game.uiElements;
+      world.gameScripts     = proj.store.game.scripts;
+            world.gameScripts     = proj.store.game.scripts;
             world.gameInput  = proj.store.game.input;
             // Keep proj.sceneId in lockstep with the loaded world so any save targets the right file.
             const next = { ...projectRef.current!, sceneId };
@@ -904,6 +911,7 @@ export default function App() {
         setZoneLights(z?.lights ?? []);
         scriptEngine.clearIndex();
         scriptEngine.loadWorld(world.world ?? {} as Parameters<typeof scriptEngine.loadWorld>[0]);
+        scriptEngine.loadGame(world.gameScripts);   // Phase 77
         if (z) scriptEngine.loadZone(z);
       }),
       bus.on("world:loaded",    ()               => {
@@ -1355,11 +1363,13 @@ export default function App() {
       worldRef.current.gameItems = undefined;
       worldRef.current.gameStateSchema = undefined;
       worldRef.current.gameUiElements = undefined;
+      worldRef.current.gameScripts    = undefined;
       worldRef.current.gameInput = undefined;
       worldRef.current.prefabLibrary = loadSessionPrefabs();
       setPrefabs(worldRef.current.prefabLibrary);
     }
     setGameSchema({});
+    setGameScripts([]);
     void clearLastProject();
   }, [canOverwriteScene]);
 
@@ -1456,6 +1466,7 @@ export default function App() {
       worldRef.current.gameItems       = store.game.items;
       worldRef.current.gameStateSchema = store.game.stateSchema;
       worldRef.current.gameUiElements  = store.game.uiElements;
+      worldRef.current.gameScripts     = store.game.scripts;
       worldRef.current.gameInput  = store.game.input;
       worldRef.current.prefabLibrary   = store.game.prefabs;
     }
@@ -1466,6 +1477,7 @@ export default function App() {
     setWorldItems(store.game.items ?? []);
     setWorldUiElements(store.game.uiElements ?? []);
     setGameSchema(store.game.stateSchema ?? {});
+          setGameScripts(store.game.scripts ?? []);
     setPrefabs(store.game.prefabs ?? []);
     syncPrefabInstances();   // library is authoritative now — heal/refresh instances
     void persistLastProject(store.id, sceneId);
@@ -1544,6 +1556,7 @@ export default function App() {
       world.gameItems       = proj.store.game.items;
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
+      world.gameScripts     = proj.store.game.scripts;
       world.gameInput  = proj.store.game.input;
       world.setGamePlayerSettings(proj.store.game.playerSettings);
       world.setGameLighting(proj.store.game.lighting);
@@ -3141,6 +3154,20 @@ export default function App() {
     setIsDirty(true);
   };
 
+  // Phase 77 — game-wide scripts (LEVEL tab, GAME scope). Written through to game.json at
+  // once like the other game-level registries; the script index picks them up at the next
+  // preview start / scene switch (the same rebuild sites zone scripts use).
+  const handleGameScriptsChange = (scripts: ScriptDef[]): void => {
+    const proj = projectRef.current, world = worldRef.current;
+    if (!proj || !world) return;
+    const normalized = scripts.length ? scripts : undefined;
+    proj.store.game.scripts = normalized;
+    world.gameScripts = normalized;
+    setGameScripts(scripts);
+    void proj.store.writeGame().catch(e => console.warn("[scripts] game.json write failed:", e));
+    setIsDirty(true);
+  };
+
   const handleWorldItemsChange = (items: ItemDef[]): void => {
     const world = worldRef.current;
     if (!world?.world) return;
@@ -3805,6 +3832,8 @@ export default function App() {
         onStateSchemaChange={handleStateSchemaChange}
         gameStateSchema={project ? gameSchema : undefined}
         onGameStateSchemaChange={project ? handleGameSchemaChange : undefined}
+        gameScripts={project ? gameScripts : undefined}
+        onGameScriptsChange={project ? handleGameScriptsChange : undefined}
         isPreviewing={isPreview}
         scriptEditRequest={scriptEditRequest}
         worldItems={worldItems}

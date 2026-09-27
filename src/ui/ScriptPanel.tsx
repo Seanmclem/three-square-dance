@@ -335,6 +335,9 @@ export interface ScriptPanelProps {
   onStateSchemaChange: (schema: Record<string, StateSchema>) => void;
   gameStateSchema?: Record<string, StateSchema>;
   onGameStateSchemaChange?: (schema: Record<string, StateSchema>) => void;
+  // Phase 77 — game.json scripts (project open only). Both present = the LEVEL tab gets a GAME / THIS SCENE scope.
+  gameScripts?: ScriptDef[];
+  onGameScriptsChange?: (scripts: ScriptDef[]) => void;
   /** True while editor preview/game is running — enables the live-values pane. */
   isPreviewing?: boolean;
   /** Jump straight into editing a script (row click on a properties-panel list).
@@ -378,6 +381,8 @@ export function ScriptPanel({
   onStateSchemaChange,
   gameStateSchema,
   onGameStateSchemaChange,
+  gameScripts,
+  onGameScriptsChange,
   isPreviewing,
   editRequest,
   worldItems,
@@ -393,6 +398,11 @@ export function ScriptPanel({
   const [editingDialogueId, setEditingDialogueId] = useState<string | null>(null);
   // STATE tab scope (project open only): GAME = shared game.json schema, SCENE = this scene's.
   const [stateScope, setStateScope] = useState<"game" | "scene">("game");
+  // Phase 77 — LEVEL tab scope. Defaults to THIS SCENE (the list users know); GAME holds the
+  // scripts that run in every level of the project.
+  const [levelScope, setLevelScope] = useState<"game" | "scene">("scene");
+  const hasGameScripts = gameScripts !== undefined && !!onGameScriptsChange;
+  const levelIsGame = hasGameScripts && levelScope === "game";
   const hasGameScope = gameStateSchema !== undefined && !!onGameStateSchemaChange;
 
   // Live-values pane: refresh twice a second while a play session is running
@@ -421,12 +431,12 @@ export function ScriptPanel({
   }, [editRequest]);
 
   const currentScripts: ScriptDef[] =
-    tab === "level" ? zoneScripts : (objectScripts ?? []);
+    tab === "level" ? (levelIsGame ? gameScripts! : zoneScripts) : (objectScripts ?? []);
 
   const currentZoneId = activeZoneId ?? "";
 
   function save(updated: ScriptDef[]): void {
-    if (tab === "level") onZoneScriptsChange(updated);
+    if (tab === "level") (levelIsGame ? onGameScriptsChange! : onZoneScriptsChange)(updated);
     if (tab === "object" && selectedObjectId)
       onObjectScriptsChange(selectedObjectId, updated);
   }
@@ -456,6 +466,26 @@ export function ScriptPanel({
 
   function updateScript(updated: ScriptDef): void {
     save(currentScripts.map((s) => (s.id === updated.id ? updated : s)));
+  }
+
+  /** Phase 77 — move a LEVEL-tab script between THIS SCENE and GAME. Same id, same script;
+   *  it leaves one list and joins the other, and the editor follows it. */
+  function moveScriptScope(id: string): void {
+    if (!hasGameScripts || tab !== "level") return;
+    const s = currentScripts.find((x) => x.id === id);
+    if (!s) return;
+    // A script id must live in exactly one list: the index buckets by id-agnostic keys, but
+    // one-shot bookkeeping and the editor are by id, so drop any stale twin on the far side.
+    if (levelIsGame) {
+      onGameScriptsChange!(gameScripts!.filter((x) => x.id !== id));
+      onZoneScriptsChange([...zoneScripts.filter((x) => x.id !== id), s]);
+      setLevelScope("scene");
+    } else {
+      onZoneScriptsChange(zoneScripts.filter((x) => x.id !== id));
+      onGameScriptsChange!([...gameScripts!.filter((x) => x.id !== id), s]);
+      setLevelScope("game");
+    }
+    setEditingId(id);   // the editor follows the script into its new scope
   }
 
   const editing = editingId
@@ -522,7 +552,7 @@ export function ScriptPanel({
   // Per-tab description — shown on demand via a (?) in each view's header row.
   const tabHelp =
     tab === "level"
-      ? "Level-wide scripts. Use on_game_start for one-time setup (spawn NPCs, set flags, play ambient audio). Use on_zone_enter for effects that replay each time the player loads in."
+      ? "Level-wide scripts. Use on_game_start for once-per-run setup (it does NOT re-fire on level changes). Use on_level_load (\"when the level starts\") for setup every time this level is entered. With a project open, the GAME scope holds scripts that run in EVERY level, e.g. one death handler for the whole game; THIS SCENE is this level only. Use on_zone_enter for effects that replay each time the player loads in."
       : tab === "object"
         ? "Scripts on the selected trigger volume or object. on_player_enter / on_player_exit fire when the player crosses the volume boundary."
         : tab === "dialogue"
@@ -578,6 +608,23 @@ export function ScriptPanel({
         ))}
       </div>
 
+      {tab === "level" && hasGameScripts && !editing && (
+        <div style={{ display: "flex", gap: 6, padding: "8px 10px 0", flexShrink: 0 }}>
+          {(["game", "scene"] as const).map((sc) => (
+            <button key={sc} onClick={() => { setLevelScope(sc); setEditingId(null); }}
+              title={sc === "game" ? "Scripts that run in EVERY level of this game (stored in game.json)" : "Scripts for this level only (stored in the scene file)"}
+              style={{
+                flex: 1, padding: "5px 0", borderRadius: 4, cursor: "pointer",
+                fontFamily: "monospace", fontSize: 10, letterSpacing: 1, border: "none",
+                background: levelScope === sc ? "rgba(80,140,255,0.2)" : "rgba(46,46,46,0.9)",
+                color: levelScope === sc ? "#80aaff" : "#646464",
+                outline: levelScope === sc ? "1px solid rgba(80,140,255,0.33)" : "1px solid rgba(255,255,255,0.07)",
+              }}>
+              {sc === "game" ? `GAME · every level${gameScripts!.length ? ` (${gameScripts!.length})` : ""}` : "THIS SCENE"}
+            </button>
+          ))}
+        </div>
+      )}
       {tab === "state" ? (
         <>
           {isPreviewing && (
@@ -708,6 +755,7 @@ export function ScriptPanel({
           onBack={() => setEditingId(null)}
           onChange={updateScript}
           onDelete={() => deleteScript(editing.id)}
+          scopeMove={tab === "level" && hasGameScripts ? { toGame: !levelIsGame, run: () => moveScriptScope(editing.id) } : undefined}
         />
       ) : tab === "object" && !selectedObjectId ? (
         <div
@@ -731,6 +779,7 @@ export function ScriptPanel({
           onSelect={(id) => setEditingId(id)}
           onToggle={(id) => toggleEnabled(id)}
           onAdd={addScript}
+          gameScope={tab === "level" && levelIsGame}
         />
       )}
     </div>
@@ -953,18 +1002,45 @@ function SchemaKeyRow({
 
 // ── ScriptList ────────────────────────────────────────────────────────────────
 
+/**
+ * Phase 77 — why a GAME-scope script would not work in another level. A game script is
+ * indexed in every scene, but an entity id (a volume, an object, a checkpoint) exists in one
+ * scene only: an entity trigger keyed to it never fires elsewhere, and an action aimed at it
+ * finds nothing. State keys, "player", "self" and dialogue ids are not scene entities.
+ * Returns the offending ids (empty = portable).
+ */
+const ENTITY_TRIGGERS = new Set<TriggerType>(["on_player_enter", "on_player_exit", "on_interact", "on_player_detected", "on_player_lost", "on_enemy_attack"]);
+const isEntityId = (id: string | undefined): id is string =>
+  !!id && id !== "self" && id !== "player" && /^(obj|vol|plat|cp|shape|light|stair|wall|floor|grp|pfi)_/.test(id);
+export function sceneBoundIds(s: ScriptDef): string[] {
+  const ids = new Set<string>();
+  if (ENTITY_TRIGGERS.has(s.trigger.type) && isEntityId(s.trigger.targetId)) ids.add(s.trigger.targetId);
+  if (isEntityId(s.trigger.entityId)) ids.add(s.trigger.entityId);
+  const conds = (cs?: ScriptCondition[]) => { for (const c of cs ?? []) if (isEntityId(c.entityId)) ids.add(c.entityId); };
+  conds(s.conditions);
+  for (const b of s.blocks ?? []) for (const br of b.branches) conds(br.conditions);
+  for (const a of s.actions) {
+    for (const id of [a.targetId, a.fromId, a.toId]) if (isEntityId(id)) ids.add(id);
+    conds(a.conditions);
+  }
+  return [...ids];
+}
+
 function ScriptList({
   scripts,
   help,
   onSelect,
   onToggle,
   onAdd,
+  gameScope = false,
 }: {
   scripts: ScriptDef[];
   help?: string;
   onSelect: (id: string) => void;
   onToggle: (id: string) => void;
   onAdd: () => void;
+  /** Phase 77 — GAME scope: rows warn when the script names an entity of one scene. */
+  gameScope?: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -993,14 +1069,23 @@ function ScriptList({
               textAlign: "center",
             }}
           >
-            No scripts yet — hit + New. A script is a trigger (when it fires:
-            interact, enter a volume, game start…) plus actions (what happens).
+            {gameScope
+              ? "No game-wide scripts yet. Scripts here run in EVERY level: a death handler, a coin counter, a game-start setup. Open a level script and press \"Move to game\", or hit + New."
+              : "No scripts yet — hit + New. A script is a trigger (when it fires: interact, enter a volume, game start…) plus actions (what happens)."}
           </div>
         )}
-        {scripts.map((s) => (
+        {scripts.map((s) => {
+          const bound = gameScope ? sceneBoundIds(s) : [];
+          return (
           <div key={s.id} style={{ ...S.row }} onClick={() => onSelect(s.id)}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={S.label}>{s.label}</div>
+              {bound.length > 0 && (
+                <div style={{ color: "#e0b25c", fontSize: 10, marginTop: 2 }}
+                  title={`Game scripts run in every level, but ${bound.join(", ")} exists in one scene only — in the other levels this part finds nothing.`}>
+                  ⚠ names {bound.length === 1 ? "an entity" : `${bound.length} entities`} of one scene: {bound.join(", ")}
+                </div>
+              )}
               <div style={S.sub}>
                 {s.trigger.type}
                 {s.conditions.length > 0
@@ -1022,7 +1107,8 @@ function ScriptList({
               ›
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1055,6 +1141,7 @@ function ScriptEditor({
   onBack,
   onChange,
   onDelete,
+  scopeMove,
   onCreateUiElement,
   onUpdateUiElement,
   onOpenUiTab,
@@ -1086,6 +1173,8 @@ function ScriptEditor({
   onBack: () => void;
   onChange: (s: ScriptDef) => void;
   onDelete: () => void;
+  /** Phase 77 — LEVEL tab only: move this script to the other scope (GAME ⇄ THIS SCENE). */
+  scopeMove?: { toGame: boolean; run: () => void };
 }) {
   // Phase 65 — legacy per-action guards are shown (and, on first edit, saved)
   // as if-blocks. Identity when there is nothing to migrate.
@@ -1508,6 +1597,16 @@ function ScriptEditor({
           >
             {script.enabled ? "Disable" : "Enable"}
           </button>
+          {scopeMove && !scopeMove.toGame && sceneBoundIds(script).length > 0 && (
+            <span style={{ alignSelf: "center", color: "#e0b25c", fontSize: 10, marginRight: 4 }}
+              title={`This game script names ${sceneBoundIds(script).join(", ")}, which exists in one scene only; in other levels that part finds nothing.`}>⚠</span>
+          )}
+          {scopeMove && (
+            <button style={S.btn()} onClick={scopeMove.run}
+              title={scopeMove.toGame ? "Run this script in EVERY level of the game (moves it to game.json)" : "Run this script in this level only (moves it back into the scene file)"}>
+              {scopeMove.toGame ? "Move to game" : "Move to this scene"}
+            </button>
+          )}
           <button
             style={{ ...S.btn(), color: "#cc6666" }}
             onClick={() => {
@@ -2107,7 +2206,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
 const TRIGGER_LABELS: Record<TriggerType, string> = {
   on_player_enter: "when the player enters", on_player_exit: "when the player leaves", on_interact: "when the player interacts with",
   on_timer: "every N seconds", on_state_changed: "when a state changes", on_state_equals: "when a state becomes a value",
-  on_level_load: "when the level loads", on_game_start: "on game start", on_health_zero: "when health reaches 0",
+  on_level_load: "when the level starts", on_game_start: "on game start", on_health_zero: "when health reaches 0",
   on_dialogue_end: "when a dialogue ends", on_player_detected: "when this enemy spots the player",
   on_player_lost: "when this enemy loses the player", on_enemy_attack: "when this enemy attacks",
 };

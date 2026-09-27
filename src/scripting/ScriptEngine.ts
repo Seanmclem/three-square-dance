@@ -308,6 +308,12 @@ export class ScriptEngine {
     for (const s of world.scripts ?? []) this._indexScript(s);
   }
 
+  /** Phase 77 — game.json's cross-scene scripts. Same buckets as zone scripts; call after
+   *  clearIndex() at every rebuild site so they are live in every scene. */
+  loadGame(scripts: ScriptDef[] | undefined): void {
+    for (const s of scripts ?? []) this._indexScript(s);
+  }
+
   clearIndex(): void { this._index.clear(); }
 
   private _indexScript(s: ScriptDef): void {

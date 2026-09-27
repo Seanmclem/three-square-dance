@@ -209,6 +209,7 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
     if (game.lighting?.skybox && game.lighting.skybox !== "sky") add(refs.skyboxes, game.lighting.skybox);  // game-default sky
     collectItems(refs, game.items);                // game-wide item registry (icons)
     collectUiElements(refs, game.uiElements);      // game-wide GUI registry
+    collectScripts(refs, game.scripts);            // Phase 77 — game-wide scripts (a play_sound here must ship its clip)
     // game.prefabs (the prefab library) is deliberately NOT walked: placed instances are
     // real entities in the scenes above, and the runtime never reads templates — an
     // unplaced prefab must not drag its assets into the bundle.

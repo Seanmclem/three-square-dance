@@ -6,7 +6,7 @@ import type {
   SceneMetadata, WorldConfig, TerrainDef,
   ZoneDef, TransitionDef, FloorDef, WallDef, WallNode, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject,
   SceneFile, Opening, SpawnDef, TriggerVolume, CheckpointDef, DecalDef, GroupDef, NodeLinks, LightDef,
-  ItemDef, StateSchema, PrefabDef, PrefabInstanceRecord, UiElementDef,
+  ItemDef, StateSchema, PrefabDef, PrefabInstanceRecord, UiElementDef, ScriptDef,
 } from "@/types";
 import { DEFAULT_STATE_SCHEMA } from "@/scripting/GameState";
 
@@ -39,6 +39,7 @@ export class WorldState {
   sceneOwnsAudioMix = false;
   gameStateSchema?: Record<string, StateSchema>;
   gameUiElements?:  UiElementDef[];
+  gameScripts?:     ScriptDef[];   // Phase 77 — game.json scripts, indexed in every scene (non-serialized, like gameItems)
   gameInput?:       import("@/types").GameConfig["input"];   // v4.79.78 — per-game interact binding
   // Prefab library (Phase 44) — session-only mirror of the App's library state
   // (game.json prefabs when a project is open, else the localStorage session

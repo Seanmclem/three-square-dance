@@ -122,6 +122,7 @@ export class SceneRouter {
       world.gameItems       = this.deps.manifest.game?.items;
       world.gameStateSchema = this.deps.manifest.game?.stateSchema;
       world.gameUiElements  = this.deps.manifest.game?.uiElements;
+      world.gameScripts     = this.deps.manifest.game?.scripts;   // Phase 77
       world.gameInput  = this.deps.manifest.game?.input;
       world.setGamePlayerSettings(this.deps.manifest.game?.playerSettings);   // Phase 68 — re-resolves
       world.setGameLighting(this.deps.manifest.game?.lighting);
@@ -138,6 +139,7 @@ export class SceneRouter {
       const activeZone = world.zones.get(world.activeZoneId);
       scriptEngine.clearIndex();
       scriptEngine.loadWorld(world.world ?? {} as WorldConfig);
+      scriptEngine.loadGame(world.gameScripts);   // Phase 77
       if (activeZone) scriptEngine.loadZone(activeZone);
 
       // NO reset here — cross-scene persistence is the point. New keys from
