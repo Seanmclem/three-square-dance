@@ -467,9 +467,10 @@ the device (not in the world) and apply the next time you press Play.
    while a project is open.)
 5. **▶ Play** saves and opens the runtime shell on your project. Walk through
    the portal — scene 2 loads, your items/state carry over.
-6. **⋯ → Publish…** copies the project's JSON to any folder you pick (assets
-   are NOT copied — see PUBLISHING_GUIDE.md). **⋯ → Close project** returns
-   to classic single-file editing.
+6. **⋯ → Export game…** writes a self-contained bundle to the workspace
+   `exports/` folder; **⋯ → Publish…** uploads it to Netlify or GitHub Pages
+   (see PUBLISHING_GUIDE.md). **⋯ → Close project** returns to classic
+   single-file editing.
 7. Reopen behavior: after a browser restart the TopBar shows an amber
    **REOPEN "name"** button — click it and re-grant folder access once.
 8. Known limitation: don't edit one project from two tabs (last writer wins).

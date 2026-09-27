@@ -136,19 +136,30 @@ export async function writeExportFile(ws: Workspace, name: string, text: string)
 // fresh clone. Holds NO credentials, and exportGameBundle never copies it, so
 // it is not served to players. Written only when the link changes (the
 // per-publish record lives in stateDir) so publishing never dirties the game.
+// ONE provider per game: switching hosts replaces the link (the old site is
+// left alone on its host).
 
-export interface PublishLink {
-  provider: "netlify";
-  siteId: string;
-  siteName: string;
-  url: string;
+export type PublishLink =
+  | { provider: "netlify"; siteId: string; siteName: string; url: string }
+  | { provider: "github"; owner: string; repo: string; branch: string; url: string };
+
+/** Drop anything that is not a field of the link's shape (nothing stray lands in a committed file). */
+function cleanLink(link: PublishLink): PublishLink | null {
+  if (link?.provider === "netlify" && link.siteId) {
+    const { provider, siteId, siteName, url } = link;
+    return { provider, siteId, siteName, url };
+  }
+  if (link?.provider === "github" && link.owner && link.repo) {
+    const { provider, owner, repo, branch, url } = link;
+    return { provider, owner, repo, branch: branch || "main", url };
+  }
+  return null;
 }
 
 export async function readPublishLink(ws: Workspace, projectId: string): Promise<PublishLink | null> {
   assertSafeId(projectId);
   try {
-    const link = JSON.parse(await Deno.readTextFile(`${gamesDir(ws)}/${projectId}/publish.json`)) as PublishLink;
-    return link?.provider === "netlify" && link.siteId ? link : null;
+    return cleanLink(JSON.parse(await Deno.readTextFile(`${gamesDir(ws)}/${projectId}/publish.json`)) as PublishLink);
   } catch {
     return null;
   }
@@ -159,6 +170,7 @@ export async function writePublishLink(ws: Workspace, projectId: string, link: P
   const path = `${gamesDir(ws)}/${projectId}/publish.json`;
   if (link === null) { await trashFile(ws, path).catch(() => {}); return; }
   await Deno.stat(`${gamesDir(ws)}/${projectId}/manifest.json`);   // refuse to create a stray game folder
-  const { provider, siteId, siteName, url } = link;                // whitelist: nothing else lands in a committed file
-  await atomicWriteText(path, JSON.stringify({ provider, siteId, siteName, url }, null, 2));
+  const clean = cleanLink(link);
+  if (!clean) throw new Error("malformed publish link");
+  await atomicWriteText(path, JSON.stringify(clean, null, 2));
 }

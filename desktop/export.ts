@@ -7,6 +7,7 @@
 //   runtime.html               copied from dist ("/assets/" script refs → "./assets/")
 //   manifest.json              game manifest, assetsBase rewritten to "./"
 //   game.json + scenes/*.json  the project's JSON, paths preserved
+//   .nojekyll                  empty; GitHub Pages would otherwise drop _/./#-prefixed files (harmless elsewhere)
 //   assets/*.js                Vite's hashed chunks reachable from runtime.html (never the editor's)
 //   assets/<kind>/manifest.json  pruned to the referenced entries
 //   assets/<kind>/<rel>          referenced files, workspace-first with dist fallback
@@ -166,6 +167,11 @@ export async function exportGameBundle(
     fileCount++;
     totalBytes += stat.size;
   }
+
+  // GitHub Pages runs Jekyll on "deploy from a branch" builds, which silently
+  // skips files starting with _ . or #. This file turns that off; every other
+  // host ignores it.
+  await writeText(".nojekyll", "");
 
   // Entry redirect, so the bundle root URL just works.
   await writeText(

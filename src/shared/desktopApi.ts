@@ -23,17 +23,24 @@ export interface AutosavePayload {
   json: string;
 }
 
-// Publish to Netlify (phase 75) — mirrors desktop/netlify.ts + deploy.ts.
+// Publish to Netlify / GitHub Pages (phases 75 + 76) — mirrors desktop/netlify.ts, github.ts + deploy.ts.
+export type PublishProvider = "netlify" | "github";
 export interface NetlifyUser { name: string; email: string }
 export interface NetlifyAccount { slug: string; name: string }
 export interface NetlifySite { id: string; name: string; url: string; accountSlug: string; updatedAt: string }
-export interface PublishLink { provider: "netlify"; siteId: string; siteName: string; url: string }
-export interface LastPublish { at: string; siteId: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
+export interface GitHubUser { login: string; name: string }
+export interface GitHubRepo { owner: string; repo: string; fullName: string; isPrivate: boolean; defaultBranch: string; pushedAt: string; url: string }
+export type PublishLink =
+  | { provider: "netlify"; siteId: string; siteName: string; url: string }
+  | { provider: "github"; owner: string; repo: string; branch: string; url: string };
+export interface LastPublish { at: string; provider: PublishProvider; target: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
 export interface PublishStatus {
-  phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "done" | "error";
+  phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "building" | "done" | "error";
+  provider: PublishProvider;
   done: number; total: number; bytesDone: number; bytesTotal: number;
   url?: string; deployUrl?: string; fileCount?: number; uploadedCount?: number; uploadedBytes?: number;
   missing?: string[];
+  stillBuilding?: boolean;
   error?: string;
 }
 
@@ -73,6 +80,11 @@ export interface DesktopApi {
   netlifyClearKey(): Promise<void>;
   netlifyListSites(): Promise<{ sites: NetlifySite[]; accounts: NetlifyAccount[] }>;
   netlifyCreateSite(opts: { name: string; accountSlug?: string }): Promise<NetlifySite>;
+  githubStatus(): Promise<{ connected: boolean; user?: GitHubUser; error?: string }>;
+  githubSetKey(key: string): Promise<{ user: GitHubUser }>;
+  githubClearKey(): Promise<void>;
+  githubListRepos(): Promise<{ repos: GitHubRepo[]; user: GitHubUser }>;
+  githubCreateRepo(opts: { name: string; isPrivate: boolean }): Promise<GitHubRepo>;
   getPublishLink(projectId: string): Promise<{ link: PublishLink | null; lastPublish: LastPublish | null }>;
   setPublishLink(projectId: string, link: PublishLink | null): Promise<void>;
   startPublish(projectId: string): Promise<{ jobId: string }>;

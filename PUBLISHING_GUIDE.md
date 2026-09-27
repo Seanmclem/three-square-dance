@@ -21,11 +21,14 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 > assets the game references* (pruned manifests included) — into the
 > workspace `exports/` folder. Drop that folder on any host in §4 and it
 > plays; `assetsBase` is already `"./"`, so no asset hosting decisions and
-> no CORS in the common case. **For Netlify you can skip the folder entirely:
-> PROJ ▾ → Publish… (Phase 75) uploads the bundle for you**: paste a Netlify
-> personal access token once, pick or create a site once, and every later
-> Publish goes to that same site, uploading only the files that changed. The manual steps below remain valid as the
-> by-hand appendix and for understanding what the editor generates.
+> no CORS in the common case. **For Netlify and GitHub Pages you can skip the
+> folder entirely: PROJ ▾ → Publish… (Phases 75 + 76) uploads the bundle for
+> you**: paste that host's personal access token once, pick or create a site
+> (Netlify) or repository (GitHub) once, and every later Publish goes to the
+> same place, uploading only the files that changed. A game remembers which
+> host it publishes to; "Change site…" moves it. The manual steps below remain
+> valid as the by-hand appendix and for understanding what the editor
+> generates.
 
 The dev server already serves everything the runtime needs. The whole loop is:
 save your world **into `public/`**, add a small manifest next to it, open
@@ -248,16 +251,57 @@ Only simple GETs are made (no custom headers), so you don't need
 
 ## 4. Host recipes
 
-### GitHub Pages — zero config ✅
+### GitHub Pages
 
-GitHub Pages already serves `Access-Control-Allow-Origin: *` on everything.
+Free on a public repository; no CORS work (GitHub Pages already serves
+`Access-Control-Allow-Origin: *`). The exported bundle uses relative paths,
+so it works from the `https://<you>.github.io/<repo>/` subpath as is.
 
-1. Make a repo, put the game folder in it (or use `docs/`), enable Pages
-   (Settings → Pages → deploy from branch).
-2. Your manifest URL:
-   `https://<user>.github.io/<repo>/my-game/manifest.json`
+**From the desktop app (recommended):** PROJ ▾ → **Publish…** → GitHub Pages.
 
-Nothing else to do. This is the easiest host for a first publish.
+1. Get a token once. The modal has a button that opens
+   github.com → Settings → Developer settings → Personal access tokens
+   (classic) → New token, with the one scope it needs (`public_repo`) already
+   ticked. Pick an expiry, press Generate token, copy it (GitHub shows it
+   once), paste it into the modal. It is checked with GitHub, then stored in
+   the app's state folder (`secrets.json`, owner-only), never in the game.
+   For a private repository tick `repo` instead; Pages on a private
+   repository needs a paid GitHub plan.
+2. Pick a repository once: create one (name prefilled from the game, public
+   by default) or choose an existing one. The app pushes the game to its
+   `main` branch and switches Pages on, replacing whatever that branch held.
+3. Press Publish. First time: the app creates the first commit, pushes every
+   file, enables Pages, then waits for GitHub's build (usually 1 to 3
+   minutes; the URL 404s until it finishes). Later publishes push only the
+   files that changed and are much faster.
+4. Open ↗ plays it at `https://<you>.github.io/<repo>/`.
+
+**By hand** (no app, or another machine):
+
+1. PROJ ▾ → Export game… (the bundle folder opens in Finder).
+2. On github.com create a new **public** repository, no README, no
+   .gitignore.
+3. Get the files in. Any of:
+   - **GitHub Desktop:** File → Add local repository on the exported folder,
+     commit, Publish repository.
+   - **Browser upload:** in the empty repo choose "uploading an existing
+     file" and drag the *contents* of the bundle folder in (not the folder
+     itself, so `index.html` lands at the root). The uploader takes at most
+     100 files per drop, so a game with more files needs two drops: first
+     `assets/`, then the rest.
+   - **git:** inside the exported folder,
+     `git init && git add -A && git commit -m "publish" && git branch -M main
+     && git remote add origin <repo url> && git push -u origin main`.
+4. Settings → Pages → Build and deployment → Source: Deploy from a branch →
+   `main` and `/ (root)` → Save. Wait a minute or two.
+5. Play at `https://<you>.github.io/<repo>/`. The standalone-runtime manifest
+   URL is `https://<you>.github.io/<repo>/manifest.json`.
+6. To update: export again, replace the files, push. GitHub Desktop shows
+   exactly which files changed.
+
+Notes: the bundle contains an empty `.nojekyll`; keep it, or GitHub's
+Jekyll step silently drops any file whose name starts with `_`. Limits: 1 GB
+per site, soft 100 GB/month bandwidth, soft 10 builds per hour.
 
 ### Netlify — add a `_headers` file
 

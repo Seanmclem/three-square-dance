@@ -167,10 +167,12 @@ stock asset library.)
 assets that game references — ~11 MB for platfrom-obby vs 150 MB of dist)
 into the workspace `exports/` folder. Drop that folder on any static host
 (see PUBLISHING_GUIDE.md §4 recipes); `index.html` redirects into the runtime
-with `assetsBase` already relative. For Netlify, **Publish…** (same menu)
-does the export and the upload in one step: it asks once for a Netlify
-personal access token (stored in the state folder's `secrets.json`, never in
-the game) and once for the site, then keeps publishing to that site.
+with `assetsBase` already relative. **Publish…** (same menu) does the export
+and the upload in one step, to Netlify or GitHub Pages: it asks once for that
+host's personal access token (stored in the state folder's `secrets.json`,
+never in the game) and once for the site or repository, then keeps
+publishing there. The game's `publish.json` remembers which host; the modal
+shows it and "Change site…" moves it (the old site is left alone).
 
 ## 4. Testing & debugging
 

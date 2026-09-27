@@ -264,11 +264,10 @@ Deno.test("startPublish: exports, deploys, reports progress to done; the link fi
     const o = { apiBase: fake.apiBase, ...FAST };
     const distDir = new URL("../dist", import.meta.url).pathname;   // real built runtime (read-only)
 
-    await assertRejects(() => D.startPublish(ws, distDir, "mini", o), Error, "No Netlify API key");
-    await D.netlifySetKey(ws, "good", o);
-    await assertRejects(() => D.startPublish(ws, distDir, "mini", o), Error, "not linked to a Netlify site");
-
+    await assertRejects(() => D.startPublish(ws, distDir, "mini", o), Error, "not linked to a site");
     await D.setPublishLink(ws, "mini", { provider: "netlify", siteId: "site-1", siteName: "my-game", url: "https://my-game.netlify.app" });
+    await assertRejects(() => D.startPublish(ws, distDir, "mini", o), Error, "no Netlify API key is saved");
+    await D.netlifySetKey(ws, "good", o);
     const { jobId } = await D.startPublish(ws, distDir, "mini", o);
     assertEquals((await D.startPublish(ws, distDir, "mini", o)).jobId, jobId);   // double click joins the running job
 
@@ -285,6 +284,7 @@ Deno.test("startPublish: exports, deploys, reports progress to done; the link fi
     const paths = fake.puts.map(p => p.path);
     assert(paths.includes("/runtime.html") && paths.includes("/scenes/s.json") && paths.includes("/manifest.json"));
     assert(!paths.some(p => p.includes("publish.json")), "publish.json must not ship");
+    assert(paths.includes("/.nojekyll"), ".nojekyll ships (phase 76)");
     assert(!paths.some(p => /\/assets\/main-/.test(p)), "the editor chunk must not ship");
 
     const linkText = await Deno.readTextFile(`${ws.contentDir}/games/mini/publish.json`);

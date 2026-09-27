@@ -1,26 +1,36 @@
-// Publish a game to a hosted site (phase 75). Backend of the editor's Publish
-// modal: the API key, the game ↔ site link, and the publish job itself
-// (exportGameBundle → Netlify file-digest deploy). Netlify is the only host;
-// the phase-57 provider registry that sat here had no second consumer, so it
-// is gone rather than generalised.
+// Publish a game to a hosted site (phases 75 + 76). Backend of the editor's
+// Publish modal: the API keys (one per host), the game ↔ site link, and the
+// publish job itself (exportGameBundle → the host's upload). Hosts: Netlify
+// (file-digest deploy) and GitHub Pages (git over REST). A game links to ONE
+// host at a time; switching replaces the link and leaves the old site alone.
 //
 // The api transport is one blocking POST per call with no progress channel, so
 // a publish runs as an in-memory JOB the modal polls (`getPublishStatus`).
 
 import { exportGameBundle } from "./export.ts";
 import { createNetlifyClient, type NetlifyAccount, type NetlifyClient, type NetlifySite, type NetlifyUser } from "./netlify.ts";
+import { createGitHubClient, type GitHubClient, type GitHubRepo, type GitHubUser } from "./github.ts";
 import { type PublishLink, readPublishLink, writePublishLink } from "./projects.ts";
 import { assertSafeId, atomicWriteText, readSecret, type Workspace, writeSecret } from "./workspace.ts";
 
-const KEY = "netlifyToken";
+export type Provider = "netlify" | "github";
+const KEY: Record<Provider, string> = { netlify: "netlifyToken", github: "githubToken" };
+const LABEL: Record<Provider, string> = { netlify: "Netlify", github: "GitHub" };
 
-/** Tests pass a fake server + fast timings; the app passes nothing. */
-export interface ClientOverrides { apiBase?: string; retryBaseMs?: number; pollMs?: number }
+/** Tests pass fake servers + fast timings; the app passes nothing. */
+export interface ClientOverrides { apiBase?: string; retryBaseMs?: number; pollMs?: number; github?: { apiBase?: string; retryBaseMs?: number; pollMs?: number } }
 
 async function client(ws: Workspace, o?: ClientOverrides): Promise<NetlifyClient> {
-  const token = await readSecret(ws, KEY);
+  const token = await readSecret(ws, KEY.netlify);
   if (!token) throw new Error("No Netlify API key saved yet");
-  return createNetlifyClient({ token, ...o });
+  const { github: _g, ...rest } = o ?? {};
+  return createNetlifyClient({ token, ...rest });
+}
+
+async function ghClient(ws: Workspace, o?: ClientOverrides): Promise<GitHubClient> {
+  const token = await readSecret(ws, KEY.github);
+  if (!token) throw new Error("No GitHub token saved yet");
+  return createGitHubClient({ token, ...(o?.github ?? {}) });
 }
 
 // ── API key ─────────────────────────────────────────────────────────────────
@@ -28,7 +38,7 @@ async function client(ws: Workspace, o?: ClientOverrides): Promise<NetlifyClient
 // only ever learns whether one is saved and whose account it is.
 
 export async function netlifyStatus(ws: Workspace, o?: ClientOverrides): Promise<{ connected: boolean; user?: NetlifyUser; error?: string }> {
-  if (!(await readSecret(ws, KEY))) return { connected: false };
+  if (!(await readSecret(ws, KEY.netlify))) return { connected: false };
   try {
     return { connected: true, user: await (await client(ws, o)).getUser() };
   } catch (e) {
@@ -42,13 +52,48 @@ export async function netlifyStatus(ws: Workspace, o?: ClientOverrides): Promise
 export async function netlifySetKey(ws: Workspace, key: string, o?: ClientOverrides): Promise<{ user: NetlifyUser }> {
   const token = key.trim();
   if (!token) throw new Error("Paste a Netlify API key first");
-  const user = await createNetlifyClient({ token, ...o }).getUser();
-  await writeSecret(ws, KEY, token);
+  const { github: _g, ...rest } = o ?? {};
+  const user = await createNetlifyClient({ token, ...rest }).getUser();
+  await writeSecret(ws, KEY.netlify, token);
   return { user };
 }
 
 export async function netlifyClearKey(ws: Workspace): Promise<void> {
-  await writeSecret(ws, KEY, null);
+  await writeSecret(ws, KEY.netlify, null);
+}
+
+// ── GitHub token (same rules as the Netlify key) ────────────────────────────
+
+export async function githubStatus(ws: Workspace, o?: ClientOverrides): Promise<{ connected: boolean; user?: GitHubUser; error?: string }> {
+  if (!(await readSecret(ws, KEY.github))) return { connected: false };
+  try {
+    return { connected: true, user: await (await ghClient(ws, o)).getUser() };
+  } catch (e) {
+    const rejected = (e as { status?: number }).status === 401;
+    return { connected: !rejected, error: (e as Error).message };
+  }
+}
+
+export async function githubSetKey(ws: Workspace, key: string, o?: ClientOverrides): Promise<{ user: GitHubUser }> {
+  const token = key.trim();
+  if (!token) throw new Error("Paste a GitHub token first");
+  const user = await createGitHubClient({ token, ...(o?.github ?? {}) }).getUser();
+  await writeSecret(ws, KEY.github, token);
+  return { user };
+}
+
+export async function githubClearKey(ws: Workspace): Promise<void> {
+  await writeSecret(ws, KEY.github, null);
+}
+
+export async function githubListRepos(ws: Workspace, o?: ClientOverrides): Promise<{ repos: GitHubRepo[]; user: GitHubUser }> {
+  const c = await ghClient(ws, o);
+  const [repos, user] = await Promise.all([c.listRepos(), c.getUser()]);
+  return { repos, user };
+}
+
+export async function githubCreateRepo(ws: Workspace, opts: { name: string; isPrivate: boolean }, o?: ClientOverrides): Promise<GitHubRepo> {
+  return (await ghClient(ws, o)).createRepo(opts);
 }
 
 // ── sites ───────────────────────────────────────────────────────────────────
@@ -65,13 +110,19 @@ export async function netlifyCreateSite(ws: Workspace, opts: { name: string; acc
 
 // ── last-publish record (local; the committed publish.json stays stable) ────
 
-export interface LastPublish { at: string; siteId: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
+/** `target` identifies the site the record belongs to: Netlify site id, or GitHub "owner/repo@branch". */
+export interface LastPublish { at: string; provider: Provider; target: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
+
+const targetOf = (link: PublishLink): string => link.provider === "netlify" ? link.siteId : `${link.owner}/${link.repo}@${link.branch}`;
 
 const lastPublishPath = (ws: Workspace, projectId: string) => `${ws.stateDir}/publish/${projectId}.json`;
 
 async function readLastPublish(ws: Workspace, projectId: string): Promise<LastPublish | null> {
   try {
-    return JSON.parse(await Deno.readTextFile(lastPublishPath(ws, projectId))) as LastPublish;
+    const raw = JSON.parse(await Deno.readTextFile(lastPublishPath(ws, projectId))) as LastPublish & { siteId?: string };
+    // phase-75 records predate `provider`/`target`
+    if (!raw.provider && raw.siteId) return { ...raw, provider: "netlify", target: raw.siteId };
+    return raw;
   } catch {
     return null;
   }
@@ -81,7 +132,7 @@ async function readLastPublish(ws: Workspace, projectId: string): Promise<LastPu
 export async function getPublishLink(ws: Workspace, projectId: string): Promise<{ link: PublishLink | null; lastPublish: LastPublish | null }> {
   const link = await readPublishLink(ws, projectId);
   const last = await readLastPublish(ws, projectId);
-  return { link, lastPublish: link && last?.siteId === link.siteId ? last : null };
+  return { link, lastPublish: link && last?.provider === link.provider && last?.target === targetOf(link) ? last : null };
 }
 
 export async function setPublishLink(ws: Workspace, projectId: string, link: PublishLink | null): Promise<void> {
@@ -91,7 +142,8 @@ export async function setPublishLink(ws: Workspace, projectId: string, link: Pub
 // ── publish job ─────────────────────────────────────────────────────────────
 
 export interface PublishStatus {
-  phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "done" | "error";
+  phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "building" | "done" | "error";
+  provider: Provider;
   done: number;
   total: number;
   bytesDone: number;
@@ -103,6 +155,8 @@ export interface PublishStatus {
   uploadedCount?: number;
   uploadedBytes?: number;
   missing?: string[];
+  /** GitHub only: pushed, but GitHub had not finished building within the wait. */
+  stillBuilding?: boolean;
   /** error */
   error?: string;
 }
@@ -118,28 +172,38 @@ export async function startPublish(ws: Workspace, distDir: string, projectId: st
   for (const [id, j] of jobs) if (j.projectId === projectId && running(j)) return { jobId: id };
   for (const [id, j] of jobs) if (!running(j) && Date.now() - j.startedAt > 3_600_000) jobs.delete(id);
 
-  // Fail fast, before a job exists, on the two things the user must fix first.
-  const c = await client(ws, o);
+  // Fail fast, before a job exists, on the two things the user must fix first:
+  // a link, then a key for THAT link's host.
   const link = await readPublishLink(ws, projectId);
-  if (!link) throw new Error("This game is not linked to a Netlify site yet");
+  if (!link) throw new Error("This game is not linked to a site yet");
+  if (!(await readSecret(ws, KEY[link.provider]))) throw new Error(`This game publishes to ${LABEL[link.provider]}, but no ${LABEL[link.provider]} ${link.provider === "github" ? "token" : "API key"} is saved. Connect ${LABEL[link.provider]} first.`);
 
   const jobId = crypto.randomUUID().slice(0, 8);
-  const job: Job = { projectId, startedAt: Date.now(), status: { phase: "exporting", done: 0, total: 0, bytesDone: 0, bytesTotal: 0 } };
+  const blank = { done: 0, total: 0, bytesDone: 0, bytesTotal: 0 };
+  const job: Job = { projectId, startedAt: Date.now(), status: { phase: "exporting", provider: link.provider, ...blank } };
   jobs.set(jobId, job);
 
   void (async () => {
     try {
       const bundle = await exportGameBundle(ws, distDir, { projectId });
-      const r = await c.deployDir(link.siteId, bundle.outputPath, p => { job.status = { ...p }; });
-      const url = r.url || link.url;
+      let result: { deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number; uploadedBytes: number; stillBuilding?: boolean };
+      if (link.provider === "netlify") {
+        const c = await client(ws, o);
+        const r = await c.deployDir(link.siteId, bundle.outputPath, p => { job.status = { ...p, provider: "netlify" }; });
+        result = { ...r, url: r.url || link.url };
+      } else {
+        const c = await ghClient(ws, o);
+        const r = await c.deployDir(link.owner, link.repo, link.branch, bundle.outputPath, p => { job.status = { ...p, provider: "github" }; });
+        result = { deployId: r.commitSha, url: r.url || link.url, deployUrl: `https://github.com/${link.owner}/${link.repo}/commit/${r.commitSha}`, fileCount: r.fileCount, uploadedCount: r.uploadedCount, uploadedBytes: r.uploadedBytes, stillBuilding: r.stillBuilding };
+      }
       const last: LastPublish = {
-        at: new Date().toISOString(), siteId: link.siteId, deployId: r.deployId,
-        url, deployUrl: r.deployUrl, fileCount: r.fileCount, uploadedCount: r.uploadedCount,
+        at: new Date().toISOString(), provider: link.provider, target: targetOf(link), deployId: result.deployId,
+        url: result.url, deployUrl: result.deployUrl, fileCount: result.fileCount, uploadedCount: result.uploadedCount,
       };
       await atomicWriteText(lastPublishPath(ws, projectId), JSON.stringify(last, null, 2));
       job.status = {
-        ...job.status, phase: "done", url, deployUrl: r.deployUrl, fileCount: r.fileCount,
-        uploadedCount: r.uploadedCount, uploadedBytes: r.uploadedBytes, missing: bundle.missing,
+        ...job.status, phase: "done", url: result.url, deployUrl: result.deployUrl, fileCount: result.fileCount,
+        uploadedCount: result.uploadedCount, uploadedBytes: result.uploadedBytes, missing: bundle.missing, stillBuilding: result.stillBuilding,
       };
     } catch (e) {
       console.error(`[publish] ${projectId} failed:`, (e as Error).message);

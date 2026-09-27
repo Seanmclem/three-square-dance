@@ -1,4 +1,13 @@
-# Phase 76: publish a game to GitHub Pages (plan only, nothing built yet)
+# Phase 76: publish a game to GitHub Pages
+
+> Built 2026-09-26 (v4.86.0). What shipped matches Part A + Part B below with
+> these decisions: branch `main`; public repo by default (private allowed,
+> with the paid-plan note); classic token with `public_repo` recommended and
+> prefilled on the token page the modal opens; ONE host per game, switching
+> is explicit ("Change site…" → host chooser with a warning) and the old
+> site is left alone. Empty-repo spike result: the git database API does
+> refuse a brand-new repo, so the client seeds `.nojekyll` through the
+> contents API and continues. Test plan: `test-plans/phase-76-github-pages-publish.md`.
 
 > Follows phase 75 (Netlify publish). User: "begin planning github static
 > sites method instructions, then api option. no code changes yet."
