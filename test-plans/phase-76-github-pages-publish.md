@@ -89,3 +89,25 @@ tokens, plus fake Netlify and fake GitHub. The dev shell was left alone.
 No custom domains (CNAME), no Actions-workflow build type, only repos the
 token's user owns, no rollback, no cancelling a running publish, the branch
 is always `main`.
+
+## Addendum (v4.86.1): Vercel as the third host
+
+- `deno test -A desktop/vercel_test.ts`: 6 PASS (file list without leading
+  slashes, sha + size correct; missing-files loop uploads once per hash;
+  republish uploads only the changed file, unchanged uploads nothing; teamId
+  on every call for team projects; 429 / 503 / 502 retried, six 500s give
+  up plainly; bad token / project taken / project gone / failed deployment
+  messages; `deploy.ts` job end to end with the token in its own slot and the
+  project listing spanning account + team).
+- UI pass in Chrome on the harness (fake Vercel added): Netlify-linked game →
+  Change site… → Vercel card ("Not connected yet") → token screen with the
+  three steps and the non-commercial note → project picker (Scope dropdown:
+  personal account / Acme Games, address preview, existing projects with
+  their team in parentheses) → Create → linked screen with the VERCEL badge →
+  Publish to Vercel → "Putting it live…" → Published, Open / Copy;
+  `publish.json` = `{provider: "vercel", projectId, projectName, teamId: null,
+  url}`.
+- Manual (user): needs a real Vercel token (vercel.com → Account settings →
+  Tokens). Create a project, Publish, play `https://<project>.vercel.app`;
+  republish after an edit (few files). Note the Hobby plan's non-commercial
+  rule and 100 MB per-deployment cap.

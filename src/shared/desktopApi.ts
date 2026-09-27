@@ -23,16 +23,20 @@ export interface AutosavePayload {
   json: string;
 }
 
-// Publish to Netlify / GitHub Pages (phases 75 + 76) — mirrors desktop/netlify.ts, github.ts + deploy.ts.
-export type PublishProvider = "netlify" | "github";
+// Publish to Netlify / GitHub Pages / Vercel (phases 75 + 76) — mirrors desktop/netlify.ts, github.ts, vercel.ts + deploy.ts.
+export type PublishProvider = "netlify" | "github" | "vercel";
 export interface NetlifyUser { name: string; email: string }
 export interface NetlifyAccount { slug: string; name: string }
 export interface NetlifySite { id: string; name: string; url: string; accountSlug: string; updatedAt: string }
 export interface GitHubUser { login: string; name: string }
 export interface GitHubRepo { owner: string; repo: string; fullName: string; isPrivate: boolean; defaultBranch: string; pushedAt: string; url: string }
+export interface VercelUser { username: string; name: string }
+export interface VercelTeam { id: string; slug: string; name: string }
+export interface VercelProject { id: string; name: string; url: string; teamId: string | null; updatedAt: string }
 export type PublishLink =
   | { provider: "netlify"; siteId: string; siteName: string; url: string }
-  | { provider: "github"; owner: string; repo: string; branch: string; url: string };
+  | { provider: "github"; owner: string; repo: string; branch: string; url: string }
+  | { provider: "vercel"; projectId: string; projectName: string; teamId: string | null; url: string };
 export interface LastPublish { at: string; provider: PublishProvider; target: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
 export interface PublishStatus {
   phase: "exporting" | "hashing" | "preparing" | "uploading" | "processing" | "building" | "done" | "error";
@@ -85,6 +89,11 @@ export interface DesktopApi {
   githubClearKey(): Promise<void>;
   githubListRepos(): Promise<{ repos: GitHubRepo[]; user: GitHubUser }>;
   githubCreateRepo(opts: { name: string; isPrivate: boolean }): Promise<GitHubRepo>;
+  vercelStatus(): Promise<{ connected: boolean; user?: VercelUser; error?: string }>;
+  vercelSetKey(key: string): Promise<{ user: VercelUser }>;
+  vercelClearKey(): Promise<void>;
+  vercelListProjects(): Promise<{ projects: VercelProject[]; teams: VercelTeam[]; user: VercelUser }>;
+  vercelCreateProject(opts: { name: string; teamId: string | null }): Promise<VercelProject>;
   getPublishLink(projectId: string): Promise<{ link: PublishLink | null; lastPublish: LastPublish | null }>;
   setPublishLink(projectId: string, link: PublishLink | null): Promise<void>;
   startPublish(projectId: string): Promise<{ jobId: string }>;

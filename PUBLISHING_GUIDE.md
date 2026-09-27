@@ -21,11 +21,12 @@ GitHub Pages / Cloudflare Pages, and how to get CORS right. Added v4.20.0.
 > assets the game references* (pruned manifests included) — into the
 > workspace `exports/` folder. Drop that folder on any host in §4 and it
 > plays; `assetsBase` is already `"./"`, so no asset hosting decisions and
-> no CORS in the common case. **For Netlify and GitHub Pages you can skip the
-> folder entirely: PROJ ▾ → Publish… (Phases 75 + 76) uploads the bundle for
-> you**: paste that host's personal access token once, pick or create a site
-> (Netlify) or repository (GitHub) once, and every later Publish goes to the
-> same place, uploading only the files that changed. A game remembers which
+> no CORS in the common case. **For Netlify, GitHub Pages and Vercel you can
+> skip the folder entirely: PROJ ▾ → Publish… (Phases 75 + 76) uploads the
+> bundle for you**: paste that host's personal access token once, pick or
+> create a site (Netlify), repository (GitHub) or project (Vercel) once, and
+> every later Publish goes to the same place, uploading only the files that
+> changed. A game remembers which
 > host it publishes to; "Change site…" moves it. The manual steps below remain
 > valid as the by-hand appendix and for understanding what the editor
 > generates.
@@ -302,6 +303,33 @@ so it works from the `https://<you>.github.io/<repo>/` subpath as is.
 Notes: the bundle contains an empty `.nojekyll`; keep it, or GitHub's
 Jekyll step silently drops any file whose name starts with `_`. Limits: 1 GB
 per site, soft 100 GB/month bandwidth, soft 10 builds per hour.
+
+### Vercel
+
+Free Hobby plan, live in seconds, no CORS work. Two limits worth knowing:
+the Hobby plan is for **personal, non-commercial** use (a game you sell or
+run ads on needs Pro), and a deployment's source files may total at most
+**100 MB** (1 GB on Pro). `platfrom-obby` is 26 MB.
+
+**From the desktop app:** PROJ ▾ → **Publish…** → Vercel.
+
+1. Get a token once: the modal's button opens vercel.com → Account settings
+   → Tokens. Press Create, name it, set Scope to your account (or a team),
+   pick an expiry, copy the token (shown once), paste it into the modal. It is
+   checked with Vercel, then stored in the app's state folder (`secrets.json`,
+   owner-only), never in the game.
+2. Pick a project once: create one (name prefilled, scope = personal account
+   or a team) or choose an existing one. The game replaces that project's
+   production deployment.
+3. Press Publish. The first publish uploads every file; later ones upload
+   only what changed (Vercel keeps files by content hash). Static files need
+   no build, so it is live at `https://<project>.vercel.app` within seconds.
+   Vercel adds a suffix to the domain if the name is taken elsewhere.
+
+**By hand:** install the Vercel CLI (`npm i -g vercel`), `vercel login`, then
+inside the exported bundle folder run `vercel --prod` and accept the
+defaults (no framework, output directory `.`). Or drag the folder onto
+vercel.com → Add New → Project → the "deploy a folder" area.
 
 ### Netlify — add a `_headers` file
 

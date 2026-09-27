@@ -1,8 +1,9 @@
 // Publish a game to a hosted site (phases 75 + 76). Backend of the editor's
 // Publish modal: the API keys (one per host), the game ↔ site link, and the
 // publish job itself (exportGameBundle → the host's upload). Hosts: Netlify
-// (file-digest deploy) and GitHub Pages (git over REST). A game links to ONE
-// host at a time; switching replaces the link and leaves the old site alone.
+// (file-digest deploy), GitHub Pages (git over REST) and Vercel (digest
+// deploy). A game links to ONE host at a time; switching replaces the link
+// and leaves the old site alone.
 //
 // The api transport is one blocking POST per call with no progress channel, so
 // a publish runs as an in-memory JOB the modal polls (`getPublishStatus`).
@@ -10,21 +11,29 @@
 import { exportGameBundle } from "./export.ts";
 import { createNetlifyClient, type NetlifyAccount, type NetlifyClient, type NetlifySite, type NetlifyUser } from "./netlify.ts";
 import { createGitHubClient, type GitHubClient, type GitHubRepo, type GitHubUser } from "./github.ts";
+import { createVercelClient, type VercelClient, type VercelProject, type VercelTeam, type VercelUser } from "./vercel.ts";
 import { type PublishLink, readPublishLink, writePublishLink } from "./projects.ts";
 import { assertSafeId, atomicWriteText, readSecret, type Workspace, writeSecret } from "./workspace.ts";
 
-export type Provider = "netlify" | "github";
-const KEY: Record<Provider, string> = { netlify: "netlifyToken", github: "githubToken" };
-const LABEL: Record<Provider, string> = { netlify: "Netlify", github: "GitHub" };
+export type Provider = "netlify" | "github" | "vercel";
+const KEY: Record<Provider, string> = { netlify: "netlifyToken", github: "githubToken", vercel: "vercelToken" };
+const LABEL: Record<Provider, string> = { netlify: "Netlify", github: "GitHub", vercel: "Vercel" };
 
 /** Tests pass fake servers + fast timings; the app passes nothing. */
-export interface ClientOverrides { apiBase?: string; retryBaseMs?: number; pollMs?: number; github?: { apiBase?: string; retryBaseMs?: number; pollMs?: number } }
+interface Timing { apiBase?: string; retryBaseMs?: number; pollMs?: number }
+export interface ClientOverrides extends Timing { github?: Timing; vercel?: Timing }
 
 async function client(ws: Workspace, o?: ClientOverrides): Promise<NetlifyClient> {
   const token = await readSecret(ws, KEY.netlify);
   if (!token) throw new Error("No Netlify API key saved yet");
-  const { github: _g, ...rest } = o ?? {};
+  const { github: _g, vercel: _v, ...rest } = o ?? {};
   return createNetlifyClient({ token, ...rest });
+}
+
+async function vcClient(ws: Workspace, o?: ClientOverrides): Promise<VercelClient> {
+  const token = await readSecret(ws, KEY.vercel);
+  if (!token) throw new Error("No Vercel token saved yet");
+  return createVercelClient({ token, ...(o?.vercel ?? {}) });
 }
 
 async function ghClient(ws: Workspace, o?: ClientOverrides): Promise<GitHubClient> {
@@ -52,7 +61,7 @@ export async function netlifyStatus(ws: Workspace, o?: ClientOverrides): Promise
 export async function netlifySetKey(ws: Workspace, key: string, o?: ClientOverrides): Promise<{ user: NetlifyUser }> {
   const token = key.trim();
   if (!token) throw new Error("Paste a Netlify API key first");
-  const { github: _g, ...rest } = o ?? {};
+  const { github: _g, vercel: _v, ...rest } = o ?? {};
   const user = await createNetlifyClient({ token, ...rest }).getUser();
   await writeSecret(ws, KEY.netlify, token);
   return { user };
@@ -96,6 +105,42 @@ export async function githubCreateRepo(ws: Workspace, opts: { name: string; isPr
   return (await ghClient(ws, o)).createRepo(opts);
 }
 
+// ── Vercel token (same rules) ───────────────────────────────────────────────
+
+export async function vercelStatus(ws: Workspace, o?: ClientOverrides): Promise<{ connected: boolean; user?: VercelUser; error?: string }> {
+  if (!(await readSecret(ws, KEY.vercel))) return { connected: false };
+  try {
+    return { connected: true, user: await (await vcClient(ws, o)).getUser() };
+  } catch (e) {
+    const rejected = (e as { status?: number }).status === 401;
+    return { connected: !rejected, error: (e as Error).message };
+  }
+}
+
+export async function vercelSetKey(ws: Workspace, key: string, o?: ClientOverrides): Promise<{ user: VercelUser }> {
+  const token = key.trim();
+  if (!token) throw new Error("Paste a Vercel token first");
+  const user = await createVercelClient({ token, ...(o?.vercel ?? {}) }).getUser();
+  await writeSecret(ws, KEY.vercel, token);
+  return { user };
+}
+
+export async function vercelClearKey(ws: Workspace): Promise<void> {
+  await writeSecret(ws, KEY.vercel, null);
+}
+
+/** Projects across the personal account and every team the token can see. */
+export async function vercelListProjects(ws: Workspace, o?: ClientOverrides): Promise<{ projects: VercelProject[]; teams: VercelTeam[]; user: VercelUser }> {
+  const c = await vcClient(ws, o);
+  const [teams, user] = await Promise.all([c.listTeams(), c.getUser()]);
+  const lists = await Promise.all([c.listProjects(null), ...teams.map(t => c.listProjects(t.id))]);
+  return { projects: lists.flat(), teams, user };
+}
+
+export async function vercelCreateProject(ws: Workspace, opts: { name: string; teamId: string | null }, o?: ClientOverrides): Promise<VercelProject> {
+  return (await vcClient(ws, o)).createProject(opts);
+}
+
 // ── sites ───────────────────────────────────────────────────────────────────
 
 export async function netlifyListSites(ws: Workspace, o?: ClientOverrides): Promise<{ sites: NetlifySite[]; accounts: NetlifyAccount[] }> {
@@ -113,7 +158,8 @@ export async function netlifyCreateSite(ws: Workspace, opts: { name: string; acc
 /** `target` identifies the site the record belongs to: Netlify site id, or GitHub "owner/repo@branch". */
 export interface LastPublish { at: string; provider: Provider; target: string; deployId: string; url: string; deployUrl: string; fileCount: number; uploadedCount: number }
 
-const targetOf = (link: PublishLink): string => link.provider === "netlify" ? link.siteId : `${link.owner}/${link.repo}@${link.branch}`;
+const targetOf = (link: PublishLink): string =>
+  link.provider === "netlify" ? link.siteId : link.provider === "github" ? `${link.owner}/${link.repo}@${link.branch}` : link.projectId;
 
 const lastPublishPath = (ws: Workspace, projectId: string) => `${ws.stateDir}/publish/${projectId}.json`;
 
@@ -191,10 +237,14 @@ export async function startPublish(ws: Workspace, distDir: string, projectId: st
         const c = await client(ws, o);
         const r = await c.deployDir(link.siteId, bundle.outputPath, p => { job.status = { ...p, provider: "netlify" }; });
         result = { ...r, url: r.url || link.url };
-      } else {
+      } else if (link.provider === "github") {
         const c = await ghClient(ws, o);
         const r = await c.deployDir(link.owner, link.repo, link.branch, bundle.outputPath, p => { job.status = { ...p, provider: "github" }; });
         result = { deployId: r.commitSha, url: r.url || link.url, deployUrl: `https://github.com/${link.owner}/${link.repo}/commit/${r.commitSha}`, fileCount: r.fileCount, uploadedCount: r.uploadedCount, uploadedBytes: r.uploadedBytes, stillBuilding: r.stillBuilding };
+      } else {
+        const c = await vcClient(ws, o);
+        const r = await c.deployDir({ id: link.projectId, name: link.projectName, teamId: link.teamId }, bundle.outputPath, p => { job.status = { ...p, provider: "vercel" }; });
+        result = { ...r, url: r.url || link.url };
       }
       const last: LastPublish = {
         at: new Date().toISOString(), provider: link.provider, target: targetOf(link), deployId: result.deployId,

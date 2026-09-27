@@ -1220,6 +1220,8 @@ world-editor/
 │   ├── github.ts                   ← hand-rolled GitHub client: user/repos/pages + deployDir = git over REST (blobs/tree/commit/ref, only changed blobs), Pages build wait
 │   ├── netlify_test.ts             ← `deno test -A` against a fake Netlify server (client + key storage + publish job)
 │   ├── github_test.ts              ← `deno test -A` against a fake GitHub (git object store + Pages builds): empty-repo seed, delta pushes, deletions, rate limits, two hosts side by side
+│   ├── vercel.ts                   ← hand-rolled Vercel client: user/teams/projects + digest deployDir (missing_files → /v2/files → deployment, READY poll)
+│   ├── vercel_test.ts              ← `deno test -A` against a fake Vercel: missing-files loop, delta republish, teamId on every call, retries, plain messages, job end to end
 │   └── spike.html                  ← phase-54 smoke harness, kept as a shell-regression tool (/spike.html)
 ├── public/
 │   └── demo/                       ← committed runtime demo: manifest.json + scenes/level_01/02 (Phase 25)
@@ -9300,12 +9302,15 @@ backend of the editor's Publish modal:
   `deployDir` in the background and returns a `jobId`; the modal polls
   `getPublishStatus(jobId)` every 500 ms (the api transport has no progress
   channel). One job per game: a second start joins the running one.
-- **Two hosts (Phase 76):** `PublishLink` is a union, `{provider: "netlify",
-  siteId, siteName, url}` | `{provider: "github", owner, repo, branch, url}`
-  (`cleanLink` in `projects.ts` whitelists per shape). Tokens are separate
-  `secrets.json` keys (`netlifyToken`, `githubToken`) with the same
+- **Three hosts (Phase 76):** `PublishLink` is a union, `{provider: "netlify",
+  siteId, siteName, url}` | `{provider: "github", owner, repo, branch, url}` |
+  `{provider: "vercel", projectId, projectName, teamId, url}` (`cleanLink` in
+  `projects.ts` whitelists per shape). Tokens are separate `secrets.json`
+  keys (`netlifyToken`, `githubToken`, `vercelToken`) with the same
   verify-before-store rule (`githubStatus/SetKey/ClearKey`,
-  `githubListRepos`, `githubCreateRepo`). The last-publish record carries
+  `githubListRepos`, `githubCreateRepo`; `vercelStatus/SetKey/ClearKey`,
+  `vercelListProjects` spans the personal account plus every team,
+  `vercelCreateProject`). The last-publish record carries
   `provider` + `target` (Netlify site id, or `owner/repo@branch`) and only
   counts for the currently linked site, so switching hosts shows "Not
   published from this computer yet" until the first publish there.
@@ -9332,6 +9337,18 @@ out (60 s cap); GET retries 5xx/network, writes retry only rate limits.
 `exportGameBundle` now always writes an empty `.nojekyll` (Jekyll would drop
 `_`/`.`/`#`-prefixed files; other hosts ignore it).
 
+**`desktop/vercel.ts`**: `createVercelClient({token, apiBase?})`. Vercel's
+deploy is digest-based like Netlify's but inverted: `deployDir(project, dir)`
+SHA-1s the bundle, `POST /v13/deployments` with every file as `{file, sha,
+size}` (no leading slash), `target: "production"`, `projectSettings:
+{framework: null}`; a 400 `missing_files` answer lists the hashes Vercel
+lacks, those go to `POST /v2/files` (`x-vercel-digest`, 4 at a time, once per
+hash), then the deployment is created again and `GET /v13/deployments/{id}`
+is polled to `READY` (`ERROR`/`CANCELED` → plain message, 5 min cap). An
+identical bundle is deduplicated by Vercel itself, so an unchanged publish
+uploads nothing. The production URL comes from the deployment's `alias`
+(`<name>.vercel.app` preferred). Team projects pass `?teamId=` on every call.
+
 **`desktop/netlify.ts`**: `createNetlifyClient({token, apiBase?})`. `deployDir`
 is Netlify's file-digest deploy: SHA-1 every bundle file, `POST
 /sites/{id}/deploys {files, async: true}`, poll for `required`, `PUT` each
@@ -9348,7 +9365,7 @@ export reads from disk), then alerts file count / size / missing refs and
 reveals the bundle folder. **"Publish…"** sits under it (Phases 75 + 76,
 `src/ui/PublishModal.tsx`): one modal, four views driven by `active` host =
 the link's provider (or the host chosen on the first screen) — **choose**
-(Netlify / GitHub Pages cards, each showing "Connected as…" or "Not connected
+(Netlify / GitHub Pages / Vercel cards, each showing "Connected as…" or "Not connected
 yet"; when a game is already linked the card is marked "(current host)" and an
 amber note says where it publishes now and that the old site stays online),
 **key** (paste that host's token; the GitHub screen carries the three-step

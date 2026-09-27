@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   desktop, type GitHubRepo, type GitHubUser, type LastPublish, type NetlifyAccount, type NetlifySite, type NetlifyUser,
-  type PublishLink, type PublishProvider, type PublishStatus,
+  type PublishLink, type PublishProvider, type PublishStatus, type VercelProject, type VercelTeam, type VercelUser,
 } from "@/shared/desktopApi";
 import { useEscapeClose } from "./useEscapeClose";
 
@@ -58,7 +58,7 @@ const TAG: React.CSSProperties = {
   background: "rgba(255,255,255,0.08)", color: "#c2cadb", marginRight: 8, verticalAlign: "middle",
 };
 
-const PROVIDER_LABEL: Record<PublishProvider, string> = { netlify: "Netlify", github: "GitHub Pages" };
+const PROVIDER_LABEL: Record<PublishProvider, string> = { netlify: "Netlify", github: "GitHub Pages", vercel: "Vercel" };
 const PHASE_LABEL: Record<PublishStatus["phase"], string> = {
   exporting:  "Building the game bundle…",
   hashing:    "Checking files…",
@@ -73,11 +73,14 @@ const PHASE_LABEL: Record<PublishStatus["phase"], string> = {
 const NETLIFY_TOKEN_PAGE = "https://app.netlify.com/user/applications#personal-access-tokens";
 /** GitHub prefills the classic-token form from the query string: one scope, a name. */
 const GITHUB_TOKEN_PAGE = "https://github.com/settings/tokens/new?description=World%20Builder%20publishing&scopes=public_repo";
+const VERCEL_TOKEN_PAGE = "https://vercel.com/account/settings/tokens";
 
 /** Netlify site names are subdomains: lowercase letters, digits, hyphens. */
 const toSiteName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 /** GitHub repo names: letters, digits, `-` `_` `.`. */
 const toRepoName = (s: string) => s.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 100);
+/** Vercel project names: lowercase letters, digits, hyphens (they double as the <name>.vercel.app subdomain). */
+const toProjectName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100);
 
 function ago(iso: string): string {
   const min = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
@@ -87,10 +90,10 @@ function ago(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
-const linkName = (l: PublishLink) => l.provider === "netlify" ? l.siteName : `${l.owner}/${l.repo}`;
+const linkName = (l: PublishLink) => l.provider === "netlify" ? l.siteName : l.provider === "github" ? `${l.owner}/${l.repo}` : l.projectName;
 
 /**
- * Publish a game to Netlify or GitHub Pages (phases 75 + 76). A game is linked
+ * Publish a game to Netlify, GitHub Pages or Vercel (phases 75 + 76). A game is linked
  * to ONE host + site; the link (publish.json) remembers which, so reopening the
  * modal lands straight on "Publish" for that site. Views: choose a host → paste
  * that host's token → pick or create a site → linked (Publish). Tokens only ever
@@ -103,6 +106,7 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
   const [loading, setLoading] = useState(true);
   const [netlify, setNetlify] = useState<{ connected: boolean; user: NetlifyUser | null }>({ connected: false, user: null });
   const [github, setGithub]   = useState<{ connected: boolean; user: GitHubUser | null }>({ connected: false, user: null });
+  const [vercel, setVercel]   = useState<{ connected: boolean; user: VercelUser | null }>({ connected: false, user: null });
   const [link, setLink] = useState<PublishLink | null>(null);
   const [lastPublish, setLastPublish] = useState<LastPublish | null>(null);
   const [changing, setChanging] = useState(false);            // "Change site…" pressed
@@ -123,6 +127,12 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
   const [repoSearch, setRepoSearch] = useState("");
   const [newRepo, setNewRepo] = useState(() => toRepoName(projectId));
   const [repoPrivate, setRepoPrivate] = useState(false);
+  // Vercel picker
+  const [vProjects, setVProjects] = useState<VercelProject[] | null>(null);
+  const [vTeams, setVTeams] = useState<VercelTeam[]>([]);
+  const [vSearch, setVSearch] = useState("");
+  const [newProject, setNewProject] = useState(() => toProjectName(projectId));
+  const [vTeamId, setVTeamId] = useState<string>("");   // "" = personal account
 
   const [status, setStatus] = useState<PublishStatus | null>(null);
   const [copied, setCopied] = useState(false);
@@ -141,11 +151,12 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
     if (!api) return;
     void (async () => {
       try {
-        const [n, g, l] = await Promise.all([api.netlifyStatus(), api.githubStatus(), api.getPublishLink(projectId)]);
+        const [n, g, v, l] = await Promise.all([api.netlifyStatus(), api.githubStatus(), api.vercelStatus(), api.getPublishLink(projectId)]);
         if (!alive.current) return;
         setNetlify({ connected: n.connected, user: n.user ?? null });
         setGithub({ connected: g.connected, user: g.user ?? null });
-        const problems = [n.error, g.error].filter(Boolean);
+        setVercel({ connected: v.connected, user: v.user ?? null });
+        const problems = [n.error, g.error, v.error].filter(Boolean);
         if (problems.length) setError(problems.join("\n"));
         setLink(l.link);
         setLastPublish(l.lastPublish);
@@ -161,7 +172,8 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
     })();
   }, [api, projectId]);
 
-  const connected = (p: PublishProvider) => (p === "netlify" ? netlify : github).connected;
+  const conn = (p: PublishProvider) => p === "netlify" ? netlify : p === "github" ? github : vercel;
+  const connected = (p: PublishProvider) => conn(p).connected;
   // Which host the current screen is about.
   const active: PublishProvider | null = link && !changing ? link.provider : chosen;
   const view: "choose" | "key" | "target" | "linked" =
@@ -190,7 +202,16 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
         setGithub(g => ({ ...g, user: r.user }));
       });
     }
-  }, [api, view, active, sites, repos, run]);
+    if (active === "vercel" && vProjects === null) {
+      void run(async () => {
+        const r = await api.vercelListProjects();
+        if (!alive.current) return;
+        setVProjects(r.projects);
+        setVTeams(r.teams);
+        setVercel(v => ({ ...v, user: r.user }));
+      });
+    }
+  }, [api, view, active, sites, repos, vProjects, run]);
 
   const filteredSites = useMemo(() => {
     const q = siteSearch.trim().toLowerCase();
@@ -200,23 +221,33 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
     const q = repoSearch.trim().toLowerCase();
     return (repos ?? []).filter(r => !q || r.repo.toLowerCase().includes(q));
   }, [repos, repoSearch]);
+  const filteredProjects = useMemo(() => {
+    const q = vSearch.trim().toLowerCase();
+    return (vProjects ?? []).filter(p => !q || p.name.toLowerCase().includes(q));
+  }, [vProjects, vSearch]);
+  const teamName = (id: string | null) => id ? (vTeams.find(t => t.id === id)?.name ?? "team") : "personal";
 
   const connect = () => run(async () => {
     if (active === "netlify") {
       const r = await api!.netlifySetKey(keyText);
       if (!alive.current) return;
       setNetlify({ connected: true, user: r.user });
-    } else {
+    } else if (active === "github") {
       const r = await api!.githubSetKey(keyText);
       if (!alive.current) return;
       setGithub({ connected: true, user: r.user });
+    } else {
+      const r = await api!.vercelSetKey(keyText);
+      if (!alive.current) return;
+      setVercel({ connected: true, user: r.user });
     }
     setKeyText("");   // never keep a token in component state once the backend has it
   });
 
   const disconnect = (p: PublishProvider) => run(async () => {
     if (p === "netlify") { await api!.netlifyClearKey(); if (alive.current) { setNetlify({ connected: false, user: null }); setSites(null); } }
-    else { await api!.githubClearKey(); if (alive.current) { setGithub({ connected: false, user: null }); setRepos(null); } }
+    else if (p === "github") { await api!.githubClearKey(); if (alive.current) { setGithub({ connected: false, user: null }); setRepos(null); } }
+    else { await api!.vercelClearKey(); if (alive.current) { setVercel({ connected: false, user: null }); setVProjects(null); } }
     if (alive.current) setStatus(null);
   });
 
@@ -240,6 +271,12 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
     const r = await api!.githubCreateRepo({ name: toRepoName(newRepo), isPrivate: repoPrivate });
     setRepos(null);
     await applyLink({ provider: "github", owner: r.owner, repo: r.repo, branch: "main", url: `https://${r.owner}.github.io/${r.repo}/` });
+  });
+  const pickProject = (p: VercelProject) => run(() => applyLink({ provider: "vercel", projectId: p.id, projectName: p.name, teamId: p.teamId, url: p.url }));
+  const createProject = () => run(async () => {
+    const p = await api!.vercelCreateProject({ name: toProjectName(newProject), teamId: vTeamId || null });
+    setVProjects(null);
+    await applyLink({ provider: "vercel", projectId: p.id, projectName: p.name, teamId: p.teamId, url: p.url });
   });
 
   const publishing = status !== null && status.phase !== "done" && status.phase !== "error";
@@ -277,8 +314,8 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
   const ghLogin = github.user?.login ?? "<you>";
 
   const providerCard = (p: PublishProvider, blurb: string) => {
-    const c = p === "netlify" ? netlify : github;
-    const who = p === "netlify" ? netlify.user?.name : github.user?.login;
+    const c = conn(p);
+    const who = p === "netlify" ? netlify.user?.name : p === "github" ? github.user?.login : vercel.user?.username;
     const isCurrent = link?.provider === p;
     return (
       <button key={p} style={ROW(isCurrent)} disabled={busy} onClick={() => { setChosen(p); setError(null); }}>
@@ -316,6 +353,7 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
               <div style={HINT}>{moving ? "Where should this game publish from now on?" : "Where should this game live? You choose once; every later Publish goes to the same place."}</div>
               {providerCard("netlify", "Free tier fine for commercial games. Uploads only the files that changed; live in seconds.")}
               {providerCard("github", "Free on a public repository. Site at <you>.github.io/<repo>/; GitHub takes a minute or two to build each publish.")}
+              {providerCard("vercel", "Free Hobby plan for personal, non-commercial games (100 MB per game). Live in seconds at <project>.vercel.app.")}
               {moving && keepButton}
             </>
           )}
@@ -328,7 +366,29 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
                   This game publishes to <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}), but {PROVIDER_LABEL[link.provider]} is not connected on this computer. Connect it to publish, or change the site below.
                 </div>
               )}
-              {active === "netlify" ? (
+              {active === "vercel" && (
+                <>
+                  <div style={HINT}>
+                    Vercel needs an access token so the app can create the project and upload the game. It is checked with Vercel, then stored on this computer only.
+                  </div>
+                  <div style={{ ...HINT, color: "#c2cadb" }}>
+                    1. Open the tokens page below and press <span style={{ color: "#dde3f0" }}>Create</span>.<br />
+                    2. Name it (say, World Builder), set Scope to your account or team, pick an expiry.<br />
+                    3. Copy the token (Vercel shows it once) and paste it here.
+                  </div>
+                  <button style={GHOST} onClick={() => void api?.openExternal(VERCEL_TOKEN_PAGE)}>
+                    Open Vercel → Account settings → Tokens ↗
+                  </button>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 4 }}>Vercel token</div>
+                    <input type="password" autoFocus value={keyText} placeholder="…" style={INPUT}
+                      onChange={e => setKeyText(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && keyText.trim() && !busy) void connect(); }} />
+                  </div>
+                  <div style={HINT}>Vercel's free Hobby plan is for personal, non-commercial use; a game you sell or run ads on needs Pro.</div>
+                </>
+              )}
+              {active === "netlify" && (
                 <>
                   <div style={HINT}>
                     Paste a Netlify personal access token. It is checked with Netlify, then stored on this
@@ -344,7 +404,8 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
                     Get a key: Netlify → User settings → Applications → Personal access tokens ↗
                   </button>
                 </>
-              ) : (
+              )}
+              {active === "github" && (
                 <>
                   <div style={HINT}>
                     GitHub Pages needs a personal access token so the app can create the repository, push the game and switch Pages on. It is checked with GitHub, then stored on this computer only.
@@ -381,7 +442,7 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
           {!loading && view === "target" && active === "netlify" && (
             <>
               {moving && link && link.provider !== "netlify" && (
-                <div style={NOTE}>Moving from <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}) to Netlify. The GitHub site stays as it is.</div>
+                <div style={NOTE}>Moving from <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}) to Netlify. The {PROVIDER_LABEL[link.provider]} site stays as it is.</div>
               )}
               <div style={HINT}>Choose the Netlify site this game publishes to. Every publish goes to the same site until you change it.</div>
               <div>
@@ -431,7 +492,7 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
           {!loading && view === "target" && active === "github" && (
             <>
               {moving && link && link.provider !== "github" && (
-                <div style={NOTE}>Moving from <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}) to GitHub Pages. The Netlify site stays as it is.</div>
+                <div style={NOTE}>Moving from <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}) to GitHub Pages. The {PROVIDER_LABEL[link.provider]} site stays as it is.</div>
               )}
               <div style={HINT}>Choose the GitHub repository this game publishes to. The app pushes the game to its <span style={{ color: "#c2cadb" }}>main</span> branch and switches Pages on; every publish goes to the same repository until you change it.</div>
               <div>
@@ -475,11 +536,62 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
             </>
           )}
 
+          {!loading && view === "target" && active === "vercel" && (
+            <>
+              {moving && link && link.provider !== "vercel" && (
+                <div style={NOTE}>Moving from <b>{PROVIDER_LABEL[link.provider]}</b> ({linkName(link)}) to Vercel. The {PROVIDER_LABEL[link.provider]} site stays as it is.</div>
+              )}
+              <div style={HINT}>Choose the Vercel project this game publishes to. Every publish goes to the same project until you change it.</div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 4 }}>Create a new project</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input value={newProject} style={INPUT} spellCheck={false}
+                    onChange={e => setNewProject(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                    onKeyDown={e => { if (e.key === "Enter" && toProjectName(newProject) && !busy) void createProject(); }} />
+                  <button style={{ ...PRIMARY(!!toProjectName(newProject) && !busy), whiteSpace: "nowrap" }} disabled={!toProjectName(newProject) || busy} onClick={() => void createProject()}>Create</button>
+                </div>
+                <div style={{ ...HINT, marginTop: 4 }}>
+                  Address: <span style={{ color: "#c2cadb" }}>https://{toProjectName(newProject) || "…"}.vercel.app</span> (Vercel adds a suffix if that name is taken elsewhere)
+                </div>
+                {vTeams.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                    <span style={LABEL}>Scope</span>
+                    <select value={vTeamId} onChange={e => setVTeamId(e.target.value)} style={{ ...INPUT, width: "auto", padding: "4px 8px" }}>
+                      <option value="">Personal account{vercel.user ? ` (${vercel.user.username})` : ""}</option>
+                      {vTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 4 }}>Or use an existing project</div>
+                <input value={vSearch} placeholder="Search your projects…" style={INPUT} onChange={e => setVSearch(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 200, overflowY: "auto" }}>
+                {vProjects === null && !error && <div style={HINT}>Loading your projects…</div>}
+                {vProjects !== null && filteredProjects.length === 0 && <div style={HINT}>{vProjects.length === 0 ? "This Vercel account has no projects yet. Create one above." : "No project matches that search."}</div>}
+                {filteredProjects.map(p => {
+                  const cur = link?.provider === "vercel" && p.id === link.projectId;
+                  return (
+                    <button key={p.id} style={ROW(cur)} disabled={busy} onClick={() => void pickProject(p)}>
+                      <span style={{ color: "#dde3f0", fontSize: 12 }}>{p.name}{p.teamId ? `  (${teamName(p.teamId)})` : ""}{cur ? "  (current)" : ""}</span>
+                      <span style={{ color: "#98a2b8", fontSize: 10 }}>{p.url}  ·  the game replaces the project's production deployment</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", gap: 16 }}>
+                <button style={GHOST} onClick={() => { setChosen(null); setError(null); }}>← Other host</button>
+                {keepButton}
+              </div>
+            </>
+          )}
+
           {/* ── linked: publish ──────────────────────────────────────────── */}
           {!loading && view === "linked" && link && (
             <>
               <div style={{ ...ROW(false), cursor: "default" }}>
-                <span style={{ color: "#dde3f0", fontSize: 12 }}><span style={TAG}>{PROVIDER_LABEL[link.provider].toUpperCase()}</span>{linkName(link)}{link.provider === "github" ? `  ·  ${link.branch}` : ""}</span>
+                <span style={{ color: "#dde3f0", fontSize: 12 }}><span style={TAG}>{PROVIDER_LABEL[link.provider].toUpperCase()}</span>{linkName(link)}{link.provider === "github" ? `  ·  ${link.branch}` : link.provider === "vercel" && link.teamId ? `  ·  ${teamName(link.teamId)}` : ""}</span>
                 <span style={{ color: "#98a2b8", fontSize: 11 }}>{link.url}</span>
                 <span style={{ color: "#98a2b8", fontSize: 10 }}>
                   {lastPublish ? `Last published ${ago(lastPublish.at)}` : "Not published from this computer yet"}
@@ -535,13 +647,16 @@ export function PublishModal({ projectId, projectName, onBeforePublish, onClose 
           {error && <div style={ERROR}>{error}</div>}
         </div>
 
-        {!loading && (netlify.connected || github.connected) && (
+        {!loading && (netlify.connected || github.connected || vercel.connected) && (
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 16px", borderTop: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
             {netlify.connected && (
               <span style={HINT}>Netlify: {netlify.user?.name ?? "connected"} <button style={{ ...GHOST, padding: 0, marginLeft: 6 }} disabled={publishing || busy} onClick={() => void disconnect("netlify")}>Disconnect</button></span>
             )}
             {github.connected && (
               <span style={HINT}>GitHub: {github.user?.login ?? "connected"} <button style={{ ...GHOST, padding: 0, marginLeft: 6 }} disabled={publishing || busy} onClick={() => void disconnect("github")}>Disconnect</button></span>
+            )}
+            {vercel.connected && (
+              <span style={HINT}>Vercel: {vercel.user?.username ?? "connected"} <button style={{ ...GHOST, padding: 0, marginLeft: 6 }} disabled={publishing || busy} onClick={() => void disconnect("vercel")}>Disconnect</button></span>
             )}
           </div>
         )}

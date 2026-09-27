@@ -141,7 +141,8 @@ export async function writeExportFile(ws: Workspace, name: string, text: string)
 
 export type PublishLink =
   | { provider: "netlify"; siteId: string; siteName: string; url: string }
-  | { provider: "github"; owner: string; repo: string; branch: string; url: string };
+  | { provider: "github"; owner: string; repo: string; branch: string; url: string }
+  | { provider: "vercel"; projectId: string; projectName: string; teamId: string | null; url: string };
 
 /** Drop anything that is not a field of the link's shape (nothing stray lands in a committed file). */
 function cleanLink(link: PublishLink): PublishLink | null {
@@ -152,6 +153,10 @@ function cleanLink(link: PublishLink): PublishLink | null {
   if (link?.provider === "github" && link.owner && link.repo) {
     const { provider, owner, repo, branch, url } = link;
     return { provider, owner, repo, branch: branch || "main", url };
+  }
+  if (link?.provider === "vercel" && link.projectId) {
+    const { provider, projectId, projectName, teamId, url } = link;
+    return { provider, projectId, projectName, teamId: teamId || null, url };
   }
   return null;
 }
