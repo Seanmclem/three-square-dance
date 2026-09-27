@@ -15304,24 +15304,6 @@
             }
           ],
           "oneShot": false
-        },
-        {
-          "id": "scr_1f56d1a1",
-          "label": "store init checkpoint",
-          "zoneId": "demo",
-          "enabled": true,
-          "trigger": {
-            "type": "on_game_start"
-          },
-          "conditions": [],
-          "actions": [
-            {
-              "type": "store_position",
-              "stateKey": "checkpoint",
-              "posSource": "player"
-            }
-          ],
-          "oneShot": false
         }
       ],
       "checkpoints": [

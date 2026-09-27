@@ -2506,5 +2506,25 @@
       "sfx": 1,
       "ambient": 1
     }
-  }
+  },
+  "scripts": [
+    {
+      "id": "scr_1f56d1a1",
+      "label": "store init checkpoint",
+      "zoneId": "demo",
+      "enabled": true,
+      "trigger": {
+        "type": "on_level_load"
+      },
+      "conditions": [],
+      "actions": [
+        {
+          "type": "store_position",
+          "stateKey": "checkpoint",
+          "posSource": "player"
+        }
+      ],
+      "oneShot": false
+    }
+  ]
 }
