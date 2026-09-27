@@ -9,6 +9,51 @@ the Crab prefab, the Jump Lab level and a game's scripts are content.
 Built in Phases 70 to 77 (September 2026). Detail and measurements are in the
 architecture changelog from v4.80.0 on.
 
+## Why it is the way it is
+
+The starting complaint (September 2026): the test character "feels rigid and awkward";
+players were "misjudging distance, or where I'm landing", and "jumping on enemies" was
+unreliable. The target feel, in the author's words: **"somewhat dependable like Roblox
+without being so rigid, something much more alive like Mario."**
+
+Those two halves pull against each other, so one rule settled every decision:
+
+> **Fixed rules, lively presentation.** The same input always produces the same arc,
+> so a level can be built around known numbers (the obby side). Everything that adds
+> life either does not move the landing point at all, or is tuned so existing levels
+> stay valid (the Mario side).
+
+That is why the jump was *reshaped* rather than changed (lighter rise, heavier fall,
+same peak and same air time), why hold-to-jump-higher only ever shortens a jump and a
+full hold is always the same height, and why run is off unless a game turns it on.
+
+The "alive" half borrows from the classic animation principles, the Disney list:
+
+- **Squash and stretch** on takeoff and landing, volume preserving, anchored at the
+  feet, so the character reads as a body with weight rather than a rigid capsule.
+- **Anticipation and follow-through** as lean: forward with speed, more when running,
+  back when braking, and the run skid, where the body keeps facing the old way for a
+  beat before whipping round. The same treatment on enemies (lean while chasing, squash
+  when stomped) so the world reacts, not only the player.
+- **Secondary motion and rhythm** in sound: footstep variation and pitch wobble exist so
+  a repeated sample stops reading as a loop.
+- **Readability**: the landing shadow is not physics, it is a cue. Its job is to answer
+  "where will I land" and "am I over the crab" while airborne, which was the biggest
+  cause of the misjudged landings.
+
+Things deliberately left out, and why:
+
+- **An anticipation dip before takeoff.** It delays the jump, which works against
+  "dependable". Jumps must respond on the frame.
+- **A fall-speed cap and a faster fall for springs and ledge drops.** Both would retune
+  every authored spring and gap; kept for a later pass with the Jump Lab.
+- **Removing the mid-jump stair-step (the hidden 0.45m of ledge reach).** Tried twice;
+  mounting a ledge became jittery and one attempt exposed a stuck ledge hang. Reverted.
+  The designed replacement is a ledge grab or a quick mantle, not tighter grounding rules
+  (constraint noted by the author: the avatar's large head rules out a classic hang pose).
+- **Sprint as a second walk speed on by default.** A second speed doubles the jump
+  distances a level must be built around.
+
 ## What you get, and where to turn it on
 
 | Behaviour | Default | Where to change it |
