@@ -71,7 +71,9 @@
           "entries": [],
           "loop": true
         },
-        "mode": "playlist"
+        "mode": "single",
+        "loop": true,
+        "soundId": "ievan_polkka_softer_true_seamless_loop_100bpm_q3"
       },
       "mix": {
         "master": 1,

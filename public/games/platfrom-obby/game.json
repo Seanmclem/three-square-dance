@@ -2525,6 +2525,31 @@
         }
       ],
       "oneShot": false
+    },
+    {
+      "id": "scr_97f699db",
+      "label": "Restore ",
+      "zoneId": "demo",
+      "enabled": true,
+      "trigger": {
+        "type": "on_level_load"
+      },
+      "conditions": [],
+      "actions": [
+        {
+          "type": "set_state",
+          "stateKey": "Hearts",
+          "stateValue": 3
+        }
+      ],
+      "oneShot": false
     }
-  ]
+  ],
+  "input": {
+    "interact": {
+      "gamepadButtons": [
+        0
+      ]
+    }
+  }
 }

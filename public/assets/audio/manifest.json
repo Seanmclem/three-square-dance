@@ -6544,6 +6544,23 @@
       "attribution": {
         "author": "Olivia"
       }
+    },
+    {
+      "id": "ievan_polkka_softer_true_seamless_loop_100bpm_q3",
+      "label": "Ievan Polkka Softer True Seamless Loop 100BPM Q3",
+      "category": "Music",
+      "path": "/assets/audio/ievan_polkka_softer_true_seamless_loop_100bpm_q3.ogg",
+      "loop": true,
+      "spatial": false,
+      "tags": [
+        "ai",
+        "midi"
+      ],
+      "dateAdded": "2026-09-27",
+      "attribution": {
+        "author": "Seanmclem",
+        "license": "CC0"
+      }
     }
   ]
 }
