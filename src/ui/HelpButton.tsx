@@ -46,6 +46,7 @@ const SECTIONS: ShortcutSection[] = [
   {
     label: "BRUSH EDITING  (shape → Convert to Brush in panel)",
     rows: [
+      { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save / Cancel in the bar" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge" },
       { keys: ["LMB"],               action: "Pick a face / corner / edge on the selected brush" },
       { keys: ["LMB drag gizmo"],    action: "Move the face / corner / edge (snaps 0.25)" },

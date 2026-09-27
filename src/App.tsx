@@ -34,7 +34,9 @@ import { loadSessionPrefabs, saveSessionPrefabs, promoteSessionPrefabs } from "@
 import { DEFAULT_PLAYER_SETTINGS, resolvePlayerSettings, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, captureInstanceToPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
 import { PrefabEditSession } from "@/prefab/PrefabEditSession";
-import { PrefabEditBar } from "@/ui/PrefabEditBar";
+import { EditModeBar } from "@/ui/EditModeBar";
+import { BrushEditSession, BRUSH_EDIT_ZONE } from "@/editor/BrushEditSession";
+import { isBrush } from "@/builders/ShapeBuilder";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
 import { GizmoManager } from "@/editor/GizmoManager";
@@ -291,6 +293,12 @@ export default function App() {
   const [editingPrefab,   setEditingPrefab]    = useState<{ id: string; name: string } | null>(null);
   const editingPrefabRef = useRef(false);
   const editSessionRef   = useRef<PrefabEditSession | null>(null);
+  // Isolated brush edit mode — same pattern, one shape. Both modes share the
+  // save/autosave/play gates via inIsolatedEdit().
+  const [editingBrush,    setEditingBrush]     = useState<{ name: string } | null>(null);
+  const editingBrushRef  = useRef(false);
+  const brushSessionRef  = useRef<BrushEditSession | null>(null);
+  const inIsolatedEdit   = (): boolean => editingPrefabRef.current || editingBrushRef.current;
   // Swallow selection-teardown events while a prefab re-expansion is in flight
   // (members are removed + re-added; without this the panel unmounts mid-edit).
   const suppressSelRef   = useRef(false);
@@ -517,7 +525,7 @@ export default function App() {
       // NEVER persist while prefab edit mode holds the staging zone — the 60s
       // tick and beforeunload would write the user's world with its real zone
       // unloaded (the 2026-07-16 autosave-contamination class).
-      if (editingPrefabRef.current) return;
+      if (inIsolatedEdit()) return;
       if (!worldRef.current || restoringRef.current) return;
       const json = JSON.stringify(worldRef.current.toJSON());
       // Only write when THIS tab changed the world since load (content-compared, so
@@ -1358,7 +1366,7 @@ export default function App() {
     worldRef.current?.setGamePlayerSettings(undefined);   // Phase 68 — no project, no game layer
     worldRef.current?.setGameLighting(undefined);
     worldRef.current?.setGameAudioMix(undefined);
-    if (editingPrefabRef.current) return;   // no project close under prefab edit mode
+    if (inIsolatedEdit()) return;   // no project close under prefab/brush edit mode
     const proj = projectRef.current;
     if (!proj) return;
     if (!opts?.skipSave && canOverwriteScene(proj.sceneId)) {
@@ -1386,7 +1394,7 @@ export default function App() {
   }, [handleLoadFromJSON, closeProject]);
 
   const handleSave = useCallback(async (): Promise<void> => {
-    if (editingPrefabRef.current) return;   // prefab edit mode: Save lives in the amber bar
+    if (inIsolatedEdit()) return;   // prefab/brush edit mode: Save lives in the amber bar
     const world = worldRef.current;
     if (!world) return;
     stampCameraPose();
@@ -1550,7 +1558,7 @@ export default function App() {
   }, [closeProject, adoptProject, handleLoadFromJSON]);
 
   const handleProjectSceneSwitch = useCallback(async (target: string): Promise<void> => {
-    if (editingPrefabRef.current) return;   // no scene switches under prefab edit mode
+    if (inIsolatedEdit()) return;   // no scene switches under prefab/brush edit mode
     const proj = projectRef.current;
     if (!proj || target === proj.sceneId) return;
     try {
@@ -1658,18 +1666,18 @@ export default function App() {
 
 
   const handlePreviewEnter = useCallback((): void => {
-    if (editingPrefabRef.current) return;
+    if (inIsolatedEdit()) return;
     previewRef.current?.enter("preview");
   }, []);
 
   const handleNewGame = useCallback((): void => {
-    if (editingPrefabRef.current) return;
+    if (inIsolatedEdit()) return;
     previewRef.current?.enter("game", { resume: false });
     scriptEngineRef.current?.onGameStart();
   }, []);
 
   const handleContinue = useCallback((): void => {
-    if (editingPrefabRef.current) return;
+    if (inIsolatedEdit()) return;
     previewRef.current?.enter("game", { resume: true });
     scriptEngineRef.current?.onGameStart();
   }, []);
@@ -3590,7 +3598,7 @@ export default function App() {
   const handleEditPrefab = (prefabId: string): void => {
     const world = worldRef.current, zones = zonesRef.current, history = historyRef.current;
     const prefab = prefabs.find(p => p.id === prefabId);
-    if (!world || !zones || !history || !prefab || prefab.kind !== "snapshot" || editingPrefabRef.current) return;
+    if (!world || !zones || !history || !prefab || prefab.kind !== "snapshot" || inIsolatedEdit()) return;
     editSessionRef.current ??= new PrefabEditSession(world, zones, history, () => sceneRef.current?.editorCamera ?? null);
     editingPrefabRef.current = true;
     setEditingPrefab({ id: prefab.id, name: prefab.name });
@@ -3630,6 +3638,55 @@ export default function App() {
     void session.cancel().then(() => {
       editingPrefabRef.current = false;
       setEditingPrefab(null);
+    });
+  };
+
+  // ── Isolated brush edit mode ───────────────────────────────────────────────
+
+  const handleEditBrush = (): void => {
+    const world = worldRef.current, zones = zonesRef.current, history = historyRef.current;
+    if (!world || !zones || !history || !selected || selected.type !== "shape" || inIsolatedEdit()) return;
+    const shape = world.zones.get(selected.zoneId)?.shapes?.find(s => s.id === selected.id);
+    if (!shape || !isBrush(shape)) return;
+    brushSessionRef.current ??= new BrushEditSession(world, zones, history, () => sceneRef.current?.editorCamera ?? null);
+    editingBrushRef.current = true;
+    setEditingBrush({ name: shape.label ?? shape.id });
+    busRef.current.emit("object:deselected", {});
+    setSelected(null);
+    setLeftPanel(null);
+    void brushSessionRef.current.enter(selected.zoneId, shape).then(() => {
+      // Open straight into face mode on the staged clone.
+      setActiveTool("select-face");
+      busRef.current.emit("tool:select", { tool: "select-face" });
+      busRef.current.emit("selection:set", { refs: [{ id: shape.id, type: "shape", zoneId: BRUSH_EDIT_ZONE }] });
+    });
+  };
+
+  const handleBrushEditSave = (): void => {
+    const session = brushSessionRef.current;
+    if (!session?.active) return;
+    void (async () => {
+      const result = await session.saveAndExit();
+      editingBrushRef.current = false;
+      setEditingBrush(null);
+      setActiveTool("select");
+      busRef.current.emit("tool:select", { tool: "select" });
+      const world = worldRef.current;
+      if (!result || !world) return;
+      world.transaction("edit brush", () => world.updateShape(result.zoneId, result.shapeId, result.changes));
+      syncHistory();
+      busRef.current.emit("selection:set", { refs: [{ id: result.shapeId, type: "shape", zoneId: result.zoneId }] });
+    })();
+  };
+
+  const handleBrushEditCancel = (): void => {
+    const session = brushSessionRef.current;
+    if (!session?.active) return;
+    void session.cancel().then(() => {
+      editingBrushRef.current = false;
+      setEditingBrush(null);
+      setActiveTool("select");
+      busRef.current.emit("tool:select", { tool: "select" });
     });
   };
 
@@ -3865,10 +3922,21 @@ export default function App() {
         onPrefabRenameRequestHandled={() => setPrefabRenameRequest(null)}
       />
       {editingPrefab && (
-        <PrefabEditBar
-          prefabName={editingPrefab.name}
+        <EditModeBar
+          title="Editing Prefab"
+          name={editingPrefab.name}
+          hint="saving updates every placed instance"
           onSave={handlePrefabEditSave}
           onCancel={handlePrefabEditCancel}
+        />
+      )}
+      {editingBrush && (
+        <EditModeBar
+          title="Editing Brush"
+          name={editingBrush.name}
+          hint="1-4 switch modes · position/rotation here are ignored"
+          onSave={handleBrushEditSave}
+          onCancel={handleBrushEditCancel}
         />
       )}
       <TopBar
@@ -3928,6 +3996,7 @@ export default function App() {
         onToggleCeilingGhost={findRunCeiling() ? handleToggleCeilingGhost : undefined}
         runCeilingGhosted={!!findRunCeiling()?.editorGhost}
         onUnlinkRunCorners={selected?.type === "wall" ? handleUnlinkRunCorners : undefined}
+        onEditBrush={selected?.type === "shape" && !editingPrefab && !editingBrush ? handleEditBrush : undefined}
         runLinkedFloors={selected?.type === "wall" ? getRunLinkedFloors() : undefined}
         onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
         multiSelected={multiSelected}

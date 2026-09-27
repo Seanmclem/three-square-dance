@@ -413,6 +413,7 @@ interface PropertiesPanelProps {
   onToggleCeilingGhost?:    () => void;
   runCeilingGhosted?:       boolean;
   onUnlinkRunCorners?:      () => void;
+  onEditBrush?:             () => void;   // shape Geometry: open the brush in its own edit mode
   runLinkedFloors?:         number[];
   onDelete?:                () => void;
   onVolumeScriptsChange?:   (scripts: ScriptDef[]) => void;
@@ -501,7 +502,7 @@ export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onFloorNodesUpdate, getNodeLinks,
   onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun,
-  onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete,
+  onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onEditBrush,
   onVolumeScriptsChange,
   onEditScript,
   zones = [], groups = [], activeZoneId, playerSettings, assets = [], sounds = [], gamePlayerSettings, scenePlayerOverrides, onGamePlayerSettingsChange, onSettingsPageOverride, onPromoteSettingsToGame,
@@ -946,7 +947,7 @@ export function PropertiesPanel({
             />
           </>
         ) : currentScreen === "geo" ? (
-          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} activeTool={activeTool} materialList={materialList} />
+          <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} activeTool={activeTool} materialList={materialList} onEditBrush={onEditBrush} />
         ) : currentScreen === "mat" ? (
           <MatScreen
             selected={selected}
@@ -1537,7 +1538,7 @@ function GroupsAccordion({ open, onToggle, selected, groups, onObjectUpdate, onS
 
 // ── GeoScreen ─────────────────────────────────────────────────────────────────
 
-function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpdate, getNodeLinks, zones, bus, activeTool, materialList }: {
+function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpdate, getNodeLinks, zones, bus, activeTool, materialList, onEditBrush }: {
   selected:        SelectedObjectPayload;
   onObjectUpdate:  (changes: Partial<WorldObject>) => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
@@ -1547,6 +1548,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   bus?:            EventBus;
   activeTool?:     ToolId;
   materialList?:   MaterialDef[];
+  onEditBrush?:    () => void;
 }) {
   if (selected.type === "wall")     return <WallGeoView     selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "floor")    return <FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />;
@@ -1555,7 +1557,7 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   if (selected.type === "ladder")   return <LadderGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "opening")  return <OpeningGeoView  selected={selected} onObjectUpdate={onObjectUpdate} />;
-  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} activeTool={activeTool} materialList={materialList} />;
+  if (selected.type === "shape")    return <ShapeGeoView    selected={selected} onObjectUpdate={onObjectUpdate} bus={bus} activeTool={activeTool} materialList={materialList} onEditBrush={onEditBrush} />;
   return null;
 }
 
@@ -2278,7 +2280,7 @@ const SHAPE_PARAM_FIELDS: Record<ShapeDef["kind"], Array<{ key: keyof ShapeDef; 
   ],
 };
 
-function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus; activeTool?: ToolId; materialList?: MaterialDef[] }) {
+function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList, onEditBrush }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus; activeTool?: ToolId; materialList?: MaterialDef[]; onEditBrush?: () => void }) {
   const shape  = selected.data as ShapeDef | null;
   const brush  = !!shape && isBrush(shape);
   const faceBrush = !!shape?.mesh?.faces?.length;
@@ -2434,6 +2436,15 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList 
             <div style={{ color: "#c0c0c0", fontSize: 11, fontFamily: "monospace", marginBottom: 6 }}>
               {shape.mesh!.vertices.length} corners
             </div>
+            {onEditBrush && (
+              <>
+                <button style={{ ...SHAPE_ACTION_BTN, color: "#f0c060", borderColor: "rgba(240,180,60,0.5)" }} onClick={onEditBrush}>Edit Brush</button>
+                <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, marginBottom: 8, lineHeight: 1.4 }}>
+                  Opens this brush alone at the origin (like prefab edit). Face / corner /
+                  edge modes (1-4) work there too; Save writes the shape back.
+                </div>
+              </>
+            )}
             <button style={SHAPE_ACTION_BTN} onClick={revertToParams}>Revert to {shape.kind} params</button>
             <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
               Drag a corner sphere to reshape (Alt = no snap). Right-click a corner to

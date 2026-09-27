@@ -1,12 +1,14 @@
 /**
- * Amber top-center bar shown while the isolated prefab edit mode is active
- * (Phase 47) — the mode must be unmistakable, since saving/scene-switching/
- * play are all disabled underneath it.
+ * Amber top-center bar shown while an isolated edit mode is active (prefab
+ * edit, Phase 47; brush edit) — the mode must be unmistakable, since saving/
+ * scene-switching/play are all disabled underneath it.
  */
-export function PrefabEditBar({ prefabName, onSave, onCancel }: {
-  prefabName: string;
-  onSave:     () => void;
-  onCancel:   () => void;
+export function EditModeBar({ title, name, hint, onSave, onCancel }: {
+  title:    string;   // "Editing Prefab"
+  name:     string;
+  hint:     string;   // what Save does
+  onSave:   () => void;
+  onCancel: () => void;
 }) {
   return (
     <div style={{
@@ -17,10 +19,10 @@ export function PrefabEditBar({ prefabName, onSave, onCancel }: {
       boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
     }}>
       <span style={{ color: "#f0c060", fontSize: 12, fontFamily: "monospace" }}>
-        ⬡ Editing Prefab · <strong>{prefabName}</strong>
+        ⬡ {title} · <strong>{name}</strong>
       </span>
       <span style={{ color: "#b09050", fontSize: 10, fontFamily: "monospace" }}>
-        saving updates every placed instance
+        {hint}
       </span>
       <button
         onClick={onSave}

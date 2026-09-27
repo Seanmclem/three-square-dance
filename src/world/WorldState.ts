@@ -990,9 +990,9 @@ export class WorldState {
       world:       (this.world ? { ...this.world, playerSettings: this.scenePlayerOverrides as PlayerSettings,
                        ...(this.world.audio ? { audio: { ...this.world.audio, mix: this.sceneOwnsAudioMix ? this._sceneAudioMix : undefined } } : {}) } : undefined) ?? { size: { width: 200, depth: 200 }, ambientLight: { color: "#aabbcc", intensity: 0.5 }, sunLight: { color: "#fff4e0", intensity: 2.0, position: { x: 30, y: 50, z: 20 } }, skybox: "sky", fogColor: "#1a1f2e", fogDensity: 0.012, playerSettings: { ...DEFAULT_PLAYER_SETTINGS }, stateSchema: DEFAULT_STATE_SCHEMA },
       terrain:     this.terrain  ?? null,
-      // The prefab edit mode's staging zone must NEVER serialize (belt-and-braces
-      // on top of the App's save/autosave gates — Phase 47).
-      zones:       [...this.zones.values()].filter(z => z.id !== "__prefab_edit__"),
+      // The prefab / brush edit modes' staging zones must NEVER serialize (belt-and-
+      // braces on top of the App's save/autosave gates — Phase 47).
+      zones:       [...this.zones.values()].filter(z => z.id !== "__prefab_edit__" && z.id !== "__brush_edit__"),
       transitions: [...this.transitions.values()],
       groups:      this.groups,
     };
