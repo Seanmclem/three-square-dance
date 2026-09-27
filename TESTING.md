@@ -1142,3 +1142,10 @@ game.json merging against the committed fixture
   compare versions side by side in one tab (original 1 reversal and 52 frames, the "fix" 6 and
   62). For any change to grounded, autostep or collision logic, run that comparison BEFORE
   shipping, holding the input the whole time.
+- **(v4.90.1) The editor preview and the runtime window are two script-lifecycle code
+  paths.** `SceneRouter` (runtime) and the `preview:start` handler in App.tsx (editor) each
+  rebuild the index, apply the schema and fire the start triggers independently. A trigger
+  that fires in one can be dead in the other (`on_level_load` was dead in the editor for as
+  long as the multi-zone `zone:enter` event has been vestigial). When adding or changing a
+  lifecycle trigger, change both, and test both: `__test.enterGame()` in an editor tab AND
+  `router.go()` in a runtime tab.

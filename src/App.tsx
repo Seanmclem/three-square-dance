@@ -716,6 +716,14 @@ export default function App() {
         }
         // Occlusion-test runs are debug sessions — never let them clobber the Continue save.
         if (mode !== "occlusion") gameAutosaveTimer = setInterval(saveGame, 30_000);
+        // v4.90.1 — the level-start trigger. The runtime's SceneRouter fires on_level_load on
+        // every scene entry; the editor relied on `zone:enter`, which only the vestigial
+        // multi-zone transition system emits (every scene has one zone), so in editor
+        // preview on_level_load NEVER fired (user report: a GAME-scope "store checkpoint on
+        // level start" script worked in the Play window and not in preview). Fired here,
+        // after the player has spawned and the state schema is applied, so a
+        // store_position(player) reads the spawn pose, exactly as in the runtime.
+        if (world.activeZoneId) scriptEngine.fire("on_level_load", world.activeZoneId);
       }),
       bus.on("preview:stop",  () => {
         // Clear the autosave timer first so a mid-route re-entry (below) starts a fresh
