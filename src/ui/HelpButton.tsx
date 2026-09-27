@@ -43,6 +43,21 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["RMB click"],              action: "Menu: move initial spawn here" },
     ],
   },
+  {
+    label: "BRUSH EDITING  (shape → Convert to Brush in panel)",
+    rows: [
+      { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge" },
+      { keys: ["LMB"],               action: "Pick a face / corner / edge on the selected brush" },
+      { keys: ["LMB drag gizmo"],    action: "Move the face / corner / edge (snaps 0.25)" },
+      { keys: ["Alt"],               action: "Free drag (no snap)" },
+      { keys: ["Esc"],               action: "Cancel drag, restore geometry" },
+      { keys: ["RMB click corner"],  action: "Delete that corner (keeps at least 4)" },
+      { keys: ["Panel: SPLIT ─ │"],  action: "Split the selected face into two" },
+      { keys: ["Panel: INSET"],      action: "Inset a smaller face inside the selected one" },
+      { keys: ["Panel: EXTRUDE / RECESS"], action: "Push the selected face out / in" },
+      { keys: ["Panel: SPLIT EDGE"], action: "Insert a vertex at the edge midpoint" },
+    ],
+  },
 ];
 
 function ShortcutRow({ keys, action }: ShortcutEntry) {
