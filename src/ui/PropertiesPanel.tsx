@@ -15,7 +15,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2585,14 +2585,17 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
   void selected;
   const face = shape.mesh!.faces![faceIndex];
   if (!face) return null;
-  const isQuad = face.verts.length === 4;
-
-  // Label which pair cuts "horizontally": pair 0 cuts mid(v0v1)→mid(v2v3). Local
-  // direction is used (yaw rotation doesn't change |y|; labels are cosmetic).
+  // Four REAL corners: straight-through verts left on an edge by a neighbor's
+  // split don't stop this face from splitting.
   const verts = shape.mesh!.vertices;
+  const corners = quadCorners(verts, face.verts);
+  const isQuad = corners !== null;
+
+  // Label which pair cuts "horizontally": pair 0 cuts mid(c0c1)→mid(c2c3). Local
+  // direction is used (yaw rotation doesn't change |y|; labels are cosmetic).
   let pair0IsH = true;
-  if (isQuad) {
-    const [a, b, c, d] = face.verts as [number, number, number, number];
+  if (corners) {
+    const [a, b, c, d] = corners.map(k => face.verts[k]!) as [number, number, number, number];
     const m1 = verts[a]!, m2 = verts[b]!, m3 = verts[c]!, m4 = verts[d]!;
     const dir = {
       x: (m3.x + m4.x) / 2 - (m1.x + m2.x) / 2,
@@ -2638,7 +2641,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
         </button>
       </div>
       {!isQuad && (
-        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split works on 4-corner faces only.</div>
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split needs a face with 4 real corners.</div>
       )}
     </div>
   );

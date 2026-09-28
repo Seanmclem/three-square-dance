@@ -274,41 +274,99 @@ function spliceMidpoint(faces: BrushFace[], mid: number, p: number, q: number): 
 }
 
 /**
- * Split a QUAD face between the midpoints of an opposite edge pair.
- * pair 0 cuts edges (v0,v1)/(v2,v3); pair 1 cuts (v1,v2)/(v3,v0). The selected
- * faceIdx stays on child A. CRITICAL: any other face traversing a split edge gets
- * the midpoint spliced into its loop (T-junction prevention — without it the
- * neighbor's fan leaves a crack in both render and trimesh).
+ * The loop positions of a face's REAL corners: verts where the boundary turns.
+ * A vert that lies straight between its neighbors (a T-junction left by a
+ * neighbor's split or splitEdge) is not a corner. Returns null unless there are
+ * exactly four, so a rectangle with extra verts on its edges still counts as a
+ * quad for splitting.
+ */
+export function quadCorners(vertices: Vec3[], loop: number[]): [number, number, number, number] | null {
+  const L = loop.length;
+  if (L < 4) return null;
+  const corners: number[] = [];
+  for (let i = 0; i < L; i++) {
+    const u = vertices[loop[(i + L - 1) % L]!]!, v = vertices[loop[i]!]!, w = vertices[loop[(i + 1) % L]!]!;
+    const ax = v.x - u.x, ay = v.y - u.y, az = v.z - u.z;
+    const bx = w.x - v.x, by = w.y - v.y, bz = w.z - v.z;
+    const la = Math.hypot(ax, ay, az) || 1, lb = Math.hypot(bx, by, bz) || 1;
+    const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+    const sin = Math.hypot(cx, cy, cz) / (la * lb);
+    const cos = (ax * bx + ay * by + az * bz) / (la * lb);
+    if (sin > 1e-3 || cos < 0) corners.push(i);   // turns (or doubles back) → a corner
+  }
+  return corners.length === 4 ? corners as [number, number, number, number] : null;
+}
+
+/**
+ * Split a QUAD face between the midpoints of an opposite side pair. "Quad" means
+ * four real corners (`quadCorners`): straight-through verts on a side are kept
+ * and end up on whichever child they fall in. pair 0 cuts sides c0→c1 / c2→c3,
+ * pair 1 cuts c1→c2 / c3→c0. The selected faceIdx stays on child A. CRITICAL:
+ * any other face traversing a split edge gets the midpoint spliced into its loop
+ * (T-junction prevention — without it the neighbor's fan leaves a crack in both
+ * render and trimesh).
  * Returns null (with reason logged) if the face isn't a quad or the result fails
  * validation.
  */
 export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1): BrushMeshData | null {
   const src = mesh.faces?.[faceIdx];
-  if (!src || src.verts.length !== 4) return null;
-  const [a, b, c, d] = src.verts as [number, number, number, number];
-  const e1: [number, number] = pair === 0 ? [a, b] : [b, c];
-  const e2: [number, number] = pair === 0 ? [c, d] : [d, a];
-
+  if (!src) return null;
   const vertices = mesh.vertices.map(v => ({ ...v }));
-  const mid = (e: [number, number]): Vec3 => ({
-    x: (vertices[e[0]]!.x + vertices[e[1]]!.x) / 2,
-    y: (vertices[e[0]]!.y + vertices[e[1]]!.y) / 2,
-    z: (vertices[e[0]]!.z + vertices[e[1]]!.z) / 2,
-  });
-  const i1 = addOrReuse(vertices, mid(e1));
-  const i2 = addOrReuse(vertices, mid(e2));
+  const corners = quadCorners(vertices, src.verts);
+  if (!corners) return null;
+  const L = src.verts.length;
+  // Rotate the loop to start at corner 0, so sides are contiguous runs.
+  const loop = src.verts.map((_, i) => src.verts[(corners[0] + i) % L]!);
+  const c = corners.map(k => (k - corners[0] + L) % L) as [number, number, number, number];
+  const sideA = pair === 0 ? 0 : 1, sideB = sideA + 2;   // side k runs loop[c[k]] .. loop[c[k+1]]
+  const end = (k: number): number => k === 3 ? loop.length : c[k + 1]!;   // loop grows after a cut
+
+  // Midpoint of a side = midpoint of its two corners; insert it into the side's
+  // chain (or reuse the vert already sitting there). Returns the midpoint's
+  // vertex index, its loop position, and the edge it split (null if reused).
+  const cut = (k: number): { idx: number; pos: number; edge: [number, number] | null } => {
+    const p = vertices[loop[c[k]!]!]!, q = vertices[loop[end(k) % loop.length]!]!;
+    const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, z: (p.z + q.z) / 2 };
+    const before = vertices.length;
+    const idx = addOrReuse(vertices, m);
+    const reused = idx < before;
+    for (let i = c[k]!; i < end(k); i++) {
+      const s = loop[i]!, t = loop[(i + 1) % loop.length]!;
+      if (reused && s === idx) return { idx, pos: i, edge: null };
+      const a = vertices[s]!, b = vertices[t]!;
+      // m on segment s→t: |a→m| + |m→b| ≈ |a→b|
+      const d = (u: Vec3, v: Vec3) => Math.hypot(u.x - v.x, u.y - v.y, u.z - v.z);
+      if (!reused && Math.abs(d(a, m) + d(m, b) - d(a, b)) < EPS_POS) {
+        loop.splice(i + 1, 0, idx);
+        return { idx, pos: i + 1, edge: [s, t] };
+      }
+    }
+    return { idx, pos: -1, edge: null };
+  };
+  const cutA = cut(sideA);
+  if (cutA.pos < 0) return null;
+  if (cutA.edge) { for (let k = sideA + 1; k < 4; k++) c[k]!++; }   // later corners shifted by the insert
+  const cutB = cut(sideB);
+  if (cutB.pos < 0) return null;
+  const N = loop.length;
+
+  // Walk the loop from one midpoint to the other; both children keep CCW winding.
+  const walk = (from: number, to: number): number[] => {
+    const out: number[] = [];
+    for (let i = from; ; i = (i + 1) % N) { out.push(loop[i]!); if (i === to) break; }
+    return out;
+  };
+  const childB = walk(cutA.pos, cutB.pos);
+  const childA = walk(cutB.pos, cutA.pos);
 
   const faces = cloneFaces(mesh.faces!);
-  // Children keep CCW winding and inherit the parent's material.
-  const childA: number[] = pair === 0 ? [a, i1, i2, d] : [a, b, i1, i2];
-  const childB: number[] = pair === 0 ? [i1, b, c, i2] : [i2, i1, c, d];
   faces[faceIdx] = { ...faces[faceIdx]!, verts: childA };
   faces.push({ ...src, verts: childB, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
 
   // T-junction propagation into every other face sharing a split edge (the two
   // children already contain the midpoints, so spliceMidpoint's guard skips them).
-  spliceMidpoint(faces, i1, e1[0], e1[1]);
-  spliceMidpoint(faces, i2, e2[0], e2[1]);
+  if (cutA.edge) spliceMidpoint(faces, cutA.idx, cutA.edge[0], cutA.edge[1]);
+  if (cutB.edge) spliceMidpoint(faces, cutB.idx, cutB.edge[0], cutB.edge[1]);
 
   const out = { vertices, faces };
   const err = validateMesh(out);
