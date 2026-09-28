@@ -188,6 +188,8 @@ export default function App() {
   const scriptEngineRef  = useRef<ScriptEngine | null>(null);
 
   const [activeTool,       setActiveTool]       = useState<ToolId>("select");
+  const activeToolRef = useRef<ToolId>("select");   // for memoized handlers (undo/redo)
+  activeToolRef.current = activeTool;
   const [spawnMode,        setSpawnMode]        = useState<"initial" | "checkpoint">("initial");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
   const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
@@ -1855,8 +1857,12 @@ export default function App() {
     } else {
       historyRef.current?.undo();
     }
-    setActiveTool("select");
-    busRef.current.emit("tool:select", { tool: "select" });
+    // Leave a placement tool, but keep a select sub-mode (face/vertex/edge):
+    // undoing brush edits must not kick the user back to object mode.
+    if (!isSelectMode(activeToolRef.current)) {
+      setActiveTool("select");
+      busRef.current.emit("tool:select", { tool: "select" });
+    }
     syncHistory();
   }, [syncHistory]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1867,8 +1873,12 @@ export default function App() {
     } else {
       historyRef.current?.redo();
     }
-    setActiveTool("select");
-    busRef.current.emit("tool:select", { tool: "select" });
+    // Leave a placement tool, but keep a select sub-mode (face/vertex/edge):
+    // undoing brush edits must not kick the user back to object mode.
+    if (!isSelectMode(activeToolRef.current)) {
+      setActiveTool("select");
+      busRef.current.emit("tool:select", { tool: "select" });
+    }
     syncHistory();
   }, [syncHistory]);  // eslint-disable-line react-hooks/exhaustive-deps
 
