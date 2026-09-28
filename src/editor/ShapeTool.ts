@@ -66,8 +66,8 @@ export class ShapeTool implements IEditorModule {
         if (button !== 0) { this._reset(); return; }
         this._onLeftClick(worldPos, surfacePos);
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._active) this._onMouseMove(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        if (this._active) this._onMouseMove(surfacePos ?? worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (this._active && code === "Escape") this._reset();
@@ -92,8 +92,12 @@ export class ShapeTool implements IEditorModule {
   }
 
   private _onLeftClick(worldPos: Vec3, surfacePos: Vec3 | null): void {
-    const sx = snap(worldPos.x);
-    const sz = snap(worldPos.z);
+    // XZ from the surface under the cursor, not the y=0 plane: on a raised
+    // platform the ground-plane hit lands further along the ray, so the box
+    // drifted away from the cursor by an amount that grew with the height.
+    const p  = surfacePos ?? worldPos;
+    const sx = snap(p.x);
+    const sz = snap(p.z);
 
     if (this._state === "IDLE") {
       this._anchor    = { x: sx, z: sz };
