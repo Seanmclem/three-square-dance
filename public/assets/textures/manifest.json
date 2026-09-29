@@ -33,7 +33,10 @@
           "enabled": false,
           "path": "/assets/textures/brick_01/displacement.jpg"
         }
-      }
+      },
+      "tags": [
+        "wall"
+      ]
     },
     {
       "id": "brick_ext_01",
@@ -67,7 +70,10 @@
           "enabled": false,
           "path": "/assets/textures/brick_ext_01/displacement.jpg"
         }
-      }
+      },
+      "tags": [
+        "wall"
+      ]
     },
     {
       "id": "concrete_01",
@@ -320,6 +326,552 @@
         "displacement": {
           "enabled": false,
           "path": "/assets/textures/white_smooth_concrete/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_01",
+      "label": "Dark-Prototype Texture 01",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_01/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_02",
+      "label": "Dark-Prototype Texture 02",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_02/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_03",
+      "label": "Dark-Prototype Texture 03",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_03/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_04",
+      "label": "Dark-Prototype Texture 04",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_04/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_05",
+      "label": "Dark-Prototype Texture 05",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_05/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_06",
+      "label": "Dark-Prototype Texture 06",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_06/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_07",
+      "label": "Dark-Prototype Texture 07",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_07/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_08",
+      "label": "Dark-Prototype Texture 08",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_08/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_09",
+      "label": "Dark-Prototype Texture 09",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_09/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_10",
+      "label": "Dark-Prototype Texture 10",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_10/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_11",
+      "label": "Dark-Prototype Texture 11",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_11/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_12",
+      "label": "Dark-Prototype Texture 12",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_12/{quality}/displacement.jpg"
+        }
+      }
+    },
+    {
+      "id": "dark-prototype_texture_13",
+      "label": "Dark-Prototype Texture 13",
+      "category": "Prototype",
+      "attribution": {
+        "author": "Kenney",
+        "patreonUrl": "https://www.patreon.com/cw/kenney",
+        "license": "CC0",
+        "sourceName": "Prototype Textures",
+        "sourceUrl": "https://kenney.nl/assets/prototype-textures"
+      },
+      "tileScale": 1,
+      "roughnessVal": 0.85,
+      "metalnessVal": 0,
+      "displacementScale": 0.03,
+      "maps": {
+        "albedo": {
+          "enabled": true,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/albedo.png"
+        },
+        "normal": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/normal.jpg"
+        },
+        "roughness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/roughness.jpg"
+        },
+        "metalness": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/metalness.jpg"
+        },
+        "ao": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/ao.jpg"
+        },
+        "displacement": {
+          "enabled": false,
+          "path": "/assets/textures/dark-prototype_texture_13/{quality}/displacement.jpg"
         }
       }
     }
