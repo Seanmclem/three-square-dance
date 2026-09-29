@@ -93,7 +93,9 @@ the vertical side edges, and the new ring is horizontal.)
 - `stops` records each open end (face index + reason) for the preview and the
   panel note.
 
-`loopCut(mesh, start) → BrushMeshData | null`
+`loopCut(mesh, start) → { mesh: BrushMeshData; ringVerts: number[] } | null`
+(`ringVerts` = the new ring's vertex indices, in ring order, like `splitEdge` returning
+`mid`; Phase 80's SELECT RING uses it)
 
 - Run `loopCutRing`, then apply `splitFaceQuad` to each recorded face in order,
   feeding each result into the next call.
@@ -219,9 +221,8 @@ ordinary faces and vertices.
 1. **Moving the new ring as a whole.** After a loop cut around a cylinder, making a
    bulge or a waist means moving each new vertex one at a time, because the editor
    selects one vertex/edge/face at a time. Blender solves this with loop select plus
-   move/scale. *Default: separate phase*, since it needs multi-vertex selection in
-   `SelectionManager` and the gizmo, which is a bigger change than the cut. Worth
-   doing next if loop cuts get used for shaping rather than for adding detail.
+   move/scale. *Planned as Phase 80* (`plans/phase-80-brush-vertex-sets.md`): vertex
+   sets, loop select, and a move/rotate/scale gizmo for the set.
 2. **Position along the ring (slide).** *Default: middle only*, matching SPLIT. A later
    `%` field could cut every face at the same fraction along its rails (rails need a
    consistent direction around the ring; doable in the walk).
