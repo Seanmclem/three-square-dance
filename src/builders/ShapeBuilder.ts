@@ -5,7 +5,7 @@ import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import { newellNormal } from "@/editor/brushOps";
+import { newellNormal, fanLoop } from "@/editor/brushOps";
 import type { ShapeDef, MeshUserData, MaterialOverrides, FaceGroup } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -373,7 +373,7 @@ export class ShapeBuilder {
   static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry {
     if (isFaceBrush(def)) {
       const buf = newBuf();
-      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, f.verts, tileScale);
+      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, fanLoop(def.mesh!.vertices, f), tileScale);
       return makeGeo(buf);
     }
     const { cap, side } = buildBufs(def, tileScale, tileScale);
@@ -387,7 +387,8 @@ export class ShapeBuilder {
     verts.forEach((p, i) => { v[i * 3] = p.x; v[i * 3 + 1] = p.y; v[i * 3 + 2] = p.z; });
     const idx: number[] = [];
     for (const f of def.mesh!.faces ?? []) {
-      for (let i = 1; i < f.verts.length - 1; i++) idx.push(f.verts[0]!, f.verts[i]!, f.verts[i + 1]!);
+      const loop = fanLoop(verts, f);   // same diagonal as the render
+      for (let i = 1; i < loop.length - 1; i++) idx.push(loop[0]!, loop[i]!, loop[i + 1]!);
     }
     return { vertices: v, indices: new Uint32Array(idx) };
   }
@@ -557,7 +558,7 @@ export class ShapeBuilder {
       const faceGroups: FaceGroup[] = [];
       let triOffset = 0;
       for (const fi of g.faceIdxs) {
-        const count = pushFaceLoop(buf, shape, faces[fi]!.verts, ts);
+        const count = pushFaceLoop(buf, shape, fanLoop(shape.mesh!.vertices, faces[fi]!), ts);
         faceGroups.push({ start: triOffset, count, faceIndex: fi });
         triOffset += count;
       }

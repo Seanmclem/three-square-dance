@@ -37,6 +37,43 @@ export function newellNormal(vertices: Vec3[], loop: number[]): THREE.Vector3 {
   return n.normalize();
 }
 
+// ── Quad folds ───────────────────────────────────────────────────────────────
+// A 4-vert face whose corners aren't coplanar must bend along one diagonal. The
+// render, the trimesh collider and the selection overlay all fan-triangulate from
+// the loop's first vertex, so they share `fanLoop` to agree on which diagonal.
+
+/** Normalized twist of a 4-vert loop a,b,c,d: ((b−a)×(c−a))·(d−a), scale-free.
+ *  0 = flat. Negative → d sits inside the plane of a,b,c, so the a–c fold is a ridge. */
+function quadTwist(vertices: Vec3[], loop: number[]): number {
+  const [a, b, c, d] = loop.map(i => vertices[i]!) as [Vec3, Vec3, Vec3, Vec3];
+  const ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z;
+  const vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+  const wx = d.x - a.x, wy = d.y - a.y, wz = d.z - a.z;
+  const t = (uy * vz - uz * vy) * wx + (uz * vx - ux * vz) * wy + (ux * vy - uy * vx) * wz;
+  const scale = Math.hypot(ux, uy, uz) * Math.hypot(vx, vy, vz) * Math.hypot(wx, wy, wz);
+  return scale > 0 ? t / scale : 0;
+}
+
+/** True for a 4-vert face whose corners aren't coplanar (it visibly folds). */
+export function isBentQuad(vertices: Vec3[], face: BrushFace): boolean {
+  return face.verts.length === 4 && Math.abs(quadTwist(vertices, face.verts)) > 1e-6;
+}
+
+/** The diagonal a 4-vert face folds along: 0 = verts[0]–verts[2], 1 = verts[1]–verts[3].
+ *  An explicit `face.fold` wins; otherwise the one that bulges outward (0 when flat,
+ *  which is the fan every face used before folds existed). */
+export function faceFold(vertices: Vec3[], face: BrushFace): 0 | 1 {
+  if (face.fold !== undefined) return face.fold;
+  return face.verts.length === 4 && quadTwist(vertices, face.verts) > 1e-6 ? 1 : 0;
+}
+
+/** The face loop rotated so a fan from its first vertex follows the fold. Same winding;
+ *  non-quads are returned unchanged. */
+export function fanLoop(vertices: Vec3[], face: BrushFace): number[] {
+  const v = face.verts;
+  return v.length === 4 && faceFold(vertices, face) === 1 ? [v[1]!, v[2]!, v[3]!, v[0]!] : v;
+}
+
 export function faceCentroid(vertices: Vec3[], loop: number[]): THREE.Vector3 {
   const c = new THREE.Vector3();
   for (const vi of loop) c.add(new THREE.Vector3(vertices[vi]!.x, vertices[vi]!.y, vertices[vi]!.z));
@@ -360,8 +397,9 @@ export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1
   const childA = walk(cutB.pos, cutA.pos);
 
   const faces = cloneFaces(mesh.faces!);
-  faces[faceIdx] = { ...faces[faceIdx]!, verts: childA };
-  faces.push({ ...src, verts: childB, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
+  // New loops: an inherited `fold` would index the wrong corners.
+  faces[faceIdx] = { ...faces[faceIdx]!, verts: childA, fold: undefined };
+  faces.push({ ...src, verts: childB, fold: undefined, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
 
   // T-junction propagation into every other face sharing a split edge (the two
   // children already contain the midpoints, so spliceMidpoint's guard skips them).

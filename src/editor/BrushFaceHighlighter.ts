@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { newellNormal } from "@/editor/brushOps";
+import { newellNormal, fanLoop, isBentQuad } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ShapeDef, ToolId } from "@/types";
@@ -121,6 +121,10 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._scene.remove(mesh);
     mesh.geometry.dispose();
     (mesh.material as THREE.Material).dispose();
+    for (const child of mesh.children as THREE.Line[]) {   // the fold line, if any
+      child.geometry.dispose();
+      (child.material as THREE.Material).dispose();
+    }
     if (which === "sel") this._selMesh = null; else this._hoverMesh = null;
   }
 
@@ -130,14 +134,15 @@ export class BrushFaceHighlighter implements IEditorModule {
     if (!shape || !face) return null;
 
     const verts = shape.mesh!.vertices;
-    const n = newellNormal(verts, face.verts);
+    const loop = fanLoop(verts, face);   // bends along the same diagonal as the brush
+    const n = newellNormal(verts, loop);
     const pos: number[] = [];
     const idx: number[] = [];
-    for (const vi of face.verts) {
+    for (const vi of loop) {
       const v = verts[vi]!;
       pos.push(v.x + n.x * LIFT, v.y + n.y * LIFT, v.z + n.z * LIFT);
     }
-    for (let i = 1; i < face.verts.length - 1; i++) idx.push(0, i, i + 1);
+    for (let i = 1; i < loop.length - 1; i++) idx.push(0, i, i + 1);
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
@@ -152,6 +157,22 @@ export class BrushFaceHighlighter implements IEditorModule {
     mesh.position.set(shape.position.x, shape.position.y, shape.position.z);
     mesh.rotation.set(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R);
     mesh.userData = { selectable: false, editorOnly: true, hideInGame: true };
+
+    // Selected bent quad: a dashed line along its fold (loop[0]–loop[2] after fanLoop),
+    // so the FOLD button's effect is visible. Child of the overlay — shares its transform.
+    if (opacity === SELECT_OPACITY && isBentQuad(verts, face)) {
+      const p = (vi: number) => { const v = verts[vi]!; return [v.x + n.x * EDGE_LIFT, v.y + n.y * EDGE_LIFT, v.z + n.z * EDGE_LIFT]; };
+      const lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute("position", new THREE.Float32BufferAttribute([...p(loop[0]!), ...p(loop[2]!)], 3));
+      const line = new THREE.Line(lineGeo, new THREE.LineDashedMaterial({
+        color: 0xffffff, dashSize: 0.08, gapSize: 0.06, depthTest: false, transparent: true,
+      }));
+      line.computeLineDistances();
+      line.renderOrder = 4;
+      line.userData = { selectable: false, editorOnly: true, hideInGame: true };
+      mesh.add(line);
+    }
+
     this._scene.add(mesh);
     return mesh;
   }

@@ -15,7 +15,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2614,6 +2614,15 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
   const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, 0.25));
   const recess  = () => run(extrudeFace(shape.mesh!, faceIndex, -0.25));
   const inset   = () => run(insetFace(shape.mesh!, faceIndex, 0.25));
+  // Flip which diagonal a bent quad folds along. Landing back on the automatic
+  // choice drops the override, so later vertex moves re-pick it.
+  const bent = isBentQuad(verts, face);
+  const auto = faceFold(verts, { ...face, fold: undefined });
+  const flipped = faceFold(verts, face) !== auto;
+  const flipFold = () => {
+    const next = (1 - faceFold(verts, face)) as 0 | 1;
+    onObjectUpdate(shapeFacesUpdate(shape, faceIndex, { fold: next === auto ? undefined : next }) as unknown as Partial<WorldObject>);
+  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2639,9 +2648,18 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
           title="Extrude this face 0.25m inward — carve a recess (inset first for a window/pit)">
           RECESS
         </button>
+        <button style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
+          title="This face is bent, so it creases along one diagonal (the dashed line). Flip it to the other diagonal.">
+          FLIP FOLD
+        </button>
       </div>
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>Split needs a face with 4 real corners.</div>
+      )}
+      {bent && (
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>
+          Bent face: creases along the dashed line ({flipped ? "flipped" : "automatic, bulges outward"}).
+        </div>
       )}
     </div>
   );

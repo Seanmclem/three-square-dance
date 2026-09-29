@@ -929,6 +929,9 @@ export interface BrushFace {
   verts: number[];                       // ≥ 3, CCW outward loop
   material?: string;                     // absent → shape.material
   materialOverrides?: MaterialOverrides; // per-face tile/offset/maps
+  /** 4-vert faces only: which diagonal a bent face folds along (0 = verts[0]–verts[2],
+   *  1 = verts[1]–verts[3]). Absent → auto (the fold that bulges outward). */
+  fold?:              0 | 1;
 }
 
 /**
