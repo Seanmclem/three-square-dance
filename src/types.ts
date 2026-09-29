@@ -14,6 +14,7 @@ export interface MaterialDef {
   label:             string;
   category?:         MaterialCategory;
   attribution?:      Attribution;
+  tags?:             string[];
   tileScale:         number;
   roughnessVal:      number;
   metalnessVal:      number;

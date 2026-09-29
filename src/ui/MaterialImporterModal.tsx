@@ -2,8 +2,9 @@ import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import { materialImporter } from "@/editor/MaterialImporter";
 import type { DetectedMaps, ImportResult } from "@/editor/MaterialImporter";
-import type { MaterialDef, MaterialCategory, Attribution } from "@/types";
+import type { MaterialCategory, Attribution } from "@/types";
 import { AttributionFields } from "@/ui/AttributionFields";
+import { TagInput } from "@/ui/TagInput";
 
 const ACG_ATTRIBUTION: Attribution = {
   author: "ambientCG", patreonUrl: "https://patreon.com/ambientcg", license: "CC0",
@@ -14,11 +15,18 @@ const MATERIAL_CATEGORIES: MaterialCategory[] = [
 ];
 
 interface Props {
-  onComplete:       (material: MaterialDef) => void;
+  existingCategories: string[];   // categories already in the material library (incl. custom ones)
+  existingAttributions: Attribution[];  // library attributions — autofill picker in AttributionFields
+  existingTags:       string[];   // suggestions from the material library
+  onComplete:       () => void;
   onClose:          () => void;
 }
 
 type Phase = "input" | "importing" | "done";
+
+/** acg: one ambientCG set = one material with several maps.
+ *  pngs: a folder of plain images = one albedo-only material per image. */
+type ImportType = "acg" | "pngs";
 
 const MAP_LABELS: Array<keyof DetectedMaps> = [
   "albedo", "normal", "roughness", "metalness", "ao", "displacement",
@@ -67,15 +75,39 @@ const STEP_LABEL: React.CSSProperties = {
   color: "#8b94a8", fontSize: 10, letterSpacing: 1, marginBottom: 8,
 };
 
+const FIELD_LABEL: React.CSSProperties = {
+  color: "#c2cadb", fontSize: 11, marginBottom: 4,
+};
+
 function autoLabel(id: string): string {
   return id.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export function MaterialImporterModal({ onComplete, onClose }: Props) {
+function toId(s: string): string {
+  return s.trim().replace(/\s+/g, "_").toLowerCase();
+}
+
+/** "texture_01.png" → "texture_01"; anything outside [a-z0-9_] becomes "_". */
+function fileBaseId(name: string): string {
+  return name.slice(0, name.lastIndexOf(".")).toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+}
+
+export function MaterialImporterModal({ existingCategories, existingAttributions, existingTags, onComplete, onClose }: Props) {
   useEscapeClose(onClose);
+  const [importType,   setImportType]   = useState<ImportType>("acg");
+  const [images,       setImages]       = useState<File[] | null>(null);
+  const [idPrefix,     setIdPrefix]     = useState("");
+  const [imageResults, setImageResults] = useState<ImportResult[] | null>(null);
   const [materialId,   setMaterialId]   = useState("");
   const [label,        setLabel]        = useState("");
   const [category,     setCategory]     = useState<MaterialCategory>("Other");
+  const [newCat,       setNewCat]       = useState(false);
+  const [tags,         setTags]         = useState<string[]>([]);
+  // Built-in categories first, then any custom ones already in the library.
+  const categories = [
+    ...MATERIAL_CATEGORIES,
+    ...[...new Set(existingCategories)].filter(c => !MATERIAL_CATEGORIES.includes(c)).sort(),
+  ];
   const [attribution,  setAttribution]  = useState<Attribution>({ ...ACG_ATTRIBUTION });
   const [acgAuto,      setAcgAuto]       = useState(true);
 
@@ -94,23 +126,53 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
 
   const effectiveLabel = label || autoLabel(materialId || "material");
 
+  const imageId = (f: File) => [toId(idPrefix), fileBaseId(f.name)].filter(Boolean).join("_");
+
+  const changeImportType = (t: ImportType) => {
+    setImportType(t);
+    setSourceName(null); setDetectedMaps(null); setImages(null); setError(null);
+    // The ambientCG auto-fill only makes sense for ambientCG sets.
+    if (t === "pngs" && acgAuto) toggleAcg(false);
+    if (t === "acg" && !acgAuto) toggleAcg(true);
+  };
+
   // Step 2 — pick ambientCG source folder
   const onSourceChosen = (list: FileList | null) => {
     setError(null);
     const files = [...(list ?? [])];
     if (!files.length) return;
-    setSourceName(files[0]!.webkitRelativePath.split("/")[0] || "folder");
-    setDetectedMaps(materialImporter.scanFiles(files));
+    const folder = files[0]!.webkitRelativePath.split("/")[0] || "folder";
+    setSourceName(folder);
+    if (importType === "pngs") {
+      setImages(materialImporter.scanImages(files));
+      setIdPrefix(toId(folder));
+    } else {
+      setDetectedMaps(materialImporter.scanFiles(files));
+    }
   };
 
   const handleImport = async () => {
+    if (importType === "pngs") {
+      if (!images?.length) return;
+      setPhase("importing");
+      setError(null);
+      try {
+        const entries = images.map(file => ({ id: imageId(file), label: autoLabel(imageId(file)), file }));
+        setImageResults(await materialImporter.importImages(entries, category.trim(), attribution, tags));
+        setPhase("done");
+      } catch (e) {
+        setError("Import failed: " + String(e));
+        setPhase("input");
+      }
+      return;
+    }
     if (!detectedMaps) return;
     const id = materialId.trim().replace(/\s+/g, "_").toLowerCase();
     if (!id) { setError("Material id is required"); return; }
     setPhase("importing");
     setError(null);
     try {
-      const res = await materialImporter.importMaterial(id, effectiveLabel, category, attribution, detectedMaps);
+      const res = await materialImporter.importMaterial(id, effectiveLabel, category.trim(), attribution, tags, detectedMaps);
       setResult(res);
       setPhase("done");
     } catch (e) {
@@ -119,31 +181,17 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
     }
   };
 
-  const handleDone = () => {
-    const id = materialId.trim().replace(/\s+/g, "_").toLowerCase();
-    const base = `/assets/textures/${id}`;
-    const def: MaterialDef = {
-      id, label: effectiveLabel, category,
-      ...(Object.keys(attribution).length ? { attribution } : {}),
-      tileScale: 1.0, roughnessVal: 0.85, metalnessVal: 0.0, displacementScale: 0.03,
-      maps: {
-        albedo:       { enabled: true,                             path: `${base}/albedo.jpg` },
-        normal:       { enabled: "normal"    in (detectedMaps!),  path: `${base}/normal.jpg` },
-        roughness:    { enabled: "roughness" in (detectedMaps!),  path: `${base}/roughness.jpg` },
-        metalness:    { enabled: false,                           path: `${base}/metalness.jpg` },
-        ao:           { enabled: "ao"        in (detectedMaps!),  path: `${base}/ao.jpg` },
-        displacement: { enabled: false,                           path: `${base}/displacement.jpg` },
-      },
-    };
-    onComplete(def);
-  };
-
   const handleImportAnother = () => {
-    setMaterialId(""); setLabel(""); setCategory("Other"); setAcgAuto(true); setAttribution({ ...ACG_ATTRIBUTION }); setSourceName(null);
-    setDetectedMaps(null); setPhase("input"); setResult(null); setError(null);
+    setMaterialId(""); setLabel(""); setCategory("Other"); setNewCat(false); setTags([]); setSourceName(null);
+    const acg = importType === "acg";
+    setAcgAuto(acg); setAttribution(acg ? { ...ACG_ATTRIBUTION } : {});
+    setDetectedMaps(null); setImages(null); setIdPrefix(""); setImageResults(null);
+    setPhase("input"); setResult(null); setError(null);
   };
 
-  const canImport = !!(detectedMaps && materialId.trim());
+  const canImport = !!category.trim() && (importType === "pngs"
+    ? !!images?.length
+    : !!(detectedMaps && materialId.trim()));
 
   return (
     <div style={OVERLAY}>
@@ -161,59 +209,121 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
             <div style={{ color: "#80aaff", fontSize: 13, letterSpacing: 1 }}>ADD MATERIAL</div>
             <button onClick={onClose} style={{ ...BTN(true), padding: "2px 8px", fontSize: 14 }}>✕</button>
           </div>
-          <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
-            Compatible with ambientCG texture sets (albedo / normal / roughness / ao / displacement maps).
-          </div>
         </div>
 
         {phase !== "done" && <>
-          {/* Step 1 — name */}
+          {/* Import type */}
           <div>
-            <div style={STEP_LABEL}>1  MATERIAL ID</div>
-            <input
-              style={INPUT_STYLE}
-              placeholder="e.g. brick_wall_02"
-              value={materialId}
-              onChange={e => setMaterialId(e.target.value)}
-            />
-            <input
-              style={{ ...INPUT_STYLE, marginTop: 6 }}
-              placeholder={`label (default: "${autoLabel(materialId || "material")}")`}
-              value={label}
-              onChange={e => setLabel(e.target.value)}
-            />
-            {materialId && (
-              <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
-                folder: /assets/textures/{materialId.trim().replace(/\s+/g, "_").toLowerCase()}/
-              </div>
-            )}
+            <div style={STEP_LABEL}>IMPORT TYPE</div>
             <select
-              value={category}
-              onChange={e => setCategory(e.target.value as MaterialCategory)}
-              style={{ ...INPUT_STYLE, marginTop: 6 }}
+              value={importType}
+              onChange={e => changeImportType(e.target.value as ImportType)}
+              style={INPUT_STYLE}
             >
-              {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="acg">ambientCG texture set</option>
+              <option value="pngs">Folder of PNGs</option>
             </select>
+            <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
+              {importType === "acg"
+                ? "One material from an ambientCG folder (albedo / normal / roughness / ao / displacement maps)."
+                : "One material per image in the folder, color map only (e.g. Kenney prototype textures)."}
+            </div>
+          </div>
+
+          {/* Step 1 — name + category */}
+          <div>
+            <div style={STEP_LABEL}>1  NAME</div>
+            {importType === "pngs" ? <>
+              <div style={FIELD_LABEL}>ID prefix</div>
+              <input
+                style={INPUT_STYLE}
+                placeholder="e.g. proto_dark (defaults to the folder name)"
+                value={idPrefix}
+                onChange={e => setIdPrefix(e.target.value)}
+              />
+              <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
+                each image becomes /assets/textures/{toId(idPrefix) ? `${toId(idPrefix)}_` : ""}&lt;image name&gt;/
+              </div>
+            </> : <>
+              <div style={FIELD_LABEL}>Material id</div>
+              <input
+                style={INPUT_STYLE}
+                placeholder="e.g. brick_wall_02"
+                value={materialId}
+                onChange={e => setMaterialId(e.target.value)}
+              />
+              {materialId && (
+                <div style={{ color: "#98a2b8", fontSize: 10, marginTop: 4 }}>
+                  folder: /assets/textures/{materialId.trim().replace(/\s+/g, "_").toLowerCase()}/
+                </div>
+              )}
+              <div style={{ ...FIELD_LABEL, marginTop: 8 }}>Label</div>
+              <input
+                style={INPUT_STYLE}
+                placeholder={`default: "${autoLabel(materialId || "material")}"`}
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+              />
+            </>}
+            <div style={{ ...FIELD_LABEL, marginTop: 8 }}>Category</div>
+            <select
+              value={newCat ? "__new__" : category}
+              onChange={e => {
+                const v = e.target.value;
+                setNewCat(v === "__new__");
+                setCategory(v === "__new__" ? "" : v);
+              }}
+              style={INPUT_STYLE}
+            >
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="__new__">New category…</option>
+            </select>
+            {newCat && (
+              <input
+                autoFocus
+                style={{ ...INPUT_STYLE, marginTop: 6 }}
+                placeholder="New category name, e.g. Prototype"
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+              />
+            )}
+            <div style={{ ...FIELD_LABEL, marginTop: 8 }}>Tags</div>
+            <TagInput value={tags} onChange={setTags} suggestions={existingTags} />
           </div>
 
           {/* Attribution (optional) */}
           <div>
             <div style={STEP_LABEL}>ATTRIBUTION (optional)</div>
+            {importType === "acg" && (
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11, marginBottom: 8 }}>
               <input type="checkbox" checked={acgAuto} onChange={e => toggleAcg(e.currentTarget.checked)} />
               Auto-fill ambientCG (author, Patreon, CC0)
             </label>
-            <AttributionFields value={attribution} onChange={setAttribution} />
+            )}
+            <AttributionFields value={attribution} onChange={setAttribution} autofillFrom={existingAttributions} />
           </div>
 
           {/* Step 2 — source folder */}
           <div>
-            <div style={STEP_LABEL}>2  AMBIENTCG SOURCE FOLDER</div>
+            <div style={STEP_LABEL}>2  {importType === "pngs" ? "IMAGE FOLDER" : "AMBIENTCG SOURCE FOLDER"}</div>
             <button style={BTN(true)} onClick={() => sourceInputRef.current?.click()}>
-              {sourceName ? `📁 ${sourceName}` : "Choose ambientCG folder…"}
+              {sourceName ? `📁 ${sourceName}` : importType === "pngs" ? "Choose image folder…" : "Choose ambientCG folder…"}
             </button>
 
-            {detectedMaps && (
+            {importType === "pngs" && images && (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                {!images.length && <div style={{ color: "#ffaa44", fontSize: 11 }}>No .png / .jpg / .webp images at the top of this folder.</div>}
+                {images.map(f => (
+                  <div key={f.name} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ color: "#6bff8a", width: 14, fontSize: 11 }}>●</span>
+                    <span style={{ color: "#c2cadb", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{imageId(f)}</span>
+                    <span style={{ color: "#98a2b8", fontSize: 10 }}>{f.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {importType === "acg" && detectedMaps && (
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                 {MAP_LABELS.map(key => {
                   const found = detectedMaps[key];
@@ -240,23 +350,31 @@ export function MaterialImporterModal({ onComplete, onClose }: Props) {
           <div>
             <div style={STEP_LABEL}>3  IMPORT</div>
             <button style={BTN(canImport)} onClick={handleImport} disabled={!canImport}>
-              {phase === "importing" ? "Importing…" : "Import material"}
+              {phase === "importing" ? "Importing…"
+                : importType === "pngs" && images?.length ? `Import ${images.length} material${images.length === 1 ? "" : "s"}`
+                : "Import material"}
             </button>
           </div>
         </>}
 
-        {phase === "done" && result && (
+        {phase === "done" && (result || imageResults) && (
           <div>
             <div style={STEP_LABEL}>RESULT</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {result.copied.map(f  => <div key={f} style={{ color: "#6bff8a", fontSize: 11 }}>✓ {f}</div>)}
-              {result.skipped.map(f => <div key={f} style={{ color: "#ffaa44", fontSize: 11 }}>⚠ {f} — already exists, skipped</div>)}
-              {result.failed.map(f  => <div key={f} style={{ color: "#ff6b6b", fontSize: 11 }}>✗ {f} — failed</div>)}
+              {imageResults?.map(r => (
+                <div key={r.materialId} style={{ fontSize: 11, color: r.failed.length ? "#ff6b6b" : r.skipped.length ? "#ffaa44" : "#6bff8a" }}>
+                  {r.failed.length ? "✗" : r.skipped.length ? "⚠" : "✓"} {r.materialId}
+                  {r.failed.length ? " — failed" : r.skipped.length ? " — image already exists, kept it" : ""}
+                </div>
+              ))}
+              {result && result.copied.map(f  => <div key={f} style={{ color: "#6bff8a", fontSize: 11 }}>✓ {f}</div>)}
+              {result && result.skipped.map(f => <div key={f} style={{ color: "#ffaa44", fontSize: 11 }}>⚠ {f} — already exists, skipped</div>)}
+              {result && result.failed.map(f  => <div key={f} style={{ color: "#ff6b6b", fontSize: 11 }}>✗ {f} — failed</div>)}
               <div style={{ color: "#6bff8a", fontSize: 11, marginTop: 4 }}>✓ manifest.json updated</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button style={BTN(true)} onClick={handleImportAnother}>Import another</button>
-              <button style={{ ...BTN(true), background: "rgba(80,140,255,0.3)" }} onClick={handleDone}>Done</button>
+              <button style={{ ...BTN(true), background: "rgba(80,140,255,0.3)" }} onClick={onComplete}>Done</button>
             </div>
           </div>
         )}

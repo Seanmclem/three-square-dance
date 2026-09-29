@@ -21,6 +21,8 @@ interface AssetFilterBarProps {
    *  here; the bar shows it in place of generic chips while `cat` is the active facet,
    *  so adopting the bar doesn't flatten a category order someone chose on purpose. */
   categorySlot?: React.ReactNode;
+  /** Shown in place of chips when the active facet has no values yet (e.g. no tags). */
+  emptyHints?: Record<string, string>;
 }
 
 const CHIP = (active: boolean): React.CSSProperties => ({
@@ -39,7 +41,7 @@ const SEG = (active: boolean): React.CSSProperties => ({
 
 const COUNT: React.CSSProperties = { opacity: 0.55, marginLeft: 4 };
 
-export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onClear, categorySlot }: AssetFilterBarProps) {
+export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onClear, categorySlot, emptyHints }: AssetFilterBarProps) {
   if (facets.length === 0) return null;
 
   const active = facets.find(f => f.key === activeKey) ?? facets[0]!;
@@ -90,6 +92,10 @@ export function AssetFilterBar({ facets, activeKey, sel, onMode, onToggle, onCle
           absolutely positioned and `overflow: auto` below would clip it. */}
       {ownSlot ? (
         <div style={{ padding: "0 8px 4px", flexShrink: 0 }}>{ownSlot}</div>
+      ) : active.values.length === 0 ? (
+        <div style={{ padding: "4px 10px 6px", flexShrink: 0, fontSize: 10, color: "#9aa3b5" }}>
+          {emptyHints?.[active.key] ?? `No ${active.label.toLowerCase()} yet`}
+        </div>
       ) : (
         <div style={{ padding: "0 8px 4px", flexShrink: 0, display: "flex", flexWrap: "wrap", gap: 4,
           maxHeight: 68, overflowY: "auto", cursor: "pointer" }}>

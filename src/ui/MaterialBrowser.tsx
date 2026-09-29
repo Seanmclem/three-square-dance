@@ -13,10 +13,12 @@ interface MaterialBrowserProps {
 
 const catOf = (m: MaterialDef) => m.category ?? "Other";
 
-// MaterialDef has no `tags` field, so there is no tag facet here.
 const FACETS: FacetSpec<MaterialDef>[] = [
   { key: "cat",    label: "Categories", always: true, read: catOf },
-  { key: "pack",   label: "Pack",   blankBucket: "(no pack)",       read: m => m.attribution?.sourceName },
+  // Tags and Pack always show, like the model browser's Tags, so they're findable
+  // before the library has any (they explain themselves when empty).
+  { key: "tag",    label: "Tags",       multi: true, prefix: "#", always: true, read: m => m.tags },
+  { key: "pack",   label: "Pack",   blankBucket: "(no pack)", always: true, read: m => m.attribution?.sourceName },
   { key: "author", label: "Author",     read: m => m.attribution?.author },
 ];
 
@@ -41,7 +43,9 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
   const facetState = useFacetFilters(materials, FACETS);
   const orderedCats = orderedMaterialCategories([...new Set(materials.map(catOf))]);
   const q = search.toLowerCase();
-  const filtered = facetState.filtered.filter(m => !q || m.label.toLowerCase().includes(q));
+  const filtered = facetState.filtered.filter(m =>
+    !q || m.label.toLowerCase().includes(q) || (m.tags ?? []).some(t => t.toLowerCase().includes(q))
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -59,10 +63,14 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
       </div>
 
       {/* Category pills (own component: domain ordering + overflow popout), plus the
-          Pack/Author segments once attribution can actually split the library. */}
+          Tags/Pack segments (always) and Author once attribution can split the library. */}
       <AssetFilterBar
         facets={facetState.facets} activeKey={facetState.activeKey} sel={facetState.sel}
         onMode={facetState.setMode} onToggle={facetState.toggle} onClear={facetState.clear}
+        emptyHints={{
+          tag:  "No tags yet. Add them when importing, or via Manage → Edit.",
+          pack: "No packs yet. Set SOURCE / KIT NAME under Attribution when importing, or via Manage → Edit.",
+        }}
         categorySlot={
           <MaterialCategoryPills
             categories={orderedCats}
@@ -125,7 +133,10 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
       {/* Grid */}
       <div style={{
         flex: 1, minHeight: 0, overflowY: "auto", padding: "4px 8px",
-        display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, alignContent: "start",
+        // Same grid as AssetBrowser: fixed 96px cells (a wider panel buys more tiles, not
+        // fatter ones) and min-content rows, so a long list can't squash the rows.
+        display: "grid", gridTemplateColumns: "repeat(auto-fill, 96px)",
+        justifyContent: "start", gridAutoRows: "min-content", gap: 4, alignContent: "start",
       }}>
         {filtered.length === 0 ? (
           <div style={{ gridColumn: "1/-1", color: "#98a2b8", fontSize: 10, textAlign: "center", paddingTop: 20 }}>
@@ -145,7 +156,7 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
                   border: sel ? "1px solid rgba(200,60,60,0.5)" : "1px solid rgba(255,255,255,0.05)",
                   borderRadius: 4, cursor: manage ? "pointer" : "default", padding: 2,
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                  overflow: "hidden", minHeight: 80,
+                  overflow: "hidden", width: 96, minHeight: 108,
                 }}
               >
                 {manage && (
@@ -159,7 +170,7 @@ export function MaterialBrowser({ materials, onImport, onDeleteMaterials, onEdit
                   }}>{sel ? "✓" : ""}</div>
                 )}
                 <div style={{
-                  width: "100%", aspectRatio: "1", borderRadius: 3,
+                  width: "100%", aspectRatio: "1", flexShrink: 0, borderRadius: 3,
                   background: `#3a3a3a url("${materialSwatchUrl(mat)}") center/cover`,
                 }} />
                 <span style={{

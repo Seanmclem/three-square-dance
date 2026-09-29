@@ -2764,6 +2764,7 @@ export default function App() {
         label:       single ? defs[0]!.label : "",
         category:    single ? (defs[0]!.category ?? "Other") : commonOr(defs.map(d => d.category ?? "Other")),
         attribution: single ? (defs[0]!.attribution ?? {}) : {},
+        tags:        single ? (defs[0]!.tags ?? []) : [],
       },
     });
   };
@@ -2951,10 +2952,19 @@ export default function App() {
     const pending = pendingMaterialEdit;
     setPendingMaterialEdit(null);
     if (!pending) return;
+    // Same tag merge semantics as the model edit: single replaces, bulk unions in.
+    const resolveTags = (m: MaterialDef): string[] =>
+      patch.tagsAdd ? [...new Set([...(m.tags ?? []), ...patch.tagsAdd])]
+                    : (patch.tags ?? m.tags ?? []);
     try {
-      await updateEntries<MaterialDef>("textures", pending.ids, m => patchEntry(m, patch));
+      await updateEntries<MaterialDef>("textures", pending.ids, m => ({ ...patchEntry(m, patch), tags: resolveTags(m) }));
     } catch (err) { console.error("material edit failed:", err); return; }
-    pending.ids.forEach(id => assetManager.updateMaterial(id, patch as Partial<MaterialDef>));
+    pending.ids.forEach(id => {
+      const def = assetManager.getMaterialList().find(m => m.id === id);
+      if (!def) return;
+      const { tagsAdd: _drop, ...rest } = patch;
+      assetManager.updateMaterial(id, { ...rest, tags: resolveTags(def) } as Partial<MaterialDef>);
+    });
     setMaterialList(assetManager.getMaterialList());
   };
 
@@ -4241,6 +4251,9 @@ SquareDance
 
       {materialImporterOpen && (
         <MaterialImporterModal
+          existingCategories={materialList.map(m => m.category ?? "Other")}
+          existingAttributions={[...materialList, ...assets, ...sounds].flatMap(a => a.attribution ? [a.attribution] : [])}
+          existingTags={[...new Set(materialList.flatMap(m => m.tags ?? []))].sort()}
           onComplete={() => { setMaterialImporterOpen(false); handleMaterialsReload(); }}
           onClose={() => setMaterialImporterOpen(false)}
         />
@@ -4362,6 +4375,7 @@ SquareDance
           noun="material"
           categoryOptions={MAT_CAT_ORDER}
           initial={pendingMaterialEdit.initial}
+          tagSuggestions={[...new Set(materialList.flatMap(m => m.tags ?? []))].sort()}
           onCancel={() => setPendingMaterialEdit(null)}
           onSave={patch => void handleConfirmMaterialEdit(patch)}
         />

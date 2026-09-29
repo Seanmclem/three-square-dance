@@ -8,6 +8,13 @@ export interface DetectedMap {
 
 export type DetectedMaps = Partial<Record<keyof MaterialDef["maps"], DetectedMap>>;
 
+/** One image of a "folder of PNGs" import — becomes its own albedo-only material. */
+export interface ImageEntry {
+  id:    string;
+  label: string;
+  file:  File;
+}
+
 export interface ImportResult {
   materialId: string;
   copied:     string[];
@@ -62,6 +69,7 @@ export class MaterialImporter {
     label:        string,
     category:     MaterialCategory,
     attribution:  Attribution,
+    tags:         string[],
     detectedMaps: DetectedMaps,
   ): Promise<ImportResult> {
     const result: ImportResult = { materialId, copied: [], skipped: [], failed: [] };
@@ -91,17 +99,67 @@ export class MaterialImporter {
       }
     }
 
-    // Read or create manifest
-    const manifest = await readManifest<MaterialManifest>("textures", { version: "1.0", materials: [] });
-
-    const entry = this._buildEntry(materialId, label, category, attribution, detectedMaps);
-    const idx   = manifest.materials.findIndex(m => m.id === materialId);
-    if (idx >= 0) manifest.materials[idx] = entry;
-    else manifest.materials.push(entry);
-
-    await writeManifest("textures", manifest);
+    await this._upsertManifest([this._buildEntry(materialId, label, category, attribution, tags, detectedMaps)]);
 
     return result;
+  }
+
+  /** Top-level image files of a picked folder, for the "folder of PNGs" import type. */
+  scanImages(files: File[]): File[] {
+    return files
+      .filter(f => !(f.webkitRelativePath && f.webkitRelativePath.split("/").length > 2))
+      .filter(f => IMAGE_EXTS.has(f.name.toLowerCase().slice(f.name.lastIndexOf("."))))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Import each image as its own material with only an albedo map. The file keeps its
+   *  extension (albedo.png), and the manifest is written once for the whole batch. */
+  async importImages(
+    entries:     ImageEntry[],
+    category:    MaterialCategory,
+    attribution: Attribution,
+    tags:        string[],
+  ): Promise<ImportResult[]> {
+    const results: ImportResult[] = [];
+    const defs:    MaterialDef[]   = [];
+    for (const { id, label, file } of entries) {
+      const result: ImportResult = { materialId: id, copied: [], skipped: [], failed: [] };
+      const ext        = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
+      const targetName = `albedo${ext}`;
+      try {
+        const res = await fetch(`/assets/textures/${id}/high/${targetName}`, { cache: "no-store" });
+        if (res.ok) {
+          void res.body?.cancel();
+          result.skipped.push(targetName);
+        }
+      } catch { /* doesn't exist — proceed */ }
+      if (!result.skipped.length) {
+        try {
+          const buf = await file.arrayBuffer();
+          for (const quality of ["low", "medium", "high"] as const) {
+            await writeAssetFile("textures", `${id}/${quality}/${targetName}`, buf);
+          }
+          result.copied.push(targetName);
+        } catch (err) {
+          console.error(`Failed to copy ${file.name} → ${id}/${targetName}`, err);
+          result.failed.push(targetName);
+        }
+      }
+      results.push(result);
+      if (!result.failed.length) defs.push(this._buildEntry(id, label, category, attribution, tags, {}, targetName));
+    }
+    await this._upsertManifest(defs);
+    return results;
+  }
+
+  private async _upsertManifest(entries: MaterialDef[]): Promise<void> {
+    const manifest = await readManifest<MaterialManifest>("textures", { version: "1.0", materials: [] });
+    for (const entry of entries) {
+      const idx = manifest.materials.findIndex(m => m.id === entry.id);
+      if (idx >= 0) manifest.materials[idx] = entry;
+      else manifest.materials.push(entry);
+    }
+    await writeManifest("textures", manifest);
   }
 
   private _buildEntry(
@@ -109,7 +167,9 @@ export class MaterialImporter {
     label:        string,
     category:     MaterialCategory,
     attribution:  Attribution,
+    tags:         string[],
     detectedMaps: DetectedMaps,
+    albedoName  = "albedo.jpg",
   ): MaterialDef {
     const base = `/assets/textures/${id}/{quality}`;
     return {
@@ -117,12 +177,13 @@ export class MaterialImporter {
       label,
       category,
       ...(Object.keys(attribution).length ? { attribution } : {}),
+      ...(tags.length ? { tags } : {}),
       tileScale:         1.0,
       roughnessVal:      0.85,
       metalnessVal:      0.0,
       displacementScale: 0.03,
       maps: {
-        albedo:       { enabled: true,                        path: `${base}/albedo.jpg` },
+        albedo:       { enabled: true,                        path: `${base}/${albedoName}` },
         normal:       { enabled: "normal" in detectedMaps,    path: `${base}/normal.jpg` },
         roughness:    { enabled: "roughness" in detectedMaps, path: `${base}/roughness.jpg` },
         metalness:    { enabled: false,                       path: `${base}/metalness.jpg` },
