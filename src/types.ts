@@ -255,6 +255,8 @@ export interface BusEvents {
   "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
+  // LOOP CUT button hover → canvas ring preview (Phase 79; null start clears).
+  "shape:loop-preview":    { zoneId: string; shapeId: string; start: LoopCutStart | null };
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
   "stair:added":           { zoneId: string; stair: StairDef };
   "stair:updated":         { zoneId: string; id: string; changes: Partial<StairDef> };
@@ -925,6 +927,9 @@ export type ShapeKind = "cylinder" | "wedge" | "box";
  * points outward). Faces tile the full boundary; every undirected edge appears in
  * exactly two loops (opposite directions).
  */
+/** Where a loop cut starts (Phase 79): a face + SPLIT direction, or an edge it crosses. */
+export type LoopCutStart = { faceIdx: number; pair: 0 | 1 } | { edge: [number, number] };
+
 export interface BrushFace {
   verts: number[];                       // ≥ 3, CCW outward loop
   material?: string;                     // absent → shape.material

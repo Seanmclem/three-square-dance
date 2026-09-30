@@ -27,6 +27,7 @@ interface TopBarProps {
   onSceneAdd?:         () => void;
   onSceneDelete?:      (id: string) => void;
   onEntrySceneChange?: (id: string) => void;
+  brushEditing?:   boolean;   // isolated brush editor open → help shows brush sections only
 }
 
 const FLOORS = [
@@ -133,7 +134,7 @@ const SEP = <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.
 
 export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
   project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport, onProjectPublish,
-  onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange }: TopBarProps) {
+  onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange, brushEditing }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const savedLabel = useSavedLabel(lastAutosaveAt);
   const [projMenuOpen, setProjMenuOpen] = useState(false);
@@ -174,7 +175,9 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       background: "rgba(28,28,28,0.95)",
       borderBottom: "1px solid rgba(255,255,255,0.08)",
       display: "flex", alignItems: "center", gap: 8,
-      padding: "0 14px", zIndex: 10, fontFamily: "monospace",
+      // 35: above the prefab/brush EditModeBar (30), so the bar's menus and the ? help
+      // popup aren't drawn underneath it.
+      padding: "0 14px", zIndex: 35, fontFamily: "monospace",
     }}>
       {/* Mark */}
       <div title="SquareDance" style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0,
@@ -320,7 +323,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
 
       <button title="Undo (⌘Z)" onClick={onUndo} disabled={!canUndo} style={ibStyle({ ghost: true, disabled: !canUndo })}><Ic name="undo" /></button>
       <button title="Redo (⌘Y)" onClick={onRedo} disabled={!canRedo} style={ibStyle({ ghost: true, disabled: !canRedo })}><Ic name="redo" /></button>
-      <HelpButton />
+      <HelpButton brushEditor={brushEditing} />
       {isDesktop() && (
         <button
           title={`Reload the editor UI — picks up a fresh build (unsaved changes are autosaved first). Running build: ${__BUILD_STAMP__}`}

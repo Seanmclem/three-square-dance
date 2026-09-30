@@ -15,7 +15,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, type LoopCutRing } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2562,7 +2562,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
                     onBlur={e => flush(() => commitTile(i, e.target.value))}
                   />
                 </div>
-                <ShapeFaceOps selected={selected} shape={shape} faceIndex={i} onObjectUpdate={onObjectUpdate} />
+                <ShapeFaceOps selected={selected} shape={shape} faceIndex={i} bus={bus} onObjectUpdate={onObjectUpdate} />
               </div>
             )}
           </div>
@@ -2575,14 +2575,27 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   );
 }
 
+/** One line saying how a loop cut went, e.g. "Cut 16 faces, ring closed." */
+function describeLoopCut(ring: LoopCutRing): string {
+  const n = `Cut ${ring.faces.length} face${ring.faces.length === 1 ? "" : "s"}`;
+  if (ring.closed) return `${n}, ring closed.`;
+  const why = [...new Set(ring.stops.map(s =>
+    s.reason === "not-quad"     ? `a ${s.corners}-sided face` :
+    s.reason === "partial-side" ? "a face split differently" :
+    s.reason === "ambiguous"    ? "an existing split point" :
+    s.reason === "revisit"      ? "a face already on the ring" : "an open edge"))];
+  return `${n}, stopped at ${why.join(" and ")}.`;
+}
+
 // Split H/V (quads only) + Extrude — the Phase 23 topology ops. Each op is a pure
 // brushOps call committed through onObjectUpdate (one undoable transaction). The
 // selected faceIndex stays on the primary child / the moved cap by construction.
-function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
-  selected: SelectedObjectPayload; shape: ShapeDef; faceIndex: number;
+function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; faceIndex: number; bus?: EventBus;
   onObjectUpdate: (c: Partial<WorldObject>) => void;
 }) {
-  void selected;
+  // Loop cut result line; the row remounts per selected face, so it clears itself.
+  const [loopNote, setLoopNote] = useState<string | null>(null);
   const face = shape.mesh!.faces![faceIndex];
   if (!face) return null;
   // Four REAL corners: straight-through verts left on an edge by a neighbor's
@@ -2623,6 +2636,18 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
     const next = (1 - faceFold(verts, face)) as 0 | 1;
     onObjectUpdate(shapeFacesUpdate(shape, faceIndex, { fold: next === auto ? undefined : next }) as unknown as Partial<WorldObject>);
   };
+  // Loop cut (Phase 79): the matching SPLIT, continued around the shape. Hover
+  // previews the ring in the canvas.
+  const loop = (pair: 0 | 1) => {
+    const r = loopCut(shape.mesh!, { faceIdx: faceIndex, pair });
+    if (!r) { setLoopNote("Loop cut failed; nothing changed."); return; }
+    onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
+    setLoopNote(describeLoopCut(r.ring));
+  };
+  const preview = (pair: 0 | 1 | null) => bus?.emit("shape:loop-preview", {
+    zoneId: selected.zoneId, shapeId: selected.id, start: pair === null ? null : { faceIdx: faceIndex, pair },
+  });
+  const loopTitle = "Split this face and keep going around the shape, until the ring comes back round or reaches a face that isn't four-sided";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -2641,6 +2666,15 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
         </button>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
+        {([["LOOP CUT ─", pair0IsH ? 0 : 1], ["LOOP CUT │", pair0IsH ? 1 : 0]] as const).map(([label, pair]) => (
+          <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
+            onClick={() => { preview(null); loop(pair); }}
+            onMouseEnter={() => isQuad && preview(pair)} onMouseLeave={() => preview(null)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
         <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m outward along its normal">
           EXTRUDE
         </button>
@@ -2654,8 +2688,9 @@ function ShapeFaceOps({ selected, shape, faceIndex, onObjectUpdate }: {
         </button>
       </div>
       {!isQuad && (
-        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split needs a face with 4 real corners.</div>
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>
       )}
+      {loopNote && <div style={{ color: "#c2cadb", fontSize: 9 }}>{loopNote}</div>}
       {bent && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>
           Bent face: creases along the dashed line ({flipped ? "flipped" : "automatic, bulges outward"}).
@@ -2830,6 +2865,11 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
   const edge = selected.edgeVerts ?? null;
   const a = edge ? verts[edge[0]] : undefined;
   const b = edge ? verts[edge[1]] : undefined;
+  // Loop cut result line, tied to the edge selected after the cut (so the cut's own
+  // re-select keeps it; picking any other edge hides it).
+  const [loopNote, setLoopNote] = useState<{ text: string; key: string } | null>(null);
+  const edgeKey = edge ? `${selected.id}:${edge[0]}|${edge[1]}` : "";
+  const canLoop = !!edge && !!loopCutRing(shape.mesh!, { edge });
 
   const doSplit = () => {
     if (!edge) return;
@@ -2841,6 +2881,28 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
       faceIndex: null, vertexIndex: null,
       edge: [Math.min(edge[0], r.mid), Math.max(edge[0], r.mid)] as [number, number],
     });
+  };
+
+  // Loop cut (Phase 79) of the ring crossing this edge. If the cut split the edge
+  // itself, re-select its surviving half (like SPLIT EDGE) so the gizmo stays live.
+  const doLoopCut = () => {
+    if (!edge) return;
+    bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null });
+    const r = loopCut(shape.mesh!, { edge });
+    if (!r) { setLoopNote({ text: "Loop cut failed; nothing changed.", key: edgeKey }); return; }
+    onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
+    const hasEdge = (p: number, q: number) => r.mesh.faces.some(f => f.verts.some((v, i) => {
+      const w = f.verts[(i + 1) % f.verts.length]!;
+      return (v === p && w === q) || (v === q && w === p);
+    }));
+    const mid = r.ringVerts.find(m => hasEdge(edge[0], m));
+    let key = edgeKey;
+    if (!hasEdge(edge[0], edge[1]) && mid !== undefined) {
+      const half: [number, number] = [Math.min(edge[0], mid), Math.max(edge[0], mid)];
+      key = `${selected.id}:${half[0]}|${half[1]}`;
+      bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: null, edge: half });
+    }
+    setLoopNote({ text: describeLoopCut(r.ring), key });
   };
 
   return (
@@ -2862,6 +2924,13 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
             title="Insert a vertex at this edge's midpoint (both adjacent faces gain a corner)">
             SPLIT EDGE
           </button>
+          <button style={canLoop ? OP_BTN : OP_BTN_OFF} disabled={!canLoop} onClick={doLoopCut}
+            title="Cut a new ring of edges around the shape, crossing this edge (stops at faces that aren't four-sided)"
+            onMouseEnter={() => canLoop && bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: { edge: edge! } })}
+            onMouseLeave={() => bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null })}>
+            LOOP CUT
+          </button>
+          {loopNote?.key === edgeKey && <div style={{ color: "#c2cadb", fontSize: 9 }}>{loopNote.text}</div>}
         </div>
       )}
       <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>

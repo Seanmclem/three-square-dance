@@ -1,11 +1,13 @@
 import { useState } from "react";
 
 interface ShortcutEntry { keys: string[]; action: string }
-interface ShortcutSection { label: string; rows: ShortcutEntry[] }
+/** `inBrushEditor`: still shown inside the isolated brush editor (the rest are hidden there). */
+interface ShortcutSection { label: string; rows: ShortcutEntry[]; inBrushEditor?: boolean }
 
 const SECTIONS: ShortcutSection[] = [
   {
     label: "CAMERA",
+    inBrushEditor: true,
     rows: [
       { keys: ["RMB"],               action: "Orbit" },
       { keys: ["MMB"],               action: "Pan" },
@@ -45,6 +47,7 @@ const SECTIONS: ShortcutSection[] = [
   },
   {
     label: "BRUSH EDITING  (shape → Convert to Brush in panel)",
+    inBrushEditor: true,
     rows: [
       { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save / Cancel in the bar" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge" },
@@ -54,9 +57,12 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Esc"],               action: "Cancel drag, restore geometry" },
       { keys: ["RMB click corner"],  action: "Delete that corner (keeps at least 4)" },
       { keys: ["Panel: SPLIT ─ │"],  action: "Split the selected face into two" },
+      { keys: ["Panel: LOOP CUT ─ │"], action: "Split the selected face and keep going around the shape (hover to preview the ring)" },
       { keys: ["Panel: INSET"],      action: "Inset a smaller face inside the selected one" },
       { keys: ["Panel: EXTRUDE / RECESS"], action: "Push the selected face out / in" },
       { keys: ["Panel: SPLIT EDGE"], action: "Insert a vertex at the edge midpoint" },
+      { keys: ["Panel: LOOP CUT"],   action: "Edge mode: cut a ring of edges around the shape, crossing the selected edge" },
+      { keys: ["Panel: FLIP FOLD"],  action: "A bent face creases along the dashed line; flip it to the other diagonal" },
     ],
   },
 ];
@@ -80,8 +86,10 @@ function ShortcutRow({ keys, action }: ShortcutEntry) {
   );
 }
 
-export function HelpButton() {
+export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
   const [open, setOpen] = useState(false);
+  // In the isolated brush editor, only the sections that apply there.
+  const sections = brushEditor ? SECTIONS.filter(s => s.inBrushEditor) : SECTIONS;
 
   return (
     <>
@@ -114,7 +122,12 @@ export function HelpButton() {
           boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
           display: "flex", flexDirection: "column", gap: 14,
         }}>
-          {SECTIONS.map(({ label, rows }) => (
+          {brushEditor && (
+            <div style={{ color: "#c2cadb", fontSize: 10 }}>
+              Brush editor: other tools' shortcuts are hidden until you Save or Cancel.
+            </div>
+          )}
+          {sections.map(({ label, rows }) => (
             <div key={label}>
               <div style={{ color: "#80aaff", fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>
                 {label}

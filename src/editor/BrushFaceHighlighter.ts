@@ -1,8 +1,8 @@
 import * as THREE from "three";
-import { newellNormal, fanLoop, isBentQuad } from "@/editor/brushOps";
+import { newellNormal, fanLoop, isBentQuad, loopCutRing } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { IEditorModule, ShapeDef, ToolId } from "@/types";
+import type { IEditorModule, ShapeDef, ToolId, LoopCutStart } from "@/types";
 
 const SELECT_OPACITY = 0.55;
 const HOVER_OPACITY  = 0.35;
@@ -29,6 +29,8 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _hoverMesh: THREE.Mesh | null = null;
   private _edgeLines: THREE.LineSegments | null = null;
   private _edgeTube:  THREE.Mesh | null = null;
+  private _loop: { zoneId: string; shapeId: string; start: LoopCutStart } | null = null;
+  private _loopObj:   THREE.Group | null = null;
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -52,12 +54,22 @@ export class BrushFaceHighlighter implements IEditorModule {
           : null;
         this._refresh();
       }),
-      this._bus.on("object:deselected", () => { this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._refresh(); }),
+      this._bus.on("object:deselected", () => {
+        this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._loop = null;
+        this._refresh();
+        this._refreshLoop();
+      }),
+      this._bus.on("shape:loop-preview", ({ zoneId, shapeId, start }) => {
+        this._loop = start ? { zoneId, shapeId, start } : null;
+        this._refreshLoop();
+      }),
       this._bus.on("shape:face-hover", ({ zoneId, shapeId, faceIndex }) => {
         this._hovered = faceIndex === null ? null : { zoneId, shapeId, faceIndex };
         this._refresh();
       }),
       this._bus.on("shape:rebuilt", ({ shapeId }) => {
+        // The cut just landed (or the mesh changed under the preview): drop it.
+        if (this._loop?.shapeId === shapeId) { this._loop = null; this._refreshLoop(); }
         if (this._selected?.shapeId === shapeId || this._hovered?.shapeId === shapeId || this._shape?.shapeId === shapeId) this._refresh();
       }),
       this._bus.on("shape:removed", ({ id }) => {
@@ -67,7 +79,7 @@ export class BrushFaceHighlighter implements IEditorModule {
         if (this._selEdge?.shapeId === id) this._selEdge = null;
         this._refresh();
       }),
-      this._bus.on("preview:start", () => { this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); }),
+      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); }),
       this._bus.on("preview:stop",  () => this._refresh()),
     );
   }
@@ -81,6 +93,63 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clear("hover");
     this._clearEdges();
     this._clearEdgeTube();
+    this._loop = null;
+    this._refreshLoop();
+  }
+
+  /**
+   * LOOP CUT hover preview (Phase 79): a white dashed line across each face the ring
+   * would cross (rail midpoint to rail midpoint, lifted off the face) and a red dot
+   * wherever it would stop short. Rebuilt per hover event; no per-frame work.
+   */
+  private _refreshLoop(): void {
+    if (this._loopObj) {
+      this._scene.remove(this._loopObj);
+      this._loopObj.traverse(o => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+        (m.material as THREE.Material | undefined)?.dispose();
+      });
+      this._loopObj = null;
+    }
+    const t = this._loop;
+    if (!t) return;
+    const shape = this._world.zones.get(t.zoneId)?.shapes?.find(s => s.id === t.shapeId) as ShapeDef | undefined;
+    if (!shape?.mesh?.faces) return;
+    const ring = loopCutRing(shape.mesh, t.start);
+    if (!ring) return;
+
+    const verts = shape.mesh.vertices;
+    const pos: number[] = [];
+    for (const f of ring.faces) {
+      const n = newellNormal(verts, shape.mesh.faces[f.faceIdx]!.verts);
+      for (const [p, q] of f.rails) {
+        const a = verts[p]!, b = verts[q]!;
+        pos.push((a.x + b.x) / 2 + n.x * EDGE_LIFT * 2, (a.y + b.y) / 2 + n.y * EDGE_LIFT * 2, (a.z + b.z) / 2 + n.z * EDGE_LIFT * 2);
+      }
+    }
+    const group = new THREE.Group();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    const lines = new THREE.LineSegments(geo, new THREE.LineDashedMaterial({
+      color: 0xffffff, dashSize: 0.08, gapSize: 0.06, depthTest: false, transparent: true,
+    }));
+    lines.computeLineDistances();
+    lines.renderOrder = 4;
+    group.add(lines);
+    for (const stop of ring.stops) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8),
+        new THREE.MeshBasicMaterial({ color: 0xff5a5a, depthTest: false, transparent: true }));
+      dot.position.set(stop.at.x, stop.at.y, stop.at.z);
+      dot.renderOrder = 5;
+      group.add(dot);
+    }
+    const D2R = Math.PI / 180;
+    group.position.set(shape.position.x, shape.position.y, shape.position.z);
+    group.rotation.set(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R);
+    group.traverse(o => { o.userData = { selectable: false, editorOnly: true, hideInGame: true }; });
+    this._scene.add(group);
+    this._loopObj = group;
   }
 
   private _refresh(): void {

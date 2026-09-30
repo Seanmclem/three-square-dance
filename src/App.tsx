@@ -3960,6 +3960,7 @@ export default function App() {
         />
       )}
       <TopBar
+        brushEditing={!!editingBrush}
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}

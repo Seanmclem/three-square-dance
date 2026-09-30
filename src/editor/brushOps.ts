@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
-import type { Vec3, BrushFace, ShapeBrushMesh, MaterialOverrides } from "@/types";
+import type { Vec3, BrushFace, ShapeBrushMesh, MaterialOverrides, LoopCutStart } from "@/types";
 
 /**
  * Pure topology operations for face-brushes (Phase 23). Data in, data out — every
@@ -560,4 +560,171 @@ export function splitEdge(mesh: ShapeBrushMesh, edge: [number, number]): SplitEd
   const err = validateMesh(out);
   if (err) { console.warn(`brushOps.splitEdge: aborted (${err})`); return null; }
   return { mesh: out, mid };
+}
+
+// ── Loop cut (Phase 79) ──────────────────────────────────────────────────────
+// A ring of SPLITs: the ring crosses four-cornered faces, entering through one side
+// and leaving through the opposite side. Those crossed sides are the RAILS; each gets
+// one new vertex at its middle. The cut itself is splitFaceQuad per ring face (it
+// already reuses shared midpoints and splices open ends into the face they stop at).
+
+export type { LoopCutStart };
+
+/** Why a ring stopped short of closing, and where (the rail midpoint it reached). */
+export interface LoopCutStop {
+  faceIdx: number | null;   // face it couldn't enter (null = no face across)
+  reason:  "not-quad" | "partial-side" | "ambiguous" | "revisit" | "open";
+  corners?: number;         // the blocking face's corner count, for "not-quad"
+  at:      Vec3;
+}
+
+/** One ring face: its SPLIT pair plus its two rails as corner-vertex pairs. */
+export interface LoopCutFace { faceIdx: number; pair: 0 | 1; rails: [[number, number], [number, number]] }
+
+export interface LoopCutRing { faces: LoopCutFace[]; closed: boolean; stops: LoopCutStop[] }
+
+/** A quad face's 4 sides as vertex runs, corner to corner inclusive (straight-through
+ *  verts included). Null unless the face has 4 real corners. */
+function quadSides(vertices: Vec3[], loop: number[]): number[][] | null {
+  const c = quadCorners(vertices, loop);
+  if (!c) return null;
+  const L = loop.length;
+  return [0, 1, 2, 3].map(k => {
+    const run: number[] = [];
+    for (let i = c[k]!; ; i = (i + 1) % L) { run.push(loop[i]!); if (i === c[(k + 1) % 4]) break; }
+    return run;
+  });
+}
+
+const midOf = (vertices: Vec3[], p: number, q: number): Vec3 => {
+  const a = vertices[p]!, b = vertices[q]!;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 };
+};
+
+/** The side index (0..3) of a quad whose corner ends are {p, q}, or null. */
+function sideWithEnds(sides: number[][], p: number, q: number): number | null {
+  for (let k = 0; k < 4; k++) {
+    const s = sides[k]!, a = s[0]!, b = s[s.length - 1]!;
+    if ((a === p && b === q) || (a === q && b === p)) return k;
+  }
+  return null;
+}
+
+/**
+ * Plan a loop cut without changing anything: which faces the ring crosses (in ring
+ * order), whether it closes, and where it stops. Used by the cut and the preview.
+ * An edge start becomes a face start on the first four-cornered face using the edge.
+ */
+export function loopCutRing(mesh: ShapeBrushMesh, start: LoopCutStart): LoopCutRing | null {
+  const faces = mesh.faces;
+  if (!faces?.length) return null;
+  const vertices = mesh.vertices;
+
+  // Undirected segment → faces traversing it.
+  const segFaces = new Map<string, number[]>();
+  const key = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  faces.forEach((f, fi) => f.verts.forEach((v, i) => {
+    const k = key(v, f.verts[(i + 1) % f.verts.length]!);
+    const list = segFaces.get(k);
+    if (list) list.push(fi); else segFaces.set(k, [fi]);
+  }));
+
+  let startFace: number, startPair: 0 | 1;
+  if ("edge" in start) {
+    const [a, b] = start.edge;
+    const hit = (segFaces.get(key(a, b)) ?? []).find(fi => {
+      const sides = quadSides(vertices, faces[fi]!.verts);
+      return sides?.some(s => s.some((v, i) => i + 1 < s.length && key(v, s[i + 1]!) === key(a, b)));
+    });
+    if (hit === undefined) return null;
+    const sides = quadSides(vertices, faces[hit]!.verts)!;
+    const k = sides.findIndex(s => s.some((v, i) => i + 1 < s.length && key(v, s[i + 1]!) === key(a, b)));
+    startFace = hit; startPair = (k % 2) as 0 | 1;
+  } else {
+    if (!faces[start.faceIdx] || !quadSides(vertices, faces[start.faceIdx]!.verts)) return null;
+    startFace = start.faceIdx; startPair = start.pair;
+  }
+
+  const ends = (s: number[]): [number, number] => [s[0]!, s[s.length - 1]!];
+  const s0 = quadSides(vertices, faces[startFace]!.verts)!;
+  const first: LoopCutFace = { faceIdx: startFace, pair: startPair, rails: [ends(s0[startPair]!), ends(s0[startPair + 2]!)] };
+  const visited = new Set([startFace]);
+  const stops: LoopCutStop[] = [];
+
+  // Walk out of `fromFace` through side run `exit` until the ring closes or stops.
+  const walk = (fromFace: number, exit: number[]): { chain: LoopCutFace[]; closed: boolean } => {
+    const chain: LoopCutFace[] = [];
+    let fi = fromFace, run = exit;
+    for (;;) {
+      const [p, q] = ends(run);
+      const at = midOf(vertices, p, q);
+      // The face across the segment of `run` that holds the side's midpoint.
+      const across = new Set<number>();
+      for (let i = 0; i + 1 < run.length; i++) {
+        const a = vertices[run[i]!]!, b = vertices[run[i + 1]!]!;
+        const d = (u: Vec3, w: Vec3) => Math.hypot(u.x - w.x, u.y - w.y, u.z - w.z);
+        if (Math.abs(d(a, at) + d(at, b) - d(a, b)) < EPS_POS) {
+          for (const g of segFaces.get(key(run[i]!, run[i + 1]!)) ?? []) if (g !== fi) across.add(g);
+        }
+      }
+      if (across.size === 0) { stops.push({ faceIdx: null, reason: "open", at }); return { chain, closed: false }; }
+      if (across.size > 1)   { stops.push({ faceIdx: null, reason: "ambiguous", at }); return { chain, closed: false }; }
+      const g = [...across][0]!;
+      if (g === startFace) return { chain, closed: true };
+      if (visited.has(g)) { stops.push({ faceIdx: g, reason: "revisit", at }); return { chain, closed: false }; }
+      const sides = quadSides(vertices, faces[g]!.verts);
+      if (!sides) {
+        stops.push({ faceIdx: g, reason: "not-quad", corners: faces[g]!.verts.length, at });
+        return { chain, closed: false };
+      }
+      const k = sideWithEnds(sides, p, q);
+      if (k === null) { stops.push({ faceIdx: g, reason: "partial-side", at }); return { chain, closed: false }; }
+      visited.add(g);
+      const out = sides[(k + 2) % 4]!;
+      chain.push({ faceIdx: g, pair: (k % 2) as 0 | 1, rails: [[p, q], ends(out)] });
+      fi = g; run = out;
+    }
+  };
+
+  const a = walk(startFace, s0[startPair + 2]!);
+  if (a.closed) return { faces: [first, ...a.chain], closed: true, stops: [] };
+  const b = walk(startFace, s0[startPair]!);
+  // Ring order: b-chain reversed (rails flipped to [far, near]; either rail gives the
+  // same split pair), the start face, then the a-chain.
+  const back = b.chain.reverse().map(f => ({ ...f, rails: [f.rails[1], f.rails[0]] as LoopCutFace["rails"] }));
+  return { faces: [...back, first, ...a.chain], closed: false, stops };
+}
+
+/** Result of a loop cut: the new mesh plus the ring's vertex indices in ring order. */
+export interface LoopCutResult { mesh: BrushMeshData; ring: LoopCutRing; ringVerts: number[] }
+
+/** Cut the ring `loopCutRing` plans: one splitFaceQuad per ring face, validated at the end. */
+export function loopCut(mesh: ShapeBrushMesh, start: LoopCutStart): LoopCutResult | null {
+  const ring = loopCutRing(mesh, start);
+  if (!ring) return null;
+  // Rail midpoints in ring order (each rail once; a closed ring's last rail = its first).
+  const railMids: Vec3[] = [];
+  const seen = new Set<string>();
+  for (const f of ring.faces) for (const [p, q] of f.rails) {
+    const k = p < q ? `${p}|${q}` : `${q}|${p}`;
+    if (!seen.has(k)) { seen.add(k); railMids.push(midOf(mesh.vertices, p, q)); }
+  }
+
+  let cur: BrushMeshData = { vertices: mesh.vertices, faces: mesh.faces! };
+  for (const f of ring.faces) {
+    // Re-derive the pair from the entry rail: earlier splits splice points into this
+    // face's loop. Face indices are stable (splitFaceQuad keeps the index, appends).
+    const sides = quadSides(cur.vertices, cur.faces[f.faceIdx]!.verts);
+    const k = sides ? sideWithEnds(sides, f.rails[0][0], f.rails[0][1]) : null;
+    if (k === null) { console.warn("brushOps.loopCut: ring face changed shape mid-cut"); return null; }
+    const next = splitFaceQuad(cur, f.faceIdx, (k % 2) as 0 | 1);
+    if (!next) return null;   // splitFaceQuad logged why
+    cur = next;
+  }
+  const err = validateMesh(cur);
+  if (err) { console.warn(`brushOps.loopCut: aborted (${err})`); return null; }
+
+  const ringVerts = railMids.map(m => cur.vertices.findIndex(v =>
+    (v.x - m.x) ** 2 + (v.y - m.y) ** 2 + (v.z - m.z) ** 2 < EPS_POS_SQ));
+  return { mesh: cur, ring, ringVerts: ringVerts.filter(i => i >= 0) };
 }
