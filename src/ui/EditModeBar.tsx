@@ -6,7 +6,7 @@
 export function EditModeBar({ title, name, hint, onSave, onCancel }: {
   title:    string;   // "Editing Prefab"
   name:     string;
-  hint:     string;   // what Save does
+  hint?:    string;   // what Save does (omitted → a narrower bar)
   onSave:   () => void;
   onCancel: () => void;
 }) {
@@ -21,9 +21,11 @@ export function EditModeBar({ title, name, hint, onSave, onCancel }: {
       <span style={{ color: "#f0c060", fontSize: 12, fontFamily: "monospace" }}>
         ⬡ {title} · <strong>{name}</strong>
       </span>
-      <span style={{ color: "#b09050", fontSize: 10, fontFamily: "monospace" }}>
-        {hint}
-      </span>
+      {hint && (
+        <span style={{ color: "#b09050", fontSize: 10, fontFamily: "monospace" }}>
+          {hint}
+        </span>
+      )}
       <button
         onClick={onSave}
         style={{

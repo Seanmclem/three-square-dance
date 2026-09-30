@@ -3965,7 +3965,6 @@ export default function App() {
         <EditModeBar
           title="Editing Brush"
           name={editingBrush.name}
-          hint="1-4 switch modes · position/rotation here are ignored"
           onSave={handleBrushEditSave}
           onCancel={handleBrushEditCancel}
         />
