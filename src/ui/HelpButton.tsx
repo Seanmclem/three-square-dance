@@ -1,8 +1,16 @@
 import { useState } from "react";
+import { DocViewerModal, type DocGuide } from "@/ui/DocViewerModal";
 
 interface ShortcutEntry { keys: string[]; action: string }
-/** `inBrushEditor`: still shown inside the isolated brush editor (the rest are hidden there). */
-interface ShortcutSection { label: string; rows: ShortcutEntry[]; inBrushEditor?: boolean }
+/** `inBrushEditor`: still shown inside the isolated brush editor (the rest are hidden there).
+ *  `guide`: an HTML guide in public/docs/, opened in DocViewerModal from the section header. */
+interface ShortcutSection { label: string; rows: ShortcutEntry[]; inBrushEditor?: boolean; guide?: DocGuide }
+
+const BRUSH_GUIDE: DocGuide = {
+  title: "Brush editing guide",
+  src: "/docs/brush-editing.html",
+  externalUrl: "https://claude.ai/artifact/GSVFjgd2USHxAE5FjLUCF6",
+};
 
 const SECTIONS: ShortcutSection[] = [
   {
@@ -48,6 +56,7 @@ const SECTIONS: ShortcutSection[] = [
   {
     label: "BRUSH EDITING  (shape → Convert to Brush in panel)",
     inBrushEditor: true,
+    guide: BRUSH_GUIDE,
     rows: [
       { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save / Cancel in the bar" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge" },
@@ -93,6 +102,7 @@ function ShortcutRow({ keys, action }: ShortcutEntry) {
 
 export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [guide, setGuide] = useState<DocGuide | null>(null);
   // In the isolated brush editor, only the sections that apply there.
   const sections = brushEditor ? SECTIONS.filter(s => s.inBrushEditor) : SECTIONS;
 
@@ -132,10 +142,21 @@ export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
               Brush editor: other tools' shortcuts are hidden until you Save or Cancel.
             </div>
           )}
-          {sections.map(({ label, rows }) => (
+          {sections.map(({ label, rows, guide: g }) => (
             <div key={label}>
-              <div style={{ color: "#80aaff", fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>
-                {label}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <span style={{ color: "#80aaff", fontSize: 10, letterSpacing: 2 }}>{label}</span>
+                {g && (
+                  <button onClick={() => { setOpen(false); setGuide(g); }}
+                    title="Diagrams and explanations for every brush mode and button"
+                    style={{
+                      marginLeft: "auto", padding: "2px 8px", borderRadius: 4, cursor: "pointer",
+                      border: "1px solid rgba(80,140,255,0.35)", background: "rgba(80,140,255,0.12)",
+                      color: "#80aaff", fontSize: 10, fontFamily: "monospace",
+                    }}>
+                    Open guide
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 {rows.map(row => <ShortcutRow key={row.action} {...row} />)}
@@ -144,6 +165,7 @@ export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
           ))}
         </div>
       )}
+      {guide && <DocViewerModal guide={guide} onClose={() => setGuide(null)} />}
     </>
   );
 }

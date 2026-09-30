@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brush Editing Guide</title>
+<!--
+  In-app HTML guide (precedent set 2026-09-30, see public/docs/README.md).
+  Self-contained: inline CSS and inline SVG, images beside it in img/<guide>/.
+  Opened from the editor's ? menu (DocViewerModal) and viewable as a plain file.
+  The editable, commentable copy lives on claude.ai (link in the header).
+-->
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --panel: #26272b;
+    --line: #3a3f4a;
+    --text: #dde3f0;
+    --text-quiet: #c2cadb;
+    --accent: #80aaff;
+    /* diagram tokens (the SVGs reference these) */
+    --d-text-primary: #dde3f0;
+    --d-text-secondary: #c2cadb;
+    --d-chart-axis: #8f98ab;
+    --d-chart-grid: #3a3f4a;
+    --d-chart-categorical-1: #5b9dff;
+    --d-chart-categorical-2: #ff8a4c;
+    --d-chart-categorical-3: #3ccf91;
+    --d-chart-categorical-4: #9aa6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  p, li { color: var(--text); }
+  .meta { color: var(--text-quiet); font-size: 13px; margin-bottom: 24px; }
+  a { color: var(--accent); }
+  nav.toc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 20px; font-size: 14px; }
+  nav.toc ol { margin: 4px 0; padding-left: 20px; }
+  figure { margin: 20px 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+  figcaption { color: var(--text-quiet); font-size: 13px; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-quiet); font-weight: 600; background: var(--panel); }
+  kbd, code {
+    font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    background: #33353b; border: 1px solid #454a55; border-radius: 4px; padding: 1px 5px; color: var(--text);
+  }
+  .answer { background: var(--panel); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 18px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Brush Editing Guide</h1>
+<div class="meta">
+  Faces, edges, corners and cuts · editor v4.95 · 2026-09-30 ·
+  also on <a href="https://claude.ai/artifact/GSVFjgd2USHxAE5FjLUCF6" target="_blank" rel="noreferrer">claude.ai</a> (editable, with comments)
+</div>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#short-answer">The short answer</a></li>
+    <li><a href="#parts">The three parts of a brush</a></li>
+    <li><a href="#modes">The four select modes</a></li>
+    <li><a href="#edge-mode">What edge mode cuts</a></li>
+    <li><a href="#ops">Every operation, before and after</a></li>
+    <li><a href="#walkthrough">Walkthrough: a bulge around a cylinder</a></li>
+    <li><a href="#folds">Bent faces and folds</a></li>
+    <li><a href="#reference">Quick reference</a></li>
+  </ol>
+</nav>
+
+<h2 id="short-answer">The short answer</h2>
+<div class="answer">
+<p>Face mode and edge mode differ in <strong>what a click picks</strong>, not in what gets cut. In face mode (<kbd>2</kbd>) you pick a flat panel of the brush; in edge mode (<kbd>4</kbd>) you pick one of the lines where two panels meet.</p>
+<p>An edge is already a cut: it's the seam between two faces. So edge mode never cuts <em>along</em> the edge you picked. Its buttons use that edge as a pointer:</p>
+<ul>
+  <li><strong>SPLIT EDGE</strong> adds a corner in the middle of that line. No new line appears; the two faces beside it just gain a corner each.</li>
+  <li><strong>LOOP CUT</strong> cuts <em>across</em> the edge: it slices the faces on both sides of it and keeps going around the shape. The new line crosses your edge at its middle.</li>
+  <li><strong>SELECT LOOP</strong> (or double-click) runs <em>along</em> the edge: it selects every corner on the line that continues straight on from it.</li>
+</ul>
+<p>Every cut in the brush editor cuts faces. Face mode says "cut this face"; edge mode says "cut the faces this edge runs between". On a cylinder, pick a vertical side edge and LOOP CUT gives a horizontal ring, because the ring has to cross that edge.</p>
+</div>
+
+<h2 id="parts">The three parts of a brush</h2>
+<p>Every brush is made of the same three things, and each select mode picks one of them.</p>
+<figure><svg viewBox="0 0 760 300" role="img" aria-label="A cube is 8 corners, 12 edges and 6 faces" font-size="13"><text x="24" y="30" font-size="15" font-weight="600" fill="var(--d-text-primary)">A cube is 8 corners, 12 edges and 6 faces</text><g><polygon points="220,250 360,250 360,130 220,130" fill="var(--d-chart-categorical-1)" fill-opacity="0.14" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="220,130 360,130 430,80 290,80" fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="360,250 430,200 430,80 360,130" fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><line x1="360" y1="130" x2="430" y2="80" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><circle cx="360" cy="250" r="7" fill="var(--d-chart-categorical-3)"></circle></g><g><line x1="196" y1="190" x2="256" y2="190" stroke="var(--d-chart-axis)" stroke-width="1"></line><text x="24" y="176" font-weight="600" fill="var(--d-text-primary)">Face (key 2)</text><text x="24" y="194" font-size="11.5" fill="var(--d-text-secondary)">a flat panel, outlined</text><text x="24" y="210" font-size="11.5" fill="var(--d-text-secondary)">by its edges</text></g><g><line x1="397" y1="103" x2="462" y2="66" stroke="var(--d-chart-axis)" stroke-width="1"></line><text x="470" y="62" font-weight="600" fill="var(--d-text-primary)">Edge (key 4)</text><text x="470" y="80" font-size="11.5" fill="var(--d-text-secondary)">the line where two faces meet:</text><text x="470" y="96" font-size="11.5" fill="var(--d-text-secondary)">a seam, already a cut</text></g><g><line x1="368" y1="252" x2="462" y2="262" stroke="var(--d-chart-axis)" stroke-width="1"></line><text x="470" y="258" font-weight="600" fill="var(--d-text-primary)">Corner / vertex (key 3)</text><text x="470" y="276" font-size="11.5" fill="var(--d-text-secondary)">a point where edges meet; the</text><text x="470" y="292" font-size="11.5" fill="var(--d-text-secondary)">spheres you drag in vertex mode</text></g></svg><figcaption>The three parts of a brush, on a cube.</figcaption></figure>
+<p>Faces are the panels you see and texture. Edges are the seams between them; each edge belongs to exactly two faces. Corners are where edges meet. A 16-sided cylinder has 32 corners, 48 edges and 18 faces (16 sides plus the two round caps).</p>
+
+<h2 id="modes">The four select modes</h2>
+<p>The number keys <kbd>1</kbd> to <kbd>4</kbd> choose what a click on the selected brush picks; the gizmo and the panel buttons then act on that pick.</p>
+<figure><svg viewBox="0 0 760 268" role="img" aria-label="Each select mode picks a different part of the brush" font-size="13"><text x="24" y="30" font-size="15" font-weight="600" fill="var(--d-text-primary)">Each select mode picks a different part of the brush</text><g><g><rect x="25" y="48" width="164" height="196" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><polygon points="55,178 125,178 125,108 55,108" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="55,108 125,108 160,83 90,83" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="125,178 160,153 160,83 125,108" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon></g><text x="107" y="210" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">1  Object</text><text x="107" y="228" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">the whole brush</text></g><g><g><rect x="207" y="48" width="164" height="196" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><polygon points="237,178 307,178 307,108 237,108" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="237,108 307,108 342,83 272,83" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="307,178 342,153 342,83 307,108" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon></g><text x="289" y="210" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">2  Face</text><text x="289" y="228" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">one panel</text></g><g><g><rect x="389" y="48" width="164" height="196" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><polygon points="419,178 489,178 489,108 419,108" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="419,108 489,108 524,83 454,83" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="489,178 524,153 524,83 489,108" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><circle cx="419" cy="178" r="4" fill="var(--d-chart-categorical-4)"></circle><circle cx="489" cy="178" r="6" fill="var(--d-chart-categorical-3)"></circle><circle cx="489" cy="108" r="4" fill="var(--d-chart-categorical-4)"></circle><circle cx="419" cy="108" r="4" fill="var(--d-chart-categorical-4)"></circle><circle cx="454" cy="83" r="4" fill="var(--d-chart-categorical-4)"></circle><circle cx="524" cy="83" r="6" fill="var(--d-chart-categorical-3)"></circle><circle cx="524" cy="153" r="4" fill="var(--d-chart-categorical-4)"></circle></g><text x="471" y="210" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">3  Vertex</text><text x="471" y="228" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">corners; Shift adds more</text></g><g><g><rect x="571" y="48" width="164" height="196" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><polygon points="601,178 671,178 671,108 601,108" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="601,108 671,108 706,83 636,83" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><polygon points="671,178 706,153 706,83 671,108" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></polygon><line x1="671" y1="108" x2="706" y2="83" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line></g><text x="653" y="210" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">4  Edge</text><text x="653" y="228" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">one seam</text></g></svg><figcaption>Select modes 1 to 4: what a click picks.</figcaption></figure>
+<table>
+  <tr><th>Key</th><th>Mode</th><th>A click picks</th><th>Dragging the gizmo moves</th><th>Panel buttons</th></tr>
+  <tr><td><kbd>1</kbd></td><td>Object</td><td>The whole brush</td><td>The whole shape (<kbd>T</kbd>/<kbd>R</kbd> to rotate)</td><td>Convert to Brush, Edit Brush</td></tr>
+  <tr><td><kbd>2</kbd></td><td>Face</td><td>One face (blue overlay)</td><td>That face, with its corners</td><td>SPLIT ─ │, LOOP CUT ─ │, INSET, EXTRUDE, RECESS, FLIP FOLD, per-face material</td></tr>
+  <tr><td><kbd>3</kbd></td><td>Vertex</td><td>One corner (a sphere); Shift-click adds or removes corners</td><td>One corner, or all selected corners together (<kbd>T</kbd>/<kbd>R</kbd>/<kbd>S</kbd>)</td><td>Corner x/y/z; with 2+ corners MOVE / ROTATE / SCALE, CLEAR SELECTION</td></tr>
+  <tr><td><kbd>4</kbd></td><td>Edge</td><td>The edge nearest where you clicked on a face (blue tube)</td><td>The edge's two corners</td><td>SPLIT EDGE, LOOP CUT, SELECT LOOP; double-click = SELECT LOOP</td></tr>
+</table>
+<p>In every mode, <kbd>Alt</kbd> while dragging turns snapping off, <kbd>Esc</kbd> cancels a drag, and <kbd>Cmd</kbd>+<kbd>Z</kbd> undoes a whole drag or button press in one step.</p>
+
+<h2 id="edge-mode">What edge mode cuts, if not faces</h2>
+<p>It does cut faces. The edge you pick decides <em>which</em> faces and in <em>which direction</em>, and each button reads it differently.</p>
+<figure><svg viewBox="0 0 760 330" role="img" aria-label="The picked edge is a pointer: LOOP CUT crosses it, SELECT LOOP follows it" font-size="13"><text x="24" y="30" font-size="15" font-weight="600" fill="var(--d-text-primary)">The picked edge is a pointer: LOOP CUT crosses it, SELECT LOOP follows it</text><g><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="16" y="52" width="232" height="228" rx="8" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="36" y="92" width="192" height="96"></rect><line x1="84" y1="92" x2="84" y2="188"></line><line x1="132" y1="92" x2="132" y2="188"></line><line x1="180" y1="92" x2="180" y2="188"></line></g><line x1="132" y1="92" x2="132" y2="188" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><circle cx="132" cy="140" r="6" fill="var(--d-chart-categorical-3)"></circle><text x="132" y="220" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">SPLIT EDGE</text><text x="132" y="240" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">adds one corner in the middle</text><text x="132" y="256" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">of the edge; no new line</text></g><g><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="264" y="52" width="232" height="228" rx="8" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="284" y="92" width="192" height="96"></rect><line x1="332" y1="92" x2="332" y2="188"></line><line x1="380" y1="92" x2="380" y2="188"></line><line x1="428" y1="92" x2="428" y2="188"></line></g><line x1="284" y1="140" x2="476" y2="140" stroke="var(--d-chart-categorical-3)" stroke-width="3"></line><line x1="380" y1="92" x2="380" y2="188" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><circle cx="380" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><text x="380" y="220" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">LOOP CUT</text><text x="380" y="240" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">cuts ACROSS the edge, through the</text><text x="380" y="256" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">faces on both sides and onward</text></g><g><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="512" y="52" width="232" height="228" rx="8" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="532" y="92" width="192" height="96"></rect><line x1="580" y1="92" x2="580" y2="188"></line><line x1="628" y1="92" x2="628" y2="188"></line><line x1="676" y1="92" x2="676" y2="188"></line><line x1="532" y1="140" x2="724" y2="140"></line></g><line x1="532" y1="140" x2="724" y2="140" stroke="var(--d-chart-categorical-3)" stroke-width="3"></line><line x1="580" y1="140" x2="628" y2="140" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><circle cx="532" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><circle cx="580" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><circle cx="628" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><circle cx="676" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><circle cx="724" cy="140" r="5" fill="var(--d-chart-categorical-3)"></circle><text x="628" y="220" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">SELECT LOOP</text><text x="628" y="240" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">runs ALONG the edge, selecting</text><text x="628" y="256" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">every corner on its line</text></g><g><line x1="24" y1="306" x2="44" y2="306" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><text x="52" y="310" font-size="11.5" fill="var(--d-text-secondary)">the edge you picked</text><line x1="200" y1="306" x2="220" y2="306" stroke="var(--d-chart-categorical-3)" stroke-width="3"></line><text x="228" y="310" font-size="11.5" fill="var(--d-text-secondary)">what the button adds or selects</text><text x="470" y="310" font-size="11.5" fill="var(--d-text-secondary)">strip = four sides of a cylinder, unrolled</text></g></svg><figcaption>Edge mode's three buttons on one picked edge.</figcaption></figure>
+<ul>
+  <li><strong>Across vs along.</strong> LOOP CUT treats your edge as a rail it has to cross, so its new line runs at right angles to the edge. SELECT LOOP treats your edge as the first step of a line and follows it. Same edge, perpendicular results.</li>
+  <li><strong>Why a vertical edge gives a horizontal ring.</strong> On a cylinder, the vertical side edges are the rails. A loop cut crosses each rail once at its middle, so the new vertices land at half height, all the way round.</li>
+  <li><strong>Face mode gets there too.</strong> LOOP CUT ─ on a side face makes the same horizontal ring; the face and the ─ / │ choice replace the edge as the pointer.</li>
+  <li><strong>SPLIT EDGE is the only one that works on the edge itself.</strong> It adds a corner to the existing seam. The faces on both sides gain that corner but no new edge crosses them, so they become five-sided.</li>
+</ul>
+
+<h2 id="ops">Every operation, before and after</h2>
+<p>Six buttons change a brush's shape; all but SPLIT EDGE work on faces, and all are one undo step.</p>
+<figure><svg viewBox="0 0 760 432" role="img" aria-label="What each button does to the brush, before and after" font-size="13"><defs><marker id="ops-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--d-chart-axis)"></path></marker></defs><text x="24" y="30" font-size="15" font-weight="600" fill="var(--d-text-primary)">What each button does to the brush, before and after</text><g><rect x="16" y="52" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="46" y="74" width="60" height="60" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="120" y1="104" x2="148" y2="104" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><rect x="162" y="74" width="60" height="60" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="162" y1="104" x2="222" y2="104" stroke="var(--d-chart-categorical-3)" stroke-width="3"></line><text x="132" y="170" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">SPLIT ─ / │</text><text x="132" y="188" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">one face becomes two</text></g><g><rect x="264" y="52" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="288" y="86" width="48" height="48"></rect><polygon points="288,86 336,86 358,70 310,70"></polygon><polygon points="336,86 358,70 358,118 336,134"></polygon></g><line x1="368" y1="104" x2="396" y2="104" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="404" y="86" width="48" height="48"></rect><polygon points="404,86 452,86 474,70 426,70"></polygon><polygon points="452,86 474,70 474,118 452,134"></polygon><polyline points="404,110 452,110 474,94" stroke="var(--d-chart-categorical-3)" stroke-width="3"></polyline></g><text x="380" y="170" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">LOOP CUT</text><text x="380" y="188" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">a split carried all the way round</text></g><g><rect x="512" y="52" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="542" y="74" width="60" height="60" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="616" y1="104" x2="644" y2="104" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><rect x="658" y="74" width="60" height="60" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><g stroke="var(--d-chart-categorical-3)" stroke-width="2" fill="none"><rect x="672" y="88" width="32" height="32"></rect><line x1="658" y1="74" x2="672" y2="88"></line><line x1="718" y1="74" x2="704" y2="88"></line><line x1="658" y1="134" x2="672" y2="120"></line><line x1="718" y1="134" x2="704" y2="120"></line></g><text x="628" y="170" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">INSET</text><text x="628" y="188" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">a smaller face inside a border</text></g><g><rect x="16" y="228" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="46" y="250" width="60" height="60" fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="106" y1="250" x2="106" y2="310" stroke="var(--d-chart-categorical-1)" stroke-width="4"></line><line x1="120" y1="280" x2="148" y2="280" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><rect x="152" y="250" width="60" height="60" fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><rect x="212" y="250" width="18" height="60" fill="var(--d-chart-categorical-3)" fill-opacity="0.2" stroke="var(--d-chart-categorical-3)" stroke-width="2"></rect><line x1="230" y1="250" x2="230" y2="310" stroke="var(--d-chart-categorical-1)" stroke-width="4"></line><text x="132" y="346" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">EXTRUDE / RECESS</text><text x="132" y="364" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">side view: the face (blue) moves out or in</text></g><g><rect x="264" y="228" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="294" y="250" width="60" height="60" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="354" y1="250" x2="354" y2="310" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><line x1="368" y1="280" x2="396" y2="280" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><rect x="410" y="250" width="60" height="60" fill="none" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="470" y1="250" x2="470" y2="310" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><circle cx="470" cy="280" r="6" fill="var(--d-chart-categorical-3)"></circle><text x="380" y="346" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">SPLIT EDGE</text><text x="380" y="364" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">a new corner, no new line</text></g><g><rect x="512" y="228" width="232" height="160" rx="8" fill="none" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="542" y="250" width="60" height="60" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="542" y1="310" x2="602" y2="250" stroke="var(--d-text-primary)" stroke-width="1.5" stroke-dasharray="5 4"></line><line x1="616" y1="280" x2="644" y2="280" stroke="var(--d-chart-axis)" stroke-width="1.25" marker-end="url(#ops-arrow)"></line><rect x="658" y="250" width="60" height="60" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)" stroke-width="1.25"></rect><line x1="658" y1="250" x2="718" y2="310" stroke="var(--d-text-primary)" stroke-width="1.5" stroke-dasharray="5 4"></line><text x="628" y="346" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">FLIP FOLD</text><text x="628" y="364" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">a bent face creases the other way</text></g><g><rect x="24" y="406" width="16" height="12" fill="var(--d-chart-categorical-1)" fill-opacity="0.16" stroke="var(--d-chart-axis)"></rect><text x="48" y="416" font-size="11.5" fill="var(--d-text-secondary)">selected face</text><line x1="170" y1="412" x2="190" y2="412" stroke="var(--d-chart-categorical-2)" stroke-width="4"></line><text x="198" y="416" font-size="11.5" fill="var(--d-text-secondary)">selected edge</text><line x1="320" y1="412" x2="340" y2="412" stroke="var(--d-chart-categorical-3)" stroke-width="3"></line><text x="348" y="416" font-size="11.5" fill="var(--d-text-secondary)">what the button adds</text></g></svg><figcaption>Six brush operations, before and after.</figcaption></figure>
+<table>
+  <tr><th>Button</th><th>Mode</th><th>What it does</th><th>Faces added</th></tr>
+  <tr><td>SPLIT ─ / │</td><td>Face</td><td>Cuts the face in two between the middles of two opposite sides; neighbours gain the new corners so no gap opens</td><td>1</td></tr>
+  <tr><td>LOOP CUT ─ / │</td><td>Face</td><td>The same split, repeated around the shape until the ring closes or reaches a face that isn't four-sided</td><td>1 per face crossed</td></tr>
+  <tr><td>LOOP CUT</td><td>Edge</td><td>The ring that crosses the picked edge</td><td>1 per face crossed</td></tr>
+  <tr><td>INSET</td><td>Face</td><td>Shrinks the face 0.25 m inward and surrounds it with a border of four-sided faces</td><td>1 per corner (4 on a square)</td></tr>
+  <tr><td>EXTRUDE / RECESS</td><td>Face</td><td>Moves the face 0.25 m out or in and fills the gap with side faces</td><td>1 per corner</td></tr>
+  <tr><td>SPLIT EDGE</td><td>Edge</td><td>A corner in the middle of the picked edge; both faces beside it gain it</td><td>0</td></tr>
+  <tr><td>FLIP FOLD</td><td>Face (bent, four-sided)</td><td>Creases the face along its other diagonal</td><td>0</td></tr>
+  <tr><td>SELECT LOOP / SELECT RING</td><td>Edge / after a loop cut</td><td>Selects corners to move, rotate or scale; changes nothing by itself</td><td>0</td></tr>
+</table>
+<p>SPLIT and LOOP CUT need a face with four real corners. A point sitting straight along a side (left there by a neighbour's split) doesn't count as a corner.</p>
+
+<h2 id="walkthrough">Walkthrough: a bulge around a cylinder</h2>
+<p>Five steps turn a plain cylinder brush into a bulged one; the screenshots are from the editor on a 16-sided cylinder.</p>
+<ol>
+  <li>Select the cylinder, press <kbd>2</kbd> (Face mode) and click one of its side faces.</li>
+  <li>Hover <strong>LOOP CUT ─</strong>: a dashed ring shows where the cut will go. Click it: the ring becomes real edges, and the panel says "Cut 16 faces, ring closed."</li>
+  <li>Click <strong>SELECT RING</strong> next to that line. The editor switches to vertex mode with the 16 new corners selected, drawn in cyan and joined by a cyan line.</li>
+  <li>Press <kbd>S</kbd> (or the SCALE button) and drag the gizmo's center box: right or up grows the ring, left or down shrinks it. The coloured end boxes scale along one axis only.</li>
+  <li><kbd>T</kbd> moves the ring (up and down gives a higher or lower bulge), <kbd>R</kbd> tilts it. Each drag is one <kbd>Cmd</kbd>+<kbd>Z</kbd>.</li>
+</ol>
+<figure><img src="img/brush-editing/loop-cut.png" alt="Hovering LOOP CUT shows a dashed ring; clicking it cuts the ring"><figcaption>Hovering LOOP CUT shows a dashed ring (left); clicking it cuts the ring (right).</figcaption></figure>
+<figure><img src="img/brush-editing/ring-scale.png" alt="SELECT RING selects the 16 new corners; S and a drag scales them out into a bulge"><figcaption>SELECT RING selects the 16 new corners (left); <kbd>S</kbd> and a drag scales them out into a bulge (right).</figcaption></figure>
+<p>A ring stops early, and the note says where, when it reaches:</p>
+<ul>
+  <li>a face that isn't four-sided (a cylinder's round cap, a triangle);</li>
+  <li>a face whose side doesn't line up with the ring, because it was split differently;</li>
+  <li>a point where an earlier split already meets the ring's path.</li>
+</ul>
+<p>That's why <strong>LOOP CUT │</strong> on a cylinder side cuts only that one column: it runs up the side and stops at both caps.</p>
+
+<h2 id="folds">Bent faces and folds</h2>
+<p>A four-sided face whose corners stop lying flat has to crease along one of its two diagonals; the editor picks the one that bulges outward, and FLIP FOLD picks the other.</p>
+<figure><svg viewBox="0 0 760 392" role="img" aria-label="Pulling the center out: the old crease went two ways, the automatic fold goes one" font-size="13"><text x="24" y="30" font-size="15" font-weight="600" fill="var(--d-text-primary)">Pulling the center out: the old crease went two ways, the automatic fold goes one</text><g><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="24" y="48" width="340" height="300" rx="8" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="104" y="70" width="180" height="180"></rect><line x1="194" y1="70" x2="194" y2="250"></line><line x1="104" y1="160" x2="284" y2="160"></line></g><line x1="104" y1="160" x2="194" y2="70" stroke="var(--d-chart-categorical-2)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="194" y1="160" x2="284" y2="70" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="104" y1="250" x2="194" y2="160" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="194" y1="250" x2="284" y2="160" stroke="var(--d-chart-categorical-2)" stroke-width="2.5" stroke-dasharray="7 5"></line><circle cx="194" cy="160" r="7" fill="var(--d-chart-categorical-3)"></circle><text x="194" y="290" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">Before v4.93: every crease the same slant</text><text x="194" y="310" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">2 quarters fold through the pulled point, 2 beside it</text></g><g><g fill="none" stroke="var(--d-chart-axis)" stroke-width="1.25"><rect x="396" y="48" width="340" height="300" rx="8" stroke="var(--d-chart-grid)" stroke-width="1"></rect><rect x="476" y="70" width="180" height="180"></rect><line x1="566" y1="70" x2="566" y2="250"></line><line x1="476" y1="160" x2="656" y2="160"></line></g><line x1="476" y1="70" x2="566" y2="160" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="566" y1="160" x2="656" y2="70" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="476" y1="250" x2="566" y2="160" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><line x1="566" y1="160" x2="656" y2="250" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><circle cx="566" cy="160" r="7" fill="var(--d-chart-categorical-3)"></circle><text x="566" y="290" text-anchor="middle" font-weight="600" fill="var(--d-text-primary)">Now: automatic fold bulges outward</text><text x="566" y="310" text-anchor="middle" font-size="11.5" fill="var(--d-text-secondary)">all 4 quarters fold through the pulled point: a tent</text></g><g><circle cx="32" cy="370" r="6" fill="var(--d-chart-categorical-3)"></circle><text x="46" y="374" font-size="11.5" fill="var(--d-text-secondary)">corner pulled toward you</text><line x1="210" y1="370" x2="232" y2="370" stroke="var(--d-chart-categorical-1)" stroke-width="2.5" stroke-dasharray="7 5"></line><text x="240" y="374" font-size="11.5" fill="var(--d-text-secondary)">crease through the pulled corner</text><line x1="470" y1="370" x2="492" y2="370" stroke="var(--d-chart-categorical-2)" stroke-width="2.5" stroke-dasharray="7 5"></line><text x="500" y="374" font-size="11.5" fill="var(--d-text-secondary)">crease beside it</text></g></svg><figcaption>A face split into four, center corner pulled out, seen from the front.</figcaption></figure>
+<ul>
+  <li><strong>Why it creases.</strong> The screen draws every face as triangles, and a four-sided face is two triangles sharing a diagonal. While the face is flat that diagonal is invisible; once a corner moves off the plane, the face bends along it.</li>
+  <li><strong>The automatic choice.</strong> Pull a corner out and the crease runs through it (the tent above). Push it in and the crease runs beside it instead, giving a diamond-shaped dent. Flat faces look exactly as before.</li>
+  <li><strong>FLIP FOLD</strong> (Face mode, only on a bent four-sided face) switches that face to its other diagonal. The selected face shows its crease as a white dashed line, and the note under the buttons says "automatic" or "flipped". Flipping back to the automatic one clears the override.</li>
+  <li><strong>The texture shows it more than the shading.</strong> Each face keeps one lighting direction, so the crease is easiest to see where the texture's grid lines bend.</li>
+  <li>Faces with five or more corners (from an earlier SPLIT next door) keep the plain crease, and FLIP FOLD is greyed out on them.</li>
+</ul>
+
+<h2 id="reference">Quick reference</h2>
+<p>The same list lives in the top bar's <kbd>?</kbd> menu under BRUSH EDITING; inside Edit Brush that menu shows only camera and brush controls.</p>
+<table>
+  <tr><th>Input</th><th>Where</th><th>Does</th></tr>
+  <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Any brush</td><td>Object / Face / Vertex / Edge mode</td></tr>
+  <tr><td>Click</td><td>Face, Vertex, Edge mode</td><td>Picks a face / corner / nearest edge</td></tr>
+  <tr><td><kbd>Shift</kbd>+click a corner</td><td>Vertex mode</td><td>Adds or removes it from the selection</td></tr>
+  <tr><td>Double-click an edge</td><td>Edge mode</td><td>Selects every corner along its line</td></tr>
+  <tr><td>Drag the gizmo</td><td>Any mode</td><td>Moves the pick (snaps 0.25 m)</td></tr>
+  <tr><td><kbd>T</kbd> <kbd>R</kbd> <kbd>S</kbd></td><td>2+ corners selected</td><td>Move / rotate / scale them together (snaps 0.25 m / 15° / 0.1)</td></tr>
+  <tr><td><kbd>Alt</kbd> (held)</td><td>While dragging</td><td>No snapping</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>While dragging</td><td>Cancels, puts everything back</td></tr>
+  <tr><td>Right-click a corner</td><td>Vertex mode</td><td>Deletes it (a brush keeps at least 4)</td></tr>
+  <tr><td><kbd>Cmd</kbd>+<kbd>Z</kbd> / <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Anywhere</td><td>Undo / redo one drag or button</td></tr>
+  <tr><td>Edit Brush</td><td>Object mode panel</td><td>Opens the brush alone; Save or Cancel in the amber bar</td></tr>
+</table>
+</main>
+</body>
+</html>

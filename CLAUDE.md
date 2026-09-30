@@ -92,6 +92,7 @@ Only `CLAUDE.md` is auto-loaded. Everything else lives in these docs — read th
 | Performance / framerate | `PROFILING.md` |
 | A specific feature area | Its guide: `AUDIO.md`, `CHARACTER_GUIDE.md`, `COLLIDERS_GUIDE.md`, `DIALOGUES_GUIDE.md`, `GAMEPLAY_STATE.md`, `GUI_GUIDE.md`, `HAZARDS_GUIDE.md`, `OBJECT_SCRIPTS_GUIDE.md`, `PREFABS_GUIDE.md`, `STATE_ITEMS_GUIDE.md` |
 | Planning a new phase | Existing plans in `plans/` (match their style); `PLAN_UPDATE_GUIDE.md` for the arch-doc update rule |
+| User-facing guides (in-app HTML, opened from the ? menu) | `public/docs/README.md` (convention + list); update a guide's page when its feature changes |
 
 ---
 
