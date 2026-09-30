@@ -191,6 +191,9 @@ export class GizmoManager implements IEditorModule {
         if (!this._controls || (this._selId === null && !this._groupMode)) return;
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
         if (this._groupMode) return;  // group is translate-only — ignore T/R/S mode switches
+        // Suspended (a brush sub-object gizmo is active, e.g. the Phase 80 vertex-set
+        // gizmo, which uses the same keys): don't silently change this hidden gizmo's mode.
+        if (this._suspends.size > 0) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
         if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "ladder" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape")) {
           this._controls.setMode("rotate");

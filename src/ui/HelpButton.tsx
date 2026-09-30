@@ -56,6 +56,9 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Alt"],               action: "Free drag (no snap)" },
       { keys: ["Esc"],               action: "Cancel drag, restore geometry" },
       { keys: ["RMB click corner"],  action: "Delete that corner (keeps at least 4)" },
+      { keys: ["Shift+LMB corner"],  action: "Vertex mode: add / remove a corner from the selection" },
+      { keys: ["Dbl-click edge"],    action: "Edge mode: select every corner along that edge's loop" },
+      { keys: ["T", "R", "S"],       action: "2+ corners selected: move / rotate / scale them together (snaps 0.25 / 15° / 0.1)" },
       { keys: ["Panel: SPLIT ─ │"],  action: "Split the selected face into two" },
       { keys: ["Panel: LOOP CUT ─ │"], action: "Split the selected face and keep going around the shape (hover to preview the ring)" },
       { keys: ["Panel: INSET"],      action: "Inset a smaller face inside the selected one" },
@@ -63,6 +66,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Panel: SPLIT EDGE"], action: "Insert a vertex at the edge midpoint" },
       { keys: ["Panel: LOOP CUT"],   action: "Edge mode: cut a ring of edges around the shape, crossing the selected edge" },
       { keys: ["Panel: FLIP FOLD"],  action: "A bent face creases along the dashed line; flip it to the other diagonal" },
+      { keys: ["Panel: SELECT LOOP"], action: "Edge mode: select the corners along the selected edge's loop" },
+      { keys: ["Panel: SELECT RING"], action: "After a loop cut: select the new ring's corners" },
     ],
   },
 ];

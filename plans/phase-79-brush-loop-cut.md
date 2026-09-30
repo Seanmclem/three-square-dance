@@ -1,7 +1,10 @@
 # Phase 79 · Brush loop cut
 
-> Status: **PLANNED**. Numbered 79 because Phase 78 (isolated brush edit mode) is the
-> latest shipped phase; renumber if something else lands first.
+> Status: **IMPLEMENTED**, shipped as v4.94.0 (2026-09-30); see
+> `test-plans/phase-79-brush-loop-cut.md`. Built as planned. Also in that release: the
+> ? help menu lists the new ops and, inside the brush editor, shows only CAMERA and
+> BRUSH EDITING (user request); the top bar moved above the amber edit bar so its
+> popups aren't covered.
 
 A **loop cut** adds a new ring of edges and vertices all the way around a face-brush:
 around the middle of a cylinder, or around the four sides of a cube. It is what

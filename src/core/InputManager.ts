@@ -131,7 +131,10 @@ export class InputManager implements IEditorModule {
   private _handleMouseDown(e: MouseEvent): void {
     this._mouseDownScreenPos = { x: e.clientX, y: e.clientY };
     if (this._suppress) return;
-    this._bus.emit("input:mousedown", { button: e.button, screenPos: { x: e.clientX, y: e.clientY } });
+    this._bus.emit("input:mousedown", {
+      button: e.button, screenPos: { x: e.clientX, y: e.clientY },
+      shift: e.shiftKey, ctrl: e.ctrlKey, meta: e.metaKey,
+    });
   }
 
   private _handleMouseMove(e: MouseEvent): void {

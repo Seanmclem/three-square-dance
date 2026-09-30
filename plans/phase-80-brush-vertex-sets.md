@@ -1,7 +1,20 @@
 # Phase 80 · Brush vertex sets: loop select, then move / rotate / scale them together
 
-> Status: **PLANNED**. Follow-up to Phase 79 (loop cut); numbered 80 on the
-> assumption 79 ships first. Renumber if something else lands in between.
+> Status: **IMPLEMENTED**, shipped as v4.95.0 (2026-09-30); see
+> `test-plans/phase-80-brush-vertex-sets.md`. Deviations found while testing:
+> - **Uniform scale** (the gizmo's center box) follows the screen-space drag instead of
+>   TransformControls' own ratio: the box sits at the pivot, so its ratio divides by
+>   almost zero (measured: a ring of radius 1 went to 2e14). Every scale factor is also
+>   capped at 20.
+> - **Validation runs after every set drag**, move included (cheap, and safer than the
+>   planned rotate/scale only).
+> - **Trigger volumes are not picked in vertex mode**: a Shift-click on a corner added
+>   the level's kill-floor volume to the selection.
+> - **The object gizmo ignores T/R/S while suspended**, so the set gizmo's keys can't
+>   silently change its hidden mode.
+> - Shift-click never toggles the object because `SelectionManager._onClick` ignores
+>   additive clicks in vertex mode, not through the planned "handled" flag.
+> - The set card says "N CORNERS SELECTED" without the planned "(loop)" tag.
 
 Phase 79 adds a ring of new vertices around a brush, but the editor selects one vertex,
 edge or face at a time, so shaping that ring (a bulge, a waist, a tilted rim) means

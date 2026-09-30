@@ -31,6 +31,8 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _edgeTube:  THREE.Mesh | null = null;
   private _loop: { zoneId: string; shapeId: string; start: LoopCutStart } | null = null;
   private _loopObj:   THREE.Group | null = null;
+  private _vset: { zoneId: string; shapeId: string; verts: number[] } | null = null;   // Phase 80
+  private _setLines:  THREE.LineSegments | null = null;
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -52,10 +54,13 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._selEdge = (payload.type === "shape" && payload.edgeVerts !== undefined)
           ? { zoneId: payload.zoneId, shapeId: payload.id, edge: payload.edgeVerts }
           : null;
+        this._vset = (payload.type === "shape" && (payload.vertexSet?.length ?? 0) > 1)
+          ? { zoneId: payload.zoneId, shapeId: payload.id, verts: payload.vertexSet! }
+          : null;
         this._refresh();
       }),
       this._bus.on("object:deselected", () => {
-        this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._loop = null;
+        this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._loop = null; this._vset = null;
         this._refresh();
         this._refreshLoop();
       }),
@@ -79,7 +84,7 @@ export class BrushFaceHighlighter implements IEditorModule {
         if (this._selEdge?.shapeId === id) this._selEdge = null;
         this._refresh();
       }),
-      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); }),
+      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); this._clearSetLines(); }),
       this._bus.on("preview:stop",  () => this._refresh()),
     );
   }
@@ -93,6 +98,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clear("hover");
     this._clearEdges();
     this._clearEdgeTube();
+    this._clearSetLines();
     this._loop = null;
     this._refreshLoop();
   }
@@ -152,7 +158,16 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._loopObj = group;
   }
 
+  private _clearSetLines(): void {
+    if (!this._setLines) return;
+    this._scene.remove(this._setLines);
+    this._setLines.geometry.dispose();
+    (this._setLines.material as THREE.Material).dispose();
+    this._setLines = null;
+  }
+
   private _refresh(): void {
+    this._clearSetLines();
     this._clear("sel");
     this._clear("hover");
     this._clearEdges();
@@ -166,6 +181,34 @@ export class BrushFaceHighlighter implements IEditorModule {
       this._edgeLines = this._buildEdges(this._shape);
     }
     if (this._selEdge) this._edgeTube = this._buildEdgeTube(this._selEdge);
+    if (this._vset && this._tool === "select-vertex") this._setLines = this._buildSetLines(this._vset);
+  }
+
+  /** Phase 80: cyan lines along every edge whose both ends are in the vertex set, so a
+   *  selected loop reads as a ring rather than a scatter of corners. */
+  private _buildSetLines(t: { zoneId: string; shapeId: string; verts: number[] }): THREE.LineSegments | null {
+    const shape = this._world.zones.get(t.zoneId)?.shapes?.find(s => s.id === t.shapeId) as ShapeDef | undefined;
+    if (!shape?.mesh?.faces) return null;
+    const verts = shape.mesh.vertices, inSet = new Set(t.verts), seen = new Set<string>();
+    const pos: number[] = [];
+    for (const f of shape.mesh.faces) f.verts.forEach((a, i) => {
+      const b = f.verts[(i + 1) % f.verts.length]!;
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      if (!inSet.has(a) || !inSet.has(b) || seen.has(k)) return;
+      seen.add(k);
+      pos.push(verts[a]!.x, verts[a]!.y, verts[a]!.z, verts[b]!.x, verts[b]!.y, verts[b]!.z);
+    });
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x00ffff, depthTest: false, transparent: true }));
+    lines.renderOrder = 4;
+    const D2R = Math.PI / 180;
+    lines.position.set(shape.position.x, shape.position.y, shape.position.z);
+    lines.rotation.set(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R);
+    lines.userData = { selectable: false, editorOnly: true, hideInGame: true };
+    this._scene.add(lines);
+    return lines;
   }
 
   private _clearEdges(): void {

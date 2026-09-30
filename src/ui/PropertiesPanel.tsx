@@ -15,7 +15,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, type LoopCutRing } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, type LoopCutRing } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2575,6 +2575,24 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   );
 }
 
+/** Loop cut result line + (Phase 80) SELECT RING, which selects the new ring's corners. */
+function LoopCutNote({ note, selected, bus }: {
+  note: { text: string; ringVerts: number[] }; selected: SelectedObjectPayload; bus?: EventBus;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ color: "#c2cadb", fontSize: 9, flex: 1 }}>{note.text}</span>
+      {note.ringVerts.length > 1 && (
+        <button style={{ ...OP_BTN, flex: "none", padding: "3px 8px" }}
+          title="Select the new ring's corners, then move / rotate / scale them together"
+          onClick={() => bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: note.ringVerts })}>
+          SELECT RING
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** One line saying how a loop cut went, e.g. "Cut 16 faces, ring closed." */
 function describeLoopCut(ring: LoopCutRing): string {
   const n = `Cut ${ring.faces.length} face${ring.faces.length === 1 ? "" : "s"}`;
@@ -2595,7 +2613,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
   onObjectUpdate: (c: Partial<WorldObject>) => void;
 }) {
   // Loop cut result line; the row remounts per selected face, so it clears itself.
-  const [loopNote, setLoopNote] = useState<string | null>(null);
+  const [loopNote, setLoopNote] = useState<{ text: string; ringVerts: number[] } | null>(null);
   const face = shape.mesh!.faces![faceIndex];
   if (!face) return null;
   // Four REAL corners: straight-through verts left on an edge by a neighbor's
@@ -2640,9 +2658,9 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
   // previews the ring in the canvas.
   const loop = (pair: 0 | 1) => {
     const r = loopCut(shape.mesh!, { faceIdx: faceIndex, pair });
-    if (!r) { setLoopNote("Loop cut failed; nothing changed."); return; }
+    if (!r) { setLoopNote({ text: "Loop cut failed; nothing changed.", ringVerts: [] }); return; }
     onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
-    setLoopNote(describeLoopCut(r.ring));
+    setLoopNote({ text: describeLoopCut(r.ring), ringVerts: r.ringVerts });
   };
   const preview = (pair: 0 | 1 | null) => bus?.emit("shape:loop-preview", {
     zoneId: selected.zoneId, shapeId: selected.id, start: pair === null ? null : { faceIdx: faceIndex, pair },
@@ -2690,7 +2708,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>
       )}
-      {loopNote && <div style={{ color: "#c2cadb", fontSize: 9 }}>{loopNote}</div>}
+      {loopNote && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
       {bent && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>
           Bent face: creases along the dashed line ({flipped ? "flipped" : "automatic, bulges outward"}).
@@ -2805,6 +2823,25 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
   }, [sel, selected.id, verts[sel ?? -1]?.x, verts[sel ?? -1]?.y, verts[sel ?? -1]?.z]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (i: number) => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: i });
+  // Phase 80 vertex set: 2+ corners share one gizmo (BrushSetEditor).
+  const set = selected.vertexSet ?? [];
+  const [setMode, setSetMode] = useState<"translate" | "rotate" | "scale">("translate");
+  const [refused, setRefused] = useState<string | null>(null);
+  useEffect(() => {
+    if (!bus) return;
+    const offs = [
+      bus.on("shape:set-gizmo-mode", ({ mode }) => setSetMode(mode)),
+      bus.on("shape:vertex-set-refused", ({ reason }) => setRefused(reason)),
+    ];
+    return () => offs.forEach(off => off());
+  }, [bus]);
+  useEffect(() => setRefused(null), [set.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  const center = set.length > 1 ? {
+    x: set.reduce((n, i) => n + (verts[i]?.x ?? 0), 0) / set.length,
+    y: set.reduce((n, i) => n + (verts[i]?.y ?? 0), 0) / set.length,
+    z: set.reduce((n, i) => n + (verts[i]?.z ?? 0), 0) / set.length,
+  } : null;
+  const clearSet = () => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: null, vertexSet: [] });
   const commitAxis = (axis: "x" | "y" | "z", val: string) => {
     if (sel === null) return;
     const n = parseFloat(val);
@@ -2815,9 +2852,28 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
 
   return (
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={LABEL}>CORNERS — click a row or a sphere in the canvas</div>
+      {center && (
+        <div style={{ border: "1px solid rgba(0,255,255,0.4)", borderRadius: 5, background: "rgba(0,255,255,0.06)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
+          <span style={{ color: "#7ff", fontSize: 11, fontFamily: "monospace" }}>{set.length} CORNERS SELECTED</span>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["translate", "MOVE", "T"], ["rotate", "ROTATE", "R"], ["scale", "SCALE", "S"]] as const).map(([mode, label, key]) => (
+              <button key={mode} title={`${label.toLowerCase()} the selected corners together (${key})`}
+                onClick={() => bus?.emit("shape:set-gizmo-mode", { mode })}
+                style={{ ...OP_BTN, ...(setMode === mode ? { background: "rgba(0,255,255,0.18)", color: "#7ff", borderColor: "rgba(0,255,255,0.5)" } : {}) }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
+            center ({center.x.toFixed(2)}, {center.y.toFixed(2)}, {center.z.toFixed(2)})
+          </div>
+          <button style={OP_BTN} onClick={clearSet}>CLEAR SELECTION</button>
+          {refused && <div style={{ color: "#ffb86b", fontSize: 10 }}>{refused}</div>}
+        </div>
+      )}
+      <div style={LABEL}>CORNERS — click a row or a sphere; Shift-click adds or removes</div>
       {verts.map((v, i) => {
-        const isSel = i === sel;
+        const isSel = i === sel || set.includes(i);
         return (
           <div key={i} style={{
             border: isSel ? "1px solid rgba(0,255,255,0.4)" : "1px solid rgba(255,255,255,0.07)",
@@ -2828,7 +2884,7 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
               <span style={{ color: isSel ? "#7ff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>V{i + 1}</span>
               <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>({v.x}, {v.y}, {v.z})</span>
             </button>
-            {isSel && (
+            {i === sel && set.length <= 1 && (
               <div style={{ display: "flex", gap: 4, padding: "2px 8px 8px" }}>
                 {(["x", "y", "z"] as const).map(axis => (
                   <div key={axis} style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 4, padding: "2px 6px" }}>
@@ -2867,7 +2923,7 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
   const b = edge ? verts[edge[1]] : undefined;
   // Loop cut result line, tied to the edge selected after the cut (so the cut's own
   // re-select keeps it; picking any other edge hides it).
-  const [loopNote, setLoopNote] = useState<{ text: string; key: string } | null>(null);
+  const [loopNote, setLoopNote] = useState<{ text: string; key: string; ringVerts: number[] } | null>(null);
   const edgeKey = edge ? `${selected.id}:${edge[0]}|${edge[1]}` : "";
   const canLoop = !!edge && !!loopCutRing(shape.mesh!, { edge });
 
@@ -2883,13 +2939,20 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
     });
   };
 
+  // Phase 80: the corners along this edge's loop → vertex mode with them selected.
+  const selectLoop = () => {
+    if (!edge) return;
+    const l = edgeLoop(shape.mesh!, edge);
+    if (l) bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: l.verts });
+  };
+
   // Loop cut (Phase 79) of the ring crossing this edge. If the cut split the edge
   // itself, re-select its surviving half (like SPLIT EDGE) so the gizmo stays live.
   const doLoopCut = () => {
     if (!edge) return;
     bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null });
     const r = loopCut(shape.mesh!, { edge });
-    if (!r) { setLoopNote({ text: "Loop cut failed; nothing changed.", key: edgeKey }); return; }
+    if (!r) { setLoopNote({ text: "Loop cut failed; nothing changed.", key: edgeKey, ringVerts: [] }); return; }
     onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
     const hasEdge = (p: number, q: number) => r.mesh.faces.some(f => f.verts.some((v, i) => {
       const w = f.verts[(i + 1) % f.verts.length]!;
@@ -2902,7 +2965,7 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
       key = `${selected.id}:${half[0]}|${half[1]}`;
       bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: null, edge: half });
     }
-    setLoopNote({ text: describeLoopCut(r.ring), key });
+    setLoopNote({ text: describeLoopCut(r.ring), key, ringVerts: r.ringVerts });
   };
 
   return (
@@ -2930,7 +2993,11 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
             onMouseLeave={() => bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null })}>
             LOOP CUT
           </button>
-          {loopNote?.key === edgeKey && <div style={{ color: "#c2cadb", fontSize: 9 }}>{loopNote.text}</div>}
+          {loopNote?.key === edgeKey && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
+          <button style={OP_BTN} onClick={selectLoop}
+            title="Select every corner along this edge's loop, then move / rotate / scale them together (or double-click an edge)">
+            SELECT LOOP
+          </button>
         </div>
       )}
       <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>

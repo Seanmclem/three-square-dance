@@ -44,6 +44,8 @@ export class BrushVertexEditor implements IEditorModule {
 
   // Vertex-mode extras (Phase 23): selected vertex + its 3-axis gizmo.
   private _selectedVertex: number | null = null;
+  // Phase 80: every selected corner (Shift-click set). 2+ → BrushSetEditor owns the gizmo.
+  private _set: number[] = [];
   private _suspended = false;
   private _controls: TransformControls | null = null;
   private readonly _proxy = new THREE.Group();
@@ -97,6 +99,9 @@ export class BrushVertexEditor implements IEditorModule {
         this._selectedId = payload.type === "shape" ? payload.id : null;
         this._zoneId = payload.zoneId;
         this._selectedVertex = payload.type === "shape" ? (payload.vertexIndex ?? null) : null;
+        this._set = payload.type === "shape"
+          ? (payload.vertexSet ?? (payload.vertexIndex !== undefined ? [payload.vertexIndex] : []))
+          : [];
         this._sync();
       }),
       this._bus.on("object:deselected", () => { this._selectedId = null; this._sync(); }),
@@ -116,8 +121,9 @@ export class BrushVertexEditor implements IEditorModule {
         if (!this._shouldShow() || this._gizmoActive) return;
         this._onHover(screenPos);
       }),
-      this._bus.on("input:mousedown", ({ button, screenPos }) => {
+      this._bus.on("input:mousedown", ({ button, screenPos, shift }) => {
         if (button !== 0 || !this._shouldShow() || this._gizmoActive) return;
+        if (shift) { this._toggleInSet(screenPos); return; }
         this._onMouseDown(screenPos);
       }),
       this._bus.on("input:mouseup", ({ button }) => {
@@ -215,11 +221,11 @@ export class BrushVertexEditor implements IEditorModule {
     for (let i = 0; i < verts.length; i++) {
       this._handles[i]!.position.set(verts[i]!.x, verts[i]!.y, verts[i]!.z).applyMatrix4(m);
       const mat = this._handles[i]!.material as THREE.MeshBasicMaterial;
-      mat.color.setHex(i === this._selectedVertex ? COLOR_SELECT : COLOR);
+      mat.color.setHex(this._set.includes(i) || i === this._selectedVertex ? COLOR_SELECT : COLOR);
     }
-    // 3-axis gizmo on the selected corner.
+    // 3-axis gizmo on the selected corner (a set of 2+ uses BrushSetEditor's instead).
     if (!this._tcDragging && this._controls) {
-      if (this._selectedVertex !== null) {
+      if (this._selectedVertex !== null && this._set.length <= 1) {
         this._proxy.position.copy(this._handles[this._selectedVertex]!.position);
         this._controls.attach(this._proxy);
         this._controls.visible = true;
@@ -260,11 +266,27 @@ export class BrushVertexEditor implements IEditorModule {
     if (idx === this._hovered) return;
     this._hovered = idx;
     for (const m of this._handles) {
-      const isHover = m.userData.vertexIndex === idx;
-      (m.material as THREE.MeshBasicMaterial).color.setHex(isHover ? COLOR_HOVER : COLOR);
+      const i = m.userData.vertexIndex as number;
+      const isHover = i === idx;
+      const selected = this._set.includes(i) || i === this._selectedVertex;
+      (m.material as THREE.MeshBasicMaterial).color.setHex(isHover ? COLOR_HOVER : selected ? COLOR_SELECT : COLOR);
       m.scale.setScalar(isHover ? 1.5 : 1.0);
     }
     this._bus.emit("collider:handle-hover", { hovering: idx !== null });
+  }
+
+  // ── Vertex set (Phase 80) ───────────────────────────────────────────────────
+
+  /** Shift-click a corner: add it to / remove it from the set. No drag starts. */
+  private _toggleInSet(screenPos: ScreenPos): void {
+    const idx = this._castHandles(screenPos);
+    if (idx === null || !this._zoneId || !this._selectedId) return;
+    const had = this._set.includes(idx);
+    const set = had ? this._set.filter(i => i !== idx) : [...this._set, idx];
+    this._bus.emit("shape:sub-select", {
+      zoneId: this._zoneId, shapeId: this._selectedId, faceIndex: null,
+      vertexIndex: had ? (set[set.length - 1] ?? null) : idx, vertexSet: set,
+    });
   }
 
   // ── Vertex drag ─────────────────────────────────────────────────────────────
@@ -277,8 +299,9 @@ export class BrushVertexEditor implements IEditorModule {
     // Click = select (Blender-ish): route through the sub-select sink so the panel,
     // gizmo and everything else read one channel. The already-selected vertex's own
     // handle yields to its TransformControls (grabbing an axis arrow wins).
-    if (idx !== this._selectedVertex) {
+    if (idx !== this._selectedVertex || this._set.length > 1) {   // a plain click collapses a set
       this._selectedVertex = idx;
+      this._set = [idx];
       this._bus.emit("shape:sub-select", { zoneId: this._zoneId!, shapeId: this._selectedId!, faceIndex: null, vertexIndex: idx });
     } else {
       return;   // TC owns drags on the selected corner

@@ -132,6 +132,9 @@ export class TriggerVolumeTool {
         // Only pick volumes under the Select or Trigger tools — never while another tool
         // (Spawn/Floor/Wall/…) is placing, so a placement click can't also select a volume.
         if (!isSelectMode(this._toolId) && this._toolId !== "trigger-volume") return;
+        // Vertex mode: clicks are for brush corners (Shift-click builds a corner set,
+        // Phase 80) — a volume behind a corner must not join or steal the selection.
+        if (this._toolId === "select-vertex") return;
         const vol = this._findVolumeAt(this._lastScreenPos);
         if (!vol) return;
         // Additive click: join SelectionManager's multi-select instead of clobbering

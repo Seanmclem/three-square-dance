@@ -728,3 +728,62 @@ export function loopCut(mesh: ShapeBrushMesh, start: LoopCutStart): LoopCutResul
     (v.x - m.x) ** 2 + (v.y - m.y) ** 2 + (v.z - m.z) ** 2 < EPS_POS_SQ));
   return { mesh: cur, ring, ringVerts: ringVerts.filter(i => i >= 0) };
 }
+
+// ── Edge loop select (Phase 80) ──────────────────────────────────────────────
+
+/**
+ * The vertices along an edge loop through edge [a, b], in order (Blender's rule):
+ * at each vertex keep going only through a regular 4-way junction (exactly 4
+ * neighbours, all 4 surrounding faces four-cornered), taking the edge that shares no
+ * face with the one we arrived on. Anything else (3 or 5+ neighbours, a triangle or
+ * n-gon, a straight-through point) ends the loop there. `closed` when it comes back
+ * round to its start.
+ */
+export function edgeLoop(mesh: ShapeBrushMesh, edge: [number, number]): { verts: number[]; closed: boolean } | null {
+  const faces = mesh.faces;
+  if (!faces?.length) return null;
+  const vertices = mesh.vertices;
+  const key = (p: number, q: number) => p < q ? `${p}|${q}` : `${q}|${p}`;
+  const nbrs = new Map<number, Set<number>>();
+  const edgeFaces = new Map<string, number[]>();
+  const vertFaces = new Map<number, Set<number>>();
+  faces.forEach((f, fi) => f.verts.forEach((v, i) => {
+    const w = f.verts[(i + 1) % f.verts.length]!;
+    if (!nbrs.has(v)) nbrs.set(v, new Set());
+    if (!nbrs.has(w)) nbrs.set(w, new Set());
+    nbrs.get(v)!.add(w); nbrs.get(w)!.add(v);
+    const k = key(v, w);
+    edgeFaces.set(k, [...(edgeFaces.get(k) ?? []), fi]);
+    if (!vertFaces.has(v)) vertFaces.set(v, new Set());
+    vertFaces.get(v)!.add(fi);
+  }));
+  const [a, b] = edge;
+  if (!edgeFaces.has(key(a, b))) return null;
+
+  const regular = (v: number): boolean =>
+    nbrs.get(v)?.size === 4 && [...vertFaces.get(v)!].every(fi => quadCorners(vertices, faces[fi]!.verts) !== null);
+  const straightOn = (from: number, at: number): number | null => {
+    if (!regular(at)) return null;
+    const inFaces = new Set(edgeFaces.get(key(from, at)) ?? []);
+    const next = [...nbrs.get(at)!].filter(n => n !== from &&
+      !(edgeFaces.get(key(at, n)) ?? []).some(fi => inFaces.has(fi)));
+    return next.length === 1 ? next[0]! : null;
+  };
+
+  // Walk forward from b; if it closes, done. Otherwise walk backward from a.
+  const fwd = [a, b];
+  for (let prev = a, cur = b; ;) {
+    const nx = straightOn(prev, cur);
+    if (nx === null) break;
+    if (nx === a) return { verts: fwd, closed: true };
+    if (fwd.includes(nx)) break;
+    fwd.push(nx); prev = cur; cur = nx;
+  }
+  const back: number[] = [];
+  for (let prev = b, cur = a; ;) {
+    const nx = straightOn(prev, cur);
+    if (nx === null || fwd.includes(nx) || back.includes(nx)) break;
+    back.push(nx); prev = cur; cur = nx;
+  }
+  return { verts: [...back.reverse(), ...fwd], closed: false };
+}

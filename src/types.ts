@@ -252,7 +252,13 @@ export interface BusEvents {
   // re-emits object:selected with faceIndex/vertexIndex/edgeVerts — one channel for
   // all consumers. null clears. Edges have no stored identity: an edge IS its
   // (unordered) vertex-index pair, valid while some face loop traverses it.
-  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null };
+  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null; vertexSet?: number[] };
+  // Phase 80 vertex sets: switch to vertex mode with these corners selected (SELECT LOOP / SELECT RING).
+  "shape:select-vertex-set": { zoneId: string; shapeId: string; verts: number[] };
+  // Set gizmo mode (move/rotate/scale): panel buttons request it, T/R/S key changes report it.
+  "shape:set-gizmo-mode":  { mode: "translate" | "rotate" | "scale" };
+  // A set rotate/scale drag was undone on release because it made the brush invalid.
+  "shape:vertex-set-refused": { reason: string };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
   // LOOP CUT button hover → canvas ring preview (Phase 79; null start clears).
@@ -351,7 +357,7 @@ export interface BusEvents {
   // delete) so the viewport context menu stays closed. Listeners run synchronously inside emit().
   "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; handled?: boolean };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
-  "input:mousedown":       { button: number; screenPos: ScreenPos };
+  "input:mousedown":       { button: number; screenPos: ScreenPos; shift: boolean; ctrl: boolean; meta: boolean };
   "input:mouseup":         { button: number; screenPos: ScreenPos };
   "input:wheel":           { delta: number; shift: boolean; ctrl: boolean; alt: boolean; meta: boolean };
   // Suspend EditorCamera wheel-zoom while a tool consumes the scroll (e.g. decal resize).
@@ -499,6 +505,7 @@ export interface SelectedObjectPayload {
   faceIndex?:   number;
   vertexIndex?: number;
   edgeVerts?:   [number, number];   // unordered vertex-index pair (edges have no stored identity)
+  vertexSet?:   number[];           // Phase 80: every selected corner (vertexIndex = the last clicked)
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
   // Populated only for type === "wall"; position.y (elevation) is already meaningful.

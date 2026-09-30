@@ -27,6 +27,7 @@ import { BrushVertexEditor } from "@/editor/BrushVertexEditor";
 import { BrushFaceHighlighter } from "@/editor/BrushFaceHighlighter";
 import { BrushFaceEditor } from "@/editor/BrushFaceEditor";
 import { BrushEdgeEditor } from "@/editor/BrushEdgeEditor";
+import { BrushSetEditor } from "@/editor/BrushSetEditor";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
@@ -428,6 +429,7 @@ export default function App() {
     const brushFaceHighlighter = new BrushFaceHighlighter(scene.scene, world, bus);
     const brushFaceEditor    = new BrushFaceEditor(scene.scene, world, bus, scene.camera, canvas);
     const brushEdgeEditor    = new BrushEdgeEditor(scene.scene, world, bus, scene.camera, canvas);
+    const brushSetEditor     = new BrushSetEditor(scene.scene, world, bus, scene.camera, canvas);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const prefabTool         = new PrefabTool(scene.scene, world, bus);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
@@ -507,6 +509,7 @@ export default function App() {
     brushFaceHighlighter.init();
     brushFaceEditor.init();
     brushEdgeEditor.init();
+    brushSetEditor.init();
     objectTool.init();
     prefabTool.init();
     nodeDragger.init();
@@ -886,6 +889,13 @@ export default function App() {
       bus.on("overlay:fade-out", ({ duration }) =>
         setFadeState(prev => prev ? { color: prev.color, duration, direction: "out" } : null)),
       bus.on("leftpanel:open", ({ panelId }) => setLeftPanel(panelId)),
+      // Phase 80: SELECT LOOP / SELECT RING → vertex mode with those corners selected.
+      // tool:select first (it clears sub-selection), then the set.
+      bus.on("shape:select-vertex-set", ({ zoneId, shapeId, verts }) => {
+        setActiveTool("select-vertex");
+        bus.emit("tool:select", { tool: "select-vertex" });
+        bus.emit("shape:sub-select", { zoneId, shapeId, faceIndex: null, vertexIndex: verts[verts.length - 1] ?? null, vertexSet: verts });
+      }),
       bus.on("input:mousemove",   ({ worldPos }) => setCoords(worldPos)),
       bus.on("object:selected", payload => {
         setSelected(payload);
@@ -1135,6 +1145,7 @@ export default function App() {
       objectTool.dispose();
       prefabTool.dispose();
       brushEdgeEditor.dispose();
+      brushSetEditor.dispose();
       brushFaceEditor.dispose();
       brushFaceHighlighter.dispose();
       brushVertexEditor.dispose();

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud } from "@/editor/brushOps";
+import { facesFromCloud, edgeLoop } from "@/editor/brushOps";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -93,6 +93,12 @@ export class BrushEdgeEditor implements IEditorModule {
       }),
       this._bus.on("shape:rebuilt", ({ shapeId }) => {
         if (shapeId === this._selectedId && !this._dragging) this._sync();
+      }),
+      // Phase 80: double-click an edge (its first click selected it) → select its loop.
+      this._bus.on("input:dblclick", () => {
+        if (!this._isActive() || this._dragging) return;
+        const loop = edgeLoop(this._shape()!.mesh!, this._edge!);
+        if (loop) this._bus.emit("shape:select-vertex-set", { zoneId: this._zoneId!, shapeId: this._selectedId!, verts: loop.verts });
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
