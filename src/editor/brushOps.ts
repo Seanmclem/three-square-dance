@@ -833,3 +833,70 @@ export function edgeLoop(mesh: ShapeBrushMesh, edge: [number, number]): { verts:
   }
   return { verts: [...back.reverse(), ...fwd], closed: false };
 }
+
+/**
+ * "Around a face" loop select (v4.97.0): the corners around the flat area on one side
+ * of an edge, in order. The area is face `faceIdx` plus every face connected to it
+ * through shared edges that lies in the same plane, so on a plain cube it's that
+ * face's outline and on a cube whose top was split it's the whole top's outline. The
+ * outline is the area's boundary edges chained into a loop; when the area has more
+ * than one (an inset frame has an outer and an inner one), the loop through `edge`
+ * wins, else the longest.
+ */
+export function flatAreaOutline(mesh: ShapeBrushMesh, faceIdx: number, edge: [number, number]): number[] | null {
+  const faces = mesh.faces;
+  const start = faces?.[faceIdx];
+  if (!faces || !start) return null;
+  const V = mesh.vertices;
+  const n0 = newellNormal(V, start.verts);
+  const p0 = V[start.verts[0]!]!;
+  const inPlane = (fi: number): boolean => {
+    const f = faces[fi]!;
+    if (newellNormal(V, f.verts).dot(n0) < EPS_NRM) return false;
+    return f.verts.every(i => Math.abs((V[i]!.x - p0.x) * n0.x + (V[i]!.y - p0.y) * n0.y + (V[i]!.z - p0.z) * n0.z) < EPS_PLANE);
+  };
+  const key = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  const edgeFaces = new Map<string, number[]>();
+  faces.forEach((f, fi) => f.verts.forEach((v, i) => {
+    const k = key(v, f.verts[(i + 1) % f.verts.length]!);
+    edgeFaces.set(k, [...(edgeFaces.get(k) ?? []), fi]);
+  }));
+
+  // Flood the flat area through shared edges.
+  const area = new Set([faceIdx]);
+  const queue = [faceIdx];
+  while (queue.length) {
+    const f = faces[queue.pop()!]!;
+    f.verts.forEach((v, i) => {
+      for (const g of edgeFaces.get(key(v, f.verts[(i + 1) % f.verts.length]!)) ?? []) {
+        if (!area.has(g) && inPlane(g)) { area.add(g); queue.push(g); }
+      }
+    });
+  }
+
+  // Boundary = directed edges of area faces whose neighbour across isn't in the area.
+  const next = new Map<number, number>();
+  for (const fi of area) {
+    const f = faces[fi]!;
+    f.verts.forEach((v, i) => {
+      const w = f.verts[(i + 1) % f.verts.length]!;
+      if ((edgeFaces.get(key(v, w)) ?? []).every(g => g === fi || !area.has(g))) next.set(v, w);
+    });
+  }
+  const loops: number[][] = [];
+  const used = new Set<number>();
+  for (const s of next.keys()) {
+    if (used.has(s)) continue;
+    const loop: number[] = [];
+    for (let v: number | undefined = s; v !== undefined && !used.has(v); v = next.get(v)) { used.add(v); loop.push(v); }
+    if (loop.length >= 3) loops.push(loop);
+  }
+  if (!loops.length) return null;
+  const through = loops.find(l => l.includes(edge[0]) && l.includes(edge[1]));
+  if (through) return through;
+  const perimeter = (l: number[]) => l.reduce((s, v, i) => {
+    const a = V[v]!, b = V[l[(i + 1) % l.length]!]!;
+    return s + Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  }, 0);
+  return loops.reduce((best, l) => perimeter(l) > perimeter(best) ? l : best);
+}

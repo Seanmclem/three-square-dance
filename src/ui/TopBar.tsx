@@ -171,7 +171,7 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
 
   return (
     <div style={{
-      position: "absolute", top: 0, left: 64, right: 280, height: 48,
+      position: "absolute", top: 0, left: 64, right: "var(--props-w, 280px)", height: 48,
       background: "rgba(28,28,28,0.95)",
       borderBottom: "1px solid rgba(255,255,255,0.08)",
       display: "flex", alignItems: "center", gap: 8,

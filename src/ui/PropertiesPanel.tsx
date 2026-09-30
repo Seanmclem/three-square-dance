@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { BrushOpIcon } from "@/ui/BrushOpIcons";
 import { prettyKey, GAMEPAD_BUTTON_NAMES } from "@/input/bindings";
 import { hasEnabledMover } from "@/world/moverDefs";
 import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
@@ -15,7 +16,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, type LoopCutRing } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, type LoopCutRing } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -36,6 +37,52 @@ const PANEL_STYLE: React.CSSProperties = {
   background: "rgba(28,28,28,0.97)", borderLeft: "1px solid rgba(255,255,255,0.08)",
   display: "flex", flexDirection: "column", zIndex: 10,
 };
+
+/**
+ * Drag the panel's LEFT edge to resize it (LeftPanel's pattern, mirrored): tracked on
+ * window while dragging, ends on any pointerup / cancel / blur, persisted. The width
+ * is published as --props-w so the top bar's right edge follows it.
+ */
+function useRightPanelWidth(): { width: number; handle: React.ReactNode } {
+  const [width, setWidth] = useState<number>(() => {
+    let saved = 0;
+    try { saved = Number(localStorage.getItem("wb_propspanel_w")); } catch { /* storage blocked */ }
+    return Math.min(600, Math.max(280, saved || 280));
+  });
+  const [resizing, setResizing] = useState(false);
+  useEffect(() => { document.documentElement.style.setProperty("--props-w", `${width}px`); }, [width]);
+  useEffect(() => {
+    if (!resizing) return;
+    const move = (e: PointerEvent) => setWidth(Math.min(600, Math.max(280, window.innerWidth - e.clientX)));
+    const end = () => {
+      setResizing(false);
+      setWidth(w => { try { localStorage.setItem("wb_propspanel_w", String(w)); } catch { /* storage blocked */ } return w; });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end, true);
+    window.addEventListener("pointercancel", end, true);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end, true);
+      window.removeEventListener("pointercancel", end, true);
+      window.removeEventListener("blur", end);
+    };
+  }, [resizing]);
+  const handle = (
+    <div
+      title="Drag to resize the panel"
+      onPointerDown={e => { e.preventDefault(); setResizing(true); }}
+      style={{
+        position: "absolute", left: 0, top: 0, bottom: 0, width: 6, cursor: "col-resize", zIndex: 11,
+        background: resizing ? "rgba(128,170,255,0.25)" : "transparent",
+      }}
+      onPointerEnter={e => { if (!resizing) (e.target as HTMLDivElement).style.background = "rgba(128,170,255,0.12)"; }}
+      onPointerLeave={e => { if (!resizing) (e.target as HTMLDivElement).style.background = "transparent"; }}
+    />
+  );
+  return { width, handle };
+}
 
 const NUM_INPUT: React.CSSProperties = {
   width: "100%", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 4,
@@ -521,6 +568,7 @@ export function PropertiesPanel({
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
+  const { width: panelW, handle: resizeHandle } = useRightPanelWidth();
   const [groupsOpen, setGroupsOpen]   = useState(false);
   const [labelDraft, setLabelDraft]   = useState("");
   const [editingLabel, setEditingLabel] = useState(false);
@@ -594,7 +642,8 @@ export function PropertiesPanel({
       color: "#c0c0c0", fontSize: 12, fontFamily: "monospace", cursor: "pointer",
     };
     return (
-      <div style={PANEL_STYLE}>
+      <div style={{ ...PANEL_STYLE, width: panelW }}>
+        {resizeHandle}
         <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           <div style={{ padding: "11px 16px 6px" }}>
             <span style={{ color: "#80aaff", fontSize: 11, letterSpacing: 2 }}>PROPERTIES</span>
@@ -661,7 +710,8 @@ export function PropertiesPanel({
   }
 
   return (
-    <div style={PANEL_STYLE}>
+    <div style={{ ...PANEL_STYLE, width: panelW }}>
+      {resizeHandle}
       {/* Fixed header */}
       <div style={{ flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ padding: "11px 16px 6px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2486,9 +2536,11 @@ const SHAPE_ACTION_BTN: React.CSSProperties = {
 
 // Topology-op buttons (shared by ShapeFaceOps + EdgesList).
 const OP_BTN: React.CSSProperties = {
-  flex: 1, padding: "5px 0", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
+  flex: 1, padding: "5px 6px", borderRadius: 4, fontSize: 10, fontFamily: "monospace",
   border: "1px solid rgba(255,255,255,0.12)", background: "rgba(46,46,46,0.9)",
-  color: "#c0c0c0", cursor: "pointer",
+  color: "#dde3f0", cursor: "pointer",
+  // icon + word (BrushOpIcon), centred together
+  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, whiteSpace: "nowrap",
 };
 const OP_BTN_OFF: React.CSSProperties = { ...OP_BTN, color: "#505060", cursor: "default" };
 
@@ -2586,7 +2638,7 @@ function LoopCutNote({ note, selected, bus }: {
         <button style={{ ...OP_BTN, flex: "none", padding: "3px 8px" }}
           title="Select the new ring's corners, then move / rotate / scale them together"
           onClick={() => bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: note.ringVerts })}>
-          SELECT RING
+          <BrushOpIcon name="select-ring" />SELECT RING
         </button>
       )}
     </div>
@@ -2671,38 +2723,38 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={{ display: "flex", gap: 4 }}>
         <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
-          onClick={() => split(pair0IsH ? 0 : 1)} title="Split between the horizontal-ish edge pair">
-          SPLIT ─
+          onClick={() => split(pair0IsH ? 0 : 1)} title="Split this face in two with a horizontal cut">
+          <BrushOpIcon name="split-h" />SPLIT H
         </button>
         <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
-          onClick={() => split(pair0IsH ? 1 : 0)} title="Split between the vertical-ish edge pair">
-          SPLIT │
+          onClick={() => split(pair0IsH ? 1 : 0)} title="Split this face in two with a vertical cut">
+          <BrushOpIcon name="split-v" />SPLIT V
         </button>
         <button style={OP_BTN} onClick={inset}
           title="Inset this face 0.25m — border ring + inner face, ready to extrude or recess">
-          INSET
+          <BrushOpIcon name="inset" />INSET
         </button>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
-        {([["LOOP CUT ─", pair0IsH ? 0 : 1], ["LOOP CUT │", pair0IsH ? 1 : 0]] as const).map(([label, pair]) => (
+        {([["LOOP CUT H", "loop-h", pair0IsH ? 0 : 1], ["LOOP CUT V", "loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
           <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
             onClick={() => { preview(null); loop(pair); }}
             onMouseEnter={() => isQuad && preview(pair)} onMouseLeave={() => preview(null)}>
-            {label}
+            <BrushOpIcon name={icon} />{label}
           </button>
         ))}
       </div>
       <div style={{ display: "flex", gap: 4 }}>
         <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m outward along its normal">
-          EXTRUDE
+          <BrushOpIcon name="extrude" />EXTRUDE
         </button>
         <button style={OP_BTN} onClick={recess}
           title="Extrude this face 0.25m inward — carve a recess (inset first for a window/pit)">
-          RECESS
+          <BrushOpIcon name="recess" />RECESS
         </button>
         <button style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
           title="This face is bent, so it creases along one diagonal (the dashed line). Flip it to the other diagonal.">
-          FLIP FOLD
+          <BrushOpIcon name="fold" />FLIP FOLD
         </button>
       </div>
       {!isQuad && (
@@ -2926,6 +2978,20 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
   const [loopNote, setLoopNote] = useState<{ text: string; key: string; ringVerts: number[] } | null>(null);
   const edgeKey = edge ? `${selected.id}:${edge[0]}|${edge[1]}` : "";
   const canLoop = !!edge && !!loopCutRing(shape.mesh!, { edge });
+  // "Around a face" loops: one per face this edge borders (the flat area on that side);
+  // when both sides are the same flat area, one button.
+  const around: Array<{ face: number; verts: number[] }> = [];
+  if (edge) {
+    shape.mesh!.faces!.forEach((f, fi) => {
+      const on = f.verts.some((v, i) => {
+        const w = f.verts[(i + 1) % f.verts.length]!;
+        return (v === edge[0] && w === edge[1]) || (v === edge[1] && w === edge[0]);
+      });
+      if (!on) return;
+      const ring = flatAreaOutline(shape.mesh!, fi, edge);
+      if (ring && !around.some(a => a.verts.length === ring.length && a.verts.every(v => ring.includes(v)))) around.push({ face: fi, verts: ring });
+    });
+  }
 
   const doSplit = () => {
     if (!edge) return;
@@ -2983,21 +3049,36 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
           <div style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>
             ({a.x}, {a.y}, {a.z}) → ({b.x}, {b.y}, {b.z})
           </div>
-          <button style={OP_BTN} onClick={doSplit}
-            title="Insert a vertex at this edge's midpoint (both adjacent faces gain a corner)">
-            SPLIT EDGE
-          </button>
-          <button style={canLoop ? OP_BTN : OP_BTN_OFF} disabled={!canLoop} onClick={doLoopCut}
-            title="Cut a new ring of edges around the shape, crossing this edge (stops at faces that aren't four-sided)"
-            onMouseEnter={() => canLoop && bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: { edge: edge! } })}
-            onMouseLeave={() => bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null })}>
-            LOOP CUT
-          </button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button style={OP_BTN} onClick={doSplit}
+              title="Insert a vertex at this edge's midpoint (both adjacent faces gain a corner)">
+              <BrushOpIcon name="split-edge" />SPLIT EDGE
+            </button>
+            <button style={canLoop ? OP_BTN : OP_BTN_OFF} disabled={!canLoop} onClick={doLoopCut}
+              title="Cut a new ring of edges around the shape, crossing this edge (stops at faces that aren't four-sided)"
+              onMouseEnter={() => canLoop && bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: { edge: edge! } })}
+              onMouseLeave={() => bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null })}>
+              <BrushOpIcon name="loop-cut-edge" />LOOP CUT
+            </button>
+          </div>
           {loopNote?.key === edgeKey && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
           <button style={OP_BTN} onClick={selectLoop}
-            title="Select every corner along this edge's loop, then move / rotate / scale them together (or double-click an edge)">
-            SELECT LOOP
+            title="Select every corner along this edge's loop, going straight on through 4-way corners (or double-click an edge)">
+            <BrushOpIcon name="select-loop" />SELECT LOOP
           </button>
+          {around.length > 0 && (
+            <div style={{ display: "flex", gap: 4 }}>
+              {around.map(({ face, verts: ring }) => (
+                <button key={face} style={OP_BTN}
+                  title={`Select the corners around the flat area of FACE ${face + 1} (hover to see it)`}
+                  onClick={() => bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: ring })}
+                  onMouseEnter={() => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: face })}
+                  onMouseLeave={() => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null })}>
+                  <BrushOpIcon name="around-face" />AROUND FACE {face + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>
