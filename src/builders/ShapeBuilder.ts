@@ -5,8 +5,8 @@ import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import { newellNormal, fanLoop } from "@/editor/brushOps";
-import type { ShapeDef, MeshUserData, MaterialOverrides, FaceGroup } from "@/types";
+import { newellNormal, faceTriangles } from "@/editor/brushOps";
+import type { ShapeDef, MeshUserData, MaterialOverrides, FaceGroup, BrushFace } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
 export interface ShapeBuildOutput {
@@ -346,10 +346,10 @@ function faceUVBasis(n: THREE.Vector3): { u: THREE.Vector3; v: THREE.Vector3 } {
   return { u, v };
 }
 
-/** Fan-triangulate one face loop into a GeoBuf with flat Newell normals + metric UVs. */
-function pushFaceLoop(buf: GeoBuf, def: ShapeDef, loop: number[], ts: number): number {
+/** One face into a GeoBuf (its `faceTriangles`) with a flat Newell normal + metric UVs. */
+function pushFaceLoop(buf: GeoBuf, def: ShapeDef, face: BrushFace, ts: number): number {
   const verts = def.mesh!.vertices;
-  const n = newellNormal(verts, loop);
+  const n = newellNormal(verts, face.verts);
   const nn: V3 = [n.x, n.y, n.z];
   const { u, v } = faceUVBasis(n);
   const p = new THREE.Vector3();
@@ -359,11 +359,9 @@ function pushFaceLoop(buf: GeoBuf, def: ShapeDef, loop: number[], ts: number): n
     return [p.dot(u) / ts, p.dot(v) / ts];
   };
   const at = (vi: number): V3 => [verts[vi]!.x, verts[vi]!.y, verts[vi]!.z];
-  for (let i = 1; i < loop.length - 1; i++) {
-    pushTri(buf, [at(loop[0]!), at(loop[i]!), at(loop[i + 1]!)], [nn, nn, nn],
-      [uvOf(loop[0]!), uvOf(loop[i]!), uvOf(loop[i + 1]!)]);
-  }
-  return loop.length - 2;   // triangles emitted
+  const tris = faceTriangles(verts, face);
+  for (const [a, b, c] of tris) pushTri(buf, [at(a), at(b), at(c)], [nn, nn, nn], [uvOf(a), uvOf(b), uvOf(c)]);
+  return tris.length;   // triangles emitted
 }
 
 // ── Builder ───────────────────────────────────────────────────────────────────
@@ -373,7 +371,7 @@ export class ShapeBuilder {
   static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry {
     if (isFaceBrush(def)) {
       const buf = newBuf();
-      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, fanLoop(def.mesh!.vertices, f), tileScale);
+      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, f, tileScale);
       return makeGeo(buf);
     }
     const { cap, side } = buildBufs(def, tileScale, tileScale);
@@ -387,8 +385,7 @@ export class ShapeBuilder {
     verts.forEach((p, i) => { v[i * 3] = p.x; v[i * 3 + 1] = p.y; v[i * 3 + 2] = p.z; });
     const idx: number[] = [];
     for (const f of def.mesh!.faces ?? []) {
-      const loop = fanLoop(verts, f);   // same diagonal as the render
-      for (let i = 1; i < loop.length - 1; i++) idx.push(loop[0]!, loop[i]!, loop[i + 1]!);
+      for (const t of faceTriangles(verts, f)) idx.push(...t);   // same triangles as the render
     }
     return { vertices: v, indices: new Uint32Array(idx) };
   }
@@ -558,7 +555,7 @@ export class ShapeBuilder {
       const faceGroups: FaceGroup[] = [];
       let triOffset = 0;
       for (const fi of g.faceIdxs) {
-        const count = pushFaceLoop(buf, shape, fanLoop(shape.mesh!.vertices, faces[fi]!), ts);
+        const count = pushFaceLoop(buf, shape, faces[fi]!, ts);
         faceGroups.push({ start: triOffset, count, faceIndex: fi });
         triOffset += count;
       }

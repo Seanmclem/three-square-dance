@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { newellNormal, fanLoop, isBentQuad, loopCutRing } from "@/editor/brushOps";
+import { newellNormal, fanLoop, faceTriangles, isBentQuad, loopCutRing } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ShapeDef, ToolId, LoopCutStart } from "@/types";
@@ -254,7 +254,8 @@ export class BrushFaceHighlighter implements IEditorModule {
       const v = verts[vi]!;
       pos.push(v.x + n.x * LIFT, v.y + n.y * LIFT, v.z + n.z * LIFT);
     }
-    for (let i = 1; i < loop.length - 1; i++) idx.push(0, i, i + 1);
+    // Same triangles as the brush (concave faces are ear-clipped, not fanned).
+    for (const t of faceTriangles(verts, face)) idx.push(...t.map(vi => loop.indexOf(vi)));
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));

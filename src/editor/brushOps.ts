@@ -74,6 +74,52 @@ export function fanLoop(vertices: Vec3[], face: BrushFace): number[] {
   return v.length === 4 && faceFold(vertices, face) === 1 ? [v[1]!, v[2]!, v[3]!, v[0]!] : v;
 }
 
+/**
+ * The triangles a face is drawn and collided with, as vertex-index triples wound like
+ * the loop (outward). A convex face fans from `fanLoop` (so a bent quad follows its
+ * fold). A CONCAVE face (split edges + dragged corners can make one) is ear-clipped in
+ * its own plane instead: a fan from one corner spills outside the outline, which drew
+ * an inset frame across the corner of its own recess (v4.96.1, `my_custom_cube`).
+ */
+export function faceTriangles(vertices: Vec3[], face: BrushFace): Array<[number, number, number]> {
+  const loop = fanLoop(vertices, face);
+  const n = newellNormal(vertices, loop);
+  if (loop.length > 3 && isConcaveLoop(vertices, loop, n)) {
+    const helper = Math.abs(n.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const u = helper.cross(n).normalize(), v = n.clone().cross(u);
+    const p = new THREE.Vector3();
+    const pts = loop.map(i => { const w = vertices[i]!; p.set(w.x, w.y, w.z); return new THREE.Vector2(p.dot(u), p.dot(v)); });
+    const tris = THREE.ShapeUtils.triangulateShape(pts, []);
+    if (tris.length === loop.length - 2) {
+      return tris.map(([a, b, c]) => {
+        const t: [number, number, number] = [loop[a!]!, loop[b!]!, loop[c!]!];
+        return triNormalDot(vertices, t, n) < 0 ? [t[0], t[2], t[1]] : t;
+      });
+    }
+  }
+  const out: Array<[number, number, number]> = [];
+  for (let i = 1; i < loop.length - 1; i++) out.push([loop[0]!, loop[i]!, loop[i + 1]!]);
+  return out;
+}
+
+/** Any corner turning against the face normal (straight-through points don't count). */
+function isConcaveLoop(vertices: Vec3[], loop: number[], n: THREE.Vector3): boolean {
+  const L = loop.length;
+  for (let i = 0; i < L; i++) {
+    const a = vertices[loop[(i + L - 1) % L]!]!, b = vertices[loop[i]!]!, c = vertices[loop[(i + 1) % L]!]!;
+    const e1 = new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z), e2 = new THREE.Vector3(c.x - b.x, c.y - b.y, c.z - b.z);
+    const scale = e1.length() * e2.length();
+    if (scale > 0 && e1.cross(e2).dot(n) < -1e-6 * scale) return true;
+  }
+  return false;
+}
+
+function triNormalDot(vertices: Vec3[], t: [number, number, number], n: THREE.Vector3): number {
+  const [a, b, c] = t.map(i => vertices[i]!) as [Vec3, Vec3, Vec3];
+  return new THREE.Vector3(b.x - a.x, b.y - a.y, b.z - a.z)
+    .cross(new THREE.Vector3(c.x - a.x, c.y - a.y, c.z - a.z)).dot(n);
+}
+
 export function faceCentroid(vertices: Vec3[], loop: number[]): THREE.Vector3 {
   const c = new THREE.Vector3();
   for (const vi of loop) c.add(new THREE.Vector3(vertices[vi]!.x, vertices[vi]!.y, vertices[vi]!.z));
