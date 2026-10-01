@@ -1,7 +1,7 @@
 /**
  * Small line icons for the brush op buttons (v4.97.0): each button shows an icon AND a
  * word, so the op reads at a glance without relying on ─ / │ text glyphs. 16×16 grid,
- * 1.4 stroke, currentColor, so they follow the button's enabled/disabled colour.
+ * 1.4 stroke, currentColor, so they follow the button's enabled/disabled color.
  */
 export type BrushOpIconName =
   | "split-h" | "split-v" | "loop-h" | "loop-v" | "inset" | "extrude" | "recess" | "fold"

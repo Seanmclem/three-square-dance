@@ -138,7 +138,7 @@ export interface SkyboxDef {
   attribution?: Attribution;
 }
 
-/** Edit Brush background (v4.99.9, an editor preference, not scene data): a plain colour,
+/** Edit Brush background (v4.99.9, an editor preference, not scene data): a plain color,
  *  or a skybox id ("sky" = the procedural sky). */
 export type BrushViewBackground = { kind: "color"; color: string } | { kind: "skybox"; skyboxId: string };
 export const DEFAULT_BRUSH_COLOR = "#2b303a";

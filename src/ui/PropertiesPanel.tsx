@@ -2392,7 +2392,7 @@ function brushBackgroundLabel(bg: BrushViewBackground, skyboxes: SkyboxDef[]): s
   return skyboxes.find(s => s.id === bg.skyboxId)?.label ?? bg.skyboxId;
 }
 
-/** Brush View (v4.99.9): the Edit Brush canvas background, a plain colour (dark by default)
+/** Brush View (v4.99.9): the Edit Brush canvas background, a plain color (dark by default)
  *  or any skybox. An editor preference shared by every brush, not saved in the scene. */
 function BrushViewScreen({ background, onChange, skyboxes }: {
   background: BrushViewBackground;
@@ -2409,14 +2409,14 @@ function BrushViewScreen({ background, onChange, skyboxes }: {
           onChange={e => onChange(e.target.value === "__color"
             ? { kind: "color", color: lastColor }
             : { kind: "skybox", skyboxId: e.target.value })}>
-          <option value="__color">Plain colour</option>
+          <option value="__color">Plain color</option>
           <option value="sky">Procedural sky</option>
           {skyboxes.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
       </div>
       {background.kind === "color" && (
         <div>
-          <div style={LABEL}>COLOUR</div>
+          <div style={LABEL}>COLOR</div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <input type="color" value={background.color}
               onChange={e => { setLastColor(e.target.value); onChange({ kind: "color", color: e.target.value }); }}

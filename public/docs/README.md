@@ -9,7 +9,7 @@ with the app (Vite copies `public/` into `dist/`) and open inside the editor.
   `<svg>` diagrams, no scripts, no external CSS or fonts, so it works offline, in the
   desktop shell and as a plain file.
 - **Images** beside it in `public/docs/img/<topic>/` (real editor screenshots).
-- **Colours**: the editor's dark palette. Body text near-white (`#dde3f0` / `#c2cadb`),
+- **Colors**: the editor's dark palette. Body text near-white (`#dde3f0` / `#c2cadb`),
   never grey on grey. Diagram SVGs use `var(--d-*)` tokens defined in the page's `:root`.
 - **Opened from the ? menu**: give the section in `src/ui/HelpButton.tsx` a `guide`
   (`{ title, src, externalUrl }`); its header gets an "Open guide" button that shows the
