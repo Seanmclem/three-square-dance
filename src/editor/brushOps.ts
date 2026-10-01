@@ -1326,3 +1326,67 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
   if (err) return { refused: `Rounding would break the brush (${err}); nothing changed.` };
   return { mesh: out };
 }
+
+// ── Wrapped texture mapping (v4.101.2) ───────────────────────────────────────
+
+/** Per-face texture axes: u horizontal along the face (up × n; world x on caps), v = n × u
+ *  (straight up on upright faces). Deterministic, so coplanar faces share one mapping. */
+export function faceUVBasis(n: THREE.Vector3): { u: THREE.Vector3; v: THREE.Vector3 } {
+  const u = new THREE.Vector3(), v = new THREE.Vector3();
+  if (Math.abs(n.y) > 0.99) u.set(1, 0, 0);
+  else u.crossVectors(new THREE.Vector3(0, 1, 0), n).normalize();
+  v.crossVectors(n, u);
+  return { u, v };
+}
+
+/**
+ * Texture shift per face (meters, added before dividing by the tile size) so the
+ * texture runs on unbroken across edges, like gift-wrap: from a starting face, a
+ * neighbor (same `group`: material + overrides) takes on the shift that makes the two
+ * agree along their shared edge, when the texture runs the same way on both sides of
+ * it (the edge lies along both faces' u, or both faces' v, same direction) or the two
+ * are coplanar. So a brick texture wraps around upright corners of any angle and over
+ * rounded edges; caps (flat tops / bottoms) keep their own mapping, and a full wrap
+ * closes with one seam where it meets itself.
+ */
+export function wrapUVOffsets(mesh: { vertices: Vec3[]; faces: BrushFace[] }, group: (fi: number) => string): Array<{ du: number; dv: number }> {
+  const { vertices, faces } = mesh;
+  const frames = faces.map(f => {
+    const n = newellNormal(vertices, f.verts);
+    return { n, ...faceUVBasis(n), cap: Math.abs(n.y) > 0.9999 };   // truly flat tops / bottoms only
+  });
+  const out = faces.map(() => ({ du: 0, dv: 0 }));
+  const placed = new Uint8Array(faces.length);
+  const edgeFaces = new Map<string, number[]>();
+  faces.forEach((f, fi) => f.verts.forEach((a, k) => {
+    const b = f.verts[(k + 1) % f.verts.length]!;
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    edgeFaces.set(key, [...(edgeFaces.get(key) ?? []), fi]);
+  }));
+  const P = (i: number) => new THREE.Vector3(vertices[i]!.x, vertices[i]!.y, vertices[i]!.z);
+  const same = (x: number, y: number) => Math.abs(x) > 0.999 && Math.abs(y) > 0.999 && Math.sign(x) === Math.sign(y);
+  for (let root = 0; root < faces.length; root++) {
+    if (placed[root]) continue;
+    placed[root] = 1;
+    if (frames[root]!.cap) continue;   // caps never start or join a wrap
+    const queue = [root];
+    while (queue.length) {
+      const fa = queue.shift()!;
+      const A = frames[fa]!, f = faces[fa]!;
+      for (let k = 0; k < f.verts.length; k++) {
+        const a = f.verts[k]!, b = f.verts[(k + 1) % f.verts.length]!;
+        const fb = (edgeFaces.get(a < b ? `${a}|${b}` : `${b}|${a}`) ?? []).find(x => x !== fa);
+        if (fb === undefined || placed[fb] || frames[fb]!.cap || group(fb) !== group(fa)) continue;
+        const B = frames[fb]!;
+        const p = P(a), d = P(b).sub(p).normalize();
+        const coplanar = A.n.dot(B.n) > 0.9999;
+        if (!coplanar && !same(d.dot(A.u), d.dot(B.u)) && !same(d.dot(A.v), d.dot(B.v))) continue;
+        // B's uv at p must equal A's: (p·uB + duB) = (p·uA + duA), same for v.
+        out[fb] = { du: p.dot(A.u) + out[fa]!.du - p.dot(B.u), dv: p.dot(A.v) + out[fa]!.dv - p.dot(B.v) };
+        placed[fb] = 1;
+        queue.push(fb);
+      }
+    }
+  }
+  return out;
+}

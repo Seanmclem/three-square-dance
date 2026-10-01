@@ -24,6 +24,12 @@ y = 20; nothing reaches `public/games`.
 - [x] STEPS 3 while live → rebuilt from the original (12 faces).
 - [x] SIZE 2.5 while live → refusal note, brush unchanged.
 - [x] One Cmd+Z → the plain cube (round + adjustments are one step); redo → rounded.
-- [ ] By hand: the curve's texture across the strips reads well; DONE ends the live card.
+- [x] (v4.101.2) Texture wraps: seam count on shared edges between upright faces, script
+      on the real brushOps: plain cube 4 → 1, two rounded edges 28 → 1, four rounded 1;
+      a rounded top edge runs on from the front over every strip, one seam at the top.
+      Headless screenshot: concrete runs unbroken round a 12-step rounded corner.
+- [ ] Faint per-strip lighting bands remain (flat shading per face; smooth lighting
+      across gentle edges was offered and deferred).
+- [ ] By hand: DONE ends the live card.
 - [x] (v4.101.1) The object's move gizmo hides in face / vertex / edge mode, so a first
       click where it used to be picks the edge; 1 brings the gizmo back.

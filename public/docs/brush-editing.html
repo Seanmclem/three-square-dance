@@ -184,6 +184,7 @@
   <li><strong>STEPS</strong> is how many thin faces make the curve: 1 is a flat cut-off, 3 a chunky low-poly round, 16 or more reads as smooth. <strong>SIZE</strong> is how far back from the edge the curve starts on each side (meters).</li>
   <li>After ROUND the result stays live: change STEPS or SIZE and it rebuilds, still one <kbd>Cmd</kbd>+<kbd>Z</kbd> for the whole thing. <strong>DONE</strong>, or any other edit, ends it.</li>
   <li>A SIZE that would run past the next corner is refused with a note; the brush stays as it was. The new curve takes the material of one of the two faces it joins; the ends (a cube's top and bottom) get a matching rounded corner.</li>
+  <li>Textures wrap like gift-wrap: around the sides of a brush (sharp or rounded corners, any angle) and up over a rounded top edge, a texture runs on without a break. Seams stay only where the shape forces one: where the sides meet a flat top or bottom, and once where a full wrap comes back to its start. Faces only wrap into neighbors with the same material.</li>
 </ul>
 
 <h2 id="folds">Bent faces and folds</h2>

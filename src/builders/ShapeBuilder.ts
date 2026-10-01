@@ -5,7 +5,7 @@ import { ColliderBuilder } from "@/physics/ColliderBuilder";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { applyUVOffset } from "@/builders/UVUtils";
-import { newellNormal, faceTriangles } from "@/editor/brushOps";
+import { newellNormal, faceTriangles, faceUVBasis, wrapUVOffsets } from "@/editor/brushOps";
 import type { ShapeDef, MeshUserData, MaterialOverrides, FaceGroup, BrushFace } from "@/types";
 import type RAPIER from "@dimforge/rapier3d-compat";
 
@@ -336,18 +336,9 @@ function buildBufs(def: ShapeDef, tsCap: number, tsSide: number): { cap: GeoBuf;
 }
 
 // ── Face-brush geometry (Phase 23) ────────────────────────────────────────────
-// Deterministic per-normal UV basis (shared with the hull path): coplanar faces
-// get identical metric projections, so flat regions have no seams.
-function faceUVBasis(n: THREE.Vector3): { u: THREE.Vector3; v: THREE.Vector3 } {
-  const u = new THREE.Vector3(), v = new THREE.Vector3();
-  if (Math.abs(n.y) > 0.99) u.set(1, 0, 0);
-  else u.crossVectors(new THREE.Vector3(0, 1, 0), n).normalize();
-  v.crossVectors(n, u);
-  return { u, v };
-}
-
-/** One face into a GeoBuf (its `faceTriangles`) with a flat Newell normal + metric UVs. */
-function pushFaceLoop(buf: GeoBuf, def: ShapeDef, face: BrushFace, ts: number): number {
+/** One face into a GeoBuf (its `faceTriangles`) with a flat Newell normal + metric UVs,
+ *  shifted by `off` (meters, from `wrapUVOffsets`) so wrapped textures run on unbroken. */
+function pushFaceLoop(buf: GeoBuf, def: ShapeDef, face: BrushFace, ts: number, off: { du: number; dv: number }): number {
   const verts = def.mesh!.vertices;
   const n = newellNormal(verts, face.verts);
   const nn: V3 = [n.x, n.y, n.z];
@@ -356,7 +347,7 @@ function pushFaceLoop(buf: GeoBuf, def: ShapeDef, face: BrushFace, ts: number): 
   const uvOf = (vi: number): [number, number] => {
     const w = verts[vi]!;
     p.set(w.x, w.y, w.z);
-    return [p.dot(u) / ts, p.dot(v) / ts];
+    return [(p.dot(u) + off.du) / ts, (p.dot(v) + off.dv) / ts];
   };
   const at = (vi: number): V3 => [verts[vi]!.x, verts[vi]!.y, verts[vi]!.z];
   const tris = faceTriangles(verts, face);
@@ -371,7 +362,8 @@ export class ShapeBuilder {
   static buildLocalGeometry(def: ShapeDef, tileScale: number): THREE.BufferGeometry {
     if (isFaceBrush(def)) {
       const buf = newBuf();
-      for (const f of def.mesh!.faces!) pushFaceLoop(buf, def, f, tileScale);
+      const offsets = wrapUVOffsets({ vertices: def.mesh!.vertices, faces: def.mesh!.faces! }, () => "");
+      def.mesh!.faces!.forEach((f, fi) => pushFaceLoop(buf, def, f, tileScale, offsets[fi]!));
       return makeGeo(buf);
     }
     const { cap, side } = buildBufs(def, tileScale, tileScale);
@@ -547,6 +539,11 @@ export class ShapeBuilder {
         ? assetManager.getMaterialWithOverrides(id, ovr).catch(() => assetManager.getDefaultMaterial(0x667788))
         : assetManager.getMaterial(id).catch(() => assetManager.getDefaultMaterial(0x667788));
 
+    // v4.101.2: textures wrap across edges within a material group (see wrapUVOffsets).
+    const groupOf = new Map<number, string>();
+    for (const [key, g] of groups) for (const fi of g.faceIdxs) groupOf.set(fi, key);
+    const offsets = wrapUVOffsets({ vertices: shape.mesh!.vertices, faces }, fi => groupOf.get(fi)!);
+
     const meshes: THREE.Mesh[] = [];
     for (const g of groups.values()) {
       const matDef = assetManager.getMaterialDef(g.matId);
@@ -555,7 +552,7 @@ export class ShapeBuilder {
       const faceGroups: FaceGroup[] = [];
       let triOffset = 0;
       for (const fi of g.faceIdxs) {
-        const count = pushFaceLoop(buf, shape, faces[fi]!, ts);
+        const count = pushFaceLoop(buf, shape, faces[fi]!, ts, offsets[fi]!);
         faceGroups.push({ start: triOffset, count, faceIndex: fi });
         triOffset += count;
       }
