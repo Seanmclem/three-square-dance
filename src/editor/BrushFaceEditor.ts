@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { facesFromCloud, loopCutRing, offsetRegion } from "@/editor/brushOps";
+import { applySoft } from "@/editor/softFalloff";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -147,6 +148,10 @@ export class BrushFaceEditor implements IEditorModule {
         if (button === 0 && this._mode === "push" && this._pushHandle?.visible && this._hitsPushHandle(screenPos)) this._beginPush();
       }),
       this._bus.on("input:mouseup", ({ button }) => { if (button === 0 && this._pushing) this._endPush(); }),
+      this._bus.on("brush:soft-changed", () => {   // Phase 82: [ ] mid-drag
+        if (this._pushing) this._onPush(true);
+        else if (this._dragging) this._onGizmoChange();
+      }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
@@ -271,9 +276,10 @@ export class BrushFaceEditor implements IEditorModule {
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")).invert();
     const local = world.applyQuaternion(inv);
     const moving = this._movingCorners(shape);
-    const vertices = this._origVertices.map((v, i) => moving.has(i)
+    const moved = this._origVertices.map((v, i) => moving.has(i)
       ? { x: +(v.x + local.x).toFixed(4), y: +(v.y + local.y).toFixed(4), z: +(v.z + local.z).toFixed(4) }
       : v);
+    const vertices = applySoft(this._bus, shape, this._origVertices, moved, [...moving], shape.mesh!.faces);
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
   }
 
@@ -311,19 +317,22 @@ export class BrushFaceEditor implements IEditorModule {
   /** PUSH drag: 1 m per 100 px of right / up mouse travel, snapped to 0.05 m (Alt = free).
    *  Always recomputed from the mesh at drag start; a distance that would turn faces
    *  inside out is skipped (the last good one stays) and reported when the drag ends. */
-  private _onPush(): void {
+  private _onPush(force = false): void {
     if (!this._origMesh || !this._zoneId || !this._selectedId) return;
     const px = (this._mouse.x - this._mouseStart.x) - (this._mouse.y - this._mouseStart.y);
     let dist = px / 100;
     dist = this._snapOn ? Math.round(dist / PUSH_SNAP) * PUSH_SNAP : Math.round(dist * 1000) / 1000;
-    if (dist === this._pushDist && !this._pushRefused) return;
+    if (dist === this._pushDist && !this._pushRefused && !force) return;
     const set = this._faceSet.length ? this._faceSet : [this._faceIndex!];
     const r = dist === 0 ? { mesh: this._origMesh } : offsetRegion(this._origMesh, set, dist);
     if ("refused" in r) { this._pushRefused = r.refused; return; }
     this._pushRefused = null;
     this._pushDist = dist;
     const shape = this._shape();
-    if (shape) this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices: r.mesh.vertices } });
+    if (!shape) return;
+    const sources = [...new Set(set.flatMap(i => this._origMesh!.faces[i]?.verts ?? []))];
+    const vertices = applySoft(this._bus, shape, this._origMesh.vertices, r.mesh.vertices, sources, this._origMesh.faces);
+    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
   }
 
   private _cancelDrag(): void {

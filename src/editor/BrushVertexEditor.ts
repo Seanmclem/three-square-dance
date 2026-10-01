@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { isBrush } from "@/builders/ShapeBuilder";
+import { applySoft } from "@/editor/softFalloff";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, ShapeDef, ScreenPos, Vec3 } from "@/types";
@@ -41,6 +42,7 @@ export class BrushVertexEditor implements IEditorModule {
   private _dragIndex = -1;
   private _dragPlane = new THREE.Plane();
   private _origVertices: Vec3[] | null = null;
+  private _lastDragPos: ScreenPos | null = null;   // free drag: re-applied when SOFT changes mid-drag
 
   // Vertex-mode extras (Phase 23): selected vertex + its 3-axis gizmo.
   private _selectedVertex: number | null = null;
@@ -110,6 +112,10 @@ export class BrushVertexEditor implements IEditorModule {
       }),
       this._bus.on("shape:updated", ({ id }) => {
         if (id === this._selectedId && this._state !== "DRAG" && !this._tcDragging) this._sync();
+      }),
+      this._bus.on("brush:soft-changed", () => {   // Phase 82: [ ] mid-drag
+        if (this._tcDragging) this._onGizmoChange();
+        else if (this._state === "DRAG" && this._lastDragPos) this._onDragMove(this._lastDragPos);
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
@@ -330,7 +336,8 @@ export class BrushVertexEditor implements IEditorModule {
     const local = world.applyQuaternion(inv);
     const o = this._origVertices[this._selectedVertex]!;
     const v: Vec3 = { x: +(o.x + local.x).toFixed(4), y: +(o.y + local.y).toFixed(4), z: +(o.z + local.z).toFixed(4) };
-    const vertices = this._origVertices.map((old, i) => i === this._selectedVertex ? v : old);
+    const moved = this._origVertices.map((old, i) => i === this._selectedVertex ? v : old);
+    const vertices = applySoft(this._bus, shape, this._origVertices, moved, [this._selectedVertex], shape.mesh!.faces);
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
     // Reposition the handles live (skip the TC to keep the drag stable).
     const m = this._shapeMatrix(shape);
@@ -341,7 +348,8 @@ export class BrushVertexEditor implements IEditorModule {
 
   private _onDragMove(screenPos: ScreenPos): void {
     const shape = this._selectedShape();
-    if (!shape || this._dragIndex < 0 || !this._zoneId || !this._selectedId) return;
+    if (!shape || this._dragIndex < 0 || !this._zoneId || !this._selectedId || !this._origVertices) return;
+    this._lastDragPos = screenPos;
     this._setRayFrom(screenPos);
     const hit = new THREE.Vector3();
     if (!this._raycaster.ray.intersectPlane(this._dragPlane, hit)) return;
@@ -351,7 +359,8 @@ export class BrushVertexEditor implements IEditorModule {
     const v: Vec3 = this._altDown
       ? { x: local.x, y: local.y, z: local.z }
       : { x: snap(local.x), y: snap(local.y), z: snap(local.z) };
-    const vertices = shape.mesh!.vertices.map((old, i) => i === this._dragIndex ? v : old);
+    const moved = this._origVertices.map((old, i) => i === this._dragIndex ? v : old);
+    const vertices = applySoft(this._bus, shape, this._origVertices, moved, [this._dragIndex], shape.mesh!.faces);
     // Full-mesh write: updateShape replaces `mesh` wholesale — dropping `faces` here
     // would silently revert a face-brush to a convex hull.
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
@@ -386,6 +395,7 @@ export class BrushVertexEditor implements IEditorModule {
 
   private _endDrag(): void {
     this._state = "IDLE";
+    this._lastDragPos = null;
     this._dragIndex = -1;
     this._origVertices = null;
     this._bus.emit("gizmo:dragging", { isDragging: false });

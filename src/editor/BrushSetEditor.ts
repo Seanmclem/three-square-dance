@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { validateMesh } from "@/editor/brushOps";
+import { applySoft } from "@/editor/softFalloff";
 import { isBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -110,6 +111,7 @@ export class BrushSetEditor implements IEditorModule {
         const mode: Mode | null = code === "KeyT" ? "translate" : code === "KeyR" ? "rotate" : code === "KeyS" ? "scale" : null;
         if (mode) this._bus.emit("shape:set-gizmo-mode", { mode });
       }),
+      this._bus.on("brush:soft-changed", () => { if (this._dragging) this._onGizmoChange(); }),   // Phase 82: [ ] mid-drag
       this._bus.on("input:mousemove", ({ screenPos }) => { this._mouse = screenPos; }),
       this._bus.on("input:mousedown", ({ screenPos }) => { this._mouse = screenPos; }),
       this._bus.on("input:keyup", ({ code }) => {
@@ -232,7 +234,7 @@ export class BrushSetEditor implements IEditorModule {
     const p = this._pivot;
     const members = new Set(this._set);
     const tmp = new THREE.Vector3();
-    const vertices = this._origVertices.map((v, i) => {
+    const moved = this._origVertices.map((v, i) => {
       if (!members.has(i)) return v;
       tmp.set((v.x - p.x) * sx, (v.y - p.y) * sy, (v.z - p.z) * sz).applyQuaternion(turn);
       return {
@@ -241,6 +243,7 @@ export class BrushSetEditor implements IEditorModule {
         z: +(p.z + tmp.z + move.z).toFixed(4),
       };
     });
+    const vertices = applySoft(this._bus, shape, this._origVertices, moved, this._set, shape.mesh!.faces);
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
   }
 

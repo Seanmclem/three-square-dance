@@ -1148,3 +1148,78 @@ export function insetRegion(mesh: ShapeBrushMesh, set: number[], margin = 0.25):
   if (err) return { refused: `INSET would make an invalid shape (${err})` };
   return { mesh: out };
 }
+
+// ── Soft falloff (Phase 82) ─────────────────────────────────────────────────
+
+export type SoftCurve = "smooth" | "linear" | "sharp";
+
+/** How much a corner follows, by its distance as a fraction of the radius (0 = at a
+ *  moved corner, 1 = the edge of the reach, where it stops following). */
+export function softWeight(t: number, curve: SoftCurve): number {
+  if (t >= 1) return 0;
+  if (t <= 0) return 1;
+  return curve === "linear" ? 1 - t : curve === "sharp" ? (1 - t) * (1 - t) : 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * Soft falloff: the corners near the moved ones follow part of the way. `sources` are
+ * the corners the drag moves (their positions in `next` are final). Every other corner
+ * within `radius` of a source takes w × that nearest source's displacement, w from
+ * `softWeight`. Distance is measured ALONG THE SURFACE (shortest path over the face
+ * edges, from the original positions), so the far side of a thin slab stays put; a
+ * cloud brush (no faces) uses straight-line distance. Returns the new vertex array and
+ * the corners it moved with their weights (for the preview); `next` is returned as is
+ * when radius ≤ 0.
+ */
+export function softDisplace(
+  orig: Vec3[], next: Vec3[], sources: number[], faces: BrushFace[] | undefined,
+  radius: number, curve: SoftCurve,
+): { vertices: Vec3[]; affected: Array<{ i: number; w: number }> } {
+  const n = orig.length;
+  if (radius <= 0 || !sources.length) return { vertices: next, affected: [] };
+  const dist = new Float64Array(n).fill(Infinity);
+  const from = new Int32Array(n).fill(-1);
+  const len = (a: number, b: number) => Math.hypot(orig[a]!.x - orig[b]!.x, orig[a]!.y - orig[b]!.y, orig[a]!.z - orig[b]!.z);
+  for (const s of sources) { if (s < n) { dist[s] = 0; from[s] = s; } }
+  if (faces?.length) {
+    const adj: number[][] = Array.from({ length: n }, () => []);
+    for (const f of faces) {
+      for (let k = 0; k < f.verts.length; k++) {
+        const a = f.verts[k]!, b = f.verts[(k + 1) % f.verts.length]!;
+        if (!adj[a]!.includes(b)) { adj[a]!.push(b); adj[b]!.push(a); }
+      }
+    }
+    // Dijkstra (meshes are small; a linear scan for the next corner is fine).
+    const done = new Uint8Array(n);
+    for (;;) {
+      let u = -1;
+      for (let i = 0; i < n; i++) if (!done[i] && dist[i]! < radius && (u < 0 || dist[i]! < dist[u]!)) u = i;
+      if (u < 0) break;
+      done[u] = 1;
+      for (const v of adj[u]!) {
+        const d = dist[u]! + len(u, v);
+        if (d < dist[v]!) { dist[v] = d; from[v] = from[u]!; }
+      }
+    }
+  } else {
+    for (let i = 0; i < n; i++) {
+      if (dist[i] === 0) continue;
+      for (const s of sources) { const d = len(i, s); if (d < dist[i]!) { dist[i] = d; from[i] = s; } }
+    }
+  }
+  const moved = new Set(sources);
+  const affected: Array<{ i: number; w: number }> = [];
+  const vertices = next.map((v, i) => {
+    if (moved.has(i) || from[i]! < 0) return v;
+    const w = softWeight(dist[i]! / radius, curve);
+    if (w <= 0) return v;
+    const s = from[i]!, o = orig[i]!;
+    affected.push({ i, w });
+    return {
+      x: +(o.x + w * (next[s]!.x - orig[s]!.x)).toFixed(4),
+      y: +(o.y + w * (next[s]!.y - orig[s]!.y)).toFixed(4),
+      z: +(o.z + w * (next[s]!.z - orig[s]!.z)).toFixed(4),
+    };
+  });
+  return { vertices, affected };
+}

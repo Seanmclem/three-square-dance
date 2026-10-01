@@ -269,6 +269,10 @@ export interface BusEvents {
   "shape:face-gizmo-mode": { mode: "move" | "push" };
   // A PUSH drag finished: how far, or why it stopped short (panel note).
   "shape:face-push-done":  { dist: number; refused: string | null };
+  // Phase 82: soft falloff settings changed (panel, O / [ ] keys); drag editors re-apply mid-drag.
+  "brush:soft-changed":    { on: boolean; radius: number; curve: "smooth" | "linear" | "sharp" };
+  // Phase 82: corners following the current soft drag (world space, w = how much), for the dots.
+  "brush:soft-preview":    { points: Array<{ x: number; y: number; z: number; w: number }> };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
   // LOOP CUT button hover → canvas ring preview (Phase 79; null start clears).

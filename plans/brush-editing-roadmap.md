@@ -76,6 +76,9 @@ extruding the band.
 
 ## Soft falloff
 
+> **Shipped as Phase 82 (v4.100.0):** `plans/phase-82-brush-soft-falloff.md`. Distance
+> along the surface; one radius for every brush.
+
 **What:** when corners move (a single corner, an edge, a face or a vertex set), nearby
 corners move too, less the farther away they are. Blender calls it proportional
 editing.

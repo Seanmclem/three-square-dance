@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { facesFromCloud, edgeLoop } from "@/editor/brushOps";
+import { applySoft } from "@/editor/softFalloff";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -100,6 +101,7 @@ export class BrushEdgeEditor implements IEditorModule {
         const loop = edgeLoop(this._shape()!.mesh!, this._edge!);
         if (loop) this._bus.emit("shape:select-vertex-set", { zoneId: this._zoneId!, shapeId: this._selectedId!, verts: loop.verts });
       }),
+      this._bus.on("brush:soft-changed", () => { if (this._dragging) this._onGizmoChange(); }),   // Phase 82: [ ] mid-drag
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
@@ -205,9 +207,10 @@ export class BrushEdgeEditor implements IEditorModule {
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")).invert();
     const local = world.applyQuaternion(inv);
     const moving = new Set(this._edge);
-    const vertices = this._origVertices.map((v, i) => moving.has(i)
+    const moved = this._origVertices.map((v, i) => moving.has(i)
       ? { x: +(v.x + local.x).toFixed(4), y: +(v.y + local.y).toFixed(4), z: +(v.z + local.z).toFixed(4) }
       : v);
+    const vertices = applySoft(this._bus, shape, this._origVertices, moved, this._edge, shape.mesh!.faces);
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
   }
 

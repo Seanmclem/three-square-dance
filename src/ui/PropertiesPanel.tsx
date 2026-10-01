@@ -13,6 +13,7 @@ import type {
   PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue, BrushViewBackground, SkyboxDef,
 } from "@/types";
 import { DEFAULT_BRUSH_BACKGROUND, DEFAULT_BRUSH_COLOR } from "@/types";
+import { softSettings, setSoftSettings, type SoftSettings } from "@/editor/softFalloff";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
@@ -2512,14 +2513,15 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
   if (!shape) return null;
 
   // Sub-object modes (Phase 23): face/vertex lists replace the param view.
+  // Phase 82: the SOFT row sits above each list (it applies to every corner drag).
   if (faceBrush && activeTool === "select-face") {
-    return <FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} />;
+    return <>{bus && <SoftFalloffRow bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-vertex") {
-    return <VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} />;
+    return <>{bus && <SoftFalloffRow bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-edge") {
-    return <EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} />;
+    return <>{bus && <SoftFalloffRow bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
 
   return (
@@ -2656,6 +2658,58 @@ const OP_BTN_OFF: React.CSSProperties = { ...OP_BTN, color: "#505060", cursor: "
 function shapeFacesUpdate(shape: ShapeDef, faceIndex: number, patch: Partial<BrushFace>): { mesh: ShapeBrushMesh } {
   const faces = shape.mesh!.faces!.map((f, i) => i === faceIndex ? { ...f, verts: [...f.verts], ...patch } : f);
   return { mesh: { ...shape.mesh!, faces } };
+}
+
+/** Soft falloff (Phase 82): SOFT on/off, the radius and the slope, for every corner drag
+ *  on every brush. State lives in `softFalloff.ts`; O and [ ] change it from the viewport. */
+function SoftFalloffRow({ bus }: { bus: EventBus }) {
+  const [s, setS] = useState<SoftSettings>(softSettings);
+  const [draft, setDraft] = useState(String(s.radius));
+  useEffect(() => bus.on("brush:soft-changed", next => { setS(next); setDraft(String(next.radius)); }), [bus]);
+  const commitRadius = (v: string) => {
+    const r = parseFloat(v);
+    if (Number.isFinite(r) && r > 0) setSoftSettings(bus, { radius: r });
+    else setDraft(String(s.radius));
+  };
+  const seg = (on: boolean): React.CSSProperties => ({
+    padding: "4px 9px", borderRadius: 5, cursor: "pointer", fontFamily: "monospace", fontSize: 11,
+    border: `1px solid ${on ? "rgba(80,140,255,0.55)" : "rgba(255,255,255,0.12)"}`,
+    background: on ? "rgba(80,140,255,0.22)" : "transparent", color: on ? "#9dbdff" : "#dde3f0",
+  });
+  return (
+    <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button style={seg(s.on)} title="Nearby corners follow a drag part of the way (O)" onClick={() => setSoftSettings(bus, { on: !s.on })}>
+          SOFT {s.on ? "ON" : "OFF"}
+        </button>
+        <span style={{ ...LABEL, marginBottom: 0 }}>RADIUS</span>
+        <input type="number" step={0.25} min={0.25} value={draft} disabled={!s.on}
+          style={{ ...NUM_INPUT, width: 64, padding: "2px 4px", opacity: s.on ? 1 : 0.5 }}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={e => commitRadius(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") commitRadius((e.target as HTMLInputElement).value); }} />
+        <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+      </div>
+      {s.on && (
+        <>
+          <div>
+            <div style={{ ...LABEL, marginBottom: 4 }}>SLOPE</div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {(["smooth", "linear", "sharp"] as const).map(c => (
+                <button key={c} style={seg(s.curve === c)} onClick={() => setSoftSettings(bus, { curve: c })}>
+                  {c[0]!.toUpperCase() + c.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
+            Corners within the radius (measured along the surface) follow a drag part of the
+            way. O turns it on or off; [ and ] shrink or grow the radius, also mid-drag.
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
