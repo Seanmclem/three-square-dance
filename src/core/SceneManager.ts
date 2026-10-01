@@ -296,12 +296,12 @@ export class SceneManager {
     this._applyGrid();
   }
 
-  /** Edit Brush view (v4.99.6/7): no solid ground plane, and a 10 m grid (1 m squares)
+  /** Edit Brush view (v4.99.6/7): no solid ground plane, and a 30 m grid (1 m squares)
    *  in place of the level's 100 m one. */
   setBrushEditView(on: boolean): void {
     this._brushView = on;
     if (on && !this._brushGrid) {
-      this._brushGrid = new THREE.GridHelper(10, 10, 0x445577, 0x2d3d55);
+      this._brushGrid = new THREE.GridHelper(30, 30, 0x445577, 0x2d3d55);
       this._brushGrid.position.y = 0.002;
       this.scene.add(this._brushGrid);
     }

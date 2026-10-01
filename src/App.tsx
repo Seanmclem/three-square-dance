@@ -331,7 +331,7 @@ export default function App() {
   const [editingBrush,    setEditingBrush]     = useState<{ name: string } | null>(null);
   const editingBrushRef  = useRef(false);
   const brushSessionRef  = useRef<BrushEditSession | null>(null);
-  // v4.99.6/7: Edit Brush has no solid ground plane and a 10 m grid instead of the level's 100 m one.
+  // v4.99.6/7: Edit Brush has no solid ground plane and a 30 m grid instead of the level's 100 m one.
   useEffect(() => { sceneRef.current?.setBrushEditView(!!editingBrush); }, [editingBrush]);
   // v4.99.1: Save stays in the session; the bar shows unsaved / saved, and Close asks
   // before dropping unsaved changes. Cmd+S saves the brush while the session is open.
