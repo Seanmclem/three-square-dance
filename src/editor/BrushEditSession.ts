@@ -7,6 +7,13 @@ import { isBrush } from "@/builders/ShapeBuilder";
 
 export const BRUSH_EDIT_ZONE = "__brush_edit__";
 
+function pickResult(s: ShapeDef): BrushEditResult {
+  return structuredClone({
+    mesh: s.mesh, material: s.material, materialOverrides: s.materialOverrides,
+    sideMaterial: s.sideMaterial, sideMaterialOverrides: s.sideMaterialOverrides,
+  });
+}
+
 /** The fields a brush edit session hands back to the original shape. */
 export type BrushEditResult = Pick<ShapeDef, "mesh" | "material" | "materialOverrides" | "sideMaterial" | "sideMaterialOverrides">;
 
@@ -14,8 +21,16 @@ export type BrushEditResult = Pick<ShapeDef, "mesh" | "material" | "materialOver
  * Isolated brush edit mode: the PrefabEditSession pattern applied to ONE shape.
  * The selected brush is cloned into a temporary zone at the origin (rotation
  * zero, so the local-space mesh is what you see), the face/vertex/edge
- * sub-modes work on it unchanged, and Save writes the mesh (+ materials) back
- * to the original shape. Position/rotation of the clone are ignored on save.
+ * sub-modes work on it unchanged. Save (v4.99.1) records a snapshot of the mesh
+ * (+ materials) and STAYS in the session; Close applies the last saved snapshot to
+ * the original shape (one undo step, done by the App after teardown) and drops any
+ * changes made after it. Position/rotation of the clone are ignored.
+ *
+ * Why Save doesn't write the original right away: its zone is unloaded while the
+ * session runs, and a shape:updated for it would make ZoneManager build it into the
+ * scene, under the same shape id as the clone (build tokens are keyed by id). Disk
+ * saves are gated during the session anyway, so holding the snapshot until Close
+ * changes nothing a user can observe.
  *
  * Same contamination rules as prefab mode: the temp zone is added/removed
  * outside the undo journal, WorldState.toJSON filters it, and the App gates
@@ -29,6 +44,8 @@ export class BrushEditSession {
   private _target: { zoneId: string; shapeId: string } | null = null;
   private _prevZoneId: string | null = null;
   private _prevPose: EditorCameraPose | null = null;
+  private _original: BrushEditResult | null = null;   // the shape as it was on enter
+  private _saved: BrushEditResult | null = null;      // last Save, applied on Close
 
   constructor(
     private readonly _world:   WorldState,
@@ -45,6 +62,8 @@ export class BrushEditSession {
     this._target = { zoneId, shapeId: shape.id };
     this._prevZoneId = this._world.activeZoneId;
     this._prevPose = this._camera()?.getPose() ?? null;
+    this._original = pickResult(shape);
+    this._saved = null;
 
     const clone = structuredClone(shape);
     clone.position = { x: 0, y: 0, z: 0 };
@@ -81,26 +100,39 @@ export class BrushEditSession {
     }
   }
 
-  /** Read the edited mesh back from the staging clone, exit, and return the
-   *  changes for the original shape. Null if the clone is gone (deleted). */
-  async saveAndExit(): Promise<{ zoneId: string; shapeId: string; changes: BrushEditResult } | null> {
+  /** The staging clone's current mesh + materials (null if it was deleted). */
+  private _current(): BrushEditResult | null {
     const target = this._target;
-    if (!target) return null;
-    const clone = this._world.zones.get(BRUSH_EDIT_ZONE)?.shapes?.find(s => s.id === target.shapeId);
-    const changes: BrushEditResult | null = clone ? structuredClone({
-      mesh: clone.mesh,
-      material: clone.material,
-      materialOverrides: clone.materialOverrides,
-      sideMaterial: clone.sideMaterial,
-      sideMaterialOverrides: clone.sideMaterialOverrides,
-    }) : null;
-    await this._teardown();
-    return changes?.mesh ? { ...target, changes } : null;
+    const clone = target && this._world.zones.get(BRUSH_EDIT_ZONE)?.shapes?.find(s => s.id === target.shapeId);
+    return clone ? pickResult(clone) : null;
   }
 
-  async cancel(): Promise<void> {
-    if (!this._target) return;
+  /** Record the current state as saved; the session stays open. False if there's
+   *  nothing to save (the clone was deleted). */
+  save(): boolean {
+    const now = this._current();
+    if (!now?.mesh) return false;
+    this._saved = now;
+    return true;
+  }
+
+  /** Changes since the last Save (or since entering, if never saved). */
+  isDirty(): boolean {
+    const now = this._current();
+    const base = this._saved ?? this._original;
+    return !!now && !!base && JSON.stringify(now) !== JSON.stringify(base);
+  }
+
+  /** Exit. Returns the last saved state for the original shape, or null if nothing
+   *  was saved (or it equals how the shape started). Unsaved changes are dropped. */
+  async close(): Promise<{ zoneId: string; shapeId: string; changes: BrushEditResult } | null> {
+    const target = this._target;
+    if (!target) return null;
+    const saved = this._saved, original = this._original;
     await this._teardown();
+    this._saved = null; this._original = null;
+    if (!saved?.mesh || JSON.stringify(saved) === JSON.stringify(original)) return null;
+    return { ...target, changes: saved };
   }
 
   private async _teardown(): Promise<void> {

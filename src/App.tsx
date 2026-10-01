@@ -301,6 +301,12 @@ export default function App() {
   const [editingBrush,    setEditingBrush]     = useState<{ name: string } | null>(null);
   const editingBrushRef  = useRef(false);
   const brushSessionRef  = useRef<BrushEditSession | null>(null);
+  // v4.99.1: Save stays in the session; the bar shows unsaved / saved, and Close asks
+  // before dropping unsaved changes. Cmd+S saves the brush while the session is open.
+  const [brushDirty,        setBrushDirty]        = useState(false);
+  const [brushSaved,        setBrushSaved]        = useState(false);
+  const [brushConfirmClose, setBrushConfirmClose] = useState(false);
+  const brushSaveRef = useRef<(() => void) | null>(null);
   const inIsolatedEdit   = (): boolean => editingPrefabRef.current || editingBrushRef.current;
   // Swallow selection-teardown events while a prefab re-expansion is in flight
   // (members are removed + re-added; without this the panel unmounts mid-edit).
@@ -1407,7 +1413,8 @@ export default function App() {
   }, [handleLoadFromJSON, closeProject]);
 
   const handleSave = useCallback(async (): Promise<void> => {
-    if (inIsolatedEdit()) return;   // prefab/brush edit mode: Save lives in the amber bar
+    if (editingBrushRef.current) { brushSaveRef.current?.(); return; }   // Cmd+S = save the brush, stay in
+    if (inIsolatedEdit()) return;   // prefab edit mode: Save lives in the amber bar
     const world = worldRef.current;
     if (!world) return;
     stampCameraPose();
@@ -3693,13 +3700,27 @@ export default function App() {
     });
   };
 
+  /** Save: snapshot the edited brush and stay in the session. */
   const handleBrushEditSave = (): void => {
     const session = brushSessionRef.current;
+    if (!session?.active || !session.save()) return;
+    setBrushDirty(false);
+    setBrushSaved(true);
+    setBrushConfirmClose(false);
+  };
+  brushSaveRef.current = handleBrushEditSave;
+
+  /** Close: exit; the last Save (if any) lands on the original shape as one undo
+   *  step. With unsaved changes, ask first (inline in the bar) unless `discard`. */
+  const handleBrushEditClose = (discard = false): void => {
+    const session = brushSessionRef.current;
     if (!session?.active) return;
+    if (!discard && session.isDirty()) { setBrushConfirmClose(true); return; }
     void (async () => {
-      const result = await session.saveAndExit();
+      const result = await session.close();
       editingBrushRef.current = false;
       setEditingBrush(null);
+      setBrushDirty(false); setBrushSaved(false); setBrushConfirmClose(false);
       setActiveTool("select");
       busRef.current.emit("tool:select", { tool: "select" });
       const world = worldRef.current;
@@ -3710,16 +3731,19 @@ export default function App() {
     })();
   };
 
-  const handleBrushEditCancel = (): void => {
-    const session = brushSessionRef.current;
-    if (!session?.active) return;
-    void session.cancel().then(() => {
-      editingBrushRef.current = false;
-      setEditingBrush(null);
-      setActiveTool("select");
-      busRef.current.emit("tool:select", { tool: "select" });
-    });
-  };
+  // Track unsaved changes while the brush session is open (edits, undo/redo, delete).
+  useEffect(() => {
+    if (!editingBrush) return;
+    const bus = busRef.current;
+    const check = ({ zoneId }: { zoneId: string }) => {
+      if (zoneId !== BRUSH_EDIT_ZONE) return;
+      const dirty = brushSessionRef.current?.isDirty() ?? false;
+      setBrushDirty(dirty);
+      if (dirty) setBrushSaved(false);
+    };
+    const offs = [bus.on("shape:updated", check), bus.on("shape:removed", check), bus.on("shape:added", check)];
+    return () => offs.forEach(off => off());
+  }, [editingBrush]);
 
   // Just-created prefab id → the PrefabPanel opens its row in rename mode.
   const [prefabRenameRequest, setPrefabRenameRequest] = useState<string | null>(null);
@@ -3966,7 +3990,14 @@ export default function App() {
           title="Editing Brush"
           name={editingBrush.name}
           onSave={handleBrushEditSave}
-          onCancel={handleBrushEditCancel}
+          onCancel={() => handleBrushEditClose()}
+          cancelLabel="Close"
+          saveDisabled={!brushDirty}
+          status={brushDirty ? { text: "unsaved changes", tone: "dirty" } : brushSaved ? { text: "saved", tone: "saved" } : null}
+          confirm={brushConfirmClose ? {
+            text: "Close without saving?", confirmLabel: "Discard changes",
+            onConfirm: () => handleBrushEditClose(true), onDismiss: () => setBrushConfirmClose(false),
+          } : null}
         />
       )}
       <TopBar

@@ -3,13 +3,24 @@
  * edit, Phase 47; brush edit) — the mode must be unmistakable, since saving/
  * scene-switching/play are all disabled underneath it.
  */
-export function EditModeBar({ title, name, hint, onSave, onCancel }: {
+export function EditModeBar({ title, name, hint, onSave, onCancel, cancelLabel = "Cancel", status, saveDisabled, confirm }: {
   title:    string;   // "Editing Prefab"
   name:     string;
   hint?:    string;   // what Save does (omitted → a narrower bar)
   onSave:   () => void;
   onCancel: () => void;
+  cancelLabel?: string;                                   // brush edit: "Close"
+  status?: { text: string; tone: "dirty" | "saved" } | null;   // brush edit: unsaved / saved
+  saveDisabled?: boolean;                                 // nothing to save
+  /** Inline confirmation (e.g. closing with unsaved changes) — replaces the buttons. */
+  confirm?: { text: string; confirmLabel: string; onConfirm: () => void; onDismiss: () => void } | null;
 }) {
+  const btn = (primary: boolean, disabled = false): React.CSSProperties => ({
+    background: primary ? "rgba(240,180,60,0.15)" : "transparent",
+    border: `1px solid ${primary ? "rgba(240,180,60,0.5)" : "rgba(255,255,255,0.2)"}`,
+    borderRadius: 4, color: primary ? "#f0c060" : "#c2cadb", fontSize: 11, fontFamily: "monospace",
+    padding: "4px 12px", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.45 : 1,
+  });
   return (
     <div style={{
       position: "absolute", top: 56, left: "50%", transform: "translateX(-50%)",
@@ -26,22 +37,23 @@ export function EditModeBar({ title, name, hint, onSave, onCancel }: {
           {hint}
         </span>
       )}
-      <button
-        onClick={onSave}
-        style={{
-          background: "rgba(240,180,60,0.15)", border: "1px solid rgba(240,180,60,0.5)",
-          borderRadius: 4, color: "#f0c060", fontSize: 11, fontFamily: "monospace",
-          padding: "4px 12px", cursor: "pointer",
-        }}
-      >Save</button>
-      <button
-        onClick={onCancel}
-        style={{
-          background: "transparent", border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 4, color: "#c2cadb", fontSize: 11, fontFamily: "monospace",
-          padding: "4px 12px", cursor: "pointer",
-        }}
-      >Cancel</button>
+      {status && (
+        <span style={{ color: status.tone === "dirty" ? "#ffcf7a" : "#8fdcaf", fontSize: 11, fontFamily: "monospace" }}>
+          {status.tone === "dirty" ? "● " : "✓ "}{status.text}
+        </span>
+      )}
+      {confirm ? (
+        <>
+          <span style={{ color: "#ffcf7a", fontSize: 11, fontFamily: "monospace" }}>{confirm.text}</span>
+          <button onClick={confirm.onConfirm} style={btn(false)}>{confirm.confirmLabel}</button>
+          <button onClick={confirm.onDismiss} style={btn(true)}>Keep editing</button>
+        </>
+      ) : (
+        <>
+          <button onClick={onSave} disabled={saveDisabled} style={btn(true, saveDisabled)}>Save</button>
+          <button onClick={onCancel} style={btn(false)}>{cancelLabel}</button>
+        </>
+      )}
     </div>
   );
 }

@@ -58,7 +58,7 @@ const SECTIONS: ShortcutSection[] = [
     inBrushEditor: true,
     guide: BRUSH_GUIDE,
     rows: [
-      { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save / Cancel in the bar" },
+      { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save (or Cmd+S) keeps editing, Close exits and asks if there are unsaved changes" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge" },
       { keys: ["LMB"],               action: "Pick a face / corner / edge on the selected brush" },
       { keys: ["LMB drag gizmo"],    action: "Move the face / corner / edge (snaps 0.25)" },
@@ -146,7 +146,7 @@ export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
         }}>
           {brushEditor && (
             <div style={{ color: "#c2cadb", fontSize: 10 }}>
-              Brush editor: other tools' shortcuts are hidden until you Save or Cancel.
+              Brush editor: other tools' shortcuts are hidden until you Close it.
             </div>
           )}
           {sections.map(({ label, rows, guide: g }) => (

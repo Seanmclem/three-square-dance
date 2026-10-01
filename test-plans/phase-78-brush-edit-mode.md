@@ -51,3 +51,12 @@ no project open (`src/editor/BrushEditSession.ts`).
   "inner loop collapsed"); the margin is fixed at 0.25m.
 - World undo history clears on enter and on exit (same tradeoff as prefab
   edit mode).
+
+## v4.99.1 Save / Close (verified 2026-10-01, headless in the running shell)
+
+- [x] Save stays in the session ("✓ saved"); the original is untouched until Close.
+- [x] Edits after a save show "● unsaved changes"; Save is greyed out when there's nothing to save.
+- [x] Close with unsaved changes asks inline ("Close without saving?"); Keep editing returns.
+- [x] Cmd+S saves the brush while the session is open.
+- [x] Undoing back to the saved state clears the unsaved marker.
+- [x] Discard & close applies only the last save (14 faces, not the unsaved recess); one Cmd+Z after closing restores the original.
