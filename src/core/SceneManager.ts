@@ -292,21 +292,34 @@ export class SceneManager {
    * them; the ground never carries the tag.
    */
   setGridVisible(v: boolean): void {
-    for (const h of this._gridHelpers) {
-      h.visible = v;
-      h.userData.hideInGame = v;
-    }
     this._gridOn = v;
-    if (this._groundMesh) this._groundMesh.visible = v && !this._groundSuppressed;
+    this._applyGrid();
   }
 
-  /** Hide just the solid ground plane (grid lines stay), e.g. in Edit Brush (v4.99.6). */
-  setGroundSuppressed(on: boolean): void {
-    this._groundSuppressed = on;
-    if (this._groundMesh) this._groundMesh.visible = this._gridOn && !on;
+  /** Edit Brush view (v4.99.6/7): no solid ground plane, and a 10 m grid (1 m squares)
+   *  in place of the level's 100 m one. */
+  setBrushEditView(on: boolean): void {
+    this._brushView = on;
+    if (on && !this._brushGrid) {
+      this._brushGrid = new THREE.GridHelper(10, 10, 0x445577, 0x2d3d55);
+      this._brushGrid.position.y = 0.002;
+      this.scene.add(this._brushGrid);
+    }
+    this._applyGrid();
   }
   private _gridOn = true;
-  private _groundSuppressed = false;
+  private _brushView = false;
+  private _brushGrid: THREE.GridHelper | null = null;
+
+  private _applyGrid(): void {
+    const levelGrid = this._gridOn && !this._brushView;
+    for (const h of this._gridHelpers) {
+      h.visible = levelGrid;
+      h.userData.hideInGame = levelGrid;
+    }
+    if (this._brushGrid) this._brushGrid.visible = this._gridOn && this._brushView;
+    if (this._groundMesh) this._groundMesh.visible = levelGrid;
+  }
 
   onUpdate(cb: UpdateCallback): void {
     this._updateCallbacks.push(cb);
