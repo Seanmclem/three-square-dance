@@ -296,8 +296,17 @@ export class SceneManager {
       h.visible = v;
       h.userData.hideInGame = v;
     }
-    if (this._groundMesh) this._groundMesh.visible = v;
+    this._gridOn = v;
+    if (this._groundMesh) this._groundMesh.visible = v && !this._groundSuppressed;
   }
+
+  /** Hide just the solid ground plane (grid lines stay), e.g. in Edit Brush (v4.99.6). */
+  setGroundSuppressed(on: boolean): void {
+    this._groundSuppressed = on;
+    if (this._groundMesh) this._groundMesh.visible = this._gridOn && !on;
+  }
+  private _gridOn = true;
+  private _groundSuppressed = false;
 
   onUpdate(cb: UpdateCallback): void {
     this._updateCallbacks.push(cb);
