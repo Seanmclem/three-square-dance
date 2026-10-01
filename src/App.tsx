@@ -3987,7 +3987,6 @@ export default function App() {
       )}
       {editingBrush && (
         <EditModeBar
-          title="Editing Brush"
           name={editingBrush.name}
           onSave={handleBrushEditSave}
           onCancel={() => handleBrushEditClose()}

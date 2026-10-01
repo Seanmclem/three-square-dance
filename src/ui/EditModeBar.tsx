@@ -4,7 +4,7 @@
  * scene-switching/play are all disabled underneath it.
  */
 export function EditModeBar({ title, name, hint, onSave, onCancel, cancelLabel = "Cancel", status, saveDisabled, confirm }: {
-  title:    string;   // "Editing Prefab"
+  title?:   string;   // "Editing Prefab" (omitted → just the name, as the brush bar does)
   name:     string;
   hint?:    string;   // what Save does (omitted → a narrower bar)
   onSave:   () => void;
@@ -30,7 +30,7 @@ export function EditModeBar({ title, name, hint, onSave, onCancel, cancelLabel =
       boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
     }}>
       <span style={{ color: "#f0c060", fontSize: 12, fontFamily: "monospace" }}>
-        ⬡ {title} · <strong>{name}</strong>
+        {title && <>⬡ {title} · </>}<strong>{name}</strong>
       </span>
       {hint && (
         <span style={{ color: "#b09050", fontSize: 10, fontFamily: "monospace" }}>
