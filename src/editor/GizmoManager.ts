@@ -171,6 +171,13 @@ export class GizmoManager implements IEditorModule {
         this._hoverMute = hovering;
         this._applyControlsEnabled();
       }),
+      // Face / vertex / edge select modes (v4.101.1): no whole-object gizmo, so the
+      // selection stays highlighted and its edges are easy to click; 1 brings it back.
+      this._bus.on("tool:select", ({ tool }) => {
+        const sub = tool === "select-face" || tool === "select-vertex" || tool === "select-edge";
+        if (sub) this._suspends.add("sub-mode"); else this._suspends.delete("sub-mode");
+        this._applyControlsEnabled();
+      }),
       // Longer-lived suspensions (Colliders panel toggle, collider move gizmo).
       this._bus.on("gizmo:suspend", ({ source, suspended }) => {
         if (suspended) this._suspends.add(source); else this._suspends.delete(source);

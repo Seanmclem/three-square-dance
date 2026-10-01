@@ -25,5 +25,5 @@ y = 20; nothing reaches `public/games`.
 - [x] SIZE 2.5 while live → refusal note, brush unchanged.
 - [x] One Cmd+Z → the plain cube (round + adjustments are one step); redo → rounded.
 - [ ] By hand: the curve's texture across the strips reads well; DONE ends the live card.
-- [ ] A clicked edge right under the object's move gizmo goes to the gizmo (pre-existing:
-      the gizmo's pick zones are large); click beside it.
+- [x] (v4.101.1) The object's move gizmo hides in face / vertex / edge mode, so a first
+      click where it used to be picks the edge; 1 brings the gizmo back.
