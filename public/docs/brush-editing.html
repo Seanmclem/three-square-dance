@@ -126,7 +126,8 @@
   <tr><td>LOOP CUT H / V</td><td>Face</td><td>The same split, repeated around the shape until the ring closes or reaches a face that isn't four-sided</td><td>1 per face crossed</td></tr>
   <tr><td>LOOP CUT</td><td>Edge</td><td>The ring that crosses the picked edge</td><td>1 per face crossed</td></tr>
   <tr><td>INSET</td><td>Face</td><td>Shrinks the face 0.25 m inward and surrounds it with a border of four-sided faces</td><td>1 per corner (4 on a square)</td></tr>
-  <tr><td>EXTRUDE / RECESS</td><td>Face</td><td>Moves the face 0.25 m out or in and fills the gap with side faces</td><td>1 per corner</td></tr>
+  <tr><td>EXTRUDE / RECESS</td><td>Face</td><td>Moves the face out or in by DIST (0.25 m unless changed) and fills the gap with side faces</td><td>1 per corner</td></tr>
+  <tr><td>PUSH (gizmo mode)</td><td>Face</td><td>Drag the green cube: the selected face(s) move out or in along their own directions, any distance, no new faces (neighbours stretch)</td><td>0</td></tr>
   <tr><td>SPLIT EDGE</td><td>Edge</td><td>A corner in the middle of the picked edge; both faces beside it gain it</td><td>0</td></tr>
   <tr><td>FLIP FOLD</td><td>Face (bent, four-sided)</td><td>Creases the face along its other diagonal</td><td>0</td></tr>
   <tr><td>SELECT LOOP / AROUND FACE n / SELECT RING</td><td>Edge / Edge / after a loop cut</td><td>Selects corners to move, rotate or scale; changes nothing by itself</td><td>0</td></tr>
@@ -158,7 +159,7 @@
   <li><strong>Selecting:</strong> <kbd>Shift</kbd>+click faces (in the view or the FACES list) to add or remove them; <strong>FACE LOOP H / V</strong> or a double-click selects the whole ring of faces through a face, e.g. every side of a cylinder.</li>
   <li><strong>Material and TILE</strong> in the "N FACES SELECTED" card apply to every selected face ("(mixed)" when they differ).</li>
   <li><strong>INSET</strong> puts one 0.25 m border round the outside of the selection, none between its faces: a 2 × 2 patch then RECESS makes one window; a cylinder band then RECESS makes one groove.</li>
-  <li><strong>EXTRUDE / RECESS</strong> move the selection 0.25 m as one piece: each face moves straight out (or in) along its own direction and grows (or shrinks) to stay joined, so a cylinder band becomes a thicker (or thinner) ring. Side walls appear only round the selection's outer edge.</li>
+  <li><strong>EXTRUDE / RECESS</strong> move the selection by DIST (0.25 m unless changed) as one piece: each face moves straight out (or in) along its own direction and grows (or shrinks) to stay joined, so a cylinder band becomes a thicker (or thinner) ring. Side walls appear only round the selection's outer edge.</li>
   <li>A recess that would turn faces inside out is refused: the brush stays as it was and the card says why.</li>
   <li>The gizmo moves every selected face together. SPLIT, LOOP CUT and FLIP FOLD work on one face at a time.</li>
   <li><strong>GIZMO: MOVE / PUSH.</strong> MOVE slides the selection one way with the arrows. PUSH swaps them for a green cube: drag it right or up to push every selected face out along its own direction, left or down to pull them in (0.05 m steps, <kbd>Alt</kbd> for free). The panel says how far it went, or where it stopped if going further would turn faces inside out.</li>
@@ -187,6 +188,7 @@
   <tr><td><kbd>Shift</kbd>+click a face</td><td>Face mode</td><td>Adds or removes it from the selection</td></tr>
   <tr><td>Double-click a face</td><td>Face mode</td><td>Selects its face loop (the ring of faces through it)</td></tr>
   <tr><td>Drag the gizmo</td><td>Any mode</td><td>Moves the pick (snaps 0.25 m)</td></tr>
+  <tr><td>Drag the green cube</td><td>Face mode, GIZMO PUSH</td><td>Pushes the selected face(s) out / in along their own directions (snaps 0.05 m)</td></tr>
   <tr><td><kbd>T</kbd> <kbd>R</kbd> <kbd>S</kbd></td><td>2+ corners selected</td><td>Move / rotate / scale them together (snaps 0.25 m / 15° / 0.1)</td></tr>
   <tr><td><kbd>Alt</kbd> (held)</td><td>While dragging</td><td>No snapping</td></tr>
   <tr><td><kbd>Esc</kbd></td><td>While dragging</td><td>Cancels, puts everything back</td></tr>
