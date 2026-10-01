@@ -3281,6 +3281,64 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
 // without that the SelectionManager liveness clamp drops the selection (the old
 // pair is no longer traversed once the midpoint is spliced in).
 
+/** Phase 83 ROUND settings, shared across edges and brushes (like EXTRUDE's DIST). */
+let roundStepsNow = 6;
+let roundSizeNow = 0.25;
+let roundStateNow: { shapeId: string | null; live: boolean; count: number; note: string | null } = { shapeId: null, live: false, count: 0, note: null };
+
+/** ROUND (bevel, Phase 83): STEPS and SIZE, then ROUND the selected edge(s). The last
+ *  round stays live: editing STEPS or SIZE rebuilds it (one undo step) until DONE. */
+function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus: EventBus }) {
+  const [steps, setSteps] = useState(String(roundStepsNow));
+  const [size, setSize]   = useState(String(roundSizeNow));
+  const [st, setSt] = useState(roundStateNow);
+  useEffect(() => bus.on("shape:round-state", s => { roundStateNow = s; setSt(s); }), [bus]);
+  const edges = selected.edgeSet ?? (selected.edgeVerts ? [selected.edgeVerts] : []);
+  const live = st.live && st.shapeId === selected.id;
+  const note = st.shapeId === selected.id ? st.note : null;
+  const change = (which: "steps" | "size", v: string) => {
+    if (which === "steps") setSteps(v); else setSize(v);
+    const n = parseFloat(v);
+    if (!Number.isFinite(n) || n <= 0) return;
+    if (which === "steps") roundStepsNow = Math.max(1, Math.min(64, Math.round(n))); else roundSizeNow = n;
+    if (live) bus.emit("shape:round-adjust", { steps: roundStepsNow, size: roundSizeNow });
+  };
+  const doRound = () => bus.emit("shape:round-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges, steps: roundStepsNow, size: roundSizeNow });
+  const field = { ...NUM_INPUT, width: 52, padding: "2px 4px" };
+  return (
+    <div style={{
+      border: `1px solid ${live ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
+      background: live ? "rgba(60,207,145,0.07)" : "transparent", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ ...LABEL, marginBottom: 0 }}>STEPS</span>
+        <input type="number" min={1} max={64} step={1} value={steps} style={field} onChange={e => change("steps", e.target.value)} />
+        <span style={{ ...LABEL, marginBottom: 0, marginLeft: 6 }}>SIZE</span>
+        <input type="number" min={0.01} step={0.05} value={size} style={field} onChange={e => change("size", e.target.value)} />
+        <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+      </div>
+      <button style={edges.length ? OP_BTN : OP_BTN_OFF} disabled={!edges.length} onClick={doRound}
+        title="Round the selected edge(s) into a curve (Shift-click edges to round several at once)">
+        <BrushOpIcon name="round" />ROUND{edges.length > 1 ? ` ${edges.length} EDGES` : edges.length ? " EDGE" : ""}
+      </button>
+      {live && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "#7fe0b5", fontSize: 11, fontFamily: "monospace", flex: 1 }}>
+            ROUNDED {st.count} EDGE{st.count === 1 ? "" : "S"}: change STEPS or SIZE to adjust
+          </span>
+          <button style={OP_BTN} onClick={() => bus.emit("shape:round-done", {})}>DONE</button>
+        </div>
+      )}
+      {note && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{note}</div>}
+      {!live && (
+        <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.4 }}>
+          STEPS 1 = a flat cut-off. Shift-click more edges to round them together (not two that meet at a corner).
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EdgesList({ selected, shape, bus, onObjectUpdate }: {
   selected: SelectedObjectPayload; shape: ShapeDef; bus?: EventBus;
   onObjectUpdate: (c: Partial<WorldObject>) => void;
@@ -3352,7 +3410,8 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
 
   return (
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={LABEL}>EDGE — click a brush face near an edge</div>
+      {bus && <RoundEdgesRow selected={selected} bus={bus} />}
+      <div style={LABEL}>{(selected.edgeSet?.length ?? 0) > 1 ? `${selected.edgeSet!.length} EDGES SELECTED` : "EDGE — click a brush face near an edge"}</div>
       {!edge || !a || !b ? (
         <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
           Click near a brush edge in the canvas to select it.

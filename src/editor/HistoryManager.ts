@@ -22,6 +22,9 @@ export interface Change {
 export interface HistoryEntry {
   label:   string;
   changes: Change[];
+  /** Phase 83: entries pushed with the same key back to back merge into one undo step
+   *  (a live ROUND and its STEPS / SIZE adjustments). */
+  coalesce?: string;
 }
 
 const MAX = 100;
@@ -43,6 +46,16 @@ export class HistoryManager {
   /** Called by WorldState.commitTransaction. */
   push(entry: HistoryEntry): void {
     if (entry.changes.length === 0) return;
+    const top = this._undo[this._undo.length - 1];
+    if (entry.coalesce && top?.coalesce === entry.coalesce && this._redo.length === 0) {
+      // Keep each entity's earliest before, take the newest after.
+      for (const c of entry.changes) {
+        const prev = top.changes.find(p => p.kind === c.kind && p.zoneId === c.zoneId && p.id === c.id);
+        if (prev) prev.after = c.after; else top.changes.push(c);
+      }
+      this._onChange?.();
+      return;
+    }
     if (this._undo.length >= MAX) this._undo.shift();
     this._undo.push(entry);
     this._redo = [];

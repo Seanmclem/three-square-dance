@@ -84,6 +84,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["2+ faces selected"],  action: "Material / TILE apply to all; INSET, EXTRUDE, RECESS act on them as one piece" },
       { keys: ["Panel: GIZMO PUSH"],  action: "Face mode: drag the gizmo's centre box to push the selected face(s) out / in along their own directions" },
       { keys: ["Panel: DIST"],        action: "How far EXTRUDE / RECESS go (default 0.25 m)" },
+      { keys: ["Shift+LMB edge"],     action: "Edge mode: add / remove an edge from the selection" },
+      { keys: ["Panel: ROUND"],       action: "Edge mode: round the selected edge(s) into a curve; STEPS (1 = flat cut-off) and SIZE stay adjustable until DONE" },
       { keys: ["O"],                  action: "SOFT on / off: nearby corners follow a drag part of the way (also the SOFT button in Geometry)" },
       { keys: ["[", "]"],             action: "SOFT on: shrink / grow its radius, also while dragging" },
     ],

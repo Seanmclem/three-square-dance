@@ -51,6 +51,7 @@ export class WorldState {
   private _journal:  Map<string, Change> | null = null;
   private _txDepth   = 0;
   private _txLabel   = "";
+  private _txCoalesce: string | undefined;
   private _applying  = false;
 
   constructor(private readonly _bus: EventBus) {}
@@ -61,14 +62,14 @@ export class WorldState {
   // Wrap a user gesture so every entity it touches (incl. cascades / run-mate sync)
   // becomes one undo step. Nested transactions join the outer one.
 
-  transaction<T>(label: string, fn: () => T): T {
-    this.beginTransaction(label);
+  transaction<T>(label: string, fn: () => T, coalesce?: string): T {
+    this.beginTransaction(label, coalesce);
     try { const r = fn(); this.commitTransaction(); return r; }
     catch (e) { this.abortTransaction(); throw e; }
   }
 
-  beginTransaction(label: string): void {
-    if (this._txDepth++ === 0) { this._txLabel = label; this._journal = new Map(); }
+  beginTransaction(label: string, coalesce?: string): void {
+    if (this._txDepth++ === 0) { this._txLabel = label; this._txCoalesce = coalesce; this._journal = new Map(); }
   }
 
   commitTransaction(): void {
@@ -82,7 +83,7 @@ export class WorldState {
       const after = this._cloneEntity(c.kind, c.zoneId, c.id);
       if (!this._eq(c.before, after)) changes.push({ ...c, after });
     }
-    if (changes.length) this._history?.push({ label: this._txLabel, changes });
+    if (changes.length) this._history?.push({ label: this._txLabel, changes, ...(this._txCoalesce ? { coalesce: this._txCoalesce } : {}) });
   }
 
   abortTransaction(): void { this._txDepth = 0; this._journal = null; }

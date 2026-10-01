@@ -28,7 +28,8 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _selMesh:   THREE.Mesh | null = null;
   private _hoverMesh: THREE.Mesh | null = null;
   private _edgeLines: THREE.LineSegments | null = null;
-  private _edgeTube:  THREE.Mesh | null = null;
+  private _edgeTubes: THREE.Mesh[] = [];
+  private _edgeSet: Array<[number, number]> = [];   // Phase 83: the rest of the edge set
   private _loop: { zoneId: string; shapeId: string; start: LoopCutStart } | null = null;
   private _loopObj:   THREE.Group | null = null;
   private _vset: { zoneId: string; shapeId: string; verts: number[] } | null = null;   // Phase 80
@@ -57,6 +58,7 @@ export class BrushFaceHighlighter implements IEditorModule {
           ? { zoneId: payload.zoneId, shapeId: payload.id, edge: payload.edgeVerts }
           : null;
         this._faceSet = payload.type === "shape" ? (payload.faceSet ?? []) : [];
+        this._edgeSet = payload.type === "shape" ? (payload.edgeSet ?? []) : [];
         this._vset = (payload.type === "shape" && (payload.vertexSet?.length ?? 0) > 1)
           ? { zoneId: payload.zoneId, shapeId: payload.id, verts: payload.vertexSet! }
           : null;
@@ -202,7 +204,14 @@ export class BrushFaceHighlighter implements IEditorModule {
     if ((this._tool === "select-face" || this._tool === "select-edge") && this._shape) {
       this._edgeLines = this._buildEdges(this._shape);
     }
-    if (this._selEdge) this._edgeTube = this._buildEdgeTube(this._selEdge);
+    if (this._selEdge) {
+      const sel = this._selEdge;
+      const all = this._edgeSet.length ? this._edgeSet : [sel.edge];
+      for (const edge of all) {
+        const tube = this._buildEdgeTube({ ...sel, edge });
+        if (tube) this._edgeTubes.push(tube);
+      }
+    }
     if (this._vset && this._tool === "select-vertex") this._setLines = this._buildSetLines(this._vset);
   }
 
@@ -242,11 +251,12 @@ export class BrushFaceHighlighter implements IEditorModule {
   }
 
   private _clearEdgeTube(): void {
-    if (!this._edgeTube) return;
-    this._scene.remove(this._edgeTube);
-    this._edgeTube.geometry.dispose();
-    (this._edgeTube.material as THREE.Material).dispose();
-    this._edgeTube = null;
+    for (const tube of this._edgeTubes) {
+      this._scene.remove(tube);
+      tube.geometry.dispose();
+      (tube.material as THREE.Material).dispose();
+    }
+    this._edgeTubes = [];
   }
 
   private _clear(which: "sel" | "hover"): void {

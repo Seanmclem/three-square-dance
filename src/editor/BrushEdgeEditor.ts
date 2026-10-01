@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud, edgeLoop } from "@/editor/brushOps";
+import { facesFromCloud, edgeLoop, roundEdges } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { IEditorModule, ToolId, ShapeDef, Vec3 } from "@/types";
+import type { IEditorModule, ToolId, ShapeDef, ShapeBrushMesh, Vec3 } from "@/types";
 
 const SNAP = 0.25;
 const SUSPEND_SOURCE = "edge-mode";
@@ -34,6 +34,10 @@ export class BrushEdgeEditor implements IEditorModule {
   private _dragging = false;
   private _dragStart = new THREE.Vector3();
   private _origVertices: Vec3[] | null = null;
+
+  // Phase 83: the last ROUND stays live (STEPS / SIZE rebuild it from `pre`) until DONE,
+  // another selection, or any other change to the mesh (`last` = the mesh we wrote).
+  private _round: { zoneId: string; shapeId: string; pre: ShapeBrushMesh; edges: Array<[number, number]>; key: string; last: string } | null = null;
 
   private readonly _unsubs: Array<() => void> = [];
 
@@ -77,6 +81,7 @@ export class BrushEdgeEditor implements IEditorModule {
         this._sync();
       }),
       this._bus.on("object:selected", payload => {
+        if (this._round && (payload.type !== "shape" || payload.id !== this._round.shapeId)) this._endRound(null);
         if (payload.type === "shape") {
           this._selectedId = payload.id;
           this._zoneId = payload.zoneId;
@@ -88,12 +93,14 @@ export class BrushEdgeEditor implements IEditorModule {
         }
         this._sync();
       }),
-      this._bus.on("object:deselected", () => { this._selectedId = null; this._edge = null; this._sync(); }),
+      this._bus.on("object:deselected", () => { this._selectedId = null; this._edge = null; this._endRound(null); this._sync(); }),
       this._bus.on("shape:removed", ({ id }) => {
         if (id === this._selectedId) { this._selectedId = null; this._edge = null; this._sync(); }
       }),
       this._bus.on("shape:rebuilt", ({ shapeId }) => {
         if (shapeId === this._selectedId && !this._dragging) this._sync();
+        // Any other change to the rounded brush (undo, a drag, another op) ends the live round.
+        if (this._round?.shapeId === shapeId && JSON.stringify(this._roundShape()?.mesh ?? null) !== this._round.last) this._endRound(null);
       }),
       // Phase 80: double-click an edge (its first click selected it) → select its loop.
       this._bus.on("input:dblclick", () => {
@@ -102,6 +109,9 @@ export class BrushEdgeEditor implements IEditorModule {
         if (loop) this._bus.emit("shape:select-vertex-set", { zoneId: this._zoneId!, shapeId: this._selectedId!, verts: loop.verts });
       }),
       this._bus.on("brush:soft-changed", () => { if (this._dragging) this._onGizmoChange(); }),   // Phase 82: [ ] mid-drag
+      this._bus.on("shape:round-edges", ({ zoneId, shapeId, edges, steps, size }) => this._roundEdges(zoneId, shapeId, edges, steps, size)),
+      this._bus.on("shape:round-adjust", ({ steps, size }) => this._adjustRound(steps, size)),
+      this._bus.on("shape:round-done", () => this._endRound(null)),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
@@ -192,6 +202,51 @@ export class BrushEdgeEditor implements IEditorModule {
     if (on === this._suspended) return;
     this._suspended = on;
     this._bus.emit("gizmo:suspend", { source: SUSPEND_SOURCE, suspended: on });
+  }
+
+  // ── Round (Phase 83) ────────────────────────────────────────────────────────
+
+  private _roundShape(): ShapeDef | undefined {
+    const r = this._round;
+    return r ? this._world.zones.get(r.zoneId)?.shapes?.find(s => s.id === r.shapeId) : undefined;
+  }
+
+  private _roundEdges(zoneId: string, shapeId: string, edges: Array<[number, number]>, steps: number, size: number): void {
+    this._endRound(null);
+    const shape = this._world.zones.get(zoneId)?.shapes?.find(s => s.id === shapeId);
+    if (!shape?.mesh) return;
+    const r = roundEdges(shape.mesh, edges, size, steps);
+    if ("refused" in r) { this._bus.emit("shape:round-state", { shapeId, live: false, count: 0, note: r.refused }); return; }
+    const key = `round:${shapeId}:${Date.now()}`;
+    this._round = { zoneId, shapeId, pre: structuredClone(shape.mesh), edges, key, last: "" };
+    this._writeRound(r.mesh);
+    this._bus.emit("shape:round-state", { shapeId, live: true, count: edges.length, note: null });
+  }
+
+  private _adjustRound(steps: number, size: number): void {
+    const t = this._round;
+    if (!t) return;
+    const r = roundEdges(t.pre, t.edges, size, steps);
+    if ("refused" in r) { this._bus.emit("shape:round-state", { shapeId: t.shapeId, live: true, count: t.edges.length, note: r.refused }); return; }
+    this._writeRound(r.mesh);
+    this._bus.emit("shape:round-state", { shapeId: t.shapeId, live: true, count: t.edges.length, note: null });
+  }
+
+  /** One undo step for the round and all its adjustments (same coalesce key). */
+  private _writeRound(mesh: ShapeBrushMesh): void {
+    const t = this._round!;
+    const shape = this._roundShape();
+    if (!shape) return;
+    const next = { ...shape.mesh!, vertices: mesh.vertices, faces: mesh.faces };
+    t.last = JSON.stringify(next);
+    this._world.transaction("round edges", () => this._world.updateShape(t.zoneId, t.shapeId, { mesh: next }), t.key);
+  }
+
+  private _endRound(note: string | null): void {
+    if (!this._round) return;
+    const shapeId = this._round.shapeId;
+    this._round = null;
+    this._bus.emit("shape:round-state", { shapeId, live: false, count: 0, note });
   }
 
   // ── Drag ────────────────────────────────────────────────────────────────────

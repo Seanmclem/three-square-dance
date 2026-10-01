@@ -1223,3 +1223,106 @@ export function softDisplace(
   });
   return { vertices, affected };
 }
+
+// ── Round edges / bevel (Phase 83) ──────────────────────────────────────────
+
+/**
+ * Round each edge (a bevel): the sharp edge becomes a curve of `steps` thin faces
+ * starting `size` back from the edge along the two faces it joins (1 step = a flat
+ * cut-off). Edges are vertex-index pairs; they may share faces but not corners. The
+ * curve at each end is `C + (pA − C) cos θ + (pB − C) sin θ`, C = pA + pB − corner:
+ * tangent to both faces (a circular arc on a right angle). When three faces meet at a
+ * corner the third face takes the curve in place of the corner; with more faces there,
+ * the curve's ends are spliced into the two rail faces and a flat patch fills the gap.
+ * Unused corners are compacted away. Refused (with a reason) rather than half-applied.
+ */
+export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>, size: number, steps: number): RegionOpResult {
+  if (!mesh.faces?.length) return { refused: "Only edited brushes (with faces) can be rounded." };
+  if (!edges.length) return { refused: "Select an edge first." };
+  if (!(size > 0) || !Number.isFinite(size)) return { refused: "SIZE must be more than 0." };
+  steps = Math.max(1, Math.min(64, Math.round(steps)));
+  const ends = edges.flat();
+  if (new Set(ends).size !== ends.length) return { refused: "Two of the selected edges meet at a corner; rounding both isn't supported yet." };
+
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  let faces = cloneFaces(mesh.faces);
+  const r4 = (n: number) => +n.toFixed(4);
+  const findDirected = (p: number, q: number) => faces.findIndex(f => f.verts.some((v, i) => v === p && f.verts[(i + 1) % f.verts.length] === q));
+  const at = (f: BrushFace, v: number, off: number) => { const L = f.verts.length, i = f.verts.indexOf(v); return f.verts[(i + off + L) % L]!; };
+
+  for (const [a, b] of edges) {
+    const fa = findDirected(a, b), fb = findDirected(b, a);
+    if (fa < 0 || fb < 0) return { refused: "That edge isn't between two faces." };
+    const FA = faces[fa]!, FB = faces[fb]!;
+    // Rails: the other edge of FA / FB at each end.
+    const naA = at(FA, a, -1), nbA = at(FA, b, +1), naB = at(FB, a, +1), nbB = at(FB, b, -1);
+    const railPoint = (end: number, toward: number): Vec3 | null => {
+      const e = vertices[end]!, t = vertices[toward]!;
+      const len = Math.hypot(t.x - e.x, t.y - e.y, t.z - e.z);
+      if (size >= len - 1e-4) return null;
+      const k = size / len;
+      return { x: e.x + (t.x - e.x) * k, y: e.y + (t.y - e.y) * k, z: e.z + (t.z - e.z) * k };
+    };
+    const pA = [railPoint(a, naA), railPoint(a, naB)], pB = [railPoint(b, nbA), railPoint(b, nbB)];
+    if (pA.some(p => !p) || pB.some(p => !p)) return { refused: "SIZE is too big: the curve would run past the next corner." };
+    const curve = (corner: Vec3, p0: Vec3, p1: Vec3): number[] => {
+      const C = { x: p0.x + p1.x - corner.x, y: p0.y + p1.y - corner.y, z: p0.z + p1.z - corner.z };
+      return Array.from({ length: steps + 1 }, (_, i) => {
+        const t = (i / steps) * Math.PI / 2, c = Math.cos(t), s = Math.sin(t);
+        vertices.push({
+          x: r4(C.x + (p0.x - C.x) * c + (p1.x - C.x) * s),
+          y: r4(C.y + (p0.y - C.y) * c + (p1.y - C.y) * s),
+          z: r4(C.z + (p0.z - C.z) * c + (p1.z - C.z) * s),
+        });
+        return vertices.length - 1;
+      });
+    };
+    const A = curve(vertices[a]!, pA[0]!, pA[1]!);   // A[0] on FA's rail, A[steps] on FB's
+    const B = curve(vertices[b]!, pB[0]!, pB[1]!);
+
+    // Rail faces / end faces, found before FA / FB change.
+    const g1 = findDirected(a, naA), gk = findDirected(naB, a);   // around a
+    const h1 = findDirected(nbA, b), hk = findDirected(b, nbB);   // around b
+    if (g1 < 0 || gk < 0 || h1 < 0 || hk < 0) return { refused: "That edge's corners aren't closed; nothing changed." };
+
+    const swap = (fi: number, from: number, to: number) => { faces[fi] = { ...faces[fi]!, verts: faces[fi]!.verts.map(v => v === from ? to : v) }; };
+    swap(fa, a, A[0]!); swap(fa, b, B[0]!);
+    swap(fb, a, A[steps]!); swap(fb, b, B[steps]!);
+    const stripMat = { material: FA.material, materialOverrides: FA.materialOverrides ? structuredClone(FA.materialOverrides) : undefined };
+    for (let i = 0; i < steps; i++) faces.push({ verts: [B[i]!, A[i]!, A[i + 1]!, B[i + 1]!], ...stripMat });
+
+    // End at a: the curve runs A[steps] → … → A[0] in the end face (or patch).
+    const insertAfter = (fi: number, v: number, add: number) => { const vs = [...faces[fi]!.verts]; vs.splice(vs.indexOf(v) + 1, 0, add); faces[fi] = { ...faces[fi]!, verts: vs }; };
+    const insertBefore = (fi: number, v: number, add: number) => { const vs = [...faces[fi]!.verts]; vs.splice(vs.indexOf(v), 0, add); faces[fi] = { ...faces[fi]!, verts: vs }; };
+    const replaceWith = (fi: number, v: number, run: number[]) => { const vs = [...faces[fi]!.verts]; vs.splice(vs.indexOf(v), 1, ...run); faces[fi] = { ...faces[fi]!, verts: vs }; };
+    if (g1 === gk) {
+      replaceWith(g1, a, [...A].reverse());
+    } else {
+      insertAfter(g1, a, A[0]!);           // a → A0 → naA
+      insertBefore(gk, a, A[steps]!);      // naB → A_s → a
+      const src = faces[g1]!;
+      faces.push({ verts: [a, ...[...A].reverse()], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
+    }
+    // End at b: B[0] → … → B[steps].
+    if (h1 === hk) {
+      replaceWith(h1, b, [...B]);
+    } else {
+      insertBefore(h1, b, B[0]!);          // nbA → B0 → b
+      insertAfter(hk, b, B[steps]!);       // b → B_s → nbB
+      const src = faces[h1]!;
+      faces.push({ verts: [b, ...B], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
+    }
+    // Faces that changed corner count can't keep a 4-corner fold choice.
+    faces = faces.map(f => (f.fold !== undefined && f.verts.length !== 4) ? (({ fold: _f, ...rest }) => rest)(f) : f);
+  }
+
+  // Compact: drop corners no face uses any more (the rounded edges' old ends).
+  const used = new Set(faces.flatMap(f => f.verts));
+  const remap = new Map<number, number>();
+  const outVerts: Vec3[] = [];
+  vertices.forEach((v, i) => { if (used.has(i)) { remap.set(i, outVerts.length); outVerts.push(v); } });
+  const out = { vertices: outVerts, faces: faces.map(f => ({ ...f, verts: f.verts.map(v => remap.get(v)!) })) };
+  const err = validateMesh(out);
+  if (err) return { refused: `Rounding would break the brush (${err}); nothing changed.` };
+  return { mesh: out };
+}
