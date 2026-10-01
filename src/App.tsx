@@ -36,6 +36,7 @@ import { DEFAULT_PLAYER_SETTINGS, resolvePlayerSettings, type SettingsPage } fro
 import { reexpandInstance, unlinkInstance, deleteInstance, captureSnapshotPrefab, captureInstanceToPrefab, removeEntities, instantiatePrefab, findInstances, collectInstanceMembers } from "@/prefab/expand";
 import { PrefabEditSession } from "@/prefab/PrefabEditSession";
 import { EditModeBar } from "@/ui/EditModeBar";
+import { SelectModeBar } from "@/ui/SelectModeBar";
 import { BrushEditSession, BRUSH_EDIT_ZONE } from "@/editor/BrushEditSession";
 import { isBrush } from "@/builders/ShapeBuilder";
 import { NodeDragger } from "@/editor/NodeDragger";
@@ -3984,6 +3985,11 @@ export default function App() {
           onSave={handlePrefabEditSave}
           onCancel={handlePrefabEditCancel}
         />
+      )}
+      {editingBrush && (
+        // One-click select modes in the brush editor (same as the 1–4 keys).
+        <SelectModeBar activeTool={activeTool}
+          onSelect={tool => { setActiveTool(tool); busRef.current.emit("tool:select", { tool }); }} />
       )}
       {editingBrush && (
         <EditModeBar
