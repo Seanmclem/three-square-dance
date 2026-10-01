@@ -29,6 +29,7 @@ import { BrushFaceEditor } from "@/editor/BrushFaceEditor";
 import { BrushEdgeEditor } from "@/editor/BrushEdgeEditor";
 import { BrushSetEditor } from "@/editor/BrushSetEditor";
 import { SoftFalloffController } from "@/editor/softFalloff";
+import { BrushRoundController } from "@/editor/BrushRoundController";
 import { ObjectTool } from "@/editor/ObjectTool";
 import { PrefabTool } from "@/editor/PrefabTool";
 import { GENERATORS } from "@/prefab/generators";
@@ -493,6 +494,7 @@ export default function App() {
     const brushEdgeEditor    = new BrushEdgeEditor(scene.scene, world, bus, scene.camera, canvas);
     const brushSetEditor     = new BrushSetEditor(scene.scene, world, bus, scene.camera, canvas);
     const softFalloff        = new SoftFalloffController(scene.scene, bus);
+    const brushRounds        = new BrushRoundController(world, bus);
     const objectTool         = new ObjectTool(scene.scene, world, bus, history, assetManager);
     const prefabTool         = new PrefabTool(scene.scene, world, bus);
     const nodeDragger    = new NodeDragger(scene.scene, world, bus, scene.camera);
@@ -574,6 +576,7 @@ export default function App() {
     brushEdgeEditor.init();
     brushSetEditor.init();
     softFalloff.init();
+    brushRounds.init();
     objectTool.init();
     prefabTool.init();
     nodeDragger.init();
@@ -1226,6 +1229,7 @@ export default function App() {
       brushEdgeEditor.dispose();
       brushSetEditor.dispose();
       softFalloff.dispose();
+      brushRounds.dispose();
       brushFaceEditor.dispose();
       brushFaceHighlighter.dispose();
       brushVertexEditor.dispose();

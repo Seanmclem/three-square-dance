@@ -1236,7 +1236,7 @@ export function softDisplace(
  * the curve's ends are spliced into the two rail faces and a flat patch fills the gap.
  * Unused corners are compacted away. Refused (with a reason) rather than half-applied.
  */
-export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>, size: number, steps: number): RegionOpResult {
+export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>, size: number, steps: number, id = `r${Math.random().toString(36).slice(2, 8)}`): RegionOpResult {
   if (!mesh.faces?.length) return { refused: "Only edited brushes (with faces) can be rounded." };
   if (!edges.length) return { refused: "Select an edge first." };
   if (!(size > 0) || !Number.isFinite(size)) return { refused: "SIZE must be more than 0." };
@@ -1250,7 +1250,7 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
   const findDirected = (p: number, q: number) => faces.findIndex(f => f.verts.some((v, i) => v === p && f.verts[(i + 1) % f.verts.length] === q));
   const at = (f: BrushFace, v: number, off: number) => { const L = f.verts.length, i = f.verts.indexOf(v); return f.verts[(i + off + L) % L]!; };
 
-  for (const [a, b] of edges) {
+  for (const [part, [a, b]] of edges.entries()) {
     const fa = findDirected(a, b), fb = findDirected(b, a);
     if (fa < 0 || fb < 0) return { refused: "That edge isn't between two faces." };
     const FA = faces[fa]!, FB = faces[fb]!;
@@ -1288,7 +1288,9 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
     const swap = (fi: number, from: number, to: number) => { faces[fi] = { ...faces[fi]!, verts: faces[fi]!.verts.map(v => v === from ? to : v) }; };
     swap(fa, a, A[0]!); swap(fa, b, B[0]!);
     swap(fb, a, A[steps]!); swap(fb, b, B[steps]!);
-    const stripMat = { material: FA.material, materialOverrides: FA.materialOverrides ? structuredClone(FA.materialOverrides) : undefined };
+    // Phase 84: every curve face remembers the curve (sig is filled in once it's built).
+    const tag = { id, part, steps, size, a: { ...vertices[a]! }, b: { ...vertices[b]! }, sig: "" };
+    const stripMat = { material: FA.material, materialOverrides: FA.materialOverrides ? structuredClone(FA.materialOverrides) : undefined, round: tag };
     for (let i = 0; i < steps; i++) faces.push({ verts: [B[i]!, A[i]!, A[i + 1]!, B[i + 1]!], ...stripMat });
 
     // End at a: the curve runs A[steps] → … → A[0] in the end face (or patch).
@@ -1301,7 +1303,7 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
       insertAfter(g1, a, A[0]!);           // a → A0 → naA
       insertBefore(gk, a, A[steps]!);      // naB → A_s → a
       const src = faces[g1]!;
-      faces.push({ verts: [a, ...[...A].reverse()], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
+      faces.push({ verts: [a, ...[...A].reverse()], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined, round: { ...tag, patch: true } });
     }
     // End at b: B[0] → … → B[steps].
     if (h1 === hk) {
@@ -1310,7 +1312,7 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
       insertBefore(h1, b, B[0]!);          // nbA → B0 → b
       insertAfter(hk, b, B[steps]!);       // b → B_s → nbB
       const src = faces[h1]!;
-      faces.push({ verts: [b, ...B], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined });
+      faces.push({ verts: [b, ...B], material: src.material, materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined, round: { ...tag, patch: true } });
     }
     // Faces that changed corner count can't keep a 4-corner fold choice.
     faces = faces.map(f => (f.fold !== undefined && f.verts.length !== 4) ? (({ fold: _f, ...rest }) => rest)(f) : f);
@@ -1324,7 +1326,126 @@ export function roundEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>,
   const out = { vertices: outVerts, faces: faces.map(f => ({ ...f, verts: f.verts.map(v => remap.get(v)!) })) };
   const err = validateMesh(out);
   if (err) return { refused: `Rounding would break the brush (${err}); nothing changed.` };
+  stampRoundSig(out, id);
   return { mesh: out };
+}
+
+// ── Editable curves (Phase 84) ───────────────────────────────────────────────
+
+/** Fingerprint of a curve: the positions of every corner its faces use, sorted. */
+export function roundSig(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string): string {
+  const vs = new Set<number>();
+  for (const f of mesh.faces) if (f.round?.id === id) f.verts.forEach(v => vs.add(v));
+  return [...vs].map(i => { const v = mesh.vertices[i]!; return `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`; }).sort().join(";");
+}
+
+function stampRoundSig(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string): void {
+  const sig = roundSig(mesh, id);
+  mesh.faces = mesh.faces.map(f => f.round?.id === id ? { ...f, round: { ...f.round, sig } } : f);
+}
+
+export interface RoundInfo { id: string; parts: number[]; steps: number; size: number; edited: boolean; faces: number[] }
+
+/** The curves on a brush, in the order they first appear in the face list. */
+export function roundsOf(mesh: { vertices: Vec3[]; faces?: BrushFace[] }): RoundInfo[] {
+  const out = new Map<string, RoundInfo>();
+  (mesh.faces ?? []).forEach((f, fi) => {
+    const r = f.round;
+    if (!r) return;
+    const info = out.get(r.id) ?? { id: r.id, parts: [], steps: r.steps, size: r.size, edited: false, faces: [] };
+    if (!info.parts.includes(r.part)) info.parts.push(r.part);
+    info.faces.push(fi);
+    out.set(r.id, info);
+  });
+  for (const info of out.values()) {
+    const sig = mesh.faces![info.faces[0]!]!.round!.sig;
+    info.edited = roundSig({ vertices: mesh.vertices, faces: mesh.faces! }, info.id) !== sig;
+    info.parts.sort((p, q) => p - q);
+  }
+  return [...out.values()];
+}
+
+/** The curve a face belongs to, or (for an edge) one of its two faces does. */
+export function roundAt(mesh: { faces?: BrushFace[] }, pick: { face?: number; edge?: [number, number] }): string | null {
+  const faces = mesh.faces ?? [];
+  if (pick.face !== undefined) return faces[pick.face]?.round?.id ?? null;
+  if (pick.edge) {
+    const [a, b] = pick.edge;
+    for (const f of faces) {
+      if (!f.round) continue;
+      if (f.verts.some((v, i) => { const w = f.verts[(i + 1) % f.verts.length]!; return (v === a && w === b) || (v === b && w === a); })) return f.round.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * MAKE SHARP: remove a curve's faces and merge each end of each of its edges back into
+ * one corner (the corner that was there, or one at the remembered position). Works on
+ * a hand-edited curve too, as long as the result is still a valid brush; otherwise
+ * refused. Returns the sharp edges as vertex pairs, in part order, for re-rounding.
+ */
+export function unroundEdges(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string): { mesh: BrushMeshData; edges: Array<[number, number]> } | { refused: string } {
+  const tagged = mesh.faces.filter(f => f.round?.id === id);
+  if (!tagged.length) return { refused: "That curve isn't on this brush any more." };
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const parts = [...new Set(tagged.map(f => f.round!.part))].sort((p, q) => p - q);
+  const target = new Map<number, number>();   // curve corner → corner it merges into
+  const ends: Array<[number, number]> = [];
+  const d2 = (v: Vec3, p: Vec3) => (v.x - p.x) ** 2 + (v.y - p.y) ** 2 + (v.z - p.z) ** 2;
+  for (const part of parts) {
+    const pf = tagged.filter(f => f.round!.part === part);
+    const { a, b } = pf[0]!.round!;
+    // A patch's own corner (not on any strip) is the surviving original corner.
+    const stripVerts = new Set(pf.filter(f => !f.round!.patch).flatMap(f => f.verts));
+    const keep = new Set<number>();
+    const endFor = (p: Vec3): number => {
+      for (const f of pf) if (f.round!.patch) for (const v of f.verts) if (!stripVerts.has(v) && d2(vertices[v]!, p) < 1e-6) { keep.add(v); return v; }
+      vertices.push({ ...p });
+      return vertices.length - 1;
+    };
+    const ta = endFor(a), tb = endFor(b);
+    ends.push([ta, tb]);
+    for (const f of pf) for (const v of f.verts) {
+      if (keep.has(v) || target.has(v)) continue;
+      target.set(v, d2(vertices[v]!, a) <= d2(vertices[v]!, b) ? ta : tb);
+    }
+  }
+  const faces: BrushFace[] = [];
+  for (const f of mesh.faces) {
+    if (f.round?.id === id) continue;
+    const vs: number[] = [];
+    for (const v of f.verts.map(v => target.get(v) ?? v)) if (vs[vs.length - 1] !== v) vs.push(v);
+    while (vs.length > 1 && vs[0] === vs[vs.length - 1]) vs.pop();
+    if (vs.length >= 3) faces.push({ ...f, verts: vs });
+  }
+  const used = new Set(faces.flatMap(f => f.verts));
+  const remap = new Map<number, number>();
+  const outVerts: Vec3[] = [];
+  vertices.forEach((v, i) => { if (used.has(i)) { remap.set(i, outVerts.length); outVerts.push(v); } });
+  const out = { vertices: outVerts, faces: faces.map(f => ({ ...f, verts: f.verts.map(v => remap.get(v)!) })) };
+  const err = validateMesh(out);
+  if (err || ends.some(([p, q]) => !remap.has(p) || !remap.has(q))) return { refused: "This curve was changed too much by hand to make sharp again; nothing changed." };
+  return { mesh: out, edges: ends.map(([p, q]) => [remap.get(p)!, remap.get(q)!]) };
+}
+
+/** SPLIT: give one edge of a curve (or every edge, part omitted) its own curve id. */
+export function splitRound(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string, part?: number): BrushMeshData {
+  const tagged = mesh.faces.filter(f => f.round?.id === id);
+  const parts = [...new Set(tagged.map(f => f.round!.part))];
+  // A hand-edited curve stays marked as edited after the split (no fresh fingerprint).
+  const edited = !!tagged.length && roundSig(mesh, id) !== tagged[0]!.round!.sig;
+  const fresh = new Map(parts.filter(p => part === undefined || p === part).map(p => [p, `${id}.${p}`]));
+  const out = {
+    vertices: mesh.vertices,
+    faces: mesh.faces.map(f => (f.round?.id === id && fresh.has(f.round.part)) ? { ...f, round: { ...f.round, id: fresh.get(f.round.part)!, part: 0 } } : f),
+  };
+  const restamp = (rid: string) => edited
+    ? (out.faces = out.faces.map(f => f.round?.id === rid ? { ...f, round: { ...f.round, sig: "edited" } } : f))
+    : stampRoundSig(out, rid);
+  for (const nid of fresh.values()) restamp(nid);
+  if (part !== undefined && parts.length > 1) restamp(id);
+  return out;
 }
 
 // ── Wrapped texture mapping (v4.101.2) ───────────────────────────────────────

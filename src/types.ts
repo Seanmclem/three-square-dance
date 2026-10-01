@@ -269,11 +269,17 @@ export interface BusEvents {
   "shape:face-gizmo-mode": { mode: "move" | "push" };
   // A PUSH drag finished: how far, or why it stopped short (panel note).
   "shape:face-push-done":  { dist: number; refused: string | null };
-  // Phase 83: ROUND (bevel) the given edges; adjust / end the live round; its state for the panel.
+  // Phase 83/84: ROUND (bevel) the given edges; open / adjust / close a curve; MAKE SHARP;
+  // SPLIT a curve's edges apart; the open curve's state for the panel (BrushRoundController).
   "shape:round-edges":     { zoneId: string; shapeId: string; edges: Array<[number, number]>; steps: number; size: number };
+  "shape:round-open":      { zoneId: string; shapeId: string; roundId: string };
   "shape:round-adjust":    { steps: number; size: number };
   "shape:round-done":      Record<string, never>;
-  "shape:round-state":     { shapeId: string | null; live: boolean; count: number; note: string | null };
+  "shape:round-sharp":     { zoneId: string; shapeId: string; roundId: string };
+  "shape:round-split":     { zoneId: string; shapeId: string; roundId: string; part?: number };
+  "shape:round-state":     { shapeId: string | null; roundId: string | null; open: boolean; count: number; steps: number; size: number; edited: boolean; note: string | null };
+  // Phase 84: green overlays on a set of brush faces (the open curve, or a hovered list row).
+  "shape:faces-highlight": { zoneId: string; shapeId: string; faces: number[] | null; channel: "round" | "hover" };
   // Phase 82: soft falloff settings changed (panel, O / [ ] keys); drag editors re-apply mid-drag.
   "brush:soft-changed":    { on: boolean; radius: number; curve: "smooth" | "linear" | "sharp" };
   // Phase 82: corners following the current soft drag (world space, w = how much), for the dots.
@@ -965,6 +971,12 @@ export interface BrushFace {
   /** 4-vert faces only: which diagonal a bent face folds along (0 = verts[0]–verts[2],
    *  1 = verts[1]–verts[3]). Absent → auto (the fold that bulges outward). */
   fold?:              0 | 1;
+  /** Phase 84: this face is part of a ROUND curve. Every face of the curve carries the
+   *  whole record (so it survives any op that copies faces): which curve (`id`) and
+   *  which of its edges (`part`), its STEPS / SIZE, where the sharp edge was (`a`, `b`),
+   *  `patch` for the fill face at a corner with 4+ faces, and `sig`, a fingerprint of
+   *  the curve's corners when it was built (a mismatch = edited by hand). */
+  round?: { id: string; part: number; steps: number; size: number; a: Vec3; b: Vec3; patch?: true; sig: string };
 }
 
 /**

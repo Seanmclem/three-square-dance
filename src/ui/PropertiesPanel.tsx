@@ -18,7 +18,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, roundsOf, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2515,13 +2515,13 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
   // Sub-object modes (Phase 23): face/vertex lists replace the param view.
   // Phase 82: the SOFT row sits above each list (it applies to every corner drag).
   if (faceBrush && activeTool === "select-face") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-vertex") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-edge") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
 
   return (
@@ -2575,6 +2575,8 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
           <span style={{ color: "#8b94a8", fontSize: 10, letterSpacing: 1 }}>RESIZE HANDLES</span>
         </label>
       )}
+
+      {faceBrush && bus && <div style={{ margin: "0 -12px" }}><CurvesList selected={selected} shape={shape} bus={bus} /></div>}
 
       <div>
         <div style={LABEL}>BRUSH</div>
@@ -3281,35 +3283,37 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
 // without that the SelectionManager liveness clamp drops the selection (the old
 // pair is no longer traversed once the midpoint is spliced in).
 
-/** Phase 83 ROUND settings, shared across edges and brushes (like EXTRUDE's DIST). */
+/** Phase 83 ROUND settings for the next round, shared across edges and brushes (like
+ *  EXTRUDE's DIST); Phase 84 open-curve state from BrushRoundController. */
 let roundStepsNow = 6;
 let roundSizeNow = 0.25;
-let roundStateNow: { shapeId: string | null; live: boolean; count: number; note: string | null } = { shapeId: null, live: false, count: 0, note: null };
+type RoundState = { shapeId: string | null; roundId: string | null; open: boolean; count: number; steps: number; size: number; edited: boolean; note: string | null };
+let roundStateNow: RoundState = { shapeId: null, roundId: null, open: false, count: 0, steps: 0, size: 0, edited: false, note: null };
 
-/** ROUND (bevel, Phase 83): STEPS and SIZE, then ROUND the selected edge(s). The last
- *  round stays live: editing STEPS or SIZE rebuilds it (one undo step) until DONE. */
+function useRoundState(bus: EventBus): RoundState {
+  const [st, setSt] = useState(roundStateNow);
+  useEffect(() => bus.on("shape:round-state", s => { roundStateNow = s; setSt(s); }), [bus]);
+  return st;
+}
+
+/** Edge mode: STEPS and SIZE, then ROUND the selected edge(s). Hidden while a curve is
+ *  open (its card in CurvesList takes over); picking a plain edge closes the curve. */
 function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus: EventBus }) {
   const [steps, setSteps] = useState(String(roundStepsNow));
   const [size, setSize]   = useState(String(roundSizeNow));
-  const [st, setSt] = useState(roundStateNow);
-  useEffect(() => bus.on("shape:round-state", s => { roundStateNow = s; setSt(s); }), [bus]);
+  const st = useRoundState(bus);
   const edges = selected.edgeSet ?? (selected.edgeVerts ? [selected.edgeVerts] : []);
-  const live = st.live && st.shapeId === selected.id;
+  if (st.open && st.shapeId === selected.id) return null;
   const note = st.shapeId === selected.id ? st.note : null;
   const change = (which: "steps" | "size", v: string) => {
     if (which === "steps") setSteps(v); else setSize(v);
     const n = parseFloat(v);
     if (!Number.isFinite(n) || n <= 0) return;
     if (which === "steps") roundStepsNow = Math.max(1, Math.min(64, Math.round(n))); else roundSizeNow = n;
-    if (live) bus.emit("shape:round-adjust", { steps: roundStepsNow, size: roundSizeNow });
   };
-  const doRound = () => bus.emit("shape:round-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges, steps: roundStepsNow, size: roundSizeNow });
   const field = { ...NUM_INPUT, width: 52, padding: "2px 4px" };
   return (
-    <div style={{
-      border: `1px solid ${live ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
-      background: live ? "rgba(60,207,145,0.07)" : "transparent", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6,
-    }}>
+    <div style={{ border: "1px solid rgba(255,255,255,0.1)", borderRadius: 5, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ ...LABEL, marginBottom: 0 }}>STEPS</span>
         <input type="number" min={1} max={64} step={1} value={steps} style={field} onChange={e => change("steps", e.target.value)} />
@@ -3317,24 +3321,111 @@ function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus
         <input type="number" min={0.01} step={0.05} value={size} style={field} onChange={e => change("size", e.target.value)} />
         <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
       </div>
-      <button style={edges.length ? OP_BTN : OP_BTN_OFF} disabled={!edges.length} onClick={doRound}
+      <button style={edges.length ? OP_BTN : OP_BTN_OFF} disabled={!edges.length}
+        onClick={() => bus.emit("shape:round-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges, steps: roundStepsNow, size: roundSizeNow })}
         title="Round the selected edge(s) into a curve (Shift-click edges to round several at once)">
         <BrushOpIcon name="round" />ROUND{edges.length > 1 ? ` ${edges.length} EDGES` : edges.length ? " EDGE" : ""}
       </button>
-      {live && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "#7fe0b5", fontSize: 11, fontFamily: "monospace", flex: 1 }}>
-            ROUNDED {st.count} EDGE{st.count === 1 ? "" : "S"}: change STEPS or SIZE to adjust
-          </span>
-          <button style={OP_BTN} onClick={() => bus.emit("shape:round-done", {})}>DONE</button>
-        </div>
-      )}
       {note && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{note}</div>}
-      {!live && (
-        <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.4 }}>
-          STEPS 1 = a flat cut-off. Shift-click more edges to round them together (not two that meet at a corner).
-        </div>
-      )}
+      <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.4 }}>
+        STEPS 1 = a flat cut-off. Shift-click more edges to round them together (not two that meet at a corner).
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Phase 84: the brush's curves. Every mode of the Geometry screen lists them; the open
+ * one (just made, picked in the view, or EDIT here) shows its card: STEPS / SIZE rebuild
+ * it (one undo per open), MAKE SHARP, DONE, SPLIT for curves of several edges. Hovering a
+ * row lights its faces green.
+ */
+function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload; shape: ShapeDef; bus: EventBus }) {
+  const st = useRoundState(bus);
+  const rounds = shape.mesh?.faces ? roundsOf(shape.mesh) : [];
+  const open = st.open && st.shapeId === selected.id ? rounds.find(r => r.id === st.roundId) : undefined;
+  const [steps, setSteps] = useState("");
+  const [size, setSize]   = useState("");
+  // Fields follow the open curve (a new open, undo / redo); typing keeps its draft.
+  useEffect(() => { setSteps(String(st.steps)); setSize(String(st.size)); }, [st.roundId, st.steps, st.size]);
+  // A row can vanish under the mouse (SPLIT, MAKE SHARP): drop its hover highlight.
+  useEffect(() => () => bus.emit("shape:faces-highlight", { zoneId: selected.zoneId, shapeId: selected.id, faces: null, channel: "hover" }), [bus, selected.zoneId, selected.id, shape.mesh?.faces?.length]);
+  if (!rounds.length) return null;
+  const ids = { zoneId: selected.zoneId, shapeId: selected.id };
+  const hover = (faces: number[] | null) => bus.emit("shape:faces-highlight", { ...ids, faces, channel: "hover" });
+  const adjust = (which: "steps" | "size", v: string) => {
+    if (which === "steps") setSteps(v); else setSize(v);
+    const s = parseFloat(which === "steps" ? v : steps), z = parseFloat(which === "size" ? v : size);
+    if (!(s >= 1) || !(z > 0)) return;
+    bus.emit("shape:round-adjust", { steps: Math.min(64, Math.round(s)), size: z });
+  };
+  const field = { ...NUM_INPUT, width: 52, padding: "2px 4px" };
+  const desc = (r: { parts: number[]; steps: number; size: number }) =>
+    `${r.parts.length > 1 ? `${r.parts.length} edges · ` : ""}${r.steps === 1 ? "flat cut" : `${r.steps} steps`} · ${+r.size.toFixed(3)} m`;
+  return (
+    <div style={{ padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ ...LABEL, marginBottom: 0 }}>CURVES ON THIS BRUSH</div>
+      {rounds.map((r, n) => {
+        const isOpen = open?.id === r.id;
+        return (
+          <div key={r.id} onMouseEnter={() => hover(r.faces)} onMouseLeave={() => hover(null)}
+            style={{
+              border: `1px solid ${isOpen ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
+              background: isOpen ? "rgba(60,207,145,0.07)" : "transparent", padding: "5px 8px", display: "flex", flexDirection: "column", gap: 6,
+            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ flex: 1, color: isOpen ? "#7fe0b5" : "#dde3f0", fontSize: 11, fontFamily: "monospace" }}>
+                Curve {n + 1} · {desc(r)}{r.edited ? " · edited by hand" : ""}
+              </span>
+              {!isOpen && <button style={OP_BTN} onClick={() => bus.emit("shape:round-open", { ...ids, roundId: r.id })}>EDIT</button>}
+            </div>
+            {isOpen && (
+              <>
+                {r.edited ? (
+                  <div style={{ color: "#c2cadb", fontSize: 10, lineHeight: 1.4 }}>
+                    Its corners were moved by hand, so STEPS and SIZE can't rebuild it. MAKE SHARP still puts the edge back.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ ...LABEL, marginBottom: 0 }}>STEPS</span>
+                    <input type="number" min={1} max={64} step={1} value={steps} style={field} onChange={e => adjust("steps", e.target.value)} />
+                    <span style={{ ...LABEL, marginBottom: 0, marginLeft: 6 }}>SIZE</span>
+                    <input type="number" min={0.01} step={0.05} value={size} style={field} onChange={e => adjust("size", e.target.value)} />
+                    <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button style={OP_BTN} title="Remove the curve and put the sharp edge(s) back"
+                    onClick={() => bus.emit("shape:round-sharp", { ...ids, roundId: r.id })}>MAKE SHARP</button>
+                  <button style={OP_BTN} onClick={() => bus.emit("shape:round-done", {})}>DONE</button>
+                </div>
+                {r.parts.length > 1 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ flex: 1, color: "#c2cadb", fontSize: 10 }}>Its {r.parts.length} edges change together.</span>
+                      <button style={OP_BTN} title="Make every edge of this curve its own curve"
+                        onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id })}>SPLIT ALL</button>
+                    </div>
+                    {r.parts.map((part, k) => {
+                      const faces = r.faces.filter(fi => shape.mesh!.faces![fi]!.round!.part === part);
+                      return (
+                        <div key={part} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 8 }}
+                          onMouseEnter={() => hover(faces)} onMouseLeave={() => hover(r.faces)}>
+                          <span style={{ flex: 1, color: "#dde3f0", fontSize: 10, fontFamily: "monospace" }}>edge {k + 1}</span>
+                          <button style={OP_BTN} title="Make this edge its own curve"
+                            onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id, part })}>SPLIT OFF</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {st.note && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{st.note}</div>}
+              </>
+            )}
+          </div>
+        );
+      })}
+      {!open && st.note && st.shapeId === selected.id && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{st.note}</div>}
     </div>
   );
 }

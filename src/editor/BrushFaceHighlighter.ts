@@ -36,6 +36,9 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _setLines:  THREE.LineSegments | null = null;
   private _faceSet: number[] = [];                // Phase 81: the rest of the face set
   private _setOverlays: THREE.Mesh[] = [];
+  // Phase 84: green overlays for the open ROUND curve and a hovered CURVES row.
+  private _green: Record<"round" | "hover", { zoneId: string; shapeId: string; faces: number[] } | null> = { round: null, hover: null };
+  private _greenOverlays: THREE.Mesh[] = [];
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -73,6 +76,10 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._loop = start ? { zoneId, shapeId, start } : null;
         this._refreshLoop();
       }),
+      this._bus.on("shape:faces-highlight", ({ zoneId, shapeId, faces, channel }) => {
+        this._green[channel] = faces?.length ? { zoneId, shapeId, faces } : null;
+        this._refresh();
+      }),
       this._bus.on("shape:face-hover", ({ zoneId, shapeId, faceIndex }) => {
         this._hovered = faceIndex === null ? null : { zoneId, shapeId, faceIndex };
         this._refresh();
@@ -89,7 +96,7 @@ export class BrushFaceHighlighter implements IEditorModule {
         if (this._selEdge?.shapeId === id) this._selEdge = null;
         this._refresh();
       }),
-      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); this._clearSetLines(); this._clearSetOverlays(); }),
+      this._bus.on("preview:start", () => { this._green = { round: null, hover: null }; this._clearGreen(); this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); this._clearSetLines(); this._clearSetOverlays(); }),
       this._bus.on("preview:stop",  () => this._refresh()),
     );
   }
@@ -105,6 +112,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clearEdgeTube();
     this._clearSetLines();
     this._clearSetOverlays();
+    this._clearGreen();
     this._loop = null;
     this._refreshLoop();
   }
@@ -164,6 +172,11 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._loopObj = group;
   }
 
+  private _clearGreen(): void {
+    for (const m of this._greenOverlays) { this._scene.remove(m); m.geometry.dispose(); (m.material as THREE.Material).dispose(); }
+    this._greenOverlays = [];
+  }
+
   private _clearSetLines(): void {
     if (!this._setLines) return;
     this._scene.remove(this._setLines);
@@ -182,6 +195,14 @@ export class BrushFaceHighlighter implements IEditorModule {
   }
 
   private _refresh(): void {
+    this._clearGreen();
+    for (const g of [this._green.round, this._green.hover]) {
+      if (!g) continue;
+      for (const faceIndex of g.faces) {
+        const m = this._buildOverlay({ zoneId: g.zoneId, shapeId: g.shapeId, faceIndex }, g === this._green.hover ? HOVER_OPACITY : 0.4, false, 0x3ccf91);
+        if (m) this._greenOverlays.push(m);
+      }
+    }
     this._clearSetLines();
     this._clearSetOverlays();
     this._clear("sel");
@@ -272,7 +293,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     if (which === "sel") this._selMesh = null; else this._hoverMesh = null;
   }
 
-  private _buildOverlay(target: { zoneId: string; shapeId: string; faceIndex: number }, opacity: number, withFold = opacity === SELECT_OPACITY): THREE.Mesh | null {
+  private _buildOverlay(target: { zoneId: string; shapeId: string; faceIndex: number }, opacity: number, withFold = opacity === SELECT_OPACITY, color = 0x4d8cff): THREE.Mesh | null {
     const shape = this._world.zones.get(target.zoneId)?.shapes?.find(s => s.id === target.shapeId) as ShapeDef | undefined;
     const face = shape?.mesh?.faces?.[target.faceIndex];
     if (!shape || !face) return null;
@@ -295,7 +316,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     geo.computeVertexNormals();
 
     const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
-      color: 0x4d8cff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+      color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
     }));
     mesh.renderOrder = 2;
     const D2R = Math.PI / 180;
