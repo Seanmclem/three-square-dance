@@ -105,7 +105,7 @@ type PendingEdit = {
   items:   { id: string; label: string }[];
   initial: { label: string; category: string; attribution: Attribution; tags?: string[] };
 };
-import { HistoryManager } from "@/editor/HistoryManager";
+import { HistoryManager, type HistoryEntry } from "@/editor/HistoryManager";
 import { copySelection, copySelectionMulti, pasteClipboard, type Clipboard } from "@/editor/copyPaste";
 import { membersByGroup, entityGroupIds, writeGroupIds, type GroupMember } from "@/editor/groupMembers";
 import { migrateWallNodes, pruneOrphanNodes, migrateUVs, migrateDialogues, migrateWorldLighting } from "@/world/WorldLoader";
@@ -123,16 +123,45 @@ const DEMO_ZONE_ID = "demo";
 
 // ── Autosave storage (phase 55): workspace file via the desktop shell when
 // available (atomic, survives cache clears), localStorage in a plain browser.
-function storeAutosave(json: string, meta: { projectId: string | null; sceneId: string | null }): number {
+// Undo history rides INSIDE the autosave payload (v4.99.4) under this key, so the
+// two are always written together: undo entries are per-entity before/after diffs and
+// are only valid against the exact world they were recorded on. On boot the history is
+// restored only when this autosave is what got loaded (not the scene file, not an
+// expired autosave). Bump the version if HistoryEntry's shape ever changes.
+const HISTORY_KEY = "__editorHistory";
+const HISTORY_VERSION = 1;
+type StoredHistory = { v: number; undo: HistoryEntry[]; redo: HistoryEntry[] };
+
+function storeAutosave(json: string, meta: { projectId: string | null; sceneId: string | null }, withHistory?: string): number {
   const ts = Date.now();
   const d = desktop();
   if (d) {
-    void d.writeAutosave(meta, json).catch(e => console.warn("autosave write failed:", e));
+    // The desktop autosave is ONE file shared by every window and tab on the shell. An
+    // automated test browser (Playwright etc. set navigator.webdriver) must never write it:
+    // a headless test's 60 s tick once saved a throwaway test shape there, the user's
+    // window restored it on the next shell start, and a Save put it in level_2 (v4.99.4).
+    if (navigator.webdriver) return ts;
+    void d.writeAutosave(meta, withHistory ?? json).catch(e => console.warn("autosave write failed:", e));
   } else {
-    localStorage.setItem("worldeditor_autosave", json);
+    // localStorage has a small quota; a long history of brush edits can exceed it —
+    // fall back to the world alone (history then simply doesn't survive the reload).
+    try {
+      localStorage.setItem("worldeditor_autosave", withHistory ?? json);
+    } catch {
+      localStorage.setItem("worldeditor_autosave", json);
+    }
     localStorage.setItem("worldeditor_autosave_ts", ts.toString());
   }
   return ts;
+}
+
+/** Split a stored autosave into the world JSON and its undo history (if valid). */
+function splitAutosave(text: string): { world: unknown; history: StoredHistory | null } {
+  const parsed = JSON.parse(text) as Record<string, unknown>;
+  const h = parsed[HISTORY_KEY] as StoredHistory | undefined;
+  delete parsed[HISTORY_KEY];
+  const ok = !!h && h.v === HISTORY_VERSION && Array.isArray(h.undo) && Array.isArray(h.redo);
+  return { world: parsed, history: ok ? h! : null };
 }
 
 function clearStoredAutosave(): void {
@@ -546,7 +575,12 @@ export default function App() {
       // newer autosaves from other tabs with its stale state (lost real edits twice).
       if (json === autosaveBaselineRef.current) return;
       const proj = projectRef.current;
-      const ts = storeAutosave(json, { projectId: proj?.store.id ?? null, sceneId: proj?.sceneId ?? null });
+      // The world + its undo history in one payload (see HISTORY_KEY).
+      const h = history.capture();
+      const withHistory = h.undo.length || h.redo.length
+        ? JSON.stringify({ ...JSON.parse(json), [HISTORY_KEY]: { v: HISTORY_VERSION, ...h } satisfies StoredHistory })
+        : undefined;
+      const ts = storeAutosave(json, { projectId: proj?.store.id ?? null, sceneId: proj?.sceneId ?? null }, withHistory);
       autosaveBaselineRef.current = json;
       setLastAutosaveAt(ts);
     };
@@ -601,6 +635,7 @@ export default function App() {
       // needs the scene path, and the project restore below reuses it.
       const last = await restoreLastProject().catch(() => null);
       let restored = false;
+      let restoredHistory: StoredHistory | null = null;
 
       if (saved) {
         const ageMs = Date.now() - saved.ts;
@@ -616,8 +651,10 @@ export default function App() {
         } else if (ageMs < 24 * 60 * 60_000) {
           try {
             restoringRef.current = true;
-            await handleLoadFromJSON(JSON.parse(saved.json));
+            const { world: savedWorld, history: savedHistory } = splitAutosave(saved.json);
+            await handleLoadFromJSON(savedWorld);
             restored = true;
+            restoredHistory = savedHistory;
             // Surface the counter immediately — an existing autosave with no
             // visible signal reads as "autosave is gone".
             setLastAutosaveAt(saved.ts);
@@ -673,6 +710,13 @@ export default function App() {
           await seedAndApplyGameDefaults(store, sceneId);
         }
       } catch (e) { console.warn('Project restore failed:', e); }
+
+      // Undo history survives a reload (v4.99.4): only when the world came from that
+      // same autosave, and last, after every load path above has cleared history.
+      if (restored && restoredHistory) {
+        history.restore({ undo: restoredHistory.undo, redo: restoredHistory.redo });
+        syncHistory();
+      }
     })();
 
     // Movers BEFORE the physics step — setNextKinematicTranslation targets must
