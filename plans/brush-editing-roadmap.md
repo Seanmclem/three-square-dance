@@ -55,12 +55,11 @@ extruding the band.
     selected face around it (two faces: `o = d (n1 + n2) / (1 + n1 · n2)`; more:
     least squares), the usual "shell" offset; a corner on a flat area just moves `d`
     along the normal.
-  - **INSET, both ways** (Blender's I and I-twice): **INSET** insets the set as one
-    region, a border only along the region's outer boundary, never between two
-    selected faces (a 2x2 wall patch gets one border round it, so a RECESS after makes
-    one big window; a closed cylinder band gets a thin strip inside each rim, so a
-    RECESS after makes one groove round the shape). **INSET EACH** insets every face
-    on its own (16 cylinder sides become 16 separate panels).
+  - **INSET the set as one region:** a border only along the region's outer boundary,
+    never between two selected faces (a 2x2 wall patch gets one border round it, so a
+    RECESS after makes one big window; a closed cylinder band gets a thin strip inside
+    each rim, so a RECESS after makes one groove round the shape). No per-face
+    "INSET EACH" (decided 2026-09-30).
   - **A recess that would turn faces inside out is refused**, not applied: the op
     computes the result, runs `validateMesh`, and on failure leaves the brush as it
     was with a note in the panel saying why (the same check vertex-set drags already
@@ -69,7 +68,7 @@ extruding the band.
 - AROUND FACE (edge mode) stays a corner/edge selection; it doesn't select faces.
 
 **Open questions:** none blocking; the plan picks the INSET border width for regions
-(0.25 m like single INSET) and whether INSET EACH sits beside INSET or behind a toggle.
+(0.25 m like single INSET).
 
 ---
 
