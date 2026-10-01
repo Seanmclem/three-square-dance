@@ -900,3 +900,205 @@ export function flatAreaOutline(mesh: ShapeBrushMesh, faceIdx: number, edge: [nu
   }, 0);
   return loops.reduce((best, l) => perimeter(l) > perimeter(best) ? l : best);
 }
+
+// ── Face sets: region INSET / EXTRUDE / RECESS (Phase 81) ────────────────────
+
+/** A region op's result: the new mesh, or why it was refused (nothing changed). */
+export type RegionOpResult = { mesh: BrushMeshData } | { refused: string };
+
+/**
+ * The outer boundary of a face set: every edge of a set face whose face across isn't in
+ * the set, directed as that set face walks it (`owner`), plus the boundary corners.
+ * Interior edges (between two set faces) are not part of it.
+ */
+export function regionBoundary(mesh: ShapeBrushMesh, set: number[]): {
+  edges: Array<{ p: number; q: number; owner: number }>;
+  corners: Set<number>;
+} {
+  const faces = mesh.faces ?? [];
+  const inSet = new Set(set);
+  const key = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  const edgeFaces = new Map<string, number[]>();
+  faces.forEach((f, fi) => f.verts.forEach((v, i) => {
+    const k = key(v, f.verts[(i + 1) % f.verts.length]!);
+    edgeFaces.set(k, [...(edgeFaces.get(k) ?? []), fi]);
+  }));
+  const edges: Array<{ p: number; q: number; owner: number }> = [];
+  const corners = new Set<number>();
+  for (const fi of inSet) {
+    const f = faces[fi];
+    if (!f) continue;
+    f.verts.forEach((p, i) => {
+      const q = f.verts[(i + 1) % f.verts.length]!;
+      if ((edgeFaces.get(key(p, q)) ?? []).some(g => g !== fi && inSet.has(g))) return;
+      edges.push({ p, q, owner: fi });
+      corners.add(p); corners.add(q);
+    });
+  }
+  return { edges, corners };
+}
+
+/**
+ * Extrude (dist > 0) or recess (dist < 0) a face set as ONE piece. Each corner moves by
+ * the offset `o` with `o · n = dist` for the normal of every set face around it, so every
+ * face's plane moves exactly `dist` along its own normal and the faces grow or shrink to
+ * stay joined (a cylinder band becomes a wider / narrower ring). Boundary corners are
+ * duplicated (unselected faces keep the originals) and get one side wall per boundary
+ * edge, `[p, q, q', p']` as in extrudeFace (sign-agnostic winding); interior corners just
+ * move. A 1-face set gives exactly extrudeFace's result. Refused (nothing changed) if a
+ * face would turn inside out or the mesh fails validateMesh.
+ */
+export function extrudeRegion(mesh: ShapeBrushMesh, set: number[], dist: number): RegionOpResult {
+  const faces0 = mesh.faces;
+  if (!faces0?.length || !set.length || dist === 0 || !Number.isFinite(dist)) return { refused: "nothing to move" };
+  const V0 = mesh.vertices;
+  const { edges, corners } = regionBoundary(mesh, set);
+
+  // Normals of the set faces around each set corner.
+  const around = new Map<number, THREE.Vector3[]>();
+  for (const fi of set) {
+    const n = newellNormal(V0, faces0[fi]!.verts);
+    for (const v of faces0[fi]!.verts) {
+      const list = around.get(v) ?? [];
+      if (!list.some(m => m.dot(n) > EPS_NRM)) list.push(n);
+      around.set(v, list);
+    }
+  }
+  const offsetFor = (ns: THREE.Vector3[]): THREE.Vector3 | null => {
+    if (ns.length === 1) return ns[0]!.clone().multiplyScalar(dist);
+    if (ns.length === 2) {
+      const [a, b] = ns as [THREE.Vector3, THREE.Vector3];
+      const den = 1 + a.dot(b);
+      return den < 1e-6 ? null : a.clone().add(b).multiplyScalar(dist / den);
+    }
+    // 3+: least squares (Σ n nᵀ) o = dist Σ n
+    const m = new THREE.Matrix3().set(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    const e = m.elements;
+    const rhs = new THREE.Vector3();
+    for (const n of ns) {
+      const c = [n.x, n.y, n.z];
+      for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) e[k * 3 + r]! += c[r]! * c[k]!;
+      rhs.addScaledVector(n, dist);
+    }
+    if (Math.abs(m.determinant()) < 1e-9) return null;
+    return rhs.applyMatrix3(m.clone().invert());
+  };
+
+  const vertices = V0.map(v => ({ ...v }));
+  const moved = new Map<number, number>();   // old corner → index of its moved position
+  for (const [v, ns] of around) {
+    const o = offsetFor(ns);
+    if (!o) return { refused: "a corner where the selected faces fold back on each other" };
+    const p = V0[v]!;
+    const np = { x: +(p.x + o.x).toFixed(4), y: +(p.y + o.y).toFixed(4), z: +(p.z + o.z).toFixed(4) };
+    if (corners.has(v)) { vertices.push(np); moved.set(v, vertices.length - 1); }
+    else { vertices[v] = np; moved.set(v, v); }
+  }
+
+  const faces = cloneFaces(faces0);
+  for (const fi of set) faces[fi] = { ...faces[fi]!, verts: faces[fi]!.verts.map(v => moved.get(v) ?? v) };
+  // Every set face must keep facing the same way after the move (else inside out).
+  for (const fi of set) {
+    const n0 = newellNormal(V0, faces0[fi]!.verts), n1 = newellNormal(vertices, faces[fi]!.verts);
+    if (n1.lengthSq() < 0.5 || n1.dot(n0) <= 0) return { refused: dist < 0 ? "RECESS would turn faces inside out" : "EXTRUDE would turn faces inside out" };
+  }
+  for (const { p, q, owner } of edges) {
+    const src = faces0[owner]!;
+    faces.push({
+      verts: [p, q, moved.get(q)!, moved.get(p)!],
+      material: src.material,
+      materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
+    });
+  }
+  const out = { vertices, faces };
+  const err = validateMesh(out);
+  if (err) return { refused: `${dist < 0 ? "RECESS" : "EXTRUDE"} would make an invalid shape (${err})` };
+  return { mesh: out };
+}
+
+/**
+ * Inset a face set as ONE region: a border of quads only along its outer boundary,
+ * never between two set faces. Each boundary corner gets an inner copy `margin` into
+ * the region: along the single set-interior edge leaving it when there is exactly one
+ * (a band's rim corner slides down its seam, a patch's side midpoint along its split
+ * line), else by insetFace's miter rule in the plane of the set faces there. Set faces
+ * swap boundary corners for the inner copies (they stay the selection, ready to
+ * EXTRUDE / RECESS); border quads `[p, q, q', p']` take the material of the face they
+ * border. Refused if a corner would collapse or a face would flip.
+ */
+export function insetRegion(mesh: ShapeBrushMesh, set: number[], margin = 0.25): RegionOpResult {
+  const faces0 = mesh.faces;
+  if (!faces0?.length || !set.length || !(margin > 0)) return { refused: "nothing to inset" };
+  const V0 = mesh.vertices;
+  const { edges, corners } = regionBoundary(mesh, set);
+  if (!edges.length) return { refused: "the selection has no outer edge to inset from (it covers the whole shape)" };
+  const inSet = new Set(set);
+  const key = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  const boundaryKeys = new Set(edges.map(e => key(e.p, e.q)));
+  const vec = (v: Vec3) => new THREE.Vector3(v.x, v.y, v.z);
+
+  // Per corner: the set-interior edges leaving it, and the set faces' normal there.
+  const interior = new Map<number, Set<number>>();
+  const normalAt = new Map<number, THREE.Vector3>();
+  for (const fi of inSet) {
+    const loop = faces0[fi]!.verts, n = newellNormal(V0, loop);
+    loop.forEach((v, i) => {
+      normalAt.set(v, (normalAt.get(v) ?? new THREE.Vector3()).add(n));
+      for (const w of [loop[(i + 1) % loop.length]!, loop[(i + loop.length - 1) % loop.length]!]) {
+        if (!boundaryKeys.has(key(v, w))) { const s = interior.get(v) ?? new Set(); s.add(w); interior.set(v, s); }
+      }
+    });
+  }
+  const prevOf = new Map<number, number>(), nextOf = new Map<number, number>();
+  for (const { p, q } of edges) { nextOf.set(p, q); prevOf.set(q, p); }
+
+  const vertices = V0.map(v => ({ ...v }));
+  const inner = new Map<number, number>();
+  for (const c of corners) {
+    const cur = vec(V0[c]!);
+    let pos: THREE.Vector3;
+    const ins = [...(interior.get(c) ?? [])];
+    if (ins.length === 1) {
+      const toW = vec(V0[ins[0]!]!).sub(cur);
+      if (toW.length() <= margin * 1.05) return { refused: "the border is wider than the faces it would cut into" };
+      pos = cur.addScaledVector(toW.normalize(), margin);
+    } else {
+      const a = prevOf.get(c), b = nextOf.get(c);
+      const n = normalAt.get(c)?.clone().normalize();
+      if (a === undefined || b === undefined || !n || n.lengthSq() < 0.5) return { refused: "a corner the border can't go round" };
+      const dPrev = cur.clone().sub(vec(V0[a]!)); dPrev.addScaledVector(n, -dPrev.dot(n));
+      const dNext = vec(V0[b]!).sub(cur); dNext.addScaledVector(n, -dNext.dot(n));
+      if (dPrev.lengthSq() < 1e-12 || dNext.lengthSq() < 1e-12) return { refused: "a zero-length edge on the border" };
+      const mPrev = new THREE.Vector3().crossVectors(n, dPrev.normalize());
+      const mNext = new THREE.Vector3().crossVectors(n, dNext.normalize());
+      const bis = mPrev.clone().add(mNext);
+      if (bis.lengthSq() < 1e-12) return { refused: "a spike-shaped corner on the border" };
+      bis.normalize();
+      const denom = bis.dot(mNext);
+      if (denom < 0.05) return { refused: "a corner too sharp to inset" };
+      pos = cur.addScaledVector(bis, margin / denom);
+    }
+    vertices.push({ x: +pos.x.toFixed(4), y: +pos.y.toFixed(4), z: +pos.z.toFixed(4) });
+    inner.set(c, vertices.length - 1);
+  }
+
+  const faces = cloneFaces(faces0);
+  for (const fi of inSet) faces[fi] = { ...faces[fi]!, verts: faces[fi]!.verts.map(v => inner.get(v) ?? v), fold: undefined };
+  for (const fi of inSet) {
+    const n0 = newellNormal(V0, faces0[fi]!.verts), n1 = newellNormal(vertices, faces[fi]!.verts);
+    const area = (() => { const l = faces[fi]!.verts; let s = 0; for (let i = 1; i < l.length - 1; i++) s += vec(vertices[l[i]!]!).sub(vec(vertices[l[0]!]!)).cross(vec(vertices[l[i + 1]!]!).sub(vec(vertices[l[0]!]!))).length(); return s; })();
+    if (area < 1e-6 || n1.dot(n0) <= 0) return { refused: "the border is wider than the faces it would cut into" };
+  }
+  for (const { p, q, owner } of edges) {
+    const src = faces0[owner]!;
+    faces.push({
+      verts: [p, q, inner.get(q)!, inner.get(p)!],
+      material: src.material,
+      materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
+    });
+  }
+  const out = { vertices, faces };
+  const err = validateMesh(out);
+  if (err) return { refused: `INSET would make an invalid shape (${err})` };
+  return { mesh: out };
+}

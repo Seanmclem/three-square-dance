@@ -33,6 +33,8 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _loopObj:   THREE.Group | null = null;
   private _vset: { zoneId: string; shapeId: string; verts: number[] } | null = null;   // Phase 80
   private _setLines:  THREE.LineSegments | null = null;
+  private _faceSet: number[] = [];                // Phase 81: the rest of the face set
+  private _setOverlays: THREE.Mesh[] = [];
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -54,13 +56,14 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._selEdge = (payload.type === "shape" && payload.edgeVerts !== undefined)
           ? { zoneId: payload.zoneId, shapeId: payload.id, edge: payload.edgeVerts }
           : null;
+        this._faceSet = payload.type === "shape" ? (payload.faceSet ?? []) : [];
         this._vset = (payload.type === "shape" && (payload.vertexSet?.length ?? 0) > 1)
           ? { zoneId: payload.zoneId, shapeId: payload.id, verts: payload.vertexSet! }
           : null;
         this._refresh();
       }),
       this._bus.on("object:deselected", () => {
-        this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._loop = null; this._vset = null;
+        this._shape = null; this._selected = null; this._hovered = null; this._selEdge = null; this._loop = null; this._vset = null; this._faceSet = [];
         this._refresh();
         this._refreshLoop();
       }),
@@ -84,7 +87,7 @@ export class BrushFaceHighlighter implements IEditorModule {
         if (this._selEdge?.shapeId === id) this._selEdge = null;
         this._refresh();
       }),
-      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); this._clearSetLines(); }),
+      this._bus.on("preview:start", () => { this._loop = null; this._refreshLoop(); this._clear("sel"); this._clear("hover"); this._clearEdges(); this._clearEdgeTube(); this._clearSetLines(); this._clearSetOverlays(); }),
       this._bus.on("preview:stop",  () => this._refresh()),
     );
   }
@@ -99,6 +102,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clearEdges();
     this._clearEdgeTube();
     this._clearSetLines();
+    this._clearSetOverlays();
     this._loop = null;
     this._refreshLoop();
   }
@@ -166,13 +170,31 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._setLines = null;
   }
 
+  private _clearSetOverlays(): void {
+    for (const m of this._setOverlays) {
+      this._scene.remove(m);
+      m.geometry.dispose();
+      (m.material as THREE.Material).dispose();
+    }
+    this._setOverlays = [];
+  }
+
   private _refresh(): void {
     this._clearSetLines();
+    this._clearSetOverlays();
     this._clear("sel");
     this._clear("hover");
     this._clearEdges();
     this._clearEdgeTube();
     if (this._selected) this._selMesh = this._buildOverlay(this._selected, SELECT_OPACITY);
+    // The rest of a face set (Phase 81) gets the same blue (the fold line stays on the active face).
+    if (this._selected && this._faceSet.length > 1) {
+      for (const fi of this._faceSet) {
+        if (fi === this._selected.faceIndex) continue;
+        const m = this._buildOverlay({ ...this._selected, faceIndex: fi }, SELECT_OPACITY, false);
+        if (m) this._setOverlays.push(m);
+      }
+    }
     // Don't double-draw when hovering the already-selected face.
     if (this._hovered && (this._hovered.shapeId !== this._selected?.shapeId || this._hovered.faceIndex !== this._selected?.faceIndex)) {
       this._hoverMesh = this._buildOverlay(this._hovered, HOVER_OPACITY);
@@ -240,7 +262,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     if (which === "sel") this._selMesh = null; else this._hoverMesh = null;
   }
 
-  private _buildOverlay(target: { zoneId: string; shapeId: string; faceIndex: number }, opacity: number): THREE.Mesh | null {
+  private _buildOverlay(target: { zoneId: string; shapeId: string; faceIndex: number }, opacity: number, withFold = opacity === SELECT_OPACITY): THREE.Mesh | null {
     const shape = this._world.zones.get(target.zoneId)?.shapes?.find(s => s.id === target.shapeId) as ShapeDef | undefined;
     const face = shape?.mesh?.faces?.[target.faceIndex];
     if (!shape || !face) return null;
@@ -273,7 +295,7 @@ export class BrushFaceHighlighter implements IEditorModule {
 
     // Selected bent quad: a dashed line along its fold (loop[0]–loop[2] after fanLoop),
     // so the FOLD button's effect is visible. Child of the overlay — shares its transform.
-    if (opacity === SELECT_OPACITY && isBentQuad(verts, face)) {
+    if (withFold && isBentQuad(verts, face)) {
       const p = (vi: number) => { const v = verts[vi]!; return [v.x + n.x * EDGE_LIFT, v.y + n.y * EDGE_LIFT, v.z + n.z * EDGE_LIFT]; };
       const lineGeo = new THREE.BufferGeometry();
       lineGeo.setAttribute("position", new THREE.Float32BufferAttribute([...p(loop[0]!), ...p(loop[2]!)], 3));

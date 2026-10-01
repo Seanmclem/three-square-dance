@@ -252,7 +252,7 @@ export interface BusEvents {
   // re-emits object:selected with faceIndex/vertexIndex/edgeVerts — one channel for
   // all consumers. null clears. Edges have no stored identity: an edge IS its
   // (unordered) vertex-index pair, valid while some face loop traverses it.
-  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null; vertexSet?: number[] };
+  "shape:sub-select":      { zoneId: string; shapeId: string; faceIndex: number | null; vertexIndex: number | null; edge?: [number, number] | null; vertexSet?: number[]; faceSet?: number[] };
   // Phase 80 vertex sets: switch to vertex mode with these corners selected (SELECT LOOP / SELECT RING).
   "shape:select-vertex-set": { zoneId: string; shapeId: string; verts: number[] };
   // Set gizmo mode (move/rotate/scale): panel buttons request it, T/R/S key changes report it.
@@ -506,6 +506,7 @@ export interface SelectedObjectPayload {
   vertexIndex?: number;
   edgeVerts?:   [number, number];   // unordered vertex-index pair (edges have no stored identity)
   vertexSet?:   number[];           // Phase 80: every selected corner (vertexIndex = the last clicked)
+  faceSet?:     number[];           // Phase 81: every selected face (faceIndex = the last clicked)
   // Walls are node-backed (no stored position/rotation on WallDef itself), so the panel
   // needs the run's current XZ centroid + orientation computed from live node positions.
   // Populated only for type === "wall"; position.y (elevation) is already meaningful.

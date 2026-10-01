@@ -66,6 +66,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Esc"],               action: "Cancel drag, restore geometry" },
       { keys: ["RMB click corner"],  action: "Delete that corner (keeps at least 4)" },
       { keys: ["Shift+LMB corner"],  action: "Vertex mode: add / remove a corner from the selection" },
+      { keys: ["Shift+LMB face"],    action: "Face mode: add / remove a face from the selection" },
+      { keys: ["Dbl-click face"],    action: "Face mode: select that face's face loop (the ring of faces through it)" },
       { keys: ["Dbl-click edge"],    action: "Edge mode: select every corner along that edge's loop" },
       { keys: ["T", "R", "S"],       action: "2+ corners selected: move / rotate / scale them together (snaps 0.25 / 15° / 0.1)" },
       { keys: ["Panel: SPLIT H / V"], action: "Split the selected face into two" },
@@ -78,6 +80,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Panel: SELECT LOOP"], action: "Edge mode: select the corners along the selected edge's loop, straight on" },
       { keys: ["Panel: AROUND FACE n"], action: "Edge mode: select the corners around the flat area on either side of the edge" },
       { keys: ["Panel: SELECT RING"], action: "After a loop cut: select the new ring's corners" },
+      { keys: ["Panel: FACE LOOP H / V"], action: "Face mode: select the ring of faces through the selected face" },
+      { keys: ["2+ faces selected"],  action: "Material / TILE apply to all; INSET, EXTRUDE, RECESS act on them as one piece" },
     ],
   },
 ];

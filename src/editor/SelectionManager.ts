@@ -45,6 +45,7 @@ export class SelectionManager implements IEditorModule {
   private _subVertex: number | null = null;
   private _subEdge:   [number, number] | null = null;   // unordered vertex-index pair
   private _subVertices: number[] = [];                   // Phase 80 vertex set (vertex mode)
+  private _subFaces: number[] = [];                      // Phase 81 face set (face mode)
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -70,8 +71,8 @@ export class SelectionManager implements IEditorModule {
         this._activeTool = tool;
         // Mode switch clears sub-object selection (a fresh click re-establishes it);
         // re-emit so the panel/highlighter/gizmos drop the stale face/vertex/edge.
-        if (changed && (this._subFace !== null || this._subVertex !== null || this._subEdge !== null || this._subVertices.length)) {
-          this._subFace = null; this._subVertex = null; this._subEdge = null; this._subVertices = [];
+        if (changed && (this._subFace !== null || this._subVertex !== null || this._subEdge !== null || this._subVertices.length || this._subFaces.length)) {
+          this._subFace = null; this._subVertex = null; this._subEdge = null; this._subVertices = []; this._subFaces = [];
           if (this._selected && this._extraRefs.length === 0) this._emitSelected(this._selected);
         }
       }),
@@ -97,7 +98,7 @@ export class SelectionManager implements IEditorModule {
       this._bus.on("object:deselected", ()           => {
         if (this._selected) { this._restore(this._selected); this._selected = null; }
         this._clearExtras();
-        this._subFace = null; this._subVertex = null; this._subEdge = null; this._subVertices = [];
+        this._subFace = null; this._subVertex = null; this._subEdge = null; this._subVertices = []; this._subFaces = [];
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
@@ -116,11 +117,12 @@ export class SelectionManager implements IEditorModule {
       }),
       // Sub-object selection sink (panel rows, vertex-handle clicks): store + re-emit
       // object:selected so all consumers read one channel.
-      this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex, edge, vertexSet }) => {
+      this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex, edge, vertexSet, faceSet }) => {
         if (this._selected?.userData.editorId !== shapeId || this._selected.userData.zoneId !== zoneId) return;
         this._subFace = faceIndex;
         this._subVertex = vertexIndex;
         this._subVertices = vertexSet ?? (vertexIndex !== null ? [vertexIndex] : []);
+        this._subFaces = faceSet ?? (faceIndex !== null ? [faceIndex] : []);
         this._subEdge = edge ?? null;
         this._emitSelected(this._selected);
       }),
@@ -151,14 +153,27 @@ export class SelectionManager implements IEditorModule {
     if (selectable.length === 0) { if (!additive) this._deselect(); return; }
     const hit  = this._pickByPriority(selectable);
     const root = this._resolveRoot(hit.object);
+    const hitFace = (): number | null => {
+      const groups = hit.object.userData.faceGroups as FaceGroup[] | undefined;
+      const t = hit.faceIndex;
+      return (groups && t != null) ? groups.find(g => t >= g.start && t < g.start + g.count)?.faceIndex ?? null : null;
+    };
+    // Face mode, Shift/Cmd-click on the selected brush (Phase 81): toggle the hit face
+    // in the face set instead of toggling the object.
+    if (additive && this._activeTool === "select-face" && root === this._selected) {
+      const f = hitFace();
+      if (f === null) return;
+      const had = this._subFaces.includes(f);
+      this._subFaces = had ? this._subFaces.filter(x => x !== f) : [...this._subFaces, f];
+      this._subFace = had ? (this._subFaces[this._subFaces.length - 1] ?? null) : f;
+      this._emitSelected(root);
+      return;
+    }
     // Face mode (Phase 23): resolve the hit triangle → logical brush face via the
     // built mesh's faceGroups range map. Non-face-brush hits behave like object mode.
     if (this._activeTool === "select-face" && !additive) {
-      const groups = hit.object.userData.faceGroups as FaceGroup[] | undefined;
-      const t = hit.faceIndex;
-      this._subFace = (groups && t != null)
-        ? groups.find(g => t >= g.start && t < g.start + g.count)?.faceIndex ?? null
-        : null;
+      this._subFace = hitFace();
+      this._subFaces = this._subFace !== null ? [this._subFace] : [];
       this._subVertex = null;
       this._subVertices = [];
       this._subEdge = null;
@@ -167,10 +182,12 @@ export class SelectionManager implements IEditorModule {
       // hit point. Every face click selects an edge — no pixel threshold needed.
       this._subEdge = this._resolveEdge(hit);
       this._subFace = null;
+      this._subFaces = [];
       this._subVertex = null;
       this._subVertices = [];
     } else if (!additive) {
       this._subFace = null;
+      this._subFaces = [];
       this._subEdge = null;
       if (this._activeTool !== "select-vertex") { this._subVertex = null; this._subVertices = []; }
     }
@@ -443,10 +460,11 @@ export class SelectionManager implements IEditorModule {
     // arrays under a live selection — clamp on EVERY emit so consumers never see a
     // dangling index.
     let faceIndex: number | undefined, vertexIndex: number | undefined, edgeVerts: [number, number] | undefined;
-    let vertexSet: number[] | undefined;
+    let vertexSet: number[] | undefined, faceSet: number[] | undefined;
     if (ud.editorType === "shape") {
       const data = this._getDataRecord(root) as { mesh?: { vertices: unknown[]; faces?: { verts: number[] }[] } } | null;
       if (this._subFace != null && this._subFace >= (data?.mesh?.faces?.length ?? 0)) this._subFace = null;
+      this._subFaces = this._subFaces.filter(i => i < (data?.mesh?.faces?.length ?? 0));
       if (this._subVertex != null && this._subVertex >= (data?.mesh?.vertices?.length ?? 0)) this._subVertex = null;
       this._subVertices = this._subVertices.filter(i => i < (data?.mesh?.vertices?.length ?? 0));
       if (this._subEdge != null) {
@@ -462,6 +480,7 @@ export class SelectionManager implements IEditorModule {
       vertexIndex = this._subVertex ?? undefined;
       edgeVerts   = this._subEdge ?? undefined;
       vertexSet   = this._subVertices.length ? [...this._subVertices] : undefined;
+      faceSet     = this._subFaces.length ? [...this._subFaces] : undefined;
     }
     this._bus.emit("object:selected", {
       id:       ud.editorId,
@@ -483,6 +502,7 @@ export class SelectionManager implements IEditorModule {
       vertexIndex,
       edgeVerts,
       vertexSet,
+      faceSet,
     });
   }
 

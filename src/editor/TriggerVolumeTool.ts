@@ -135,6 +135,8 @@ export class TriggerVolumeTool {
         // Vertex mode: clicks are for brush corners (Shift-click builds a corner set,
         // Phase 80) — a volume behind a corner must not join or steal the selection.
         if (this._toolId === "select-vertex") return;
+        // Face mode Shift-click builds a face set (Phase 81): same rule.
+        if (this._toolId === "select-face" && (shift || meta || ctrl)) return;
         const vol = this._findVolumeAt(this._lastScreenPos);
         if (!vol) return;
         // Additive click: join SelectionManager's multi-select instead of clobbering

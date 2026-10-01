@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud, faceCentroid } from "@/editor/brushOps";
+import { facesFromCloud, loopCutRing } from "@/editor/brushOps";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -26,6 +26,7 @@ export class BrushFaceEditor implements IEditorModule {
   private _zoneId: string | null = null;
   private _selectedId: string | null = null;
   private _faceIndex: number | null = null;
+  private _faceSet: number[] = [];   // Phase 81: every selected face; the gizmo moves them all
   private _previewing = false;
   private _suspended = false;
 
@@ -81,6 +82,7 @@ export class BrushFaceEditor implements IEditorModule {
           this._selectedId = payload.id;
           this._zoneId = payload.zoneId;
           this._faceIndex = payload.faceIndex ?? null;
+          this._faceSet = payload.faceSet ?? (payload.faceIndex !== undefined ? [payload.faceIndex] : []);
           this._maybeAutoBake();
         } else {
           this._selectedId = null;
@@ -94,6 +96,14 @@ export class BrushFaceEditor implements IEditorModule {
       }),
       this._bus.on("shape:rebuilt", ({ shapeId }) => {
         if (shapeId === this._selectedId && !this._dragging) this._sync();
+      }),
+      // Phase 81: double-click a face → its face loop (the longer of its two rings).
+      this._bus.on("input:dblclick", () => {
+        if (!this._isActive() || this._dragging) return;
+        const mesh = this._shape()!.mesh!;
+        const rings = ([0, 1] as const).map(pair => loopCutRing(mesh, { faceIdx: this._faceIndex!, pair })?.faces.map(f => f.faceIdx) ?? []);
+        const ring = rings[0]!.length >= rings[1]!.length ? rings[0]! : rings[1]!;
+        if (ring.length > 1) this._bus.emit("shape:sub-select", { zoneId: this._zoneId!, shapeId: this._selectedId!, faceIndex: this._faceIndex, vertexIndex: null, faceSet: ring });
       }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
@@ -167,11 +177,21 @@ export class BrushFaceEditor implements IEditorModule {
       return;
     }
     const shape = this._shape()!;
-    const face = shape.mesh!.faces![this._faceIndex!]!;
-    const centroid = faceCentroid(shape.mesh!.vertices, face.verts).applyMatrix4(this._shapeMatrix(shape));
-    this._proxy.position.copy(centroid);
+    // Gizmo at the centre of every corner the face set moves.
+    const verts = shape.mesh!.vertices, corners = this._movingCorners(shape);
+    const c = new THREE.Vector3();
+    for (const i of corners) c.add(new THREE.Vector3(verts[i]!.x, verts[i]!.y, verts[i]!.z));
+    c.divideScalar(Math.max(1, corners.size)).applyMatrix4(this._shapeMatrix(shape));
+    this._proxy.position.copy(c);
     this._controls.attach(this._proxy);
     this._controls.visible = true;
+  }
+
+  /** Corners of every face in the set (just the one face when there's no set). */
+  private _movingCorners(shape: ShapeDef): Set<number> {
+    const faces = shape.mesh!.faces!;
+    const set = this._faceSet.length ? this._faceSet : [this._faceIndex!];
+    return new Set(set.filter(i => i < faces.length).flatMap(i => faces[i]!.verts));
   }
 
   private _setSuspended(on: boolean): void {
@@ -186,15 +206,14 @@ export class BrushFaceEditor implements IEditorModule {
     if (!this._dragging || !this._origVertices || !this._zoneId || !this._selectedId) return;
     const shape = this._shape();
     if (!shape || this._faceIndex === null) return;
-    const face = shape.mesh!.faces![this._faceIndex];
-    if (!face) return;
+    if (!shape.mesh!.faces![this._faceIndex]) return;
     // World delta → local via the inverse shape rotation (shapes have no scale).
     const world = this._proxy.position.clone().sub(this._dragStart);
     const D2R = Math.PI / 180;
     const inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(
       shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")).invert();
     const local = world.applyQuaternion(inv);
-    const moving = new Set(face.verts);
+    const moving = this._movingCorners(shape);
     const vertices = this._origVertices.map((v, i) => moving.has(i)
       ? { x: +(v.x + local.x).toFixed(4), y: +(v.y + local.y).toFixed(4), z: +(v.z + local.z).toFixed(4) }
       : v);

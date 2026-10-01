@@ -1,8 +1,8 @@
 # Phase 81 · Brush face sets: face loop select, one material for many faces, region INSET / EXTRUDE / RECESS
 
-> Status: **PLANNED** (2026-09-30). From `plans/brush-editing-roadmap.md` (face sets
-> item), with the user's decisions. Numbered 81 as the next free phase; renumber if
-> something else lands first. Drawings of the decided behaviour:
+> Status: **IMPLEMENTED**, shipped as v4.98.0 (2026-09-30); see
+> `test-plans/phase-81-brush-face-sets.md`. Built as planned, plus Shift-click on rows
+> in the FACES list. Drawings of the behaviour:
 > https://claude.ai/artifact/F3EvgpZtrbniJdmKkJPjke
 
 Face mode selects one face at a time today. This phase lets it hold **several faces**

@@ -5,7 +5,7 @@
  */
 export type BrushOpIconName =
   | "split-h" | "split-v" | "loop-h" | "loop-v" | "inset" | "extrude" | "recess" | "fold"
-  | "split-edge" | "loop-cut-edge" | "select-loop" | "around-face" | "select-ring";
+  | "split-edge" | "loop-cut-edge" | "select-loop" | "around-face" | "select-ring" | "face-loop-h" | "face-loop-v";
 
 export function BrushOpIcon({ name, size = 14 }: { name: BrushOpIconName; size?: number }) {
   const s = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -24,6 +24,8 @@ export function BrushOpIcon({ name, size = 14 }: { name: BrushOpIconName; size?:
       case "loop-cut-edge": return <><line x1="8" y1="1.5" x2="8" y2="14.5" {...s} opacity="0.55" /><ellipse cx="8" cy="8" rx="6.5" ry="2.2" {...s} strokeWidth="1.8" /></>;
       case "select-loop":   return <><line x1="2" y1="8" x2="14" y2="8" {...s} strokeWidth="1.8" /><circle cx="2.5" cy="8" r="1.6" fill="currentColor" /><circle cx="8" cy="8" r="1.6" fill="currentColor" /><circle cx="13.5" cy="8" r="1.6" fill="currentColor" /></>;
       case "around-face":   return <><rect x="3" y="3" width="10" height="10" rx="0.5" {...s} strokeWidth="1.8" /><circle cx="3" cy="3" r="1.5" fill="currentColor" /><circle cx="13" cy="3" r="1.5" fill="currentColor" /><circle cx="3" cy="13" r="1.5" fill="currentColor" /><circle cx="13" cy="13" r="1.5" fill="currentColor" /></>;
+      case "face-loop-h":   return <>{box}<rect x="2.5" y="6" width="11" height="4" fill="currentColor" opacity="0.85" /></>;
+      case "face-loop-v":   return <>{box}<rect x="6" y="2.5" width="4" height="11" fill="currentColor" opacity="0.85" /></>;
       case "select-ring":   return <><ellipse cx="8" cy="8" rx="6.5" ry="3" {...s} strokeWidth="1.6" /><circle cx="1.5" cy="8" r="1.5" fill="currentColor" /><circle cx="14.5" cy="8" r="1.5" fill="currentColor" /><circle cx="8" cy="11" r="1.5" fill="currentColor" /><circle cx="8" cy="5" r="1.5" fill="currentColor" /></>;
     }
   })();

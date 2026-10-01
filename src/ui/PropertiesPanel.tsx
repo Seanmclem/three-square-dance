@@ -16,7 +16,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, type LoopCutRing } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2569,7 +2569,14 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   }, [sel, selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hover = (i: number | null) => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i });
-  const pick  = (i: number) => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i, vertexIndex: null });
+  // Phase 81 face set: Shift-click a row toggles it, like Shift-click in the canvas.
+  const set = selected.faceSet ?? (sel !== null ? [sel] : []);
+  const pick  = (i: number, shift = false) => {
+    if (!shift) { bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: i, vertexIndex: null }); return; }
+    const had = set.includes(i);
+    const next = had ? set.filter(x => x !== i) : [...set, i];
+    bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: had ? (next[next.length - 1] ?? null) : i, vertexIndex: null, faceSet: next });
+  };
   const commitMat = (i: number, id: string) =>
     onObjectUpdate(shapeFacesUpdate(shape, i, { material: id === "__inherit__" ? undefined : id, materialOverrides: undefined }) as unknown as Partial<WorldObject>);
   const commitTile = (i: number, val: string) => {
@@ -2582,9 +2589,13 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   return (
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6 }}
          onMouseLeave={() => hover(null)}>
-      <div style={LABEL}>FACES — click a row or a face in the canvas</div>
+      {set.length > 1 && (
+        <FaceSetCard selected={selected} shape={shape} set={set} materialList={materialList} bus={bus} onObjectUpdate={onObjectUpdate} />
+      )}
+      <div style={LABEL}>FACES — click a row or a face; Shift-click adds or removes</div>
       {faces.map((f, i) => {
-        const isSel = i === sel;
+        const isSel = set.includes(i);
+        const expanded = i === sel && set.length <= 1;
         const matLabel = f.material ? getMaterialLabel(f.material, materialList) : "inherit";
         return (
           <div key={i}
@@ -2593,12 +2604,12 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
               border: isSel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.07)",
               borderRadius: 5, background: isSel ? "rgba(80,140,255,0.08)" : "rgba(40,40,40,0.6)",
             }}>
-            <button onClick={() => pick(i)}
+            <button onClick={e => pick(i, e.shiftKey || e.metaKey || e.ctrlKey)}
               style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "6px 8px", background: "none", border: "none", cursor: "pointer" }}>
               <span style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>FACE {i + 1}</span>
               <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{f.verts.length} corners · {matLabel}</span>
             </button>
-            {isSel && (
+            {expanded && (
               <div style={{ padding: "4px 8px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ color: "#98a2b8", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -2621,8 +2632,97 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
         );
       })}
       <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>
-        Drag the gizmo on the selected face to move it. Press 1/3 for object/vertex modes.
+        Drag the gizmo to move the selected face(s). Double-click a face for its face loop. Press 1/3 for object/vertex modes.
       </div>
+    </div>
+  );
+}
+
+/** The faces of a face loop through `faceIdx` in SPLIT direction `pair` (Phase 81). */
+function faceLoopOf(shape: ShapeDef, faceIdx: number, pair: 0 | 1): number[] {
+  return loopCutRing(shape.mesh!, { faceIdx, pair })?.faces.map(f => f.faceIdx) ?? [];
+}
+
+/**
+ * Phase 81: 2+ faces selected. Material and TILE apply to every face; INSET / EXTRUDE /
+ * RECESS act on the set as one region (brushOps insetRegion / extrudeRegion), each one
+ * undo step; a refused op leaves the brush unchanged and says why.
+ */
+function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }: {
+  selected: SelectedObjectPayload; shape: ShapeDef; set: number[]; materialList: MaterialDef[];
+  bus?: EventBus; onObjectUpdate: (c: Partial<WorldObject>) => void;
+}) {
+  const faces = shape.mesh!.faces!;
+  const members = set.filter(i => i < faces.length);
+  const mats = new Set(members.map(i => faces[i]!.material ?? "__inherit__"));
+  const tiles = new Set(members.map(i => String(faces[i]!.materialOverrides?.tileScale ?? "")));
+  const [note, setNote] = useState<string | null>(null);
+  const [tileStr, setTileStr] = useState(tiles.size === 1 ? [...tiles][0]! : "");
+  const setKey = members.join(",");
+  useEffect(() => { setNote(null); setTileStr(tiles.size === 1 ? [...tiles][0]! : ""); }, [setKey, selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { schedule, flush } = useFieldDebounce(300);
+
+  const patchAll = (patch: (f: BrushFace) => Partial<BrushFace>) => onObjectUpdate({
+    mesh: { ...shape.mesh!, faces: faces.map((f, i) => members.includes(i) ? { ...f, verts: [...f.verts], ...patch(f) } : f) },
+  } as unknown as Partial<WorldObject>);
+  const commitMat = (id: string) => { if (id !== "__mixed__") patchAll(() => ({ material: id === "__inherit__" ? undefined : id, materialOverrides: undefined })); };
+  const commitTile = (val: string) => {
+    const n = parseFloat(val);
+    patchAll(f => ({ materialOverrides: Number.isFinite(n) && n > 0 ? { ...(f.materialOverrides ?? {}), tileScale: n } : undefined }));
+  };
+  const run = (r: RegionOpResult) => {
+    if ("refused" in r) { setNote(`${r.refused}; nothing changed.`); return; }
+    onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
+    setNote(null);
+  };
+  const selectLoop = (pair: 0 | 1) => {
+    const ring = faceLoopOf(shape, selected.faceIndex ?? members[0]!, pair);
+    if (ring.length) bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: selected.faceIndex ?? ring[0]!, vertexIndex: null, faceSet: ring });
+  };
+  const clear = () => bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: null, vertexIndex: null, faceSet: [] });
+
+  return (
+    <div style={{ border: "1px solid rgba(80,140,255,0.5)", borderRadius: 5, background: "rgba(80,140,255,0.08)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
+      <span style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace" }}>{members.length} FACES SELECTED</span>
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <select value={mats.size === 1 ? [...mats][0]! : "__mixed__"} onChange={e => commitMat(e.target.value)}
+          title="Material for every selected face"
+          style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#dde3f0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
+          {mats.size > 1 && <option value="__mixed__">(mixed)</option>}
+          <option value="__inherit__">(shape material)</option>
+          {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+        </select>
+        <span style={{ ...LABEL, marginBottom: 0 }}>TILE</span>
+        <input type="number" step={0.5} min={0.1} value={tileStr} placeholder={tiles.size > 1 ? "mixed" : "—"}
+          style={{ ...NUM_INPUT, width: 52, padding: "2px 4px", fontSize: 10 }}
+          onChange={e => { setTileStr(e.target.value); const v = e.target.value; schedule(() => commitTile(v)); }}
+          onBlur={e => flush(() => commitTile(e.target.value))}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button style={OP_BTN} onClick={() => run(insetRegion(shape.mesh!, members, 0.25))}
+          title="Inset the selection as one region: a 0.25 m border round its outside, none between the faces">
+          <BrushOpIcon name="inset" />INSET
+        </button>
+        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, 0.25))}
+          title="Push the selection out 0.25 m as one piece; the faces grow to stay joined">
+          <BrushOpIcon name="extrude" />EXTRUDE
+        </button>
+        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, -0.25))}
+          title="Push the selection in 0.25 m as one piece; the faces shrink to stay joined">
+          <BrushOpIcon name="recess" />RECESS
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
+          <BrushOpIcon name="face-loop-h" />FACE LOOP H
+        </button>
+        <button style={OP_BTN} onClick={() => selectLoop(1)} title="Select the other ring of faces through the active face">
+          <BrushOpIcon name="face-loop-v" />FACE LOOP V
+        </button>
+      </div>
+      <button style={OP_BTN} onClick={clear}>CLEAR SELECTION</button>
+      {note && <div style={{ color: "#ffb86b", fontSize: 10 }}>{note}</div>}
     </div>
   );
 }
@@ -2740,6 +2840,15 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
           <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
             onClick={() => { preview(null); loop(pair); }}
             onMouseEnter={() => isQuad && preview(pair)} onMouseLeave={() => preview(null)}>
+            <BrushOpIcon name={icon} />{label}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 4 }}>
+        {([["FACE LOOP H", "face-loop-h", pair0IsH ? 0 : 1], ["FACE LOOP V", "face-loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
+          <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+            title="Select the ring of faces through this face (then EXTRUDE / RECESS / INSET or a material act on all of them)"
+            onClick={() => { const ring = faceLoopOf(shape, faceIndex, pair); if (ring.length) bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex, vertexIndex: null, faceSet: ring }); }}>
             <BrushOpIcon name={icon} />{label}
           </button>
         ))}
