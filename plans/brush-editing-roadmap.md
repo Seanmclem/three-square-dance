@@ -27,6 +27,8 @@ most), then sliding + several cuts together, then pivots and box select.
 
 ## Face sets and face loop select
 
+> **Planned as Phase 81:** `plans/phase-81-brush-face-sets.md`.
+
 **What:** face mode selects several faces at once (Shift-click adds or removes), and a
 **face loop** selects the whole ring of faces around the shape in one step: the faces a
 loop cut would cross, e.g. every side of a cylinder, or one band of a cube.
