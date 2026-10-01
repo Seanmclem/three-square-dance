@@ -10,8 +10,9 @@ import type {
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, EnemyAIDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AudioPlaylist, PlaylistEntry, AttachedSound, AudioMix, SoundDef,
-  PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue,
+  PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue, BrushViewBackground, SkyboxDef,
 } from "@/types";
+import { DEFAULT_BRUSH_BACKGROUND, DEFAULT_BRUSH_COLOR } from "@/types";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
@@ -219,12 +220,12 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 // ── Screen config ─────────────────────────────────────────────────────────────
 
-type ScreenId = "geo" | "mat" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
+type ScreenId = "geo" | "mat" | "brush-view" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
   | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-sounds" | "spawn-controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
-  geo: "Geometry", mat: "Material", open: "Openings", seg: "Segments", vert: "Vertices",
+  geo: "Geometry", mat: "Material", "brush-view": "Brush View", open: "Openings", seg: "Segments", vert: "Vertices",
   animations: "Animations", colliders: "Colliders", motion: "Motion", lights: "Lights", sound: "Sound", audio: "Audio",
   "audio-mixer": "Mixer", "audio-music": "Background Music", "audio-ambient": "Ambient", "audio-character": "Character Sounds",
   scripts: "Scripts",
@@ -236,6 +237,7 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   geo:  "HEIGHT · THICKNESS",
   mat:  "MATERIAL · MAPS",
+  "brush-view": "EDIT BRUSH BACKGROUND",
   open: "OPENINGS",
   seg:  "WALL SEGMENTS",
   vert: "ELEVATION",
@@ -366,6 +368,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
       if (def?.colliders?.length) return `auto (${def.colliders.length} preset${def.colliders.length !== 1 ? "s" : ""})`;
       return def?.collidable ? "auto box" : "none";
     }
+    case "brush-view": return "";   // label comes from the brush-background pref (root rows)
     case "sound": {
       const snd = (selected.data as { sound?: { soundId?: string } } | null)?.sound;
       return snd?.soundId ? snd.soundId : "none";
@@ -541,6 +544,10 @@ interface PropertiesPanelProps {
   onToggleCrosshair?:       () => void;
   showGridFloor?:           boolean;
   onToggleGridFloor?:       () => void;
+  // Edit Brush background (v4.99.9): an editor pref, shown on brushes' Brush View screen.
+  brushBackground?:         BrushViewBackground;
+  onBrushBackgroundChange?: (bg: BrushViewBackground) => void;
+  skyboxes?:                SkyboxDef[];
 }
 
 // ── PropertiesPanel ───────────────────────────────────────────────────────────
@@ -565,6 +572,7 @@ export function PropertiesPanel({
   onAddPressPrompt,
   showPerfCounter, onTogglePerfCounter, showJumpStats, onToggleJumpStats, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor,
+  brushBackground = DEFAULT_BRUSH_BACKGROUND, onBrushBackgroundChange, skyboxes = [],
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
   const [actionsOpen, setActionsOpen] = useState(true);
@@ -600,7 +608,8 @@ export function PropertiesPanel({
   const objAssetId    = selected?.type === "object" ? (selected.data as WorldObject | null)?.assetId : undefined;
   const hasClips      = !!assets.find(a => a.id === objAssetId)?.animations?.length;
   const screens: ScreenId[] = selected
-    ? [...(OBJECT_SCREENS[selected.type] ?? []), ...(hasClips ? ["animations" as ScreenId] : [])]
+    ? [...(OBJECT_SCREENS[selected.type] ?? []), ...(hasClips ? ["animations" as ScreenId] : []),
+       ...(selected.type === "shape" && selected.data && isBrush(selected.data as ShapeDef) && onBrushBackgroundChange ? ["brush-view" as ScreenId] : [])]
     : [];
 
   // Committed label (if any). The root header shows it in place of the id;
@@ -965,7 +974,7 @@ export function PropertiesPanel({
               <CategoryRow
                 key={s}
                 label={SCREEN_LABELS[s]}
-                summary={summaryFor(s, selected, materialList, assets)}
+                summary={s === "brush-view" ? brushBackgroundLabel(brushBackground, skyboxes) : summaryFor(s, selected, materialList, assets)}
                 onPress={() => push(s)}
               />
             ))}
@@ -1037,6 +1046,8 @@ export function PropertiesPanel({
           />
         ) : currentScreen === "motion" ? (
           <MotionScreen selected={selected} onObjectUpdate={onObjectUpdate} />
+        ) : currentScreen === "brush-view" && onBrushBackgroundChange ? (
+          <BrushViewScreen background={brushBackground} onChange={onBrushBackgroundChange} skyboxes={skyboxes} />
         ) : currentScreen === "sound" ? (
           <EntitySoundScreen selected={selected} onObjectUpdate={onObjectUpdate} />
         ) : currentScreen === "scripts" ? (
@@ -2373,6 +2384,57 @@ function brushMeshFromShape(shape: ShapeDef) {
     sideMaterialOverrides: shape.sideMaterialOverrides,
   });
   return faced ?? { vertices: cloud };
+}
+
+function brushBackgroundLabel(bg: BrushViewBackground, skyboxes: SkyboxDef[]): string {
+  if (bg.kind === "color") return bg.color;
+  if (bg.skyboxId === "sky") return "procedural sky";
+  return skyboxes.find(s => s.id === bg.skyboxId)?.label ?? bg.skyboxId;
+}
+
+/** Brush View (v4.99.9): the Edit Brush canvas background, a plain colour (dark by default)
+ *  or any skybox. An editor preference shared by every brush, not saved in the scene. */
+function BrushViewScreen({ background, onChange, skyboxes }: {
+  background: BrushViewBackground;
+  onChange:   (bg: BrushViewBackground) => void;
+  skyboxes:   SkyboxDef[];
+}) {
+  const [lastColor, setLastColor] = useState(background.kind === "color" ? background.color : DEFAULT_BRUSH_COLOR);
+  const value = background.kind === "color" ? "__color" : background.skyboxId;
+  return (
+    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div>
+        <div style={LABEL}>BACKGROUND</div>
+        <select value={value} style={{ ...NUM_INPUT, width: "100%" }}
+          onChange={e => onChange(e.target.value === "__color"
+            ? { kind: "color", color: lastColor }
+            : { kind: "skybox", skyboxId: e.target.value })}>
+          <option value="__color">Plain colour</option>
+          <option value="sky">Procedural sky</option>
+          {skyboxes.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </div>
+      {background.kind === "color" && (
+        <div>
+          <div style={LABEL}>COLOUR</div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input type="color" value={background.color}
+              onChange={e => { setLastColor(e.target.value); onChange({ kind: "color", color: e.target.value }); }}
+              style={{ width: 44, height: 28, padding: 0, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, background: "none", cursor: "pointer" }} />
+            <span style={{ color: "#c2cadb", fontSize: 11, fontFamily: "monospace" }}>{background.color}</span>
+            {background.color !== DEFAULT_BRUSH_COLOR && (
+              <button style={{ ...SHAPE_ACTION_BTN, width: "auto", padding: "4px 10px", marginLeft: "auto" }}
+                onClick={() => { setLastColor(DEFAULT_BRUSH_COLOR); onChange(DEFAULT_BRUSH_BACKGROUND); }}>Default</button>
+            )}
+          </div>
+        </div>
+      )}
+      <div style={{ color: "#98a2b8", fontSize: 10, lineHeight: 1.5 }}>
+        Used behind every brush in Edit Brush; the level keeps its own sky. Saved as an
+        editor preference, not in the scene.
+      </div>
+    </div>
+  );
 }
 
 function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList, onEditBrush }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus; activeTool?: ToolId; materialList?: MaterialDef[]; onEditBrush?: () => void }) {

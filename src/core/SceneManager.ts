@@ -5,7 +5,7 @@ import { ViewHelper } from "three/addons/helpers/ViewHelper.js";
 import { EditorCamera } from "@/editor/EditorCamera";
 import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
-import type { MeshUserData } from "@/types";
+import { DEFAULT_BRUSH_BACKGROUND, type BrushViewBackground, type MeshUserData } from "@/types";
 
 type UpdateCallback = (dt: number) => void;
 
@@ -108,7 +108,10 @@ export class SceneManager {
       this._applyLightVisibility();
     });
     // Skybox selection (WorldState emits on load and on panel edits). "sky" = procedural.
-    this._unsubSky = bus.on("world:sky", ({ skybox }) => this._applySkybox(skybox));
+    this._unsubSky = bus.on("world:sky", ({ skybox }) => {
+      this._worldSkybox = skybox;
+      if (!this._brushView) this._applySkybox(skybox);   // Edit Brush keeps its own background
+    });
     if (editor) this._setupGrid();   // grid helpers + demo ground are editor furniture
 
     if (editor) {
@@ -299,6 +302,7 @@ export class SceneManager {
   /** Edit Brush view (v4.99.6/7): no solid ground plane, and a 30 m grid (1 m squares)
    *  in place of the level's 100 m one. */
   setBrushEditView(on: boolean): void {
+    if (on === this._brushView) return;
     this._brushView = on;
     if (on && !this._brushGrid) {
       this._brushGrid = new THREE.GridHelper(30, 30, 0x445577, 0x2d3d55);
@@ -306,10 +310,39 @@ export class SceneManager {
       this.scene.add(this._brushGrid);
     }
     this._applyGrid();
+    // v4.99.9: the brush view has its own background and no fog; the level's come back on exit.
+    if (on) {
+      this._levelFog = this.scene.fog;
+      this.scene.fog = null;
+      this._applyBrushBackground();
+    } else {
+      this.scene.fog = this._levelFog;
+      this._levelFog = null;
+      this._applySkybox(this._worldSkybox);
+    }
+  }
+
+  /** Edit Brush background (Brush View screen); applied now if the brush view is open. */
+  setBrushBackground(bg: BrushViewBackground): void {
+    this._brushBg = bg;
+    if (this._brushView) this._applyBrushBackground();
+  }
+
+  private _applyBrushBackground(): void {
+    const bg = this._brushBg;
+    if (bg.kind === "skybox") { this._applySkybox(bg.skyboxId); return; }
+    ++this._skyReqToken;   // drop any skybox load still in flight
+    this._sky.visible = false;
+    this.scene.background = new THREE.Color(bg.color);
+    this.scene.environment = this._roomEnvMap;
+    if (this._skyboxEnvMap) { this._skyboxEnvMap.dispose(); this._skyboxEnvMap = null; }
   }
   private _gridOn = true;
   private _brushView = false;
   private _brushGrid: THREE.GridHelper | null = null;
+  private _worldSkybox = "sky";
+  private _brushBg: BrushViewBackground = DEFAULT_BRUSH_BACKGROUND;
+  private _levelFog: THREE.Scene["fog"] = null;
 
   private _applyGrid(): void {
     const levelGrid = this._gridOn && !this._brushView;

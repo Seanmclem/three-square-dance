@@ -95,8 +95,8 @@ import { writeAssetToLibrary, writeAssetFile, removeAssetFiles, removeEntries, u
 import { BakeDialog } from "@/ui/BakeDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
 import type {
-  GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue } from "@/types";
-import { isGameplayMode, HIDDEN_CATEGORY } from "@/types";
+  GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue, BrushViewBackground } from "@/types";
+import { isGameplayMode, HIDDEN_CATEGORY, DEFAULT_BRUSH_BACKGROUND } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other", HIDDEN_CATEGORY];
 
@@ -129,6 +129,7 @@ const DEMO_ZONE_ID = "demo";
 // restored only when this autosave is what got loaded (not the scene file, not an
 // expired autosave). Bump the version if HistoryEntry's shape ever changes.
 const HISTORY_KEY = "__editorHistory";
+const BRUSH_BG_KEY = "brushViewBackground";
 const HISTORY_VERSION = 1;
 type StoredHistory = { v: number; undo: HistoryEntry[]; redo: HistoryEntry[] };
 
@@ -332,7 +333,29 @@ export default function App() {
   const editingBrushRef  = useRef(false);
   const brushSessionRef  = useRef<BrushEditSession | null>(null);
   // v4.99.6/7: Edit Brush has no solid ground plane and a 30 m grid instead of the level's 100 m one.
-  useEffect(() => { sceneRef.current?.setBrushEditView(!!editingBrush); }, [editingBrush]);
+  // v4.99.9: and its own background (Brush View screen), an editor pref kept in the workspace
+  // settings on desktop (the shell's port changes per launch, so localStorage alone resets).
+  const [brushBg, setBrushBg] = useState<BrushViewBackground>(() => {
+    try { return JSON.parse(localStorage.getItem(BRUSH_BG_KEY) ?? "null") ?? DEFAULT_BRUSH_BACKGROUND; }
+    catch { return DEFAULT_BRUSH_BACKGROUND; }
+  });
+  useEffect(() => {
+    void detectDesktop().then(() => desktop()?.getPref(BRUSH_BG_KEY)).then(v => {
+      if (v) try { setBrushBg(JSON.parse(v)); } catch { /* keep the default */ }
+    });
+  }, []);
+  const handleBrushBgChange = (bg: BrushViewBackground): void => {
+    setBrushBg(bg);
+    const json = JSON.stringify(bg);
+    try { localStorage.setItem(BRUSH_BG_KEY, json); } catch { /* storage blocked */ }
+    void desktop()?.setPref(BRUSH_BG_KEY, json);
+  };
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    scene.setBrushBackground(brushBg);
+    scene.setBrushEditView(!!editingBrush);
+  }, [editingBrush, brushBg]);
   // v4.99.1: Save stays in the session; the bar shows unsaved / saved, and Close asks
   // before dropping unsaved changes. Cmd+S saves the brush while the session is open.
   const [brushDirty,        setBrushDirty]        = useState(false);
@@ -4094,6 +4117,9 @@ export default function App() {
         showCrosshair={showCrosshair}
         onToggleCrosshair={handleToggleCrosshair}
         showGridFloor={showGridFloor}
+        brushBackground={brushBg}
+        onBrushBackgroundChange={handleBrushBgChange}
+        skyboxes={skyboxes}
         gameInput={project ? projectRef.current?.store.game.input : undefined}
         onGameInputChange={project ? handleGameInputChange : undefined}
         onToggleGridFloor={handleToggleGridFloor}
