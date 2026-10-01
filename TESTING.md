@@ -29,7 +29,10 @@ System Access API is gone.
    `nohup deno task desktop:dev >> /tmp/wb-shell.log 2>&1 < /dev/null &`
    — NOT via Bash `run_in_background` (the harness can reap it; killed the
    server mid-day once). `desktop:dev` = shell + `vite build --watch`.
-4. **Connect the Chrome extension** (§1) and open a tab on the shell's origin.
+4. **(2026-10-01) Prefer the throwaway harness (§12) for anything that edits the
+   world.** An editor tab on the shell's origin shares the user's autosave (and,
+   since v4.99.4, their undo history); a test entity leaked into level_2 that way.
+   Otherwise: **connect the Chrome extension** (§1) and open a tab on the shell's origin.
    Tag it: `document.title = "🤖 CLAUDE TESTING — <Mon DD H:MMam>"`.
 5. **Verify the harness:** `!!window.__world` in `javascript_tool` must be
    `true` (see "full harness" below). If false → stale bundle (reload the tab;
@@ -1149,3 +1152,50 @@ game.json merging against the committed fixture
   long as the multi-zone `zone:enter` event has been vestigial). When adding or changing a
   lifecycle trigger, change both, and test both: `__test.enterGame()` in an editor tab AND
   `router.go()` in a runtime tab.
+
+---
+
+## 12. Throwaway harness, autosave and undo history (2026-10-01, v4.99.4)
+
+- **Test edits on the harness, not the user's shell.** `deno task test:harness
+  [project] [scene] [port]` (defaults `platfrom-obby level_2 7411`) starts
+  `scripts/test-harness.ts`: the real desktop api on a temp copy of one game,
+  serving the repo's `dist/` (run `npm run build` first if it is stale; the shell's
+  `build:watch` keeps it fresh while the shell runs). It prints its temp workspace;
+  the autosave is `<tmp>/state/autosave/latest.json`. Saves, autosaves and restores
+  all happen there, so tests can add, delete, save and reload freely. Stop it with
+  `pkill -f scripts/test-harness.ts` when done. Asset imports are the exception:
+  `content/assets` is a symlink to `public/assets`.
+- **Why:** on the shell, every editor window and tab shares one autosave. A headless
+  test made a cylinder (`claude_p80_cyl`), the 60s tick autosaved it, the user's
+  window restored that autosave after a shell restart, and their next Save put it in
+  `level_2.json`. The commit was then mislabelled "user save".
+- **Automated browsers never write the desktop autosave** (v4.99.4): `storeAutosave`
+  returns early when `navigator.webdriver` is true (Playwright, Puppeteer). So on
+  the shell, a Playwright tab cannot leak state through the autosave, but it also
+  cannot test autosave/restore. To test those on the HARNESS, add an init script:
+  `ctx.addInitScript(() => Object.defineProperty(Navigator.prototype, "webdriver", { get: () => false }))`.
+  Never use that override against the shell's port. A Chrome-extension tab (§1) is the
+  user's own Chrome, which is not flagged as automated: expect it to write the
+  shared autosave as before.
+- **Undo history now survives a reload.** The autosave carries
+  `__editorHistory: { v, undo, redo }` whenever either stack is non-empty, and
+  startup restores it when the autosave (not the scene file) is what loaded.
+  Consequences for tests:
+  - After a reload, `__history.canUndo` can be true: do not assume a fresh tab starts
+    with empty history. To start clean, load with the scene file newer than the
+    autosave, or call `/api/clearAutosave` first (harness only).
+  - Cmd+Z after a reload can re-create entities that were deleted before the reload.
+    When cleaning up test entities, delete them and let the autosave tick run; do not
+    rely on undo, and remember that the undo stack still holds the "add" step.
+  - The payload grows with history (100 entries max, each holding the before/after of
+    the entities it touched). Search it with `grep` for test ids: an id can appear in
+    `__editorHistory` even when the world no longer contains it.
+  - In plain-browser mode (no shell) the history goes to `localStorage`
+    (`worldeditor_autosave`); if it does not fit, only the world is stored.
+- **A check of the whole loop on the harness** (what verified v4.99.4): add + move a
+  shape and delete a brush through `__world.transaction`, `reload()`, read the autosave
+  file for `__editorHistory`, then Cmd+Z / Cmd+Shift+Z with the mouse over the canvas
+  and compare `__history.canUndo / canRedo` and the shapes. Last step: set the scene
+  file's mtime ahead (`utimesSync`) and reload; the scene must load from disk with
+  empty history.
