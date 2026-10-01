@@ -259,6 +259,10 @@ export interface BusEvents {
   "shape:set-gizmo-mode":  { mode: "translate" | "rotate" | "scale" };
   // A set rotate/scale drag was undone on release because it made the brush invalid.
   "shape:vertex-set-refused": { reason: string };
+  // Face gizmo mode (v4.99.0): MOVE slides the face(s), PUSH moves each along its own normal.
+  "shape:face-gizmo-mode": { mode: "move" | "push" };
+  // A PUSH drag finished: how far, or why it stopped short (panel note).
+  "shape:face-push-done":  { dist: number; refused: string | null };
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
   // LOOP CUT button hover → canvas ring preview (Phase 79; null start clears).

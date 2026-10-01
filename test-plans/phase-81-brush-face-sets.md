@@ -37,6 +37,17 @@ saved.
 - [x] INSET on the band: 18 → 50 faces, band now y 0.25..1.75.
 - [ ] TILE for all; "(mixed)" shown when materials differ.
 
+## PUSH and DIST (v4.99.0)
+
+- [x] GIZMO PUSH swaps the arrows for a green cube handle at the selection's centre.
+- [x] Drag it 50 px right with the 16-face band: every face 0.5 m out (radius 1.51),
+      note "Pushed out 0.50 m."; one Cmd+Z restores.
+- [x] Drag 200 px left: stops at the last valid distance (−0.90 m), note "Stopped at
+      -0.90 m: PUSH would turn faces inside out."
+- [x] Escape mid-push restores exactly.
+- [x] DIST 0.5 → EXTRUDE moves the band 0.5 m (radius 1.51).
+- [ ] PUSH on a single face (moves it along its normal; neighbours stretch).
+
 ## Gizmo
 
 - [x] With the 16-face set, dragging the up arrow moves every set corner by the same

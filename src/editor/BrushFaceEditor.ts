@@ -1,13 +1,14 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud, loopCutRing } from "@/editor/brushOps";
+import { facesFromCloud, loopCutRing, offsetRegion } from "@/editor/brushOps";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { IEditorModule, ToolId, ShapeDef, Vec3 } from "@/types";
+import type { IEditorModule, ToolId, ShapeDef, Vec3, BrushFace } from "@/types";
 
 const SNAP = 0.25;
 const SUSPEND_SOURCE = "face-mode";
+const PUSH_SNAP = 0.05;
 
 /**
  * Face-mode controller (Phase 23): a translate-only TransformControls parked on the
@@ -27,6 +28,20 @@ export class BrushFaceEditor implements IEditorModule {
   private _selectedId: string | null = null;
   private _faceIndex: number | null = null;
   private _faceSet: number[] = [];   // Phase 81: every selected face; the gizmo moves them all
+  // v4.99.0 PUSH mode: a green cube handle at the selection's centre (the arrows hide);
+  // dragging it right / up pushes every selected face out along its own normal
+  // (offsetRegion), left / down pulls them in. Its own handle, not TransformControls:
+  // TC's centre box is hidden along with its X/Y/Z handles.
+  private _mode: "move" | "push" = "move";
+  private _mouse = { x: 0, y: 0 };
+  private _mouseStart = { x: 0, y: 0 };
+  private _snapOn = true;
+  private _origMesh: { vertices: Vec3[]; faces: BrushFace[] } | null = null;
+  private _pushDist = 0;
+  private _pushRefused: string | null = null;
+  private _pushHandle: THREE.Mesh | null = null;
+  private _pushing = false;
+  private readonly _ray = new THREE.Raycaster();
   private _previewing = false;
   private _suspended = false;
 
@@ -62,15 +77,28 @@ export class BrushFaceEditor implements IEditorModule {
         this._dragStart.copy(this._proxy.position);
         const shape = this._shape();
         this._origVertices = shape ? structuredClone(shape.mesh!.vertices) : null;
+        this._origMesh = shape ? structuredClone({ vertices: shape.mesh!.vertices, faces: shape.mesh!.faces! }) : null;
+        this._mouseStart = { ...this._mouse };
+        this._pushDist = 0; this._pushRefused = null;
         this._world.beginTransaction("move brush face");
       } else {
-        this._dragging = false;
         this._origVertices = null;
+        this._origMesh = null;
         this._world.commitTransaction();
+        this._dragging = false;
         this._sync();
       }
     });
     this._controls.addEventListener("objectChange", () => this._onGizmoChange());
+
+    this._pushHandle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.22, 0.22),
+      new THREE.MeshBasicMaterial({ color: 0x3ccf91, depthTest: false, transparent: true, opacity: 0.9 }),
+    );
+    this._pushHandle.renderOrder = 6;
+    this._pushHandle.visible = false;
+    this._pushHandle.userData = { hideInGame: true, editorOnly: true, selectable: false };
+    this._scene.add(this._pushHandle);
 
     this._unsubs.push(
       this._bus.on("tool:select", ({ tool }) => {
@@ -105,14 +133,28 @@ export class BrushFaceEditor implements IEditorModule {
         const ring = rings[0]!.length >= rings[1]!.length ? rings[0]! : rings[1]!;
         if (ring.length > 1) this._bus.emit("shape:sub-select", { zoneId: this._zoneId!, shapeId: this._selectedId!, faceIndex: this._faceIndex, vertexIndex: null, faceSet: ring });
       }),
+      this._bus.on("shape:face-gizmo-mode", ({ mode }) => {
+        if (mode === this._mode) return;
+        this._mode = mode;
+        this._sync();
+      }),
+      this._bus.on("input:mousemove", ({ screenPos }) => {
+        this._mouse = screenPos;
+        if (this._pushing) this._onPush();
+      }),
+      this._bus.on("input:mousedown", ({ button, screenPos }) => {
+        this._mouse = screenPos;
+        if (button === 0 && this._mode === "push" && this._pushHandle?.visible && this._hitsPushHandle(screenPos)) this._beginPush();
+      }),
+      this._bus.on("input:mouseup", ({ button }) => { if (button === 0 && this._pushing) this._endPush(); }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(null);
+        if (code === "AltLeft" || code === "AltRight") { this._controls?.setTranslationSnap(null); this._snapOn = false; }
         if (code === "Escape" && this._dragging) this._cancelDrag();
       }),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(SNAP);
+        if (code === "AltLeft" || code === "AltRight") { this._controls?.setTranslationSnap(SNAP); this._snapOn = true; }
       }),
     );
   }
@@ -130,6 +172,12 @@ export class BrushFaceEditor implements IEditorModule {
       this._controls = null;
     }
     this._scene.remove(this._proxy);
+    if (this._pushHandle) {
+      this._scene.remove(this._pushHandle);
+      this._pushHandle.geometry.dispose();
+      (this._pushHandle.material as THREE.Material).dispose();
+      this._pushHandle = null;
+    }
   }
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -174,6 +222,7 @@ export class BrushFaceEditor implements IEditorModule {
     if (!active) {
       this._controls.detach();
       this._controls.visible = false;
+      if (this._pushHandle) this._pushHandle.visible = false;
       return;
     }
     const shape = this._shape()!;
@@ -183,6 +232,14 @@ export class BrushFaceEditor implements IEditorModule {
     for (const i of corners) c.add(new THREE.Vector3(verts[i]!.x, verts[i]!.y, verts[i]!.z));
     c.divideScalar(Math.max(1, corners.size)).applyMatrix4(this._shapeMatrix(shape));
     this._proxy.position.copy(c);
+    if (this._mode === "push") {
+      this._controls.detach();
+      this._controls.visible = false;
+      this._pushHandle!.position.copy(c);
+      this._pushHandle!.visible = true;
+      return;
+    }
+    this._pushHandle!.visible = false;
     this._controls.attach(this._proxy);
     this._controls.visible = true;
   }
@@ -220,6 +277,55 @@ export class BrushFaceEditor implements IEditorModule {
     this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
   }
 
+  private _hitsPushHandle(screenPos: { x: number; y: number }): boolean {
+    const rect = this._canvas.getBoundingClientRect();
+    this._ray.setFromCamera(new THREE.Vector2(
+      ((screenPos.x - rect.left) / rect.width) * 2 - 1, -((screenPos.y - rect.top) / rect.height) * 2 + 1), this._camera);
+    return this._ray.intersectObject(this._pushHandle!, false).length > 0;
+  }
+
+  private _beginPush(): void {
+    const shape = this._shape();
+    if (!shape || !this._isActive()) return;
+    this._pushing = true;
+    this._dragging = true;
+    this._origVertices = structuredClone(shape.mesh!.vertices);
+    this._origMesh = structuredClone({ vertices: shape.mesh!.vertices, faces: shape.mesh!.faces! });
+    this._mouseStart = { ...this._mouse };
+    this._pushDist = 0; this._pushRefused = null;
+    this._world.beginTransaction("push brush faces");
+    this._bus.emit("gizmo:dragging", { isDragging: true });   // camera + click selection stand down
+  }
+
+  private _endPush(): void {
+    this._pushing = false;
+    this._dragging = false;
+    this._origVertices = null;
+    this._origMesh = null;
+    this._world.commitTransaction();
+    this._bus.emit("gizmo:dragging", { isDragging: false });
+    this._bus.emit("shape:face-push-done", { dist: this._pushDist, refused: this._pushRefused });
+    this._sync();
+  }
+
+  /** PUSH drag: 1 m per 100 px of right / up mouse travel, snapped to 0.05 m (Alt = free).
+   *  Always recomputed from the mesh at drag start; a distance that would turn faces
+   *  inside out is skipped (the last good one stays) and reported when the drag ends. */
+  private _onPush(): void {
+    if (!this._origMesh || !this._zoneId || !this._selectedId) return;
+    const px = (this._mouse.x - this._mouseStart.x) - (this._mouse.y - this._mouseStart.y);
+    let dist = px / 100;
+    dist = this._snapOn ? Math.round(dist / PUSH_SNAP) * PUSH_SNAP : Math.round(dist * 1000) / 1000;
+    if (dist === this._pushDist && !this._pushRefused) return;
+    const set = this._faceSet.length ? this._faceSet : [this._faceIndex!];
+    const r = dist === 0 ? { mesh: this._origMesh } : offsetRegion(this._origMesh, set, dist);
+    if ("refused" in r) { this._pushRefused = r.refused; return; }
+    this._pushRefused = null;
+    this._pushDist = dist;
+    const shape = this._shape();
+    if (shape) this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices: r.mesh.vertices } });
+  }
+
   private _cancelDrag(): void {
     if (this._origVertices && this._zoneId && this._selectedId) {
       const shape = this._shape();
@@ -227,7 +333,11 @@ export class BrushFaceEditor implements IEditorModule {
     }
     this._world.abortTransaction();
     this._dragging = false;
+    this._pushing = false;
     this._origVertices = null;
+    this._origMesh = null;
+    this._pushDist = 0;
+    this._pushRefused = null;
     this._bus.emit("gizmo:dragging", { isDragging: false });
     this._sync();
   }

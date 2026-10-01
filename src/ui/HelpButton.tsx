@@ -82,6 +82,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Panel: SELECT RING"], action: "After a loop cut: select the new ring's corners" },
       { keys: ["Panel: FACE LOOP H / V"], action: "Face mode: select the ring of faces through the selected face" },
       { keys: ["2+ faces selected"],  action: "Material / TILE apply to all; INSET, EXTRUDE, RECESS act on them as one piece" },
+      { keys: ["Panel: GIZMO PUSH"],  action: "Face mode: drag the gizmo's centre box to push the selected face(s) out / in along their own directions" },
+      { keys: ["Panel: DIST"],        action: "How far EXTRUDE / RECESS go (default 0.25 m)" },
     ],
   },
 ];

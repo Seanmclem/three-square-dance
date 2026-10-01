@@ -939,21 +939,15 @@ export function regionBoundary(mesh: ShapeBrushMesh, set: number[]): {
 }
 
 /**
- * Extrude (dist > 0) or recess (dist < 0) a face set as ONE piece. Each corner moves by
- * the offset `o` with `o · n = dist` for the normal of every set face around it, so every
- * face's plane moves exactly `dist` along its own normal and the faces grow or shrink to
- * stay joined (a cylinder band becomes a wider / narrower ring). Boundary corners are
- * duplicated (unselected faces keep the originals) and get one side wall per boundary
- * edge, `[p, q, q', p']` as in extrudeFace (sign-agnostic winding); interior corners just
- * move. A 1-face set gives exactly extrudeFace's result. Refused (nothing changed) if a
- * face would turn inside out or the mesh fails validateMesh.
+ * Per-corner offset that moves every face of a set exactly `dist` along its own normal
+ * while keeping the faces joined: `o · n = dist` for the normal `n` of every set face
+ * around the corner (1 normal: `dist n`; 2: `dist (n1 + n2) / (1 + n1 · n2)`; 3+: least
+ * squares). Null when a corner's faces fold back on each other (no such offset).
+ * Shared by extrudeRegion (EXTRUDE / RECESS) and offsetRegion (PUSH).
  */
-export function extrudeRegion(mesh: ShapeBrushMesh, set: number[], dist: number): RegionOpResult {
-  const faces0 = mesh.faces;
-  if (!faces0?.length || !set.length || dist === 0 || !Number.isFinite(dist)) return { refused: "nothing to move" };
+export function regionOffsets(mesh: ShapeBrushMesh, set: number[], dist: number): Map<number, THREE.Vector3> | null {
+  const faces0 = mesh.faces!;
   const V0 = mesh.vertices;
-  const { edges, corners } = regionBoundary(mesh, set);
-
   // Normals of the set faces around each set corner.
   const around = new Map<number, THREE.Vector3[]>();
   for (const fi of set) {
@@ -984,11 +978,63 @@ export function extrudeRegion(mesh: ShapeBrushMesh, set: number[], dist: number)
     return rhs.applyMatrix3(m.clone().invert());
   };
 
-  const vertices = V0.map(v => ({ ...v }));
-  const moved = new Map<number, number>();   // old corner → index of its moved position
+  const out = new Map<number, THREE.Vector3>();
   for (const [v, ns] of around) {
     const o = offsetFor(ns);
-    if (!o) return { refused: "a corner where the selected faces fold back on each other" };
+    if (!o) return null;
+    out.set(v, o);
+  }
+  return out;
+}
+
+/**
+ * PUSH (v4.99.0): move a face set `dist` along its faces' own normals without adding
+ * walls: the same offsets as extrudeRegion, applied to the existing corners, so the set
+ * faces grow or shrink to stay joined and the faces around them stretch to follow.
+ * Refused if a set face would turn inside out or the mesh fails validateMesh.
+ */
+export function offsetRegion(mesh: ShapeBrushMesh, set: number[], dist: number): RegionOpResult {
+  const faces0 = mesh.faces;
+  if (!faces0?.length || !set.length || !Number.isFinite(dist)) return { refused: "nothing to push" };
+  const offsets = regionOffsets(mesh, set, dist);
+  if (!offsets) return { refused: "a corner where the selected faces fold back on each other" };
+  const V0 = mesh.vertices;
+  const vertices = V0.map((v, i) => {
+    const o = offsets.get(i);
+    return o ? { x: +(v.x + o.x).toFixed(4), y: +(v.y + o.y).toFixed(4), z: +(v.z + o.z).toFixed(4) } : { ...v };
+  });
+  for (const fi of set) {
+    const n0 = newellNormal(V0, faces0[fi]!.verts), n1 = newellNormal(vertices, faces0[fi]!.verts);
+    if (n1.lengthSq() < 0.5 || n1.dot(n0) <= 0) return { refused: "PUSH would turn faces inside out" };
+  }
+  const out = { vertices, faces: cloneFaces(faces0) };
+  const err = validateMesh(out);
+  if (err) return { refused: `PUSH would make an invalid shape (${err})` };
+  return { mesh: out };
+}
+
+/**
+ * Extrude (dist > 0) or recess (dist < 0) a face set as ONE piece. Each corner moves by
+ * the offset `o` with `o · n = dist` for the normal of every set face around it, so every
+ * face's plane moves exactly `dist` along its own normal and the faces grow or shrink to
+ * stay joined (a cylinder band becomes a wider / narrower ring). Boundary corners are
+ * duplicated (unselected faces keep the originals) and get one side wall per boundary
+ * edge, `[p, q, q', p']` as in extrudeFace (sign-agnostic winding); interior corners just
+ * move. A 1-face set gives exactly extrudeFace's result. Refused (nothing changed) if a
+ * face would turn inside out or the mesh fails validateMesh.
+ */
+export function extrudeRegion(mesh: ShapeBrushMesh, set: number[], dist: number): RegionOpResult {
+  const faces0 = mesh.faces;
+  if (!faces0?.length || !set.length || dist === 0 || !Number.isFinite(dist)) return { refused: "nothing to move" };
+  const V0 = mesh.vertices;
+  const { edges, corners } = regionBoundary(mesh, set);
+
+  const offsets = regionOffsets(mesh, set, dist);
+  if (!offsets) return { refused: "a corner where the selected faces fold back on each other" };
+
+  const vertices = V0.map(v => ({ ...v }));
+  const moved = new Map<number, number>();   // old corner → index of its moved position
+  for (const [v, o] of offsets) {
     const p = V0[v]!;
     const np = { x: +(p.x + o.x).toFixed(4), y: +(p.y + o.y).toFixed(4), z: +(p.z + o.z).toFixed(4) };
     if (corners.has(v)) { vertices.push(np); moved.set(v, vertices.length - 1); }

@@ -2638,6 +2638,52 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
   );
 }
 
+// v4.99.0: the face gizmo's mode and the EXTRUDE / RECESS distance outlive any one panel
+// (they're tool settings, not per-face data), so they sit at module level.
+let faceGizmoModeNow: "move" | "push" = "move";
+let extrudeDistNow = 0.25;
+
+/** GIZMO MOVE / PUSH switch + the last PUSH result (shape:face-push-done). */
+function FaceGizmoModeRow({ bus }: { bus?: EventBus }) {
+  const [mode, setMode] = useState(faceGizmoModeNow);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => bus?.on("shape:face-push-done", ({ dist, refused }) => setNote(
+    refused ? `Stopped at ${dist.toFixed(2)} m: ${refused}.` : `Pushed ${dist > 0 ? "out" : "in"} ${Math.abs(dist).toFixed(2)} m.`,
+  )), [bus]);
+  const pick = (m: "move" | "push") => { faceGizmoModeNow = m; setMode(m); setNote(null); bus?.emit("shape:face-gizmo-mode", { mode: m }); };
+  const on = { background: "rgba(80,140,255,0.2)", color: "#9dbdff", borderColor: "rgba(80,140,255,0.5)" };
+  return (
+    <>
+      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        <span style={{ ...LABEL, marginBottom: 0, width: 44 }}>GIZMO</span>
+        <button style={{ ...OP_BTN, ...(mode === "move" ? on : {}) }} onClick={() => pick("move")}
+          title="Drag the gizmo's arrows to slide the selected face(s) in one direction">MOVE</button>
+        <button style={{ ...OP_BTN, ...(mode === "push" ? on : {}) }} onClick={() => pick("push")}
+          title="Drag the gizmo's centre box right / up to push every selected face out along its own direction, left / down to pull them in (snaps 0.05 m, Alt = free)">
+          <BrushOpIcon name="extrude" />PUSH
+        </button>
+      </div>
+      {note && <div style={{ color: "#c2cadb", fontSize: 9 }}>{note}</div>}
+    </>
+  );
+}
+
+/** How far EXTRUDE / RECESS go, in meters (default 0.25). */
+function ExtrudeDistField() {
+  const [str, setStr] = useState(String(extrudeDistNow));
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <span style={{ ...LABEL, marginBottom: 0 }}>EXTRUDE / RECESS DIST</span>
+      <input type="number" step={0.05} min={0.01} value={str}
+        title="How far EXTRUDE and RECESS move the face(s), in meters"
+        style={{ ...NUM_INPUT, width: 64, padding: "2px 4px", fontSize: 10 }}
+        onChange={e => { setStr(e.target.value); const n = parseFloat(e.target.value); if (Number.isFinite(n) && n > 0) extrudeDistNow = n; }}
+      />
+      <span style={{ color: "#98a2b8", fontSize: 10 }}>m</span>
+    </div>
+  );
+}
+
 /** The faces of a face loop through `faceIdx` in SPLIT direction `pair` (Phase 81). */
 function faceLoopOf(shape: ShapeDef, faceIdx: number, pair: 0 | 1): number[] {
   return loopCutRing(shape.mesh!, { faceIdx, pair })?.faces.map(f => f.faceIdx) ?? [];
@@ -2704,15 +2750,17 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
           title="Inset the selection as one region: a 0.25 m border round its outside, none between the faces">
           <BrushOpIcon name="inset" />INSET
         </button>
-        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, 0.25))}
-          title="Push the selection out 0.25 m as one piece; the faces grow to stay joined">
+        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, extrudeDistNow))}
+          title="Push the selection out (by DIST) as one piece, adding side walls; the faces grow to stay joined">
           <BrushOpIcon name="extrude" />EXTRUDE
         </button>
-        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, -0.25))}
-          title="Push the selection in 0.25 m as one piece; the faces shrink to stay joined">
+        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, -extrudeDistNow))}
+          title="Push the selection in (by DIST) as one piece, adding side walls; the faces shrink to stay joined">
           <BrushOpIcon name="recess" />RECESS
         </button>
       </div>
+      <ExtrudeDistField />
+      <FaceGizmoModeRow bus={bus} />
       <div style={{ display: "flex", gap: 4 }}>
         <button style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
           <BrushOpIcon name="face-loop-h" />FACE LOOP H
@@ -2794,8 +2842,8 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     onObjectUpdate({ mesh: result } as unknown as Partial<WorldObject>);
   };
   const split = (pair: 0 | 1) => run(splitFaceQuad(shape.mesh!, faceIndex, pair));
-  const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, 0.25));
-  const recess  = () => run(extrudeFace(shape.mesh!, faceIndex, -0.25));
+  const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, extrudeDistNow));
+  const recess  = () => run(extrudeFace(shape.mesh!, faceIndex, -extrudeDistNow));
   const inset   = () => run(insetFace(shape.mesh!, faceIndex, 0.25));
   // Flip which diagonal a bent quad folds along. Landing back on the automatic
   // choice drops the override, so later vertex moves re-pick it.
@@ -2854,11 +2902,11 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
         ))}
       </div>
       <div style={{ display: "flex", gap: 4 }}>
-        <button style={OP_BTN} onClick={extrude} title="Extrude this face 0.25m outward along its normal">
+        <button style={OP_BTN} onClick={extrude} title="Extrude this face outward along its normal (by DIST)">
           <BrushOpIcon name="extrude" />EXTRUDE
         </button>
         <button style={OP_BTN} onClick={recess}
-          title="Extrude this face 0.25m inward — carve a recess (inset first for a window/pit)">
+          title="Extrude this face inward (by DIST) — carve a recess (inset first for a window/pit)">
           <BrushOpIcon name="recess" />RECESS
         </button>
         <button style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
@@ -2866,6 +2914,8 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
           <BrushOpIcon name="fold" />FLIP FOLD
         </button>
       </div>
+      <ExtrudeDistField />
+      <FaceGizmoModeRow bus={bus} />
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>
       )}
