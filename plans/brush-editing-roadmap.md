@@ -13,7 +13,7 @@ gizmo (Phase 80). Selection is one face or one edge at a time, or a set of corne
 
 | Item | What it adds | Size | Needs first |
 |---|---|---|---|
-| [Face sets and face loop select](#face-sets-and-face-loop-select) | Several faces selected at once; a whole ring of faces in one click | Large | nothing |
+| [Face sets and face loop select](#face-sets-and-face-loop-select) | Several faces selected at once; a whole ring of faces in one click; one material for all; extrude / recess the band as one piece | Large | nothing |
 | [Soft falloff](#soft-falloff) | Nearby corners follow a move with a falloff, for smooth bulges | Medium | nothing |
 | [Sliding a loop cut](#sliding-a-loop-cut) | Cut at any point along the faces, not only the middle | Medium | nothing |
 | [Several parallel loop cuts](#several-parallel-loop-cuts) | 2, 3, 4… evenly spaced rings in one step | Small | best after sliding |
@@ -41,15 +41,27 @@ extruding the band.
 - Face loop = `loopCutRing(mesh, { faceIdx, pair }).faces`, which already finds exactly
   that ring. Entry points: a FACE LOOP H / V pair of buttons, and double-click a face.
 - Highlight: the blue overlay on every face in the set.
-- What each op does with several faces decides the size of the phase:
-  - material and tile for all: simple, first version;
-  - EXTRUDE / RECESS the set as one region (shared sides not duplicated), the way
-    Blender extrudes a band: the hard part;
-  - INSET each face or the region as a whole: pick one;
-  - SPLIT / LOOP CUT: stay single-face.
+- What each op does with several faces (decided 2026-09-30, user):
+  - **Material and tile for all:** with 2+ faces selected, the material picker and
+    TILE apply to every face in the set.
+  - **EXTRUDE / RECESS the band as one piece, faces scaling to stay joined.** The
+    selected faces move out (or in) together as a connected region, not as separate
+    blocks: side walls are added only along the region's outer boundary (a band's top
+    and bottom rims), never between two selected faces. Each face's plane moves
+    exactly 0.25 m along its own normal, so the faces stay parallel to where they were
+    and grow (extrude) or shrink (recess) to stay joined. On a cylinder band that's a
+    thicker ring: every side face pushed straight out, each one wider than before.
+    Per corner, the offset `o` satisfies `o · n = d` for the normal `n` of every
+    selected face around it (two faces: `o = d (n1 + n2) / (1 + n1 · n2)`; more:
+    least squares), the usual "shell" offset; a corner on a flat area just moves `d`
+    along the normal.
+  - INSET: each face on its own, or the region as a whole; to decide in the plan.
+  - SPLIT / LOOP CUT / FLIP FOLD: stay single-face.
 
-**Open questions:** first version = selection + material only, or include region
-extrude? Should AROUND FACE (edge mode) also be able to select faces, not corners?
+**Open questions:** INSET per face or as a region? Should AROUND FACE (edge mode) also
+be able to select faces, not corners? Cap how far a recess can shrink faces before it
+refuses (a deep recess on a thin band can turn faces inside out; `validateMesh` on
+release catches it)?
 
 ---
 
