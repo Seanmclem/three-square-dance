@@ -983,6 +983,8 @@ export function PropertiesPanel({
               selected={selected}
               groups={groups}
               onSelectGroup={onSelectGroup}
+              onEditBrush={onEditBrush}
+              onObjectUpdate={onObjectUpdate}
               onCopyRunToFloor={onCopyRunToFloor}
               onFillRunWithFloor={onFillRunWithFloor}
               onAddCeilingToRun={onAddCeilingToRun}
@@ -1074,7 +1076,7 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onCreatePrefab, isPrefabMember }: {
+function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onCreatePrefab, isPrefabMember, onEditBrush, onObjectUpdate }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
@@ -1091,6 +1093,8 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
   onBake?:            (refs: SelectedRef[]) => void;
   onCreatePrefab?:    (refs: SelectedRef[]) => void;
   isPrefabMember?:    boolean;
+  onEditBrush?:       () => void;
+  onObjectUpdate:     (c: Partial<WorldObject>) => void;
 }) {
   const wallData = selected.type === "wall" ? selected.data as WallDef : null;
   const [hovered, setHovered] = useState(false);
@@ -1206,6 +1210,31 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
               </div>
             </div>
           )}
+
+          {/* Brush shortcuts (v4.99.5), the same as the Geometry screen's BRUSH buttons. */}
+          {selected.type === "shape" && selected.data && (isBrush(selected.data as ShapeDef)
+            ? onEditBrush && (
+              <button
+                onClick={onEditBrush}
+                title="Open this brush alone in Edit Brush (face / corner / edge modes)"
+                style={{
+                  width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                  background: "rgba(240,180,60,0.1)", border: "1px solid rgba(240,180,60,0.5)",
+                  color: "#f0c060", fontSize: 11, fontFamily: "monospace",
+                }}
+              >Edit Brush</button>
+            )
+            : (
+              <button
+                onClick={() => onObjectUpdate({ mesh: brushMeshFromShape(selected.data as ShapeDef) } as unknown as Partial<WorldObject>)}
+                title="Bake the shape's corners into an editable brush; its size params stop applying"
+                style={{
+                  width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                  background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                  color: "#80aaff", fontSize: 11, fontFamily: "monospace",
+                }}
+              >Convert to Brush</button>
+            ))}
 
           {onBake && selected.type === "shape" && (
             <button
@@ -2330,6 +2359,22 @@ const SHAPE_PARAM_FIELDS: Record<ShapeDef["kind"], Array<{ key: keyof ShapeDef; 
   ],
 };
 
+/** Convert to Brush (Geometry screen and Actions): the shape's corners baked into explicit
+ *  face loops (seeded so cap/side materials keep looking the same). Degenerate hull →
+ *  the plain convex cloud. */
+function brushMeshFromShape(shape: ShapeDef) {
+  const pts = ShapeBuilder.localHullPoints(shape);
+  const cloud: Vec3[] = [];
+  for (let i = 0; i < pts.length; i += 3) {
+    cloud.push({ x: +pts[i]!.toFixed(3), y: +pts[i + 1]!.toFixed(3), z: +pts[i + 2]!.toFixed(3) });
+  }
+  const faced = facesFromCloud(cloud, {
+    sideMaterial: shape.sideMaterial,
+    sideMaterialOverrides: shape.sideMaterialOverrides,
+  });
+  return faced ?? { vertices: cloud };
+}
+
 function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList, onEditBrush }: { selected: SelectedObjectPayload; onObjectUpdate: (c: Partial<WorldObject>) => void; bus?: EventBus; activeTool?: ToolId; materialList?: MaterialDef[]; onEditBrush?: () => void }) {
   const shape  = selected.data as ShapeDef | null;
   const brush  = !!shape && isBrush(shape);
@@ -2344,21 +2389,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
   }, [selected.id]);
 
   const toggleResize = (on: boolean) => { setResizeOn(on); bus?.emit("shape:resize-toggle", { enabled: on }); };
-  const convertToBrush = () => {
-    if (!shape) return;
-    const pts = ShapeBuilder.localHullPoints(shape);
-    const cloud: Vec3[] = [];
-    for (let i = 0; i < pts.length; i += 3) {
-      cloud.push({ x: +pts[i]!.toFixed(3), y: +pts[i + 1]!.toFixed(3), z: +pts[i + 2]!.toFixed(3) });
-    }
-    // Phase 23: bake explicit face loops (seeded so cap/side materials keep looking
-    // the same). Degenerate hull → fall back to the plain convex cloud.
-    const faced = facesFromCloud(cloud, {
-      sideMaterial: shape.sideMaterial,
-      sideMaterialOverrides: shape.sideMaterialOverrides,
-    });
-    onObjectUpdate({ mesh: faced ?? { vertices: cloud } } as unknown as Partial<WorldObject>);
-  };
+  const convertToBrush = () => { if (shape) onObjectUpdate({ mesh: brushMeshFromShape(shape) } as unknown as Partial<WorldObject>); };
   const revertToParams = () => onObjectUpdate({ mesh: undefined } as unknown as Partial<WorldObject>);
 
   const paramStrs = (): Record<string, string> => {
