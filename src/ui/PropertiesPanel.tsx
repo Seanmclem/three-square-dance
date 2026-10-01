@@ -590,6 +590,16 @@ export function PropertiesPanel({
     setLabelDraft((selected?.data as { label?: string } | null)?.label ?? "");
   }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // v4.99.10: picking a face / edge / corner on a brush opens Geometry, where its ops live.
+  // Keyed on the pick itself, so Back to the root stays put until the next pick.
+  const sub = selected?.type === "shape" ? selected : null;
+  const subKey = sub && (sub.faceIndex !== undefined || sub.vertexIndex !== undefined || sub.edgeVerts || sub.faceSet?.length || sub.vertexSet?.length)
+    ? JSON.stringify([sub.id, sub.faceIndex, sub.vertexIndex, sub.edgeVerts, sub.faceSet, sub.vertexSet])
+    : null;
+  useEffect(() => {
+    if (subKey) setStack(prev => (prev.length === 1 && prev[0] === "geo" ? prev : ["geo"]));
+  }, [subKey]);
+
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [stack.length]);
