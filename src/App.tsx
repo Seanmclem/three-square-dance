@@ -357,6 +357,15 @@ export default function App() {
     if (!scene) return;
     scene.setBrushBackground(brushBg);
     scene.setBrushEditView(!!editingBrush);
+    // v4.102.2: Edit Brush can orbit underneath the brush; back above ground on Close.
+    const cam = scene.editorCamera;
+    if (!cam) return;
+    cam.allowBelow = !!editingBrush;
+    if (!editingBrush) {
+      const cap = Math.PI / 2 - 0.02;
+      cam.targetSpherical.phi = Math.min(cam.targetSpherical.phi, cap);
+      cam.spherical.phi = Math.min(cam.spherical.phi, cap);
+    }
   }, [editingBrush, brushBg]);
   // v4.99.1: Save stays in the session; the bar shows unsaved / saved, and Close asks
   // before dropping unsaved changes. Cmd+S saves the brush while the session is open.

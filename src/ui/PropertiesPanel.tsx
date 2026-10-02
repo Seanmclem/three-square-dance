@@ -3290,6 +3290,9 @@ let roundSizeNow = 0.25;
 type RoundState = { shapeId: string | null; roundId: string | null; open: boolean; count: number; steps: number; size: number; edited: boolean; note: string | null };
 let roundStateNow: RoundState = { shapeId: null, roundId: null, open: false, count: 0, steps: 0, size: 0, edited: false, note: null };
 
+/** Copied curve settings (the ⋯ menu's Copy / Paste), kept for the session. */
+let roundClipboard: { steps: number; size: number } | null = null;
+
 function useRoundState(bus: EventBus): RoundState {
   const [st, setSt] = useState(roundStateNow);
   useEffect(() => bus.on("shape:round-state", s => { roundStateNow = s; setSt(s); }), [bus]);
@@ -3342,6 +3345,8 @@ function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus
  */
 function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload; shape: ShapeDef; bus: EventBus }) {
   const st = useRoundState(bus);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [clip, setClip] = useState(roundClipboard);
   const rounds = shape.mesh?.faces ? roundsOf(shape.mesh) : [];
   const open = st.open && st.shapeId === selected.id ? rounds.find(r => r.id === st.roundId) : undefined;
   const [steps, setSteps] = useState("");
@@ -3377,8 +3382,27 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
               <span style={{ flex: 1, color: isOpen ? "#7fe0b5" : "#dde3f0", fontSize: 11, fontFamily: "monospace" }}>
                 Curve {n + 1} · {desc(r)}{r.edited ? " · edited by hand" : ""}
               </span>
-              {!isOpen && <button style={OP_BTN} onClick={() => bus.emit("shape:round-open", { ...ids, roundId: r.id })}>EDIT</button>}
+              {!isOpen && <button style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} onClick={() => bus.emit("shape:round-open", { ...ids, roundId: r.id })}>EDIT</button>}
+              <button style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} title="Copy / paste this curve's STEPS and SIZE"
+                onClick={() => setMenuFor(m => m === r.id ? null : r.id)}>⋯</button>
             </div>
+            {menuFor === r.id && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: 6, borderRadius: 5, background: "rgba(28,28,28,0.96)", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <button style={OP_BTN} onClick={() => { roundClipboard = { steps: r.steps, size: r.size }; setClip(roundClipboard); setMenuFor(null); }}>
+                  Copy settings ({r.steps} steps · {+r.size.toFixed(3)} m)
+                </button>
+                <button style={clip && !r.edited ? OP_BTN : OP_BTN_OFF} disabled={!clip || r.edited}
+                  title={r.edited ? "This curve was edited by hand, so its settings can't change" : undefined}
+                  onClick={() => {
+                    if (!clip) return;
+                    bus.emit("shape:round-open", { ...ids, roundId: r.id });
+                    bus.emit("shape:round-adjust", clip);
+                    setMenuFor(null);
+                  }}>
+                  {clip ? `Paste settings (${clip.steps} steps · ${+clip.size.toFixed(3)} m)` : "Paste settings (copy one first)"}
+                </button>
+              </div>
+            )}
             {isOpen && (
               <>
                 {r.edited ? (

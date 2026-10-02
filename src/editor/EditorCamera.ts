@@ -9,6 +9,9 @@ export class EditorCamera {
   public spherical:        THREE.Spherical;
   public targetSpherical:  THREE.Spherical;
   public targetFocus:      THREE.Vector3;
+  /** v4.102.2: orbit below the horizon (Edit Brush: look up at a brush from underneath).
+   *  Off in the level, where the camera stays above ground. */
+  public allowBelow = false;
 
   private readonly _camera:  THREE.PerspectiveCamera;
   private readonly _dom:     HTMLCanvasElement;
@@ -101,7 +104,8 @@ export class EditorCamera {
 
     if (this._isOrbiting) {
       this.targetSpherical.theta -= dx * 0.005;
-      this.targetSpherical.phi = Math.max(0.02, Math.min(Math.PI / 2 - 0.02, this.targetSpherical.phi - dy * 0.005));
+      const maxPhi = this.allowBelow ? Math.PI - 0.02 : Math.PI / 2 - 0.02;
+      this.targetSpherical.phi = Math.max(0.02, Math.min(maxPhi, this.targetSpherical.phi - dy * 0.005));
     }
     if (this._isPanning) {
       const speed = this.spherical.radius * 0.001;
