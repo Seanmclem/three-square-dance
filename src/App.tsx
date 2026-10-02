@@ -1963,6 +1963,7 @@ export default function App() {
       withInstanceReselect(ctx.zoneId, ctx.instanceId, ctx.primaryId, () => historyRef.current?.undo());
     } else {
       historyRef.current?.undo();
+      busRef.current.emit("selection:check-sub", {});   // v4.104.1: picks on a renumbered brush
     }
     // Leave a placement tool, but keep a select sub-mode (face/vertex/edge):
     // undoing brush edits must not kick the user back to object mode.
@@ -1979,6 +1980,7 @@ export default function App() {
       withInstanceReselect(ctx.zoneId, ctx.instanceId, ctx.primaryId, () => historyRef.current?.redo());
     } else {
       historyRef.current?.redo();
+      busRef.current.emit("selection:check-sub", {});   // v4.104.1: picks on a renumbered brush
     }
     // Leave a placement tool, but keep a select sub-mode (face/vertex/edge):
     // undoing brush edits must not kick the user back to object mode.

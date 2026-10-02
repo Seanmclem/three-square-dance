@@ -14,6 +14,7 @@ import type { IEditorModule, ShapeDef, ShapeBrushMesh } from "@/types";
 export class BrushRoundController implements IEditorModule {
   private _open: { zoneId: string; shapeId: string; id: string; key: string } | null = null;
   private _note: string | null = null;
+  private _writing = false;   // our own write re-announces the selection; don't let stale picks close the curve
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(private readonly _world: WorldState, private readonly _bus: EventBus) {}
@@ -21,6 +22,7 @@ export class BrushRoundController implements IEditorModule {
   init(): void {
     this._unsubs.push(
       this._bus.on("object:selected", p => {
+        if (this._writing) return;
         if (p.type !== "shape") { this._close(); return; }
         if (this._open && p.id !== this._open.shapeId) this._close();
         const mesh = this._shape(p.zoneId, p.id)?.mesh;
@@ -57,7 +59,13 @@ export class BrushRoundController implements IEditorModule {
   private _write(zoneId: string, shapeId: string, mesh: ShapeBrushMesh, label: string, key?: string): void {
     const shape = this._shape(zoneId, shapeId);
     if (!shape) return;
-    this._world.transaction(label, () => this._world.updateShape(zoneId, shapeId, { mesh: { ...shape.mesh!, vertices: mesh.vertices, faces: mesh.faces } }), key);
+    this._writing = true;
+    try {
+      this._world.transaction(label, () => this._world.updateShape(zoneId, shapeId, { mesh: { ...shape.mesh!, vertices: mesh.vertices, faces: mesh.faces } }), key);
+      // ROUND / MAKE SHARP renumber corners and faces: drop picks made on the old layout
+      // (they'd point at some other edge or corner and grab a gizmo).
+      this._bus.emit("selection:check-sub", {});
+    } finally { this._writing = false; }
   }
 
   private _round(zoneId: string, shapeId: string, edges: Array<[number, number]>, steps: number, size: number): void {

@@ -47,6 +47,10 @@ export class SelectionManager implements IEditorModule {
   private _subVertices: number[] = [];                   // Phase 80 vertex set (vertex mode)
   private _subFaces: number[] = [];                      // Phase 81 face set (face mode)
   private _subEdges: Array<[number, number]> = [];       // Phase 83 edge set (edge mode)
+  // v4.104.1: the selected brush's face layout when the picks above were made. Picks are
+  // corner / face NUMBERS, so after an op that renumbers (ROUND compacts corners) they
+  // would silently point at other parts; "selection:check-sub" drops them if it changed.
+  private _subSig: string | null = null;
   private _unsub: Array<() => void> = [];
 
   constructor(
@@ -103,6 +107,13 @@ export class SelectionManager implements IEditorModule {
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
+      this._bus.on("selection:check-sub", () => {
+        if (!this._selected || this._selected.userData.editorType !== "shape") return;
+        const has = this._subFace !== null || this._subVertex !== null || this._subEdge !== null || this._subEdges.length || this._subVertices.length || this._subFaces.length;
+        if (!has || this._layoutSig(this._selected) === this._subSig) return;
+        this._subFace = null; this._subVertex = null; this._subEdge = null; this._subEdges = []; this._subVertices = []; this._subFaces = [];
+        this._emitSelected(this._selected);
+      }),
       this._bus.on("selection:toggle-ref", ({ ref })   => this._toggleRef(ref)),
       // The volume tool owns volume picking (their meshes are selectable:false, so
       // _cast never sees them); mirror its single-select into this manager's state
@@ -120,6 +131,7 @@ export class SelectionManager implements IEditorModule {
       // object:selected so all consumers read one channel.
       this._bus.on("shape:sub-select", ({ shapeId, zoneId, faceIndex, vertexIndex, edge, vertexSet, faceSet, edgeSet }) => {
         if (this._selected?.userData.editorId !== shapeId || this._selected.userData.zoneId !== zoneId) return;
+        this._subSig = null;   // new picks: record the layout they were made on
         this._subFace = faceIndex;
         this._subVertex = vertexIndex;
         this._subVertices = vertexSet ?? (vertexIndex !== null ? [vertexIndex] : []);
@@ -155,6 +167,7 @@ export class SelectionManager implements IEditorModule {
     if (selectable.length === 0) { if (!additive) this._deselect(); return; }
     const hit  = this._pickByPriority(selectable);
     const root = this._resolveRoot(hit.object);
+    this._subSig = null;   // any pick below is made on the current layout
     const hitFace = (): number | null => {
       const groups = hit.object.userData.faceGroups as FaceGroup[] | undefined;
       const t = hit.faceIndex;
@@ -470,6 +483,12 @@ export class SelectionManager implements IEditorModule {
     this._emitSelectionChanged();
   }
 
+  /** Face layout of a brush (which corners each face uses, and how many corners). */
+  private _layoutSig(root: THREE.Object3D): string {
+    const m = (this._getDataRecord(root) as { mesh?: { vertices: unknown[]; faces?: { verts: number[] }[] } } | null)?.mesh;
+    return m ? `${m.vertices.length}#${(m.faces ?? []).map(f => f.verts.join(",")).join("|")}` : "";
+  }
+
   private _emitSelected(root: THREE.Object3D): void {
     const ud = root.userData;
     const wallTransform = ud.editorType === "wall" ? this._wallRunTransform(root) : undefined;
@@ -491,6 +510,8 @@ export class SelectionManager implements IEditorModule {
       }));
       if (this._subEdge != null && !alive(this._subEdge)) this._subEdge = null;
       this._subEdges = this._subEdges.filter(alive);
+      if (!(this._subFace !== null || this._subVertex !== null || this._subEdge !== null || this._subEdges.length || this._subVertices.length || this._subFaces.length)) this._subSig = null;
+      else if (this._subSig === null) this._subSig = this._layoutSig(root);
       faceIndex   = this._subFace ?? undefined;
       vertexIndex = this._subVertex ?? undefined;
       edgeVerts   = this._subEdge ?? undefined;
