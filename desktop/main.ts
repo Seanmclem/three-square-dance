@@ -31,6 +31,7 @@ import * as P from "./projects.ts";
 import * as A from "./assets.ts";
 import { exportGameBundle } from "./export.ts";
 import * as D from "./deploy.ts";
+import { writePrintFile, openInSlicer } from "./printFiles.ts";
 import { getLastSession, getPref, setLastSession, setPref } from "./workspace.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -53,6 +54,8 @@ const apiMethods: Record<string, (...args: any[]) => unknown> = {
   readAutosave: () => P.readAutosave(ws),
   clearAutosave: () => P.clearAutosave(ws),
   writeExportFile: (name: string, text: string) => P.writeExportFile(ws, name, text),
+  writePrintFile: (name: string, ext: "3mf" | "stl", base64: string) => writePrintFile(ws, name, ext, base64),
+  openInSlicer: (path: string, slicer: string) => openInSlicer(path, slicer),
   exportGameBundle: (opts: { projectId: string; format?: "folder" }) => exportGameBundle(ws, distDir, opts),
   // Publish to Netlify (phase 75). The API key goes in via netlifySetKey and is never returned.
   netlifyStatus: () => D.netlifyStatus(ws),

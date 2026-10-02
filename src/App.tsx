@@ -95,6 +95,7 @@ import { dataURLtoArrayBuffer, renderModelThumbnail } from "@/editor/thumbnailRe
 import { bakeShapes, disposeBakeGroup } from "@/editor/bakeShapes";
 import { writeAssetToLibrary, writeAssetFile, removeAssetFiles, removeEntries, updateEntries, upsertEntry } from "@/assets/assetLibrary";
 import { BakeDialog } from "@/ui/BakeDialog";
+import { PrintExportDialog } from "@/ui/PrintExportDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
 import type {
   GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue, BrushViewBackground } from "@/types";
@@ -270,6 +271,7 @@ export default function App() {
   const [pendingSkyboxEdit, setPendingSkyboxEdit] = useState<PendingEdit | null>(null);
   // Shapes queued for bake-to-GLB (Phase 26) — non-null renders the BakeDialog.
   const [bakeRefs,        setBakeRefs]         = useState<SelectedRef[] | null>(null);
+  const [printShapes,     setPrintShapes]      = useState<ShapeDef[] | null>(null);   // v4.107.0 3D print export
   const [materialImporterOpen, setMaterialImporterOpen] = useState(false);
   const [pendingMaterialDelete, setPendingMaterialDelete] = useState<
     { ids: string[]; labels: string[]; usage: { count: number; zones: string[] } } | null
@@ -4172,6 +4174,10 @@ export default function App() {
         onGroupSelected={handleGroupSelected}
         onSelectGroup={handleSelectGroupMembers}
         onBake={refs => setBakeRefs(refs)}
+        onPrintExport={refs => {
+          const shapes = refs.flatMap(r => worldRef.current?.zones.get(r.zoneId)?.shapes?.filter(s => s.id === r.id) ?? []);
+          if (shapes.length) setPrintShapes(shapes.map(s => structuredClone(s)));
+        }}
         decalTextures={decalTextures}
         onVolumeScriptsChange={selectedObjectId ? (scripts) => handleObjectScriptsChange(selectedObjectId, scripts) : undefined}
         onEditScript={handleEditScriptRow}
@@ -4507,6 +4513,8 @@ SquareDance
           onApply={(delta, compensate) => void handleApplyReorigin(reoriginAsset, delta, compensate)}
         />
       )}
+
+      {printShapes && <PrintExportDialog shapes={printShapes} onClose={() => setPrintShapes(null)} />}
 
       {bakeRefs && (
         <BakeDialog

@@ -84,6 +84,7 @@
     <li><a href="#textures">Textures across edges</a></li>
     <li><a href="#folds">Bent faces and folds</a></li>
     <li><a href="#edit-brush">The brush editor (Edit Brush)</a></li>
+    <li><a href="#print">Export for 3D printing</a></li>
     <li><a href="#reference">Quick reference</a></li>
   </ol>
 </nav>
@@ -267,6 +268,15 @@
   <li id="help-brush-view"><strong>Background:</strong> dark by default. The brush's <strong>Brush View</strong> screen (right panel) picks a plain color, the procedural sky or any skybox; it's one setting for every brush, not saved in the scene. There's no fog and no solid ground, just a 30 m grid of 1 m squares.</li>
   <li><strong>Looking from below:</strong> right-drag orbits all the way under the brush (the level's camera stops at the horizon).</li>
   <li>The level's spawn point and its right-click "Move initial spawn here" stay out of the brush editor.</li>
+</ul>
+
+<h2 id="print"><span id="help-print">Export for 3D printing</span></h2>
+<p><strong>Export for 3D printing…</strong> (Actions, on a shape or a selection of shapes) saves the shape as a file a slicer can print, at a size you choose, and can open it straight in Bambu Studio.</p>
+<ul>
+  <li><strong>Why the size needs choosing:</strong> the editor works in meters, printers in millimeters. Copied as plain numbers, a 2 m brush would arrive as a 2 mm speck; converted, as a 2000 mm giant. So you pick the printed size: <strong>LONGEST SIDE</strong> in mm (100 by default), or <strong>SCALE</strong> (1 m in the editor = N mm). The dialog shows the result in mm and warns above a Bambu bed (256 mm) or below 2 mm.</li>
+  <li><strong>3MF (Bambu)</strong> states millimeters inside the file, so there's no guessing; <strong>STL</strong> works in any slicer (no units; slicers read mm).</li>
+  <li>The file goes to your Downloads folder (a name already taken gets -2, -3 …). <strong>Save and open in Bambu Studio</strong> also opens it there; <strong>Show in Finder</strong> reveals it.</li>
+  <li>The model is turned so the editor's up is the printer's up, centered and set on the bed. Several shapes become one model, placed as in the level. Just the shape is exported, not colors or textures; brushes are closed solids, which is what slicers need.</li>
 </ul>
 
 <h2 id="reference">Quick reference</h2>

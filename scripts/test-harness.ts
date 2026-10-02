@@ -12,6 +12,7 @@ import { makeHandler } from "../desktop/serve.ts";
 import * as P from "../desktop/projects.ts";
 import * as A from "../desktop/assets.ts";
 import { getLastSession, getPref, setLastSession, setPref } from "../desktop/workspace.ts";
+import { writePrintFile } from "../desktop/printFiles.ts";
 
 const [project = "platfrom-obby", scene = "level_2", portArg = "7411"] = Deno.args;
 const port = Number(portArg);
@@ -38,6 +39,9 @@ const api: Record<string, (...a: any[]) => unknown> = {
   readAutosave: () => P.readAutosave(ws), clearAutosave: () => P.clearAutosave(ws),
   writeAssetManifest: (k: string, j: string) => A.writeAssetManifest(ws, k, j),
   openExternal: () => null, revealPath: () => null,
+  // Print files land in the temp workspace here, and "opening" one is faked (no app launches).
+  writePrintFile: (n: string, e: "3mf" | "stl", b: string) => writePrintFile(ws, n, e, b, `${tmp}/print`),   // never the real Downloads
+  openInSlicer: (p: string) => ({ ok: true, faked: p }),
 };
 
 console.log(`harness: ${project}/${scene} on http://127.0.0.1:${port}/  workspace ${tmp}`);

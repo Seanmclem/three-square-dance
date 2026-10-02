@@ -74,6 +74,9 @@ export interface DesktopApi {
 
   // single-file export (replaces the browser save-file picker)
   writeExportFile(name: string, text: string): Promise<{ path: string }>;
+  // 3D-print export (v4.107.0): file bytes as base64; saved to ~/Downloads; opened in the slicer
+  writePrintFile(name: string, ext: "3mf" | "stl", base64: string): Promise<{ path: string }>;
+  openInSlicer(path: string, slicer: "bambu"): Promise<{ ok: boolean; error?: string }>;
 
   // self-contained game export: runtime shell + project JSON + referenced assets
   exportGameBundle(opts: { projectId: string; format?: "folder" }): Promise<{ outputPath: string; fileCount: number; totalBytes: number; missing: string[] }>;

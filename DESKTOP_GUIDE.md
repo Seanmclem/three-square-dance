@@ -191,6 +191,14 @@ Full detail in **TESTING.md §0**. The short version:
 - The api is curl-able (`POST /api/<method>` with a JSON array of args).
 - Data safety is structural: atomic writes, 10-deep rotating backups
   (`<stateDir>/backups/`), trash instead of delete (`<stateDir>/trash/`).
+- New api methods need a shell restart (the Deno side doesn't hot-reload). To try
+  one without restarting the user's shell, add it to `scripts/test-harness.ts` and
+  run `deno task test:harness` (TESTING.md §12).
+- 3D print export (v4.107.0, `desktop/printFiles.ts`): `writePrintFile(name, ext,
+  base64)` saves to `~/Downloads` (or `<stateDir>/exports/print`), renaming instead of
+  overwriting; `openInSlicer(path, "bambu")` runs `open -a BambuStudio` (Windows: the
+  app registered for the file) and only opens files this session wrote. The harness
+  writes to its temp folder and fakes the open.
 
 ## 5. Microphone in the shell (sound recorder) — TCC patch
 

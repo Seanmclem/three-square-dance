@@ -514,6 +514,7 @@ interface PropertiesPanelProps {
   onSelectGroup?:           (groupId: string) => void;
   // Bake the given shape refs to a GLB asset (Phase 26) — opens the bake dialog.
   onBake?:                  (refs: SelectedRef[]) => void;
+  onPrintExport?:           (refs: SelectedRef[]) => void;   // v4.107.0 Export for 3D printing
   // Auto-fit box from the placed model's local AABB (null until the mesh is built).
   defaultColliderFor?:      (objectId: string) => AttachedCollider | null;
   onSaveCollidersToAsset?:  (objectId: string, assetId: string, colliders: AttachedCollider[]) => void;
@@ -566,7 +567,7 @@ export function PropertiesPanel({
   onPlayerSettingsChange, onSpawnPositionChange,
   worldLighting, onWorldLightingChange, worldAudio, onWorldAudioChange, zoneLights = [], onSelectLight,
   bus, onPreviewClip, onStopPreview, onAutoPlayChange,
-  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
+  decalTextures = [], multiSelected = [], onCopy, onDuplicate, onGroupSelected, onSelectGroup, onBake, onPrintExport, defaultColliderFor, onSaveCollidersToAsset, hullPointsFor,
   prefabInfo, onEditPrefab, onSelectInstance, onPrefabVariablesChange, onPrefabOriginChange, onPrefabReexpand, onPrefabPushToPrefab, onPrefabUnlink, onPrefabDeleteInstance,
   onCreatePrefab,
   gameInput,
@@ -713,6 +714,11 @@ export function PropertiesPanel({
           )}
           {onBake && multiSelected.every(r => r.type === "shape") && (
             <button style={ACTION_BTN} onClick={() => onBake(multiSelected)}>Bake → GLB asset</button>
+          )}
+          {onPrintExport && multiSelected.some(r => r.type === "shape") && (
+            <button data-help="help-print" style={{ ...ACTION_BTN, color: "#7fe0b5", borderColor: "rgba(60,207,145,0.35)" }}
+              title="Save the selected shapes as one 3MF / STL for a 3D printer"
+              onClick={() => onPrintExport(multiSelected.filter(r => r.type === "shape"))}>Export for 3D printing…</button>
           )}
           {onCreatePrefab && !prefabInfo && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder"].includes(r.type)) && (
             <button
@@ -1019,6 +1025,7 @@ export function PropertiesPanel({
               runLinkedFloors={runLinkedFloors}
               onDelete={onDelete}
               onBake={onBake}
+              onPrintExport={onPrintExport}
               onCreatePrefab={onCreatePrefab}
               isPrefabMember={!!prefabInfo}
             />
@@ -1103,7 +1110,7 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
 
 // ── ActionsAccordion ──────────────────────────────────────────────────────────
 
-function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onCreatePrefab, isPrefabMember, onEditBrush, onObjectUpdate }: {
+function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onPrintExport, onCreatePrefab, isPrefabMember, onEditBrush, onObjectUpdate }: {
   open:               boolean;
   onToggle:           () => void;
   selected:           SelectedObjectPayload;
@@ -1118,6 +1125,7 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
   runLinkedFloors?:   number[];
   onDelete?:          () => void;
   onBake?:            (refs: SelectedRef[]) => void;
+  onPrintExport?:     (refs: SelectedRef[]) => void;
   onCreatePrefab?:    (refs: SelectedRef[]) => void;
   isPrefabMember?:    boolean;
   onEditBrush?:       () => void;
@@ -1262,6 +1270,18 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
                 }}
               >Convert to Brush</button>
             ))}
+
+          {onPrintExport && selected.type === "shape" && (
+            <button data-help="help-print"
+              onClick={() => onPrintExport([{ id: selected.id, type: "shape", zoneId: selected.zoneId }])}
+              title="Save this shape as a 3MF / STL for a 3D printer, at the size you choose (opens in Bambu Studio)"
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(60,207,145,0.08)", border: "1px solid rgba(60,207,145,0.35)",
+                color: "#7fe0b5", fontSize: 11, fontFamily: "monospace",
+              }}
+            >Export for 3D printing…</button>
+          )}
 
           {onBake && selected.type === "shape" && (
             <button
