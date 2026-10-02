@@ -35,6 +35,9 @@ export class BrushVertexEditor implements IEditorModule {
   private _previewing = false;
   private _gizmoActive = false;
   private _altDown = false;
+  // v4.108.0 box select: a left drag that doesn't start on a corner handle draws a
+  // rectangle; corners inside it (hidden ones too) become the corner set.
+  private _box: { x0: number; y0: number; mode: "replace" | "add" | "remove"; el: HTMLDivElement | null } | null = null;
 
   private _handles: THREE.Mesh[] = [];
   private _hovered: number | null = null;
@@ -96,6 +99,7 @@ export class BrushVertexEditor implements IEditorModule {
       this._bus.on("tool:select", ({ tool }) => {
         this._activeTool = tool;
         if (tool !== "select-vertex" && this._state === "DRAG") this._cancelDrag();
+        this._clearBox();
         this._sync();
       }),
       this._bus.on("object:selected", payload => {
@@ -124,16 +128,24 @@ export class BrushVertexEditor implements IEditorModule {
         this._gizmoActive = isDragging && this._state !== "DRAG";
       }),
       this._bus.on("input:mousemove", ({ screenPos }) => {
+        if (this._box) { this._onBoxMove(screenPos); return; }
         if (this._state === "DRAG") { this._onDragMove(screenPos); return; }
         if (!this._shouldShow() || this._gizmoActive) return;
         this._onHover(screenPos);
       }),
-      this._bus.on("input:mousedown", ({ button, screenPos, shift }) => {
+      this._bus.on("input:mousedown", ({ button, screenPos, shift, ctrl, meta }) => {
         if (button !== 0 || !this._shouldShow() || this._gizmoActive) return;
+        const onHandle = this._castHandles(screenPos) !== null;
+        if (!onHandle) {
+          // Not on a corner: maybe the start of a box (a gizmo that grabs this press cancels it).
+          this._box = { x0: screenPos.x, y0: screenPos.y, mode: this._altDown ? "remove" : (shift || ctrl || meta) ? "add" : "replace", el: null };
+          return;
+        }
         if (shift) { this._toggleInSet(screenPos); return; }
         this._onMouseDown(screenPos);
       }),
-      this._bus.on("input:mouseup", ({ button }) => {
+      this._bus.on("input:mouseup", ({ button, screenPos }) => {
+        if (button === 0 && this._box) { this._endBox(screenPos); return; }
         if (button === 0 && this._state === "DRAG") this._commitDrag();
       }),
       this._bus.on("input:rightclick", (e) => {
@@ -143,6 +155,7 @@ export class BrushVertexEditor implements IEditorModule {
       this._bus.on("input:keydown", ({ code }) => {
         if (code === "AltLeft" || code === "AltRight") { this._altDown = true; this._controls?.setTranslationSnap(null); }
         if (code === "Escape") {
+          if (this._box) this._clearBox();
           if (this._state === "DRAG") this._cancelDrag();
           if (this._tcDragging) this._cancelTcDrag();
         }
@@ -295,6 +308,57 @@ export class BrushVertexEditor implements IEditorModule {
       zoneId: this._zoneId, shapeId: this._selectedId, faceIndex: null,
       vertexIndex: had ? (set[set.length - 1] ?? null) : idx, vertexSet: set,
     });
+  }
+
+  // ── Box select (v4.108.0) ───────────────────────────────────────────────────
+
+  private _onBoxMove(p: ScreenPos): void {
+    const b = this._box!;
+    if (this._gizmoActive) { this._clearBox(); return; }   // a gizmo took this drag
+    const w = Math.abs(p.x - b.x0), h = Math.abs(p.y - b.y0);
+    if (!b.el) {
+      if (w < 5 && h < 5) return;   // still a click
+      b.el = document.createElement("div");
+      Object.assign(b.el.style, {
+        position: "fixed", pointerEvents: "none", zIndex: "40",
+        border: `1px dashed ${b.mode === "remove" ? "#ff9b8a" : "#7ff"}`,
+        background: b.mode === "remove" ? "rgba(255,120,100,0.08)" : "rgba(0,255,255,0.08)",
+      });
+      document.body.appendChild(b.el);   // (a drag past the click threshold never becomes a click)
+    }
+    Object.assign(b.el.style, { left: `${Math.min(p.x, b.x0)}px`, top: `${Math.min(p.y, b.y0)}px`, width: `${w}px`, height: `${h}px` });
+  }
+
+  private _endBox(p: ScreenPos): void {
+    const b = this._box!;
+    const drew = !!b.el;
+    this._clearBox();
+    if (!drew) return;   // a plain click: let normal click selection handle it
+    const shape = this._selectedShape();
+    if (!shape?.mesh || !this._zoneId || !this._selectedId) return;
+    const rect = this._canvas.getBoundingClientRect();
+    const x0 = Math.min(p.x, b.x0), x1 = Math.max(p.x, b.x0), y0 = Math.min(p.y, b.y0), y1 = Math.max(p.y, b.y0);
+    const m = this._shapeMatrix(shape), v = new THREE.Vector3();
+    const inside: number[] = [];
+    shape.mesh.vertices.forEach((c, i) => {
+      v.set(c.x, c.y, c.z).applyMatrix4(m).project(this._camera);
+      if (v.z > 1) return;   // behind the camera
+      const sx = rect.left + (v.x + 1) / 2 * rect.width, sy = rect.top + (1 - v.y) / 2 * rect.height;
+      if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) inside.push(i);   // hidden corners count too
+    });
+    const cur = this._set;
+    const next = b.mode === "replace" ? inside
+      : b.mode === "add" ? [...cur, ...inside.filter(i => !cur.includes(i))]
+      : cur.filter(i => !inside.includes(i));
+    this._bus.emit("shape:sub-select", {
+      zoneId: this._zoneId, shapeId: this._selectedId, faceIndex: null,
+      vertexIndex: next.length ? next[next.length - 1]! : null, vertexSet: next,
+    });
+  }
+
+  private _clearBox(): void {
+    this._box?.el?.remove();
+    this._box = null;
   }
 
   // ── Vertex drag ─────────────────────────────────────────────────────────────

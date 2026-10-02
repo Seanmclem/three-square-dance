@@ -117,6 +117,7 @@
   <tr><td><kbd>4</kbd></td><td>Edge</td><td>The edge nearest where you clicked on a face (blue tube)</td><td>The edge's two corners</td><td>SPLIT EDGE, LOOP CUT, SELECT LOOP, AROUND FACE n; double-click = SELECT LOOP</td></tr>
 </table>
 <p>In face, vertex and edge mode the whole-object move gizmo is hidden, so the brush stays highlighted and its edges are easy to click; <kbd>1</kbd> brings it back. Picking a face, edge or corner opens the Geometry screen of the right panel, where its buttons are.</p>
+<p>To move a whole end of a brush (curves and all), use vertex mode and <strong>drag a box</strong> over it: every corner inside is selected, including the hidden ones at the back and underneath. Drag the gizmo and only the faces in between stretch.</p>
 <p id="help-snap"><strong>SNAP</strong> sets the step for every face, edge and corner drag and for PUSH: off, 0.05, 0.1, 0.25 (the default), 0.5 or 1 m. It's in the DRAG group of the face card, and at the top of the Geometry screen in vertex and edge mode; one setting for all brushes, remembered. Corner sets keep their own 15° rotate and 0.1 scale steps.</p>
 <p>In face mode the selected face's card is grouped: <strong>LOOK</strong> (material, TILE), <strong>CUT</strong> (SPLIT, INSET, LOOP CUT, FLIP FOLD), <strong>SHAPE</strong> (EXTRUDE, RECESS, DIST, OUTER WALLS), <strong>SELECT</strong> (FACE LOOP) and <strong>DRAG</strong> (MOVE / PUSH, SNAP, SOFT).</p>
 <p>In every mode, <kbd>Alt</kbd> while dragging turns snapping off, <kbd>Esc</kbd> cancels a drag, and <kbd>Cmd</kbd>+<kbd>Z</kbd> undoes a whole drag or button press in one step.</p>
@@ -287,6 +288,7 @@
   <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Any brush</td><td>Object / Face / Vertex / Edge mode</td></tr>
   <tr><td>Click</td><td>Face, Vertex, Edge mode</td><td>Picks a face / corner / nearest edge</td></tr>
   <tr><td><kbd>Shift</kbd>+click a corner</td><td>Vertex mode</td><td>Adds or removes it from the selection</td></tr>
+  <tr id="help-box-select"><td>Drag a box (not starting on a corner)</td><td>Vertex mode</td><td>Selects every corner inside it, hidden ones (back, underside) too; <kbd>Shift</kbd>+drag adds, <kbd>Alt</kbd>+drag removes. Then the gizmo or <kbd>T</kbd> / <kbd>R</kbd> / <kbd>S</kbd> moves them together: box one end of a plate and drag it to stretch the middle.</td></tr>
   <tr><td>Double-click an edge</td><td>Edge mode</td><td>Selects every corner along its line</td></tr>
   <tr><td><kbd>Shift</kbd>+click a face</td><td>Face mode</td><td>Adds or removes it from the selection</td></tr>
   <tr><td>Double-click a face</td><td>Face mode</td><td>Selects its face loop (the ring of faces through it)</td></tr>

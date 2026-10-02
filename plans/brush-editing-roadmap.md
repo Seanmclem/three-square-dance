@@ -166,6 +166,8 @@ custom points later?
 
 ## Box and lasso select
 
+> **Box select shipped in v4.108.0** (vertex mode, hidden corners included, Shift adds, Alt removes). Lasso not built.
+
 **What:** in vertex mode, drag a rectangle (or draw a free shape) over the brush to
 select every corner inside it; Shift adds to the set, Alt removes.
 
