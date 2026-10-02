@@ -75,6 +75,7 @@
     <li><a href="#modes">The four select modes</a></li>
     <li><a href="#edge-mode">What edge mode cuts</a></li>
     <li><a href="#ops">Every operation, before and after</a></li>
+    <li><a href="#dissolve">Removing edges (DISSOLVE)</a></li>
     <li><a href="#walkthrough">Walkthrough: a bulge around a cylinder</a></li>
     <li><a href="#face-sets">Several faces at once</a></li>
     <li><a href="#outer-walls">Outer walls: keep or follow</a></li>
@@ -141,6 +142,7 @@
   <tr><td>PUSH (gizmo mode)</td><td>Face</td><td>Drag the green cube: the selected face(s) move out or in along their own directions, any distance, no new faces (neighbours stretch)</td><td>0</td></tr>
   <tr id="help-split-edge"><td>SPLIT EDGE</td><td>Edge</td><td>A corner in the middle of the picked edge; both faces beside it gain it</td><td>0</td></tr>
   <tr id="help-fold"><td>FLIP FOLD</td><td>Face (bent, four-sided)</td><td>Creases the face along its other diagonal</td><td>0</td></tr>
+  <tr><td>DISSOLVE / DISSOLVE LOOP</td><td>Edge</td><td>Removes the edge(s), or the whole loop, by merging the faces either side (see <a href="#dissolve">Removing edges</a>)</td><td>−1 per edge</td></tr>
   <tr id="help-select-loop"><td>SELECT LOOP</td><td>Edge</td><td>Selects every corner along the line the edge continues (also double-click the edge); changes nothing by itself</td><td>0</td></tr>
   <tr id="help-around-face"><td>AROUND FACE n</td><td>Edge</td><td>Selects the corners around the flat area on that side of the edge</td><td>0</td></tr>
   <tr id="help-select-ring"><td>SELECT RING</td><td>After a loop cut</td><td>Selects the new ring's corners, ready for <kbd>T</kbd> / <kbd>R</kbd> / <kbd>S</kbd></td><td>0</td></tr>
@@ -148,6 +150,15 @@
 </table>
 <p>Hovering SPLIT H / V shows a dashed line where the face will be cut; hovering LOOP CUT shows the whole ring, with a red dot where it would stop.</p>
 <p>SPLIT and LOOP CUT need a face with four real corners. A point sitting straight along a side (left there by a neighbour's split) doesn't count as a corner.</p>
+
+<h2 id="dissolve"><span id="help-dissolve">Removing edges (DISSOLVE)</span></h2>
+<p>An edge can't simply be deleted: a brush is a closed solid, so taking an edge away would open a hole. <strong>DISSOLVE</strong> removes it the other way, by merging the two faces on either side into one.</p>
+<figure><svg viewBox="0 0 760 262" role="img" aria-label="DISSOLVE merges the faces either side of an edge; a corner edge is refused" font-size="13"><text x="130" y="30" font-size="13" text-anchor="middle" fill="#dde3f0" font-weight="600">DISSOLVE a split's line</text><polygon points="18.0,165.0 62.0,187.0 62.0,137.7 18.0,115.7" fill="#2e3440" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="62.0,187.0 106.0,165.0 106.0,115.7 62.0,137.7" fill="#39404e" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="18.0,115.7 62.0,137.7 106.0,115.7 62.0,93.7" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><line x1="40" y1="176" x2="40" y2="126.72" stroke="#5b9dff" stroke-width="3.5" stroke-linecap="round" /><path d="M117 135h26m-7 -6 7 6-7 6" fill="none" stroke="#8f98ab" stroke-width="1.6"/><polygon points="154.0,165.0 198.0,187.0 198.0,137.7 154.0,115.7" fill="#2e3440" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="198.0,187.0 242.0,165.0 242.0,115.7 198.0,137.7" fill="#39404e" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="154.0,115.7 198.0,137.7 242.0,115.7 198.0,93.7" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><text x="130" y="232" font-size="12" text-anchor="middle" fill="#8f98ab" >one face again</text><text x="385" y="30" font-size="13" text-anchor="middle" fill="#dde3f0" font-weight="600">DISSOLVE LOOP on a loop cut</text><polygon points="274.0,165.0 318.0,187.0 318.0,137.7 274.0,115.7" fill="#2e3440" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="318.0,187.0 362.0,165.0 362.0,115.7 318.0,137.7" fill="#39404e" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="274.0,115.7 318.0,137.7 362.0,115.7 318.0,93.7" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><line x1="274" y1="140.36" x2="318" y2="162.36" stroke="#5b9dff" stroke-width="3.5" stroke-linecap="round" /><line x1="318" y1="162.36" x2="362" y2="140.36" stroke="#5b9dff" stroke-width="3.5" stroke-linecap="round" /><path d="M373 135h26m-7 -6 7 6-7 6" fill="none" stroke="#8f98ab" stroke-width="1.6"/><polygon points="410.0,165.0 454.0,187.0 454.0,137.7 410.0,115.7" fill="#2e3440" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="454.0,187.0 498.0,165.0 498.0,115.7 454.0,137.7" fill="#39404e" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="410.0,115.7 454.0,137.7 498.0,115.7 454.0,93.7" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><text x="385" y="232" font-size="12" text-anchor="middle" fill="#8f98ab" >the whole ring goes</text><text x="640" y="30" font-size="13" text-anchor="middle" fill="#dde3f0" font-weight="600">A corner edge: refused</text><polygon points="601.0,165.0 645.0,187.0 645.0,137.7 601.0,115.7" fill="#2e3440" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="645.0,187.0 689.0,165.0 689.0,115.7 645.0,137.7" fill="#39404e" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><polygon points="601.0,115.7 645.0,137.7 689.0,115.7 645.0,93.7" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/><line x1="645" y1="187" x2="645" y2="137.72" stroke="#ff8a4c" stroke-width="3.5" stroke-linecap="round" /><text x="640" y="232" font-size="12" text-anchor="middle" fill="#ff8a4c" >the faces meet at an angle;</text><text x="640" y="248" font-size="12" text-anchor="middle" fill="#ff8a4c" >one face would have to bend</text></svg></figure>
+<ul>
+  <li><strong>DISSOLVE</strong> (edge mode, or <kbd>Delete</kbd>) removes the picked edge, or every edge picked with <kbd>Shift</kbd>+click. Corners left sitting in the middle of a straight line go too, so dissolving a SPLIT's line leaves a clean four-cornered face.</li>
+  <li><strong>DISSOLVE LOOP</strong> removes every edge along the picked edge's loop (the line SELECT LOOP follows), e.g. a whole LOOP CUT ring.</li>
+  <li>Only edges between faces that are flat to each other can go. A corner edge, where two faces meet at an angle, is refused with a note: the merged face would have to bend. Each DISSOLVE is one <kbd>Cmd</kbd>+<kbd>Z</kbd>.</li>
+</ul>
 
 <h2 id="walkthrough">Walkthrough: a bulge around a cylinder</h2>
 <p>Five steps turn a plain cylinder brush into a bulged one; the screenshots are from the editor on a 16-sided cylinder.</p>
@@ -270,6 +281,7 @@
   <tr><td><kbd>O</kbd>, <kbd>[</kbd> <kbd>]</kbd></td><td>Face, Vertex, Edge mode</td><td>SOFT on / off; shrink / grow its radius (also mid-drag)</td></tr>
   <tr><td><kbd>Shift</kbd>+click an edge</td><td>Edge mode</td><td>Adds or removes it (ROUND rounds them all)</td></tr>
   <tr><td>Click a curve</td><td>Face, Edge mode</td><td>Opens it: STEPS / SIZE again, MAKE SHARP</td></tr>
+  <tr><td><kbd>Delete</kbd></td><td>Edge mode, edge(s) picked</td><td>DISSOLVE them (in other modes Delete removes the whole selection)</td></tr>
   <tr><td>Right-click a button</td><td>Brush panels</td><td>Opens this guide at that button</td></tr>
   <tr><td>Drag the green cube</td><td>Face mode, GIZMO PUSH</td><td>Pushes the selected face(s) out / in along their own directions (snaps 0.05 m)</td></tr>
   <tr id="help-vertex-set"><td><kbd>T</kbd> <kbd>R</kbd> <kbd>S</kbd></td><td>2+ corners selected</td><td>Move / rotate / scale them together (snaps 0.25 m / 15° / 0.1)</td></tr>

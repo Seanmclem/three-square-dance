@@ -1597,3 +1597,72 @@ export function followRegion(mesh: ShapeBrushMesh, set: number[], dist: number):
   if (err) return { refused: `${dist < 0 ? "RECESS" : "EXTRUDE"} would break the brush (${err}); nothing changed.` };
   return { mesh: out };
 }
+
+// ── Dissolve edges (v4.105.0) ─────────────────────────────────────────────────
+
+/**
+ * DISSOLVE: remove each edge by merging the two faces on either side into one face
+ * (the first face's material). Refused when the two faces aren't flat to each other
+ * (the merged face would be bent), when an edge borders the same face twice, or when
+ * the result isn't a valid brush. Afterwards a corner left with just two edges in a
+ * straight line (the dissolved edge's ends, typically) is removed too, so dissolving a
+ * split's line leaves a clean four-cornered face. Unused corners are compacted.
+ */
+export function dissolveEdges(mesh: ShapeBrushMesh, edges: Array<[number, number]>): RegionOpResult {
+  if (!mesh.faces?.length) return { refused: "Only edited brushes (with faces) have edges to dissolve." };
+  if (!edges.length) return { refused: "Select an edge first." };
+  let faces = cloneFaces(mesh.faces);
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const findDirected = (p: number, q: number) => faces.findIndex(f => f.verts.some((v, i) => v === p && f.verts[(i + 1) % f.verts.length] === q));
+  const rotateTo = (loop: number[], start: number) => { const i = loop.indexOf(start); return [...loop.slice(i), ...loop.slice(0, i)]; };
+  const touched = new Set<number>();
+  for (const [a, b] of edges) {
+    const fa = findDirected(a, b), fb = findDirected(b, a);
+    if (fa < 0 || fb < 0) continue;   // already gone (an earlier merge in this batch took it)
+    if (fa === fb) return { refused: "That edge borders the same face on both sides; nothing changed." };
+    const na = newellNormal(vertices, faces[fa]!.verts), nb = newellNormal(vertices, faces[fb]!.verts);
+    if (na.dot(nb) < 0.999) return { refused: "Those two faces aren't flat to each other, so merging them would bend the face; nothing changed." };
+    const A = rotateTo(faces[fa]!.verts, b);   // b … a  (the a→b edge closes it)
+    const B = rotateTo(faces[fb]!.verts, a);   // a … b
+    const merged = [...A, ...B.slice(1, -1)];
+    if (new Set(merged).size !== merged.length) return { refused: "Those faces touch along more than one edge; dissolve them one at a time." };
+    const keep: BrushFace = { ...faces[fa]!, verts: merged };
+    delete keep.fold;
+    faces = faces.filter((_, i) => i !== fa && i !== fb);
+    faces.push(keep);
+    touched.add(a); touched.add(b);
+  }
+  // Corners left on a straight line between exactly two neighbours: remove them.
+  for (const v of touched) {
+    const nbrs = new Set<number>();
+    for (const f of faces) f.verts.forEach((x, i) => { if (x === v) { nbrs.add(f.verts[(i + 1) % f.verts.length]!); nbrs.add(f.verts[(i + f.verts.length - 1) % f.verts.length]!); } });
+    if (nbrs.size !== 2) continue;
+    const [p, q] = [...nbrs].map(i => vertices[i]!), c = vertices[v]!;
+    const d1 = new THREE.Vector3(c.x - p.x, c.y - p.y, c.z - p.z), d2 = new THREE.Vector3(q.x - c.x, q.y - c.y, q.z - c.z);
+    if (d1.lengthSq() < 1e-12 || d2.lengthSq() < 1e-12 || d1.normalize().dot(d2.normalize()) < 0.9999) continue;
+    faces = faces.map(f => f.verts.includes(v) ? { ...f, verts: f.verts.filter(x => x !== v) } : f);
+  }
+  if (faces.some(f => f.verts.length < 3)) return { refused: "That would leave a face with fewer than 3 corners; nothing changed." };
+  const used = new Set(faces.flatMap(f => f.verts));
+  const remap = new Map<number, number>();
+  const outVerts: Vec3[] = [];
+  vertices.forEach((v, i) => { if (used.has(i)) { remap.set(i, outVerts.length); outVerts.push(v); } });
+  const out = { vertices: outVerts, faces: faces.map(f => {
+    const g = { ...f, verts: f.verts.map(v => remap.get(v)!) };
+    if (g.fold !== undefined && g.verts.length !== 4) delete g.fold;
+    return g;
+  }) };
+  const err = validateMesh(out);
+  if (err) return { refused: `Dissolving would break the brush (${err}); nothing changed.` };
+  return { mesh: out };
+}
+
+/** The edges of the loop SELECT LOOP / double-click would follow from `edge` (DISSOLVE LOOP). */
+export function edgeLoopEdges(mesh: ShapeBrushMesh, edge: [number, number]): Array<[number, number]> {
+  const l = edgeLoop(mesh, edge);
+  if (!l || l.verts.length < 2) return [edge];
+  const out: Array<[number, number]> = [];
+  for (let i = 0; i + 1 < l.verts.length; i++) out.push([l.verts[i]!, l.verts[i + 1]!]);
+  if (l.closed) out.push([l.verts[l.verts.length - 1]!, l.verts[0]!]);
+  return out;
+}

@@ -18,7 +18,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -3500,7 +3500,10 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
   // Loop cut result line, tied to the edge selected after the cut (so the cut's own
   // re-select keeps it; picking any other edge hides it).
   const [loopNote, setLoopNote] = useState<{ text: string; key: string; ringVerts: number[] } | null>(null);
+  const [dissolveNote, setDissolveNote] = useState<string | null>(null);   // v4.105.0: refusals
+  useEffect(() => bus?.on("shape:dissolve-result", r => { if (r.shapeId === selected.id) setDissolveNote(r.note); }), [bus, selected.id]);
   const edgeKey = edge ? `${selected.id}:${edge[0]}|${edge[1]}` : "";
+  useEffect(() => { setDissolveNote(null); }, [edgeKey]);
   const canLoop = !!edge && !!loopCutRing(shape.mesh!, { edge });
   // "Around a face" loops: one per face this edge borders (the flat area on that side);
   // when both sides are the same flat area, one button.
@@ -3587,6 +3590,17 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
             </button>
           </div>
           {loopNote?.key === edgeKey && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
+          <div style={{ display: "flex", gap: 4 }}>
+            <button data-help="help-dissolve" style={OP_BTN} onClick={() => bus?.emit("shape:dissolve-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges: selected.edgeSet ?? [edge] })}
+              title="Remove the edge by merging the two faces on either side into one (only when they're flat to each other). Also Delete.">
+              <BrushOpIcon name="dissolve" />DISSOLVE{(selected.edgeSet?.length ?? 0) > 1 ? ` ${selected.edgeSet!.length}` : ""}
+            </button>
+            <button data-help="help-dissolve" style={OP_BTN} onClick={() => bus?.emit("shape:dissolve-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges: edgeLoopEdges(shape.mesh!, edge) })}
+              title="Dissolve every edge along this edge's loop, e.g. remove a whole loop cut">
+              <BrushOpIcon name="dissolve-loop" />DISSOLVE LOOP
+            </button>
+          </div>
+          {dissolveNote && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{dissolveNote}</div>}
           <button data-help="help-select-loop" style={OP_BTN} onClick={selectLoop}
             title="Select every corner along this edge's loop, going straight on through 4-way corners (or double-click an edge)">
             <BrushOpIcon name="select-loop" />SELECT LOOP

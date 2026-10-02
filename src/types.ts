@@ -291,6 +291,9 @@ export interface BusEvents {
   // v4.104.1: an op that renumbers corners / faces just ran (ROUND, MAKE SHARP, undo / redo):
   // SelectionManager drops face / edge / corner picks made on the old layout.
   "selection:check-sub":   Record<string, never>;
+  // v4.105.0: DISSOLVE the given edges (panel buttons, Delete in edge mode); the result for the panel.
+  "shape:dissolve-edges":  { zoneId: string; shapeId: string; edges: Array<[number, number]> };
+  "shape:dissolve-result": { shapeId: string; count: number; note: string | null };
   "spawn:suppress":        { suppressed: boolean };   // v4.102.2: hide the spawn marker in Edit Brush / prefab edit
   "shape:loop-preview":    { zoneId: string; shapeId: string; start: LoopCutStart | null; single?: boolean };   // single: SPLIT H / V (just that face, v4.102.2)
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };

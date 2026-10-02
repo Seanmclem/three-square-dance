@@ -2540,6 +2540,13 @@ export default function App() {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       e.preventDefault();
+      // v4.105.0: in edge mode with edges picked, Delete dissolves them (not the brush).
+      const sel = selectedRef.current;
+      const edges = sel?.type === "shape" ? (sel.edgeSet ?? (sel.edgeVerts ? [sel.edgeVerts] : [])) : [];
+      if (activeToolRef.current === "select-edge" && sel && edges.length) {
+        busRef.current.emit("shape:dissolve-edges", { zoneId: sel.zoneId, shapeId: sel.id, edges });
+        return;
+      }
       handleDelete();
     };
     window.addEventListener("keydown", onKey);

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud, edgeLoop } from "@/editor/brushOps";
+import { facesFromCloud, edgeLoop, dissolveEdges } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
@@ -102,6 +102,17 @@ export class BrushEdgeEditor implements IEditorModule {
         if (loop) this._bus.emit("shape:select-vertex-set", { zoneId: this._zoneId!, shapeId: this._selectedId!, verts: loop.verts });
       }),
       this._bus.on("brush:soft-changed", () => { if (this._dragging) this._onGizmoChange(); }),   // Phase 82: [ ] mid-drag
+      // v4.105.0: DISSOLVE (merge the faces either side of each edge), one undo step.
+      this._bus.on("shape:dissolve-edges", ({ zoneId, shapeId, edges }) => {
+        const shape = this._world.zones.get(zoneId)?.shapes?.find(s => s.id === shapeId);
+        if (!shape?.mesh) return;
+        const r = dissolveEdges(shape.mesh, edges);
+        if ("refused" in r) { this._bus.emit("shape:dissolve-result", { shapeId, count: 0, note: r.refused }); return; }
+        this._world.transaction(edges.length > 1 ? "dissolve edges" : "dissolve edge",
+          () => this._world.updateShape(zoneId, shapeId, { mesh: { ...shape.mesh!, vertices: r.mesh.vertices, faces: r.mesh.faces } }));
+        this._bus.emit("selection:check-sub", {});   // corners were renumbered
+        this._bus.emit("shape:dissolve-result", { shapeId, count: edges.length, note: null });
+      }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {

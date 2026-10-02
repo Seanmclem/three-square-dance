@@ -93,6 +93,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Panel: DIST"],        action: "How far EXTRUDE / RECESS go (default 0.25 m)" },
       { keys: ["Panel: OUTER WALLS"], action: "KEEP: walls all round (as before). FOLLOW: tops / bottoms / outer sides are cut back or stretched with the face (EXTRUDE, RECESS, PUSH)" },
       { keys: ["Shift+LMB edge"],     action: "Edge mode: add / remove an edge from the selection" },
+      { keys: ["Delete"],             action: "Edge mode: DISSOLVE the picked edge(s), merging the faces either side (also the DISSOLVE / DISSOLVE LOOP buttons)" },
       { keys: ["Panel: ROUND"],       action: "Edge mode: round the selected edge(s) into a curve (STEPS: 1 = flat cut-off; SIZE)" },
       { keys: ["LMB curve"],          action: "Face / edge mode: open that curve again: STEPS / SIZE rebuild it; MAKE SHARP puts the edge back" },
       { keys: ["Panel: CURVES"],      action: "Every curve on the brush: hover to light it up, EDIT, SPLIT ALL / SPLIT OFF for curves of several edges" },
