@@ -212,11 +212,12 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clearGreen();
     for (const g of [this._green.round, this._green.hover]) {
       if (!g) continue;
-      // A curve's faces are looked up now, so a rebuild (new face numbers) can't leave the
-      // highlight on the wrong faces.
+      // A curve's (or hole's, Phase 85: just its walls and floor, the faces around it
+      // cover the whole face) faces are looked up now, so a rebuild (new face numbers)
+      // can't leave the highlight on the wrong faces.
       const tagged = g.round
         ? (this._world.zones.get(g.zoneId)?.shapes?.find(s => s.id === g.shapeId)?.mesh?.faces ?? [])
-            .map((f, i) => (f.round?.id === g.round!.id && (g.round!.part === undefined || f.round.part === g.round!.part)) ? i : -1)
+            .map((f, i) => ((f.round?.id === g.round!.id && (g.round!.part === undefined || f.round.part === g.round!.part)) || (f.hole?.id === g.round!.id && (f.hole.part === "wall" || f.hole.part === "floor"))) ? i : -1)
             .filter(i => i >= 0)
         : g.faces;
       for (const faceIndex of tagged) {

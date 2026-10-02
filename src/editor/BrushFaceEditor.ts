@@ -44,6 +44,7 @@ export class BrushFaceEditor implements IEditorModule {
   private _follow = false;   // OUTER WALLS FOLLOW (v4.103.0): PUSH uses followRegion
   private readonly _ray = new THREE.Raycaster();
   private _previewing = false;
+  private _paused = false;   // Phase 85: the hole ghost is being placed (no face gizmo in the way)
   private _suspended = false;
 
   private _controls: TransformControls | null = null;
@@ -153,6 +154,7 @@ export class BrushFaceEditor implements IEditorModule {
         if (this._pushing) this._onPush(true);
         else if (this._dragging) this._onGizmoChange();
       }),
+      this._bus.on("selection:pause", ({ paused }) => { this._paused = paused; this._sync(); }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
@@ -195,7 +197,7 @@ export class BrushFaceEditor implements IEditorModule {
   }
 
   private _isActive(): boolean {
-    if (this._activeTool !== "select-face" || this._previewing || this._faceIndex === null) return false;
+    if (this._activeTool !== "select-face" || this._previewing || this._paused || this._faceIndex === null) return false;
     const s = this._shape();
     return !!s && isFaceBrush(s) && this._faceIndex < (s.mesh!.faces!.length);
   }

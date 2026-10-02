@@ -39,6 +39,7 @@ export class SelectionManager implements IEditorModule {
   private _hovered:           THREE.Object3D | null = null;
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
+  private readonly _paused = new Set<string>();   // Phase 85: selection:pause sources
   private _activeFloorLevel   = 0;
   // Sub-object selection on the selected shape (Phase 23 face/vertex/edge modes).
   private _subFace:   number | null = null;
@@ -107,6 +108,7 @@ export class SelectionManager implements IEditorModule {
         this._emitSelectionChanged();
       }),
       this._bus.on("selection:set",     ({ refs })     => this._setSelection(refs)),
+      this._bus.on("selection:pause", ({ source, paused }) => { if (paused) this._paused.add(source); else this._paused.delete(source); }),
       this._bus.on("selection:check-sub", () => {
         if (!this._selected || this._selected.userData.editorType !== "shape") return;
         const has = this._subFace !== null || this._subVertex !== null || this._subEdge !== null || this._subEdges.length || this._subVertices.length || this._subFaces.length;
@@ -159,6 +161,7 @@ export class SelectionManager implements IEditorModule {
 
   private _onClick(screenPos: ScreenPos, additive = false): void {
     if (this._suppressNextClick) { this._suppressNextClick = false; return; }
+    if (this._paused.size) return;   // Phase 85: the hole ghost owns clicks while it's placed
     if (!isSelectMode(this._activeTool)) return;
     // Vertex mode: Shift-click builds a corner set (BrushVertexEditor), never an
     // additive object toggle.

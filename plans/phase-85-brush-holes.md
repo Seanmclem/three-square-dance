@@ -1,6 +1,17 @@
 # Phase 85 · Brush holes: cut a round or square hole through a flat part
 
-> Status: **PLANNED** (2026-10-02). Not built. Open questions at the end.
+> Status: **IMPLEMENTED**, shipped as v4.109.0 (2026-10-02); see
+> `test-plans/phase-85-brush-holes.md`.
+
+## Decided (2026-10-02, user)
+
+- Placement: a see-through ghost of the cutter on the face ("a ghost cylinder to place
+  and be like, cut"): it follows the mouse, a click drops it, CUT HOLE cuts. X / Y
+  fields for exact spots.
+- ROUND and SQUARE are enough for v1.
+- Blind pockets (a DEPTH) are in v1.
+- Holes stay re-editable in v1 (settings, PLACE to move, FILL), like curves: every
+  hole face carries a `hole` record. A hole edited by hand can only be filled.
 
 Today the only way to make an opening in a brush is INSET + RECESS, which digs a pocket
 but never comes out the other side, and is square. This phase adds **HOLE**: pick a
@@ -17,8 +28,8 @@ depth makes a blind pocket instead.
 - Face mode, CUT group: **HOLE**. Opens a hole card for the selected face.
 - Hole shape: **ROUND** (SIDES 6 to 64, default 24) or **SQUARE** (width × height).
   SIZE in meters (diameter, or W × H).
-- Placement: centred on the face by default; **click on the face** to move it there
-  (a dashed outline previews it under the mouse); X / Y offset fields for exact values.
+- Placement: a see-through ghost of the cutter starts in the middle of the face and
+  follows the mouse; **a click drops it**; X / Y offset fields for exact values.
 - Depth: **THROUGH** (default: out of the face on the far side) or a number (a blind
   pocket with a floor).
 - One undo step. The result is ordinary faces, so ROUND can soften the rim, DISSOLVE
@@ -28,7 +39,6 @@ depth makes a blind pocket instead.
 
 - Holes that cross an edge or come out through more than one face.
 - Cutting with any other brush or shape (general boolean subtract, §6).
-- Re-editing a hole's size after DONE (could reuse the curve memory idea from Phase 84).
 
 ---
 
@@ -57,9 +67,11 @@ ROUND + SIDES, or a rectangle), size, depth (THROUGH or metres).
    It must lie fully inside the exit face, else refused ("the hole would come out
    across an edge").
 3. **Faces around each outline** (a face can't have a hole, so the ring between the face
-   outline and the hole becomes several faces): each hole corner is matched to the face
-   outline by angle around the hole centre; between consecutive hole corners a face runs
-   from the outline back to the hole: `[outline chain …, hole k+1, hole k]`. Works for
+   outline and the hole becomes several faces): each outline corner gets a "spoke" to the
+   hole corner nearest its direction from the centre that it can see; a run of corners
+   on one hole corner shares a spoke; between two spokes one face runs along the outline
+   and back along the hole: `[outline chain …, hole m(j2) … hole m(j1)]` (a rectangle
+   gives 4 faces). Spokes crossing an edge are refused. Works for
    any face that every ray from the hole centre leaves once (rectangles, rounded
    rectangles, any convex face); other faces are refused in v1.
 4. **The tube:** one wall quad per hole side, joining the entry and exit outlines,
@@ -81,9 +93,9 @@ ROUND + SIDES, or a rectangle), size, depth (THROUGH or metres).
  [CUT HOLE]  [CANCEL]
 ```
 
-- While the card is open, the hole's outline is drawn dashed on the face; moving the mouse
-  over the face moves the preview, a click places it, and the exit outline shows on the
-  far side (through the brush) for THROUGH.
+- While the card is open, a see-through ghost of the cutter (orange, red where the hole
+  can't go) sits on the face, drawn through the brush, from just above the face to just
+  past the far side (THROUGH) or to DEPTH; it follows the mouse until a click drops it.
 - Refusal notes in the card; the guide gets a "Holes" section with drawings and a
   `help-hole` anchor.
 
@@ -121,8 +133,4 @@ separate "SUBTRACT SHAPE" op after HOLE.
 
 ## 8. Open questions
 
-1. Placement: click on the face to place it (with X / Y fields), or just centred plus
-   X / Y fields?
-2. Shapes: ROUND and SQUARE enough for v1?
-3. Blind pockets (a depth) in v1, or THROUGH only?
-4. Should a hole stay re-editable (size, sides, position) like curves, in v1 or later?
+All answered; see "Decided" at the top.

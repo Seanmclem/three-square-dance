@@ -297,6 +297,17 @@ export interface BusEvents {
   "shape:dissolve-edges":  { zoneId: string; shapeId: string; edges: Array<[number, number]> };
   "shape:dissolve-result": { shapeId: string; count: number; note: string | null };
   "brush:snap-changed":    { step: number };   // v4.106.0: brush drag SNAP step (0 = off)
+  // Phase 85 HOLE: place the ghost on a face (HOLE button) or move an existing hole (PLACE);
+  // the card's settings; CUT; DONE / Escape; FILL; the state for the panel (BrushHoleController).
+  "shape:hole-start":      { zoneId: string; shapeId: string; face?: number; holeId?: string };
+  "shape:hole-settings":   { shape: "round" | "square"; sides: number; w: number; h: number; depth: number | null; x?: number; y?: number };
+  "shape:hole-cut":        Record<string, never>;
+  "shape:hole-open":       { zoneId: string; shapeId: string; holeId: string };
+  "shape:hole-done":       Record<string, never>;
+  "shape:hole-fill":       { zoneId: string; shapeId: string; holeId: string };
+  "shape:hole-state":      { shapeId: string | null; mode: "placing" | "open" | null; holeId: string | null; shape: "round" | "square"; sides: number; w: number; h: number; depth: number | null; x: number; y: number; pinned: boolean; edited: boolean; note: string | null };
+  // Phase 85: while the hole ghost is being placed, canvas clicks place it instead of picking.
+  "selection:pause":       { source: string; paused: boolean };
   "spawn:suppress":        { suppressed: boolean };   // v4.102.2: hide the spawn marker in Edit Brush / prefab edit
   "shape:loop-preview":    { zoneId: string; shapeId: string; start: LoopCutStart | null; single?: boolean };   // single: SPLIT H / V (just that face, v4.102.2)
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };
@@ -988,7 +999,17 @@ export interface BrushFace {
    *  `patch` for the fill face at a corner with 4+ faces, and `sig`, a fingerprint of
    *  the curve's corners when it was built (a mismatch = edited by hand). */
   round?: { id: string; part: number; steps: number; size: number; a: Vec3; b: Vec3; patch?: true; sig: string };
+  /** Phase 85: this face is part of a HOLE. Every face of the hole carries the whole
+   *  record: which hole (`id`), which `part` (the faces around the opening on the
+   *  `entry` / `exit` side, the tube `wall`, a pocket's `floor`), its settings, the
+   *  centre `c` on the entry face, and `sig` (a mismatch = edited by hand). */
+  hole?: HoleTag;
 }
+
+/** Phase 85: what a HOLE is (round = a circle of `sides` straight sides `w` across;
+ *  square = `w` × `h`), `depth` null = right through, `c` its centre (brush space). */
+export interface HoleSpec { shape: "round" | "square"; sides: number; w: number; h: number; depth: number | null; c: Vec3 }
+export interface HoleTag extends HoleSpec { id: string; part: "entry" | "exit" | "wall" | "floor"; sig: string }
 
 /**
  * Brush mode (v4.10.0): a LOCAL-space vertex cloud that supersedes the kind params

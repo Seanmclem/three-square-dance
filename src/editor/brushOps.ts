@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ConvexGeometry } from "three/addons/geometries/ConvexGeometry.js";
-import type { Vec3, BrushFace, ShapeBrushMesh, MaterialOverrides, LoopCutStart } from "@/types";
+import type { Vec3, BrushFace, ShapeBrushMesh, MaterialOverrides, LoopCutStart, HoleSpec, HoleTag } from "@/types";
 
 /**
  * Pure topology operations for face-brushes (Phase 23). Data in, data out — every
@@ -1730,4 +1730,288 @@ export function edgeLoopEdges(mesh: ShapeBrushMesh, edge: [number, number]): Arr
   for (let i = 0; i + 1 < l.verts.length; i++) out.push([l.verts[i]!, l.verts[i + 1]!]);
   if (l.closed) out.push([l.verts[l.verts.length - 1]!, l.verts[0]!]);
   return out;
+}
+
+// ── Holes (Phase 85) ─────────────────────────────────────────────────────────
+
+const HOLE_MARGIN = 0.005;   // a hole keeps this far inside its face (meters)
+type P2 = { x: number; y: number };
+
+/** A flat face's own 2D frame: centroid O, normal n, texture axes u / v (u × v = n). */
+export function holeFrame(vertices: Vec3[], loop: number[]): { O: THREE.Vector3; n: THREE.Vector3; u: THREE.Vector3; v: THREE.Vector3 } {
+  const n = newellNormal(vertices, loop);
+  const { u, v } = faceUVBasis(n);
+  return { O: faceCentroid(vertices, loop), n, u, v };
+}
+
+/** The hole's outline around (0, 0), counter-clockwise about the face normal. */
+function holeOutline2D(spec: HoleSpec): P2[] {
+  if (spec.shape === "square") return [[1, 1], [-1, 1], [-1, -1], [1, -1]].map(([a, b]) => ({ x: a! * spec.w / 2, y: b! * spec.h / 2 }));
+  const N = Math.max(3, Math.min(64, Math.round(spec.sides)));
+  return Array.from({ length: N }, (_, k) => { const t = 2 * Math.PI * (k + 0.5) / N; return { x: Math.cos(t) * spec.w / 2, y: Math.sin(t) * spec.w / 2 }; });
+}
+
+/** First face a ray from `o` along `d` (brush space) passes through, skipping `skip`. */
+function rayFirstFace(mesh: { vertices: Vec3[]; faces: BrushFace[] }, o: THREE.Vector3, d: THREE.Vector3, skip: number): { face: number; t: number } | null {
+  const ray = new THREE.Ray(o, d), hit = new THREE.Vector3();
+  const V = (i: number) => new THREE.Vector3(mesh.vertices[i]!.x, mesh.vertices[i]!.y, mesh.vertices[i]!.z);
+  let best: { face: number; t: number } | null = null;
+  mesh.faces.forEach((f, fi) => {
+    if (fi === skip) return;
+    for (const [a, b, c] of faceTriangles(mesh.vertices, f)) {
+      if (!ray.intersectTriangle(V(a), V(b), V(c), false, hit)) continue;
+      const t = hit.distanceTo(o);
+      if (t > 1e-5 && (!best || t < best.t)) best = { face: fi, t };
+    }
+  });
+  return best;
+}
+
+/** How deep the brush is under point `c` of face `faceIdx` (straight in), or null. */
+export function holeThickness(mesh: ShapeBrushMesh, faceIdx: number, c: Vec3): number | null {
+  const face = mesh.faces?.[faceIdx];
+  if (!face) return null;
+  const n = newellNormal(mesh.vertices, face.verts);
+  return rayFirstFace({ vertices: mesh.vertices, faces: mesh.faces! }, new THREE.Vector3(c.x, c.y, c.z), n.clone().negate(), faceIdx)?.t ?? null;
+}
+
+const cross2 = (o: P2, a: P2, b: P2) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+function segsCross(a: P2, b: P2, c: P2, d: P2): boolean {
+  const d1 = cross2(c, d, a), d2 = cross2(c, d, b), d3 = cross2(a, b, c), d4 = cross2(a, b, d);
+  return ((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9)) && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9));
+}
+function segDist(p: P2, a: P2, b: P2): number {
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+function insidePoly(p: P2, poly: P2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!, b = poly[j]!;
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * The faces around a hole in a flat face (a brush face can't have a hole in it): a
+ * "spoke" from outline corners to hole corners, chosen by direction from the hole's
+ * centre, and between two spokes one face: the outline run, then back along the hole.
+ * `outline` / `hole` are 2D, both counter-clockwise; returns vertex loops or a refusal.
+ */
+function holeRing(outline: P2[], outlineIdx: number[], hole: P2[], holeIdx: number[], c: P2): number[][] | string {
+  const L = outline.length, N = hole.length;
+  const ang = (p: P2) => Math.atan2(p.y - c.y, p.x - c.x);
+  const wrap = (a: number) => { while (a <= -Math.PI) a += 2 * Math.PI; while (a > Math.PI) a -= 2 * Math.PI; return a; };
+  const simpler = "This face's shape goes around the hole in a way HOLE can't cut yet; try nearer the middle.";
+  // Every direction from the centre must leave the face once.
+  let turn = 0;
+  for (let j = 0; j < L; j++) {
+    const d = wrap(ang(outline[(j + 1) % L]!) - ang(outline[j]!));
+    if (!(d > 1e-9)) return simpler;
+    turn += d;
+  }
+  if (Math.abs(turn - 2 * Math.PI) > 1e-6) return simpler;
+  // The hole sits inside, clear of the edges.
+  for (const p of hole) {
+    if (!insidePoly(p, outline)) return "The hole doesn't fit on this face there.";
+    for (let j = 0; j < L; j++) if (segDist(p, outline[j]!, outline[(j + 1) % L]!) < HOLE_MARGIN) return "The hole doesn't fit on this face there.";
+  }
+  for (let j = 0; j < L; j++) for (let k = 0; k < N; k++) if (segsCross(outline[j]!, outline[(j + 1) % L]!, hole[k]!, hole[(k + 1) % N]!)) return "The hole doesn't fit on this face there.";
+  // Each outline corner's spoke: the hole corner nearest its direction that it can see.
+  const m = outline.map(o => {
+    let best = -1, bestD = Infinity;
+    for (let k = 0; k < N; k++) {
+      const h = hole[k]!, prev = hole[(k + N - 1) % N]!, next = hole[(k + 1) % N]!;
+      if (!(cross2(prev, h, o) < 0 || cross2(h, next, o) < 0)) continue;   // behind the hole
+      const d = Math.abs(wrap(ang(h) - ang(o)));
+      if (d < bestD) { bestD = d; best = k; }
+    }
+    return best;
+  });
+  if (m.some(k => k < 0)) return simpler;
+  let adv = 0;
+  for (let j = 0; j < L; j++) adv += (m[(j + 1) % L]! - m[j]! + N) % N;
+  if (adv !== N) return simpler;
+  // A run of corners on one hole corner shares one spoke (its first corner).
+  const spokes = outline.map((_, j) => j).filter(j => m[j] !== m[(j + L - 1) % L]);
+  if (spokes.length < 2) return simpler;
+  for (const j of spokes) {
+    const o = outline[j]!, h = hole[m[j]!]!;
+    for (let i = 0; i < L; i++) if (i !== j && (i + 1) % L !== j && segsCross(o, h, outline[i]!, outline[(i + 1) % L]!)) return simpler;
+    for (let k = 0; k < N; k++) if (k !== m[j] && (k + 1) % N !== m[j] && segsCross(o, h, hole[k]!, hole[(k + 1) % N]!)) return simpler;
+  }
+  return spokes.map((j, s) => {
+    const j2 = spokes[(s + 1) % spokes.length]!;
+    const loop: number[] = [];
+    for (let i = j; ; i = (i + 1) % L) { loop.push(outlineIdx[i]!); if (i === j2) break; }
+    for (let k = m[j2]!; ; k = (k + N - 1) % N) { loop.push(holeIdx[k]!); if (k === m[j]) break; }
+    return loop;
+  });
+}
+
+/** Whether point `p` (on the face's plane, brush space) is inside flat face `loop`. */
+export function faceContainsPoint(vertices: Vec3[], loop: number[], p: Vec3): boolean {
+  const fr = holeFrame(vertices, loop);
+  const to2 = (q: Vec3) => { const d = new THREE.Vector3(q.x, q.y, q.z).sub(fr.O); return { x: d.dot(fr.u), y: d.dot(fr.v) }; };
+  return insidePoly(to2(p), loop.map(i => to2(vertices[i]!)));
+}
+
+/** Fingerprint of a hole: the positions of every corner its faces use, sorted. */
+export function holeSig(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string): string {
+  const vs = new Set<number>();
+  for (const f of mesh.faces) if (f.hole?.id === id) f.verts.forEach(v => vs.add(v));
+  return [...vs].map(i => { const v = mesh.vertices[i]!; return `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`; }).sort().join(";");
+}
+
+/**
+ * HOLE (Phase 85): cut a round (`sides` straight sides) or square hole into flat face
+ * `faceIdx` at `spec.c`, straight in along the face normal: right through to the face
+ * on the far side (`depth` null), or a pocket `depth` deep with a floor. The two faces
+ * become rings of faces around the opening, joined by a tube of walls; every new face
+ * carries the hole's record (`hole`), so it can be changed or filled later. Refused,
+ * with a reason, when it doesn't fit (not flat, too close to an edge, comes out across
+ * an edge or through more than one face, deeper than the brush).
+ */
+export function cutHole(mesh: ShapeBrushMesh, faceIdx: number, spec: HoleSpec, id = `h${Date.now().toString(36)}`): RegionOpResult {
+  const src = mesh.faces?.[faceIdx];
+  if (!src) return { refused: "Pick a face to cut the hole into." };
+  if (src.round || src.hole) return { refused: "Holes go in flat faces, not in a curve or another hole's faces." };
+  if (!(spec.w > 0) || (spec.shape === "square" && !(spec.h > 0))) return { refused: "SIZE must be more than 0." };
+  if (spec.depth !== null && !(spec.depth > 0)) return { refused: "DEPTH must be more than 0 (or THROUGH)." };
+  const all = { vertices: mesh.vertices, faces: mesh.faces! };
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const V3 = (i: number) => new THREE.Vector3(vertices[i]!.x, vertices[i]!.y, vertices[i]!.z);
+  const fr = holeFrame(vertices, src.verts);
+  const to2 = (p: THREE.Vector3, f = fr) => { const d = p.clone().sub(f.O); return { x: d.dot(f.u), y: d.dot(f.v), h: d.dot(f.n) }; };
+  if (src.verts.some(i => Math.abs(to2(V3(i)).h) > 1e-3)) return { refused: "This face isn't flat, so a hole can't go in it." };
+  const c2 = to2(new THREE.Vector3(spec.c.x, spec.c.y, spec.c.z));
+  const H2 = holeOutline2D(spec).map(p => ({ x: p.x + c2.x, y: p.y + c2.y }));
+  const H3 = H2.map(p => fr.O.clone().addScaledVector(fr.u, p.x).addScaledVector(fr.v, p.y));
+  const N = H3.length;
+  const into = fr.n.clone().negate();
+
+  // How far in each part of the hole can go: every ray must stay inside one face's reach.
+  const centre = fr.O.clone().addScaledVector(fr.u, c2.x).addScaledVector(fr.v, c2.y);
+  const hits = [centre, ...H3].map(p => rayFirstFace(all, p, into, faceIdx));
+  if (hits.some(h => !h)) return { refused: "The hole doesn't fit on this face there." };
+  const exitIdx = hits[0]!.face;
+  let exit: BrushFace | null = null, exitFr: ReturnType<typeof holeFrame> | null = null;
+  if (spec.depth === null) {
+    if (hits.some(h => h!.face !== exitIdx)) return { refused: "The hole would come out across an edge on the far side (or through another part); move it or make it smaller." };
+    exit = mesh.faces![exitIdx]!;
+    if (exit.round || exit.hole) return { refused: "The hole would come out in a curve or another hole's faces." };
+    exitFr = holeFrame(vertices, exit.verts);
+    if (exit.verts.some(i => Math.abs(to2(V3(i), exitFr!).h) > 1e-3)) return { refused: "The face on the far side isn't flat, so the hole can't come out there." };
+    if (exitFr.n.dot(fr.n) > -0.05) return { refused: "The far side is too slanted for the hole to come out." };
+  } else if (hits.some(h => h!.t <= spec.depth! + HOLE_MARGIN)) {
+    return { refused: "DEPTH goes deeper than the brush here; make it shallower or use THROUGH." };
+  }
+
+  const r4 = (n: number) => +n.toFixed(4);
+  const push = (p: THREE.Vector3) => { vertices.push({ x: r4(p.x), y: r4(p.y), z: r4(p.z) }); return vertices.length - 1; };
+  const Hi = H3.map(push);
+  const Xp = spec.depth === null ? H3.map((p, k) => p.clone().addScaledVector(into, hits[k + 1]!.t)) : H3.map(p => p.clone().addScaledVector(into, spec.depth!));
+  const Xi = Xp.map(push);
+
+  const tag = (part: HoleTag["part"]): HoleTag => ({ id, part, shape: spec.shape, sides: N, w: spec.w, h: spec.shape === "square" ? spec.h : spec.w, depth: spec.depth, c: { x: r4(centre.x), y: r4(centre.y), z: r4(centre.z) }, sig: "" });
+  const like = (f: BrushFace, part: HoleTag["part"]) => (verts: number[]): BrushFace => ({
+    verts, material: f.material, materialOverrides: f.materialOverrides ? structuredClone(f.materialOverrides) : undefined, hole: tag(part),
+  });
+  const entryRing = holeRing(src.verts.map(i => to2(V3(i))), src.verts, H2, Hi, c2);
+  if (typeof entryRing === "string") return { refused: entryRing };
+  const added: BrushFace[] = entryRing.map(like(src, "entry"));
+  for (let k = 0; k < N; k++) added.push(like(src, "wall")([Hi[k]!, Hi[(k + 1) % N]!, Xi[(k + 1) % N]!, Xi[k]!]));
+  if (exit && exitFr) {
+    // The far side's opening, counter-clockwise about its own (opposite) normal.
+    const order = [...Array(N).keys()].reverse();
+    const ring = holeRing(exit.verts.map(i => to2(V3(i), exitFr)), exit.verts, order.map(k => to2(Xp[k]!, exitFr)), order.map(k => Xi[k]!), to2(centre.clone().addScaledVector(into, hits[0]!.t), exitFr));
+    if (typeof ring === "string") return { refused: ring.replace("This face's", "The far side's").replace("on this face", "on the far side") };
+    added.push(...ring.map(like(exit, "exit")));
+  } else {
+    added.push(like(src, "floor")([...Xi]));
+  }
+  const faces = [...cloneFaces(mesh.faces!).filter((_, i) => i !== faceIdx && !(exit && i === exitIdx)), ...added];
+  const out = { vertices, faces };
+  const err = validateMesh(out);
+  if (err) return { refused: `The hole would break the brush (${err}); nothing changed.` };
+  const sig = holeSig(out, id);
+  out.faces = out.faces.map(f => f.hole?.id === id ? { ...f, hole: { ...f.hole, sig } } : f);
+  return { mesh: out };
+}
+
+export interface HoleInfo { id: string; spec: HoleSpec; edited: boolean; faces: number[] }
+
+/** The holes in a brush, oldest first. */
+export function holesOf(mesh: { vertices: Vec3[]; faces?: BrushFace[] }): HoleInfo[] {
+  const out = new Map<string, HoleInfo>();
+  (mesh.faces ?? []).forEach((f, fi) => {
+    const h = f.hole;
+    if (!h) return;
+    const info = out.get(h.id) ?? { id: h.id, spec: { shape: h.shape, sides: h.sides, w: h.w, h: h.h, depth: h.depth, c: h.c }, edited: false, faces: [] };
+    info.faces.push(fi);
+    out.set(h.id, info);
+  });
+  for (const info of out.values()) info.edited = holeSig({ vertices: mesh.vertices, faces: mesh.faces! }, info.id) !== mesh.faces![info.faces[0]!]!.hole!.sig;
+  return [...out.values()].sort((p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0));
+}
+
+/** The hole a face belongs to. */
+export function holeAt(mesh: { faces?: BrushFace[] }, face: number): string | null {
+  return mesh.faces?.[face]?.hole?.id ?? null;
+}
+
+/**
+ * FILL: take a hole's faces out and close each opening they leave with one face (the
+ * face that was there before the cut, with its material). Works on a hand-edited hole
+ * as long as the result is still a valid brush. Returns the entry face's new index.
+ */
+export function fillHole(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string): { mesh: BrushMeshData; entry: number; spec: HoleSpec } | { refused: string } {
+  const tagged = mesh.faces.filter(f => f.hole?.id === id);
+  if (!tagged.length) return { refused: "That hole isn't on this brush any more." };
+  const t = tagged[0]!.hole!;
+  const spec: HoleSpec = { shape: t.shape, sides: t.sides, w: t.w, h: t.h, depth: t.depth, c: t.c };
+  // The edges the hole's faces share with the rest of the brush, chained into loops.
+  const dir = new Set<string>();
+  for (const f of tagged) f.verts.forEach((v, i) => dir.add(`${v},${f.verts[(i + 1) % f.verts.length]}`));
+  const next = new Map<number, { to: number; face: BrushFace }>();
+  for (const f of tagged) f.verts.forEach((v, i) => {
+    const w = f.verts[(i + 1) % f.verts.length]!;
+    if (!dir.has(`${w},${v}`)) next.set(v, { to: w, face: f });
+  });
+  const restored: Array<{ face: BrushFace; part: HoleTag["part"] }> = [];
+  const seen = new Set<number>();
+  for (const start of next.keys()) {
+    if (seen.has(start)) continue;
+    const loop: number[] = [];
+    let v = start;
+    while (!seen.has(v)) {
+      seen.add(v); loop.push(v);
+      const e = next.get(v);
+      if (!e) return { refused: "This hole was changed too much by hand to fill; nothing changed." };
+      v = e.to;
+    }
+    if (v !== start || loop.length < 3) return { refused: "This hole was changed too much by hand to fill; nothing changed." };
+    const owner = next.get(start)!.face;
+    const { hole: _h, round: _r, fold: _f, ...rest } = owner;
+    restored.push({ face: { ...rest, verts: loop, materialOverrides: owner.materialOverrides ? structuredClone(owner.materialOverrides) : undefined }, part: owner.hole!.part });
+  }
+  const faces = [...cloneFaces(mesh.faces.filter(f => f.hole?.id !== id)), ...restored.map(r => r.face)];
+  const used = new Set(faces.flatMap(f => f.verts));
+  const remap = new Map<number, number>();
+  const outVerts: Vec3[] = [];
+  mesh.vertices.forEach((v, i) => { if (used.has(i)) { remap.set(i, outVerts.length); outVerts.push({ ...v }); } });
+  const out = { vertices: outVerts, faces: faces.map(f => ({ ...f, verts: f.verts.map(v => remap.get(v)!) })) };
+  const err = validateMesh(out);
+  const entryAt = restored.findIndex(r => r.part === "entry");
+  if (err || entryAt < 0) return { refused: "This hole was changed too much by hand to fill; nothing changed." };
+  return { mesh: out, entry: out.faces.length - restored.length + entryAt, spec };
+}
+
+/** Change a hole's settings (or move it): fill it, then cut it again with the same id. */
+export function recutHole(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: string, spec: HoleSpec): RegionOpResult {
+  const f = fillHole(mesh, id);
+  if ("refused" in f) return f;
+  return cutHole(f.mesh, f.entry, spec, id);
 }

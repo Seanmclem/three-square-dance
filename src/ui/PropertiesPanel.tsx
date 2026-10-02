@@ -19,7 +19,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, holesOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2540,13 +2540,13 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
   // Sub-object modes (Phase 23): face/vertex lists replace the param view.
   // Phase 82: the SOFT row sits above each list (it applies to every corner drag).
   if (faceBrush && activeTool === "select-face") {
-    return <>{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}{bus && <HolesList selected={selected} shape={shape} bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-vertex") {
-    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}{bus && <HolesList selected={selected} shape={shape} bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-edge") {
-    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}{bus && <HolesList selected={selected} shape={shape} bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
 
   return (
@@ -2601,7 +2601,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
         </label>
       )}
 
-      {faceBrush && bus && <div style={{ margin: "0 -12px" }}><CurvesList selected={selected} shape={shape} bus={bus} /></div>}
+      {faceBrush && bus && <div style={{ margin: "0 -12px" }}><CurvesList selected={selected} shape={shape} bus={bus} /><HolesList selected={selected} shape={shape} bus={bus} /></div>}
 
       <div>
         <div style={LABEL}>BRUSH</div>
@@ -3179,6 +3179,11 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
           <BrushOpIcon name="fold" />FLIP FOLD
         </button>
       </div>
+      <button data-help="help-hole" style={bus ? OP_BTN : OP_BTN_OFF} disabled={!bus}
+        onClick={() => bus?.emit("shape:hole-start", { zoneId: selected.zoneId, shapeId: selected.id, face: faceIndex })}
+        title="Cut a round or square hole through this face (or a pocket): place the ghost on the face, then CUT">
+        <BrushOpIcon name="hole" />HOLE
+      </button>
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>{canSplit
           ? "Loop cut needs a face with 4 real corners; SPLIT works on this rounded face."
@@ -3583,6 +3588,160 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
         );
       })}
       {!open && st.note && st.shapeId === selected.id && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{st.note}</div>}
+    </div>
+  );
+}
+
+// ── Holes (Phase 85) ─────────────────────────────────────────────────────────
+
+type HoleState = {
+  shapeId: string | null; mode: "placing" | "open" | null; holeId: string | null;
+  shape: "round" | "square"; sides: number; w: number; h: number; depth: number | null;
+  x: number; y: number; pinned: boolean; edited: boolean; note: string | null;
+};
+let holeStateNow: HoleState = { shapeId: null, mode: null, holeId: null, shape: "round", sides: 24, w: 0.5, h: 0.5, depth: null, x: 0, y: 0, pinned: false, edited: false, note: null };
+let holePocketDepthNow = 0.1;   // what DEPTH goes back to after THROUGH
+
+function useHoleState(bus: EventBus): HoleState {
+  const [st, setSt] = useState(holeStateNow);
+  useEffect(() => bus.on("shape:hole-state", s => { holeStateNow = s; setSt(s); }), [bus]);
+  return st;
+}
+
+/** A hole's settings (the ghost while placing, or the open hole): shape, size, depth, spot. */
+function HoleSettings({ st, bus }: { st: HoleState; bus: EventBus }) {
+  const [d, setD] = useState({ sides: "", w: "", h: "", depth: "", x: "", y: "" });
+  const r3 = (n: number) => String(+n.toFixed(3));
+  useEffect(() => {
+    setD({ sides: String(st.sides), w: r3(st.w), h: r3(st.h), depth: r3(st.depth ?? holePocketDepthNow), x: r3(st.x), y: r3(st.y) });
+  }, [st.holeId, st.mode, st.sides, st.w, st.h, st.depth, st.x, st.y]);
+  const send = (patch: Partial<Omit<HoleState, "x" | "y">>, at?: { x: number; y: number }) =>
+    bus.emit("shape:hole-settings", { shape: st.shape, sides: st.sides, w: st.w, h: st.h, depth: st.depth, ...patch, ...(at ?? {}) });
+  const field = { ...NUM_INPUT, width: 52, padding: "2px 4px" };
+  const num = (key: keyof typeof d, v: string, apply: (n: number) => void, min = 0) => {
+    setD(p => ({ ...p, [key]: v }));
+    const n = parseFloat(v);
+    if (Number.isFinite(n) && n > min) apply(n);
+  };
+  const seg = (on: boolean): React.CSSProperties => ({ ...OP_BTN, ...(on ? { background: "rgba(80,140,255,0.22)", color: "#9dbdff", borderColor: "rgba(80,140,255,0.55)" } : {}) });
+  const lab = { ...LABEL, marginBottom: 0 };
+  return (
+    <div data-help="help-hole" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", gap: 4 }}>
+        <button style={seg(st.shape === "round")} onClick={() => send({ shape: "round" })}>ROUND</button>
+        <button style={seg(st.shape === "square")} onClick={() => send({ shape: "square" })}>SQUARE</button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        {st.shape === "round" ? (<>
+          <span style={lab}>SIDES</span>
+          <input type="number" min={3} max={64} step={1} value={d.sides} style={field} onChange={e => num("sides", e.target.value, n => send({ sides: Math.round(n) }), 2)} />
+          <span style={lab}>SIZE</span>
+          <input type="number" min={0.01} step={0.05} value={d.w} style={field} onChange={e => num("w", e.target.value, n => send({ w: n }))} />
+        </>) : (<>
+          <span style={lab}>W</span>
+          <input type="number" min={0.01} step={0.05} value={d.w} style={field} onChange={e => num("w", e.target.value, n => send({ w: n }))} />
+          <span style={lab}>H</span>
+          <input type="number" min={0.01} step={0.05} value={d.h} style={field} onChange={e => num("h", e.target.value, n => send({ h: n }))} />
+        </>)}
+        <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={lab}>DEPTH</span>
+        <button style={{ ...seg(st.depth === null), flex: "0 0 auto", padding: "4px 8px" }} title="Right through to the far side"
+          onClick={() => send({ depth: st.depth === null ? holePocketDepthNow : null })}>THROUGH</button>
+        <input type="number" min={0.01} step={0.05} value={d.depth} style={{ ...field, opacity: st.depth === null ? 0.5 : 1 }}
+          title="A pocket this deep, with a floor"
+          onChange={e => num("depth", e.target.value, n => { holePocketDepthNow = n; send({ depth: n }); })} />
+        <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={lab}>X</span>
+        <input type="number" step={0.05} value={d.x} style={field} onChange={e => num("x", e.target.value, n => send({}, { x: n, y: st.y }), -Infinity)} />
+        <span style={lab}>Y</span>
+        <input type="number" step={0.05} value={d.y} style={field} onChange={e => num("y", e.target.value, n => send({}, { x: st.x, y: n }), -Infinity)} />
+        <span style={{ color: "#98a2b8", fontSize: 10 }}>m from the face's middle</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Phase 85: the HOLE card while the ghost is out (placing), and the brush's holes. The
+ * open hole (just cut, picked in the view, or EDIT here) shows its settings, which
+ * rebuild it (one undo per open); PLACE brings the ghost back to move it; FILL closes it.
+ */
+function HolesList({ selected, shape, bus }: { selected: SelectedObjectPayload; shape: ShapeDef; bus: EventBus }) {
+  const st = useHoleState(bus);
+  const [hovRow, setHovRow] = useState<string | null>(null);
+  useEffect(() => () => bus.emit("shape:faces-highlight", { zoneId: selected.zoneId, shapeId: selected.id, faces: null, channel: "hover" }), [bus, selected.zoneId, selected.id, shape.mesh?.faces?.length]);
+  const holes = shape.mesh?.faces ? holesOf(shape.mesh) : [];
+  const mine = st.shapeId === selected.id;
+  const placing = mine && st.mode === "placing";
+  if (!holes.length && !placing && !(mine && st.note)) return null;
+  const ids = { zoneId: selected.zoneId, shapeId: selected.id };
+  const hover = (id: string | null) => bus.emit("shape:faces-highlight", { ...ids, faces: null, channel: "hover", ...(id ? { round: { id } } : {}) });
+  const note = mine && st.note ? <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{st.note}</div> : null;
+  const desc = (h: { spec: { shape: string; sides: number; w: number; h: number; depth: number | null } }) =>
+    `${h.spec.shape === "square" ? `square ${+h.spec.w.toFixed(3)} × ${+h.spec.h.toFixed(3)} m` : `round ${+h.spec.w.toFixed(3)} m, ${h.spec.sides} sides`} · ${h.spec.depth === null ? "through" : `${+h.spec.depth.toFixed(3)} m deep`}`;
+  return (
+    <div style={{ padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 }}>
+      {placing && !st.holeId && (
+        <div style={{ border: "1px solid rgba(255,160,64,0.6)", borderRadius: 5, background: "rgba(255,160,64,0.07)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
+          <span data-help="help-hole" style={{ color: "#ffc58a", fontSize: 11, fontFamily: "monospace" }}>NEW HOLE</span>
+          <div style={{ color: "#c2cadb", fontSize: 10, lineHeight: 1.4 }}>
+            {st.pinned ? "Placed. Click the face again to move it, or type X / Y." : "The ghost follows the mouse over the face: click to drop it there."}
+          </div>
+          <HoleSettings st={st} bus={bus} />
+          <div style={{ display: "flex", gap: 4 }}>
+            <button style={st.note ? OP_BTN_OFF : OP_BTN} disabled={!!st.note} onClick={() => bus.emit("shape:hole-cut", {})}><BrushOpIcon name="hole" />CUT HOLE</button>
+            <button style={OP_BTN} onClick={() => bus.emit("shape:hole-done", {})}>CANCEL</button>
+          </div>
+          {note}
+        </div>
+      )}
+      {holes.length > 0 && <div data-help="help-hole" style={{ ...LABEL, marginBottom: 0 }}>HOLES IN THIS BRUSH</div>}
+      {holes.map((h, n) => {
+        const isOpen = mine && st.holeId === h.id;
+        const moving = isOpen && st.mode === "placing";
+        return (
+          <div key={h.id} onMouseEnter={() => { hover(h.id); setHovRow(h.id); }} onMouseLeave={() => { hover(null); setHovRow(null); }}
+            style={{
+              border: `1px solid ${hovRow === h.id ? "rgba(255,176,32,0.8)" : isOpen ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
+              background: isOpen ? "rgba(60,207,145,0.07)" : "transparent", padding: "5px 8px", display: "flex", flexDirection: "column", gap: 6,
+            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ flex: 1, color: isOpen ? "#7fe0b5" : "#dde3f0", fontSize: 11, fontFamily: "monospace" }}>
+                Hole {n + 1} · {desc(h)}{h.edited ? " · edited by hand" : ""}
+              </span>
+              {!isOpen && <button data-help="help-hole" style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} onClick={() => bus.emit("shape:hole-open", { ...ids, holeId: h.id })}>EDIT</button>}
+            </div>
+            {isOpen && (
+              <>
+                {h.edited ? (
+                  <div style={{ color: "#c2cadb", fontSize: 10, lineHeight: 1.4 }}>
+                    Its corners were moved by hand, so its settings can't rebuild it. FILL still closes it.
+                  </div>
+                ) : <HoleSettings st={st} bus={bus} />}
+                {moving && <div style={{ color: "#ffc58a", fontSize: 10, lineHeight: 1.4 }}>Click the face to put the hole somewhere else, then MOVE HERE.</div>}
+                <div style={{ display: "flex", gap: 4 }}>
+                  {moving ? (<>
+                    <button style={st.note ? OP_BTN_OFF : OP_BTN} disabled={!!st.note} onClick={() => bus.emit("shape:hole-cut", {})}>MOVE HERE</button>
+                    <button style={OP_BTN} onClick={() => bus.emit("shape:hole-done", {})}>CANCEL</button>
+                  </>) : (<>
+                    {!h.edited && <button data-help="help-hole" style={OP_BTN} title="Bring the ghost back to move this hole with the mouse"
+                      onClick={() => bus.emit("shape:hole-start", { ...ids, holeId: h.id })}>PLACE</button>}
+                    <button data-help="help-hole" style={OP_BTN} title="Close the hole: put the faces back as they were"
+                      onClick={() => bus.emit("shape:hole-fill", { ...ids, holeId: h.id })}>FILL</button>
+                    <button style={OP_BTN} onClick={() => bus.emit("shape:hole-done", {})}>DONE</button>
+                  </>)}
+                </div>
+                {note}
+              </>
+            )}
+          </div>
+        );
+      })}
+      {!placing && !holes.some(h => mine && st.holeId === h.id) && note}
     </div>
   );
 }

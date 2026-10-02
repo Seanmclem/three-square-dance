@@ -5,7 +5,7 @@
  */
 export type BrushOpIconName =
   | "split-h" | "split-v" | "loop-h" | "loop-v" | "inset" | "extrude" | "recess" | "fold"
-  | "split-edge" | "loop-cut-edge" | "select-loop" | "around-face" | "select-ring" | "face-loop-h" | "face-loop-v" | "round" | "dissolve" | "dissolve-loop";
+  | "split-edge" | "loop-cut-edge" | "select-loop" | "around-face" | "select-ring" | "face-loop-h" | "face-loop-v" | "round" | "dissolve" | "dissolve-loop" | "hole";
 
 export function BrushOpIcon({ name, size = 14 }: { name: BrushOpIconName; size?: number }) {
   const s = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -16,6 +16,7 @@ export function BrushOpIcon({ name, size = 14 }: { name: BrushOpIconName; size?:
       case "split-v":  return <>{box}<line x1="8" y1="2.5" x2="8" y2="13.5" {...s} strokeWidth="2" /></>;
       case "loop-h":   return <><rect x="3.5" y="1.5" width="9" height="13" rx="1.5" {...s} opacity="0.55" /><ellipse cx="8" cy="8" rx="6.5" ry="2.2" {...s} strokeWidth="1.8" /></>;
       case "loop-v":   return <><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" {...s} opacity="0.55" /><ellipse cx="8" cy="8" rx="2.2" ry="6.5" {...s} strokeWidth="1.8" /></>;
+      case "hole":     return <>{box}<circle cx="8" cy="8" r="3.2" {...s} strokeWidth="1.8" /><path d="M5.6 10.4 10.4 5.6" {...s} opacity="0.55" /></>;
       case "inset":    return <>{box}<rect x="5.5" y="5.5" width="5" height="5" rx="0.5" {...s} strokeWidth="1.8" /></>;
       case "extrude":  return <><rect x="2.5" y="8.5" width="11" height="5" rx="1" {...s} opacity="0.55" /><path d="M8 8.5V2M5.5 4.5 8 2l2.5 2.5" {...s} strokeWidth="1.8" /></>;
       case "recess":   return <><path d="M2.5 5.5h3v5h5v-5h3v8h-11z" {...s} opacity="0.55" /><path d="M8 1.5v6M5.5 5 8 7.5 10.5 5" {...s} strokeWidth="1.8" /></>;
