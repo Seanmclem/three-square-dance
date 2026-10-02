@@ -82,7 +82,8 @@ export class BrushRoundController implements IEditorModule {
   }
 
   private _openRound(zoneId: string, shapeId: string, id: string): void {
-    if (this._open?.shapeId === shapeId && this._open.id === id) return;
+    // Already open: just say so again (EDIT from a panel that missed the state).
+    if (this._open?.shapeId === shapeId && this._open.id === id) { this._emit(); return; }
     this._open = { zoneId, shapeId, id, key: `round:${shapeId}:${id}:${Date.now()}` };
     this._note = null;
     this._emit();

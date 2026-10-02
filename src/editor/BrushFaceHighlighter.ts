@@ -200,7 +200,11 @@ export class BrushFaceHighlighter implements IEditorModule {
     for (const g of [this._green.round, this._green.hover]) {
       if (!g) continue;
       for (const faceIndex of g.faces) {
-        const m = this._buildOverlay({ zoneId: g.zoneId, shapeId: g.shapeId, faceIndex }, g === this._green.hover ? HOVER_OPACITY : 0.4, false, 0x3ccf91);
+        // Hovered CURVES row: bright amber over everything, so it stands out from the
+        // open curve's green (v4.104.2; it was the same green at nearly the same strength).
+        const hover = g === this._green.hover;
+        const m = this._buildOverlay({ zoneId: g.zoneId, shapeId: g.shapeId, faceIndex }, hover ? 0.7 : 0.4, false, hover ? 0xffb020 : 0x3ccf91);
+        if (m && hover) { (m.material as THREE.Material).depthTest = false; m.renderOrder = 6; }
         if (m) this._greenOverlays.push(m);
       }
     }

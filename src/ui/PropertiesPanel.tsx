@@ -576,6 +576,10 @@ export function PropertiesPanel({
   brushBackground = DEFAULT_BRUSH_BACKGROUND, onBrushBackgroundChange, skyboxes = [],
 }: PropertiesPanelProps) {
   const [stack, setStack]           = useState<ScreenId[]>([]);
+  // v4.104.2: keep the open-curve state current even while no curves list is on screen
+  // (a click on a curve often opens the Geometry screen in the same moment, and the list
+  // that mounts then reads this; before, it showed the curve closed).
+  useEffect(() => bus?.on("shape:round-state", s => { roundStateNow = s; }), [bus]);
   const [actionsOpen, setActionsOpen] = useState(true);
   const { width: panelW, handle: resizeHandle } = useRightPanelWidth();
   const [groupsOpen, setGroupsOpen]   = useState(false);
@@ -3376,6 +3380,7 @@ function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus
 function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload; shape: ShapeDef; bus: EventBus }) {
   const st = useRoundState(bus);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [hovRow, setHovRow] = useState<string | null>(null);   // amber like its faces in the view
   const [clip, setClip] = useState(roundClipboard);
   const rounds = shape.mesh?.faces ? roundsOf(shape.mesh) : [];
   const open = st.open && st.shapeId === selected.id ? rounds.find(r => r.id === st.roundId) : undefined;
@@ -3403,9 +3408,9 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
       {rounds.map((r, n) => {
         const isOpen = open?.id === r.id;
         return (
-          <div key={r.id} onMouseEnter={() => hover(r.faces)} onMouseLeave={() => hover(null)}
+          <div key={r.id} onMouseEnter={() => { hover(r.faces); setHovRow(r.id); }} onMouseLeave={() => { hover(null); setHovRow(null); }}
             style={{
-              border: `1px solid ${isOpen ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
+              border: `1px solid ${hovRow === r.id ? "rgba(255,176,32,0.8)" : isOpen ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
               background: isOpen ? "rgba(60,207,145,0.07)" : "transparent", padding: "5px 8px", display: "flex", flexDirection: "column", gap: 6,
             }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
