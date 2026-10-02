@@ -18,7 +18,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, roundsOf, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -2801,6 +2801,24 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
 // (they're tool settings, not per-face data), so they sit at module level.
 let faceGizmoModeNow: "move" | "push" = "move";
 let extrudeDistNow = 0.25;
+// v4.103.0: OUTER WALLS KEEP (walls all round, as before) / FOLLOW (faces at an angle are
+// cut back or stretched with the face; see followRegion). Covers EXTRUDE, RECESS and PUSH.
+let outerWallsFollowNow = false;
+
+function OuterWallsRow({ bus }: { bus?: EventBus }) {
+  const [follow, setFollow] = useState(outerWallsFollowNow);
+  const pick = (f: boolean) => { outerWallsFollowNow = f; setFollow(f); bus?.emit("shape:outer-walls", { follow: f }); };
+  const on = { background: "rgba(80,140,255,0.2)", color: "#9dbdff", borderColor: "rgba(80,140,255,0.5)" };
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <span style={{ ...LABEL, marginBottom: 0, width: 92 }}>OUTER WALLS</span>
+      <button style={{ ...OP_BTN, ...(!follow ? on : {}) }} onClick={() => pick(false)}
+        title="EXTRUDE / RECESS / PUSH add walls all round the face; the sides around it stay where they are">KEEP</button>
+      <button style={{ ...OP_BTN, ...(follow ? on : {}) }} onClick={() => pick(true)}
+        title="Sides at an angle to the face (a top, a bottom, an outer side) are cut back or stretched with it; walls only where it meets the rest of its own flat side">FOLLOW</button>
+    </div>
+  );
+}
 
 /** GIZMO MOVE / PUSH switch + the last PUSH result (shape:face-push-done). */
 function FaceGizmoModeRow({ bus }: { bus?: EventBus }) {
@@ -2909,16 +2927,17 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
           title="Inset the selection as one region: a 0.25 m border round its outside, none between the faces">
           <BrushOpIcon name="inset" />INSET
         </button>
-        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, extrudeDistNow))}
+        <button style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, extrudeDistNow))}
           title="Push the selection out (by DIST) as one piece, adding side walls; the faces grow to stay joined">
           <BrushOpIcon name="extrude" />EXTRUDE
         </button>
-        <button style={OP_BTN} onClick={() => run(extrudeRegion(shape.mesh!, members, -extrudeDistNow))}
+        <button style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, -extrudeDistNow))}
           title="Push the selection in (by DIST) as one piece, adding side walls; the faces shrink to stay joined">
           <BrushOpIcon name="recess" />RECESS
         </button>
       </div>
       <ExtrudeDistField />
+      <OuterWallsRow bus={bus} />
       <FaceGizmoModeRow bus={bus} />
       <div style={{ display: "flex", gap: 4 }}>
         <button style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
@@ -2973,6 +2992,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
 }) {
   // Loop cut result line; the row remounts per selected face, so it clears itself.
   const [loopNote, setLoopNote] = useState<{ text: string; ringVerts: number[] } | null>(null);
+  const [wallNote, setWallNote] = useState<string | null>(null);   // FOLLOW refusals
   const face = shape.mesh!.faces![faceIndex];
   if (!face) return null;
   // Four REAL corners: straight-through verts left on an edge by a neighbor's
@@ -3001,8 +3021,14 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     onObjectUpdate({ mesh: result } as unknown as Partial<WorldObject>);
   };
   const split = (pair: 0 | 1) => run(splitFaceQuad(shape.mesh!, faceIndex, pair));
-  const extrude = () => run(extrudeFace(shape.mesh!, faceIndex, extrudeDistNow));
-  const recess  = () => run(extrudeFace(shape.mesh!, faceIndex, -extrudeDistNow));
+  const push = (d: number) => {
+    setWallNote(null);
+    if (!outerWallsFollowNow) { run(extrudeFace(shape.mesh!, faceIndex, d)); return; }
+    const r = followRegion(shape.mesh!, [faceIndex], d);
+    if ("refused" in r) setWallNote(r.refused); else run(r.mesh);
+  };
+  const extrude = () => push(extrudeDistNow);
+  const recess  = () => push(-extrudeDistNow);
   const inset   = () => run(insetFace(shape.mesh!, faceIndex, 0.25));
   // Flip which diagonal a bent quad folds along. Landing back on the automatic
   // choice drops the override, so later vertex moves re-pick it.
@@ -3076,6 +3102,8 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
         </button>
       </div>
       <ExtrudeDistField />
+      <OuterWallsRow bus={bus} />
+      {wallNote && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{wallNote}</div>}
       <FaceGizmoModeRow bus={bus} />
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>

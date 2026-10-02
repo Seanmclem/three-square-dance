@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-import { facesFromCloud, loopCutRing, offsetRegion } from "@/editor/brushOps";
+import { facesFromCloud, loopCutRing, offsetRegion, followRegion } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
@@ -42,6 +42,7 @@ export class BrushFaceEditor implements IEditorModule {
   private _pushRefused: string | null = null;
   private _pushHandle: THREE.Mesh | null = null;
   private _pushing = false;
+  private _follow = false;   // OUTER WALLS FOLLOW (v4.103.0): PUSH uses followRegion
   private readonly _ray = new THREE.Raycaster();
   private _previewing = false;
   private _suspended = false;
@@ -134,6 +135,7 @@ export class BrushFaceEditor implements IEditorModule {
         const ring = rings[0]!.length >= rings[1]!.length ? rings[0]! : rings[1]!;
         if (ring.length > 1) this._bus.emit("shape:sub-select", { zoneId: this._zoneId!, shapeId: this._selectedId!, faceIndex: this._faceIndex, vertexIndex: null, faceSet: ring });
       }),
+      this._bus.on("shape:outer-walls", ({ follow }) => { this._follow = follow; }),
       this._bus.on("shape:face-gizmo-mode", ({ mode }) => {
         if (mode === this._mode) return;
         this._mode = mode;
@@ -324,15 +326,21 @@ export class BrushFaceEditor implements IEditorModule {
     dist = this._snapOn ? Math.round(dist / PUSH_SNAP) * PUSH_SNAP : Math.round(dist * 1000) / 1000;
     if (dist === this._pushDist && !this._pushRefused && !force) return;
     const set = this._faceSet.length ? this._faceSet : [this._faceIndex!];
-    const r = dist === 0 ? { mesh: this._origMesh } : offsetRegion(this._origMesh, set, dist);
+    // OUTER WALLS FOLLOW (v4.103.0): step walls toward the flat side, angled sides follow.
+    const r = dist === 0 ? { mesh: this._origMesh } : (this._follow ? followRegion : offsetRegion)(this._origMesh, set, dist);
     if ("refused" in r) { this._pushRefused = r.refused; return; }
     this._pushRefused = null;
     this._pushDist = dist;
     const shape = this._shape();
     if (!shape) return;
+    if (r.mesh.vertices.length !== this._origMesh.vertices.length) {
+      // FOLLOW added corners and faces: write the whole mesh (soft falloff needs a fixed corner list).
+      this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices: r.mesh.vertices, faces: r.mesh.faces } });
+      return;
+    }
     const sources = [...new Set(set.flatMap(i => this._origMesh!.faces[i]?.verts ?? []))];
     const vertices = applySoft(this._bus, shape, this._origMesh.vertices, r.mesh.vertices, sources, this._origMesh.faces);
-    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices } });
+    this._world.updateShape(this._zoneId, this._selectedId, { mesh: { ...shape.mesh!, vertices, faces: r.mesh.faces } });
   }
 
   private _cancelDrag(): void {

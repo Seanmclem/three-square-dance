@@ -1511,3 +1511,89 @@ export function wrapUVOffsets(mesh: { vertices: Vec3[]; faces: BrushFace[] }, gr
   }
   return out;
 }
+
+// ── Outer walls follow (v4.103.0) ────────────────────────────────────────────
+
+/**
+ * EXTRUDE / RECESS / PUSH with OUTER WALLS: FOLLOW. The face set moves `dist` along its
+ * normals (regionOffsets, as EXTRUDE does). For each boundary edge of the set, the face
+ * on the other side decides: a face in the same flat side (coplanar with the set face it
+ * borders) stays and gets a step wall, as EXTRUDE / RECESS do; a face at an angle (a
+ * top, a bottom, an outer side) gets no wall and follows instead: its corners on that
+ * edge move with the set, so it is cut back (or stretched out). A corner touching a step
+ * wall is duplicated (the original stays for the flat side, its copy moves); every other
+ * set corner just moves. Refused when a face would turn inside out or validateMesh fails.
+ */
+export function followRegion(mesh: ShapeBrushMesh, set: number[], dist: number): RegionOpResult {
+  const faces0 = mesh.faces;
+  if (!faces0?.length || !set.length || !Number.isFinite(dist) || dist === 0) return { refused: "nothing to move" };
+  const offsets = regionOffsets(mesh, set, dist);
+  if (!offsets) return { refused: "a corner where the selected faces fold back on each other" };
+  const inSet = new Set(set);
+  const vertices = mesh.vertices.map(v => ({ ...v }));
+  const key = (a: number, b: number) => a < b ? `${a}|${b}` : `${b}|${a}`;
+  const normals = faces0.map(f => newellNormal(mesh.vertices, f.verts));
+
+  // Boundary edges: set face → the outside face across each edge.
+  const owner = new Map<string, number[]>();
+  faces0.forEach((f, fi) => f.verts.forEach((a, k) => {
+    const b = f.verts[(k + 1) % f.verts.length]!;
+    owner.set(key(a, b), [...(owner.get(key(a, b)) ?? []), fi]);
+  }));
+  const walls: Array<{ p: number; q: number; src: BrushFace }> = [];   // p→q in the set face
+  const followEdge = new Set<string>();   // boundary edges whose outside face follows
+  const dup = new Set<number>();
+  for (const fi of set) {
+    const f = faces0[fi]!;
+    f.verts.forEach((p, k) => {
+      const q = f.verts[(k + 1) % f.verts.length]!;
+      const other = owner.get(key(p, q))!.find(g => g !== fi);
+      if (other === undefined || inSet.has(other)) return;
+      if (normals[other]!.dot(normals[fi]!) > 0.999) { walls.push({ p, q, src: f }); dup.add(p); dup.add(q); }
+      else followEdge.add(key(p, q));
+    });
+  }
+
+  // Moved position of every set corner: a copy where it meets a step wall, else in place.
+  const moved = new Map<number, number>();
+  for (const [v, o] of offsets) {
+    const w = vertices[v]!;
+    const p = { x: +(w.x + o.x).toFixed(4), y: +(w.y + o.y).toFixed(4), z: +(w.z + o.z).toFixed(4) };
+    if (dup.has(v)) { vertices.push(p); moved.set(v, vertices.length - 1); }
+    else { vertices[v] = p; moved.set(v, v); }
+  }
+  const mv = (v: number) => moved.get(v) ?? v;
+
+  const faces: BrushFace[] = faces0.map((f, fi) => {
+    if (inSet.has(fi)) return { ...f, verts: f.verts.map(mv) };
+    // An outside face: an edge it shares with the set (a follow edge) uses the moved
+    // corners, its other edges the originals; a duplicated corner between the two kinds
+    // of edge appears twice (original, then copy, or the reverse).
+    const L = f.verts.length, out: number[] = [];
+    for (let i = 0; i < L; i++) {
+      const x = f.verts[i]!, prev = f.verts[(i + L - 1) % L]!, next = f.verts[(i + 1) % L]!;
+      const xin = followEdge.has(key(prev, x)) ? mv(x) : x;
+      const xout = followEdge.has(key(x, next)) ? mv(x) : x;
+      if (out[out.length - 1] !== xin) out.push(xin);
+      if (xout !== xin) out.push(xout);
+    }
+    while (out.length > 1 && out[0] === out[out.length - 1]) out.pop();
+    return { ...f, verts: out };
+  });
+  for (const { p, q, src } of walls) {
+    faces.push({
+      verts: [p, q, mv(q), mv(p)],   // same sign-agnostic winding as extrudeFace
+      material: src.material,
+      materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
+    });
+  }
+  // No face may turn inside out (e.g. a top cut back past its far side).
+  for (let fi = 0; fi < faces0.length; fi++) {
+    const n1 = newellNormal(vertices, faces[fi]!.verts);
+    if (n1.lengthSq() < 1e-8 || n1.dot(normals[fi]!) <= 0) return { refused: `${dist < 0 ? "RECESS" : "EXTRUDE"} would turn faces inside out; nothing changed.` };
+  }
+  const out = { vertices, faces: faces.map(f => (f.fold !== undefined && f.verts.length !== 4) ? (({ fold: _f, ...rest }) => rest)(f) : f) };
+  const err = validateMesh(out);
+  if (err) return { refused: `${dist < 0 ? "RECESS" : "EXTRUDE"} would break the brush (${err}); nothing changed.` };
+  return { mesh: out };
+}

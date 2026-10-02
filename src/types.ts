@@ -287,6 +287,7 @@ export interface BusEvents {
   // Panel face-row hover → canvas overlay (wall:segment-hover idiom; null clears).
   "shape:face-hover":      { zoneId: string; shapeId: string; faceIndex: number | null };
   // LOOP CUT button hover → canvas ring preview (Phase 79; null start clears).
+  "shape:outer-walls":     { follow: boolean };   // v4.103.0: OUTER WALLS KEEP / FOLLOW (EXTRUDE, RECESS, PUSH)
   "spawn:suppress":        { suppressed: boolean };   // v4.102.2: hide the spawn marker in Edit Brush / prefab edit
   "shape:loop-preview":    { zoneId: string; shapeId: string; start: LoopCutStart | null; single?: boolean };   // single: SPLIT H / V (just that face, v4.102.2)
   "tool:placed":           { type: EditorObjectType; id: string; zoneId: string };

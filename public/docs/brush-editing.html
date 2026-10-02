@@ -164,6 +164,7 @@
   <li>The gizmo moves every selected face together. SPLIT, LOOP CUT and FLIP FOLD work on one face at a time.</li>
   <li><strong>GIZMO: MOVE / PUSH.</strong> MOVE slides the selection one way with the arrows. PUSH swaps them for a green cube: drag it right or up to push every selected face out along its own direction, left or down to pull them in (0.05 m steps, <kbd>Alt</kbd> for free). The panel says how far it went, or where it stopped if going further would turn faces inside out.</li>
   <li><strong>EXTRUDE / RECESS DIST</strong> sets how far those two buttons go (0.25 m by default), for one face or many.</li>
+  <li><strong>OUTER WALLS: KEEP / FOLLOW</strong> (for EXTRUDE, RECESS and PUSH, one face or many). KEEP adds walls all round the face, as before. FOLLOW gives walls only where the face meets the rest of its own flat side; a top, bottom or outer side at an angle to it is cut back (or stretched out) with it instead. Split a cube's front in two, pick the right half, FOLLOW + RECESS 1 m: the whole corner steps back into an L, with no paper-thin skin over a pocket. Drawings: <a href="https://claude.ai/artifact/NGEHQ3PuqJ9eb1nFJui2w9" target="_blank" rel="noreferrer">Recess Through Outer Walls</a>.</li>
 </ul>
 
 <h2 id="soft">Soft falloff: smooth bulges and hills</h2>
