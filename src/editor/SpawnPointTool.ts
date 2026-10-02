@@ -6,6 +6,7 @@ export class SpawnPointTool {
   private _marker:  THREE.Object3D | null = null;
   private _active   = false;
   private _mode: "initial" | "checkpoint" = "initial";  // Spawn-tool sub-mode (popover)
+  private _suppressed = false;   // v4.102.2: isolated edit (Edit Brush / prefab): no marker, no placing
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -20,8 +21,9 @@ export class SpawnPointTool {
         this._active = (tool === "spawnpoint");
       }),
       this._bus.on("spawn:mode", ({ mode }) => { this._mode = mode; }),
+      this._bus.on("spawn:suppress", ({ suppressed }) => { this._suppressed = suppressed; this._applySuppressed(); }),
       this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
-        if (!this._active || this._mode !== "initial" || button !== 0) return;
+        if (!this._active || this._mode !== "initial" || button !== 0 || this._suppressed) return;
         // Prefer the real surface hit so the marker lands on top of a floor/platform
         // instead of falling through to the y=0 ground plane underneath it.
         const p = surfacePos ?? worldPos;
@@ -106,12 +108,20 @@ export class SpawnPointTool {
 
     this._scene.add(group);
     this._marker = group;
+    this._applySuppressed();
 
     if (persist) {
       this._world.transaction(label, () => {
         this._world.setDefaultSpawn({ position: { x, y, z }, facingDeg });
       });
     }
+  }
+
+  /** Out of the scene (so it can't be seen or clicked) while an isolated edit is open. */
+  private _applySuppressed(): void {
+    if (!this._marker) return;
+    if (this._suppressed) this._scene.remove(this._marker);
+    else if (!this._marker.parent) this._scene.add(this._marker);
   }
 
   private _removeMarker(): void {

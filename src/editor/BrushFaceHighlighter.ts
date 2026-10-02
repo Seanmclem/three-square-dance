@@ -30,7 +30,7 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _edgeLines: THREE.LineSegments | null = null;
   private _edgeTubes: THREE.Mesh[] = [];
   private _edgeSet: Array<[number, number]> = [];   // Phase 83: the rest of the edge set
-  private _loop: { zoneId: string; shapeId: string; start: LoopCutStart } | null = null;
+  private _loop: { zoneId: string; shapeId: string; start: LoopCutStart; single?: boolean } | null = null;
   private _loopObj:   THREE.Group | null = null;
   private _vset: { zoneId: string; shapeId: string; verts: number[] } | null = null;   // Phase 80
   private _setLines:  THREE.LineSegments | null = null;
@@ -72,8 +72,8 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._refresh();
         this._refreshLoop();
       }),
-      this._bus.on("shape:loop-preview", ({ zoneId, shapeId, start }) => {
-        this._loop = start ? { zoneId, shapeId, start } : null;
+      this._bus.on("shape:loop-preview", ({ zoneId, shapeId, start, single }) => {
+        this._loop = start ? { zoneId, shapeId, start, single } : null;
         this._refreshLoop();
       }),
       this._bus.on("shape:faces-highlight", ({ zoneId, shapeId, faces, channel }) => {
@@ -141,7 +141,8 @@ export class BrushFaceHighlighter implements IEditorModule {
 
     const verts = shape.mesh.vertices;
     const pos: number[] = [];
-    for (const f of ring.faces) {
+    // SPLIT H / V preview (single): just the first face of the ring, no stop dots.
+    for (const f of t.single ? ring.faces.slice(0, 1) : ring.faces) {
       const n = newellNormal(verts, shape.mesh.faces[f.faceIdx]!.verts);
       for (const [p, q] of f.rails) {
         const a = verts[p]!, b = verts[q]!;
@@ -157,7 +158,7 @@ export class BrushFaceHighlighter implements IEditorModule {
     lines.computeLineDistances();
     lines.renderOrder = 4;
     group.add(lines);
-    for (const stop of ring.stops) {
+    for (const stop of t.single ? [] : ring.stops) {
       const dot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8),
         new THREE.MeshBasicMaterial({ color: 0xff5a5a, depthTest: false, transparent: true }));
       dot.position.set(stop.at.x, stop.at.y, stop.at.z);

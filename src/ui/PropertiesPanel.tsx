@@ -3021,8 +3021,8 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     onObjectUpdate({ mesh: r.mesh } as unknown as Partial<WorldObject>);
     setLoopNote({ text: describeLoopCut(r.ring), ringVerts: r.ringVerts });
   };
-  const preview = (pair: 0 | 1 | null) => bus?.emit("shape:loop-preview", {
-    zoneId: selected.zoneId, shapeId: selected.id, start: pair === null ? null : { faceIdx: faceIndex, pair },
+  const preview = (pair: 0 | 1 | null, single = false) => bus?.emit("shape:loop-preview", {
+    zoneId: selected.zoneId, shapeId: selected.id, start: pair === null ? null : { faceIdx: faceIndex, pair }, single,
   });
   const loopTitle = "Split this face and keep going around the shape, until the ring comes back round or reaches a face that isn't four-sided";
 
@@ -3030,11 +3030,13 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={{ display: "flex", gap: 4 }}>
         <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
-          onClick={() => split(pair0IsH ? 0 : 1)} title="Split this face in two with a horizontal cut">
+          onClick={() => { preview(null); split(pair0IsH ? 0 : 1); }} title="Split this face in two with a horizontal cut (hover to see where)"
+          onMouseEnter={() => isQuad && preview(pair0IsH ? 0 : 1, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-h" />SPLIT H
         </button>
         <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
-          onClick={() => split(pair0IsH ? 1 : 0)} title="Split this face in two with a vertical cut">
+          onClick={() => { preview(null); split(pair0IsH ? 1 : 0); }} title="Split this face in two with a vertical cut (hover to see where)"
+          onMouseEnter={() => isQuad && preview(pair0IsH ? 1 : 0, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-v" />SPLIT V
         </button>
         <button style={OP_BTN} onClick={inset}

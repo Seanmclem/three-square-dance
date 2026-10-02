@@ -352,6 +352,8 @@ export default function App() {
     try { localStorage.setItem(BRUSH_BG_KEY, json); } catch { /* storage blocked */ }
     void desktop()?.setPref(BRUSH_BG_KEY, json);
   };
+  // v4.102.2: the level's spawn marker (and its right-click move) stay out of isolated edits.
+  useEffect(() => { busRef.current.emit("spawn:suppress", { suppressed: !!editingBrush || !!editingPrefab }); }, [editingBrush, editingPrefab]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
@@ -4351,7 +4353,7 @@ export default function App() {
 
       {isPreview && showPerfCounter && <FpsCounter getInfo={getRenderInfo} />}
       {isPreview && showJumpStats && <JumpReadout bus={busRef.current} />}
-      <ViewportContextMenu bus={busRef.current} enabled={!isPreview && isSelectMode(activeTool)}
+      <ViewportContextMenu bus={busRef.current} enabled={!isPreview && isSelectMode(activeTool) && !editingBrush && !editingPrefab}
         hasSpawn={!!worldRef.current?.world?.defaultSpawn} />
 
       {!isGame && (
