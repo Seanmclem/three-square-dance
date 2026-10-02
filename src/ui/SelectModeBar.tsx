@@ -44,7 +44,7 @@ export function SelectModeBar({ activeTool, onSelect, showLabels = true }: {
       {MODES.map(m => {
         const on = activeTool === m.tool;
         return (
-          <button key={m.tool} onClick={() => onSelect(m.tool)} title={`${m.label} select (${m.key})`}
+          <button data-help="help-modes" key={m.tool} onClick={() => onSelect(m.tool)} title={`${m.label} select (${m.key})`}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: showLabels ? "4px 10px" : "5px 7px", borderRadius: 5, cursor: "pointer",

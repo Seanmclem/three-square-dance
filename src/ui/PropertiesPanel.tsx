@@ -1236,7 +1236,7 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
           {/* Brush shortcuts (v4.99.5), the same as the Geometry screen's BRUSH buttons. */}
           {selected.type === "shape" && selected.data && (isBrush(selected.data as ShapeDef)
             ? onEditBrush && (
-              <button
+              <button data-help="help-edit-brush"
                 onClick={onEditBrush}
                 title="Open this brush alone in Edit Brush (face / corner / edge modes)"
                 style={{
@@ -1247,7 +1247,7 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
               >Edit Brush</button>
             )
             : (
-              <button
+              <button data-help="help-convert"
                 onClick={() => onObjectUpdate({ mesh: brushMeshFromShape(selected.data as ShapeDef) } as unknown as Partial<WorldObject>)}
                 title="Bake the shape's corners into an editable brush; its size params stop applying"
                 style={{
@@ -2416,7 +2416,7 @@ function BrushViewScreen({ background, onChange, skyboxes }: {
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
         <div style={LABEL}>BACKGROUND</div>
-        <select value={value} style={{ ...NUM_INPUT, width: "100%" }}
+        <select data-help="help-brush-view" value={value} style={{ ...NUM_INPUT, width: "100%" }}
           onChange={e => onChange(e.target.value === "__color"
             ? { kind: "color", color: lastColor }
             : { kind: "skybox", skyboxId: e.target.value })}>
@@ -2582,7 +2582,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
         <div style={LABEL}>BRUSH</div>
         {!brush ? (
           <>
-            <button style={SHAPE_ACTION_BTN} onClick={convertToBrush}>Convert to Brush</button>
+            <button data-help="help-convert" style={SHAPE_ACTION_BTN} onClick={convertToBrush}>Convert to Brush</button>
             <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, lineHeight: 1.4 }}>
               Bakes the {shape.kind}'s corners into an editable convex solid. Params above
               stop applying; drag corners instead.
@@ -2595,7 +2595,7 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
             </div>
             {onEditBrush && (
               <>
-                <button style={{ ...SHAPE_ACTION_BTN, color: "#f0c060", borderColor: "rgba(240,180,60,0.5)" }} onClick={onEditBrush}>Edit Brush</button>
+                <button data-help="help-edit-brush" style={{ ...SHAPE_ACTION_BTN, color: "#f0c060", borderColor: "rgba(240,180,60,0.5)" }} onClick={onEditBrush}>Edit Brush</button>
                 <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 4, marginBottom: 8, lineHeight: 1.4 }}>
                   Opens this brush alone at the origin (like prefab edit). Face / corner /
                   edge modes (1-4) work there too; Save writes the shape back.
@@ -2681,11 +2681,11 @@ function SoftFalloffRow({ bus }: { bus: EventBus }) {
   return (
     <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button style={seg(s.on)} title="Nearby corners follow a drag part of the way (O)" onClick={() => setSoftSettings(bus, { on: !s.on })}>
+        <button data-help="help-soft" style={seg(s.on)} title="Nearby corners follow a drag part of the way (O)" onClick={() => setSoftSettings(bus, { on: !s.on })}>
           SOFT {s.on ? "ON" : "OFF"}
         </button>
         <span style={{ ...LABEL, marginBottom: 0 }}>RADIUS</span>
-        <input type="number" step={0.25} min={0.25} value={draft} disabled={!s.on}
+        <input data-help="help-soft" type="number" step={0.25} min={0.25} value={draft} disabled={!s.on}
           style={{ ...NUM_INPUT, width: 64, padding: "2px 4px", opacity: s.on ? 1 : 0.5 }}
           onChange={e => setDraft(e.target.value)}
           onBlur={e => commitRadius(e.target.value)}
@@ -2698,7 +2698,7 @@ function SoftFalloffRow({ bus }: { bus: EventBus }) {
             <div style={{ ...LABEL, marginBottom: 4 }}>SLOPE</div>
             <div style={{ display: "flex", gap: 4 }}>
               {(["smooth", "linear", "sharp"] as const).map(c => (
-                <button key={c} style={seg(s.curve === c)} onClick={() => setSoftSettings(bus, { curve: c })}>
+                <button data-help="help-soft" key={c} style={seg(s.curve === c)} onClick={() => setSoftSettings(bus, { curve: c })}>
                   {c[0]!.toUpperCase() + c.slice(1)}
                 </button>
               ))}
@@ -2772,7 +2772,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
               <div style={{ padding: "4px 8px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
                 <div style={{ color: "#98a2b8", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <select value={f.material ?? "__inherit__"} onChange={e => commitMat(i, e.target.value)}
+                  <select data-help="help-face-material" value={f.material ?? "__inherit__"} onChange={e => commitMat(i, e.target.value)}
                     style={{ flex: 1, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
                     <option value="__inherit__">(shape material)</option>
                     {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -2812,9 +2812,9 @@ function OuterWallsRow({ bus }: { bus?: EventBus }) {
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
       <span style={{ ...LABEL, marginBottom: 0, width: 92 }}>OUTER WALLS</span>
-      <button style={{ ...OP_BTN, ...(!follow ? on : {}) }} onClick={() => pick(false)}
+      <button data-help="help-outer-walls" style={{ ...OP_BTN, ...(!follow ? on : {}) }} onClick={() => pick(false)}
         title="EXTRUDE / RECESS / PUSH add walls all round the face; the sides around it stay where they are">KEEP</button>
-      <button style={{ ...OP_BTN, ...(follow ? on : {}) }} onClick={() => pick(true)}
+      <button data-help="help-outer-walls" style={{ ...OP_BTN, ...(follow ? on : {}) }} onClick={() => pick(true)}
         title="Sides at an angle to the face (a top, a bottom, an outer side) are cut back or stretched with it; walls only where it meets the rest of its own flat side">FOLLOW</button>
     </div>
   );
@@ -2833,9 +2833,9 @@ function FaceGizmoModeRow({ bus }: { bus?: EventBus }) {
     <>
       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
         <span style={{ ...LABEL, marginBottom: 0, width: 44 }}>GIZMO</span>
-        <button style={{ ...OP_BTN, ...(mode === "move" ? on : {}) }} onClick={() => pick("move")}
+        <button data-help="help-push" style={{ ...OP_BTN, ...(mode === "move" ? on : {}) }} onClick={() => pick("move")}
           title="Drag the gizmo's arrows to slide the selected face(s) in one direction">MOVE</button>
-        <button style={{ ...OP_BTN, ...(mode === "push" ? on : {}) }} onClick={() => pick("push")}
+        <button data-help="help-push" style={{ ...OP_BTN, ...(mode === "push" ? on : {}) }} onClick={() => pick("push")}
           title="Drag the gizmo's centre box right / up to push every selected face out along its own direction, left / down to pull them in (snaps 0.05 m, Alt = free)">
           <BrushOpIcon name="extrude" />PUSH
         </button>
@@ -2851,7 +2851,7 @@ function ExtrudeDistField() {
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
       <span style={{ ...LABEL, marginBottom: 0 }}>EXTRUDE / RECESS DIST</span>
-      <input type="number" step={0.05} min={0.01} value={str}
+      <input data-help="help-dist" type="number" step={0.05} min={0.01} value={str}
         title="How far EXTRUDE and RECESS move the face(s), in meters"
         style={{ ...NUM_INPUT, width: 64, padding: "2px 4px", fontSize: 10 }}
         onChange={e => { setStr(e.target.value); const n = parseFloat(e.target.value); if (Number.isFinite(n) && n > 0) extrudeDistNow = n; }}
@@ -2908,7 +2908,7 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
     <div style={{ border: "1px solid rgba(80,140,255,0.5)", borderRadius: 5, background: "rgba(80,140,255,0.08)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
       <span style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace" }}>{members.length} FACES SELECTED</span>
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-        <select value={mats.size === 1 ? [...mats][0]! : "__mixed__"} onChange={e => commitMat(e.target.value)}
+        <select data-help="help-face-material" value={mats.size === 1 ? [...mats][0]! : "__mixed__"} onChange={e => commitMat(e.target.value)}
           title="Material for every selected face"
           style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#dde3f0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
           {mats.size > 1 && <option value="__mixed__">(mixed)</option>}
@@ -2923,15 +2923,15 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
         />
       </div>
       <div style={{ display: "flex", gap: 4 }}>
-        <button style={OP_BTN} onClick={() => run(insetRegion(shape.mesh!, members, 0.25))}
+        <button data-help="help-inset" style={OP_BTN} onClick={() => run(insetRegion(shape.mesh!, members, 0.25))}
           title="Inset the selection as one region: a 0.25 m border round its outside, none between the faces">
           <BrushOpIcon name="inset" />INSET
         </button>
-        <button style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, extrudeDistNow))}
+        <button data-help="help-extrude" style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, extrudeDistNow))}
           title="Push the selection out (by DIST) as one piece, adding side walls; the faces grow to stay joined">
           <BrushOpIcon name="extrude" />EXTRUDE
         </button>
-        <button style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, -extrudeDistNow))}
+        <button data-help="help-extrude" style={OP_BTN} onClick={() => run((outerWallsFollowNow ? followRegion : extrudeRegion)(shape.mesh!, members, -extrudeDistNow))}
           title="Push the selection in (by DIST) as one piece, adding side walls; the faces shrink to stay joined">
           <BrushOpIcon name="recess" />RECESS
         </button>
@@ -2940,10 +2940,10 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
       <OuterWallsRow bus={bus} />
       <FaceGizmoModeRow bus={bus} />
       <div style={{ display: "flex", gap: 4 }}>
-        <button style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
+        <button data-help="help-face-loop" style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
           <BrushOpIcon name="face-loop-h" />FACE LOOP H
         </button>
-        <button style={OP_BTN} onClick={() => selectLoop(1)} title="Select the other ring of faces through the active face">
+        <button data-help="help-face-loop" style={OP_BTN} onClick={() => selectLoop(1)} title="Select the other ring of faces through the active face">
           <BrushOpIcon name="face-loop-v" />FACE LOOP V
         </button>
       </div>
@@ -2961,7 +2961,7 @@ function LoopCutNote({ note, selected, bus }: {
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <span style={{ color: "#c2cadb", fontSize: 9, flex: 1 }}>{note.text}</span>
       {note.ringVerts.length > 1 && (
-        <button style={{ ...OP_BTN, flex: "none", padding: "3px 8px" }}
+        <button data-help="help-select-ring" style={{ ...OP_BTN, flex: "none", padding: "3px 8px" }}
           title="Select the new ring's corners, then move / rotate / scale them together"
           onClick={() => bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: note.ringVerts })}>
           <BrushOpIcon name="select-ring" />SELECT RING
@@ -3055,24 +3055,24 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={{ display: "flex", gap: 4 }}>
-        <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+        <button data-help="help-split" style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
           onClick={() => { preview(null); split(pair0IsH ? 0 : 1); }} title="Split this face in two with a horizontal cut (hover to see where)"
           onMouseEnter={() => isQuad && preview(pair0IsH ? 0 : 1, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-h" />SPLIT H
         </button>
-        <button style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+        <button data-help="help-split" style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
           onClick={() => { preview(null); split(pair0IsH ? 1 : 0); }} title="Split this face in two with a vertical cut (hover to see where)"
           onMouseEnter={() => isQuad && preview(pair0IsH ? 1 : 0, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-v" />SPLIT V
         </button>
-        <button style={OP_BTN} onClick={inset}
+        <button data-help="help-inset" style={OP_BTN} onClick={inset}
           title="Inset this face 0.25m — border ring + inner face, ready to extrude or recess">
           <BrushOpIcon name="inset" />INSET
         </button>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
         {([["LOOP CUT H", "loop-h", pair0IsH ? 0 : 1], ["LOOP CUT V", "loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
-          <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
+          <button data-help="help-loop-cut" key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
             onClick={() => { preview(null); loop(pair); }}
             onMouseEnter={() => isQuad && preview(pair)} onMouseLeave={() => preview(null)}>
             <BrushOpIcon name={icon} />{label}
@@ -3081,7 +3081,7 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
       </div>
       <div style={{ display: "flex", gap: 4 }}>
         {([["FACE LOOP H", "face-loop-h", pair0IsH ? 0 : 1], ["FACE LOOP V", "face-loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
-          <button key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+          <button data-help="help-face-loop" key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
             title="Select the ring of faces through this face (then EXTRUDE / RECESS / INSET or a material act on all of them)"
             onClick={() => { const ring = faceLoopOf(shape, faceIndex, pair); if (ring.length) bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex, vertexIndex: null, faceSet: ring }); }}>
             <BrushOpIcon name={icon} />{label}
@@ -3089,14 +3089,14 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
         ))}
       </div>
       <div style={{ display: "flex", gap: 4 }}>
-        <button style={OP_BTN} onClick={extrude} title="Extrude this face outward along its normal (by DIST)">
+        <button data-help="help-extrude" style={OP_BTN} onClick={extrude} title="Extrude this face outward along its normal (by DIST)">
           <BrushOpIcon name="extrude" />EXTRUDE
         </button>
-        <button style={OP_BTN} onClick={recess}
+        <button data-help="help-extrude" style={OP_BTN} onClick={recess}
           title="Extrude this face inward (by DIST) — carve a recess (inset first for a window/pit)">
           <BrushOpIcon name="recess" />RECESS
         </button>
-        <button style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
+        <button data-help="help-fold" style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
           title="This face is bent, so it creases along one diagonal (the dashed line). Flip it to the other diagonal.">
           <BrushOpIcon name="fold" />FLIP FOLD
         </button>
@@ -3192,7 +3192,7 @@ function FaceMaterialRow({ index, face, materialList, isSel, onHover, onPick, ti
         style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 10, fontFamily: "monospace", width: 52, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "left" }}>
         FACE {index + 1}
       </button>
-      <select value={face.material ?? "__inherit__"} onChange={e => onMat(e.target.value)}
+      <select data-help="help-face-material" value={face.material ?? "__inherit__"} onChange={e => onMat(e.target.value)}
         style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
         <option value="__inherit__">(shape material)</option>
         {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -3253,7 +3253,7 @@ function VerticesList({ selected, shape, bus, onObjectUpdate }: {
   return (
     <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 4 }}>
       {center && (
-        <div style={{ border: "1px solid rgba(0,255,255,0.4)", borderRadius: 5, background: "rgba(0,255,255,0.06)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
+        <div data-help="help-vertex-set" style={{ border: "1px solid rgba(0,255,255,0.4)", borderRadius: 5, background: "rgba(0,255,255,0.06)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
           <span style={{ color: "#7ff", fontSize: 11, fontFamily: "monospace" }}>{set.length} CORNERS SELECTED</span>
           <div style={{ display: "flex", gap: 4 }}>
             {([["translate", "MOVE", "T"], ["rotate", "ROTATE", "R"], ["scale", "SCALE", "S"]] as const).map(([mode, label, key]) => (
@@ -3354,7 +3354,7 @@ function RoundEdgesRow({ selected, bus }: { selected: SelectedObjectPayload; bus
         <input type="number" min={0.01} step={0.05} value={size} style={field} onChange={e => change("size", e.target.value)} />
         <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
       </div>
-      <button style={edges.length ? OP_BTN : OP_BTN_OFF} disabled={!edges.length}
+      <button data-help="help-round" style={edges.length ? OP_BTN : OP_BTN_OFF} disabled={!edges.length}
         onClick={() => bus.emit("shape:round-edges", { zoneId: selected.zoneId, shapeId: selected.id, edges, steps: roundStepsNow, size: roundSizeNow })}
         title="Round the selected edge(s) into a curve (Shift-click edges to round several at once)">
         <BrushOpIcon name="round" />ROUND{edges.length > 1 ? ` ${edges.length} EDGES` : edges.length ? " EDGE" : ""}
@@ -3399,7 +3399,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
     `${r.parts.length > 1 ? `${r.parts.length} edges · ` : ""}${r.steps === 1 ? "flat cut" : `${r.steps} steps`} · ${+r.size.toFixed(3)} m`;
   return (
     <div style={{ padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ ...LABEL, marginBottom: 0 }}>CURVES ON THIS BRUSH</div>
+      <div data-help="help-curves" style={{ ...LABEL, marginBottom: 0 }}>CURVES ON THIS BRUSH</div>
       {rounds.map((r, n) => {
         const isOpen = open?.id === r.id;
         return (
@@ -3412,8 +3412,8 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
               <span style={{ flex: 1, color: isOpen ? "#7fe0b5" : "#dde3f0", fontSize: 11, fontFamily: "monospace" }}>
                 Curve {n + 1} · {desc(r)}{r.edited ? " · edited by hand" : ""}
               </span>
-              {!isOpen && <button style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} onClick={() => bus.emit("shape:round-open", { ...ids, roundId: r.id })}>EDIT</button>}
-              <button style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} title="Copy / paste this curve's STEPS and SIZE"
+              {!isOpen && <button data-help="help-curves" style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} onClick={() => bus.emit("shape:round-open", { ...ids, roundId: r.id })}>EDIT</button>}
+              <button data-help="help-curves" style={{ ...OP_BTN, flex: "0 0 auto", padding: "4px 8px" }} title="Copy / paste this curve's STEPS and SIZE"
                 onClick={() => setMenuFor(m => m === r.id ? null : r.id)}>⋯</button>
             </div>
             {menuFor === r.id && (
@@ -3449,7 +3449,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
                   </div>
                 )}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <button style={OP_BTN} title="Remove the curve and put the sharp edge(s) back"
+                  <button data-help="help-curves" style={OP_BTN} title="Remove the curve and put the sharp edge(s) back"
                     onClick={() => bus.emit("shape:round-sharp", { ...ids, roundId: r.id })}>MAKE SHARP</button>
                   <button style={OP_BTN} onClick={() => bus.emit("shape:round-done", {})}>DONE</button>
                 </div>
@@ -3457,7 +3457,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ flex: 1, color: "#c2cadb", fontSize: 10 }}>Its {r.parts.length} edges change together.</span>
-                      <button style={OP_BTN} title="Make every edge of this curve its own curve"
+                      <button data-help="help-curves" style={OP_BTN} title="Make every edge of this curve its own curve"
                         onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id })}>SPLIT ALL</button>
                     </div>
                     {r.parts.map((part, k) => {
@@ -3466,7 +3466,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
                         <div key={part} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 8 }}
                           onMouseEnter={() => hover(faces)} onMouseLeave={() => hover(r.faces)}>
                           <span style={{ flex: 1, color: "#dde3f0", fontSize: 10, fontFamily: "monospace" }}>edge {k + 1}</span>
-                          <button style={OP_BTN} title="Make this edge its own curve"
+                          <button data-help="help-curves" style={OP_BTN} title="Make this edge its own curve"
                             onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id, part })}>SPLIT OFF</button>
                         </div>
                       );
@@ -3570,11 +3570,11 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
             ({a.x}, {a.y}, {a.z}) → ({b.x}, {b.y}, {b.z})
           </div>
           <div style={{ display: "flex", gap: 4 }}>
-            <button style={OP_BTN} onClick={doSplit}
+            <button data-help="help-split-edge" style={OP_BTN} onClick={doSplit}
               title="Insert a vertex at this edge's midpoint (both adjacent faces gain a corner)">
               <BrushOpIcon name="split-edge" />SPLIT EDGE
             </button>
-            <button style={canLoop ? OP_BTN : OP_BTN_OFF} disabled={!canLoop} onClick={doLoopCut}
+            <button data-help="help-edge-loop-cut" style={canLoop ? OP_BTN : OP_BTN_OFF} disabled={!canLoop} onClick={doLoopCut}
               title="Cut a new ring of edges around the shape, crossing this edge (stops at faces that aren't four-sided)"
               onMouseEnter={() => canLoop && bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: { edge: edge! } })}
               onMouseLeave={() => bus?.emit("shape:loop-preview", { zoneId: selected.zoneId, shapeId: selected.id, start: null })}>
@@ -3582,14 +3582,14 @@ function EdgesList({ selected, shape, bus, onObjectUpdate }: {
             </button>
           </div>
           {loopNote?.key === edgeKey && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
-          <button style={OP_BTN} onClick={selectLoop}
+          <button data-help="help-select-loop" style={OP_BTN} onClick={selectLoop}
             title="Select every corner along this edge's loop, going straight on through 4-way corners (or double-click an edge)">
             <BrushOpIcon name="select-loop" />SELECT LOOP
           </button>
           {around.length > 0 && (
             <div style={{ display: "flex", gap: 4 }}>
               {around.map(({ face, verts: ring }) => (
-                <button key={face} style={OP_BTN}
+                <button data-help="help-around-face" key={face} style={OP_BTN}
                   title={`Select the corners around the flat area of FACE ${face + 1} (hover to see it)`}
                   onClick={() => bus?.emit("shape:select-vertex-set", { zoneId: selected.zoneId, shapeId: selected.id, verts: ring })}
                   onMouseEnter={() => bus?.emit("shape:face-hover", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex: face })}

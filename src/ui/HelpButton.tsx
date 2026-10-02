@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DocViewerModal, type DocGuide } from "@/ui/DocViewerModal";
 
 interface ShortcutEntry { keys: string[]; action: string }
@@ -6,11 +6,17 @@ interface ShortcutEntry { keys: string[]; action: string }
  *  `guide`: an HTML guide in public/docs/, opened in DocViewerModal from the section header. */
 interface ShortcutSection { label: string; rows: ShortcutEntry[]; inBrushEditor?: boolean; guide?: DocGuide }
 
+// The guide file is the single source (v4.104.0); the old claude.ai copy had drifted.
 const BRUSH_GUIDE: DocGuide = {
   title: "Brush editing guide",
   src: "/docs/brush-editing.html",
-  externalUrl: "https://claude.ai/artifact/GSVFjgd2USHxAE5FjLUCF6",
 };
+
+/** Right-click help (v4.104.0): an element with data-help="<id>" (brush panel buttons)
+ *  opens the brush guide at that id. */
+function helpAnchorFrom(target: EventTarget | null): string | null {
+  return (target instanceof Element ? target.closest<HTMLElement>("[data-help]")?.dataset.help : null) ?? null;
+}
 
 const SECTIONS: ShortcutSection[] = [
   {
@@ -58,6 +64,7 @@ const SECTIONS: ShortcutSection[] = [
     inBrushEditor: true,
     guide: BRUSH_GUIDE,
     rows: [
+      { keys: ["RMB panel button"], action: "Open the brush guide at that button's entry (Cmd+F searches the guide)" },
       { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save (or Cmd+S) keeps editing, Close exits and asks if there are unsaved changes" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge (in Edit Brush, also the bar top-left: one click)" },
       { keys: ["LMB"],               action: "Pick a face / corner / edge on the selected brush" },
@@ -117,6 +124,18 @@ function ShortcutRow({ keys, action }: ShortcutEntry) {
 export function HelpButton({ brushEditor = false }: { brushEditor?: boolean }) {
   const [open, setOpen] = useState(false);
   const [guide, setGuide] = useState<DocGuide | null>(null);
+  // One capture listener for right-click help, installed by the always-mounted top bar.
+  useEffect(() => {
+    const onContext = (e: MouseEvent) => {
+      const id = helpAnchorFrom(e.target);
+      if (!id) return;
+      e.preventDefault();
+      setOpen(false);
+      setGuide({ ...BRUSH_GUIDE, src: `${BRUSH_GUIDE.src}#${id}` });
+    };
+    window.addEventListener("contextmenu", onContext, true);
+    return () => window.removeEventListener("contextmenu", onContext, true);
+  }, []);
   // In the isolated brush editor, only the sections that apply there.
   const sections = brushEditor ? SECTIONS.filter(s => s.inBrushEditor) : SECTIONS;
 
