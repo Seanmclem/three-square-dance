@@ -19,7 +19,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { facesFromCloud, splitFaceQuad, quadCorners, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
+import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
@@ -3091,12 +3091,16 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
   const verts = shape.mesh!.vertices;
   const corners = quadCorners(verts, face.verts);
   const isQuad = corners !== null;
+  // SPLIT also takes a rounded rectangle (its four straight sides, v4.107.1); LOOP CUT
+  // still needs four real corners.
+  const sides = splitSides(verts, face.verts);
+  const canSplit = sides !== null;
 
-  // Label which pair cuts "horizontally": pair 0 cuts mid(c0c1)→mid(c2c3). Local
+  // Label which pair cuts "horizontally": pair 0 cuts mid(side 0)→mid(side 2). Local
   // direction is used (yaw rotation doesn't change |y|; labels are cosmetic).
   let pair0IsH = true;
-  if (corners) {
-    const [a, b, c, d] = corners.map(k => face.verts[k]!) as [number, number, number, number];
+  if (sides) {
+    const [a, b, c, d] = [sides[0]!.from, sides[0]!.to, sides[2]!.from, sides[2]!.to].map(k => face.verts[k % face.verts.length]!) as [number, number, number, number];
     const m1 = verts[a]!, m2 = verts[b]!, m3 = verts[c]!, m4 = verts[d]!;
     const dir = {
       x: (m3.x + m4.x) / 2 - (m1.x + m2.x) / 2,
@@ -3147,14 +3151,14 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <Group title="CUT" hint="hover to preview">
       <div style={{ display: "flex", gap: 4 }}>
-        <button data-help="help-split" style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+        <button data-help="help-split" style={canSplit ? OP_BTN : OP_BTN_OFF} disabled={!canSplit}
           onClick={() => { preview(null); split(pair0IsH ? 0 : 1); }} title="Split this face in two with a horizontal cut (hover to see where)"
-          onMouseEnter={() => isQuad && preview(pair0IsH ? 0 : 1, true)} onMouseLeave={() => preview(null)}>
+          onMouseEnter={() => canSplit && preview(pair0IsH ? 0 : 1, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-h" />SPLIT H
         </button>
-        <button data-help="help-split" style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+        <button data-help="help-split" style={canSplit ? OP_BTN : OP_BTN_OFF} disabled={!canSplit}
           onClick={() => { preview(null); split(pair0IsH ? 1 : 0); }} title="Split this face in two with a vertical cut (hover to see where)"
-          onMouseEnter={() => isQuad && preview(pair0IsH ? 1 : 0, true)} onMouseLeave={() => preview(null)}>
+          onMouseEnter={() => canSplit && preview(pair0IsH ? 1 : 0, true)} onMouseLeave={() => preview(null)}>
           <BrushOpIcon name="split-v" />SPLIT V
         </button>
         <button data-help="help-inset" style={OP_BTN} onClick={inset}
@@ -3176,7 +3180,9 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
         </button>
       </div>
       {!isQuad && (
-        <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>
+        <div style={{ color: "#98a2b8", fontSize: 9 }}>{canSplit
+          ? "Loop cut needs a face with 4 real corners; SPLIT works on this rounded face."
+          : "Split and loop cut need a face with 4 sides."}</div>
       )}
       {loopNote && <LoopCutNote note={loopNote} selected={selected} bus={bus} />}
       {bent && (

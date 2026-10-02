@@ -382,7 +382,8 @@ export function quadCorners(vertices: Vec3[], loop: number[]): [number, number, 
 
 /**
  * Split a QUAD face between the midpoints of an opposite side pair. "Quad" means
- * four real corners (`quadCorners`): straight-through verts on a side are kept
+ * four sides (`splitSides`: four real corners, or a rounded rectangle's four straight
+ * runs, v4.107.1): straight-through verts and curves are kept
  * and end up on whichever child they fall in. pair 0 cuts sides c0→c1 / c2→c3,
  * pair 1 cuts c1→c2 / c3→c0. The selected faceIdx stays on child A. CRITICAL:
  * any other face traversing a split edge gets the midpoint spliced into its loop
@@ -391,29 +392,62 @@ export function quadCorners(vertices: Vec3[], loop: number[]): [number, number, 
  * Returns null (with reason logged) if the face isn't a quad or the result fails
  * validation.
  */
+/**
+ * The four sides of a face for SPLIT (v4.107.1): runs of edges that continue in a
+ * straight line. A four-cornered face has exactly four. A rounded rectangle (a face
+ * whose corners a ROUND turned into curves) has four long straight runs with short
+ * curve edges between them: those four count as its sides, each at least 3× longer
+ * than any curve edge. Returns each side's first and last loop position, in loop
+ * order, or null.
+ */
+export function splitSides(vertices: Vec3[], loop: number[]): Array<{ from: number; to: number }> | null {
+  const L = loop.length;
+  if (L < 4) return null;
+  const P = (i: number) => vertices[loop[(i + L) % L]!]!;
+  const dirAt = (i: number) => { const a = P(i), b = P(i + 1); const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }; const l = Math.hypot(d.x, d.y, d.z) || 1; return { x: d.x / l, y: d.y / l, z: d.z / l, l }; };
+  const D = Array.from({ length: L }, (_, i) => dirAt(i));
+  const straight = (i: number) => { const a = D[(i + L - 1) % L]!, b = D[i]!; return a.x * b.x + a.y * b.y + a.z * b.z > 0.9998; };   // corner i continues the previous edge
+  const start = Array.from({ length: L }, (_, i) => i).find(i => !straight(i));
+  if (start === undefined) return null;
+  const runs: Array<{ from: number; to: number; len: number }> = [];
+  for (let k = 0; k < L; ) {
+    const from = (start + k) % L;
+    let len = D[from]!.l, n = 1;
+    while (n < L && straight((from + n) % L)) { len += D[(from + n) % L]!.l; n++; }
+    runs.push({ from, to: (from + n) % L, len });
+    k += n;
+  }
+  if (runs.length === 4) return runs.map(({ from, to }) => ({ from, to }));
+  if (runs.length < 4) return null;
+  const byLen = [...runs].sort((a, b) => b.len - a.len);
+  const four = byLen.slice(0, 4), rest = byLen.slice(4);
+  if (rest.length && four[3]!.len < 3 * rest[0]!.len) return null;   // no clear four sides
+  return runs.filter(r => four.includes(r)).map(({ from, to }) => ({ from, to }));
+}
+
 export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1): BrushMeshData | null {
   const src = mesh.faces?.[faceIdx];
   if (!src) return null;
   const vertices = mesh.vertices.map(v => ({ ...v }));
-  const corners = quadCorners(vertices, src.verts);
-  if (!corners) return null;
+  const sides = splitSides(vertices, src.verts);
+  if (!sides) return null;
   const L = src.verts.length;
-  // Rotate the loop to start at corner 0, so sides are contiguous runs.
-  const loop = src.verts.map((_, i) => src.verts[(corners[0] + i) % L]!);
-  const c = corners.map(k => (k - corners[0] + L) % L) as [number, number, number, number];
-  const sideA = pair === 0 ? 0 : 1, sideB = sideA + 2;   // side k runs loop[c[k]] .. loop[c[k+1]]
-  const end = (k: number): number => k === 3 ? loop.length : c[k + 1]!;   // loop grows after a cut
+  // Rotate the loop to start at side 0, so every side is a contiguous run of positions.
+  const r0 = sides[0]!.from;
+  const loop = src.verts.map((_, i) => src.verts[(r0 + i) % L]!);
+  const run = sides.map(s => ({ from: (s.from - r0 + L) % L, to: ((s.to - r0 + L) % L) || L }));
+  const sideA = pair === 0 ? 0 : 1, sideB = sideA + 2;
 
-  // Midpoint of a side = midpoint of its two corners; insert it into the side's
-  // chain (or reuse the vert already sitting there). Returns the midpoint's
+  // Midpoint of a side = midpoint of its two ends (on its straight run); insert it into
+  // the side's chain (or reuse the vert already sitting there). Returns the midpoint's
   // vertex index, its loop position, and the edge it split (null if reused).
   const cut = (k: number): { idx: number; pos: number; edge: [number, number] | null } => {
-    const p = vertices[loop[c[k]!]!]!, q = vertices[loop[end(k) % loop.length]!]!;
+    const p = vertices[loop[run[k]!.from]!]!, q = vertices[loop[run[k]!.to % loop.length]!]!;
     const m = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, z: (p.z + q.z) / 2 };
     const before = vertices.length;
     const idx = addOrReuse(vertices, m);
     const reused = idx < before;
-    for (let i = c[k]!; i < end(k); i++) {
+    for (let i = run[k]!.from; i < run[k]!.to; i++) {
       const s = loop[i]!, t = loop[(i + 1) % loop.length]!;
       if (reused && s === idx) return { idx, pos: i, edge: null };
       const a = vertices[s]!, b = vertices[t]!;
@@ -428,7 +462,7 @@ export function splitFaceQuad(mesh: ShapeBrushMesh, faceIdx: number, pair: 0 | 1
   };
   const cutA = cut(sideA);
   if (cutA.pos < 0) return null;
-  if (cutA.edge) { for (let k = sideA + 1; k < 4; k++) c[k]!++; }   // later corners shifted by the insert
+  if (cutA.edge) for (let k = sideA + 1; k < 4; k++) { run[k]!.from++; run[k]!.to++; }   // later sides shifted by the insert
   const cutB = cut(sideB);
   if (cutB.pos < 0) return null;
   const N = loop.length;
@@ -481,39 +515,66 @@ export function insetFace(mesh: ShapeBrushMesh, faceIdx: number, margin = 0.25):
   const n = newellNormal(vertices, loop);
   if (n.lengthSq() < 0.5) { console.warn("brushOps.insetFace: degenerate normal"); return null; }
 
-  const inner: number[] = [];
-  const V = (i: number): THREE.Vector3 => {
-    const v = vertices[loop[(i + L) % L]!]!;
-    return new THREE.Vector3(v.x, v.y, v.z);
+  // v4.107.1: the border is built from SIDES, not corners: each side's line moves
+  // `margin` inward and neighbouring lines meet at the inner corners. A side whose inner
+  // copy would come out zero or reversed (a curve tighter than the border, e.g. a ROUND
+  // with a small SIZE) drops out and its neighbours meet in one sharp corner instead, so
+  // a rounded face insets at any width that fits. Done in the face's plane (2D).
+  const u = new THREE.Vector3(), w = new THREE.Vector3();
+  u.set(Math.abs(n.x) < 0.9 ? 1 : 0, Math.abs(n.x) < 0.9 ? 0 : 1, 0).cross(n).normalize();
+  w.crossVectors(n, u);
+  const O = new THREE.Vector3();
+  for (const vi of loop) O.add(new THREE.Vector3(vertices[vi]!.x, vertices[vi]!.y, vertices[vi]!.z));
+  O.divideScalar(L);
+  const P = loop.map(vi => { const v = new THREE.Vector3(vertices[vi]!.x, vertices[vi]!.y, vertices[vi]!.z).sub(O); return { x: v.dot(u), y: v.dot(w), h: v.dot(n) }; });
+  // Side i runs P[i] → P[i+1]; its direction and inward normal (CCW about n → left).
+  const dir = P.map((p, i) => { const q = P[(i + 1) % L]!; const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy); return { x: dx / (l || 1), y: dy / (l || 1), l }; });
+  if (dir.some(d => d.l < 1e-6)) { console.warn("brushOps.insetFace: zero-length edge"); return null; }
+  const line = (i: number) => ({ px: P[i]!.x - dir[i]!.y * margin, py: P[i]!.y + dir[i]!.x * margin, dx: dir[i]!.x, dy: dir[i]!.y });
+  const meet = (a: number, b: number): { x: number; y: number } | null => {
+    const A = line(a), B = line(b), den = A.dx * B.dy - A.dy * B.dx;
+    if (Math.abs(den) < 1e-9) return null;   // parallel sides (a straight-through corner): no meeting point
+    const s = ((B.px - A.px) * B.dy - (B.py - A.py) * B.dx) / den;
+    return { x: A.px + A.dx * s, y: A.py + A.dy * s };
   };
-  for (let i = 0; i < L; i++) {
-    const prev = V(i - 1), cur = V(i), next = V(i + 1);
-    // Edge directions projected into the face plane (Newell handles mild non-planarity).
-    const dPrev = cur.clone().sub(prev); dPrev.addScaledVector(n, -dPrev.dot(n));
-    const dNext = next.clone().sub(cur); dNext.addScaledVector(n, -dNext.dot(n));
-    if (dPrev.lengthSq() < 1e-12 || dNext.lengthSq() < 1e-12) { console.warn("brushOps.insetFace: zero-length edge"); return null; }
-    dPrev.normalize(); dNext.normalize();
-    // In-plane inward edge normals (loop is CCW about n, so n × d points into the face).
-    const mPrev = new THREE.Vector3().crossVectors(n, dPrev);
-    const mNext = new THREE.Vector3().crossVectors(n, dNext);
-    const b = mPrev.clone().add(mNext);
-    if (b.lengthSq() < 1e-12) { console.warn("brushOps.insetFace: spike corner (edges reverse)"); return null; }
-    b.normalize();
-    const denom = b.dot(mNext);   // = sin(θ/2) for interior angle θ; miter blows up as θ → 0
-    if (denom < 0.05) { console.warn("brushOps.insetFace: near-degenerate corner"); return null; }
-    const p = cur.addScaledVector(b, margin / denom);
+  // Inner start of active side j = where the previous active side's line meets j's
+  // (a straight-through corner just offsets its own point).
+  let active = Array.from({ length: L }, (_, i) => i);
+  let starts = new Map<number, { x: number; y: number }>();
+  for (let pass = 0; pass < L; pass++) {
+    if (active.length < 3) { console.warn("brushOps.insetFace: inner loop collapsed (margin too large)"); return null; }
+    starts = new Map();
+    active.forEach((j, k) => {
+      const prev = active[(k + active.length - 1) % active.length]!;
+      starts.set(j, meet(prev, j) ?? { x: P[j]!.x - dir[j]!.y * margin, y: P[j]!.y + dir[j]!.x * margin });
+    });
+    const gone = active.filter((j, k) => {
+      const a = starts.get(j)!, b = starts.get(active[(k + 1) % active.length]!)!;
+      return (b.x - a.x) * dir[j]!.x + (b.y - a.y) * dir[j]!.y <= 1e-5;   // zero or reversed inner side
+    });
+    if (!gone.length) break;
+    active = active.filter(j => !gone.includes(j));
+  }
+  if (active.length < 3) { console.warn("brushOps.insetFace: inner loop collapsed (margin too large)"); return null; }
+  // Each original corner i maps to the inner start of the first active side at or after i.
+  const firstActiveFrom = (i: number) => { for (let k = 0; k < L; k++) { const j = (i + k) % L; if (active.includes(j)) return j; } return i; };
+  const innerOf = new Map<number, number>();   // active side → inner vertex index
+  const heights = new Map<number, number[]>();
+  for (let i = 0; i < L; i++) { const j = firstActiveFrom(i); heights.set(j, [...(heights.get(j) ?? []), P[i]!.h]); }
+  for (const j of active) {
+    const s2 = starts.get(j)!, hs = heights.get(j) ?? [0], h = hs.reduce((a, b) => a + b, 0) / hs.length;
+    const p = O.clone().addScaledVector(u, s2.x).addScaledVector(w, s2.y).addScaledVector(n, h);
     // Never addOrReuse here: welding an inner vertex onto the outer ring would corrupt topology.
     vertices.push({ x: +p.x.toFixed(4), y: +p.y.toFixed(4), z: +p.z.toFixed(4) });
-    inner.push(vertices.length - 1);
+    innerOf.set(j, vertices.length - 1);
   }
+  const corner = (i: number) => innerOf.get(firstActiveFrom(i % L))!;
+  const inner = active.map(j => innerOf.get(j)!);
 
-  // Margin-too-large guards: collapsed inner edge, or inner loop inverted/degenerate
-  // (raw = unnormalized Newell vector of the inner loop; ‖raw‖ = 2×area).
+  // Inner loop inverted or degenerate → margin too large (raw = Newell vector, ‖raw‖ = 2×area).
   const raw = new THREE.Vector3();
-  for (let i = 0; i < L; i++) {
-    const a = vertices[inner[i]!]!, c = vertices[inner[(i + 1) % L]!]!;
-    const dx = a.x - c.x, dy = a.y - c.y, dz = a.z - c.z;
-    if (dx * dx + dy * dy + dz * dz < 1e-6) { console.warn("brushOps.insetFace: inner loop collapsed (margin too large)"); return null; }
+  for (let i = 0; i < inner.length; i++) {
+    const a = vertices[inner[i]!]!, c = vertices[inner[(i + 1) % inner.length]!]!;
     raw.x += (a.y - c.y) * (a.z + c.z);
     raw.y += (a.z - c.z) * (a.x + c.x);
     raw.z += (a.x - c.x) * (a.y + c.y);
@@ -523,10 +584,12 @@ export function insetFace(mesh: ShapeBrushMesh, faceIdx: number, margin = 0.25):
   const faces = cloneFaces(mesh.faces!);
   faces[faceIdx] = { ...faces[faceIdx]!, verts: inner };
   for (let i = 0; i < L; i++) {
+    const a = corner(i), b = corner(i + 1);
     faces.push({
       // Border quad [p, q, qInner, pInner]: supplies p→q (pairs the untouched
       // neighbor's q→p) and qInner→pInner (pairs the inner face's pInner→qInner).
-      verts: [loop[i]!, loop[(i + 1) % L]!, inner[(i + 1) % L]!, inner[i]!],
+      // A side that dropped out has one inner corner: a triangle [p, q, inner].
+      verts: a === b ? [loop[i]!, loop[(i + 1) % L]!, a] : [loop[i]!, loop[(i + 1) % L]!, b, a],
       material: src.material,
       materialOverrides: src.materialOverrides ? structuredClone(src.materialOverrides) : undefined,
     });

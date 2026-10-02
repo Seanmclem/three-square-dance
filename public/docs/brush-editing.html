@@ -152,6 +152,7 @@
   <tr id="help-round-row"><td>ROUND</td><td>Edge</td><td>Turns the picked edge(s) into a curve of thin faces (see <a href="#round">Rounding edges</a>)</td><td>STEPS per edge</td></tr>
 </table>
 <p>Hovering SPLIT H / V shows a dashed line where the face will be cut; hovering LOOP CUT shows the whole ring, with a red dot where it would stop.</p>
+<p>SPLIT also works on a face whose corners a ROUND turned into curves: it finds the face's four straight sides and cuts between the middles of two opposite ones, and each half keeps its share of the curves. INSET works on any face its border fits, at any curve size: where the border is wider than a curve, the inner face simply gets a sharp corner there. LOOP CUT still needs four real corners.</p>
 <p>SPLIT and LOOP CUT need a face with four real corners. A point sitting straight along a side (left there by a neighbour's split) doesn't count as a corner.</p>
 
 <h2 id="dissolve"><span id="help-dissolve">Removing edges (DISSOLVE)</span></h2>

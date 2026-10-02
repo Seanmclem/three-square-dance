@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { newellNormal, fanLoop, faceTriangles, isBentQuad, loopCutRing } from "@/editor/brushOps";
+import { newellNormal, fanLoop, faceTriangles, isBentQuad, loopCutRing, splitSides } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ShapeDef, ToolId, LoopCutStart } from "@/types";
@@ -19,6 +19,16 @@ const EDGE_LIFT = 0.012;   // edges sit just above the face fills
  * meshes/lines, rebuilt from data on every change, disposed on clear; never pickable.
  * No per-frame work.
  */
+/** A one-face "ring" for the SPLIT preview: the two side ends the cut joins (as rails). */
+function splitRing(mesh: { vertices: { x: number; y: number; z: number }[]; faces?: { verts: number[] }[] }, faceIdx: number, pair: 0 | 1) {
+  const f = mesh.faces?.[faceIdx];
+  const sides = f ? splitSides(mesh.vertices, f.verts) : null;
+  if (!f || !sides) return null;
+  const L = f.verts.length, at = (k: number) => f.verts[k % L]!;
+  const sa = sides[pair === 0 ? 0 : 1]!, sb = sides[pair === 0 ? 2 : 3]!;
+  return { faces: [{ faceIdx, pair, rails: [[at(sa.from), at(sa.to)], [at(sb.from), at(sb.to)]] as [[number, number], [number, number]] }], closed: false, stops: [] };
+}
+
 export class BrushFaceHighlighter implements IEditorModule {
   private _tool: ToolId = "select";
   private _shape:    { zoneId: string; shapeId: string } | null = null;
@@ -136,7 +146,10 @@ export class BrushFaceHighlighter implements IEditorModule {
     if (!t) return;
     const shape = this._world.zones.get(t.zoneId)?.shapes?.find(s => s.id === t.shapeId) as ShapeDef | undefined;
     if (!shape?.mesh?.faces) return;
-    const ring = loopCutRing(shape.mesh, t.start);
+    // SPLIT preview on a rounded face (v4.107.1): no loop-cut ring there, so draw the cut
+    // straight from the middle of one straight side to the middle of the opposite one.
+    const ring = loopCutRing(shape.mesh, t.start)
+      ?? (t.single && "faceIdx" in t.start ? splitRing(shape.mesh, t.start.faceIdx, t.start.pair) : null);
     if (!ring) return;
 
     const verts = shape.mesh.vertices;
