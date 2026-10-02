@@ -14,6 +14,7 @@ import type {
 } from "@/types";
 import { DEFAULT_BRUSH_BACKGROUND, DEFAULT_BRUSH_COLOR } from "@/types";
 import { softSettings, setSoftSettings, type SoftSettings } from "@/editor/softFalloff";
+import { SNAP_STEPS, dragSnapStep, setDragSnapStep } from "@/editor/dragSnap";
 import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
@@ -2519,13 +2520,13 @@ function ShapeGeoView({ selected, onObjectUpdate, bus, activeTool, materialList,
   // Sub-object modes (Phase 23): face/vertex lists replace the param view.
   // Phase 82: the SOFT row sits above each list (it applies to every corner drag).
   if (faceBrush && activeTool === "select-face") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<FacesList selected={selected} shape={shape} bus={bus} materialList={materialList ?? []} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-vertex") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<VerticesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
   if (faceBrush && activeTool === "select-edge") {
-    return <>{bus && <SoftFalloffRow bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
+    return <>{bus && <DragTopRows bus={bus} />}{bus && <CurvesList selected={selected} shape={shape} bus={bus} />}<EdgesList selected={selected} shape={shape} bus={bus} onObjectUpdate={onObjectUpdate} /></>;
   }
 
   return (
@@ -2666,9 +2667,55 @@ function shapeFacesUpdate(shape: ShapeDef, faceIndex: number, patch: Partial<Bru
   return { mesh: { ...shape.mesh!, faces } };
 }
 
+/** Vertex / edge mode: SNAP above SOFT at the top of the Geometry screen. */
+function DragTopRows({ bus }: { bus: EventBus }) {
+  return (
+    <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+      <SnapRow bus={bus} />
+      <SoftFalloffRow bus={bus} compact />
+    </div>
+  );
+}
+
+/** Face panel groups (v4.106.0, "light touch" redesign): a thin divider and a label, so
+ *  related buttons read as related; `hint` sits on the right of the label. */
+function Group({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
+      <div style={{ ...LABEL, marginBottom: 0, display: "flex", justifyContent: "space-between" }}>
+        <span>{title}</span>{hint && <span style={{ color: "#98a2b8", letterSpacing: 0 }}>{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** SNAP (v4.106.0): the move step for every face / edge / corner drag and PUSH. */
+function SnapRow({ bus }: { bus: EventBus }) {
+  const [v, setV] = useState(dragSnapStep());
+  useEffect(() => bus.on("brush:snap-changed", ({ step }) => setV(step)), [bus]);
+  const seg = (on: boolean): React.CSSProperties => ({
+    flex: 1, padding: "3px 0", cursor: "pointer", fontFamily: "monospace", fontSize: 10, border: "none",
+    borderRight: "1px solid rgba(255,255,255,0.1)",
+    background: on ? "rgba(80,140,255,0.22)" : "transparent", color: on ? "#9dbdff" : "#dde3f0",
+  });
+  return (
+    <div data-help="help-snap" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ ...LABEL, marginBottom: 0 }}>SNAP</span>
+      <div style={{ flex: 1, display: "flex", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 4, overflow: "hidden" }}>
+        {SNAP_STEPS.map(s => (
+          <button key={s} style={seg(v === s)} title={s ? `Drags move in ${s} m steps (Alt = free)` : "No snapping"}
+            onClick={() => setDragSnapStep(bus, s)}>{s ? s : "off"}</button>
+        ))}
+      </div>
+      <span style={{ color: "#c2cadb", fontSize: 11 }}>m</span>
+    </div>
+  );
+}
+
 /** Soft falloff (Phase 82): SOFT on/off, the radius and the slope, for every corner drag
  *  on every brush. State lives in `softFalloff.ts`; O and [ ] change it from the viewport. */
-function SoftFalloffRow({ bus }: { bus: EventBus }) {
+function SoftFalloffRow({ bus, compact = false }: { bus: EventBus; compact?: boolean }) {
   const [s, setS] = useState<SoftSettings>(softSettings);
   const [draft, setDraft] = useState(String(s.radius));
   useEffect(() => bus.on("brush:soft-changed", next => { setS(next); setDraft(String(next.radius)); }), [bus]);
@@ -2683,7 +2730,9 @@ function SoftFalloffRow({ bus }: { bus: EventBus }) {
     background: on ? "rgba(80,140,255,0.22)" : "transparent", color: on ? "#9dbdff" : "#dde3f0",
   });
   return (
-    <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={compact
+      ? { display: "flex", flexDirection: "column", gap: 6 }
+      : { padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button data-help="help-soft" style={seg(s.on)} title="Nearby corners follow a drag part of the way (O)" onClick={() => setSoftSettings(bus, { on: !s.on })}>
           SOFT {s.on ? "ON" : "OFF"}
@@ -2755,7 +2804,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
       {set.length > 1 && (
         <FaceSetCard selected={selected} shape={shape} set={set} materialList={materialList} bus={bus} onObjectUpdate={onObjectUpdate} />
       )}
-      <div style={LABEL}>FACES — click a row or a face; Shift-click adds or removes</div>
+      <div style={LABEL}>FACES</div>
       {faces.map((f, i) => {
         const isSel = set.includes(i);
         const expanded = i === sel && set.length <= 1;
@@ -2767,17 +2816,17 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
               border: isSel ? "1px solid rgba(80,140,255,0.5)" : "1px solid rgba(255,255,255,0.07)",
               borderRadius: 5, background: isSel ? "rgba(80,140,255,0.08)" : "rgba(40,40,40,0.6)",
             }}>
-            <button onClick={e => pick(i, e.shiftKey || e.metaKey || e.ctrlKey)}
+            <button onClick={e => pick(i, e.shiftKey || e.metaKey || e.ctrlKey)} title={`Corners ${f.verts.join(", ")}. Shift-click adds or removes it.`}
               style={{ width: "100%", display: "flex", justifyContent: "space-between", padding: "6px 8px", background: "none", border: "none", cursor: "pointer" }}>
               <span style={{ color: isSel ? "#80aaff" : "#c0c0c0", fontSize: 11, fontFamily: "monospace" }}>FACE {i + 1}</span>
               <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{f.verts.length} corners · {matLabel}</span>
             </button>
             {expanded && (
               <div style={{ padding: "4px 8px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ color: "#98a2b8", fontSize: 9, fontFamily: "monospace" }}>corners: {f.verts.join(", ")}</div>
+                <Group title="LOOK">
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <select data-help="help-face-material" value={f.material ?? "__inherit__"} onChange={e => commitMat(i, e.target.value)}
-                    style={{ flex: 1, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
+                    style={{ flex: 1, minWidth: 0, background: "rgba(46,46,46,0.9)", color: "#c0c0c0", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, fontSize: 10, fontFamily: "monospace", padding: "3px 4px" }}>
                     <option value="__inherit__">(shape material)</option>
                     {materialList.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
@@ -2788,6 +2837,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
                     onBlur={e => flush(() => commitTile(i, e.target.value))}
                   />
                 </div>
+                </Group>
                 <ShapeFaceOps selected={selected} shape={shape} faceIndex={i} bus={bus} onObjectUpdate={onObjectUpdate} />
               </div>
             )}
@@ -2795,7 +2845,7 @@ function FacesList({ selected, shape, bus, materialList, onObjectUpdate }: {
         );
       })}
       <div style={{ color: "#98a2b8", fontSize: 9, lineHeight: 1.4 }}>
-        Drag the gizmo to move the selected face(s). Double-click a face for its face loop. Press 1/3 for object/vertex modes.
+        Click a face or a row; Shift-click adds more; double-click selects a face loop. Right-click a button for its guide entry.
       </div>
     </div>
   );
@@ -2840,7 +2890,7 @@ function FaceGizmoModeRow({ bus }: { bus?: EventBus }) {
         <button data-help="help-push" style={{ ...OP_BTN, ...(mode === "move" ? on : {}) }} onClick={() => pick("move")}
           title="Drag the gizmo's arrows to slide the selected face(s) in one direction">MOVE</button>
         <button data-help="help-push" style={{ ...OP_BTN, ...(mode === "push" ? on : {}) }} onClick={() => pick("push")}
-          title="Drag the gizmo's centre box right / up to push every selected face out along its own direction, left / down to pull them in (snaps 0.05 m, Alt = free)">
+          title="Drag the gizmo's centre box right / up to push every selected face out along its own direction, left / down to pull them in (snaps by SNAP, Alt = free)">
           <BrushOpIcon name="extrude" />PUSH
         </button>
       </div>
@@ -2849,12 +2899,23 @@ function FaceGizmoModeRow({ bus }: { bus?: EventBus }) {
   );
 }
 
+/** DRAG group (v4.106.0): gizmo MOVE / PUSH, SNAP and SOFT, the settings for dragging. */
+function DragGroup({ bus }: { bus: EventBus }) {
+  return (
+    <Group title="DRAG" hint="Alt = free">
+      <FaceGizmoModeRow bus={bus} />
+      <SnapRow bus={bus} />
+      <SoftFalloffRow bus={bus} compact />
+    </Group>
+  );
+}
+
 /** How far EXTRUDE / RECESS go, in meters (default 0.25). */
 function ExtrudeDistField() {
   const [str, setStr] = useState(String(extrudeDistNow));
   return (
     <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-      <span style={{ ...LABEL, marginBottom: 0 }}>EXTRUDE / RECESS DIST</span>
+      <span style={{ ...LABEL, marginBottom: 0 }}>DIST</span>
       <input data-help="help-dist" type="number" step={0.05} min={0.01} value={str}
         title="How far EXTRUDE and RECESS move the face(s), in meters"
         style={{ ...NUM_INPUT, width: 64, padding: "2px 4px", fontSize: 10 }}
@@ -2911,6 +2972,7 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
   return (
     <div style={{ border: "1px solid rgba(80,140,255,0.5)", borderRadius: 5, background: "rgba(80,140,255,0.08)", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, marginBottom: 6 }}>
       <span style={{ color: "#80aaff", fontSize: 11, fontFamily: "monospace" }}>{members.length} FACES SELECTED</span>
+      <Group title="LOOK">
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <select data-help="help-face-material" value={mats.size === 1 ? [...mats][0]! : "__mixed__"} onChange={e => commitMat(e.target.value)}
           title="Material for every selected face"
@@ -2926,6 +2988,8 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
           onBlur={e => flush(() => commitTile(e.target.value))}
         />
       </div>
+      </Group>
+      <Group title="SHAPE">
       <div style={{ display: "flex", gap: 4 }}>
         <button data-help="help-inset" style={OP_BTN} onClick={() => run(insetRegion(shape.mesh!, members, 0.25))}
           title="Inset the selection as one region: a 0.25 m border round its outside, none between the faces">
@@ -2942,7 +3006,9 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
       </div>
       <ExtrudeDistField />
       <OuterWallsRow bus={bus} />
-      <FaceGizmoModeRow bus={bus} />
+      {note && <div style={{ color: "#ffb86b", fontSize: 10 }}>{note}</div>}
+      </Group>
+      <Group title="SELECT">
       <div style={{ display: "flex", gap: 4 }}>
         <button data-help="help-face-loop" style={OP_BTN} onClick={() => selectLoop(0)} title="Select a ring of faces through the active face">
           <BrushOpIcon name="face-loop-h" />FACE LOOP H
@@ -2952,7 +3018,8 @@ function FaceSetCard({ selected, shape, set, materialList, bus, onObjectUpdate }
         </button>
       </div>
       <button style={OP_BTN} onClick={clear}>CLEAR SELECTION</button>
-      {note && <div style={{ color: "#ffb86b", fontSize: 10 }}>{note}</div>}
+      </Group>
+      {bus && <DragGroup bus={bus} />}
     </div>
   );
 }
@@ -3054,10 +3121,11 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
   const preview = (pair: 0 | 1 | null, single = false) => bus?.emit("shape:loop-preview", {
     zoneId: selected.zoneId, shapeId: selected.id, start: pair === null ? null : { faceIdx: faceIndex, pair }, single,
   });
-  const loopTitle = "Split this face and keep going around the shape, until the ring comes back round or reaches a face that isn't four-sided";
+  const loopTitle = "LOOP CUT: split this face and keep going around the shape, until the ring comes back round or reaches a face that isn't four-sided";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <Group title="CUT" hint="hover to preview">
       <div style={{ display: "flex", gap: 4 }}>
         <button data-help="help-split" style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
           onClick={() => { preview(null); split(pair0IsH ? 0 : 1); }} title="Split this face in two with a horizontal cut (hover to see where)"
@@ -3075,40 +3143,18 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
         </button>
       </div>
       <div style={{ display: "flex", gap: 4 }}>
-        {([["LOOP CUT H", "loop-h", pair0IsH ? 0 : 1], ["LOOP CUT V", "loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
+        {([["LOOP H", "loop-h", pair0IsH ? 0 : 1], ["LOOP V", "loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
           <button data-help="help-loop-cut" key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad} title={loopTitle}
             onClick={() => { preview(null); loop(pair); }}
             onMouseEnter={() => isQuad && preview(pair)} onMouseLeave={() => preview(null)}>
             <BrushOpIcon name={icon} />{label}
           </button>
         ))}
-      </div>
-      <div style={{ display: "flex", gap: 4 }}>
-        {([["FACE LOOP H", "face-loop-h", pair0IsH ? 0 : 1], ["FACE LOOP V", "face-loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
-          <button data-help="help-face-loop" key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
-            title="Select the ring of faces through this face (then EXTRUDE / RECESS / INSET or a material act on all of them)"
-            onClick={() => { const ring = faceLoopOf(shape, faceIndex, pair); if (ring.length) bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex, vertexIndex: null, faceSet: ring }); }}>
-            <BrushOpIcon name={icon} />{label}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 4 }}>
-        <button data-help="help-extrude" style={OP_BTN} onClick={extrude} title="Extrude this face outward along its normal (by DIST)">
-          <BrushOpIcon name="extrude" />EXTRUDE
-        </button>
-        <button data-help="help-extrude" style={OP_BTN} onClick={recess}
-          title="Extrude this face inward (by DIST) — carve a recess (inset first for a window/pit)">
-          <BrushOpIcon name="recess" />RECESS
-        </button>
         <button data-help="help-fold" style={bent ? OP_BTN : OP_BTN_OFF} disabled={!bent} onClick={flipFold}
           title="This face is bent, so it creases along one diagonal (the dashed line). Flip it to the other diagonal.">
           <BrushOpIcon name="fold" />FLIP FOLD
         </button>
       </div>
-      <ExtrudeDistField />
-      <OuterWallsRow bus={bus} />
-      {wallNote && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{wallNote}</div>}
-      <FaceGizmoModeRow bus={bus} />
       {!isQuad && (
         <div style={{ color: "#98a2b8", fontSize: 9 }}>Split and loop cut need a face with 4 real corners.</div>
       )}
@@ -3118,6 +3164,33 @@ function ShapeFaceOps({ selected, shape, faceIndex, bus, onObjectUpdate }: {
           Bent face: creases along the dashed line ({flipped ? "flipped" : "automatic, bulges outward"}).
         </div>
       )}
+      </Group>
+      <Group title="SHAPE">
+      <div style={{ display: "flex", gap: 4 }}>
+        <button data-help="help-extrude" style={OP_BTN} onClick={extrude} title="Extrude this face outward along its normal (by DIST)">
+          <BrushOpIcon name="extrude" />EXTRUDE
+        </button>
+        <button data-help="help-extrude" style={OP_BTN} onClick={recess}
+          title="Extrude this face inward (by DIST) — carve a recess (inset first for a window/pit)">
+          <BrushOpIcon name="recess" />RECESS
+        </button>
+      </div>
+      <ExtrudeDistField />
+      <OuterWallsRow bus={bus} />
+      {wallNote && <div style={{ color: "#ff9b8a", fontSize: 10, lineHeight: 1.4 }}>{wallNote}</div>}
+      </Group>
+      <Group title="SELECT">
+      <div style={{ display: "flex", gap: 4 }}>
+        {([["FACE LOOP H", "face-loop-h", pair0IsH ? 0 : 1], ["FACE LOOP V", "face-loop-v", pair0IsH ? 1 : 0]] as const).map(([label, icon, pair]) => (
+          <button data-help="help-face-loop" key={label} style={isQuad ? OP_BTN : OP_BTN_OFF} disabled={!isQuad}
+            title="Select the ring of faces through this face (then EXTRUDE / RECESS / INSET or a material act on all of them)"
+            onClick={() => { const ring = faceLoopOf(shape, faceIndex, pair); if (ring.length) bus?.emit("shape:sub-select", { zoneId: selected.zoneId, shapeId: selected.id, faceIndex, vertexIndex: null, faceSet: ring }); }}>
+            <BrushOpIcon name={icon} />{label}
+          </button>
+        ))}
+      </div>
+      </Group>
+      {bus && <DragGroup bus={bus} />}
     </div>
   );
 }

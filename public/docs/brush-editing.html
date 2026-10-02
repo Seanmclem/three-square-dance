@@ -116,6 +116,8 @@
   <tr><td><kbd>4</kbd></td><td>Edge</td><td>The edge nearest where you clicked on a face (blue tube)</td><td>The edge's two corners</td><td>SPLIT EDGE, LOOP CUT, SELECT LOOP, AROUND FACE n; double-click = SELECT LOOP</td></tr>
 </table>
 <p>In face, vertex and edge mode the whole-object move gizmo is hidden, so the brush stays highlighted and its edges are easy to click; <kbd>1</kbd> brings it back. Picking a face, edge or corner opens the Geometry screen of the right panel, where its buttons are.</p>
+<p id="help-snap"><strong>SNAP</strong> sets the step for every face, edge and corner drag and for PUSH: off, 0.05, 0.1, 0.25 (the default), 0.5 or 1 m. It's in the DRAG group of the face card, and at the top of the Geometry screen in vertex and edge mode; one setting for all brushes, remembered. Corner sets keep their own 15° rotate and 0.1 scale steps.</p>
+<p>In face mode the selected face's card is grouped: <strong>LOOK</strong> (material, TILE), <strong>CUT</strong> (SPLIT, INSET, LOOP CUT, FLIP FOLD), <strong>SHAPE</strong> (EXTRUDE, RECESS, DIST, OUTER WALLS), <strong>SELECT</strong> (FACE LOOP) and <strong>DRAG</strong> (MOVE / PUSH, SNAP, SOFT).</p>
 <p>In every mode, <kbd>Alt</kbd> while dragging turns snapping off, <kbd>Esc</kbd> cancels a drag, and <kbd>Cmd</kbd>+<kbd>Z</kbd> undoes a whole drag or button press in one step.</p>
 
 <h2 id="edge-mode">What edge mode cuts, if not faces</h2>
@@ -135,7 +137,7 @@
 <table>
   <tr><th>Button</th><th>Mode</th><th>What it does</th><th>Faces added</th></tr>
   <tr id="help-split"><td>SPLIT H / V</td><td>Face</td><td>Cuts the face in two between the middles of two opposite sides; neighbours gain the new corners so no gap opens</td><td>1</td></tr>
-  <tr id="help-loop-cut"><td>LOOP CUT H / V</td><td>Face</td><td>The same split, repeated around the shape until the ring closes or reaches a face that isn't four-sided</td><td>1 per face crossed</td></tr>
+  <tr id="help-loop-cut"><td>LOOP CUT H / V (LOOP H / V in the face card)</td><td>Face</td><td>The same split, repeated around the shape until the ring closes or reaches a face that isn't four-sided</td><td>1 per face crossed</td></tr>
   <tr id="help-edge-loop-cut"><td>LOOP CUT</td><td>Edge</td><td>The ring that crosses the picked edge</td><td>1 per face crossed</td></tr>
   <tr id="help-inset"><td>INSET</td><td>Face</td><td>Shrinks the face 0.25 m inward and surrounds it with a border of four-sided faces</td><td>1 per corner (4 on a square)</td></tr>
   <tr id="help-extrude"><td>EXTRUDE / RECESS</td><td>Face</td><td>Moves the face out or in by DIST (0.25 m unless changed) and fills the gap with side faces</td><td>1 per corner</td></tr>
@@ -164,7 +166,7 @@
 <p>Five steps turn a plain cylinder brush into a bulged one; the screenshots are from the editor on a 16-sided cylinder.</p>
 <ol>
   <li>Select the cylinder, press <kbd>2</kbd> (Face mode) and click one of its side faces.</li>
-  <li>Hover <strong>LOOP CUT H</strong>: a dashed ring shows where the cut will go. Click it: the ring becomes real edges, and the panel says "Cut 16 faces, ring closed."</li>
+  <li>Hover <strong>LOOP H</strong> (LOOP CUT H) in the CUT group: a dashed ring shows where the cut will go. Click it: the ring becomes real edges, and the panel says "Cut 16 faces, ring closed."</li>
   <li>Click <strong>SELECT RING</strong> next to that line. The editor switches to vertex mode with the 16 new corners selected, drawn in cyan and joined by a cyan line.</li>
   <li>Press <kbd>S</kbd> (or the SCALE button) and drag the gizmo's center box: right or up grows the ring, left or down shrinks it. The colored end boxes scale along one axis only.</li>
   <li><kbd>T</kbd> moves the ring (up and down gives a higher or lower bulge), <kbd>R</kbd> tilts it. Each drag is one <kbd>Cmd</kbd>+<kbd>Z</kbd>.</li>
@@ -188,7 +190,7 @@
   <li><strong>EXTRUDE / RECESS</strong> move the selection by DIST (0.25 m unless changed) as one piece: each face moves straight out (or in) along its own direction and grows (or shrinks) to stay joined, so a cylinder band becomes a thicker (or thinner) ring. Side walls appear only round the selection's outer edge.</li>
   <li>A recess that would turn faces inside out is refused: the brush stays as it was and the card says why.</li>
   <li>The gizmo moves every selected face together. SPLIT, LOOP CUT and FLIP FOLD work on one face at a time.</li>
-  <li id="help-push"><strong>GIZMO: MOVE / PUSH.</strong> MOVE slides the selection one way with the arrows. PUSH swaps them for a green cube: drag it right or up to push every selected face out along its own direction, left or down to pull them in (0.05 m steps, <kbd>Alt</kbd> for free). The panel says how far it went, or where it stopped if going further would turn faces inside out.</li>
+  <li id="help-push"><strong>GIZMO: MOVE / PUSH.</strong> MOVE slides the selection one way with the arrows. PUSH swaps them for a green cube: drag it right or up to push every selected face out along its own direction, left or down to pull them in (in SNAP steps, <kbd>Alt</kbd> for free). The panel says how far it went, or where it stopped if going further would turn faces inside out.</li>
   <li id="help-dist"><strong>EXTRUDE / RECESS DIST</strong> sets how far those two buttons go (0.25 m by default), for one face or many.</li>
 </ul>
 
@@ -277,14 +279,14 @@
   <tr><td>Double-click an edge</td><td>Edge mode</td><td>Selects every corner along its line</td></tr>
   <tr><td><kbd>Shift</kbd>+click a face</td><td>Face mode</td><td>Adds or removes it from the selection</td></tr>
   <tr><td>Double-click a face</td><td>Face mode</td><td>Selects its face loop (the ring of faces through it)</td></tr>
-  <tr><td>Drag the gizmo</td><td>Any mode</td><td>Moves the pick (snaps 0.25 m)</td></tr>
+  <tr><td>Drag the gizmo</td><td>Any mode</td><td>Moves the pick (in SNAP steps, 0.25 m by default)</td></tr>
   <tr><td><kbd>O</kbd>, <kbd>[</kbd> <kbd>]</kbd></td><td>Face, Vertex, Edge mode</td><td>SOFT on / off; shrink / grow its radius (also mid-drag)</td></tr>
   <tr><td><kbd>Shift</kbd>+click an edge</td><td>Edge mode</td><td>Adds or removes it (ROUND rounds them all)</td></tr>
   <tr><td>Click a curve</td><td>Face, Edge mode</td><td>Opens it: STEPS / SIZE again, MAKE SHARP</td></tr>
   <tr><td><kbd>Delete</kbd></td><td>Edge mode, edge(s) picked</td><td>DISSOLVE them (in other modes Delete removes the whole selection)</td></tr>
   <tr><td>Right-click a button</td><td>Brush panels</td><td>Opens this guide at that button</td></tr>
-  <tr><td>Drag the green cube</td><td>Face mode, GIZMO PUSH</td><td>Pushes the selected face(s) out / in along their own directions (snaps 0.05 m)</td></tr>
-  <tr id="help-vertex-set"><td><kbd>T</kbd> <kbd>R</kbd> <kbd>S</kbd></td><td>2+ corners selected</td><td>Move / rotate / scale them together (snaps 0.25 m / 15° / 0.1)</td></tr>
+  <tr><td>Drag the green cube</td><td>Face mode, GIZMO PUSH</td><td>Pushes the selected face(s) out / in along their own directions (in SNAP steps)</td></tr>
+  <tr id="help-vertex-set"><td><kbd>T</kbd> <kbd>R</kbd> <kbd>S</kbd></td><td>2+ corners selected</td><td>Move / rotate / scale them together (SNAP steps / 15° / 0.1)</td></tr>
   <tr><td><kbd>Alt</kbd> (held)</td><td>While dragging</td><td>No snapping</td></tr>
   <tr><td><kbd>Esc</kbd></td><td>While dragging</td><td>Cancels, puts everything back</td></tr>
   <tr><td>Right-click a corner</td><td>Vertex mode</td><td>Deletes it (a brush keeps at least 4)</td></tr>

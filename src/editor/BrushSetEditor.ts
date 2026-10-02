@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { validateMesh } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
+import { dragSnapStep } from "@/editor/dragSnap";
 import { isBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, ShapeDef, Vec3 } from "@/types";
 
-const SNAP_MOVE   = 0.25;
 const SNAP_ROTATE = THREE.MathUtils.degToRad(15);
 const SNAP_SCALE  = 0.1;
 const MIN_SCALE   = 0.05;   // no collapsing the set flat or mirroring it through the pivot
@@ -112,6 +112,7 @@ export class BrushSetEditor implements IEditorModule {
         if (mode) this._bus.emit("shape:set-gizmo-mode", { mode });
       }),
       this._bus.on("brush:soft-changed", () => { if (this._dragging) this._onGizmoChange(); }),   // Phase 82: [ ] mid-drag
+      this._bus.on("brush:snap-changed", () => { if (this._snapOn) this._setSnap(true); }),
       this._bus.on("input:mousemove", ({ screenPos }) => { this._mouse = screenPos; }),
       this._bus.on("input:mousedown", ({ screenPos }) => { this._mouse = screenPos; }),
       this._bus.on("input:keyup", ({ code }) => {
@@ -165,7 +166,7 @@ export class BrushSetEditor implements IEditorModule {
 
   private _setSnap(on: boolean): void {
     this._snapOn = on;
-    this._controls?.setTranslationSnap(on ? SNAP_MOVE : null);
+    this._controls?.setTranslationSnap(on ? (dragSnapStep() || null) : null);   // the panel's SNAP step (v4.106.0)
     this._controls?.setRotationSnap(on ? SNAP_ROTATE : null);
     this._controls?.setScaleSnap(on ? SNAP_SCALE : null);
   }

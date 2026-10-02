@@ -2,11 +2,12 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { isBrush } from "@/builders/ShapeBuilder";
 import { applySoft } from "@/editor/softFalloff";
+import { dragSnapStep, snapToStep } from "@/editor/dragSnap";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, ShapeDef, ScreenPos, Vec3 } from "@/types";
 
-const SNAP = 0.25;             // local-space grid for vertex edits (Alt = free)
+// Local-space snap for corner drags: the panel's SNAP step (dragSnap.ts, v4.106.0; Alt = free).
 const HANDLE_R = 0.09;
 const COLOR        = 0xffaa33;  // brush-corner amber
 const COLOR_HOVER  = 0xffffff;
@@ -14,7 +15,7 @@ const COLOR_SELECT = 0x00ffff;  // selected vertex (vertex mode)
 const MIN_VERTS = 4;
 const SUSPEND_SOURCE = "vertex-mode";
 
-const snap = (v: number): number => Math.round(v / SNAP) * SNAP;
+const snap = snapToStep;
 
 /**
  * Quake/UE-style brush editing for shapes in brush mode (v4.10.0): a sphere handle
@@ -71,7 +72,7 @@ export class BrushVertexEditor implements IEditorModule {
     this._controls = new TransformControls(this._camera as THREE.PerspectiveCamera, this._canvas);
     this._controls.setMode("translate");
     this._controls.setSize(0.4);
-    this._controls.setTranslationSnap(SNAP);
+    this._controls.setTranslationSnap((dragSnapStep() || null));
     this._scene.add(this._controls);
     this._controls.addEventListener("dragging-changed", e => {
       const isDragging = (e as unknown as { value: boolean }).value;
@@ -146,8 +147,9 @@ export class BrushVertexEditor implements IEditorModule {
           if (this._tcDragging) this._cancelTcDrag();
         }
       }),
+      this._bus.on("brush:snap-changed", () => { if (!this._altDown) this._controls?.setTranslationSnap((dragSnapStep() || null)); }),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") { this._altDown = false; this._controls?.setTranslationSnap(SNAP); }
+        if (code === "AltLeft" || code === "AltRight") { this._altDown = false; this._controls?.setTranslationSnap((dragSnapStep() || null)); }
       }),
     );
   }

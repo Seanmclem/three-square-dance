@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { facesFromCloud, edgeLoop, dissolveEdges } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
+import { dragSnapStep } from "@/editor/dragSnap";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, ShapeDef, Vec3 } from "@/types";
 
-const SNAP = 0.25;
 const SUSPEND_SOURCE = "edge-mode";
 
 /**
@@ -50,7 +50,7 @@ export class BrushEdgeEditor implements IEditorModule {
     this._controls = new TransformControls(this._camera, this._canvas);
     this._controls.setMode("translate");
     this._controls.setSize(0.5);
-    this._controls.setTranslationSnap(SNAP);
+    this._controls.setTranslationSnap((dragSnapStep() || null));   // the panel's SNAP step (v4.106.0)
     this._scene.add(this._controls);
 
     this._controls.addEventListener("dragging-changed", e => {
@@ -119,8 +119,9 @@ export class BrushEdgeEditor implements IEditorModule {
         if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(null);
         if (code === "Escape" && this._dragging) this._cancelDrag();
       }),
+      this._bus.on("brush:snap-changed", () => this._controls?.setTranslationSnap((dragSnapStep() || null))),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(SNAP);
+        if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap((dragSnapStep() || null));
       }),
     );
   }

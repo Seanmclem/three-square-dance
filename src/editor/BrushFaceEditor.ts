@@ -2,14 +2,13 @@ import * as THREE from "three";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 import { facesFromCloud, loopCutRing, offsetRegion, followRegion } from "@/editor/brushOps";
 import { applySoft } from "@/editor/softFalloff";
+import { dragSnapStep } from "@/editor/dragSnap";
 import { isBrush, isFaceBrush } from "@/builders/ShapeBuilder";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { IEditorModule, ToolId, ShapeDef, Vec3, BrushFace } from "@/types";
 
-const SNAP = 0.25;
 const SUSPEND_SOURCE = "face-mode";
-const PUSH_SNAP = 0.05;
 
 /**
  * Face-mode controller (Phase 23): a translate-only TransformControls parked on the
@@ -68,7 +67,7 @@ export class BrushFaceEditor implements IEditorModule {
     this._controls = new TransformControls(this._camera, this._canvas);
     this._controls.setMode("translate");
     this._controls.setSize(0.5);
-    this._controls.setTranslationSnap(SNAP);
+    this._controls.setTranslationSnap((dragSnapStep() || null));   // the panel's SNAP step (v4.106.0)
     this._scene.add(this._controls);
 
     this._controls.addEventListener("dragging-changed", e => {
@@ -160,8 +159,9 @@ export class BrushFaceEditor implements IEditorModule {
         if (code === "AltLeft" || code === "AltRight") { this._controls?.setTranslationSnap(null); this._snapOn = false; }
         if (code === "Escape" && this._dragging) this._cancelDrag();
       }),
+      this._bus.on("brush:snap-changed", () => { if (this._snapOn) this._controls?.setTranslationSnap((dragSnapStep() || null)); }),
       this._bus.on("input:keyup", ({ code }) => {
-        if (code === "AltLeft" || code === "AltRight") { this._controls?.setTranslationSnap(SNAP); this._snapOn = true; }
+        if (code === "AltLeft" || code === "AltRight") { this._controls?.setTranslationSnap((dragSnapStep() || null)); this._snapOn = true; }
       }),
     );
   }
@@ -323,7 +323,7 @@ export class BrushFaceEditor implements IEditorModule {
     if (!this._origMesh || !this._zoneId || !this._selectedId) return;
     const px = (this._mouse.x - this._mouseStart.x) - (this._mouse.y - this._mouseStart.y);
     let dist = px / 100;
-    dist = this._snapOn ? Math.round(dist / PUSH_SNAP) * PUSH_SNAP : Math.round(dist * 1000) / 1000;
+    dist = this._snapOn && dragSnapStep() > 0 ? Math.round(dist / dragSnapStep()) * dragSnapStep() : Math.round(dist * 1000) / 1000;
     if (dist === this._pushDist && !this._pushRefused && !force) return;
     const set = this._faceSet.length ? this._faceSet : [this._faceIndex!];
     // OUTER WALLS FOLLOW (v4.103.0): step walls toward the flat side, angled sides follow.
