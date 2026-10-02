@@ -37,7 +37,7 @@ export class BrushFaceHighlighter implements IEditorModule {
   private _faceSet: number[] = [];                // Phase 81: the rest of the face set
   private _setOverlays: THREE.Mesh[] = [];
   // Phase 84: green overlays for the open ROUND curve and a hovered CURVES row.
-  private _green: Record<"round" | "hover", { zoneId: string; shapeId: string; faces: number[] } | null> = { round: null, hover: null };
+  private _green: Record<"round" | "hover", { zoneId: string; shapeId: string; faces: number[]; round?: { id: string; part?: number } } | null> = { round: null, hover: null };
   private _greenOverlays: THREE.Mesh[] = [];
   private readonly _unsubs: Array<() => void> = [];
 
@@ -76,8 +76,8 @@ export class BrushFaceHighlighter implements IEditorModule {
         this._loop = start ? { zoneId, shapeId, start, single } : null;
         this._refreshLoop();
       }),
-      this._bus.on("shape:faces-highlight", ({ zoneId, shapeId, faces, channel }) => {
-        this._green[channel] = faces?.length ? { zoneId, shapeId, faces } : null;
+      this._bus.on("shape:faces-highlight", ({ zoneId, shapeId, faces, channel, round }) => {
+        this._green[channel] = round ? { zoneId, shapeId, faces: [], round } : faces?.length ? { zoneId, shapeId, faces } : null;
         this._refresh();
       }),
       this._bus.on("shape:face-hover", ({ zoneId, shapeId, faceIndex }) => {
@@ -199,7 +199,14 @@ export class BrushFaceHighlighter implements IEditorModule {
     this._clearGreen();
     for (const g of [this._green.round, this._green.hover]) {
       if (!g) continue;
-      for (const faceIndex of g.faces) {
+      // A curve's faces are looked up now, so a rebuild (new face numbers) can't leave the
+      // highlight on the wrong faces.
+      const tagged = g.round
+        ? (this._world.zones.get(g.zoneId)?.shapes?.find(s => s.id === g.shapeId)?.mesh?.faces ?? [])
+            .map((f, i) => (f.round?.id === g.round!.id && (g.round!.part === undefined || f.round.part === g.round!.part)) ? i : -1)
+            .filter(i => i >= 0)
+        : g.faces;
+      for (const faceIndex of tagged) {
         // Hovered CURVES row: bright amber over everything, so it stands out from the
         // open curve's green (v4.104.2; it was the same green at nearly the same strength).
         const hover = g === this._green.hover;

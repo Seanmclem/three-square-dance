@@ -138,7 +138,7 @@ export class BrushRoundController implements IEditorModule {
     const mesh = this._shape(o.zoneId, o.shapeId)?.mesh;
     const info = mesh ? roundsOf(mesh).find(r => r.id === o.id) : undefined;
     if (!info) { this._close(); return; }
-    this._bus.emit("shape:faces-highlight", { zoneId: o.zoneId, shapeId: o.shapeId, faces: info.faces, channel: "round" });
+    this._bus.emit("shape:faces-highlight", { zoneId: o.zoneId, shapeId: o.shapeId, faces: null, channel: "round", round: { id: o.id } });
     this._bus.emit("shape:round-state", {
       shapeId: o.shapeId, roundId: o.id, open: true, count: info.parts.length,
       steps: info.steps, size: info.size, edited: info.edited, note: this._note,

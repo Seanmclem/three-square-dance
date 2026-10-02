@@ -3465,7 +3465,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
   useEffect(() => () => bus.emit("shape:faces-highlight", { zoneId: selected.zoneId, shapeId: selected.id, faces: null, channel: "hover" }), [bus, selected.zoneId, selected.id, shape.mesh?.faces?.length]);
   if (!rounds.length) return null;
   const ids = { zoneId: selected.zoneId, shapeId: selected.id };
-  const hover = (faces: number[] | null) => bus.emit("shape:faces-highlight", { ...ids, faces, channel: "hover" });
+  const hover = (round: { id: string; part?: number } | null) => bus.emit("shape:faces-highlight", { ...ids, faces: null, channel: "hover", ...(round ? { round } : {}) });
   const adjust = (which: "steps" | "size", v: string) => {
     if (which === "steps") setSteps(v); else setSize(v);
     const s = parseFloat(which === "steps" ? v : steps), z = parseFloat(which === "size" ? v : size);
@@ -3481,7 +3481,7 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
       {rounds.map((r, n) => {
         const isOpen = open?.id === r.id;
         return (
-          <div key={r.id} onMouseEnter={() => { hover(r.faces); setHovRow(r.id); }} onMouseLeave={() => { hover(null); setHovRow(null); }}
+          <div key={r.id} onMouseEnter={() => { hover({ id: r.id }); setHovRow(r.id); }} onMouseLeave={() => { hover(null); setHovRow(null); }}
             style={{
               border: `1px solid ${hovRow === r.id ? "rgba(255,176,32,0.8)" : isOpen ? "rgba(60,207,145,0.55)" : "rgba(255,255,255,0.1)"}`, borderRadius: 5,
               background: isOpen ? "rgba(60,207,145,0.07)" : "transparent", padding: "5px 8px", display: "flex", flexDirection: "column", gap: 6,
@@ -3539,10 +3539,9 @@ function CurvesList({ selected, shape, bus }: { selected: SelectedObjectPayload;
                         onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id })}>SPLIT ALL</button>
                     </div>
                     {r.parts.map((part, k) => {
-                      const faces = r.faces.filter(fi => shape.mesh!.faces![fi]!.round!.part === part);
                       return (
                         <div key={part} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 8 }}
-                          onMouseEnter={() => hover(faces)} onMouseLeave={() => hover(r.faces)}>
+                          onMouseEnter={() => hover({ id: r.id, part })} onMouseLeave={() => hover({ id: r.id })}>
                           <span style={{ flex: 1, color: "#dde3f0", fontSize: 10, fontFamily: "monospace" }}>edge {k + 1}</span>
                           <button data-help="help-curves" style={OP_BTN} title="Make this edge its own curve"
                             onClick={() => bus.emit("shape:round-split", { ...ids, roundId: r.id, part })}>SPLIT OFF</button>

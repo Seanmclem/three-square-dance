@@ -279,7 +279,9 @@ export interface BusEvents {
   "shape:round-split":     { zoneId: string; shapeId: string; roundId: string; part?: number };
   "shape:round-state":     { shapeId: string | null; roundId: string | null; open: boolean; count: number; steps: number; size: number; edited: boolean; note: string | null };
   // Phase 84: green overlays on a set of brush faces (the open curve, or a hovered list row).
-  "shape:faces-highlight": { zoneId: string; shapeId: string; faces: number[] | null; channel: "round" | "hover" };
+  // `round` (v4.106.2): light that curve (or one edge of it), its faces looked up fresh on every
+  // rebuild; face numbers change when a curve is rebuilt, so a stored list would go stale.
+  "shape:faces-highlight": { zoneId: string; shapeId: string; faces: number[] | null; channel: "round" | "hover"; round?: { id: string; part?: number } };
   // Phase 82: soft falloff settings changed (panel, O / [ ] keys); drag editors re-apply mid-drag.
   "brush:soft-changed":    { on: boolean; radius: number; curve: "smooth" | "linear" | "sharp" };
   // Phase 82: corners following the current soft drag (world space, w = how much), for the dots.
