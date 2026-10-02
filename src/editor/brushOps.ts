@@ -1346,7 +1346,9 @@ function stampRoundSig(mesh: { vertices: Vec3[]; faces: BrushFace[] }, id: strin
 
 export interface RoundInfo { id: string; parts: number[]; steps: number; size: number; edited: boolean; faces: number[] }
 
-/** The curves on a brush, in the order they first appear in the face list. */
+/** The curves on a brush, oldest first (v4.106.1). Ids are `r` + a base-36 time stamp
+ *  (a split adds `.part`), so sorting by id keeps each curve's number stable when
+ *  STEPS / SIZE rebuild it (its faces move to the end of the face list). */
 export function roundsOf(mesh: { vertices: Vec3[]; faces?: BrushFace[] }): RoundInfo[] {
   const out = new Map<string, RoundInfo>();
   (mesh.faces ?? []).forEach((f, fi) => {
@@ -1362,7 +1364,7 @@ export function roundsOf(mesh: { vertices: Vec3[]; faces?: BrushFace[] }): Round
     info.edited = roundSig({ vertices: mesh.vertices, faces: mesh.faces! }, info.id) !== sig;
     info.parts.sort((p, q) => p - q);
   }
-  return [...out.values()];
+  return [...out.values()].sort((p, q) => (p.id < q.id ? -1 : p.id > q.id ? 1 : 0));
 }
 
 /** The curve a face belongs to, or (for an edge) one of its two faces does. */
