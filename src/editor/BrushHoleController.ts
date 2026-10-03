@@ -1,8 +1,10 @@
 import * as THREE from "three";
+import { TransformControls } from "three/addons/controls/TransformControls.js";
+import { dragSnapStep } from "@/editor/dragSnap";
 import { cutHole, fillHole, holesOf, holeAt, holeFrame, holeThickness, faceContainsPoint, type BrushMeshData } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
-import type { IEditorModule, ShapeDef, ShapeBrushMesh, HoleSpec } from "@/types";
+import type { IEditorModule, ShapeDef, ShapeBrushMesh, HoleSpec, ToolId } from "@/types";
 
 type Settings = Omit<HoleSpec, "c">;
 const PAUSE_SOURCE = "hole";
@@ -19,6 +21,12 @@ const OVER = 0.03;   // the ghost pokes out of the surface this much (meters)
  * them (or EDIT in the HOLES list) opens it; its settings rebuild it (fill, then cut
  * again, one undo step per open), PLACE brings the ghost back to move it, FILL closes it.
  * A hole whose corners were moved by hand can only be filled.
+ *
+ * v4.109.2: in face mode the open hole has its own move gizmo at its centre (arrows in
+ * the face's plane, in SNAP steps, Alt = free): a drag moves the whole hole, cut again at
+ * every step from the brush with it filled in (one undo step per drag; a spot where it
+ * can't go is skipped). Opening a hole drops the face pick, so the face gizmo that would
+ * move just the clicked face stays away.
  */
 export class BrushHoleController implements IEditorModule {
   private _settings: Settings = { shape: "round", sides: 24, w: 0.5, h: 0.5, depth: null };
@@ -31,6 +39,11 @@ export class BrushHoleController implements IEditorModule {
   private _writing = false;
   private readonly _ghost = new THREE.Group();
   private readonly _ray = new THREE.Raycaster();
+  private _tool: ToolId = "select";
+  private _previewing = false;
+  private _controls: TransformControls | null = null;
+  private readonly _proxy = new THREE.Group();
+  private _drag: { base: BrushMeshData; entry: number; spec: HoleSpec; startC: THREE.Vector3; startWorld: THREE.Vector3; orig: ShapeBrushMesh } | null = null;
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -45,7 +58,25 @@ export class BrushHoleController implements IEditorModule {
     this._ghost.visible = false;
     this._ghost.userData = { hideInGame: true, editorOnly: true, selectable: false };
     this._scene.add(this._ghost);
+    this._scene.add(this._proxy);
+    this._controls = new TransformControls(this._camera, this._canvas);
+    this._controls.setMode("translate");
+    this._controls.setSpace("local");
+    this._controls.showZ = false;   // the proxy's z is the face normal: the hole slides on the face
+    this._controls.setSize(0.6);
+    this._controls.setTranslationSnap(dragSnapStep() || null);
+    this._controls.visible = false;
+    this._scene.add(this._controls);
+    this._controls.addEventListener("dragging-changed", e => {
+      const on = (e as unknown as { value: boolean }).value;
+      this._bus.emit("gizmo:dragging", { isDragging: on });
+      if (on) this._beginDrag(); else this._endDrag();
+    });
+    this._controls.addEventListener("objectChange", () => this._onDrag());
     this._unsubs.push(
+      this._bus.on("brush:snap-changed", () => this._controls?.setTranslationSnap(dragSnapStep() || null)),
+      this._bus.on("input:keyup", ({ code }) => { if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(dragSnapStep() || null); }),
+      this._bus.on("preview:stop", () => { this._previewing = false; this._syncGizmo(); }),
       this._bus.on("object:selected", p => {
         if (this._writing) return;
         if (this._placing && (p.type !== "shape" || p.id !== this._placing.shapeId)) this._cancelPlacing();
@@ -56,7 +87,13 @@ export class BrushHoleController implements IEditorModule {
         if (!mesh?.faces || p.faceIndex === undefined) return;
         // A pick on a hole's face opens it; a pick on any other face closes the open one.
         const id = holeAt(mesh, p.faceIndex);
-        if (id) this._openHole(p.zoneId, p.id, id); else this._close();
+        if (!id) { this._close(); return; }
+        this._openHole(p.zoneId, p.id, id);
+        // The hole is the selection now, not the clicked face (its gizmo would move just
+        // that face). After this dispatch, so every listener sees the pick first.
+        queueMicrotask(() => {
+          if (this._open?.id === id) this._bus.emit("shape:sub-select", { zoneId: p.zoneId, shapeId: p.id, faceIndex: null, vertexIndex: null });
+        });
       }),
       this._bus.on("object:deselected", () => { this._cancelPlacing(); this._close(); }),
       this._bus.on("shape:removed", ({ id }) => {
@@ -64,12 +101,12 @@ export class BrushHoleController implements IEditorModule {
         if (this._open?.shapeId === id) this._close();
       }),
       this._bus.on("shape:rebuilt", ({ shapeId }) => {
-        if (this._writing) return;
+        if (this._writing || this._drag) return;
         if (this._placing?.shapeId === shapeId) this._cancelPlacing();   // undo under the ghost: its face is gone
         if (this._open?.shapeId === shapeId) this._emit();
       }),
-      this._bus.on("tool:select", ({ tool }) => { if (tool !== "select-face") this._cancelPlacing(); }),
-      this._bus.on("preview:start", () => { this._cancelPlacing(); this._close(); }),
+      this._bus.on("tool:select", ({ tool }) => { this._tool = tool; if (tool !== "select-face") this._cancelPlacing(); this._syncGizmo(); }),
+      this._bus.on("preview:start", () => { this._previewing = true; this._cancelPlacing(); this._close(); }),
       this._bus.on("shape:hole-start", ({ zoneId, shapeId, face, holeId }) => this._startPlacing(zoneId, shapeId, face, holeId)),
       this._bus.on("shape:hole-settings", s => this._changeSettings(s)),
       this._bus.on("shape:hole-cut", () => this._cut()),
@@ -82,7 +119,11 @@ export class BrushHoleController implements IEditorModule {
         if (this._follow(screenPos, true)) this._placing.pinned = true;
         this._emit();
       }),
-      this._bus.on("input:keydown", ({ code }) => { if (code === "Escape" && this._placing) this._cancelPlacing(); }),
+      this._bus.on("input:keydown", ({ code }) => {
+        if (code === "Escape" && this._drag) this._cancelDrag();
+        else if (code === "Escape" && this._placing) this._cancelPlacing();
+        if (code === "AltLeft" || code === "AltRight") this._controls?.setTranslationSnap(null);
+      }),
     );
   }
 
@@ -93,6 +134,13 @@ export class BrushHoleController implements IEditorModule {
     this._unsubs.length = 0;
     this._clearGhost();
     this._scene.remove(this._ghost);
+    if (this._controls) {
+      this._controls.detach();
+      this._scene.remove(this._controls);
+      this._controls.dispose();
+      this._controls = null;
+    }
+    this._scene.remove(this._proxy);
   }
 
   private _shape(zoneId: string, shapeId: string): ShapeDef | undefined {
@@ -299,6 +347,7 @@ export class BrushHoleController implements IEditorModule {
       const fr = holeFrame(pl.base.vertices, pl.base.faces[pl.face]!.verts);
       const d = pl.c.clone().sub(fr.O);
       this._bus.emit("shape:hole-state", { ...base, shapeId: pl.shapeId, mode: "placing", holeId: pl.holeId, x: d.dot(fr.u), y: d.dot(fr.v), pinned: pl.pinned, note: pl.note ?? this._note });
+      this._syncGizmo();
       return;
     }
     const o = this._open;
@@ -307,6 +356,7 @@ export class BrushHoleController implements IEditorModule {
     if (!o || !info || !mesh?.faces) {
       if (o) { this._close(); return; }
       this._bus.emit("shape:hole-state", { ...base, shapeId: null, mode: null, holeId: null, note: this._note });
+      this._syncGizmo();
       return;
     }
     let x = 0, y = 0;
@@ -319,5 +369,78 @@ export class BrushHoleController implements IEditorModule {
     this._bus.emit("shape:faces-highlight", { zoneId: o.zoneId, shapeId: o.shapeId, faces: null, channel: "round", round: { id: o.id } });
     const { c: _c, ...spec } = info.spec;
     this._bus.emit("shape:hole-state", { ...base, ...spec, shapeId: o.shapeId, mode: "open", holeId: o.id, x, y, edited: info.edited, note: this._note });
+    this._syncGizmo();
+  }
+
+  // ── Move gizmo (v4.109.2) ───────────────────────────────────────────────────
+
+  /** Gizmo on the open hole's centre, in face mode, unless it was edited by hand. */
+  private _syncGizmo(): void {
+    const c = this._controls;
+    if (!c || this._drag) return;
+    const o = this._open;
+    const shape = o && this._shape(o.zoneId, o.shapeId);
+    const info = shape?.mesh?.faces ? holesOf(shape.mesh).find(h => h.id === o!.id) : undefined;
+    const f = info && !info.edited && !this._placing && !this._previewing && this._tool === "select-face"
+      ? fillHole({ vertices: shape!.mesh!.vertices, faces: shape!.mesh!.faces! }, o!.id) : null;
+    if (!f || "refused" in f || !info || !shape) { c.detach(); c.visible = false; return; }
+    const fr = holeFrame(f.mesh.vertices, f.mesh.faces[f.entry]!.verts);
+    const m = this._shapeMatrix(shape);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(fr.u, fr.v, fr.n));
+    this._proxy.position.set(info.spec.c.x, info.spec.c.y, info.spec.c.z).applyMatrix4(m);
+    this._proxy.quaternion.setFromRotationMatrix(m).multiply(q);
+    c.attach(this._proxy);
+    c.visible = true;
+  }
+
+  private _beginDrag(): void {
+    const o = this._open;
+    const mesh = o && this._shape(o.zoneId, o.shapeId)?.mesh;
+    const info = mesh?.faces ? holesOf(mesh).find(h => h.id === o!.id) : undefined;
+    const f = info ? fillHole({ vertices: mesh!.vertices, faces: mesh!.faces! }, o!.id) : null;
+    if (!o || !mesh || !info || !f || "refused" in f) return;
+    this._drag = {
+      base: f.mesh, entry: f.entry, spec: { ...info.spec },
+      startC: new THREE.Vector3(info.spec.c.x, info.spec.c.y, info.spec.c.z),
+      startWorld: this._proxy.position.clone(), orig: structuredClone(mesh),
+    };
+    this._world.beginTransaction("move hole");
+  }
+
+  private _onDrag(): void {
+    const d = this._drag, o = this._open;
+    const shape = o && this._shape(o.zoneId, o.shapeId);
+    if (!d || !o || !shape) return;
+    // World move → brush space, kept in the face's plane.
+    const D2R = Math.PI / 180;
+    const inv = new THREE.Quaternion().setFromEuler(new THREE.Euler(shape.rotation.x * D2R, shape.rotation.y * D2R, shape.rotation.z * D2R, "XYZ")).invert();
+    const delta = this._proxy.position.clone().sub(d.startWorld).applyQuaternion(inv);
+    const n = holeFrame(d.base.vertices, d.base.faces[d.entry]!.verts).n;
+    delta.addScaledVector(n, -delta.dot(n));
+    const c = d.startC.clone().add(delta);
+    const r = cutHole(d.base, d.entry, { ...d.spec, c: { x: c.x, y: c.y, z: c.z } }, o.id);
+    if ("refused" in r) return;   // can't go there: the hole stays at the last good spot
+    this._world.updateShape(o.zoneId, o.shapeId, { mesh: { ...shape.mesh!, vertices: r.mesh.vertices, faces: r.mesh.faces } });
+  }
+
+  private _endDrag(): void {
+    if (!this._drag) return;
+    this._drag = null;
+    this._world.commitTransaction();
+    this._writing = true;
+    try { this._bus.emit("selection:check-sub", {}); } finally { this._writing = false; }
+    this._emit();   // card X / Y, highlight, gizmo back on the hole's actual centre
+  }
+
+  private _cancelDrag(): void {
+    const d = this._drag, o = this._open;
+    if (!d || !o) return;
+    this._drag = null;
+    const shape = this._shape(o.zoneId, o.shapeId);
+    if (shape) this._world.updateShape(o.zoneId, o.shapeId, { mesh: { ...shape.mesh!, vertices: d.orig.vertices, faces: d.orig.faces } });
+    this._world.abortTransaction();
+    this._controls?.detach();   // ends TransformControls' own drag
+    this._bus.emit("gizmo:dragging", { isDragging: false });
+    this._emit();
   }
 }

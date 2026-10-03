@@ -33,6 +33,11 @@ input, on a 2 × 0.2 × 1 m plate brush at y = 20; nothing reaches `public/games
 - [x] PLACE, click elsewhere, MOVE HERE → moved, settings kept.
 - [x] Undo: 1 step for the move, 1 for the cut and its edits; redo both.
 - [x] FILL → the plain plate.
+- [x] v4.109.2: after the cut, and after clicking one of the hole's faces, there is one
+      gizmo, at the hole's centre (no face gizmo); dragging its arrows moves the whole
+      hole along the face (same face count, card X / Y follow, gizmo follows); one undo
+      puts it back; dragging past the edge leaves it at the last spot that fits; DONE
+      removes the gizmo.
 - [x] HOLE then Esc → placing cancelled, ghost gone.
 - [x] Cmd+S, reload → the hole is still there.
 - [ ] By hand: the ghost reads clearly on light and dark materials; the open hole's

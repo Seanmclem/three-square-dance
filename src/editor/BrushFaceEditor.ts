@@ -45,6 +45,7 @@ export class BrushFaceEditor implements IEditorModule {
   private readonly _ray = new THREE.Raycaster();
   private _previewing = false;
   private _paused = false;   // Phase 85: the hole ghost is being placed (no face gizmo in the way)
+  private _holeShape: string | null = null;   // v4.109.2: a hole is open on this shape (it has its own gizmo)
   private _suspended = false;
 
   private _controls: TransformControls | null = null;
@@ -155,6 +156,10 @@ export class BrushFaceEditor implements IEditorModule {
         else if (this._dragging) this._onGizmoChange();
       }),
       this._bus.on("selection:pause", ({ paused }) => { this._paused = paused; this._sync(); }),
+      this._bus.on("shape:hole-state", ({ shapeId, mode }) => {
+        const next = mode ? shapeId : null;
+        if (next !== this._holeShape) { this._holeShape = next; this._sync(); }
+      }),
       this._bus.on("preview:start", () => { this._previewing = true;  this._sync(); }),
       this._bus.on("preview:stop",  () => { this._previewing = false; this._sync(); }),
       this._bus.on("input:keydown", ({ code }) => {
@@ -198,6 +203,7 @@ export class BrushFaceEditor implements IEditorModule {
 
   private _isActive(): boolean {
     if (this._activeTool !== "select-face" || this._previewing || this._paused || this._faceIndex === null) return false;
+    if (this._holeShape !== null && this._holeShape === this._selectedId) return false;
     const s = this._shape();
     return !!s && isFaceBrush(s) && this._faceIndex < (s.mesh!.faces!.length);
   }
