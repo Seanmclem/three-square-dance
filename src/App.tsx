@@ -3787,7 +3787,8 @@ export default function App() {
 
   const handleEditBrush = (): void => {
     const world = worldRef.current, zones = zonesRef.current, history = historyRef.current;
-    if (!world || !zones || !history || !selected || selected.type !== "shape" || inIsolatedEdit()) return;
+    // v4.110.0: also from inside the prefab editor (Close returns there); never nested twice.
+    if (!world || !zones || !history || !selected || selected.type !== "shape" || editingBrushRef.current) return;
     const shape = world.zones.get(selected.zoneId)?.shapes?.find(s => s.id === selected.id);
     if (!shape || !isBrush(shape)) return;
     brushSessionRef.current ??= new BrushEditSession(world, zones, history, () => sceneRef.current?.editorCamera ?? null);
@@ -3796,7 +3797,7 @@ export default function App() {
     busRef.current.emit("object:deselected", {});
     setSelected(null);
     setLeftPanel(null);
-    void brushSessionRef.current.enter(selected.zoneId, shape).then(() => {
+    void brushSessionRef.current.enter(selected.zoneId, shape, { keepHistory: editingPrefabRef.current }).then(() => {
       // Open straight into face mode on the staged clone.
       setActiveTool("select-face");
       busRef.current.emit("tool:select", { tool: "select-face" });
@@ -3884,10 +3885,12 @@ export default function App() {
     multiSelected.length > 1 ? multiSelected
     : selected && selected.id !== "__spawn__" ? [{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef]
     : [];
+  // Never inside the prefab / brush editor: it would capture their temporary staging copies.
   const prefabSelectionEligible =
-    prefabSelectionRefs.some(r => PREFABABLE_TYPES.includes(r.type as string)) && !selPrefabInfo;
+    prefabSelectionRefs.some(r => PREFABABLE_TYPES.includes(r.type as string)) && !selPrefabInfo && !editingPrefab && !editingBrush;
   const prefabSelectionHint =
-    prefabSelectionRefs.length === 0 ? "Select an object, trigger volume, shape, stair, ladder, or checkpoint first"
+    editingPrefab || editingBrush ? "Leave the prefab or brush editor to make a prefab"
+    : prefabSelectionRefs.length === 0 ? "Select an object, trigger volume, shape, stair, ladder, or checkpoint first"
     : selPrefabInfo ? "Prefab members can't be re-captured — unlink the instance first"
     : "Selection has no capturable entities (walls/floors/platforms are node-backed)";
   const prefabCreateFromSelection = prefabSelectionEligible
@@ -4080,7 +4083,7 @@ export default function App() {
         prefabRenameRequestId={prefabRenameRequest}
         onPrefabRenameRequestHandled={() => setPrefabRenameRequest(null)}
       />
-      {editingPrefab && (
+      {editingPrefab && !editingBrush && (
         <EditModeBar
           title="Editing Prefab"
           name={editingPrefab.name}
@@ -4097,6 +4100,7 @@ export default function App() {
       {editingBrush && (
         <EditModeBar
           name={editingBrush.name}
+          hint={editingPrefab ? `in prefab ${editingPrefab.name}: Close returns to it` : undefined}
           onSave={handleBrushEditSave}
           onCancel={() => handleBrushEditClose()}
           cancelLabel="Close"
@@ -4169,7 +4173,7 @@ export default function App() {
         onToggleCeilingGhost={findRunCeiling() ? handleToggleCeilingGhost : undefined}
         runCeilingGhosted={!!findRunCeiling()?.editorGhost}
         onUnlinkRunCorners={selected?.type === "wall" ? handleUnlinkRunCorners : undefined}
-        onEditBrush={selected?.type === "shape" && !editingPrefab && !editingBrush ? handleEditBrush : undefined}
+        onEditBrush={selected?.type === "shape" && !editingBrush ? handleEditBrush : undefined}
         runLinkedFloors={selected?.type === "wall" ? getRunLinkedFloors() : undefined}
         onDelete={selected || multiSelected.length > 1 ? handleDelete : undefined}
         multiSelected={multiSelected}
@@ -4232,7 +4236,7 @@ export default function App() {
         onPrefabPushToPrefab={() => setPrefabConfirm("push")}
         onPrefabUnlink={() => setPrefabConfirm("unlink")}
         onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
-        onCreatePrefab={handleCreatePrefab}
+        onCreatePrefab={editingPrefab || editingBrush ? undefined : handleCreatePrefab}
         onAddPressPrompt={handleAddPressPrompt}
       />
       <CoordinateDisplay coords={coords} />

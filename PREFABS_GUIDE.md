@@ -139,6 +139,12 @@ things, add objects, edit scripts, delete pieces.
   the scene rebuilds to match** — one undo step. Other scenes in the project
   catch up when next opened.
 - **Cancel**: discards the editing session; nothing changes.
+- **Brushes in a prefab** (v4.110.0): select one and press **Edit Brush** (Actions or
+  Geometry) to open it in the brush editor. The prefab bar hides while you're in there;
+  the brush bar says which prefab it's in. **Close** returns to the prefab editor with
+  the saved brush changes applied as one undo step there, and the prefab editor's undo
+  history is still there. Then **Save** the prefab as usual to update its instances.
+  (Create Prefab is off inside both editors.)
 
 While editing: project save, scene switching, and Play are disabled, and the
 autosave is suspended (the editing sandbox can never leak into your world).

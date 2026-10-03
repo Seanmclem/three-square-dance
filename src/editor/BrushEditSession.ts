@@ -37,6 +37,11 @@ export type BrushEditResult = Pick<ShapeDef, "mesh" | "material" | "materialOver
  * every save/autosave/preview path while a session is active. History is
  * cleared on enter AND exit (the world's undo stack is sacrificed).
  *
+ * v4.110.0: it can open from inside the prefab editor (`keepHistory`): the prefab's
+ * staging zone is only unloaded while the brush is edited (its data stays in the
+ * world), Close loads it back, and the prefab editor's undo history is kept aside and
+ * put back instead of being cleared.
+ *
  * Brushes only — a parametric shape's params are its editing interface; the
  * panel's Convert to Brush comes first.
  */
@@ -46,6 +51,7 @@ export class BrushEditSession {
   private _prevPose: EditorCameraPose | null = null;
   private _original: BrushEditResult | null = null;   // the shape as it was on enter
   private _saved: BrushEditResult | null = null;      // last Save, applied on Close
+  private _keptHistory: ReturnType<HistoryManager["capture"]> | null = null;   // nested in prefab edit
 
   constructor(
     private readonly _world:   WorldState,
@@ -57,13 +63,14 @@ export class BrushEditSession {
   get active(): boolean { return this._target !== null; }
   get target(): { zoneId: string; shapeId: string } | null { return this._target; }
 
-  async enter(zoneId: string, shape: ShapeDef): Promise<void> {
+  async enter(zoneId: string, shape: ShapeDef, opts: { keepHistory?: boolean } = {}): Promise<void> {
     if (this._target || !isBrush(shape)) return;   // idempotent (StrictMode) + brushes only
     this._target = { zoneId, shapeId: shape.id };
     this._prevZoneId = this._world.activeZoneId;
     this._prevPose = this._camera()?.getPose() ?? null;
     this._original = pickResult(shape);
     this._saved = null;
+    this._keptHistory = opts.keepHistory ? this._history.capture() : null;
 
     const clone = structuredClone(shape);
     clone.position = { x: 0, y: 0, z: 0 };
@@ -143,7 +150,9 @@ export class BrushEditSession {
       await this._zones.loadZone(this._prevZoneId);
       this._world.setActiveZone(this._prevZoneId);
     }
-    this._history.clear();
+    if (this._keptHistory) this._history.restore(this._keptHistory);
+    else this._history.clear();
+    this._keptHistory = null;
     const cam = this._camera();
     if (cam && this._prevPose) cam.setPose(this._prevPose);
     this._prevZoneId = null;

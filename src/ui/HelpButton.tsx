@@ -65,7 +65,7 @@ const SECTIONS: ShortcutSection[] = [
     guide: BRUSH_GUIDE,
     rows: [
       { keys: ["RMB panel button"], action: "Open the brush guide at that button's entry (Cmd+F searches the guide)" },
-      { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin; Save (or Cmd+S) keeps editing, Close exits and asks if there are unsaved changes" },
+      { keys: ["Panel: Edit Brush"], action: "Open the brush alone at the origin (also from inside the prefab editor: Close returns there); Save (or Cmd+S) keeps editing, Close exits and asks if there are unsaved changes" },
       { keys: ["1", "2", "3", "4"],  action: "Select mode: Object / Face / Vertex / Edge (in Edit Brush, also the bar top-left: one click)" },
       { keys: ["LMB"],               action: "Pick a face / corner / edge on the selected brush" },
       { keys: ["LMB drag gizmo"],    action: "Move the face / corner / edge (in SNAP steps, 0.25 m by default; SNAP is in the panel)" },
