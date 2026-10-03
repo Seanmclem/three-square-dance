@@ -72,7 +72,7 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Alt"],               action: "Free drag (no snap)" },
       { keys: ["Esc"],               action: "Cancel drag, restore geometry" },
       { keys: ["RMB click corner"],  action: "Delete that corner (keeps at least 4)" },
-      { keys: ["LMB drag (empty)"],  action: "Vertex mode: box-select corners, hidden ones too (Shift+drag adds, Alt+drag removes); then T / R / S or the gizmo moves them all" },
+      { keys: ["LMB drag (box select)"],  action: "Vertex mode: box select: drag a box over corners (not starting on a corner dot) to pick them all, hidden ones too (Shift+drag adds, Alt+drag removes); then T / R / S or the gizmo moves them all" },
       { keys: ["Shift+LMB corner"],  action: "Vertex mode: add / remove a corner from the selection" },
       { keys: ["Shift+LMB face"],    action: "Face mode: add / remove a face from the selection" },
       { keys: ["Dbl-click face"],    action: "Face mode: select that face's face loop (the ring of faces through it)" },

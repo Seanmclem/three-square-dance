@@ -72,7 +72,7 @@
   <ol>
     <li><a href="#short-answer">The short answer</a></li>
     <li><a href="#parts">The three parts of a brush</a></li>
-    <li><a href="#modes">The four select modes</a></li>
+    <li><a href="#modes">The four select modes</a> · <a href="#box-select">box select</a></li>
     <li><a href="#edge-mode">What edge mode cuts</a></li>
     <li><a href="#ops">Every operation, before and after</a></li>
     <li><a href="#dissolve">Removing edges (DISSOLVE)</a></li>
@@ -118,7 +118,90 @@
   <tr><td><kbd>4</kbd></td><td>Edge</td><td>The edge nearest where you clicked on a face (blue tube)</td><td>The edge's two corners</td><td>SPLIT EDGE, LOOP CUT, SELECT LOOP, AROUND FACE n; double-click = SELECT LOOP</td></tr>
 </table>
 <p>In face, vertex and edge mode the whole-object move gizmo is hidden, so the brush stays highlighted and its edges are easy to click; <kbd>1</kbd> brings it back. Picking a face, edge or corner opens the Geometry screen of the right panel, where its buttons are.</p>
-<p>To move a whole end of a brush (curves and all), use vertex mode and <strong>drag a box</strong> over it: every corner inside is selected, including the hidden ones at the back and underneath. Drag the gizmo and only the faces in between stretch.</p>
+<h3 id="box-select">Box select: grab a whole end at once</h3>
+<p>Box select has no button: it's a drag with the mouse in vertex mode. Use it to move a whole end of a brush, curves and all, e.g. to make a plate with rounded ends longer.</p>
+<figure><svg viewBox="0 0 780 295" role="img" aria-label="Box select: drag a box over one end in vertex mode, then drag the gizmo to stretch the middle" font-size="13">
+<text x="24" y="28" font-size="13" fill="#dde3f0" font-weight="600">1. Vertex mode: drag a box over one end</text>
+<polygon points="60.3,110.0 63.1,118.1 63.1,98.1 60.3,90.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="63.1,118.1 71.1,125.0 71.1,105.0 63.1,98.1" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="71.1,125.0 192.3,195.0 192.3,175.0 71.1,105.0" fill="#39404e" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="286.9,168.1 289.7,160.0 289.7,140.0 286.9,148.1" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="278.9,175.0 286.9,168.1 286.9,148.1 278.9,155.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="244.3,195.0 278.9,175.0 278.9,155.0 244.3,175.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="192.3,195.0 204.2,199.6 204.2,179.6 192.3,175.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="232.4,199.6 244.3,195.0 244.3,175.0 232.4,179.6" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="204.2,199.6 218.3,201.2 218.3,181.2 204.2,179.6" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="218.3,201.2 232.4,199.6 232.4,179.6 218.3,181.2" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="192.3,175.0 204.2,179.6 218.3,181.2 232.4,179.6 244.3,175.0 278.9,155.0 286.9,148.1 289.7,140.0 286.9,131.9 278.9,125.0 157.7,55.0 145.8,50.4 131.7,48.8 117.6,50.4 105.7,55.0 71.1,75.0 63.1,81.9 60.3,90.0 63.1,98.1 71.1,105.0" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/>
+<rect x="180.3" y="113.0" width="121.4" height="100.2" fill="rgba(91,212,255,0.08)" stroke="#5bd4ff" stroke-width="1.4" stroke-dasharray="5 4"/>
+<circle cx="192.3" cy="175.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="192.3" cy="195.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="204.2" cy="179.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="204.2" cy="199.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="218.3" cy="181.2" r="3.6" fill="#5bd4ff"/>
+<circle cx="218.3" cy="201.2" r="3.6" fill="#5bd4ff"/>
+<circle cx="232.4" cy="179.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="232.4" cy="199.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="244.3" cy="175.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="244.3" cy="195.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="278.9" cy="155.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="278.9" cy="175.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="286.9" cy="148.1" r="3.6" fill="#5bd4ff"/>
+<circle cx="286.9" cy="168.1" r="3.6" fill="#5bd4ff"/>
+<circle cx="289.7" cy="140.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="289.7" cy="160.0" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<circle cx="286.9" cy="131.9" r="3.6" fill="#5bd4ff"/>
+<circle cx="286.9" cy="151.9" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<circle cx="278.9" cy="125.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="278.9" cy="145.0" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<text x="175" y="262" font-size="12" text-anchor="middle" fill="#8f98ab">every corner inside is picked,</text>
+<text x="175" y="278" font-size="12" text-anchor="middle" fill="#8f98ab">hidden ones too (hollow dots)</text>
+<text x="380" y="28" font-size="13" fill="#dde3f0" font-weight="600">2. Drag the gizmo: only the middle stretches</text>
+<polygon points="375.3,95.0 378.1,103.1 378.1,83.1 375.3,75.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="378.1,103.1 386.1,110.0 386.1,90.0 378.1,83.1" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="386.1,110.0 559.3,210.0 559.3,190.0 386.1,90.0" fill="rgba(60,207,145,0.35)" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="653.8,183.1 656.6,175.0 656.6,155.0 653.8,163.1" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="645.9,190.0 653.8,183.1 653.8,163.1 645.9,170.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="611.2,210.0 645.9,190.0 645.9,170.0 611.2,190.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="559.3,210.0 571.2,214.6 571.2,194.6 559.3,190.0" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="599.3,214.6 611.2,210.0 611.2,190.0 599.3,194.6" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="571.2,214.6 585.3,216.2 585.3,196.2 571.2,194.6" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="585.3,216.2 599.3,214.6 599.3,194.6 585.3,196.2" fill="#323845" stroke="#c9d1e0" stroke-width="0.9" stroke-linejoin="round"/>
+<polygon points="559.3,190.0 571.2,194.6 585.3,196.2 599.3,194.6 611.2,190.0 645.9,170.0 653.8,163.1 656.6,155.0 653.8,146.9 645.9,140.0 472.7,40.0 460.8,35.4 446.7,33.8 432.6,35.4 420.7,40.0 386.1,60.0 378.1,66.9 375.3,75.0 378.1,83.1 386.1,90.0" fill="#4a5468" stroke="#c9d1e0" stroke-width="1.1" stroke-linejoin="round"/>
+<circle cx="559.3" cy="190.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="559.3" cy="210.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="571.2" cy="194.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="571.2" cy="214.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="585.3" cy="196.2" r="3.6" fill="#5bd4ff"/>
+<circle cx="585.3" cy="216.2" r="3.6" fill="#5bd4ff"/>
+<circle cx="599.3" cy="194.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="599.3" cy="214.6" r="3.6" fill="#5bd4ff"/>
+<circle cx="611.2" cy="190.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="611.2" cy="210.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="645.9" cy="170.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="645.9" cy="190.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="653.8" cy="163.1" r="3.6" fill="#5bd4ff"/>
+<circle cx="653.8" cy="183.1" r="3.6" fill="#5bd4ff"/>
+<circle cx="656.6" cy="155.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="656.6" cy="175.0" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<circle cx="653.8" cy="146.9" r="3.6" fill="#5bd4ff"/>
+<circle cx="653.8" cy="166.9" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<circle cx="645.9" cy="140.0" r="3.6" fill="#5bd4ff"/>
+<circle cx="645.9" cy="160.0" r="3.4" fill="none" stroke="#5bd4ff" stroke-width="1.3" opacity="0.6"/>
+<line x1="641.6" y1="197.5" x2="689.6" y2="225.5" stroke="#ff6b6b" stroke-width="2.6"/><polygon points="697.6,230.5 681.6,228.5 688.6,216.5" fill="#ff6b6b"/>
+<text x="520" y="262" font-size="12" text-anchor="middle" fill="#8f98ab">the rounded end keeps its shape;</text>
+<text x="520" y="278" font-size="12" text-anchor="middle" fill="#8f98ab">the long sides (green) get longer</text>
+</svg></figure>
+<ol>
+  <li>Select the brush and press <kbd>3</kbd> (vertex mode).</li>
+  <li>Press the mouse on empty space or on the brush (not on a corner dot) and drag: a dashed blue box follows the mouse. Let go and every corner inside the box is selected, including the ones you can't see at the back and underneath.</li>
+  <li>Drag the gizmo (or press <kbd>T</kbd>, <kbd>R</kbd> or <kbd>S</kbd> to move, rotate or scale them). The selected corners move together, so the end keeps its shape and only the faces between the two ends stretch.</li>
+</ol>
+<ul>
+  <li><kbd>Shift</kbd>+drag adds the corners in the box to the ones already selected; <kbd>Alt</kbd>+drag removes them.</li>
+  <li>A short drag (under about 5 pixels) counts as a plain click. <kbd>Esc</kbd> while dragging cancels the box.</li>
+  <li>Orbit the camera so the end you want is clear of the other end before you drag: the box takes everything inside it on screen, front and back.</li>
+</ul>
 <p id="help-snap"><strong>SNAP</strong> sets the step for every face, edge and corner drag and for PUSH: off, 0.05, 0.1, 0.25 (the default), 0.5 or 1 m. It's in the DRAG group of the face card, and at the top of the Geometry screen in vertex and edge mode; one setting for all brushes, remembered. Corner sets keep their own 15° rotate and 0.1 scale steps.</p>
 <p>In face mode the selected face's card is grouped: <strong>LOOK</strong> (material, TILE), <strong>CUT</strong> (SPLIT, INSET, LOOP CUT, FLIP FOLD), <strong>SHAPE</strong> (EXTRUDE, RECESS, DIST, OUTER WALLS), <strong>SELECT</strong> (FACE LOOP) and <strong>DRAG</strong> (MOVE / PUSH, SNAP, SOFT).</p>
 <p>In every mode, <kbd>Alt</kbd> while dragging turns snapping off, <kbd>Esc</kbd> cancels a drag, and <kbd>Cmd</kbd>+<kbd>Z</kbd> undoes a whole drag or button press in one step.</p>
@@ -368,7 +451,7 @@
   <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></td><td>Any brush</td><td>Object / Face / Vertex / Edge mode</td></tr>
   <tr><td>Click</td><td>Face, Vertex, Edge mode</td><td>Picks a face / corner / nearest edge</td></tr>
   <tr><td><kbd>Shift</kbd>+click a corner</td><td>Vertex mode</td><td>Adds or removes it from the selection</td></tr>
-  <tr id="help-box-select"><td>Drag a box (not starting on a corner)</td><td>Vertex mode</td><td>Selects every corner inside it, hidden ones (back, underside) too; <kbd>Shift</kbd>+drag adds, <kbd>Alt</kbd>+drag removes. Then the gizmo or <kbd>T</kbd> / <kbd>R</kbd> / <kbd>S</kbd> moves them together: box one end of a plate and drag it to stretch the middle.</td></tr>
+  <tr id="help-box-select"><td>Box select: drag a box (not starting on a corner)</td><td>Vertex mode</td><td>Selects every corner inside it, hidden ones (back, underside) too; <kbd>Shift</kbd>+drag adds, <kbd>Alt</kbd>+drag removes. Then the gizmo or <kbd>T</kbd> / <kbd>R</kbd> / <kbd>S</kbd> moves them together: box one end of a plate and drag it to stretch the middle (see <a href="#box-select">Box select</a>).</td></tr>
   <tr><td>Double-click an edge</td><td>Edge mode</td><td>Selects every corner along its line</td></tr>
   <tr><td><kbd>Shift</kbd>+click a face</td><td>Face mode</td><td>Adds or removes it from the selection</td></tr>
   <tr><td>Double-click a face</td><td>Face mode</td><td>Selects its face loop (the ring of faces through it)</td></tr>
