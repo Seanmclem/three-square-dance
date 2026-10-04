@@ -2557,8 +2557,24 @@
       "id": "chr_864e191c",
       "name": "Mannequin F",
       "modelAssetId": "mannequin_f",
-      "clipSources": [],
-      "moves": {}
+      "clipSources": [
+        "ual1",
+        "ual2"
+      ],
+      "moves": {
+        "idle": {
+          "clip": "Idle_Loop",
+          "source": "ual1"
+        },
+        "walk": {
+          "clip": "Walk_Loop",
+          "source": "ual1"
+        },
+        "run": {
+          "clip": "Jog_Fwd_Loop",
+          "source": "ual1"
+        }
+      }
     }
   ]
 }
