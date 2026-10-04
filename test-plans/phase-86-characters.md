@@ -23,9 +23,9 @@ Mannequin_F added); nothing reaches `public/games` or `public/assets`.
       with `inPlace: false` it travels (0.57 m).
 - [x] Export: a used character's model and clip files are collected; an unused
       character's are not.
-- [ ] Import UAL1 / Mannequin_F through the Model Importer: the manifest entry gets
-      `rig` (65 bones, same id for both). (Needs a real import; the editor UI in part B
-      shows it.)
+- [x] Import UAL1 / UAL2 / Mannequin_F through the Model Importer (the user's import,
+      2026-10-04): each manifest entry got `rig` with 65 bones and the same id
+      (`d3a03ee5`).
 
 ## Part B (v4.112.0)
 
