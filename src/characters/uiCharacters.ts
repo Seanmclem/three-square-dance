@@ -22,4 +22,4 @@ export function missingMoves(c: CharacterDef, moves: readonly string[]): string[
 /** The moves the engine plays by itself for the player / an enemy (Phase 86 §3). */
 export const PLAYER_MOVES = ["idle", "walk", "jump", "jump_idle", "jump_land", "climb"] as const;
 export const ENEMY_MOVES  = ["idle", "walk", "attack"] as const;
-export const moveLabel = (m: string) => ({ jump_idle: "in air", jump_land: "land" } as Record<string, string>)[m] ?? m;
+export const moveLabel = (m: string) => ({ jump: "jump (takeoff)", jump_idle: "in air", jump_land: "land" } as Record<string, string>)[m] ?? m;

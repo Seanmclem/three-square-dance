@@ -10,7 +10,7 @@ import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
 interface FileFit { state: "checking" | "same" | "close" | "different" | "none"; missing?: string[]; why?: string }
 
 /** How the built-in moves read in the editor. */
-const MOVE_LABEL: Record<string, string> = { jump_idle: "in air", jump_land: "land" };
+const MOVE_LABEL: Record<string, string> = { jump: "jump (takeoff)", jump_idle: "in air", jump_land: "land" };
 const label = (m: string) => MOVE_LABEL[m] ?? m.replace(/_/g, " ");
 
 const C = {
@@ -279,7 +279,7 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             const cur = draft.moves[m];
             const custom = !(BUILT_IN_MOVES as readonly string[]).includes(m);
             return (
-              <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "62px 1fr auto auto", alignItems: "center", gap: 4 }}>
+              <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "96px 1fr auto auto", alignItems: "center", gap: 4 }}>
                 <span style={{ color: custom ? "#ffc58a" : C.text, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }} title={LOOPING_MOVES.has(m) ? "loops" : "plays once"}>{label(m)}</span>
                 <select aria-label={`Clip for ${label(m)}`} value={clipValue(cur)} onChange={e => pickClip(m, e.target.value)} style={{ ...INPUT, minWidth: 0 }}>
                   <option value="">no clip</option>
