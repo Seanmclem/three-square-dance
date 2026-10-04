@@ -21,9 +21,16 @@ export function CharacterPanel({ characters, assets, playerCharacterId, onNew, o
 }) {
   const [model, setModel] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const models = assets
-    .filter(a => /\.(glb|gltf)$/i.test(a.path))
-    .sort((a, b) => Number(b.category === "Characters") - Number(a.category === "Characters") || a.label.localeCompare(b.label));
+  // Grouped with headings: the Characters category, then other models that animate
+  // (clips or a skeleton), then everything else by category.
+  const models = assets.filter(a => /\.(glb|gltf)$/i.test(a.path)).sort((a, b) => a.label.localeCompare(b.label));
+  const animates = (a: AssetDef) => !!(a.animations?.length || a.rig);
+  const groups: Array<{ label: string; items: AssetDef[] }> = [
+    { label: "Characters", items: models.filter(a => a.category === "Characters") },
+    { label: "Other models that animate", items: models.filter(a => a.category !== "Characters" && animates(a)) },
+  ];
+  const rest = models.filter(a => a.category !== "Characters" && !animates(a));
+  for (const cat of [...new Set(rest.map(a => a.category))].sort()) groups.push({ label: `${cat} (no animations)`, items: rest.filter(a => a.category === cat) });
   const label = (id: string) => assets.find(a => a.id === id)?.label ?? id;
   const btn = (primary = false): React.CSSProperties => ({
     padding: "5px 8px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
@@ -38,7 +45,11 @@ export function CharacterPanel({ characters, assets, playerCharacterId, onNew, o
           <select value={model} onChange={e => setModel(e.target.value)} aria-label="Model for a new character"
             style={{ flex: 1, minWidth: 0, background: "#141416", color: "#dde3f0", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, fontSize: 11, fontFamily: "monospace", padding: "4px" }}>
             <option value="">choose a model…</option>
-            {models.map(a => <option key={a.id} value={a.id}>{a.label}{a.category === "Characters" ? "" : ` (${a.category})`}{a.animations?.length ? ` · ${a.animations.length} clips` : ""}</option>)}
+            {groups.filter(g => g.items.length).map(g => (
+              <optgroup key={g.label} label={g.label}>
+                {g.items.map(a => <option key={a.id} value={a.id}>{a.label}{a.animations?.length ? ` · ${a.animations.length} clips` : a.rig ? " · skeleton, no clips" : ""}</option>)}
+              </optgroup>
+            ))}
           </select>
           <button style={btn(!!model)} disabled={!model} onClick={() => { if (model) { onNew(model); setModel(""); } }}>NEW</button>
         </div>
