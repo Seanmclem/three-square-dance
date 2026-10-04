@@ -10,7 +10,7 @@ import type {
   PlatformDef, StairDef, StairRailingDef, StairUndersideMode, StairTurn, LadderDef, ZoneDef, ZoneType, PlayerSettings, LocomotionState, AssetDef, TriggerVolume, TriggerVolumeShape, TriggerVolumeVisual, CheckpointDef, StateSchema, EnemyAIDef, ScriptDef, MoverDef, LightDef,
   GroupDef, AttachedCollider, AttachedColliderShape, NodeLinks, WallNode, Vec2,
   DecalDef, DecalTexDef, ShapeDef, ShapeBrushMesh, BrushFace, WorldAudio, AudioPlaylist, PlaylistEntry, AttachedSound, AudioMix, SoundDef,
-  PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue, BrushViewBackground, SkyboxDef,
+  PrefabDef, PrefabInstanceRecord, PrefabVariableDef, PrefabVarValue, BrushViewBackground, SkyboxDef, PlayerFeel,
 } from "@/types";
 import { DEFAULT_BRUSH_BACKGROUND, DEFAULT_BRUSH_COLOR } from "@/types";
 import { softSettings, setSoftSettings, type SoftSettings } from "@/editor/softFalloff";
@@ -225,7 +225,7 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 type ScreenId = "geo" | "mat" | "brush-view" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
-  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-sounds" | "spawn-controls";
+  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-feel" | "spawn-sounds" | "spawn-controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", "brush-view": "Brush View", open: "Openings", seg: "Segments", vert: "Vertices",
@@ -234,7 +234,7 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
   scripts: "Scripts",
   ai: "Enemy AI",
   "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character",
-  "spawn-sounds": "Character Sounds", "spawn-controls": "Controls",
+  "spawn-sounds": "Character Sounds", "spawn-controls": "Controls", "spawn-feel": "Feel",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -260,6 +260,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   "spawn-camera": "MODE · FOV · DISTANCE · ANGLE",
   "spawn-character": "MODEL · SCALE · ANIMATIONS",
   "spawn-sounds": "FOOTSTEP · JUMP · LAND",
+  "spawn-feel": "SQUASH · LEAN · ROLL · SKID",
   "spawn-controls": "THIS DEVICE · SENSITIVITY",
 };
 
@@ -397,6 +398,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "spawn-movement":
     case "spawn-camera":
     case "spawn-character":
+    case "spawn-feel":
     case "spawn-sounds":
     case "spawn-controls":
       return "";   // non-object screens — never listed for a selected object (spawn rows build their own summaries)
@@ -6361,7 +6363,7 @@ function InheritBanner({ overridden, what, onInherit, onPromote }: {
 // (single-scene mode) it renders the plain view exactly as before.
 const SPAWN_PAGE_MAP: Partial<Record<ScreenId, SettingsPage>> = {
   "spawn-movement": "movement", "spawn-camera": "camera",
-  "spawn-character": "character", "spawn-sounds": "sounds",
+  "spawn-character": "character", "spawn-sounds": "sounds", "spawn-feel": "feel",
 };
 function SpawnSettingsScoped({ gameSettings, sceneOverrides, onGameChange, onPageOverride, onPromote,
   settings, assets, onChange, position, onPositionChange, screen, onOpen }: {
@@ -6671,6 +6673,40 @@ function SpawnSettingsView({
     <CharacterSoundsPage playerSettings={settings} onPlayerSettingsChange={onChange} />
   );
 
+  // Phase 86 follow-up: the third-person feel (Phase 70), all or each part.
+  if (screen === "spawn-feel") {
+    const f = settings.feel ?? {};
+    const all = f.enabled !== false;
+    const setFeel = (patch: Partial<PlayerFeel>) => {
+      const next: PlayerFeel = { ...f, ...patch };
+      for (const k of Object.keys(next) as (keyof PlayerFeel)[]) if (next[k] !== false) delete next[k];   // absent = on
+      onChange({ feel: Object.keys(next).length ? next : undefined });
+    };
+    const row = (key: Exclude<keyof PlayerFeel, "enabled">, label: string, what: string) => (
+      <label key={key} style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px", alignItems: "center", cursor: "pointer", opacity: all ? 1 : 0.5 }}>
+        <input type="checkbox" className="wb-switch" checked={f[key] !== false} disabled={!all} onChange={e => setFeel({ [key]: e.target.checked })} />
+        <span style={{ color: "#dde3f0", fontSize: 11, fontFamily: "monospace" }}>{label}</span>
+        <span />
+        <span style={BLURB}>{what}</span>
+      </label>
+    );
+    return (
+      <div style={PAGE}>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+          <input type="checkbox" className="wb-switch" checked={all} onChange={e => setFeel({ enabled: e.target.checked })} />
+          <span style={{ color: "#dde3f0", fontSize: 12, fontFamily: "monospace", fontWeight: 600 }}>FEEL</span>
+          <span style={BLURB}>all of these at once</span>
+        </label>
+        {row("squash", "SQUASH AND STRETCH", "Stretches on takeoff, squashes on landing (harder landings squash more).")}
+        {row("speedLean", "LEAN WITH SPEED", "Tilts forward while moving, a little more when running.")}
+        {row("startStopLean", "LEAN ON START / STOP", "Leans into speeding up and back when braking.")}
+        {row("turnRoll", "ROLL INTO TURNS", "Banks into a turn, more at speed.")}
+        {row("skid", "RUN SKID", "Reversing at a run slides about 0.9 m with the facing held, leaning back, then whips round. This one also changes movement: off = a sharp stop and turn.")}
+        <div style={BLURB}>Third person only, whatever character is the player. The others only change how the character looks, never where it goes.</div>
+      </div>
+    );
+  }
+
   if (screen === "spawn-controls") return (
     <div style={{ padding: "14px 16px" }}>
       <ControlsSection />
@@ -6702,6 +6738,14 @@ function SpawnSettingsView({
       <CategoryRow label="Character"
         summary={modelLabel}
         onPress={() => onOpen("spawn-character")} />
+      <CategoryRow label="Feel"
+        summary={(() => {
+          const f = settings.feel;
+          if (f?.enabled === false) return "off";
+          const off = (["squash", "speedLean", "startStopLean", "turnRoll", "skid"] as const).filter(k => f?.[k] === false).length;
+          return off ? `${5 - off} of 5 on` : "all on";
+        })()}
+        onPress={() => onOpen("spawn-feel")} />
       <CategoryRow label="Character Sounds"
         summary={(() => {
           const n = [settings.footstepSound, settings.jumpSound, settings.landSound].filter(Boolean).length;
@@ -7394,6 +7438,33 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
               {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}
               {clipRow("ATTACK CLIP", "attackClip", "Played once per bite (auto also matches 'bite')")}
             </>;
+          })()}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
+          {(() => {
+            // Phase 86 follow-up: the enemy FEEL (Phase 72), all or each part. Looks only.
+            const f = ai?.feel ?? {};
+            const all = f.enabled !== false;
+            const setFeel = (patch: Partial<NonNullable<EnemyAIDef["feel"]>>) => {
+              const next: NonNullable<EnemyAIDef["feel"]> = { ...f, ...patch };
+              for (const k of Object.keys(next) as (keyof typeof next)[]) if (next[k] !== false) delete next[k];   // absent = on
+              write({ feel: Object.keys(next).length ? next : undefined });
+            };
+            return (
+              <div data-enemy-feel style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 4 }}>
+                <div style={ROW} title="All of the enemy's feel at once (looks only: never changes where it goes)">
+                  <span style={{ color: "#dde3f0", fontSize: 10, letterSpacing: 0.5 }}>FEEL</span>
+                  <input type="checkbox" className="wb-switch" checked={all} onChange={e => setFeel({ enabled: e.target.checked })} />
+                </div>
+                <div style={{ ...ROW, opacity: all ? 1 : 0.5 }} title="Squashes when the player lands on it">
+                  <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, paddingLeft: 10 }}>SQUASH WHEN STOMPED</span>
+                  <input type="checkbox" className="wb-switch" disabled={!all} checked={f.stompSquash !== false} onChange={e => setFeel({ stompSquash: e.target.checked })} />
+                </div>
+                <div style={{ ...ROW, opacity: all ? 1 : 0.5 }} title="Tilts forward while it moves (chasing, walking home)">
+                  <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, paddingLeft: 10 }}>LEAN WHILE MOVING</span>
+                  <input type="checkbox" className="wb-switch" disabled={!all} checked={f.chaseLean !== false} onChange={e => setFeel({ chaseLean: e.target.checked })} />
+                </div>
+              </div>
+            );
           })()}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
           <div style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, marginBottom: 6 }}>SOUNDS</div>

@@ -459,7 +459,7 @@ export class CharacterController {
     const against = isMoving && vLen > 0.01 && (this._velX * dir.x + this._velZ * dir.z) < -0.5 * vLen * Math.hypot(dir.x, dir.z);
     if (vLen > this._settings.moveSpeed * RUN_SKID_MIN) this._ranRecently = RUN_SKID_MEMORY;
     else this._ranRecently = Math.max(0, this._ranRecently - dt);
-    if (!this._skidding && against && this._coyote > 0 && this._ranRecently > 0
+    if (!this._skidding && against && this._coyote > 0 && this._ranRecently > 0 && this._feel("skid")
         && vLen > this._settings.moveSpeed * RUN_SKID_FLOOR) this._skidding = true;
     else if (this._skidding && (!against || this._coyote <= 0)) this._skidding = false;
     const rampSec = this._skidding ? RUN_SKID_SEC
@@ -1007,13 +1007,19 @@ export class CharacterController {
    * only: the capsule, the camera and the landing point never see any of it.
    * The root's origin is at the feet, so squash anchors to the ground.
    */
+  /** Is this FEEL part on (Feel page; absent = on)? */
+  private _feel(part: "squash" | "speedLean" | "startStopLean" | "turnRoll" | "skid"): boolean {
+    const f = this._settings.feel;
+    return !f || (f.enabled !== false && f[part] !== false);
+  }
+
   private _updatePresentation(dt: number): void {
     const root = this._modelRoot!;
     const h = Math.min(dt, 1 / 30);   // spring stability across a frame hitch
     // Squash & stretch: damped spring back to 1, kicked at takeoff / launch / landing.
     this._squashVel += (-SQUASH_STIFFNESS * (this._squash - 1) - SQUASH_DAMPING * this._squashVel) * h;
     this._squash = Math.max(0.6, Math.min(1.35, this._squash + this._squashVel * h));
-    const sy = this._squash, sxz = 1 / Math.sqrt(sy);   // volume-preserving
+    const sy = this._feel("squash") ? this._squash : 1, sxz = 1 / Math.sqrt(sy);   // volume-preserving
     root.scale.set(this._modelBaseScale * sxz, this._modelBaseScale * sy, this._modelBaseScale * sxz);
 
     // Lean: forward with speed, roll into the turn (from the avatar's own turn rate).
@@ -1021,12 +1027,12 @@ export class CharacterController {
     if (!this._climbLadder && dt > 0) {
       const leanMax = Math.max(1, this._settings.runMultiplier ?? 1);   // a little more lean while running
       const speedK = Math.min(leanMax, Math.hypot(this._velX, this._velZ) / (this._settings.moveSpeed || 1));
-      pitch = speedK * LEAN_FORWARD;
+      pitch = this._feel("speedLean") ? speedK * LEAN_FORWARD : 0;
       // Acceleration along the avatar's forward. The avatar faces the compass angle _modelYaw,
       // i.e. along (−sin, −cos) — the same convention the launch handler uses.
       const ax = (this._velX - this._prevVelX) / dt, az = (this._velZ - this._prevVelZ) / dt;
       const fwdAccel = ax * -Math.sin(this._modelYaw) + az * -Math.cos(this._modelYaw);
-      pitch += Math.max(-LEAN_ACCEL_MAX, Math.min(LEAN_ACCEL_MAX, fwdAccel * LEAN_ACCEL));
+      if (this._feel("startStopLean")) pitch += Math.max(-LEAN_ACCEL_MAX, Math.min(LEAN_ACCEL_MAX, fwdAccel * LEAN_ACCEL));
       if (this._skidding) pitch = SKID_LEAN;   // planted, leaning back against the slide
       let dYaw = this._modelYaw - this._prevModelYaw;
       dYaw = Math.atan2(Math.sin(dYaw), Math.cos(dYaw));
@@ -1035,7 +1041,7 @@ export class CharacterController {
       // RIGHT; turning right is a DEcreasing yaw → negate.
       // Turning at a run leans more than the same turn at a walk (roll ∝ turn rate × speed).
       const rollMax = LEAN_ROLL_MAX * Math.max(1, speedK);
-      roll = Math.max(-rollMax, Math.min(rollMax, -(dYaw / dt) * LEAN_ROLL * Math.max(0.5, speedK)));
+      roll = this._feel("turnRoll") ? Math.max(-rollMax, Math.min(rollMax, -(dYaw / dt) * LEAN_ROLL * Math.max(0.5, speedK))) : 0;
     }
     this._prevModelYaw = this._modelYaw;
     this._prevVelX = this._velX; this._prevVelZ = this._velZ;

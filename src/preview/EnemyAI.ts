@@ -51,6 +51,12 @@ const FEEL_DAMPING     = 11;   // 1/s (one visible rebound, then settles)
 const FEEL_STOMP_KICK  = 7;    // spring velocity toward squash when the player lands on it (≈ -35%)
 const FEEL_LEAN        = 0.17; // rad (≈ 10°) forward tilt while actually moving
 const FEEL_LEAN_RATE   = 8;    // 1/s exp smoothing
+
+/** Is this enemy FEEL part on (AI screen FEEL group; absent = on)? */
+function feelOn(def: EnemyAIDef, part: "stompSquash" | "chaseLean"): boolean {
+  const f = def.feel;
+  return !f || (f.enabled !== false && f[part] !== false);
+}
 const STOMP_RADIUS     = 0.95; // m, XZ — "the player is over me"
 const STOMP_MAX_ABOVE  = 1.9;  // m, player CENTRE above the enemy's top — close enough to be a landing
 
@@ -453,13 +459,13 @@ export class EnemyAI {
     if (!over) { rec.stompArmed = true; return; }
     if (!rec.stompArmed || player.y - rec.pos.y - (rec.p.heightY ?? 1) > STOMP_MAX_ABOVE) return;
     const m = this._preview.playerMotion;   // allocates — only reached while the player is right over an enemy
-    if (m && (m.velY < -1 || m.fellMsAgo < 120)) { rec.squashVel -= FEEL_STOMP_KICK; rec.stompArmed = false; }
+    if (m && (m.velY < -1 || m.fellMsAgo < 120)) { if (feelOn(rec.def, "stompSquash")) rec.squashVel -= FEEL_STOMP_KICK; rec.stompArmed = false; }
   }
 
   /** Advance the squash spring and the chase lean. */
   private _feel(rec: AiRec, dt: number, moved: boolean): void {
     rec.squashVel += (-FEEL_STIFFNESS * (rec.squash - 1) - FEEL_DAMPING * rec.squashVel) * dt;
     rec.squash = Math.max(0.5, Math.min(1.3, rec.squash + rec.squashVel * dt));
-    rec.lean += ((moved ? FEEL_LEAN : 0) - rec.lean) * Math.min(1, dt * FEEL_LEAN_RATE);
+    rec.lean += ((moved && feelOn(rec.def, "chaseLean") ? FEEL_LEAN : 0) - rec.lean) * Math.min(1, dt * FEEL_LEAN_RATE);
   }
 }

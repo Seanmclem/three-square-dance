@@ -700,6 +700,20 @@ export interface LightDef {
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).
+/**
+ * The player's third-person FEEL (Phase 70): `enabled` switches them all; each part can
+ * be switched alone. Absent = on. All but `skid` are presentation only (the avatar's
+ * scale and tilt); the skid also moves you (a ~0.9 m slide when reversing at a run).
+ */
+export interface PlayerFeel {
+  enabled?:       boolean;
+  squash?:        boolean;   // squash and stretch on takeoff and landing
+  speedLean?:     boolean;   // lean forward with speed
+  startStopLean?: boolean;   // lean into speeding up, back when braking
+  turnRoll?:      boolean;   // roll into turns
+  skid?:          boolean;   // run skid: slide, facing held, lean back (moves you)
+}
+
 export type LocomotionState = "idle" | "walk" | "run" | "jump" | "jump_idle" | "jump_land" | "climb";
 
 export interface PlayerSettings {
@@ -736,6 +750,8 @@ export interface PlayerSettings {
   // Phase 86: the game's character (GameConfig.characters) the player uses. Absent = the
   // older fields above (modelAssetId + animClips) still say how the player looks and moves.
   characterId?:        string | null;
+  // Phase 86 follow-up: the third-person FEEL (Phase 70), each switchable; absent = on.
+  feel?:               PlayerFeel;
   bagStyle?:           string;             // BagOverlay style-registry key (default "list")
   // Character locomotion audio (Phase 36 follow-up) — SoundDef ids, played as SFX-bus
   // one-shots by CharacterController at the matching moment. Absent = silent.
@@ -1176,6 +1192,8 @@ export interface AttachedCollider {
  */
 export interface EnemyAIDef {
   enabled:         boolean;
+  /** Enemy FEEL (Phase 72), each switchable; absent = on. Presentation only. */
+  feel?:           { enabled?: boolean; stompSquash?: boolean; chaseLean?: boolean };
   detectRadius?:   number;        // acquire the player within this (default 6)
   giveUpRadius?:   number;        // lose the player beyond this (default 1.5 × detectRadius)
   attackRange?:    number;        // start a bite within this (default 1.2)

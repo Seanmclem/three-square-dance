@@ -17,7 +17,8 @@ export const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
 export const SETTINGS_PAGES = {
   movement:  ["moveSpeed", "runMultiplier", "jumpHeight", "variableJump", "climbSpeed"],
   camera:    ["cameraMode", "fov", "fpsEyeHeight", "thirdPersonDistance", "thirdPersonHeight", "thirdPersonPitch"],
-  character: ["modelAssetId", "characterScale", "fpsCharacterScale", "jumpAnimSpeed", "animClips", "bagStyle"],
+  character: ["characterId", "modelAssetId", "characterScale", "fpsCharacterScale", "jumpAnimSpeed", "animClips", "bagStyle"],
+  feel:      ["feel"],
   sounds:    ["jumpSound", "landSound", "footstepSound", "footstepVariants", "footstepPitchWobble", "footstepDistance", "jumpVolume", "landVolume", "footstepVolume"],
 } as const satisfies Record<string, readonly (keyof PlayerSettings)[]>;
 

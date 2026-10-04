@@ -63,13 +63,13 @@ Things deliberately left out, and why:
 | Hold jump to go higher: tap = short hop (about a third of the height), hold = full height, which is always the same | On | Spawn marker, Movement page, checkbox |
 | Start and stop weight: about 0.08s to full speed and 0.27m of slide to stop; no instant mid-air reversal | On | Nothing to set |
 | Run: hold Shift, or push the stick past 85%. Same jump height, longer jump distance | Off | RUN SPEED x (Movement page), 1 = no run |
-| Run skid: reversing at full run slides for about 0.2s, facing held, leaning back | With run | `RUN_SKID_SEC`, `SKID_LEAN` in CharacterController.ts |
-| Squash and stretch, forward lean, roll into turns, lean back when braking | On | `SQUASH_*`, `LEAN_*` constants |
+| Run skid: reversing at full run slides for about 0.2s, facing held, leaning back | With run | Feel page: RUN SKID (this one also changes movement); tuning `RUN_SKID_SEC`, `SKID_LEAN` |
+| Squash and stretch, forward lean, roll into turns, lean back when braking | On | Feel page (spawn point settings): FEEL for all, or SQUASH AND STRETCH / LEAN WITH SPEED / LEAN ON START / STOP / ROLL INTO TURNS each; tuning `SQUASH_*`, `LEAN_*` |
 | Landing animation only for standing landings; landing while moving keeps the legs going | On | Nothing to set |
 | Footstep variations (up to 3 extra sounds, random, equal chance) | Off | Character Sounds page, + Add variation |
 | Footstep pitch wobble (plus or minus 6%) | Off | Character Sounds page, checkbox |
 | Surface footstep overrides with their own variations | Per volume | `set_footstep` action |
-| Enemy squash when stomped, lean while chasing | On | `FEEL_*` constants in EnemyAI.ts |
+| Enemy squash when stomped, lean while chasing | On | Enemy AI screen, FEEL group (all, or each); tuning `FEEL_*` in EnemyAI.ts |
 | Bite knockback straight away from the attacker | Per script | `launch_player`, RELATIVE TO: Away |
 
 Settings on the Movement and Character Sounds pages follow the Phase 68 rule: set
