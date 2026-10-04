@@ -1199,3 +1199,29 @@ game.json merging against the committed fixture
   and compare `__history.canUndo / canRedo` and the shapes. Last step: set the scene
   file's mtime ahead (`utimesSync`) and reload; the scene must load from disk with
   empty history.
+
+## 13. Regression recordings around engine refactors (2026-10-03, Phase 86)
+
+For refactors of shared runtime code (the player controller, enemy AI), record behaviour
+before and compare after; not for every small change.
+
+- **Recorder:** `node scripts/regression/character-anim.mjs record <out.json>`, then
+  `compare <baseline.json> <new.json>`. It starts its own harnesses (level_3 Jump Lab and
+  level_1's ladder), plays fixed keyboard input and records every frame: the player's
+  position, move and clip weights, and each enemy's state, clip and position. `compare`
+  prints SAME / DIFF per level with the first frame that differs.
+- **Frame-exact:** an init script replaces `requestAnimationFrame` and `performance.now`
+  with a fixed 1/60 s clock stepped by the test, and seeds `Math.random`; the clock starts
+  BEFORE `enterGame`, and nothing steps while the avatar loads. Two recordings of the same
+  build are identical (0 m). Under the fixed clock, `page.waitForFunction` needs
+  `polling: <ms>`: its default rAF polling never fires.
+- **The dev shell rebuilds `dist/` on every save** (`build:watch`), and the harness
+  serves `dist/`. So "before" must be built separately: `git worktree add --detach <dir>
+  HEAD`, symlink `node_modules`, `npx vite build --outDir <base-dist>`, then record with
+  `DIST=<base-dist>`. Build "after" the same way from the working tree (`--outDir`), not
+  from the shared `dist/`.
+- Harness switches: `HARNESS_DIST=<dir>` serves another build; `HARNESS_ASSETS=<dir>`
+  links another asset library (a temp copy with test-only files, e.g. the UAL packs),
+  so the repo's `public/assets` stays untouched. Spawn the harness with `deno run`, not
+  `deno task`: killing a task wrapper leaves the server on its port.
+- Needs `playwright-core` importable (`PLAYWRIGHT_CORE=<path to index.mjs>` otherwise).

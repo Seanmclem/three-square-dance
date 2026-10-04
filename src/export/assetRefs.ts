@@ -156,9 +156,10 @@ function collectTriggerVolume(refs: AssetRefs, v: TriggerVolume): void {
   collectScripts(refs, v.scripts);           // visual fill is a shader gradient — no textures
 }
 
-function collectPlayerSettings(refs: AssetRefs, ps: PlayerSettings | undefined): void {
+function collectPlayerSettings(refs: AssetRefs, ps: PlayerSettings | undefined, characterIds?: Set<string>): void {
   if (!ps) return;
   add(refs.models, ps.modelAssetId);         // third-person avatar model
+  if (ps.characterId) characterIds?.add(ps.characterId);   // Phase 86: shipped below from game.characters
   add(refs.audio, ps.jumpSound);             // locomotion one-shots
   add(refs.audio, ps.landSound);
   add(refs.audio, ps.footstepSound);
@@ -185,12 +186,13 @@ function collectZone(refs: AssetRefs, z: ZoneDef): void {
 /** Walk every scene + the shared game config and collect referenced asset ids. */
 export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): AssetRefs {
   const refs = newRefs();
+  const characterIds = new Set<string>();   // Phase 86: characters the player settings use
 
   for (const scene of scenes) {
     const w = scene.world;
     if (w) {
       if (w.skybox && w.skybox !== "sky") add(refs.skyboxes, w.skybox);  // "sky" = built-in procedural
-      collectPlayerSettings(refs, w.playerSettings);
+      collectPlayerSettings(refs, w.playerSettings, characterIds);
       add(refs.audio, w.audio?.music?.soundId);    // scene music track
       add(refs.audio, w.audio?.ambient?.soundId);  // scene ambient loop
       // Phase 64: playlist clips — every entry's sound must ship with the export.
@@ -205,7 +207,13 @@ export function collectAssetRefs(scenes: SceneFile[], game: GameConfig | null): 
   }
 
   if (game) {
-    collectPlayerSettings(refs, game.playerSettings);  // Phase 68 — game-default character model/sounds
+    collectPlayerSettings(refs, game.playerSettings, characterIds);  // Phase 68 — game-default character model/sounds
+    // Phase 86: a used character ships its model and every file it borrows clips from.
+    for (const c of game.characters ?? []) {
+      if (!characterIds.has(c.id)) continue;
+      add(refs.models, c.modelAssetId);
+      for (const src of c.clipSources) add(refs.models, src);
+    }
     if (game.lighting?.skybox && game.lighting.skybox !== "sky") add(refs.skyboxes, game.lighting.skybox);  // game-default sky
     collectItems(refs, game.items);                // game-wide item registry (icons)
     collectUiElements(refs, game.uiElements);      // game-wide GUI registry

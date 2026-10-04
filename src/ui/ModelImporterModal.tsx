@@ -1,7 +1,8 @@
 import { useEscapeClose } from "./useEscapeClose";
 import { useState, useRef } from "react";
 import { LoadingManager } from "three";
-import type { AssetDef, AssetCategory, AssetManifest, Attribution } from "@/types";
+import type { AssetDef, AssetCategory, AssetManifest, Attribution, RigInfo } from "@/types";
+import { rigInfo } from "@/characters/rig";
 import { renderModelThumbnail, releaseThumbnailRenderer, dataURLtoArrayBuffer } from "@/editor/thumbnailRenderer";
 import { readManifest, writeManifest, writeAssetFile } from "@/assets/assetLibrary";
 import { AttributionFields } from "@/ui/AttributionFields";
@@ -49,10 +50,11 @@ async function generateThumbnail(
   file: File,
   ext: string,
   mtlFile?: File | null,
-): Promise<{ thumb: string | null; animations: string[] }> {
+): Promise<{ thumb: string | null; animations: string[]; rig: RigInfo | null }> {
   let blobUrl: string | null = null;
   let mtlBlobUrl: string | null = null;
   let animations: string[] = [];
+  let rig: RigInfo | null = null;
   try {
     blobUrl = URL.createObjectURL(file);
 
@@ -82,14 +84,15 @@ async function generateThumbnail(
       };
       root = gltf.scene;
       animations = gltf.animations.map(a => a.name);
+      rig = rigInfo(root);   // Phase 86: the skeleton, before the thumbnail renderer touches the scene
     } else {
-      return { thumb: null, animations };
+      return { thumb: null, animations, rig };
     }
 
-    return { thumb: renderModelThumbnail(root), animations };
+    return { thumb: renderModelThumbnail(root), animations, rig };
   } catch (err) {
     console.warn("Thumbnail generation failed:", err);
-    return { thumb: null, animations };
+    return { thumb: null, animations, rig };
   } finally {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     if (mtlBlobUrl) URL.revokeObjectURL(mtlBlobUrl);
@@ -215,7 +218,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
         // Generate thumbnail
         setProgress(`Generating thumbnail ${i + 1} of ${entries.length}: ${entry.modelFile.name}`);
         let destThumb: string | undefined;
-        const { thumb: thumbDataUrl, animations } = await generateThumbnail(entry.modelFile, modelExt, entry.mtlFile);
+        const { thumb: thumbDataUrl, animations, rig } = await generateThumbnail(entry.modelFile, modelExt, entry.mtlFile);
         if (thumbDataUrl) {
           destThumb = `${base}_thumb.png`;
           await writeAssetFile("models", destThumb, dataURLtoArrayBuffer(thumbDataUrl));
@@ -237,6 +240,7 @@ export function ModelImporterModal({ existingTags, existingAttributions, onCompl
           tags:         animations.length ? [...new Set([...tags, "animated"])] : [...tags],
           dateAdded:    new Date().toISOString().slice(0, 10),
           ...(animations.length ? { animations } : {}),
+          ...(rig ? { rig } : {}),
           ...(Object.keys(attribution).length ? { attribution } : {}),
         };
 

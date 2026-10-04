@@ -101,6 +101,20 @@ because the camera follows the look direction; a reversal just brakes a little l
 - Cost: one physics ray per frame for the shadow (4 to 9 microseconds), one flat quad;
   footsteps cost about 0.03ms each; nothing else was added to the per-frame path.
 
+## Characters (Phase 86)
+
+A **character** is a model plus how it moves, saved per game in `game.json`
+(`characters`): the model, other files it borrows clips from (same skeleton, e.g.
+Quaternius's Universal Animation Library on either mannequin), which clip each move plays,
+and KEEP IN PLACE (on by default: root-motion clips stay under the character). The player
+uses one when the player settings name it (`characterId`); without one, the older
+MODEL + ANIMATIONS settings still describe the player, exactly as before.
+
+All character animation goes through one shared `CharacterAnimator`
+(`src/characters/`); the player's controls are one driver of it, and enemies and later
+NPCs will be others. Part A (v4.111.0) has no editor yet: the character editor and the
+Characters panel are part B of the Phase 86 plan.
+
 ## Related scripting
 
 - `on_level_load` ("when the level starts") fires on every level entry, in the editor

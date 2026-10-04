@@ -742,6 +742,7 @@ export default function App() {
           projectRef.current = ctx;
           setProject(ctx);
           world.gameItems       = store.game.items;
+          world.gameCharacters = store.game.characters;   // Phase 86
           world.gameStateSchema = store.game.stateSchema;
           world.gameUiElements  = store.game.uiElements;
           world.gameScripts     = store.game.scripts;
@@ -873,6 +874,7 @@ export default function App() {
               const file = snapRec?.snap ?? await proj.store.loadScene(back);
               await handleLoadFromJSON(file);
               worldRef.current!.gameItems       = proj.store.game.items;
+              worldRef.current!.gameCharacters = proj.store.game.characters;   // Phase 86
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
               worldRef.current!.gameUiElements  = proj.store.game.uiElements;
               worldRef.current!.gameScripts     = proj.store.game.scripts;
@@ -928,6 +930,7 @@ export default function App() {
             await handleLoadFromJSON(file);                    // teardown zones + rebuild world/physics (no save)
             const world = worldRef.current!;
             world.gameItems       = proj.store.game.items;
+            world.gameCharacters = proj.store.game.characters;   // Phase 86
             world.gameStateSchema = proj.store.game.stateSchema;
             world.gameUiElements  = proj.store.game.uiElements;
       world.gameScripts     = proj.store.game.scripts;
@@ -1595,6 +1598,7 @@ export default function App() {
     if (promoteSessionPrefabs(store.game)) setIsDirty(true);
     if (worldRef.current) {
       worldRef.current.gameItems       = store.game.items;
+      worldRef.current.gameCharacters = store.game.characters;   // Phase 86
       worldRef.current.gameStateSchema = store.game.stateSchema;
       worldRef.current.gameUiElements  = store.game.uiElements;
       worldRef.current.gameScripts     = store.game.scripts;
@@ -1685,6 +1689,7 @@ export default function App() {
       await handleLoadFromJSON(file);
       const world = worldRef.current!;
       world.gameItems       = proj.store.game.items;
+      world.gameCharacters = proj.store.game.characters;   // Phase 86
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
       world.gameScripts     = proj.store.game.scripts;

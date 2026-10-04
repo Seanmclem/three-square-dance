@@ -85,11 +85,36 @@ export interface AssetDef {
   tags:         string[];
   dateAdded:    string;
   animations?:  string[];   // GLTF clip names, populated at import (Phase 10.7)
+  rig?:         RigInfo;    // Phase 86: the skeleton (skinned models), populated at import
   attribution?: Attribution;
   // Asset-level preset colliders (Phase 26 baked assets: one box per source shape).
   // Placement preference: obj.colliders ?? def.colliders ?? auto box. Local space.
   colliders?:   AttachedCollider[];
 }
+
+/** Phase 86: one move of a character: the clip it plays (null = none), from which file
+ *  (`source` = an asset id; absent = the first file that has a clip of that name: the
+ *  model's own, then `clipSources` in order). */
+export interface CharacterMove { clip: string | null; source?: string; loop?: boolean; speed?: number }
+
+/**
+ * Phase 86: a character, saved per game (GameConfig.characters, like prefabs): a model
+ * plus how it moves. `clipSources` = other imported files (same skeleton) whose clips it
+ * borrows; `moves` = move name → clip; `inPlace` (default true) pins the skeleton's top
+ * bone sideways so clips with root travel stay under the character.
+ */
+export interface CharacterDef {
+  id:           string;
+  name:         string;
+  modelAssetId: string;
+  clipSources:  string[];
+  moves:        Record<string, CharacterMove>;
+  inPlace?:     boolean;
+}
+
+/** Phase 86: a model's skeleton: its bone names (sorted), an id made from them (same
+ *  bones = same id = clips can be shared), and its height in its own units. */
+export interface RigInfo { id: string; bones: string[]; height: number }
 
 export interface AssetManifest {
   version: string;
@@ -698,6 +723,9 @@ export interface PlayerSettings {
   // (play nothing); string = use that exact clip name.
   animClips?:          Partial<Record<LocomotionState, string | null>>;
   modelAssetId?:       string | null;
+  // Phase 86: the game's character (GameConfig.characters) the player uses. Absent = the
+  // older fields above (modelAssetId + animClips) still say how the player looks and moves.
+  characterId?:        string | null;
   bagStyle?:           string;             // BagOverlay style-registry key (default "list")
   // Character locomotion audio (Phase 36 follow-up) — SoundDef ids, played as SFX-bus
   // one-shots by CharacterController at the matching moment. Absent = silent.
@@ -1499,6 +1527,7 @@ export interface GameConfig {
   stateSchema?: Record<string, StateSchema>;
   lightingQuality?: "fancy" | "fast";   // game-wide default; a scene's own setting wins
   prefabs?:     PrefabDef[];   // cross-scene prefab library (Phase 44)
+  characters?:  CharacterDef[];   // Phase 86: the game's characters (player, enemies)
   uiElements?:  UiElementDef[]; // cross-scene custom GUI registry (Phase 49)
   // Phase 77 — game-wide scripts: indexed in EVERY scene alongside the scene's own
   // zone scripts (LEVEL tab, GAME scope). A death handler belongs here, not copied per level.

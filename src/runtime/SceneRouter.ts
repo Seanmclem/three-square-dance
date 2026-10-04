@@ -120,6 +120,7 @@ export class SceneRouter {
       // Shared game config (manifest-linked game.json, Phase 33) — session-only
       // fields, merged under the scene's own registry/schema by the readers.
       world.gameItems       = this.deps.manifest.game?.items;
+      world.gameCharacters = this.deps.manifest.game?.characters;   // Phase 86
       world.gameStateSchema = this.deps.manifest.game?.stateSchema;
       world.gameUiElements  = this.deps.manifest.game?.uiElements;
       world.gameScripts     = this.deps.manifest.game?.scripts;   // Phase 77

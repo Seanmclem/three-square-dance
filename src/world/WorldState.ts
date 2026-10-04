@@ -1,6 +1,6 @@
 import type { EventBus } from "@/core/EventBus";
 import { DEFAULT_PLAYER_SETTINGS, SETTINGS_PAGES, resolvePlayerSettings, type SettingsPage } from "@/shared/playerSettingsDefaults";
-import type { AudioMix, PlayerSettings } from "@/types";
+import type { AudioMix, PlayerSettings, CharacterDef } from "@/types";
 import type { HistoryManager, Change, ChangeKind } from "@/editor/HistoryManager";
 import type {
   SceneMetadata, WorldConfig, TerrainDef,
@@ -45,6 +45,7 @@ export class WorldState {
   // (game.json prefabs when a project is open, else the localStorage session
   // library). Same non-serialized contract as gameItems.
   prefabLibrary?:   PrefabDef[];
+  gameCharacters?:  CharacterDef[];   // Phase 86: game.json characters (non-serialized, like gameItems)
 
   // ── Undo journal ────────────────────────────────────────────────────────────
   private _history:  HistoryManager | null = null;

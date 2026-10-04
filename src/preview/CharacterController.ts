@@ -2,7 +2,7 @@ import * as THREE from "three";
 import RAPIER from "@dimforge/rapier3d-compat";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { enablePaddedSkinnedCulling } from "./skinnedCulling";
-import type { PlayerSettings, LocomotionState, LadderDef } from "@/types";
+import type { PlayerSettings, LadderDef, CharacterDef } from "@/types";
 import type { EventBus } from "@/core/EventBus";
 import type { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { RUN_STICK_THRESHOLD } from "@/input/actions";
@@ -12,6 +12,8 @@ import type { MoverSystem } from "@/world/MoverSystem";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
+import { CharacterAnimator } from "@/characters/CharacterAnimator";
+import { loadCharacter, legacyCharacter, moveResolver, topBoneNames } from "@/characters/characterRuntime";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const MAX_PITCH = Math.PI * 80 / 180;   // look-up/down clamp
@@ -205,11 +207,9 @@ export class CharacterController {
   private _interactTargetId: string | null = null;
 
   private _modelRoot: THREE.Object3D | null = null;
-  private _mixer:     THREE.AnimationMixer | null = null;
-  private _modelAnimations: THREE.AnimationClip[] = [];
-  private _currentClip = "";
-  private _currentAction:  THREE.AnimationAction | null = null;
-  private _currentClipObj: THREE.AnimationClip  | null = null;
+  // Phase 86: the shared animator plays the avatar's clips; this controller is the
+  // player's DRIVER (it decides the move: the locomotion state machine below).
+  private _anim: CharacterAnimator | null = null;
   private _animPhase: "ground" | "jump" | "airidle" | "land" | "climb" = "ground";
 
   // ── Locomotion audio (Phase 36 follow-up) — footstep stride accumulator ──────
@@ -257,9 +257,6 @@ export class CharacterController {
   // We clone the avatar's materials once and only ever touch those copies.
   private _flash: { t: number; dur: number; color: THREE.Color } | null = null;
   private _flashMats: { mat: THREE.Material; emissive: THREE.Color | null; intensity: number }[] | null = null;
-  // Script-driven avatar clip (play_animation target "player") — overrides the
-  // locomotion state machine until it ends / is cleared / the player moves.
-  private _scriptAnim: { name: string; loop: boolean; hold: boolean } | null = null;
 
   constructor(
     private readonly _settings: PlayerSettings,
@@ -268,6 +265,9 @@ export class CharacterController {
     private readonly _input: ControlSchemeManager,
     private readonly _movers: MoverSystem | null = null,
     private readonly _ladderLookup: (id: string) => LadderDef | null = () => null,
+    // Phase 86: the game's character for the player (settings.characterId); null = the
+    // older settings (modelAssetId + animClips) describe it, exactly as before.
+    private readonly _character: CharacterDef | null = null,
   ) {
     this.camera = new THREE.PerspectiveCamera(
       _settings.fov, window.innerWidth / window.innerHeight, 0.05, 500,
@@ -358,8 +358,7 @@ export class CharacterController {
     // back to locomotion; anything else plays that clip on the avatar.
     this._offScriptAnim = this._bus.on("character:play-animation", ({ clipName, loop, hold }) => {
       if (clipName === "__auto__") { this._clearScriptAnim(); return; }
-      this._scriptAnim = { name: clipName, loop: !!loop, hold: !!hold };
-      this._playByName(clipName, !!loop);
+      this._anim?.playScript(clipName, !!loop, !!hold);   // overrides locomotion until it ends (CharacterAnimator)
     });
     // Damage flash. In FPS the avatar is hidden (see the visible= line in update),
     // so there is nothing to tint — hand it to the screen overlay instead.
@@ -679,7 +678,7 @@ export class CharacterController {
       }
       this._updatePresentation(dt);   // yaw + lean + squash on the root
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
-      this._mixer?.update(dt);
+      this._anim?.update(dt);
       this._updateAnim(!this._body.isGrounded, isMoving, running);
       if (this._flash) this._updateFlash(dt);
     }
@@ -783,7 +782,7 @@ export class CharacterController {
     this._velX = this._velZ = 0;
     this._jumpArc = false;
     this._extVelX = this._extVelZ = 0;   // grabbing a ladder kills launch momentum
-    this._scriptAnim = null;             // climb owns the animation from here
+    this._anim?.clearScript();           // climb owns the animation from here
     // Wide ladders keep the grab-point lateral position; narrow ones center.
     const p = resolveLadderParams(def);
     if (p.width > CLIMB_FREE_X_WIDTH) {
@@ -818,7 +817,7 @@ export class CharacterController {
     this._promptCooldown = 1.5;   // don't flash "Climb down" while stepping off the top
     if (this._animPhase === "climb") {
       this._animPhase = "ground";   // resolves to idle/walk/air next frame
-      if (this._currentAction) this._currentAction.timeScale = 1;
+      if (this._anim?.currentAction) this._anim.currentAction.timeScale = 1;
     }
   }
 
@@ -893,9 +892,7 @@ export class CharacterController {
 
     // Clip rate follows actual movement speed (vertical, lateral, or diagonal);
     // holding still = hanging (paused clip).
-    if (this._currentClip === "climb" && this._currentAction) {
-      this._currentAction.timeScale = Math.hypot(vy, latSpeed) / CLIMB_ANIM_REF;
-    }
+    this._anim?.setSpeed("climb", Math.hypot(vy, latSpeed) / CLIMB_ANIM_REF);
   }
 
   // Re-scan the scene for interactable objects (deduped by editorId; the root is visited first so
@@ -914,18 +911,17 @@ export class CharacterController {
   private async _loadModel(): Promise<void> {
     // No avatar asset chosen → show a plain capsule (the dropdown's "capsule only" option),
     // so third-person always has a visible body.
-    if (!this._settings.modelAssetId) { this._buildCapsule(); return; }
+    const modelId = this._character?.modelAssetId ?? this._settings.modelAssetId;
+    if (!modelId) { this._buildCapsule(); return; }
     try {
-      const gltf = await assetManager.loadGLTF(this._settings.modelAssetId) as {
-        scene: THREE.Object3D; animations: THREE.AnimationClip[];
-      };
+      const loaded = await loadCharacter(this._character ?? { modelAssetId: modelId, clipSources: [] });
       // SkeletonUtils.clone rebinds skinned meshes to the cloned skeleton (plain .clone() breaks it)
-      const root = cloneSkinned(gltf.scene);
+      const root = cloneSkinned(loaded.scene);
       enablePaddedSkinnedCulling(root);              // cull off-screen, padded so it doesn't pop
       root.traverse(c => { c.raycast = NO_RAYCAST; });
-      this._modelAnimations = gltf.animations ?? [];
+      const def = this._character ?? legacyCharacter(this._settings, loaded.pool.map(p => p.clip.name));
       this._modelRoot = root;
-      this._mixer = new THREE.AnimationMixer(root);
+      this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root)), "CharacterController");
       this._modelBaseScale = effectiveCharacterScale(this._settings);   // squash multiplies this
       root.scale.setScalar(this._modelBaseScale);
       this._scene.add(root);
@@ -1093,82 +1089,18 @@ export class CharacterController {
     this._modelYaw = this._yaw;
   }
 
-  private _byName(name: string): THREE.AnimationClip | null {
-    return this._modelAnimations.find(c => c.name === name) ?? null;
-  }
+  private _has(intent: string): boolean { return !!this._anim?.has(intent); }
 
-  // Resolve an intent ("idle"/"walk"/…) to an actual clip. A per-character override wins:
-  // null = None (play nothing), a string = that exact clip. Undefined falls back to
-  // case-insensitive name matching, so any model's capitalization ("Idle", "Walk", …) works.
-  private _clipFor(intent: string): THREE.AnimationClip | null {
-    const override = this._settings.animClips?.[intent as LocomotionState];
-    if (override === null) return null;
-    if (override) return this._byName(override);
-    const lc = intent.toLowerCase();
-    return this._modelAnimations.find(c => c.name.toLowerCase() === lc)
-        ?? this._modelAnimations.find(c => c.name.toLowerCase().includes(lc))
-        ?? null;
-  }
-
-  private _has(intent: string): boolean { return this._clipFor(intent) != null; }
-
-  // Crossfade to a clip. `loop` false = one-shot that clamps on its last frame.
+  // Crossfade to a move. `loop` false = one-shot that clamps on its last frame.
   // `speed` scales playback rate (used for the configurable jump-anim speed).
-  private _play(intent: string, loop: boolean, speed = 1): void {
-    if (intent === this._currentClip || !this._mixer) return;
-    const clip = this._clipFor(intent);
-    if (!clip) return;
-    this._crossfadeTo(this._mixer.clipAction(clip), loop, speed);
-    this._currentClipObj = clip;
-    this._currentClip    = intent;
-  }
-
-  /**
-   * Crossfade the avatar to `next`. `mixer.clipAction(clip)` returns ONE action per
-   * clip, so two intents that resolve to the same clip share it (platfrom-obby maps
-   * WALK to the "Run" clip, and RUN auto-matches "Run" too). Crossfading an action
-   * with ITSELF fades it in and straight back out: weight 0, nothing playing, the
-   * skeleton drops to its bind pose (user report, v4.81.1). Same action = keep it
-   * playing and only retime/reloop it (restarting it if it was a finished one-shot).
-   */
-  private _crossfadeTo(next: THREE.AnimationAction, loop: boolean, speed: number): void {
-    const same = next === this._currentAction;
-    if (!same || !next.isRunning()) next.reset();
-    next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, loop ? Infinity : 1);
-    next.clampWhenFinished = !loop;
-    next.timeScale = speed;
-    if (same) { next.play(); return; }
-    next.fadeIn(0.15).play();
-    this._currentAction?.fadeOut(0.15);
-    this._currentAction = next;
-  }
+  private _play(intent: string, loop: boolean, speed = 1): void { this._anim?.play(intent, loop, speed); }
 
   // Has the current one-shot reached its end? (Only meaningful for a clamped LoopOnce.)
-  private _animDone(): boolean {
-    const a = this._currentAction, c = this._currentClipObj;
-    return !!a && !!c && a.time >= c.duration - 0.02;
-  }
-
-  // Play an exact clip by NAME (script override) — unlike _play's intent lookup.
-  private _playByName(name: string, loop: boolean): void {
-    if (!this._mixer) return;
-    const lc = name.toLowerCase();
-    const clip = this._modelAnimations.find(c => c.name === name)
-      ?? this._modelAnimations.find(c => c.name.toLowerCase() === lc)
-      ?? this._modelAnimations.find(c => c.name.toLowerCase().includes(lc));
-    if (!clip) {
-      console.warn(`CharacterController: no clip "${name}" on the avatar — available: [${this._modelAnimations.map(c => c.name).join(", ")}]`);
-      this._scriptAnim = null;
-      return;
-    }
-    this._crossfadeTo(this._mixer.clipAction(clip), loop, 1);
-    this._currentClipObj = clip;
-    this._currentClip    = `script:${clip.name}`;   // never collides with locomotion intents
-  }
+  private _animDone(): boolean { return !!this._anim?.done(); }
 
   private _clearScriptAnim(): void {
-    if (!this._scriptAnim) return;
-    this._scriptAnim = null;
+    if (!this._anim?.scripted) return;
+    this._anim.clearScript();
     if (this._climbLadder) return;   // the climb branch owns the animation
     this._animPhase = "ground";      // locomotion re-resolves (idle/walk/air) next frame
   }
@@ -1181,38 +1113,23 @@ export class CharacterController {
    * machine takes over normally from idle next frame.
    */
   private _snapAnimToIdle(): void {
-    if (!this._mixer) return;
-    this._mixer.stopAllAction();
-    this._currentAction = null;
-    this._currentClipObj = null;
-    this._currentClip = "";
+    if (!this._anim) return;
     this._animPhase = "ground";
-    const clip = this._clipFor("idle");
-    if (!clip) return;
-    const a = this._mixer.clipAction(clip);
-    a.reset();
-    a.setLoop(THREE.LoopRepeat, Infinity);
-    a.timeScale = 1;
-    a.setEffectiveWeight(1);
-    a.play();
-    this._currentAction  = a;
-    this._currentClipObj = clip;
-    this._currentClip    = "idle";
+    this._anim.snapTo("idle");
   }
 
   // Locomotion state machine: ground (idle/walk) → jump takeoff → air-idle loop → land → ground.
   // Each stage falls back gracefully if the model lacks that clip.
   private _updateAnim(airborne: boolean, isMoving: boolean, running = false): void {
-    if (!this._mixer) return;
+    if (!this._anim) return;
     // Script override. LOOPING clips (ambient emotes) cancel the moment the player
     // moves — no moonwalking. One-shots and holds play through movement: they're
     // deliberate beats (death pose, hit react) usually fired WHILE a key is held,
     // and a move-cancel would kill them the next frame. A finished one-shot (not
     // hold) returns to locomotion; "__auto__"/warp/climb clear everything.
-    if (this._scriptAnim) {
-      if (this._scriptAnim.loop && isMoving) this._clearScriptAnim();
-      else if (!this._scriptAnim.loop && !this._scriptAnim.hold && this._animDone()) this._clearScriptAnim();
-      else return;
+    if (this._anim.scripted) {
+      if (this._anim.scriptOwns(isMoving)) return;
+      if (!this._climbLadder) this._animPhase = "ground";   // it just ended: locomotion re-resolves below (as _clearScriptAnim)
     }
     switch (this._animPhase) {
       case "ground":
@@ -1252,12 +1169,12 @@ export class CharacterController {
    *  running still reads as running. */
   private _playGround(isMoving: boolean, running: boolean): void {
     const intent = this._groundClip(isMoving, running);
-    const sameAsWalk = running && this._clipFor(intent) === this._clipFor("walk");
+    const sameAsWalk = running && this._anim?.clipFor(intent) === this._anim?.clipFor("walk");
     const speed = sameAsWalk ? (this._settings.runMultiplier ?? 1) : 1;
     this._play(intent, true, speed);
     // _play no-ops when the intent is unchanged (a model with no run clip stays on "walk"
     // through a walk → run change), so retime the live loop here.
-    if (this._currentAction && this._currentClip === intent) this._currentAction.timeScale = speed;
+    this._anim?.setSpeed(intent, speed);
   }
 
   private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
@@ -1306,7 +1223,7 @@ export class CharacterController {
       m.map?.dispose(); m.dispose(); this._shadow.geometry.dispose();
       this._shadow = null;
     }
-    this._mixer?.stopAllAction();
+    this._anim?.stopAll();
     if (this._interactTargetId) this._bus.emit("character:interact-range", null);
     this._body.dispose();
   }

@@ -6,6 +6,7 @@ import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
 import type { MoverSystem } from "@/world/MoverSystem";
 import { CharacterController, effectiveCharacterScale } from "./CharacterController";
+import { characterFor } from "@/characters/characterRuntime";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { loadBindings, resolveGameBindings } from "@/input/bindings";
@@ -119,7 +120,9 @@ export class PreviewController {
           if (l) return l;
         }
         return null;
-      });
+      },
+      // Phase 86: the player's character, if the game has one picked (else the older settings).
+      characterFor(settings as Parameters<typeof characterFor>[0], this._world.gameCharacters));
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);

@@ -5,7 +5,8 @@
  * writes reaches `public/games/**` or the shell's shared autosave. See TESTING.md §12.
  *
  * Run: `deno task test:harness [project] [scene] [port]`
- *      (defaults platfrom-obby level_2 7411; `npm run build` first if dist/ is stale)
+ *      (defaults platfrom-obby level_2 7411; `npm run build` first if dist/ is stale;
+ *      HARNESS_DIST=<dir> serves another build; HARNESS_ASSETS=<dir> another asset library)
  * The temp workspace path is printed; its autosave is `<tmp>/state/autosave/latest.json`.
  */
 import { makeHandler } from "../desktop/serve.ts";
@@ -22,11 +23,15 @@ const tmp = await Deno.makeTempDir({ prefix: "wb-harness-" });
 await Deno.mkdir(`${tmp}/content/games`, { recursive: true });
 await Deno.mkdir(`${tmp}/state`, { recursive: true });
 await new Deno.Command("cp", { args: ["-R", `${repo}public/games/${project}`, `${tmp}/content/games/`] }).output();
-await Deno.symlink(`${repo}public/assets`, `${tmp}/content/assets`);   // read-only use; asset imports would write through
+// HARNESS_ASSETS: use another asset library (e.g. a temp copy with test-only files);
+// default = the repo's, read-only use (asset imports would write through).
+await Deno.symlink(Deno.env.get("HARNESS_ASSETS") ?? `${repo}public/assets`, `${tmp}/content/assets`);
 
 const ws = { contentDir: `${tmp}/content`, stateDir: `${tmp}/state`, dev: true };
 await setLastSession(ws, { projectId: project, sceneId: scene });
-const handler = makeHandler(`${repo}dist`, ws);
+// HARNESS_DIST: serve another build (e.g. a baseline built from an older commit for a
+// before / after regression recording); default = this repo's dist/.
+const handler = makeHandler(Deno.env.get("HARNESS_DIST") ?? `${repo}dist`, ws);
 const appInfo = () => ({ version: "harness", platform: Deno.build.os, contentDir: ws.contentDir, stateDir: ws.stateDir, serveOrigin: `http://127.0.0.1:${port}`, dev: true });
 
 // deno-lint-ignore no-explicit-any
