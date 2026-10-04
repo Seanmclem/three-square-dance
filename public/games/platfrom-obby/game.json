@@ -2551,5 +2551,14 @@
         0
       ]
     }
-  }
+  },
+  "characters": [
+    {
+      "id": "chr_864e191c",
+      "name": "Mannequin F",
+      "modelAssetId": "mannequin_f",
+      "clipSources": [],
+      "moves": {}
+    }
+  ]
 }
