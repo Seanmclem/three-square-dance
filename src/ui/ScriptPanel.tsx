@@ -3573,7 +3573,7 @@ function ActionFields({
             <input style={S.field} list="wb-move-names" placeholder="idle, walk, death, or a custom move"
               value={action.move ?? ""} onChange={(e) => set({ move: e.target.value.trim() || undefined })} />
             <datalist id="wb-move-names">
-              {["idle", "walk", "run", "jump", "jump_idle", "jump_land", "climb", "attack", "hit", "death", "talk"].map(m => <option key={m} value={m} />)}
+              {["idle", "walk", "run", "jump", "jump_idle", "jump_land", "fall", "climb", "attack", "hit", "death", "talk"].map(m => <option key={m} value={m} />)}
             </datalist>
           </F>
           <F label="Loop">

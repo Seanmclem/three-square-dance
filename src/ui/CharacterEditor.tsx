@@ -10,7 +10,7 @@ import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
 interface FileFit { state: "checking" | "same" | "close" | "different" | "none"; missing?: string[]; why?: string }
 
 /** How the built-in moves read in the editor. */
-const MOVE_LABEL: Record<string, string> = { jump: "jump (takeoff)", jump_idle: "in air", jump_land: "land" };
+const MOVE_LABEL: Record<string, string> = { jump: "jump (takeoff)", jump_idle: "in air", jump_land: "land", fall: "fall (no jump)" };
 const label = (m: string) => MOVE_LABEL[m] ?? m.replace(/_/g, " ");
 
 const C = {

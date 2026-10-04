@@ -9,11 +9,11 @@
  */
 
 /** The moves the engine plays by itself (§3 of the Phase 86 plan). */
-export const BUILT_IN_MOVES = ["idle", "walk", "run", "jump", "jump_idle", "jump_land", "climb", "attack", "hit", "death", "talk"] as const;
+export const BUILT_IN_MOVES = ["idle", "walk", "run", "jump", "jump_idle", "jump_land", "fall", "climb", "attack", "hit", "death", "talk"] as const;
 export type BuiltInMove = typeof BUILT_IN_MOVES[number];
 
 /** Moves that loop (the rest are one-shots). */
-export const LOOPING_MOVES = new Set<string>(["idle", "walk", "run", "jump_idle", "climb", "talk"]);
+export const LOOPING_MOVES = new Set<string>(["idle", "walk", "run", "jump_idle", "fall", "climb", "talk"]);
 
 /** Word groups per move, best first; a clip matches a group when it has all its words. */
 const GROUPS: Record<BuiltInMove, string[][]> = {
@@ -23,6 +23,7 @@ const GROUPS: Record<BuiltInMove, string[][]> = {
   jump:      [["jump", "start"], ["jump"]],
   jump_idle: [["jump", "loop"], ["jump", "idle"], ["fall"], ["air"]],
   jump_land: [["jump", "land"], ["land"]],
+  fall:      [["fall"], ["falling"]],
   climb:     [["climb", "up"], ["climb"]],
   attack:    [["attack"], ["bite"], ["punch"], ["slash"], ["kick"]],
   hit:       [["hit"]],
@@ -73,8 +74,12 @@ export function guessClip(move: string, clips: readonly string[]): string | null
     if (!best || score > best.score || (score === best.score && name.length < best.name.length)
       || (score === best.score && name.length === best.name.length && name < best.name)) best = { name, score };
   }
-  return best?.name ?? null;
+  // A guess that only fits through prop / style words (UAL2's LiftAir_Fall_Air_Loop for
+  // fall) is worse than none: leave the move empty for the user.
+  return best && best.score >= MIN_SCORE ? best.name : null;
 }
+
+const MIN_SCORE = 50;
 
 /** AUTO FILL: a guess for every built-in move (null where nothing fits). */
 export function autoFillMoves(clips: readonly string[]): Record<BuiltInMove, string | null> {

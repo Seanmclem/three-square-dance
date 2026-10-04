@@ -1162,7 +1162,7 @@ export class CharacterController {
     }
     switch (this._animPhase) {
       case "ground":
-        if (airborne) this._enterJump();
+        if (airborne) this._enterAir();
         else this._playGround(isMoving, running);
         break;
       case "jump":                                        // takeoff one-shot
@@ -1176,7 +1176,7 @@ export class CharacterController {
         if (!airborne) this._enterLand(isMoving, running);
         break;
       case "land":                                        // landing one-shot
-        if (airborne) this._enterJump();                  // jumped again mid-landing
+        if (airborne) this._enterAir();                   // jumped again (or stepped off) mid-landing
         else if (isMoving || this._animDone()) {            // moving cuts the landing short (see _enterLand)
           this._playGround(isMoving, running);
           this._animPhase = "ground";
@@ -1211,6 +1211,20 @@ export class CharacterController {
   /** Fire a locomotion one-shot (jump/land/footstep) — a non-positional SFX-bus sound. */
   private _emitSound(id?: string, volume?: number, rate?: number): void {
     if (id) this._bus.emit("audio:play", { id, volume, rate });
+  }
+
+  /**
+   * Left the ground. Rising (a jump, a spring, a launch) = the takeoff; already dropping
+   * (walked off a ledge) = the character's FALL move, when it has one (Phase 86
+   * follow-up); without one, the takeoff as before.
+   */
+  private _enterAir(): void {
+    if (this._character && this._velY <= 0 && this._has("fall")) {
+      this._play("fall", true);
+      this._animPhase = "airidle";
+      return;
+    }
+    this._enterJump();
   }
 
   private _enterJump(): void {

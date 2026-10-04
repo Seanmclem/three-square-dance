@@ -98,6 +98,7 @@ export function moveResolver(def: Pick<CharacterDef, "moves" | "inPlace">, pool:
 export function legacyCharacter(settings: PlayerSettings, clipNames: readonly string[]): CharacterDef {
   const moves: Record<string, CharacterMove> = {};
   for (const move of BUILT_IN_MOVES) {
+    if (move === "fall") continue;   // older players never had a fall: walking off a ledge stays as it was
     const override = settings.animClips?.[move as LocomotionState];
     moves[move] = { clip: override === null ? null : override ? override : legacyGuess(move, clipNames) };
   }
