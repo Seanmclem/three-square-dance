@@ -81,7 +81,7 @@ export class PreviewController {
     return { subMode: this._subMode, cullView: this._cullView };
   }
 
-  enter(mode: PreviewMode, opts?: { resume?: boolean; character?: CharacterDef }): void {
+  enter(mode: PreviewMode, opts?: { resume?: boolean; character?: CharacterDef; atSpawn?: boolean }): void {
     if (this._controller) return;
 
     // Occlusion mode needs the editor orbit camera as its vantage — the runtime
@@ -95,7 +95,9 @@ export class PreviewController {
 
     let spawnPos: THREE.Vector3;
     let facingDeg = 0;
-    if (isGameplayMode(mode) && this._world.world?.defaultSpawn) {
+    // atSpawn: TRY IT (character editor) starts at the level spawn, not the camera focus
+    // (which, after the editor puts the camera back, can be over empty air).
+    if ((isGameplayMode(mode) || opts?.atSpawn) && this._world.world?.defaultSpawn) {
       const s = this._world.world.defaultSpawn;
       // s.position is at foot/floor level; body origin is at capsule center (scaled)
       const capsuleBottom = (0.6 + 0.3) * effectiveCharacterScale(settings); // (halfHeight + radius) * per-mode scale

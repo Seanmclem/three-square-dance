@@ -3578,7 +3578,7 @@ export default function App() {
     setCharacterTrying(true);
     void (async () => {
       await stage?.exit();                               // the level comes back
-      previewRef.current?.enter("preview", { character: characterTryRef.current! });
+      previewRef.current?.enter("preview", { character: characterTryRef.current!, atSpawn: true });
     })();
   };
   // Back from TRY IT: the editor reopens on the same (still unsaved) draft.

@@ -81,3 +81,8 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
       model; WALK filters its clips.
 - [ ] By hand: an object's AUTO-PLAY clip field; the list opening upward near the
       window bottom.
+
+## TRY IT starts at the spawn (v4.115.3)
+
+- [x] TRY IT on level_1 and level_3 (camera focus left elsewhere): the player stands at
+      the level spawn, grounded, idle (before: spawned at the camera focus and fell forever).
