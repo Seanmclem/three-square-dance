@@ -69,3 +69,15 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
 - [x] No errors or "no move" warnings.
 - [ ] By hand: the dialogue talk move; a script adjust_number hit; the Characters guide
       from the ? menu.
+
+## Searchable menus (v4.115.2)
+
+- [x] Characters panel: typing "ual" in the model field leaves UAL1 / UAL2 under the
+      Characters heading; Enter picks; NEW opens the editor.
+- [x] Editor: a move's clip field filters word by word ("loop walk"); click picks;
+      "no matches" for junk; Escape keeps the pick; the list stays on screen at the
+      right edge.
+- [x] Player Character page (CHARACTER = None): CHARACTER MODEL "ual1" + Enter sets the
+      model; WALK filters its clips.
+- [ ] By hand: an object's AUTO-PLAY clip field; the list opening upward near the
+      window bottom.

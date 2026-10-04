@@ -96,7 +96,7 @@
 <h2 id="panel">The Characters panel</h2>
 <p>The <b>Characters</b> button on the left toolbar (under Prefabs) lists the game's characters.</p>
 <ul>
-  <li><b>New character from a model:</b> pick any model and press NEW. Its moves are guessed from the model's clip names (AUTO FILL) and the editor opens.</li>
+  <li><b>New character from a model:</b> pick any model and press NEW. The model field is a search box: type part of a name (ual, mannequin) to narrow the list, then click a match or press Enter. Its moves are guessed from the model's clip names (AUTO FILL) and the editor opens.</li>
   <li>Each character: <b>EDIT</b>, <b>PLACE</b> (put it in the level), <b>USE AS PLAYER</b> / NOT PLAYER, <b>DUPLICATE</b>, <b>DELETE</b> (asks first; deleting the player's character puts the player back on its model settings).</li>
 </ul>
 
@@ -105,7 +105,7 @@
 <ul>
   <li><b>Left, ANIMATIONS:</b> every clip it can use, grouped by file, with search and filters (loops, one-shots, clips that move the body). Click one to play it. <b>+ ADD FILE</b> (at the bottom) opens a list of every imported file with clips, checked against the model's skeleton (see <a href="#files">Borrowing clips</a>); ✕ on a file's heading stops borrowing from it.</li>
   <li><b>Right, CHARACTER:</b> the name, <b>HEIGHT</b> (FIT TO CAPSULE makes it as tall as the collision capsule, 1.8 m at character scale 1; AS IMPORTED goes back), <b>KEEP IN PLACE</b>, and a color for each material.</li>
-  <li><b>Right, MOVES:</b> one list for the character. Pick a clip for each move from its menu, or click a clip on the left and then ◀ on the move. ▶ plays the move. <b>AUTO FILL</b> guesses the empty ones; <b>+ ADD MOVE</b> adds your own (wave, sit, cheer …).</li>
+  <li><b>Right, MOVES:</b> one list for the character. Pick a clip for each move from its search box (type words in any order, such as "walk loop"; spaces match underscores), or click a clip on the left and then ◀ on the move. ▶ plays the move. <b>AUTO FILL</b> guesses the empty ones; <b>+ ADD MOVE</b> adds your own (wave, sit, cheer …).</li>
   <li><b>Bottom, the player bar:</b> play / pause, scrub (click or drag; it pauses on that frame), speed, LOOP, and <b>BLEND</b> from one move to another, which plays the first and blends into the second the way the game does.</li>
   <li><b>TRY IT ▸</b> plays the level with this character as the player, unsaved changes included. <kbd>Esc</kbd> comes back to the editor, changes still there.</li>
   <li><b>Save</b> (or <kbd>Cmd</kbd>+<kbd>S</kbd>) writes the character to the game and keeps editing; <b>Close</b> asks first if there are unsaved changes.</li>

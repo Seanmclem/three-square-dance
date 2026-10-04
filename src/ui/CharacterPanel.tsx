@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SearchSelect } from "@/ui/SearchSelect";
 import type { AssetDef, CharacterDef } from "@/types";
 
 /**
@@ -42,15 +43,10 @@ export function CharacterPanel({ characters, assets, playerCharacterId, onNew, o
       <div style={{ padding: "8px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 6 }}>
         <span style={{ color: "#c2cadb", fontSize: 10, fontFamily: "monospace", letterSpacing: 1 }}>NEW CHARACTER FROM A MODEL</span>
         <div style={{ display: "flex", gap: 6 }}>
-          <select value={model} onChange={e => setModel(e.target.value)} aria-label="Model for a new character"
-            style={{ flex: 1, minWidth: 0, background: "#141416", color: "#dde3f0", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, fontSize: 11, fontFamily: "monospace", padding: "4px" }}>
-            <option value="">choose a model…</option>
-            {groups.filter(g => g.items.length).map(g => (
-              <optgroup key={g.label} label={g.label}>
-                {g.items.map(a => <option key={a.id} value={a.id}>{a.label}{a.animations?.length ? ` · ${a.animations.length} clips` : a.rig ? " · skeleton, no clips" : ""}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          <SearchSelect value={model} onChange={setModel} ariaLabel="Model for a new character" placeholder="search models…"
+            style={{ flex: 1, padding: "4px 6px" }}
+            options={groups.flatMap(g => g.items.map(a => ({ value: a.id, label: a.label, group: g.label,
+              hint: a.animations?.length ? `${a.animations.length} clips` : a.rig ? "skeleton, no clips" : undefined })))} />
           <button style={btn(!!model)} disabled={!model} onClick={() => { if (model) { onNew(model); setModel(""); } }}>NEW</button>
         </div>
       </div>

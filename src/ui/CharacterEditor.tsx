@@ -5,6 +5,7 @@ import { rigOfAsset } from "@/characters/CharacterStage";
 import { rigOverlap } from "@/characters/rig";
 import { BUILT_IN_MOVES, LOOPING_MOVES, guessClip } from "@/characters/autoFill";
 import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
+import { SearchSelect } from "@/ui/SearchSelect";
 
 /** + ADD FILE: how a file's skeleton compares with the model's. */
 interface FileFit { state: "checking" | "same" | "close" | "different" | "none"; missing?: string[]; why?: string }
@@ -281,15 +282,15 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             return (
               <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "96px 1fr auto auto", alignItems: "center", gap: 4 }}>
                 <span style={{ color: custom ? "#ffc58a" : C.text, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }} title={LOOPING_MOVES.has(m) ? "loops" : "plays once"}>{label(m)}</span>
-                <select aria-label={`Clip for ${label(m)}`} value={clipValue(cur)} onChange={e => pickClip(m, e.target.value)} style={{ ...INPUT, minWidth: 0 }}>
-                  <option value="">no clip</option>
-                  {sources.map(src => (
-                    <optgroup key={src} label={assetLabel(src)}>
-                      {clips.filter(c => c.source === src).map(c => <option key={c.name} value={`${src === draft.modelAssetId ? "" : src}::${c.name}`}>{c.name}</option>)}
-                    </optgroup>
-                  ))}
-                  {cur?.clip && !clips.some(c => c.name === cur.clip) && <option value={clipValue(cur)}>{cur.clip} (missing)</option>}
-                </select>
+                <SearchSelect ariaLabel={`Clip for ${label(m)}`} value={clipValue(cur)} onChange={v => pickClip(m, v)} placeholder="no clip · search…"
+                  dataAttr={`clip-${m}`}
+                  options={[
+                    { value: "", label: "no clip" },
+                    ...sources.flatMap(src => clips.filter(c => c.source === src).map(c => ({
+                      value: `${src === draft.modelAssetId ? "" : src}::${c.name}`, label: c.name, group: assetLabel(src),
+                      hint: c.loop ? "loop" : "once" }))),
+                    ...(cur?.clip && !clips.some(c => c.name === cur.clip) ? [{ value: clipValue(cur), label: `${cur.clip} (missing)` }] : []),
+                  ]} />
                 {selected
                   ? <button style={{ ...BTN(), padding: "3px 6px" }} title={`Use the clip picked on the left (${selected.name})`} onClick={() => setMove(m, { ...cur, clip: selected.name, source: selected.source === draft.modelAssetId ? undefined : selected.source })}>◀</button>
                   : <span />}

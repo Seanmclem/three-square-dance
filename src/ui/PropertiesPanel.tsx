@@ -30,6 +30,7 @@ import { GENERATORS } from "@/prefab/generators";
 import { gameState } from "@/scripting/GameState";
 import { assetManager } from "@/core/AssetManager";
 import { entKey } from "@/scripting/entityState";
+import { SearchSelect } from "@/ui/SearchSelect";
 
 // Preview swatch size in the material picker rows — tweak to taste.
 const PICKER_SWATCH = 26;
@@ -5155,19 +5156,13 @@ function AnimationsScreen({ selected, assets, bus, onPreviewClip, onStopPreview,
     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div>
         <div style={LABEL}>AUTO-PLAY</div>
-        <select
+        <SearchSelect
+          ariaLabel="Auto-play clip"
           value={autoPlay ?? ""}
-          onChange={e => setAuto(e.target.value || null)}
-          style={{
-            width: "100%", boxSizing: "border-box",
-            border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4,
-            background: "rgba(40,40,40,0.9)", color: "#c0c0c0",
-            fontSize: 10, fontFamily: "monospace", padding: "4px 6px", outline: "none",
-          }}
-        >
-          <option value="">None</option>
-          {clips.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+          onChange={v => setAuto(v || null)}
+          style={{ width: "100%", boxSizing: "border-box", fontSize: 10, padding: "4px 6px" }}
+          options={[{ value: "", label: "None" }, ...clips.map(c => ({ value: c, label: c }))]}
+        />
       </div>
 
       <div>
@@ -6497,19 +6492,20 @@ function SpawnSettingsView({
     return (
       <div key={slot}>
         <div style={{ ...LABEL, marginBottom: 3 }}>{label}</div>
-        <select
+        <SearchSelect
+          ariaLabel={`${label} animation`}
           value={value}
-          onChange={e => {
-            const v = e.target.value;
+          onChange={v => {
             const next = v === "__auto__" ? undefined : v === "__none__" ? null : v;
             onChange({ animClips: { ...settings.animClips, [slot]: next } });
           }}
-          style={{ width: "100%", background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "4px 6px" }}
-        >
-          <option value="__auto__">{auto ? `Auto (${auto})` : "Auto (none found)"}</option>
-          <option value="__none__">None</option>
-          {modelClips.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+          style={{ width: "100%", boxSizing: "border-box", fontSize: 10, padding: "4px 6px" }}
+          options={[
+            { value: "__auto__", label: auto ? `Auto (${auto})` : "Auto (none found)" },
+            { value: "__none__", label: "None" },
+            ...modelClips.map(c => ({ value: c, label: c })),
+          ]}
+        />
       </div>
     );
   };
@@ -6630,16 +6626,17 @@ function SpawnSettingsView({
       </div>
       {!playerChar && <div>
         <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER MODEL</div>
-        <select
+        <SearchSelect
+          ariaLabel="Character model"
           value={settings.modelAssetId ?? ""}
-          onChange={e => onChange({ modelAssetId: e.target.value || null })}
-          style={{ width: "100%", background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#c0c0c0", fontSize: 10, fontFamily: "monospace", padding: "4px 6px" }}
-        >
-          <option value="">None (capsule only)</option>
-          {modelAssets.map(a => (
-            <option key={a.id} value={a.id}>{a.label}</option>
-          ))}
-        </select>
+          onChange={v => onChange({ modelAssetId: v || null })}
+          style={{ width: "100%", boxSizing: "border-box", fontSize: 10, padding: "4px 6px" }}
+          options={[
+            { value: "", label: "None (capsule only)" },
+            ...[...modelAssets].sort((x, y) => x.category.localeCompare(y.category) || x.label.localeCompare(y.label)).map(a => ({ value: a.id, label: a.label, group: a.category,
+              hint: a.animations?.length ? `${a.animations.length} clips` : undefined })),
+          ]}
+        />
       </div>}
       {numField("CHARACTER SCALE (3RD PERSON)", "characterScale", 0.1, 1,
         "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
