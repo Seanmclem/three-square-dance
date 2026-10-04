@@ -97,7 +97,6 @@
 <p>The <b>Characters</b> button on the left toolbar (under Prefabs) lists the game's characters.</p>
 <ul>
   <li><b>New character from a model:</b> pick any model and press NEW. Its moves are guessed from the model's clip names (AUTO FILL) and the editor opens.</li>
-  <li><b>Make the player's look a character:</b> turns the player's current MODEL and ANIMATIONS settings into a character and uses it as the player. It plays exactly as before; from then on you edit it like any other.</li>
   <li>Each character: <b>EDIT</b>, <b>PLACE</b> (put it in the level), <b>USE AS PLAYER</b> / NOT PLAYER, <b>DUPLICATE</b>, <b>DELETE</b> (asks first; deleting the player's character puts the player back on its model settings).</li>
 </ul>
 
@@ -138,7 +137,7 @@
 
 <h2 id="using">Using characters: player, enemies, scripts</h2>
 <ul>
-  <li><b>Player:</b> USE AS PLAYER in the panel, or the CHARACTER menu on the player settings' Character page. The character brings the model, size, colors and animations; jump height, speed, run and CHARACTER SCALE stay with the game.</li>
+  <li><b>Player:</b> the CHARACTER menu on the player settings' Character page (or USE AS PLAYER in the panel). On that page, with CHARACTER set to None, <b>SAVE AS A CHARACTER</b> turns the MODEL and ANIMATIONS settings there into a character and picks it: it plays exactly as before, and from then on you edit it in the character editor. The character brings the model, size, colors and animations; jump height, speed, run and CHARACTER SCALE stay with the game.</li>
   <li><b>Placing one:</b> PLACE arms the object tool with it; click to drop it (keep clicking for more, <kbd>Esc</kbd> stops). A placed character idles in its idle move and plays moves from scripts.</li>
   <li><b>Enemies:</b> select a placed character and turn on ENEMY AI on its AI screen. Its idle, walk and attack clips come from the character's moves.</li>
   <li><b>Scripts, play move:</b> pick the target (the player or an object) and a move name; Loop and Hold at end work as in play animation. It plays whatever clip that character's move is set to, so swapping a clip never touches the script.</li>

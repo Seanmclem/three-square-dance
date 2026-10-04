@@ -19,7 +19,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
-import { uiCharacters, missingMoves, PLAYER_MOVES, ENEMY_MOVES, moveLabel } from "@/characters/uiCharacters";
+import { uiCharacters, uiCharacterActions, missingMoves, PLAYER_MOVES, ENEMY_MOVES, moveLabel } from "@/characters/uiCharacters";
 import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, holesOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -6650,6 +6650,16 @@ function SpawnSettingsView({
           <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
           {animSlots.map(({ slot, label }) => animField(slot, label))}
           <div style={BLURB}>Animations play on the 3rd-person avatar (FPS hides the model).</div>
+        </div>
+      )}
+      {!playerChar && settings.modelAssetId && uiCharacterActions() && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <button data-save-as-character
+            style={{ padding: "6px 8px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10, border: "1px solid rgba(80,140,255,0.45)", background: "rgba(80,140,255,0.14)", color: "#9dbdff" }}
+            onClick={() => { const id = uiCharacterActions()?.fromSettings(settings); if (id) onChange({ characterId: id }); }}>
+            SAVE AS A CHARACTER
+          </button>
+          <div style={BLURB}>Saves the model and animations above as a character (Characters panel) and picks it in CHARACTER: it plays the same, and from then on you edit it in the character editor.</div>
         </div>
       )}
     </div>

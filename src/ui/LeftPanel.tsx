@@ -16,14 +16,12 @@ interface LeftPanelProps {
   // Phase 86: characters panel
   characters?:            CharacterDef[];
   playerCharacterId?:     string | null;
-  legacyPlayerModel?:     string | null;
   onCharacterNew?:        (modelAssetId: string) => void;
   onCharacterEdit?:       (id: string) => void;
   onCharacterDuplicate?:  (id: string) => void;
   onCharacterPlace?:      (id: string) => void;
   onCharacterDelete?:     (id: string) => void;
   onCharacterUseAsPlayer?:(id: string | null) => void;
-  onCharacterFromPlayer?: () => void;
   panelId:         LeftPanelId;
   assets:          AssetDef[];
   selectedAssetId: string | null;
@@ -117,7 +115,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  characters, playerCharacterId, legacyPlayerModel, onCharacterNew, onCharacterEdit, onCharacterDuplicate, onCharacterPlace, onCharacterDelete, onCharacterUseAsPlayer, onCharacterFromPlayer,
+  characters, playerCharacterId, onCharacterNew, onCharacterEdit, onCharacterDuplicate, onCharacterPlace, onCharacterDelete, onCharacterUseAsPlayer,
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onReoriginAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onSoundRecord, onDeleteSounds, onEditSounds,
@@ -270,14 +268,12 @@ export function LeftPanel({
                 characters={characters ?? []}
                 assets={assets}
                 playerCharacterId={playerCharacterId ?? null}
-                legacyPlayerModel={legacyPlayerModel ?? null}
                 onNew={id => onCharacterNew?.(id)}
                 onEdit={id => onCharacterEdit?.(id)}
                 onDuplicate={id => onCharacterDuplicate?.(id)}
                 onPlace={id => onCharacterPlace?.(id)}
                 onDelete={id => onCharacterDelete?.(id)}
                 onUseAsPlayer={id => onCharacterUseAsPlayer?.(id)}
-                onImportPlayer={onCharacterFromPlayer}
               />
             )}
             {panelId === "prefabs" && (

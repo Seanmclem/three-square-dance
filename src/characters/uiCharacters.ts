@@ -1,4 +1,4 @@
-import type { CharacterDef } from "@/types";
+import type { CharacterDef, PlayerSettings } from "@/types";
 
 /**
  * Phase 86: the game's characters for deep UI (player settings, the enemy AI screen),
@@ -8,6 +8,11 @@ import type { CharacterDef } from "@/types";
 let current: CharacterDef[] = [];
 export function setUiCharacters(list: CharacterDef[]): void { current = list; }
 export function uiCharacters(): CharacterDef[] { return current; }
+
+/** Actions the App provides to those panels (null outside a project's App). */
+let actions: { fromSettings: (settings: PlayerSettings) => string | null } | null = null;
+export function setUiCharacterActions(a: typeof actions): void { actions = a; }
+export function uiCharacterActions(): typeof actions { return actions; }
 
 /** Moves a use plays by itself that the character has no clip for. */
 export function missingMoves(c: CharacterDef, moves: readonly string[]): string[] {

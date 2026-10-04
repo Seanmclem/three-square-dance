@@ -115,9 +115,9 @@ All character animation goes through one shared `CharacterAnimator`
 NPCs will be others.
 
 **Making one (v4.112.0):** the **Characters** button on the left toolbar opens the game's
-characters. NEW makes one from any model (its moves guessed from the clip names), and
-"Make the player's look a character" turns the current player settings into one that plays
-the same. EDIT opens the character editor, isolated like Edit Brush: the level is set
+characters. NEW makes one from any model (its moves guessed from the clip names). On the player
+settings' Character page, SAVE AS A CHARACTER (under the old MODEL / ANIMATIONS settings)
+turns them into a character that plays the same and picks it in the CHARACTER menu. EDIT opens the character editor, isolated like Edit Brush: the level is set
 aside, the character stands on a dark grid inside its collision capsule. Left: every clip
 it can use, by file (+ ADD FILE borrows clips from a file with the same skeleton). Right:
 name, HEIGHT (FIT TO CAPSULE), KEEP IN PLACE, colors, and the MOVES list (AUTO FILL,

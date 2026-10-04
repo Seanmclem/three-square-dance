@@ -4,20 +4,20 @@ import type { AssetDef, CharacterDef } from "@/types";
 /**
  * Phase 86 part B: the game's characters (game.json `characters`, like prefabs). Each row:
  * EDIT (the isolated character editor), USE AS PLAYER, DUPLICATE, DELETE (asks inline).
- * NEW starts a character from any model; its moves are filled in by AUTO FILL.
+ * NEW starts a character from any model; its moves are filled in by AUTO FILL. (Turning
+ * the player's MODEL + ANIMATIONS settings into a character lives on the player's
+ * Character page, next to those settings: SAVE AS A CHARACTER.)
  */
-export function CharacterPanel({ characters, assets, playerCharacterId, legacyPlayerModel, onNew, onEdit, onDuplicate, onDelete, onUseAsPlayer, onImportPlayer, onPlace }: {
+export function CharacterPanel({ characters, assets, playerCharacterId, onNew, onEdit, onDuplicate, onDelete, onUseAsPlayer, onPlace }: {
   characters:        CharacterDef[];
   assets:            AssetDef[];
   playerCharacterId: string | null;
-  legacyPlayerModel: string | null;   // the player's model when it isn't a character yet
   onNew:             (modelAssetId: string) => void;
   onEdit:            (id: string) => void;
   onDuplicate:       (id: string) => void;
   onPlace:           (id: string) => void;   // part C: place it in the level (an animated object; turn on enemy AI for an enemy)
   onDelete:          (id: string) => void;
   onUseAsPlayer:     (id: string | null) => void;
-  onImportPlayer?:   () => void;       // make a character from today's player settings
 }) {
   const [model, setModel] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -42,12 +42,6 @@ export function CharacterPanel({ characters, assets, playerCharacterId, legacyPl
           </select>
           <button style={btn(!!model)} disabled={!model} onClick={() => { if (model) { onNew(model); setModel(""); } }}>NEW</button>
         </div>
-        {legacyPlayerModel && onImportPlayer && (
-          <button style={btn()} onClick={onImportPlayer}
-            title="Make a character from the player's current model and ANIMATIONS choices, and use it as the player">
-            Make the player's look a character ({label(legacyPlayerModel)})
-          </button>
-        )}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6 }}>
         {characters.length === 0 && (

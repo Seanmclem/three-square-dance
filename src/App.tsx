@@ -45,7 +45,7 @@ import { CharacterStage } from "@/characters/CharacterStage";
 import { autoFillMoves } from "@/characters/autoFill";
 import { legacyCharacter } from "@/characters/characterRuntime";
 import { CharacterEditor } from "@/ui/CharacterEditor";
-import { setUiCharacters } from "@/characters/uiCharacters";
+import { setUiCharacters, setUiCharacterActions } from "@/characters/uiCharacters";
 import { effectiveCharacterScale } from "@/preview/CharacterController";
 import { isBrush } from "@/builders/ShapeBuilder";
 import { NodeDragger } from "@/editor/NodeDragger";
@@ -3511,18 +3511,19 @@ export default function App() {
     applyCharacters([...characters, def]);
     openCharacterEditor(def);
   };
-  /** Today's player (model + ANIMATIONS choices) as a character, used as the player. Same
-   *  clips and no KEEP IN PLACE, so the game plays the same. */
-  const handleCharacterFromPlayer = (): void => {
-    const settings = worldRef.current?.world?.playerSettings;
-    if (!settings?.modelAssetId) return;
+  /** SAVE AS A CHARACTER (the player's Character page): the MODEL + ANIMATIONS settings on
+   *  that page as a new character. Same clips, no KEEP IN PLACE, so it plays the same; the
+   *  page then selects it in its CHARACTER menu (in its own game / scene scope). */
+  const characterFromSettings = (settings: PlayerSettings): string | null => {
+    if (!settings.modelAssetId) return null;
     const a = assets.find(x => x.id === settings.modelAssetId);
     const legacy = legacyCharacter(settings, a?.animations ?? []);
-    const def: CharacterDef = { ...legacy, id: newCharacterId(), name: `${a?.label ?? "Player"} (player)`,
+    const def: CharacterDef = { ...legacy, id: newCharacterId(), name: a?.label ?? "Player",
       moves: Object.fromEntries(Object.entries(legacy.moves).filter(([, m]) => m.clip)) };
     applyCharacters([...characters, def]);
-    setPlayerCharacter(def.id);
+    return def.id;
   };
+  setUiCharacterActions({ fromSettings: characterFromSettings });
   /** PLACE: the object tool, armed with the character's model; clicks place it (Esc stops). */
   const handleCharacterPlace = (id: string): void => {
     const c = characters.find(x => x.id === id);
@@ -4238,14 +4239,12 @@ export default function App() {
         prefabRenameRequestId={prefabRenameRequest}
         characters={characters}
         playerCharacterId={worldRef.current?.world?.playerSettings?.characterId ?? null}
-        legacyPlayerModel={worldRef.current?.world?.playerSettings?.characterId ? null : (worldRef.current?.world?.playerSettings?.modelAssetId ?? null)}
         onCharacterNew={handleCharacterNew}
         onCharacterEdit={id => { const c = characters.find(x => x.id === id); if (c) openCharacterEditor(c); }}
         onCharacterDuplicate={handleCharacterDuplicate}
         onCharacterPlace={handleCharacterPlace}
         onCharacterDelete={handleCharacterDelete}
         onCharacterUseAsPlayer={setPlayerCharacter}
-        onCharacterFromPlayer={handleCharacterFromPlayer}
         onPrefabRenameRequestHandled={() => setPrefabRenameRequest(null)}
       />
       {editingPrefab && !editingBrush && (

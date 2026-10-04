@@ -132,8 +132,18 @@ export class ProjectStore {
     await api().writeProjectManifest(this.id, JSON.stringify(this.manifest, null, 2));
   }
 
-  async writeGame(): Promise<void> {
-    await api().writeGameFile(this.id, JSON.stringify(this.game, null, 2));
+  /**
+   * game.json writes go one at a time, each sending the game as it is when its turn
+   * comes. Two quick writes (a new character, then the player setting that picks it)
+   * used to be two parallel requests, and the earlier snapshot could land last and undo
+   * the later change on disk (v4.113.2).
+   */
+  private _gameWrite: Promise<void> = Promise.resolve();
+  writeGame(): Promise<void> {
+    const run = () => api().writeGameFile(this.id, JSON.stringify(this.game, null, 2));
+    const next = this._gameWrite.then(run, run);
+    this._gameWrite = next.catch(() => {});   // a failed write doesn't block the next one
+    return next;
   }
 }
 
