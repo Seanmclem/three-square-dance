@@ -2575,6 +2575,49 @@
           "source": "ual1"
         }
       }
+    },
+    {
+      "id": "chr_13e910a4",
+      "name": "UAL1",
+      "modelAssetId": "ual1",
+      "clipSources": [
+        "ual2"
+      ],
+      "moves": {
+        "idle": {
+          "clip": "Idle_Loop"
+        },
+        "walk": {
+          "clip": "Walk_Loop"
+        },
+        "run": {
+          "clip": "Jog_Fwd_Loop"
+        },
+        "jump": {
+          "clip": "Jump_Start"
+        },
+        "jump_idle": {
+          "clip": "Jump_Loop"
+        },
+        "jump_land": {
+          "clip": "Jump_Land"
+        },
+        "climb": {
+          "clip": "Climb_Up_Loop"
+        },
+        "attack": {
+          "clip": "Punch_Jab"
+        },
+        "hit": {
+          "clip": "Hit_Head"
+        },
+        "death": {
+          "clip": "Death01"
+        },
+        "talk": {
+          "clip": "Idle_Talking_Loop"
+        }
+      }
     }
   ]
 }
