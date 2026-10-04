@@ -6,6 +6,9 @@ import { rigOverlap } from "@/characters/rig";
 import { BUILT_IN_MOVES, LOOPING_MOVES, guessClip } from "@/characters/autoFill";
 import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
 
+/** + ADD FILE: how a file's skeleton compares with the model's. */
+interface FileFit { state: "checking" | "same" | "close" | "different" | "none"; missing?: string[]; why?: string }
+
 /** How the built-in moves read in the editor. */
 const MOVE_LABEL: Record<string, string> = { jump_idle: "in air", jump_land: "land" };
 const label = (m: string) => MOVE_LABEL[m] ?? m.replace(/_/g, " ");
@@ -40,7 +43,9 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "loops" | "once" | "travels">("all");
   const [pb, setPb] = useState<StagePlayback | null>(null);
-  const [addFile, setAddFile] = useState("");
+  // + ADD FILE: every imported file with clips, its skeleton checked against the model's.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [fits, setFits] = useState<Record<string, FileFit>>({});
   const [fileNote, setFileNote] = useState<string | null>(null);
   const [newMove, setNewMove] = useState("");
   const [blend, setBlend] = useState<{ from: string; to: string }>({ from: "walk", to: "run" });
@@ -101,19 +106,43 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
     onChange({ ...draft, moves });
     setFileNote(n ? `AUTO FILL set ${n} empty move${n === 1 ? "" : "s"}.` : "AUTO FILL: every move it could guess already has a clip.");
   };
-  const tryAddFile = async (id: string) => {
-    setAddFile("");
-    if (!id) return;
-    setFileNote("Checking the skeleton…");
-    const [model, lib] = await Promise.all([
-      rigOfAsset(draft.modelAssetId, assets.find(a => a.id === draft.modelAssetId)?.rig),
-      rigOfAsset(id, assets.find(a => a.id === id)?.rig),
-    ]);
-    if (!model || !lib) { setFileNote(`${assetLabel(id)}: ${!model ? "this model" : "that file"} has no skeleton, so its clips can't be shared.`); return; }
-    const o = rigOverlap(model, lib);
-    if (o.share < 0.9) { setFileNote(`${assetLabel(id)} uses a different skeleton (${Math.round(o.share * 100)}% of its bones match), so its clips won't fit.`); return; }
+  // Check every candidate's skeleton when the picker opens (each file loads once per
+  // session; files imported since Phase 86 carry their skeleton in the manifest).
+  useEffect(() => {
+    if (!pickerOpen) return;
+    let alive = true;
+    void (async () => {
+      const model = await rigOfAsset(draft.modelAssetId, assets.find(a => a.id === draft.modelAssetId)?.rig);
+      const todo = candidates.filter(a => !fits[a.id] || fits[a.id]!.state === "checking");
+      setFits(f => ({ ...f, ...Object.fromEntries(todo.map(a => [a.id, { state: "checking" } as FileFit])) }));
+      let next = 0;
+      const worker = async () => {
+        while (alive && next < todo.length) {
+          const a = todo[next++]!;
+          const lib = await rigOfAsset(a.id, a.rig);
+          if (!alive) return;
+          let fit: FileFit;
+          if (!model) fit = { state: "none", why: "this model has no skeleton" };
+          else if (!lib) fit = { state: "none", why: "no skeleton" };
+          else {
+            const o = rigOverlap(model, lib);
+            fit = o.share >= 1 ? { state: "same" } : o.share >= 0.9 ? { state: "close", missing: o.missing }
+              : { state: "different", why: `different skeleton (${Math.round(o.share * 100)}% of its bones match)` };
+          }
+          setFits(f => ({ ...f, [a.id]: fit }));
+        }
+      };
+      await Promise.all([worker(), worker(), worker()]);
+    })();
+    return () => { alive = false; };
+  }, [pickerOpen, draft.modelAssetId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const addFile = (id: string) => {
+    const fit = fits[id];
     onChange({ ...draft, clipSources: [...draft.clipSources, id] });
-    setFileNote(o.share < 1 ? `Added ${assetLabel(id)} (missing bones: ${o.missing.slice(0, 4).join(", ")}${o.missing.length > 4 ? " …" : ""}).` : `Added ${assetLabel(id)}: same skeleton.`);
+    setFileNote(fit?.state === "close" && fit.missing?.length
+      ? `Added ${assetLabel(id)} (missing bones: ${fit.missing.slice(0, 4).join(", ")}${fit.missing.length > 4 ? " …" : ""}).`
+      : `Added ${assetLabel(id)}: same skeleton.`);
+    setPickerOpen(false);
   };
   const removeFile = (id: string) => {
     const moves = Object.fromEntries(Object.entries(draft.moves).map(([k, m]) => [k, m.source === id ? { ...m, clip: null, source: undefined } : m]));
@@ -165,12 +194,42 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
           })}
         </div>
         <div style={{ padding: "8px 10px", borderTop: `1px solid ${C.line}`, display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={LBL}>+ ADD FILE (clips with the same skeleton)</span>
-          <select aria-label="Add an animation file" value={addFile} onChange={e => void tryAddFile(e.target.value)} style={INPUT}>
-            <option value="">choose a file with clips…</option>
-            {candidates.map(a => <option key={a.id} value={a.id}>{a.label} · {a.animations!.length} clips</option>)}
-          </select>
-          {fileNote && <span style={{ color: /different|no skeleton/.test(fileNote) ? C.red : C.text2, fontSize: 10, lineHeight: 1.4 }}>{fileNote}</span>}
+          <button style={{ ...BTN(pickerOpen), textAlign: "left" }} aria-expanded={pickerOpen} onClick={() => setPickerOpen(o => !o)}>
+            {pickerOpen ? "▾" : "▸"} + ADD FILE: borrow clips from another file
+          </button>
+          {pickerOpen && (() => {
+            const order: Record<FileFit["state"], number> = { same: 0, close: 1, checking: 2, different: 3, none: 4 };
+            const rows = [...candidates].sort((a, b) => order[fits[a.id]?.state ?? "checking"] - order[fits[b.id]?.state ?? "checking"] || a.label.localeCompare(b.label));
+            const ok = rows.filter(a => ["same", "close"].includes(fits[a.id]?.state ?? "")).length;
+            const checking = rows.filter(a => (fits[a.id]?.state ?? "checking") === "checking").length;
+            return (
+              <div data-file-picker style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: "42vh", overflowY: "auto", border: `1px solid ${C.line}`, borderRadius: 5, padding: 4, background: "#18191d" }}>
+                <span style={{ color: C.text2, fontSize: 10, padding: "2px 4px 4px", lineHeight: 1.4 }}>
+                  {checking ? `Checking skeletons… ${rows.length - checking} of ${rows.length}` : `${ok} of ${rows.length} file${rows.length === 1 ? "" : "s"} with clips share this model's skeleton.`}
+                  {" "}Clips only fit a model with the same bones.
+                </span>
+                {rows.length === 0 && <span style={{ color: C.muted, fontSize: 10, padding: 4 }}>No other imported files have clips.</span>}
+                {rows.map(a => {
+                  const f = fits[a.id] ?? { state: "checking" as const };
+                  const usable = f.state === "same" || f.state === "close";
+                  return (
+                    <div key={a.id} data-file-row={a.id} title={f.why ?? (f.state === "close" ? `Missing bones: ${f.missing?.join(", ")}` : undefined)}
+                      style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 6, padding: "4px 6px", borderRadius: 4,
+                        background: usable ? "rgba(60,207,145,0.07)" : "transparent", opacity: usable || f.state === "checking" ? 1 : 0.75 }}>
+                      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                        <span style={{ color: C.text, fontSize: 11, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.label} · {a.animations!.length} clips</span>
+                        <span style={{ color: usable ? C.green : f.state === "checking" ? C.muted : C.text2, fontSize: 9, fontFamily: "monospace" }}>
+                          {f.state === "same" ? "same skeleton" : f.state === "close" ? `nearly the same (${f.missing?.length} bones missing)` : f.state === "checking" ? "checking…" : f.why}
+                        </span>
+                      </span>
+                      {usable && <button style={{ ...BTN(true), padding: "3px 8px" }} onClick={() => addFile(a.id)}>ADD</button>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          {fileNote && <span style={{ color: C.text2, fontSize: 10, lineHeight: 1.4 }}>{fileNote}</span>}
         </div>
       </div>
 

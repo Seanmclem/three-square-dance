@@ -104,7 +104,7 @@
 <h2 id="editor">The character editor</h2>
 <p>EDIT opens the character alone, like Edit Brush: the level is set aside and the character stands on a dark grid inside a wireframe of its collision capsule. Orbit all the way around, underneath too.</p>
 <ul>
-  <li><b>Left, ANIMATIONS:</b> every clip it can use, grouped by file, with search and filters (loops, one-shots, clips that move the body). Click one to play it. <b>+ ADD FILE</b> borrows clips from another file (see <a href="#files">Borrowing clips</a>); ✕ on a file's heading stops borrowing from it.</li>
+  <li><b>Left, ANIMATIONS:</b> every clip it can use, grouped by file, with search and filters (loops, one-shots, clips that move the body). Click one to play it. <b>+ ADD FILE</b> (at the bottom) opens a list of every imported file with clips, checked against the model's skeleton (see <a href="#files">Borrowing clips</a>); ✕ on a file's heading stops borrowing from it.</li>
   <li><b>Right, CHARACTER:</b> the name, <b>HEIGHT</b> (FIT TO CAPSULE makes it as tall as the collision capsule, 1.8 m at character scale 1; AS IMPORTED goes back), <b>KEEP IN PLACE</b>, and a color for each material.</li>
   <li><b>Right, MOVES:</b> one list for the character. Pick a clip for each move from its menu, or click a clip on the left and then ◀ on the move. ▶ plays the move. <b>AUTO FILL</b> guesses the empty ones; <b>+ ADD MOVE</b> adds your own (wave, sit, cheer …).</li>
   <li><b>Bottom, the player bar:</b> play / pause, scrub (click or drag; it pauses on that frame), speed, LOOP, and <b>BLEND</b> from one move to another, which plays the first and blends into the second the way the game does.</li>
@@ -132,7 +132,7 @@
 <h2 id="files">Borrowing clips from other files</h2>
 <ul>
   <li>Clips play on a model by bone name, so a file whose skeleton has the same bones can lend its clips. Quaternius's <b>Universal Animation Library</b> 1 and 2 and both mannequins share one 65-bone skeleton: any of their 254 clips plays on either mannequin.</li>
-  <li>+ ADD FILE checks the skeleton first. A file with 90% or more of the same bones is added (the missing ones are named); anything else is refused with the reason, e.g. "uses a different skeleton".</li>
+  <li><b>+ ADD FILE</b> opens a list of every imported file that has clips and checks each one's skeleton against the model's (a few seconds the first time). Files with the same skeleton are at the top, marked <b>same skeleton</b>, with an <b>ADD</b> button; a file with 90% or more of the same bones is marked <b>nearly the same</b> (hover to see which bones are missing) and can be added too. The rest are greyed out with the reason, e.g. "different skeleton (12% of its bones match)".</li>
   <li><b>KEEP IN PLACE</b> (on by default) pins the skeleton's root sideways, so root-motion files (the <code>_RM</code> versions, which walk the body 1.3 to 5.5 m per loop) stay under the character. Prefer the plain files anyway. Clips that move the body show <b>MOVES</b> in the list.</li>
 </ul>
 
