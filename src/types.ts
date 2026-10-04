@@ -55,7 +55,7 @@ export type AssetCategory = 'Furniture' | 'Props' | 'Structures' | 'Lights' | 'C
 /** Reserved category: assets in it show in the asset browser only while its own
  *  category pill is selected (not under All, tags, packs or search). */
 export const HIDDEN_CATEGORY = 'Hidden';
-export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'graphics' | 'prefabs' | null;
+export type LeftPanelId   = 'assets' | 'materials' | 'groups' | 'scripts' | 'decals' | 'audio' | 'skybox' | 'graphics' | 'prefabs' | 'characters' | null;
 
 export interface GroupDef {
   id:   string;
@@ -110,6 +110,11 @@ export interface CharacterDef {
   clipSources:  string[];
   moves:        Record<string, CharacterMove>;
   inPlace?:     boolean;
+  /** Part B: the model's height in meters at character scale 1 (FIT TO CAPSULE = 1.8);
+   *  absent = the model as imported. Gameplay CHARACTER SCALE still applies on top. */
+  height?:      number;
+  /** Part B: material name → color (#rrggbb), replacing that material's base color. */
+  colors?:      Record<string, string>;
 }
 
 /** Phase 86: a model's skeleton: its bone names (sorted), an id made from them (same

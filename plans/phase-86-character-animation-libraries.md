@@ -1,7 +1,7 @@
 # Phase 86 · Characters: models, rigs and animation libraries, set up in a character editor
 
-> Status: **Part A IMPLEMENTED** (v4.111.0, 2026-10-03; see
-> `test-plans/phase-86-characters.md`). Parts B and C planned. Built in
+> Status: **Parts A and B IMPLEMENTED** (v4.111.0, v4.112.0; see
+> `test-plans/phase-86-characters.md`). Part C planned. Built in
 > three parts (A, B, C below), each shipped and tested on its own. Decisions at the end.
 > Visual overview: the HTML page linked from the chat.
 

@@ -112,8 +112,17 @@ MODEL + ANIMATIONS settings still describe the player, exactly as before.
 
 All character animation goes through one shared `CharacterAnimator`
 (`src/characters/`); the player's controls are one driver of it, and enemies and later
-NPCs will be others. Part A (v4.111.0) has no editor yet: the character editor and the
-Characters panel are part B of the Phase 86 plan.
+NPCs will be others.
+
+**Making one (v4.112.0):** the **Characters** button on the left toolbar opens the game's
+characters. NEW makes one from any model (its moves guessed from the clip names), and
+"Make the player's look a character" turns the current player settings into one that plays
+the same. EDIT opens the character editor, isolated like Edit Brush: the level is set
+aside, the character stands on a dark grid inside its collision capsule. Left: every clip
+it can use, by file (+ ADD FILE borrows clips from a file with the same skeleton). Right:
+name, HEIGHT (FIT TO CAPSULE), KEEP IN PLACE, colors, and the MOVES list (AUTO FILL,
++ ADD MOVE). Bottom: play, scrub, speed, loop and a blend test. Save writes game.json;
+USE AS PLAYER makes the game's player use it.
 
 ## Related scripting
 

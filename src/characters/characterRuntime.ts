@@ -40,6 +40,21 @@ export function topBoneNames(root: THREE.Object3D): string[] {
 const IN_PLACE_MIN_TRAVEL = 0.2;   // m: less sideways root travel than this is left alone
 const inPlaceCache = new WeakMap<THREE.AnimationClip, THREE.AnimationClip>();
 
+function rootTrackNames(topBones: readonly string[]): Set<string> {
+  return new Set(topBones.map(b => `${THREE.PropertyBinding.sanitizeNodeName(b)}.position`));
+}
+
+/** Does `clip` move the body sideways (a top bone travels more than 0.2 m)? */
+export function clipTravels(clip: THREE.AnimationClip, topBones: readonly string[]): boolean {
+  const names = rootTrackNames(topBones);
+  return clip.tracks.some(t => {
+    if (!names.has(t.name)) return false;
+    const v = t.values;
+    for (let i = 3; i < v.length; i += 3) if (Math.hypot(v[i]! - v[0]!, v[i + 2]! - v[2]!) > IN_PLACE_MIN_TRAVEL) return true;
+    return false;
+  });
+}
+
 /**
  * KEEP IN PLACE: a copy of `clip` whose top bones stay put sideways (X / Z pinned to the
  * first key; height kept, so jumps still rise), or the clip itself when nothing travels.
@@ -49,14 +64,9 @@ const inPlaceCache = new WeakMap<THREE.AnimationClip, THREE.AnimationClip>();
 export function keepInPlace(clip: THREE.AnimationClip, topBones: readonly string[]): THREE.AnimationClip {
   const cached = inPlaceCache.get(clip);
   if (cached) return cached;
-  const names = new Set(topBones.map(b => `${THREE.PropertyBinding.sanitizeNodeName(b)}.position`));
-  const travels = (t: THREE.KeyframeTrack) => {
-    const v = t.values;
-    for (let i = 3; i < v.length; i += 3) if (Math.hypot(v[i]! - v[0]!, v[i + 2]! - v[2]!) > IN_PLACE_MIN_TRAVEL) return true;
-    return false;
-  };
+  const names = rootTrackNames(topBones);
   let out = clip;
-  if (clip.tracks.some(t => names.has(t.name) && travels(t))) {
+  if (clipTravels(clip, topBones)) {
     out = clip.clone();
     for (const t of out.tracks) {
       if (!names.has(t.name)) continue;
@@ -98,4 +108,64 @@ export function legacyCharacter(settings: PlayerSettings, clipNames: readonly st
  *  settings describe the player). */
 export function characterFor(settings: PlayerSettings, characters: readonly CharacterDef[] | undefined): CharacterDef | null {
   return (settings.characterId && characters?.find(c => c.id === settings.characterId)) || null;
+}
+
+/** The capsule's full height at character scale 1 (2 × (half height 0.6 + radius 0.3)). */
+export const CAPSULE_HEIGHT = 1.8;
+
+/** The model's height in its own units (bind pose, before any character scale). */
+export function modelHeight(root: THREE.Object3D): number {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  return box.isEmpty() ? 0 : box.max.y - box.min.y;
+}
+
+/**
+ * A character's look on a fresh model clone: its colors (each named material cloned, so
+ * the cached source asset is never touched) and the scale that makes the model `height`
+ * tall (1 when no height is set). The caller multiplies its own scale by the result.
+ */
+export function applyCharacterLook(root: THREE.Object3D, def: Pick<CharacterDef, "colors" | "height">, measuredHeight = modelHeight(root)): number {
+  const colors = def.colors ?? {};
+  if (Object.keys(colors).length) {
+    const clones = new Map<THREE.Material, THREE.Material>();
+    root.traverse(o => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const swap = (m: THREE.Material) => {
+        const c = colors[m.name];
+        if (!c) return m;
+        let k = clones.get(m);
+        if (!k) { k = m.clone(); (k as THREE.MeshStandardMaterial).color?.set(c); clones.set(m, k); }
+        return k;
+      };
+      mesh.material = Array.isArray(mesh.material) ? mesh.material.map(swap) : swap(mesh.material);
+    });
+  }
+  return def.height && measuredHeight > 0 ? def.height / measuredHeight : 1;
+}
+
+/** Material names on a model (for the colors list), in first-seen order. */
+export function materialNames(root: THREE.Object3D): string[] {
+  const out: string[] = [];
+  root.traverse(o => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) if (m.name && !out.includes(m.name)) out.push(m.name);
+  });
+  return out;
+}
+
+/** The base color of each named material, as #rrggbb (for the color pickers' start values). */
+export function materialColors(root: THREE.Object3D): Record<string, string> {
+  const out: Record<string, string> = {};
+  root.traverse(o => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const c = (m as THREE.MeshStandardMaterial).color;
+      if (m.name && c && !(m.name in out)) out[m.name] = `#${c.getHexString()}`;
+    }
+  });
+  return out;
 }

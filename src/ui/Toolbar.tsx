@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ToolId, LeftPanelId } from "@/types";
-import { TOOL_ICONS, IconPlay, IconScript, IconMaterial, IconAudio, IconSkybox, IconGraphic } from "@/ui/icons";
+import { TOOL_ICONS, IconPlay, IconScript, IconMaterial, IconAudio, IconSkybox, IconGraphic, IconCharacter } from "@/ui/icons";
 
 // `variants`: a tool button that opens a popover to pick between related tools (rect vs
 // polygon). The button's primary id is variants[0]; the group is "active" when any variant
@@ -316,6 +316,36 @@ export function Toolbar({ activeTool, openPanel, onToolSelect, onPanelToggle, on
             <span style={{ fontSize: 8, letterSpacing: 0.5, color: labelColor, fontFamily: "monospace",
                            textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
               Prefabs
+            </span>
+          </button>
+        );
+      })()}
+
+      {/* Characters panel button (Phase 86): characters are authored data (a model + how it
+          moves, saved in game.json like prefabs), so they get their own button too. */}
+      {(() => {
+        const active = openPanel === "characters";
+        const iconColor  = active ? "#80aaff" : "#9aa3b5";
+        const labelColor = active ? "#80aaff" : "#c2cadb";
+        return (
+          <button
+            title="Characters: a model plus how it moves, for the player and enemies"
+            onClick={() => onPanelToggle(active ? null : "characters")}
+            style={{
+              width: 48, height: 48, border: "none", cursor: "pointer",
+              borderRadius: 8, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", gap: 2,
+              background: active ? "rgba(80,140,255,0.2)" : "transparent",
+              outline: active ? "1px solid rgba(80,140,255,0.45)" : "none",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "rgba(80,140,255,0.08)"; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+          >
+            <IconCharacter color={iconColor} />
+            <span style={{ fontSize: 8, letterSpacing: 0.5, color: labelColor, fontFamily: "monospace",
+                           textAlign: "center", lineHeight: 1.1, maxWidth: 46 }}>
+              Characters
             </span>
           </button>
         );

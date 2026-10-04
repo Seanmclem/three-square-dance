@@ -27,6 +27,30 @@ Mannequin_F added); nothing reaches `public/games` or `public/assets`.
       `rig` (65 bones, same id for both). (Needs a real import; the editor UI in part B
       shows it.)
 
-## Part B, part C
+## Part B (v4.112.0)
 
-Planned; checklists added when they're built.
+Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
+
+- [x] Characters button → panel; NEW from Mannequin F → saved in game.json, editor opens.
+- [x] The level is set aside (129 visible level meshes → 0) and comes back on Close;
+      checkpoint markers hidden while editing.
+- [x] + ADD FILE: UAL1 accepted ("same skeleton"), 120 clips listed; the crab refused
+      (different skeleton).
+- [x] AUTO FILL: walk = Walk_Loop (and the rest from UAL1).
+- [x] Clicking Dance_Loop plays it; + ADD MOVE "dance" takes the picked clip; ▶ on jump
+      plays Jump_Start.
+- [x] A click at the start of the scrub bar pauses at 0.00; the pose holds through a
+      color change (no T-pose).
+- [x] FIT TO CAPSULE, a color for M_Main, a new name → "unsaved changes"; Save writes all
+      of it to game.json.
+- [x] USE AS PLAYER → `playerSettings.characterId`; in game the player has 120 clips,
+      plays idle, shows the new color.
+- [x] Close with unsaved changes asks; Discard keeps the saved name.
+- [x] "Make the player's look a character" (stock obby): walk Run, idle Idle, land
+      Jump_Land, keep in place off; used as the player; plays as before.
+- [ ] By hand: orbit under the character; BLEND TEST walk → run looks right; the capsule
+      ghost reads clearly.
+
+## Part C
+
+Planned; checklist added when it's built.

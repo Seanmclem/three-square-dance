@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef } from "@/types";
+import type { LeftPanelId, AssetDef, MaterialDef, GroupDef, ScriptDef, TriggerVolume, WorldObject, PlatformDef, ShapeDef, StairDef, WallDef, FloorDef, CheckpointDef, LightDef, SelectedRef, StateSchema, DecalTexDef, DecalKind, DialogueTreeDef, ItemDef, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, CharacterDef } from "@/types";
 import type { GroupMember } from "@/editor/groupMembers";
 import { AssetBrowser } from "@/ui/AssetBrowser";
 import { MaterialBrowser } from "@/ui/MaterialBrowser";
@@ -10,8 +10,19 @@ import { GraphicsBrowser } from "@/ui/GraphicsBrowser";
 import { GroupPanel } from "@/ui/GroupPanel";
 import { ScriptPanel } from "@/ui/ScriptPanel";
 import { PrefabPanel } from "@/ui/PrefabPanel";
+import { CharacterPanel } from "@/ui/CharacterPanel";
 
 interface LeftPanelProps {
+  // Phase 86: characters panel
+  characters?:            CharacterDef[];
+  playerCharacterId?:     string | null;
+  legacyPlayerModel?:     string | null;
+  onCharacterNew?:        (modelAssetId: string) => void;
+  onCharacterEdit?:       (id: string) => void;
+  onCharacterDuplicate?:  (id: string) => void;
+  onCharacterDelete?:     (id: string) => void;
+  onCharacterUseAsPlayer?:(id: string | null) => void;
+  onCharacterFromPlayer?: () => void;
   panelId:         LeftPanelId;
   assets:          AssetDef[];
   selectedAssetId: string | null;
@@ -105,6 +116,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
+  characters, playerCharacterId, legacyPlayerModel, onCharacterNew, onCharacterEdit, onCharacterDuplicate, onCharacterDelete, onCharacterUseAsPlayer, onCharacterFromPlayer,
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onReoriginAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onSoundRecord, onDeleteSounds, onEditSounds,
@@ -250,6 +262,20 @@ export function LeftPanel({
                 decals={decalTextures}
                 selectedId={selectedDecalId}
                 onSelect={onDecalSelect}
+              />
+            )}
+            {panelId === "characters" && (
+              <CharacterPanel
+                characters={characters ?? []}
+                assets={assets}
+                playerCharacterId={playerCharacterId ?? null}
+                legacyPlayerModel={legacyPlayerModel ?? null}
+                onNew={id => onCharacterNew?.(id)}
+                onEdit={id => onCharacterEdit?.(id)}
+                onDuplicate={id => onCharacterDuplicate?.(id)}
+                onDelete={id => onCharacterDelete?.(id)}
+                onUseAsPlayer={id => onCharacterUseAsPlayer?.(id)}
+                onImportPlayer={onCharacterFromPlayer}
               />
             )}
             {panelId === "prefabs" && (

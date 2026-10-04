@@ -81,6 +81,19 @@ export class CharacterAnimator {
     this._action = next;
   }
 
+  /** Play a given clip (the character editor's preview), labelled `key` as the current
+   *  move; replays from the start even when it's already the playing one. */
+  playClip(clip: THREE.AnimationClip, loop: boolean, speed = 1, key = `clip:${clip.name}`): void {
+    this._script = null;
+    const next = this.mixer.clipAction(clip);
+    if (next === this._action) next.reset();
+    this._crossfadeTo(next, loop, speed);
+    this._clip = clip;
+    this._current = key;
+  }
+
+  get currentClip(): THREE.AnimationClip | null { return this._clip; }
+
   // ── Script override ─────────────────────────────────────────────────────────
 
   get scripted(): boolean { return this._script !== null; }

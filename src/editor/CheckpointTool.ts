@@ -20,6 +20,7 @@ export class CheckpointTool {
   private _mode: "initial" | "checkpoint" = "initial";
   private _activeZoneId = "demo";
   private _markers = new Map<string, THREE.Group>();  // checkpoint id → marker group
+  private _suppressed = false;   // an isolated editor is open (spawn:suppress): markers hidden
   private readonly _unsubs: Array<() => void> = [];
 
   constructor(
@@ -58,6 +59,11 @@ export class CheckpointTool {
 
       // Hide markers in play mode (they're editor helpers), restore on exit.
       this._bus.on("preview:start", () => { for (const m of this._markers.values()) m.visible = false; }),
+      // Isolated editors (brush, prefab, character) set the level aside; its markers go too.
+      this._bus.on("spawn:suppress", ({ suppressed }) => {
+        this._suppressed = suppressed;
+        for (const m of this._markers.values()) m.visible = !suppressed;
+      }),
       this._bus.on("preview:stop",  () => { for (const m of this._markers.values()) m.visible = true; }),
     );
   }
@@ -111,6 +117,7 @@ export class CheckpointTool {
       child.userData._parentId  = cp.id;
     });
 
+    group.visible = !this._suppressed;
     this._scene.add(group);
     this._markers.set(cp.id, group);
   }

@@ -13,7 +13,7 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
 import { CharacterAnimator } from "@/characters/CharacterAnimator";
-import { loadCharacter, legacyCharacter, moveResolver, topBoneNames } from "@/characters/characterRuntime";
+import { loadCharacter, legacyCharacter, moveResolver, topBoneNames, applyCharacterLook } from "@/characters/characterRuntime";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const MAX_PITCH = Math.PI * 80 / 180;   // look-up/down clamp
@@ -922,7 +922,9 @@ export class CharacterController {
       const def = this._character ?? legacyCharacter(this._settings, loaded.pool.map(p => p.clip.name));
       this._modelRoot = root;
       this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root)), "CharacterController");
-      this._modelBaseScale = effectiveCharacterScale(this._settings);   // squash multiplies this
+      // Phase 86: the character's own size (height) and colors; 1 / none for older settings.
+      const look = this._character ? applyCharacterLook(root, this._character) : 1;
+      this._modelBaseScale = effectiveCharacterScale(this._settings) * look;   // squash multiplies this
       root.scale.setScalar(this._modelBaseScale);
       this._scene.add(root);
       this._modelYaw = this._yaw;

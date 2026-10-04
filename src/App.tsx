@@ -41,6 +41,11 @@ import { PrefabEditSession } from "@/prefab/PrefabEditSession";
 import { EditModeBar } from "@/ui/EditModeBar";
 import { SelectModeBar } from "@/ui/SelectModeBar";
 import { BrushEditSession, BRUSH_EDIT_ZONE } from "@/editor/BrushEditSession";
+import { CharacterStage } from "@/characters/CharacterStage";
+import { autoFillMoves } from "@/characters/autoFill";
+import { legacyCharacter } from "@/characters/characterRuntime";
+import { CharacterEditor } from "@/ui/CharacterEditor";
+import { effectiveCharacterScale } from "@/preview/CharacterController";
 import { isBrush } from "@/builders/ShapeBuilder";
 import { NodeDragger } from "@/editor/NodeDragger";
 import { OpeningDragHandler } from "@/editor/OpeningDragHandler";
@@ -99,7 +104,7 @@ import { BakeDialog } from "@/ui/BakeDialog";
 import { PrintExportDialog } from "@/ui/PrintExportDialog";
 import { MAT_CAT_ORDER } from "@/ui/materialCategories";
 import type {
-  GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue, BrushViewBackground } from "@/types";
+  GameConfig, ToolId, Vec2, Vec3, SelectedObjectPayload, SelectedRef, WorldObject, ZoneDef, FloorDef, WallDef, Opening, MaterialDef, QualityScale, PlatformDef, StairDef, LadderDef, ShapeDef, SceneFile, AssetDef, AttachedCollider, LeftPanelId, PlayerSettings, ScriptAction, ScriptDef, TriggerVolume, CheckpointDef, LightDef, GroupDef, Attribution, JsonValue, StateSchema, NodeLinks, DecalTexDef, DecalKind, DecalDef, PreviewMode, DialogueTreeDef, ItemDef, WorldAudio, SoundDef, SkyboxDef, GraphicDef, UiElementDef, PrefabDef, PrefabVarValue, BrushViewBackground, CharacterDef } from "@/types";
 import { isGameplayMode, HIDDEN_CATEGORY, DEFAULT_BRUSH_BACKGROUND } from "@/types";
 
 const ASSET_CATEGORIES = ["Furniture", "Props", "Structures", "Lights", "Characters", "Vegetation", "Other", HIDDEN_CATEGORY];
@@ -321,6 +326,7 @@ export default function App() {
   const [worldItems,      setWorldItems]       = useState<ItemDef[]>([]);
   const [worldUiElements, setWorldUiElements]  = useState<UiElementDef[]>([]);
   const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
+  const [characters,      setCharacters]       = useState<CharacterDef[]>([]);   // Phase 86: game.json characters
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
   // Non-null = the "can't delete prefab yet" dialog is open, listing its instances.
   const [prefabDeleteBlocked, setPrefabDeleteBlocked] = useState<{ prefabId: string; rows: PrefabInstanceRow[] } | null>(null);
@@ -336,6 +342,13 @@ export default function App() {
   // save/autosave/play gates via inIsolatedEdit().
   const [editingBrush,    setEditingBrush]     = useState<{ name: string } | null>(null);
   const editingBrushRef  = useRef(false);
+  // Phase 86 part B: the character editor (isolated, like Edit Brush). `saved` = the JSON
+  // last written to game.json, for the unsaved-changes check.
+  const [editingCharacter, setEditingCharacter] = useState<{ draft: CharacterDef; saved: string } | null>(null);
+  const editingCharacterRef = useRef(false);
+  const characterStageRef = useRef<CharacterStage | null>(null);
+  const [characterConfirmClose, setCharacterConfirmClose] = useState(false);
+  const characterSaveRef = useRef<(() => void) | null>(null);
   const brushSessionRef  = useRef<BrushEditSession | null>(null);
   // v4.99.6/7: Edit Brush has no solid ground plane and a 30 m grid instead of the level's 100 m one.
   // v4.99.9: and its own background (Brush View screen), an editor pref kept in the workspace
@@ -356,29 +369,30 @@ export default function App() {
     void desktop()?.setPref(BRUSH_BG_KEY, json);
   };
   // v4.102.2: the level's spawn marker (and its right-click move) stay out of isolated edits.
-  useEffect(() => { busRef.current.emit("spawn:suppress", { suppressed: !!editingBrush || !!editingPrefab }); }, [editingBrush, editingPrefab]);
+  useEffect(() => { busRef.current.emit("spawn:suppress", { suppressed: !!editingBrush || !!editingPrefab || !!editingCharacter }); }, [editingBrush, editingPrefab, editingCharacter]);
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
     scene.setBrushBackground(brushBg);
-    scene.setBrushEditView(!!editingBrush);
+    const isolatedView = !!editingBrush || !!editingCharacter;   // Phase 86: the character editor uses the same dark view
+    scene.setBrushEditView(isolatedView);
     // v4.102.2: Edit Brush can orbit underneath the brush; back above ground on Close.
     const cam = scene.editorCamera;
     if (!cam) return;
-    cam.allowBelow = !!editingBrush;
-    if (!editingBrush) {
+    cam.allowBelow = isolatedView;
+    if (!isolatedView) {
       const cap = Math.PI / 2 - 0.02;
       cam.targetSpherical.phi = Math.min(cam.targetSpherical.phi, cap);
       cam.spherical.phi = Math.min(cam.spherical.phi, cap);
     }
-  }, [editingBrush, brushBg]);
+  }, [editingBrush, editingCharacter, brushBg]);
   // v4.99.1: Save stays in the session; the bar shows unsaved / saved, and Close asks
   // before dropping unsaved changes. Cmd+S saves the brush while the session is open.
   const [brushDirty,        setBrushDirty]        = useState(false);
   const [brushSaved,        setBrushSaved]        = useState(false);
   const [brushConfirmClose, setBrushConfirmClose] = useState(false);
   const brushSaveRef = useRef<(() => void) | null>(null);
-  const inIsolatedEdit   = (): boolean => editingPrefabRef.current || editingBrushRef.current;
+  const inIsolatedEdit   = (): boolean => editingPrefabRef.current || editingBrushRef.current || editingCharacterRef.current;
   // Swallow selection-teardown events while a prefab re-expansion is in flight
   // (members are removed + re-added; without this the panel unmounts mid-edit).
   const suppressSelRef   = useRef(false);
@@ -566,6 +580,7 @@ export default function App() {
       g.__enemyAI = enemyAIRef.current;   // Phase 61 (set below; read-only debugging)
       g.__audio = audio;
       g.__copyPaste = { copySelection, pasteClipboard };
+      Object.defineProperty(g, "__characterStage", { configurable: true, get: () => characterStageRef.current });   // Phase 86 (dev)
       g.__bindings = { load: loadBindings, save: saveBindings, reset: resetBindings, defaults: DEFAULT_BINDINGS };
       armTransformWatchdog();   // Phase 62: warn when two systems co-drive one entity's transform
       installTestHelpers({ bus, world, scriptEngine, preview, gameState });
@@ -743,6 +758,7 @@ export default function App() {
           setProject(ctx);
           world.gameItems       = store.game.items;
           world.gameCharacters = store.game.characters;   // Phase 86
+          setCharacters(store.game.characters ?? []);
           world.gameStateSchema = store.game.stateSchema;
           world.gameUiElements  = store.game.uiElements;
           world.gameScripts     = store.game.scripts;
@@ -875,6 +891,7 @@ export default function App() {
               await handleLoadFromJSON(file);
               worldRef.current!.gameItems       = proj.store.game.items;
               worldRef.current!.gameCharacters = proj.store.game.characters;   // Phase 86
+              setCharacters(proj.store.game.characters ?? []);
               worldRef.current!.gameStateSchema = proj.store.game.stateSchema;
               worldRef.current!.gameUiElements  = proj.store.game.uiElements;
               worldRef.current!.gameScripts     = proj.store.game.scripts;
@@ -931,6 +948,7 @@ export default function App() {
             const world = worldRef.current!;
             world.gameItems       = proj.store.game.items;
             world.gameCharacters = proj.store.game.characters;   // Phase 86
+            setCharacters(proj.store.game.characters ?? []);
             world.gameStateSchema = proj.store.game.stateSchema;
             world.gameUiElements  = proj.store.game.uiElements;
       world.gameScripts     = proj.store.game.scripts;
@@ -1500,7 +1518,9 @@ export default function App() {
       worldRef.current.gameInput = undefined;
       worldRef.current.prefabLibrary = loadSessionPrefabs();
       setPrefabs(worldRef.current.prefabLibrary);
+      worldRef.current.gameCharacters = undefined;
     }
+    setCharacters([]);
     setGameSchema({});
     setGameScripts([]);
     void clearLastProject();
@@ -1512,6 +1532,7 @@ export default function App() {
 
   const handleSave = useCallback(async (): Promise<void> => {
     if (editingBrushRef.current) { brushSaveRef.current?.(); return; }   // Cmd+S = save the brush, stay in
+    if (editingCharacterRef.current) { characterSaveRef.current?.(); return; }   // …or the character
     if (inIsolatedEdit()) return;   // prefab edit mode: Save lives in the amber bar
     const world = worldRef.current;
     if (!world) return;
@@ -1599,6 +1620,7 @@ export default function App() {
     if (worldRef.current) {
       worldRef.current.gameItems       = store.game.items;
       worldRef.current.gameCharacters = store.game.characters;   // Phase 86
+      setCharacters(store.game.characters ?? []);
       worldRef.current.gameStateSchema = store.game.stateSchema;
       worldRef.current.gameUiElements  = store.game.uiElements;
       worldRef.current.gameScripts     = store.game.scripts;
@@ -1690,6 +1712,7 @@ export default function App() {
       const world = worldRef.current!;
       world.gameItems       = proj.store.game.items;
       world.gameCharacters = proj.store.game.characters;   // Phase 86
+      setCharacters(proj.store.game.characters ?? []);
       world.gameStateSchema = proj.store.game.stateSchema;
       world.gameUiElements  = proj.store.game.uiElements;
       world.gameScripts     = proj.store.game.scripts;
@@ -3457,6 +3480,93 @@ export default function App() {
     setPrefabs(next);
   };
 
+  // ── Phase 86: characters (game.json `characters`, like prefabs) ───────────────
+
+  const applyCharacters = (next: CharacterDef[]): void => {
+    const world = worldRef.current, proj = projectRef.current;
+    if (proj) {
+      proj.store.game.characters = next;
+      // Written at once, like prefabs: the player / enemies refer to characters by id.
+      void proj.store.writeGame().catch(e => console.warn("[characters] game.json write failed:", e));
+    }
+    if (world) world.gameCharacters = next;
+    setCharacters(next);
+  };
+  const setPlayerCharacter = (id: string | null): void => {
+    if (projectRef.current) handleGamePlayerSettingsChange({ characterId: id });
+    else handlePlayerSettingsChange({ characterId: id });
+  };
+  const newCharacterId = (): string => `chr_${crypto.randomUUID().slice(0, 8)}`;
+  const handleCharacterNew = (modelAssetId: string): void => {
+    const a = assets.find(x => x.id === modelAssetId);
+    const fill = autoFillMoves(a?.animations ?? []);
+    const moves = Object.fromEntries(Object.entries(fill).filter(([, c]) => c).map(([m, c]) => [m, { clip: c }]));
+    const def: CharacterDef = { id: newCharacterId(), name: a?.label ?? modelAssetId, modelAssetId, clipSources: [], moves };
+    applyCharacters([...characters, def]);
+    openCharacterEditor(def);
+  };
+  /** Today's player (model + ANIMATIONS choices) as a character, used as the player. Same
+   *  clips and no KEEP IN PLACE, so the game plays the same. */
+  const handleCharacterFromPlayer = (): void => {
+    const settings = worldRef.current?.world?.playerSettings;
+    if (!settings?.modelAssetId) return;
+    const a = assets.find(x => x.id === settings.modelAssetId);
+    const legacy = legacyCharacter(settings, a?.animations ?? []);
+    const def: CharacterDef = { ...legacy, id: newCharacterId(), name: `${a?.label ?? "Player"} (player)`,
+      moves: Object.fromEntries(Object.entries(legacy.moves).filter(([, m]) => m.clip)) };
+    applyCharacters([...characters, def]);
+    setPlayerCharacter(def.id);
+  };
+  const handleCharacterDuplicate = (id: string): void => {
+    const c = characters.find(x => x.id === id);
+    if (c) applyCharacters([...characters, { ...structuredClone(c), id: newCharacterId(), name: `${c.name} copy` }]);
+  };
+  const handleCharacterDelete = (id: string): void => {
+    if (worldRef.current?.world?.playerSettings?.characterId === id) setPlayerCharacter(null);
+    applyCharacters(characters.filter(x => x.id !== id));
+  };
+
+  const openCharacterEditor = (def: CharacterDef): void => {
+    const scene = sceneRef.current, world = worldRef.current, zones = zonesRef.current;
+    if (!scene || !world || !zones || inIsolatedEdit() || isPreview) return;
+    editingCharacterRef.current = true;
+    busRef.current.emit("object:deselected", {});
+    setSelected(null);
+    setLeftPanel(null);
+    const stage = new CharacterStage(scene, world, zones, effectiveCharacterScale(world.world?.playerSettings ?? DEFAULT_PLAYER_SETTINGS));
+    characterStageRef.current = stage;
+    setCharacterConfirmClose(false);
+    setEditingCharacter({ draft: structuredClone(def), saved: JSON.stringify(def) });
+    void stage.enter(structuredClone(def));
+  };
+  const editingCharacterNow = useRef(editingCharacter);
+  editingCharacterNow.current = editingCharacter;
+  const handleCharacterDraft = (next: CharacterDef): void => {
+    setEditingCharacter(e => e && { ...e, draft: next });
+    void characterStageRef.current?.update(next);
+  };
+  const handleCharacterSave = (): void => {
+    const e = editingCharacterNow.current;
+    if (!e) return;
+    const def = structuredClone(e.draft);
+    applyCharacters(characters.some(c => c.id === def.id) ? characters.map(c => c.id === def.id ? def : c) : [...characters, def]);
+    setEditingCharacter({ draft: e.draft, saved: JSON.stringify(e.draft) });
+    setCharacterConfirmClose(false);
+  };
+  characterSaveRef.current = handleCharacterSave;
+  const handleCharacterClose = (discard = false): void => {
+    const e = editingCharacterNow.current;
+    if (!e) return;
+    if (!discard && JSON.stringify(e.draft) !== e.saved) { setCharacterConfirmClose(true); return; }
+    const stage = characterStageRef.current;
+    characterStageRef.current = null;
+    editingCharacterRef.current = false;
+    setEditingCharacter(null);
+    setCharacterConfirmClose(false);
+    setLeftPanel("characters");
+    void stage?.exit();
+  };
+
   const armPrefabPlacement = (prefab: PrefabDef): void => {
     setActiveTool("prefab");
     busRef.current.emit("tool:select", { tool: "prefab" });
@@ -4086,6 +4196,15 @@ export default function App() {
         onPrefabCreateFromSelection={prefabCreateFromSelection}
         prefabSelectionHint={prefabSelectionHint}
         prefabRenameRequestId={prefabRenameRequest}
+        characters={characters}
+        playerCharacterId={worldRef.current?.world?.playerSettings?.characterId ?? null}
+        legacyPlayerModel={worldRef.current?.world?.playerSettings?.characterId ? null : (worldRef.current?.world?.playerSettings?.modelAssetId ?? null)}
+        onCharacterNew={handleCharacterNew}
+        onCharacterEdit={id => { const c = characters.find(x => x.id === id); if (c) openCharacterEditor(c); }}
+        onCharacterDuplicate={handleCharacterDuplicate}
+        onCharacterDelete={handleCharacterDelete}
+        onCharacterUseAsPlayer={setPlayerCharacter}
+        onCharacterFromPlayer={handleCharacterFromPlayer}
         onPrefabRenameRequestHandled={() => setPrefabRenameRequest(null)}
       />
       {editingPrefab && !editingBrush && (
@@ -4114,6 +4233,25 @@ export default function App() {
           confirm={brushConfirmClose ? {
             text: "Close without saving?", confirmLabel: "Discard changes",
             onConfirm: () => handleBrushEditClose(true), onDismiss: () => setBrushConfirmClose(false),
+          } : null}
+        />
+      )}
+      {editingCharacter && characterStageRef.current && (
+        <CharacterEditor draft={editingCharacter.draft} onChange={handleCharacterDraft} stage={characterStageRef.current} assets={assets} />
+      )}
+      {editingCharacter && (
+        <EditModeBar
+          title="Character"
+          name={editingCharacter.draft.name || "(no name)"}
+          hint="saved in this game's characters"
+          onSave={handleCharacterSave}
+          onCancel={() => handleCharacterClose()}
+          cancelLabel="Close"
+          saveDisabled={JSON.stringify(editingCharacter.draft) === editingCharacter.saved}
+          status={JSON.stringify(editingCharacter.draft) !== editingCharacter.saved ? { text: "unsaved changes", tone: "dirty" } : { text: "saved", tone: "saved" }}
+          confirm={characterConfirmClose ? {
+            text: "Close without saving?", confirmLabel: "Discard changes",
+            onConfirm: () => handleCharacterClose(true), onDismiss: () => setCharacterConfirmClose(false),
           } : null}
         />
       )}
@@ -4148,7 +4286,7 @@ export default function App() {
         onSceneDelete={id => void handleProjectSceneDelete(id)}
         onEntrySceneChange={id => void handleEntrySceneChange(id)}
       />
-      <PropertiesPanel
+      {!editingCharacter && <PropertiesPanel
         activeTool={activeTool}
         selected={selected}
         materialList={materialList}
@@ -4243,7 +4381,7 @@ export default function App() {
         onPrefabDeleteInstance={() => setPrefabConfirm("delete")}
         onCreatePrefab={editingPrefab || editingBrush ? undefined : handleCreatePrefab}
         onAddPressPrompt={handleAddPressPrompt}
-      />
+      />}
       <CoordinateDisplay coords={coords} />
       </>}
 

@@ -246,6 +246,14 @@ export const IconPrefab = ({ color }: IconProps) => (
   </svg>
 );
 
+/** Character (Phase 86): a standing figure. */
+export const IconCharacter = ({ color }: IconProps) => (
+  <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+    <circle cx="14" cy="6.5" r="3" stroke={color} strokeWidth="1.5" fill={color} fillOpacity="0.15"/>
+    <path d="M14 10 V18 M14 18 L10 25 M14 18 L18 25 M8 13 L14 11.5 L20 13" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 /** Camera (thumbnail re-stage). Takes the usual color prop so the button can
  *  brighten/dim it like its text siblings — the 📷 emoji it replaces couldn't. */
 export const IconCamera = ({ color, size = 16 }: IconProps & { size?: number }) => (
