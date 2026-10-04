@@ -56,23 +56,33 @@ an enemy.
 
 ## 3. Moves: modular instead of fixed slots
 
-Each character has a list of moves. A move = `{ clip, loop, speed, blend }`.
+Each character has a list of moves. A move = `{ clip, loop, speed, blend }`. **Every move
+is available in every role**: scripts can play any move on the player, an NPC or an enemy.
+What differs by role is only which moves the engine plays **by itself**, because only
+those have an engine moment behind them:
 
-| Move | Played by the engine when | Used by |
-|---|---|---|
-| idle | standing still | all roles |
-| walk | moving | all roles |
-| run | running (if the game has run on); falls back to walk | Player |
-| jump · in air · land | takeoff · airborne · landing | Player |
-| climb | on a ladder | Player |
-| attack | an enemy bites / swings | Enemy |
-| hit | taking damage | Player, Enemy, NPC (new trigger) |
-| death | an enemy is defeated (stomped), or a script says so | Enemy, scripts |
-| talk | an NPC is spoken to (dialogue open) | NPC |
-| *any name you add* | a script's play-move action, or an NPC idle variation | scripts, NPC |
+| Move | Player plays it automatically | NPC | Enemy |
+|---|---|---|---|
+| idle | standing still | standing | waiting / lost the player |
+| walk | moving | (walking, if NPCs ever walk) | chasing, walking home |
+| run | running (if the game has run on); falls back to walk | | |
+| jump · in air · land | takeoff · airborne · landing | | |
+| climb | on a ladder | | |
+| attack | (no player attack yet, see below) | | biting / swinging |
+| hit | taking damage (a health key goes down) | when hit, if it has health | when damaged |
+| death | before the respawn fade (`respawn_player`) | | when defeated (stomped) |
+| talk | while a dialogue is on screen (`dialogue:show` until `dialogue:closed`) | while its dialogue is open | |
+| *any name you add* | scripts | scripts, idle variations | scripts |
 
-- The character editor shows which moves each role needs and marks the empty ones ("Enemy:
-  attack missing").
+- **Why the player has no automatic attack:** the engine has no player attack yet (no
+  attack button, nothing that lands a hit on an enemy; enemies are beaten by stomping).
+  The move can be set up and played by scripts now; an attack button that plays it and
+  damages what's in front is a gameplay feature for a later phase (question 2).
+- Player **death** and **talk** are new automatic moments: `respawn_player` plays death
+  before it fades (if the character has one), and talk plays while a dialogue is open.
+
+- The character editor's role tabs show which moves that role plays automatically and
+  mark the empty ones ("Enemy: attack has no clip").
 - Engine code asks for a **move** ("walk"), never a clip name, so swapping a character's
   clips never touches the player code, the AI or scripts.
 - Scripts: `play_animation` keeps working with clip names; a new **play move** action (and
@@ -80,17 +90,18 @@ Each character has a list of moves. A move = `{ clip, loop, speed, blend }`.
 
 ## 4. Where characters are saved, and the obby's player
 
-- Characters live in the **shared asset library next to the models**
-  (`public/assets/characters/<id>.json` + a manifest), so every game can use them (the
-  user's choice: "on the model"). Each model with a skeleton gets a default character the
-  first time it's opened in the editor.
+- Characters are saved **per game, like prefabs** (the user's choice, "for now"): in the
+  game's `game.json` (`characters: CharacterDef[]`), so editing one never changes another
+  game. Models and animation files stay in the shared asset library as today. Copying a
+  character to another game (export / import, like prefabs) can come later.
 - They're authored data, not imported files, so they get their own **Characters** panel
   (left toolbar, beside Prefabs), not a place in the ASSETS flyout.
 - **The obby's player** becomes a character too: "Obby Hero" = `character.gltf` + its
   current clip choices (today stored per game as `animClips`), made automatically on first
-  load. The game's player settings then point at the character (`characterId`); the old
-  fields are still read for games that haven't moved over. The character is edited and
-  saved in isolation like any other, and other games or NPCs can use it.
+  load and saved in platfrom-obby's `game.json`. The game's player settings then point at
+  the character (`characterId`); the old fields are still read for games that haven't moved
+  over. The character is edited and saved in isolation like any other, and NPCs and enemies
+  in that game can use it too.
 - Gameplay numbers stay with the game, not the character: jump height, speed, run, and
   CHARACTER SCALE (it changes the collision capsule). The character's own size setting only
   makes the model the right height for its capsule.
@@ -151,13 +162,13 @@ death `Death01`. Tested on the real clip lists in the repo so today's picks don'
 **Part A: characters exist, the player uses them**
 1. Import records each model's skeleton (bone names, an id from them, height); backfill
    existing models → check UAL1, UAL2, Mannequin_F, character.gltf.
-2. Character files + manifest; clip resolver (own + borrowed files, loaded once and shared,
+2. `characters` in game.json; clip resolver (own + borrowed files, loaded once and shared,
    KEEP IN PLACE) → script test on UAL1_RM: root travel 0 after pinning.
 3. Moves and AUTO FILL scoring → script over every clip list in the repo + UAL1 / UAL2.
 4. Player uses a character (`characterId`); "Obby Hero" made from today's settings;
    old fields still read → test harness: obby plays exactly as before; Mannequin_F as the
    player walks / jumps / lands on UAL1 clips.
-5. Game export copies characters + the files their clips come from.
+5. Game export copies the files the game's characters take clips from.
 
 **Part B: the character editor**
 6. Isolated session (the BrushEditSession pattern) + Characters panel (list, New, Edit,
@@ -179,11 +190,16 @@ death `Death01`. Tested on the real clip lists in the repo so today's picks don'
 - Trimming unused clips from published games (each UAL file is about 21 MB).
 - Facial animation, attachments (holding a sword in `hand_r`), ragdolls.
 
-## 10. Questions still open
+## 10. Decided and open
 
-1. **Where characters are saved:** the shared asset library (every game sees them), as
-   planned from "on the model", or per game like prefabs? The shared library means an
-   edit changes that character in every game.
-2. **The NPC role:** is "idle, look at the player, talk, scripted moves" the right first
-   size, or do you want simple walking between points too?
-3. **TRY IT** in part C, or not needed?
+Decided (2026-10-03, user): characters are saved per game, like prefabs, for now; TRY IT is
+in part C; the obby's player becomes a character (switching it to a mannequin is optional,
+for testing).
+
+Open:
+1. **How much the first NPC does on its own** (without scripts): the plan is stand, idle
+   (with optional variations), turn to face the player, play talk during its dialogue. The
+   bigger option adds walking between points you place (a patrol route). Is the small
+   version enough to start?
+2. **A player attack** (a button that plays the attack move and hurts what's in front):
+   wanted, and if so in this phase or its own later one?
