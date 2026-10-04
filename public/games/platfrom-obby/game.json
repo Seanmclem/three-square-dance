@@ -2616,6 +2616,9 @@
         },
         "talk": {
           "clip": "Idle_Talking_Loop"
+        },
+        "fall": {
+          "clip": "Jump_Loop"
         }
       }
     }
