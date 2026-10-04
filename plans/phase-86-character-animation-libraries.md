@@ -33,7 +33,7 @@ later phases on top of this.
   plays a clip by bone name, and the names match exactly (checked: identical bone lists).
 - They don't fit our current `character.gltf` (a different skeleton). That character keeps
   working with its own 19 clips; mapping clips between different skeletons is out of
-  scope (§9).
+  scope (§11).
 - In the non-RM files the `root` bone stays put (0.00 m on Walk / Jog / Sprint); the pelvis
   still moves (0.35 m in `Jump_Start`), which is body motion and stays.
 
@@ -157,35 +157,93 @@ death `Death01`. Tested on the real clip lists in the repo so today's picks don'
   pickers become the character's moves (idle / walk / attack, plus hit and death), with the
   note from §3 when one has no clip.
 - Prefabs capture placed characters like any object.
-- No NPC behaviour (facing the player, talking, routes) in this phase; see §9.
+- No NPC behaviour (facing the player, talking, routes) in this phase; see §11.
 
-## 8. Implementation order
+## 8. One character player, many drivers
+
+Today two separate paths play a model's animations:
+
+- **Player:** `CharacterController` loads its own model, makes its own `AnimationMixer`,
+  picks clips with its own name guess (`_clipFor`) and has its own crossfade code
+  (`_crossfadeTo`, with the v4.81.1 fix for two intents sharing one clip).
+- **Enemies:** the model and mixer belong to `ObjectPlacer`; `EnemyAI` picks clips with a
+  different guess and plays them through `ObjectPlacer.aiPlay()`, with its own rule for
+  when a script's clip wins (`hasScriptClip`).
+
+This phase replaces both with **one shared piece that plays a character**, and everything
+else only decides **which move** to play:
+
+- **`CharacterAnimator`** (new, `src/characters/`): given a character (or a plain animated
+  model, which gets an automatic character: its own clips, AUTO FILL moves), it builds the
+  model instance, the mixer and the resolved clips, applies size and KEEP IN PLACE, and
+  offers `play(move, { loop, speed, fade })`, `has(move)`, `duration(move)`, a "finished"
+  callback for one-shots, and one rule for a script's move overriding the automatic ones
+  (held until it finishes or is released). The crossfade fixes live here once.
+- **Drivers** decide the move:
+  - the **player driver** is `CharacterController` (keeps all physics, input, squash /
+    lean; asks the animator for idle / walk / jump …);
+  - the **enemy driver** is `EnemyAI` (idle / walk / attack / hit / death);
+  - **scripts** call the same `play(move)` on the player or a placed character;
+  - **NPCs** (a later phase) are a third driver on the same animator, touching neither
+    the player nor the enemy code.
+- Anything added to the animator (a blend option, the missing-move notes, KEEP IN PLACE)
+  applies to every driver at once.
+
+Part A builds the animator and moves the player onto it; part C moves enemies onto it.
+
+## 9. Regression testing (before and after the player and enemy refactors)
+
+There's no unit test suite, so changes are checked against **recorded baselines** on the
+throwaway test harness (`deno task test:harness`, never the user's app):
+
+Two moments get the full recording: the **player refactor** (step 4) and the **enemy
+refactor** (step 9). Other steps get the usual checks only.
+
+- **Before** each of those refactors, record a baseline with
+  `scripts/regression/character-anim.mjs` (Playwright, real keyboard input, the obby's
+  level): standing, walking, running, jumping (tap and hold), landing, a ladder, a
+  scripted animation on the player, a respawn, and an enemy (the crab) idling, chasing,
+  biting and being stomped. It records, every frame, the player's position and which
+  clips are playing at what weight, and the crab's clip and position.
+- **After** the refactor, record again and compare: the same clip sequence for the same
+  inputs, crossfades within one frame of the baseline, and positions and jump arcs within
+  1 cm (physics must not move at all, since only animation code changes).
+- The usual checks on every step: `npm run typecheck`, `npm run build`, no console
+  errors.
+- Baselines and the recorder live in the repo, so later phases (NPCs, player attack)
+  start by re-recording.
+
+## 10. Implementation order
 
 **Part A: characters exist, the player uses them**
+0. Regression recorder + baseline, before the player refactor (§9).
 1. Import records each model's skeleton (bone names, an id from them, height); backfill
    existing models → check UAL1, UAL2, Mannequin_F, character.gltf.
 2. `characters` in game.json; clip resolver (own + borrowed files, loaded once and shared,
    KEEP IN PLACE) → script test on UAL1_RM: root travel 0 after pinning.
 3. Moves and AUTO FILL scoring → script over every clip list in the repo + UAL1 / UAL2.
-4. Player uses a character (`characterId`); "Obby Hero" made from today's settings;
-   old fields still read → test harness: obby plays exactly as before; Mannequin_F as the
-   player walks / jumps / lands on UAL1 clips.
-5. Game export copies the files the game's characters take clips from.
+4. `CharacterAnimator` (§8); the player moves onto it → regression compare: identical
+   to the baseline.
+5. Player uses a character (`characterId`); "Obby Hero" made from today's settings;
+   old fields still read → test harness: the obby plays as before; Mannequin_F as the player walks /
+   jumps / lands on UAL1 clips.
+6. Game export copies the files the game's characters take clips from.
 
 **Part B: the character editor**
-6. Isolated session (the BrushEditSession pattern) + Characters panel (list, New, Edit,
+7. Isolated session (the BrushEditSession pattern) + Characters panel (list, New, Edit,
    Duplicate, Delete).
-7. Animations browser, player bar, preview, moves list, character card
+8. Animations browser, player bar, preview, moves list, character card
    (height / fit, keep in place, colors) → harness with real clicks.
 
 **Part C: enemies, scripts, try it**
-8. Placing characters; enemy AI on moves (hit, death added); "play move" script action;
-   the missing-move notes → harness: a mannequin zombie enemy (UAL2 zombie moves), a
-   script that plays a custom move on the player.
-9. TRY IT in the editor.
-10. Guides (CHARACTER_GUIDE + an in-app page), test plans, architecture doc.
+9. Enemies move onto `CharacterAnimator` → regression compare (the crab must behave
+   exactly as before); placing characters; hit and death for enemies; "play move" script
+   action; the missing-move notes → harness: a mannequin zombie enemy (UAL2 zombie
+   moves), a script that plays a custom move on the player.
+10. TRY IT in the editor.
+11. Guides (CHARACTER_GUIDE + an in-app page), test plans, architecture doc.
 
-## 9. Not in this phase
+## 11. Not in this phase
 
 - Mapping clips between **different skeletons** (UAL clips on `character.gltf`).
 - **NPC behaviour** (facing the player, talking, walking routes): a later phase on top of
@@ -195,12 +253,15 @@ death `Death01`. Tested on the real clip lists in the repo so today's picks don'
 - Trimming unused clips from published games (each UAL file is about 21 MB).
 - Facial animation, attachments (holding a sword in `hand_r`), ragdolls.
 
-## 10. Decided (2026-10-03, user)
+## 12. Decided (2026-10-03, user)
 
 - Characters are saved per game, like prefabs, for now.
 - One moves list per character; the editor doesn't care what uses the character.
 - This phase is the foundation (models, rigs, animations, the editor, the player and
   enemies). NPC behaviour and a player attack are later phases.
 - TRY IT is in part C.
+- One shared `CharacterAnimator` with drivers (player, enemies, later NPCs), §8.
+- Regression baselines recorded before and compared after the player refactor and the
+  enemy refactor (not every change), §9.
 - The obby's player becomes a character; switching it to a mannequin is optional, for
   testing.
