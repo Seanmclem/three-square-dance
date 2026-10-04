@@ -567,9 +567,12 @@ export class ScriptEngine {
         break;
 
       case "adjust_number":
-        if (action.stateKey)
+        if (action.stateKey) {
           for (const key of this._scopedStateKeys(action, ownerId, action.stateKey))
             gameState.adjust(key, action.numberDelta ?? 0);
+          // Phase 86: losing health plays the player character's HIT move (if it has one).
+          if ((action.numberDelta ?? 0) < 0 && action.stateKey === this._healthKey(action)) this._bus.emit("character:play-move", { move: "hit", auto: true });
+        }
         break;
 
       case "delete_state":
@@ -608,6 +611,7 @@ export class ScriptEngine {
         // optionally refill health, and fade back. Destination priority:
         // stored pose key → checkpoint → the world's default spawn.
         const dur = action.fadeDuration ?? 0.4;
+        this._bus.emit("character:play-move", { move: "death", hold: true, auto: true });   // Phase 86: under the fade
         this._bus.emit("overlay:fade-in", { color: action.fadeColor ?? "#000000", duration: dur });
         const t = setTimeout(() => {
           let dest: Vec3 | undefined;
@@ -834,6 +838,18 @@ export class ScriptEngine {
           }
           for (const id of this._resolveTargets(action.targetId))
             this._bus.emit("object:play-animation", { id, clipName: action.animation, loop: action.animationLoop, hold: action.animationHold, blend: action.animationBlend });
+        }
+        break;
+
+      // Phase 86: a character's MOVE (whatever clip it maps to). Loop / hold as play_animation.
+      case "play_move":
+        if (action.move) {
+          if (action.targetId === "player") {
+            this._bus.emit("character:play-move", { move: action.move, loop: action.animationLoop, hold: action.animationHold });
+            break;
+          }
+          for (const id of this._resolveTargets(action.targetId))
+            this._bus.emit("object:play-move", { id, move: action.move, loop: action.animationLoop, hold: action.animationHold });
         }
         break;
 

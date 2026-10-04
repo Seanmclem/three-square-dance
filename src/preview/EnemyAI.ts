@@ -202,6 +202,17 @@ export class EnemyAI {
     if (!names.length) return;
     const pick = (authored: string | null | undefined, want: string): string | null =>
       authored === null ? null : (authored ?? autoClip(names, want));
+    // Phase 86: a game character brings its own moves (idle / walk / attack); the AI plays
+    // the clips those name. Plain models keep the authored names or the name guess.
+    if (this._placer.isCharacter(rec.id)) {
+      const anim = this._placer.animatorFor(rec.id);
+      const move = (m: string) => anim?.clipFor(m)?.name ?? null;
+      rec.p.idleClip   = move("idle");
+      rec.p.walkClip   = move("walk") ?? move("run");
+      rec.p.attackClip = move("attack");
+      rec.p.clipsResolved = true;
+      return;
+    }
     rec.p.idleClip   = pick(rec.def.idleClip,   "idle");
     rec.p.walkClip   = pick(rec.def.walkClip,   "walk") ?? autoClip(names, "run");
     rec.p.attackClip = pick(rec.def.attackClip, "attack") ?? autoClip(names, "bite");
@@ -280,6 +291,7 @@ export class EnemyAI {
       }
       if (intent.attackLanded) {
         gameState.adjust(p.damageKey, -p.attackDamage);
+      this._bus.emit("character:play-move", { move: "hit", auto: true });   // Phase 86: a character player flinches
         this._engine.fire("on_enemy_attack", rec.id);
       }
 

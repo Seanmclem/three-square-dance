@@ -6,7 +6,7 @@ import type { AssetDef, CharacterDef } from "@/types";
  * EDIT (the isolated character editor), USE AS PLAYER, DUPLICATE, DELETE (asks inline).
  * NEW starts a character from any model; its moves are filled in by AUTO FILL.
  */
-export function CharacterPanel({ characters, assets, playerCharacterId, legacyPlayerModel, onNew, onEdit, onDuplicate, onDelete, onUseAsPlayer, onImportPlayer }: {
+export function CharacterPanel({ characters, assets, playerCharacterId, legacyPlayerModel, onNew, onEdit, onDuplicate, onDelete, onUseAsPlayer, onImportPlayer, onPlace }: {
   characters:        CharacterDef[];
   assets:            AssetDef[];
   playerCharacterId: string | null;
@@ -14,6 +14,7 @@ export function CharacterPanel({ characters, assets, playerCharacterId, legacyPl
   onNew:             (modelAssetId: string) => void;
   onEdit:            (id: string) => void;
   onDuplicate:       (id: string) => void;
+  onPlace:           (id: string) => void;   // part C: place it in the level (an animated object; turn on enemy AI for an enemy)
   onDelete:          (id: string) => void;
   onUseAsPlayer:     (id: string | null) => void;
   onImportPlayer?:   () => void;       // make a character from today's player settings
@@ -75,6 +76,8 @@ export function CharacterPanel({ characters, assets, playerCharacterId, legacyPl
               ) : (
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   <button style={btn(true)} onClick={() => onEdit(c.id)}>EDIT</button>
+                  <button style={btn()} onClick={() => onPlace(c.id)}
+                    title="Place it in the level: click to drop it (Esc stops). It idles and plays moves from scripts; turn on ENEMY AI on its AI screen to make it an enemy.">PLACE</button>
                   <button style={btn()} onClick={() => onUseAsPlayer(isPlayer ? null : c.id)}
                     title={isPlayer ? "Go back to the player's model settings" : "The game's player uses this character"}>{isPlayer ? "NOT PLAYER" : "USE AS PLAYER"}</button>
                   <button style={btn()} onClick={() => onDuplicate(c.id)}>DUPLICATE</button>

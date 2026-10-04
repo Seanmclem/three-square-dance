@@ -51,6 +51,21 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
 - [ ] By hand: orbit under the character; BLEND TEST walk → run looks right; the capsule
       ghost reads clearly.
 
-## Part C
+## Part C (v4.113.0)
 
-Planned; checklist added when it's built.
+- [x] Regression around the enemy refactor (baseline from the part-B commit): the
+      refactor alone and the final part-C build both SAME on every frame (player and crab,
+      1557 + 272 frames).
+- [x] PLACE a UAL2 zombie character: an object with `characterId`, idles in
+      Zombie_Idle_Loop, 134 clips.
+- [x] ENEMY AI on it: the AI screen says its clips come from the character's moves.
+- [x] In game (Hero character as the player): the zombie walks with Zombie_Walk_Fwd_Loop
+      and bites with Zombie_Bite; the player plays its hit move (Hit_Chest) when bitten.
+- [x] Play move: "dance" on the player plays Dance_Loop; "hit" on the zombie plays
+      Hit_Knockback.
+- [x] respawn_player plays Death01 under the fade, then idle.
+- [x] TRY IT plays the unsaved draft (new color); Esc returns to the editor with the
+      change still unsaved.
+- [x] No errors or "no move" warnings.
+- [ ] By hand: the dialogue talk move; a script adjust_number hit; the Characters guide
+      from the ? menu.

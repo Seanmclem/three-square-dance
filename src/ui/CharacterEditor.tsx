@@ -28,7 +28,8 @@ const INPUT: React.CSSProperties = { background: "#141416", color: C.text, borde
  * list; pick a clip per move, ▶ to preview, AUTO FILL for empty ones, + ADD MOVE).
  * Bottom: the player bar (play / pause, scrub, speed, loop, BLEND TEST).
  */
-export function CharacterEditor({ draft, onChange, stage, assets }: {
+export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
+  onTryIt?: () => void;   // walk it around the level with the real controls (Esc returns)
   draft: CharacterDef;
   onChange: (next: CharacterDef) => void;
   stage: CharacterStage;
@@ -272,6 +273,9 @@ export function CharacterEditor({ draft, onChange, stage, assets }: {
           <select aria-label="Blend to" value={blend.to} onChange={e => setBlend({ ...blend, to: e.target.value })} style={INPUT}>{moveNames.filter(m => draft.moves[m]?.clip).map(m => <option key={m} value={m}>{label(m)}</option>)}</select>
           <button style={BTN()} title="Play the first move, then blend into the second the way the game does" onClick={() => stage.blendTest(blend.from, blend.to)}>TEST</button>
         </span>
+        {onTryIt && <button style={{ ...BTN(true), borderColor: "rgba(60,207,145,0.6)", color: "#7fe0b5", background: "rgba(60,207,145,0.15)" }}
+          title="Walk this character around the level with the real controls (unsaved changes included). Esc comes back here."
+          onClick={onTryIt}>TRY IT ▸</button>}
       </div>
     </>
   );

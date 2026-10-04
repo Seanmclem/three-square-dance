@@ -56,7 +56,7 @@ const INIT = `(() => {
         window.__scene.traverse(n => { if (!o && n.userData?.editorId === rec.id && n.userData?.editorType === "object") o = n; });
         enemies.push({ id: rec.id, state: rec.state, clip: rec.currentClip,
           p: o ? [r4(o.position.x), r4(o.position.y), r4(o.position.z)] : null,
-          acts: acts(window.__objectPlacer?._mixers?.get(rec.id)) });
+          acts: acts(window.__objectPlacer?._anims?.get(rec.id)?.mixer ?? window.__objectPlacer?._mixers?.get(rec.id)) });   // Phase 86 C: animator per object
       }
       return { player, enemies };
     },
@@ -108,7 +108,8 @@ async function scenario(browser, scene, port, steps) {
 }
 
 async function record(out) {
-  const { chromium } = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
+  const pw = await import(process.env.PLAYWRIGHT_CORE ?? "playwright-core");
+  const chromium = pw.chromium ?? pw.default?.chromium;   // ESM build or CommonJS default export
   const browser = await chromium.launch({ channel: "chrome", headless: true, args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
   const key = async (page, k, down) => down ? page.keyboard.down(k) : page.keyboard.up(k);
   const act = (page, action) => page.evaluate(a => window.__test.runAction(a), action);

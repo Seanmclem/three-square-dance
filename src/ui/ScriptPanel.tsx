@@ -206,6 +206,7 @@ const ACTION_TYPES: ActionType[] = [
   "move_object",
   "open_door",
   "play_animation",
+  "play_move",
   "play_music",
   "play_sound",
   "launch_player",
@@ -2193,7 +2194,7 @@ const SANS = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
 const ACTION_LABELS: Record<ActionType, string> = {
   play_sound: "play sound", stop_sound: "stop sound", play_music: "play music", stop_music: "stop music",
-  set_footstep: "set footstep sound", show_dialogue: "show dialogue", move_object: "move", play_animation: "play animation",
+  set_footstep: "set footstep sound", show_dialogue: "show dialogue", move_object: "move", play_animation: "play animation", play_move: "play move",
   spawn_npc: "spawn NPC", despawn_object: "despawn", spawn_object: "spawn", change_material: "change material",
   open_door: "open door", close_door: "close door", set_state: "set state", adjust_number: "adjust number",
   delete_state: "delete state", store_position: "store position", fire_event: "fire event", fade_screen: "fade screen",
@@ -2247,6 +2248,7 @@ function actionFamily(type: ActionType): { icon: string; tint: string } {
     case "show_dialogue": return { icon: "dialogue", tint: "#80aaff" };
     case "show_ui": case "hide_ui": case "run_script": case "load_scene": return { icon: "flow", tint: "#80aaff" };
     case "play_animation": return { icon: "play", tint: "#80aaff" };
+    case "play_move":      return { icon: "play", tint: "#80aaff" };
     case "despawn_object": return { icon: "despawn", tint: "#cc6666" };
     case "spawn_object": case "spawn_npc": return { icon: "spawn", tint: "#44cc88" };
     case "light_on": case "light_off": case "toggle_light": return { icon: "light", tint: "#e8c14b" };
@@ -2297,6 +2299,7 @@ function describeAction(a: ScriptAction, ctx: NameCtx): { title: string; sub: st
     case "show_dialogue": noun = ctx.zoneDialogues?.find(d => d.id === a.dialogueId)?.label ?? a.dialogueId ?? ""; break;
     case "move_object": noun = tgt; if (a.position) tail.push(`to ${fmtVec(a.position)}`); break;
     case "play_animation": noun = a.animation ?? ""; if (tgt) tail.push(`on ${tgt}`); if (a.animationHold) tail.push("hold at end"); if (a.animationLoop) tail.push("loop"); break;
+    case "play_move":      noun = a.move ?? ""; if (tgt) tail.push(`on ${tgt}`); if (a.animationHold) tail.push("hold at end"); if (a.animationLoop) tail.push("loop"); break;
     case "despawn_object": case "spawn_object": noun = tgt; if (a.fadeSeconds) tail.push(`fade ${a.fadeSeconds}s`); break;
     case "change_material": noun = tgt; if (a.material) tail.push(a.material); break;
     case "set_state": noun = scopeKey; tail.push(`→ ${fmtVal(a.stateValue)}`); break;
@@ -3559,6 +3562,30 @@ function ActionFields({
         </div>
       );
     }
+
+    // Phase 86: a character's MOVE, whatever clip that character maps it to (the player's
+    // or a placed character's; other animated objects use the old name guess).
+    case "play_move":
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <F label="Target">{animTargetPicker}</F>
+          <F label="Move">
+            <input style={S.field} list="wb-move-names" placeholder="idle, walk, death, or a custom move"
+              value={action.move ?? ""} onChange={(e) => set({ move: e.target.value.trim() || undefined })} />
+            <datalist id="wb-move-names">
+              {["idle", "walk", "run", "jump", "jump_idle", "jump_land", "climb", "attack", "hit", "death", "talk"].map(m => <option key={m} value={m} />)}
+            </datalist>
+          </F>
+          <F label="Loop">
+            <input type="checkbox" className="wb-switch" checked={action.animationLoop ?? false}
+              onChange={(e) => set({ animationLoop: e.target.checked })} />
+          </F>
+          <F label="Hold at end" style={action.animationLoop ? { opacity: 0.45 } : undefined}>
+            <input type="checkbox" className="wb-switch" disabled={action.animationLoop ?? false}
+              checked={action.animationHold ?? false} onChange={(e) => set({ animationHold: e.target.checked })} />
+          </F>
+        </div>
+      );
 
     case "change_material":
       return (

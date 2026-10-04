@@ -124,6 +124,13 @@ name, HEIGHT (FIT TO CAPSULE), KEEP IN PLACE, colors, and the MOVES list (AUTO F
 + ADD MOVE). Bottom: play, scrub, speed, loop and a blend test. Save writes game.json;
 USE AS PLAYER makes the game's player use it.
 
+**Using them (v4.113.0):** PLACE drops a character into the level (it idles; turn on ENEMY
+AI for an enemy, whose idle / walk / attack then come from its moves). The **play move**
+script action plays any move on the player or a placed character. A player that uses a
+character also plays hit (losing health), death (start of a respawn) and talk (in a
+dialogue) by itself. TRY IT in the editor plays the level as the unsaved character. The
+in-app guide is `public/docs/characters.html` (? menu, CHARACTERS).
+
 ## Related scripting
 
 - `on_level_load` ("when the level starts") fires on every level entry, in the editor

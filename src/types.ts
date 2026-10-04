@@ -253,7 +253,7 @@ export interface BusEvents {
   "object:selected":       SelectedObjectPayload;
   "object:deselected":     Record<string, never>;
   "object:updated":        { id: string; zoneId: string; changes: Partial<WorldObject> };
-  "asset:selected":        { assetId: string };
+  "asset:selected":        { assetId: string; characterId?: string };   // Phase 86: placing a game character
   // ObjectTool announcing it disarmed itself (Escape / right-click / tool switch), so the
   // AssetBrowser highlight can follow. Without this the panel keeps showing an asset as
   // selected while the tool is idle, and the next click on that tile reads as "deselect".
@@ -537,6 +537,11 @@ export interface BusEvents {
   // play_animation with target "player" — a script clip overrides the avatar's locomotion
   // state machine until it ends (one-shot), is cleared ("__auto__"), or the player moves.
   "character:play-animation": { clipName: string; loop?: boolean; hold?: boolean };
+  // Phase 86: play a MOVE on the player (play move action), or an automatic one (`auto`:
+  // death before a respawn, hit on damage), which only a player using a character plays.
+  "character:play-move":   { move: string; loop?: boolean; hold?: boolean; auto?: boolean };
+  // Phase 86: play a MOVE on a placed object / character (play move action).
+  "object:play-move":      { id: string; move: string; loop?: boolean; hold?: boolean };
   // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
   "mover:set":             { targetId: string; op: "start" | "stop" | "toggle"; moverId?: string };
   "state:changed":         { key: string; value: JsonValue };
@@ -1218,6 +1223,9 @@ export interface WorldObject {
   ai?: EnemyAIDef;
   groupIds?:  string[];
   autoPlayAnimation?: string | null;   // clip name that loops automatically (Phase 10.7)
+  // Phase 86: a game character (GameConfig.characters) this object is: its model, borrowed
+  // clips, moves, size and colors. `assetId` mirrors the character's model.
+  characterId?: string;
   material?:  string;                  // registry material id; overrides baked GLTF materials (change_material)
   // undefined → implicit auto-box from model bounds when asset.collidable; [] → explicitly none.
   colliders?: AttachedCollider[];
@@ -1415,6 +1423,7 @@ export type ActionType =
   | 'show_dialogue'
   | 'move_object'
   | 'play_animation'
+  | 'play_move'
   | 'spawn_npc'
   | 'despawn_object'
   | 'spawn_object'
@@ -1586,6 +1595,7 @@ export interface ScriptAction {
   animation?:    string;
   animationLoop?: boolean;   // play_animation: loop the clip forever
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
+  move?:          string;    // play_move (Phase 86): the move to play (idle, walk, death, a custom one …)
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
   sound?:        string;       // play_sound / stop_sound: SoundDef id
   soundVariants?: string[];    // set_footstep (Phase 73): extra sounds for the override — same random pick as PlayerSettings.footstepVariants

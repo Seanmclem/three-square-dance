@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Characters Guide</title>
+<!--
+  In-app HTML guide (see public/docs/README.md). Self-contained: inline CSS and SVG.
+  Opened from the editor's ? menu (CHARACTERS section). Keep it current with the
+  character features (Phase 86 onward).
+-->
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --panel: #26272b;
+    --line: #3a3f4a;
+    --text: #dde3f0;
+    --text-quiet: #c2cadb;
+    --accent: #80aaff;
+    /* diagram tokens (the SVGs reference these) */
+    --d-text-primary: #dde3f0;
+    --d-text-secondary: #c2cadb;
+    --d-chart-axis: #8f98ab;
+    --d-chart-grid: #3a3f4a;
+    --d-chart-categorical-1: #5b9dff;
+    --d-chart-categorical-2: #ff8a4c;
+    --d-chart-categorical-3: #3ccf91;
+    --d-chart-categorical-4: #9aa6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  p, li { color: var(--text); }
+  .meta { color: var(--text-quiet); font-size: 13px; margin-bottom: 24px; }
+  a { color: var(--accent); }
+  nav.toc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 20px; font-size: 14px; }
+  nav.toc ol { margin: 4px 0; padding-left: 20px; }
+  figure { margin: 20px 0; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figure img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+  figcaption { color: var(--text-quiet); font-size: 13px; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-quiet); font-weight: 600; background: var(--panel); }
+  kbd, code {
+    font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+    background: #33353b; border: 1px solid #454a55; border-radius: 4px; padding: 1px 5px; color: var(--text);
+  }
+  :target { scroll-margin-top: 20px; animation: help-flash 2.4s ease-out; border-radius: 4px; }
+  @keyframes help-flash { 0%, 30% { background: rgba(128,170,255,0.28); } 100% { background: transparent; } }
+  h3 { font-size: 16px; margin: 28px 0 8px; }
+  .answer { background: var(--panel); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 18px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Characters Guide</h1>
+<div class="meta">
+  A model plus how it moves, for the player and enemies · editor v4.113 · 2026-10-04 · <kbd>Cmd</kbd>+<kbd>F</kbd> searches
+</div>
+
+<nav class="toc"><ol>
+  <li><a href="#what">What a character is</a></li>
+  <li><a href="#panel">The Characters panel</a></li>
+  <li><a href="#editor">The character editor</a></li>
+  <li><a href="#moves">Moves: what plays when</a></li>
+  <li><a href="#files">Borrowing clips from other files</a></li>
+  <li><a href="#using">Using characters: player, enemies, scripts</a></li>
+  <li><a href="#tips">Tips</a></li>
+</ol></nav>
+
+<h2 id="what">What a character is</h2>
+<p>A character is a model plus how it moves: which file its clips come from, which clip plays for each <b>move</b> (idle, walk, jump …), its height, colors, and whether clips stay in place. It is saved in the game (like prefabs), set up once, and then used by the player, by enemies and by scripts. The character doesn't care which of them uses it.</p>
+<figure><svg viewBox="0 0 760 170" role="img" aria-label="Files feed a character, which the player, enemies and scripts use" font-size="13">
+  <g font-family="ui-monospace, Menlo, monospace">
+    <rect x="10" y="30" width="190" height="44" rx="7" fill="#26272b" stroke="#3a3f4a"/><text x="24" y="57" fill="#dde3f0">Model (Mannequin F)</text>
+    <rect x="10" y="94" width="190" height="44" rx="7" fill="#26272b" stroke="#3a3f4a"/><text x="24" y="121" fill="#dde3f0">Clip files (UAL1, UAL2)</text>
+    <path d="M200 52 C 240 52, 240 85, 276 85 M200 116 C 240 116, 240 90, 276 90" stroke="#5b9dff" stroke-width="2" fill="none"/>
+    <rect x="280" y="34" width="210" height="102" rx="10" fill="rgba(255,176,32,0.10)" stroke="#ffb020"/>
+    <text x="296" y="60" fill="#ffd38a" font-weight="600">Character</text>
+    <text x="296" y="84" fill="#c2cadb" font-size="12">moves: idle → Idle_Loop …</text>
+    <text x="296" y="104" fill="#c2cadb" font-size="12">height · colors</text>
+    <text x="296" y="124" fill="#c2cadb" font-size="12">keep in place</text>
+    <path d="M490 85 L 540 40 M490 85 L 540 85 M490 85 L 540 130" stroke="#5b9dff" stroke-width="2" fill="none"/>
+    <rect x="544" y="22" width="200" height="36" rx="7" fill="#26272b" stroke="#3a3f4a"/><text x="558" y="45" fill="#dde3f0">Player (controls)</text>
+    <rect x="544" y="67" width="200" height="36" rx="7" fill="#26272b" stroke="#3a3f4a"/><text x="558" y="90" fill="#dde3f0">Enemies (enemy AI)</text>
+    <rect x="544" y="112" width="200" height="36" rx="7" fill="#26272b" stroke="#3a3f4a"/><text x="558" y="135" fill="#dde3f0">Scripts (play move)</text>
+  </g>
+</svg></figure>
+
+<h2 id="panel">The Characters panel</h2>
+<p>The <b>Characters</b> button on the left toolbar (under Prefabs) lists the game's characters.</p>
+<ul>
+  <li><b>New character from a model:</b> pick any model and press NEW. Its moves are guessed from the model's clip names (AUTO FILL) and the editor opens.</li>
+  <li><b>Make the player's look a character:</b> turns the player's current MODEL and ANIMATIONS settings into a character and uses it as the player. It plays exactly as before; from then on you edit it like any other.</li>
+  <li>Each character: <b>EDIT</b>, <b>PLACE</b> (put it in the level), <b>USE AS PLAYER</b> / NOT PLAYER, <b>DUPLICATE</b>, <b>DELETE</b> (asks first; deleting the player's character puts the player back on its model settings).</li>
+</ul>
+
+<h2 id="editor">The character editor</h2>
+<p>EDIT opens the character alone, like Edit Brush: the level is set aside and the character stands on a dark grid inside a wireframe of its collision capsule. Orbit all the way around, underneath too.</p>
+<ul>
+  <li><b>Left, ANIMATIONS:</b> every clip it can use, grouped by file, with search and filters (loops, one-shots, clips that move the body). Click one to play it. <b>+ ADD FILE</b> borrows clips from another file (see <a href="#files">Borrowing clips</a>); ✕ on a file's heading stops borrowing from it.</li>
+  <li><b>Right, CHARACTER:</b> the name, <b>HEIGHT</b> (FIT TO CAPSULE makes it as tall as the collision capsule, 1.8 m at character scale 1; AS IMPORTED goes back), <b>KEEP IN PLACE</b>, and a color for each material.</li>
+  <li><b>Right, MOVES:</b> one list for the character. Pick a clip for each move from its menu, or click a clip on the left and then ◀ on the move. ▶ plays the move. <b>AUTO FILL</b> guesses the empty ones; <b>+ ADD MOVE</b> adds your own (wave, sit, cheer …).</li>
+  <li><b>Bottom, the player bar:</b> play / pause, scrub (click or drag; it pauses on that frame), speed, LOOP, and <b>BLEND</b> from one move to another, which plays the first and blends into the second the way the game does.</li>
+  <li><b>TRY IT ▸</b> plays the level with this character as the player, unsaved changes included. <kbd>Esc</kbd> comes back to the editor, changes still there.</li>
+  <li><b>Save</b> (or <kbd>Cmd</kbd>+<kbd>S</kbd>) writes the character to the game and keeps editing; <b>Close</b> asks first if there are unsaved changes.</li>
+</ul>
+
+<h2 id="moves">Moves: what plays when</h2>
+<p>Every move works for every use; scripts can play any of them. What differs is which moves the engine plays <i>by itself</i>:</p>
+<table>
+  <tr><th>Move</th><th>Played automatically for the player</th><th>…for an enemy</th></tr>
+  <tr><td>idle</td><td>standing still</td><td>waiting, or lost the player</td></tr>
+  <tr><td>walk</td><td>moving</td><td>chasing, walking home</td></tr>
+  <tr><td>run</td><td>running, if the game has run on (falls back to walk)</td><td></td></tr>
+  <tr><td>jump · in air · land</td><td>takeoff · airborne · touching down</td><td></td></tr>
+  <tr><td>climb</td><td>on a ladder</td><td></td></tr>
+  <tr><td>attack</td><td>(the player has no attack yet)</td><td>biting or swinging</td></tr>
+  <tr><td>hit</td><td>losing health (an enemy bite, a script taking health)</td><td>(scripts)</td></tr>
+  <tr><td>death</td><td>at the start of a respawn, under the fade</td><td>(scripts: the engine has no enemy health yet)</td></tr>
+  <tr><td>talk</td><td>while a dialogue is on screen</td><td></td></tr>
+  <tr><td><i>your own</i></td><td colspan="2">only when a script plays it</td></tr>
+</table>
+<p>The player's automatic hit, death and talk only happen for a player that uses a character, so older games look exactly as before. Where a character is used, the panel notes moves it would play that have no clip (player settings, the enemy AI screen).</p>
+
+<h2 id="files">Borrowing clips from other files</h2>
+<ul>
+  <li>Clips play on a model by bone name, so a file whose skeleton has the same bones can lend its clips. Quaternius's <b>Universal Animation Library</b> 1 and 2 and both mannequins share one 65-bone skeleton: any of their 254 clips plays on either mannequin.</li>
+  <li>+ ADD FILE checks the skeleton first. A file with 90% or more of the same bones is added (the missing ones are named); anything else is refused with the reason, e.g. "uses a different skeleton".</li>
+  <li><b>KEEP IN PLACE</b> (on by default) pins the skeleton's root sideways, so root-motion files (the <code>_RM</code> versions, which walk the body 1.3 to 5.5 m per loop) stay under the character. Prefer the plain files anyway. Clips that move the body show <b>MOVES</b> in the list.</li>
+</ul>
+
+<h2 id="using">Using characters: player, enemies, scripts</h2>
+<ul>
+  <li><b>Player:</b> USE AS PLAYER in the panel, or the CHARACTER menu on the player settings' Character page. The character brings the model, size, colors and animations; jump height, speed, run and CHARACTER SCALE stay with the game.</li>
+  <li><b>Placing one:</b> PLACE arms the object tool with it; click to drop it (keep clicking for more, <kbd>Esc</kbd> stops). A placed character idles in its idle move and plays moves from scripts.</li>
+  <li><b>Enemies:</b> select a placed character and turn on ENEMY AI on its AI screen. Its idle, walk and attack clips come from the character's moves.</li>
+  <li><b>Scripts, play move:</b> pick the target (the player or an object) and a move name; Loop and Hold at end work as in play animation. It plays whatever clip that character's move is set to, so swapping a clip never touches the script.</li>
+</ul>
+
+<h2 id="tips">Tips</h2>
+<ul>
+  <li>Import the files with the Model Importer first (GLB from the Unreal-Godot folders, not the FBX).</li>
+  <li>One model can be several characters: DUPLICATE, then change moves and colors (a mannequin Hero and a mannequin Zombie).</li>
+  <li>Characters are saved per game for now; another game doesn't see them.</li>
+</ul>
+</main>
+</body>
+</html>

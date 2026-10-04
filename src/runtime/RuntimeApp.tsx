@@ -93,6 +93,7 @@ export default function RuntimeApp() {
     // InstancedMesh pools (the editor shell never constructs one).
     const instancing   = new InstancedObjectPool(scene.scene, bus, world);
     const objectPlacer = new ObjectPlacer(bus, { instancing });
+    objectPlacer.setCharacterLookup(id => world.gameCharacters?.find(c => c.id === id) ?? null);   // Phase 86
     const movers       = new MoverSystem(bus);
     const zones        = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     const preview      = new PreviewController(bus, world, scene, zones, movers);

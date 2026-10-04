@@ -94,6 +94,55 @@ export class CharacterAnimator {
 
   get currentClip(): THREE.AnimationClip | null { return this._clip; }
 
+  // ── Placed objects (enemies, props): ObjectPlacer's blend, kept exactly ───────────
+  // Always restart the clip at full weight and crossfade from the playing one
+  // (`crossFadeTo`, no warp); a 0 fade just stops the old one.
+
+  /** Crossfade to `clip` the way placed objects always have (see above). */
+  fadeToClip(clip: THREE.AnimationClip, opts: { loop: boolean; fade: number; key?: string }): THREE.AnimationAction {
+    const next = this.mixer.clipAction(clip);
+    next.reset();
+    next.setLoop(opts.loop ? THREE.LoopRepeat : THREE.LoopOnce, opts.loop ? Infinity : 1);
+    next.clampWhenFinished = !opts.loop;
+    next.enabled = true;
+    next.setEffectiveWeight(1);
+    next.play();
+    const prev = this._action;
+    if (prev && prev !== next) {
+      if (opts.fade > 0) prev.crossFadeTo(next, opts.fade, false);
+      else prev.stop();
+    }
+    this._action = next;
+    this._clip = clip;
+    this._current = opts.key ?? `clip:${clip.name}`;
+    return next;
+  }
+
+  /** Start a looping clip with no fade (a placed object's auto-play clip at build). */
+  startLoop(clip: THREE.AnimationClip): void {
+    const a = this.mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity);
+    a.play();
+    this._action = a;
+    this._clip = clip;
+    this._current = `clip:${clip.name}`;
+  }
+
+  /** Fade the playing clip out to the bind pose. */
+  fadeOutCurrent(fade: number): void {
+    this._action?.fadeOut(fade);
+    this._action = null;
+    this._clip = null;
+    this._current = "";
+  }
+
+  /** Stop everything and forget the playing clip (a despawned object). */
+  clearPlaying(): void {
+    this.mixer.stopAllAction();
+    this._action = null;
+    this._clip = null;
+    this._current = "";
+  }
+
   // ── Script override ─────────────────────────────────────────────────────────
 
   get scripted(): boolean { return this._script !== null; }
@@ -115,6 +164,14 @@ export class CharacterAnimator {
     this._clip = clip;
     this._current = `script:${clip.name}`;   // never collides with a move name
     return true;
+  }
+
+  /** Script override with a given clip (a move resolved to its clip, from its own file). */
+  playScriptClip(clip: THREE.AnimationClip, loop: boolean, hold: boolean): void {
+    this._script = { name: clip.name, loop, hold };
+    this._crossfadeTo(this.mixer.clipAction(clip), loop, 1);
+    this._clip = clip;
+    this._current = `script:${clip.name}`;
   }
 
   /** Drop the script override (the driver re-picks its move next frame). */

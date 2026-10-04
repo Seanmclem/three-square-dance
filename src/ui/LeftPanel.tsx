@@ -20,6 +20,7 @@ interface LeftPanelProps {
   onCharacterNew?:        (modelAssetId: string) => void;
   onCharacterEdit?:       (id: string) => void;
   onCharacterDuplicate?:  (id: string) => void;
+  onCharacterPlace?:      (id: string) => void;
   onCharacterDelete?:     (id: string) => void;
   onCharacterUseAsPlayer?:(id: string | null) => void;
   onCharacterFromPlayer?: () => void;
@@ -116,7 +117,7 @@ interface LeftPanelProps {
 }
 
 export function LeftPanel({
-  characters, playerCharacterId, legacyPlayerModel, onCharacterNew, onCharacterEdit, onCharacterDuplicate, onCharacterDelete, onCharacterUseAsPlayer, onCharacterFromPlayer,
+  characters, playerCharacterId, legacyPlayerModel, onCharacterNew, onCharacterEdit, onCharacterDuplicate, onCharacterPlace, onCharacterDelete, onCharacterUseAsPlayer, onCharacterFromPlayer,
   panelId, assets, selectedAssetId, onAssetSelect, onImport, onDeleteAssets, onEditAssets, onRestageAsset, onReoriginAsset, onClose,
   materials, onMaterialImport, onDeleteMaterials, onEditMaterials,
   sounds, onSoundImport, onSoundRecord, onDeleteSounds, onEditSounds,
@@ -273,6 +274,7 @@ export function LeftPanel({
                 onNew={id => onCharacterNew?.(id)}
                 onEdit={id => onCharacterEdit?.(id)}
                 onDuplicate={id => onCharacterDuplicate?.(id)}
+                onPlace={id => onCharacterPlace?.(id)}
                 onDelete={id => onCharacterDelete?.(id)}
                 onUseAsPlayer={id => onCharacterUseAsPlayer?.(id)}
                 onImportPlayer={onCharacterFromPlayer}

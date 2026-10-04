@@ -8,6 +8,10 @@ import { assetManager } from "@/core/AssetManager";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldObject, Vec3 } from "@/types";
 import { reportTransformWrite } from "@/world/transformWatchdog";
+import { CharacterAnimator } from "@/characters/CharacterAnimator";
+import { legacyGuess } from "@/characters/autoFill";
+import { loadCharacter, moveResolver, topBoneNames, applyCharacterLook, keepInPlace } from "@/characters/characterRuntime";
+import type { CharacterDef } from "@/types";
 
 /** Default crossfade duration (seconds) when switching animation clips. */
 const BLEND_SEC = 0.3;
@@ -25,16 +29,23 @@ const ANIM_SCRIPT   = 2;
  * and disposes its geometry; everything else about an object lives here.
  *
  * Phase 13 (NPCs/enemies) reuses this same object-mixer subsystem.
+ *
+ * Phase 86 part C: each animated object's clips are played by a shared
+ * `CharacterAnimator` (the player's too), with this class keeping its priority
+ * arbiter (autoplay < AI < script) and its blend (`fadeToClip`).
  */
 export class ObjectPlacer {
-  private readonly _mixers   = new Map<string, THREE.AnimationMixer>();
+  private readonly _anims    = new Map<string, CharacterAnimator>();   // Phase 86: was a raw mixer per object
+  private readonly _characterObjs = new Set<string>();                  // Phase 86: objects that are game characters
   private readonly _clips    = new Map<string, Map<string, THREE.AnimationClip>>();
   private readonly _autoPlay = new Map<string, string | null>();
   private readonly _finish   = new Map<string, () => void>();
-  private readonly _active   = new Map<string, THREE.AnimationAction>();
   private readonly _meshes   = new Map<string, THREE.Object3D>();
   private readonly _despawned = new Set<string>();
   private _previewingId: string | null = null;
+  // Phase 86: game characters by id (App / runtime point this at world.gameCharacters).
+  private _characterLookup: (id: string) => CharacterDef | null = () => null;
+  setCharacterLookup(fn: (id: string) => CharacterDef | null): void { this._characterLookup = fn; }
 
   // Runtime-shell InstancedMesh pooling (never set in the editor). Type-only
   // import keeps the pool module out of the editor bundle.
@@ -48,6 +59,10 @@ export class ObjectPlacer {
     // serves as the script-reachable way to STOP a looping/held clip.
     this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) =>
       clipName === "__auto__" ? this.stopPreview(id) : this.previewClip(id, clipName, { loop, hold, blend }));
+    // Phase 86: play move (a character's move, else the model's clip that the name guess picks).
+    this._bus.on("object:play-move", ({ id, move, loop, hold }) => {
+      if (!this.playMove(id, move, { loop, hold })) console.warn(`ObjectPlacer: object "${id}" has no move "${move}"`);
+    });
     this._bus.on("object:updated", ({ id, changes }) => {
       if (import.meta.env.DEV && this._meshes.get(id)?.userData["_instanced"] &&
           (changes.material || changes.position || changes.rotation || changes.scale)) {
@@ -70,10 +85,7 @@ export class ObjectPlacer {
       // fade START resets the pose (a held Chest_Open snaps shut / autoplay
       // restarts) while the mesh is still fading in view. A preview:stop that
       // cancels the fade skips the stop entirely — same as an uncompleted despawn.
-      const finish = () => {
-        this._mixers.get(id)?.stopAllAction();
-        this._active.delete(id);
-      };
+      const finish = () => { this._anims.get(id)?.clearPlaying(); };
       if (mesh && fade && fade > 0 && mesh.visible) {
         fadeMeshes([mesh], "out", fade, () => { mesh.visible = false; finish(); });
       } else {
@@ -119,7 +131,7 @@ export class ObjectPlacer {
       // Runtime instancing: eligible objects register a placement in the pool
       // and get a proxy Object3D (userData + transform, no children) so the
       // collider/audio/interact paths keyed on the id map keep working.
-      if (isGltf && this._pool) {
+      if (isGltf && this._pool && !obj.characterId) {   // a character animates: never pooled
         const pooled = await this._pool.tryAdd(obj, zoneId);
         if (pooled) {
           const proxy = new THREE.Object3D();
@@ -132,7 +144,23 @@ export class ObjectPlacer {
       }
       let mesh: THREE.Object3D;
       let clips: THREE.AnimationClip[] = [];
-      if (isGltf) {
+      let resolve: ((move: string) => THREE.AnimationClip | null) | undefined;
+      const character = obj.characterId ? this._characterLookup(obj.characterId) : null;
+      if (character) {
+        // A game character: its model, its clips (own + borrowed), its moves and its look.
+        // The model sits in a holder group so the character's size multiplies the object's
+        // scale instead of being overwritten by it.
+        const loaded = await loadCharacter(character);
+        const model = cloneSkinned(loaded.scene);
+        enablePaddedSkinnedCulling(model);
+        model.scale.setScalar(applyCharacterLook(model, character));
+        mesh = new THREE.Group();
+        mesh.add(model);
+        const tops = topBoneNames(model);
+        // KEEP IN PLACE applies to every clip (the AI and scripts play clips by name too).
+        clips = loaded.pool.map(p => character.inPlace === false ? p.clip : keepInPlace(p.clip, tops));
+        resolve = moveResolver(character, loaded.pool, tops);
+      } else if (isGltf) {
         const gltf = await assetManager.loadGLTF(obj.assetId) as {
           scene: THREE.Object3D;
           animations: THREE.AnimationClip[];
@@ -165,7 +193,7 @@ export class ObjectPlacer {
       // Which model this mesh was built from — ZoneManager compares it against
       // object:updated payloads to detect a model swap needing a full rebuild.
       mesh.userData["assetId"] = obj.assetId;
-      if (clips.length) this._setupMixer(obj, mesh, clips);
+      if (clips.length) this._setupMixer(obj, mesh, clips, resolve);
       if (obj.material) void this._applyMaterial(obj.id, obj.material, mesh);
       return this._register(obj.id, mesh);
     } catch (err) {
@@ -241,51 +269,29 @@ export class ObjectPlacer {
   remove(objectId: string): void {
     this._pool?.release(objectId);
     if (this._previewingId === objectId) this._previewingId = null;
-    const mixer = this._mixers.get(objectId);
-    if (mixer) {
+    const anim = this._anims.get(objectId);
+    if (anim) {
       const fin = this._finish.get(objectId);
-      if (fin) mixer.removeEventListener("finished", fin);
-      mixer.stopAllAction();
+      if (fin) anim.mixer.removeEventListener("finished", fin);
+      anim.stopAll();
     }
-    this._mixers.delete(objectId);
+    this._anims.delete(objectId);
+    this._characterObjs.delete(objectId);
     this._clips.delete(objectId);
     this._autoPlay.delete(objectId);
     this._channel.delete(objectId);
     this._finish.delete(objectId);
-    this._active.delete(objectId);
     this._meshes.delete(objectId);
   }
 
-  /**
-   * Crossfade the object's active action to `clip`. Tracks the new action in `_active` so the
-   * next switch can fade from it. With no prior action (or duration 0) it just starts the clip.
-   */
-  private _fadeTo(
-    objectId: string,
-    mixer: THREE.AnimationMixer,
-    clip: THREE.AnimationClip,
-    opts: { loop: boolean; duration: number },
-  ): THREE.AnimationAction {
-    const next = mixer.clipAction(clip);
-    next.reset();
-    next.setLoop(opts.loop ? THREE.LoopRepeat : THREE.LoopOnce, opts.loop ? Infinity : 1);
-    next.clampWhenFinished = !opts.loop;
-    next.enabled = true;
-    next.setEffectiveWeight(1);
-    next.play();
-
-    const prev = this._active.get(objectId);
-    if (prev && prev !== next) {
-      if (opts.duration > 0) prev.crossFadeTo(next, opts.duration, false);
-      else prev.stop();
-    }
-    this._active.set(objectId, next);
-    return next;
+  /** Crossfade the object's playing clip to `clip` (CharacterAnimator.fadeToClip). */
+  private _fadeTo(objectId: string, clip: THREE.AnimationClip, opts: { loop: boolean; duration: number }): void {
+    this._anims.get(objectId)?.fadeToClip(clip, { loop: opts.loop, fade: opts.duration });
   }
 
   /** Advance every active mixer. Registered on the SceneManager RAF loop. */
   update(dt: number): void {
-    for (const mixer of this._mixers.values()) mixer.update(dt);
+    for (const anim of this._anims.values()) anim.update(dt);
   }
 
   /**
@@ -306,11 +312,11 @@ export class ObjectPlacer {
     // Arbiter: script-driven clips (play_animation — held death pose, the
     // checkpoint Dance) outrank AI clips until stopPreview drops the level.
     if (this._level(objectId) > ANIM_AI) return false;
-    const mixer = this._mixers.get(objectId);
-    const clip  = this._clips.get(objectId)?.get(clipName);
-    if (!mixer || !clip) return false;
+    const anim = this._anims.get(objectId);
+    const clip = this._clips.get(objectId)?.get(clipName);
+    if (!anim || !clip) return false;
     this._channel.set(objectId, { level: ANIM_AI, clip: clipName });
-    this._fadeTo(objectId, mixer, clip, { loop: opts?.loop ?? true, duration: opts?.blend ?? BLEND_SEC });
+    this._fadeTo(objectId, clip, { loop: opts?.loop ?? true, duration: opts?.blend ?? BLEND_SEC });
     return true;
   }
 
@@ -339,7 +345,8 @@ export class ObjectPlacer {
 
   previewClip(objectId: string, clipName: string, opts?: { loop?: boolean; hold?: boolean; blend?: number }): void {
     if (this._previewingId) this.stopPreview(this._previewingId);
-    const mixer = this._mixers.get(objectId);
+    const anim  = this._anims.get(objectId);
+    const mixer = anim?.mixer;
     const clip  = this._clips.get(objectId)?.get(clipName);
     if (!mixer || !clip) {
       console.warn(
@@ -352,7 +359,7 @@ export class ObjectPlacer {
 
     const loop = opts?.loop ?? false;
     this._channel.set(objectId, { level: ANIM_SCRIPT, clip: clipName });   // outranks AI until stopPreview
-    this._fadeTo(objectId, mixer, clip, { loop, duration: opts?.blend ?? BLEND_SEC });
+    this._fadeTo(objectId, clip, { loop, duration: opts?.blend ?? BLEND_SEC });
 
     // Only the default case plays once then reverts, and counts as the evictable preview.
     // Loop never finishes; hold freezes on the clamped final frame (e.g. a death pose stays
@@ -370,8 +377,9 @@ export class ObjectPlacer {
   /** Stop a preview and fall back to the object's auto-play clip (or bind pose). */
   stopPreview(objectId: string): void {
     this._channel.delete(objectId);   // level → autoplay; the AI re-issues on its next frame
-    const mixer = this._mixers.get(objectId);
-    if (!mixer) return;
+    const anim = this._anims.get(objectId);
+    if (!anim) return;
+    const mixer = anim.mixer;
     const fin = this._finish.get(objectId);
     if (fin) { mixer.removeEventListener("finished", fin); this._finish.delete(objectId); }
 
@@ -379,10 +387,9 @@ export class ObjectPlacer {
     const auto = this._autoPlay.get(objectId);
     const clip = auto ? this._clips.get(objectId)?.get(auto) : undefined;
     if (clip) {
-      this._fadeTo(objectId, mixer, clip, { loop: true, duration: BLEND_SEC });
+      this._fadeTo(objectId, clip, { loop: true, duration: BLEND_SEC });
     } else {
-      this._active.get(objectId)?.fadeOut(BLEND_SEC);
-      this._active.delete(objectId);
+      anim.fadeOutCurrent(BLEND_SEC);
     }
     if (this._previewingId === objectId) this._previewingId = null;
     this._bus.emit("animation:preview-stop", { objectId });
@@ -395,14 +402,13 @@ export class ObjectPlacer {
     // Arbiter: autoplay is the LOWEST level — never disturb an active script
     // clip (incl. holds, which the old _previewingId check missed) or AI clip.
     if (this._level(objectId) > ANIM_AUTOPLAY) return;
-    const mixer = this._mixers.get(objectId);
-    if (!mixer) return;
+    const anim = this._anims.get(objectId);
+    if (!anim) return;
     if (clipName) {
       const clip = this._clips.get(objectId)?.get(clipName);
-      if (clip) this._fadeTo(objectId, mixer, clip, { loop: true, duration: BLEND_SEC });
+      if (clip) this._fadeTo(objectId, clip, { loop: true, duration: BLEND_SEC });
     } else {
-      this._active.get(objectId)?.fadeOut(BLEND_SEC);
-      this._active.delete(objectId);
+      anim.fadeOutCurrent(BLEND_SEC);
     }
   }
 
@@ -456,20 +462,43 @@ export class ObjectPlacer {
     });
   }
 
-  private _setupMixer(obj: WorldObject, mesh: THREE.Object3D, clips: THREE.AnimationClip[]): void {
-    const mixer = new THREE.AnimationMixer(mesh);
+  private _setupMixer(obj: WorldObject, mesh: THREE.Object3D, clips: THREE.AnimationClip[], resolve?: (move: string) => THREE.AnimationClip | null): void {
     const clipMap = new Map<string, THREE.AnimationClip>();
-    for (const c of clips) clipMap.set(c.name, c);
-    this._mixers.set(obj.id, mixer);
+    // A character's pool lists its own clips first (first name wins); a plain model keeps
+    // the old map (a later clip of the same name wins).
+    for (const c of clips) if (!resolve || !clipMap.has(c.name)) clipMap.set(c.name, c);
+    // Moves: a character's own list, else the old name guess over the model's clips.
+    const names = [...clipMap.keys()];
+    const anim = new CharacterAnimator(mesh, clips, resolve ?? (move => {
+      const n = legacyGuess(move, names);
+      return n ? clipMap.get(n) ?? null : null;
+    }), `object ${obj.id}`);
+    this._anims.set(obj.id, anim);
+    if (resolve) this._characterObjs.add(obj.id); else this._characterObjs.delete(obj.id);
     this._clips.set(obj.id, clipMap);
-    this._autoPlay.set(obj.id, obj.autoPlayAnimation ?? null);
+    // A placed character rests in its idle move unless an auto-play clip is set.
+    const rest = obj.autoPlayAnimation ?? (resolve ? anim.clipFor("idle")?.name ?? null : null);
+    this._autoPlay.set(obj.id, rest);
 
-    if (obj.autoPlayAnimation && clipMap.has(obj.autoPlayAnimation)) {
-      // Hard start (nothing to blend from); record as active so the first switch can crossfade.
-      const action = mixer.clipAction(clipMap.get(obj.autoPlayAnimation)!).setLoop(THREE.LoopRepeat, Infinity);
-      action.play();
-      this._active.set(obj.id, action);
+    if (rest && clipMap.has(rest)) {
+      // Hard start (nothing to blend from); the first switch crossfades from it.
+      anim.startLoop(clipMap.get(rest)!);
     }
+  }
+
+  /** Phase 86: the object's animator (null for objects with no clips). */
+  animatorFor(objectId: string): CharacterAnimator | null { return this._anims.get(objectId) ?? null; }
+
+  /** Phase 86: is this object a game character (its moves come from the character)? */
+  isCharacter(objectId: string): boolean { return this._characterObjs.has(objectId); }
+
+  /** Phase 86: play a MOVE on an object (play move action): the clip its moves give,
+   *  through the script channel like play_animation. False when it has no such move. */
+  playMove(objectId: string, move: string, opts?: { loop?: boolean; hold?: boolean }): boolean {
+    const clip = this._anims.get(objectId)?.clipFor(move);
+    if (!clip) return false;
+    this.previewClip(objectId, clip.name, opts);
+    return true;
   }
 
   private _fallbackBox(obj: WorldObject, zoneId: string): THREE.Object3D {

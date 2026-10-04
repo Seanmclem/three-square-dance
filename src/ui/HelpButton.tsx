@@ -12,6 +12,11 @@ const BRUSH_GUIDE: DocGuide = {
   src: "/docs/brush-editing.html",
 };
 
+const CHARACTERS_GUIDE: DocGuide = {
+  title: "Characters guide",
+  src: "/docs/characters.html",
+};
+
 /** Right-click help (v4.104.0): an element with data-help="<id>" (brush panel buttons)
  *  opens the brush guide at that id. */
 function helpAnchorFrom(target: EventTarget | null): string | null {
@@ -57,6 +62,19 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["RMB click wall"],         action: "Split the wall there (insert a vertex)" },
       { keys: ["RMB click brush corner"], action: "Delete that corner" },
       { keys: ["RMB click"],              action: "Menu: move initial spawn here" },
+    ],
+  },
+  {
+    label: "CHARACTERS  (Characters button, left toolbar)",
+    guide: CHARACTERS_GUIDE,
+    rows: [
+      { keys: ["Panel: NEW"],          action: "A character from a model (moves guessed from its clip names); the editor opens" },
+      { keys: ["Panel: EDIT"],         action: "The character editor: the character alone in its capsule; clips by file (+ ADD FILE), moves, height, colors, keep in place; Save stays, Close asks" },
+      { keys: ["Click a clip"],        action: "Play it; then ◀ on a move uses it for that move" },
+      { keys: ["TRY IT ▸"],            action: "Play the level as this character (unsaved changes included); Esc returns to the editor" },
+      { keys: ["Panel: PLACE"],        action: "Drop the character into the level (Esc stops); turn on ENEMY AI on its AI screen for an enemy" },
+      { keys: ["Panel: USE AS PLAYER"],action: "The game's player uses this character" },
+      { keys: ["Script: play move"],   action: "Play a move (idle, death, a custom one …) on the player or a placed character" },
     ],
   },
   {

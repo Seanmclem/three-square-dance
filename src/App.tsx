@@ -45,6 +45,7 @@ import { CharacterStage } from "@/characters/CharacterStage";
 import { autoFillMoves } from "@/characters/autoFill";
 import { legacyCharacter } from "@/characters/characterRuntime";
 import { CharacterEditor } from "@/ui/CharacterEditor";
+import { setUiCharacters } from "@/characters/uiCharacters";
 import { effectiveCharacterScale } from "@/preview/CharacterController";
 import { isBrush } from "@/builders/ShapeBuilder";
 import { NodeDragger } from "@/editor/NodeDragger";
@@ -327,6 +328,7 @@ export default function App() {
   const [worldUiElements, setWorldUiElements]  = useState<UiElementDef[]>([]);
   const [prefabs,         setPrefabs]          = useState<PrefabDef[]>([]);
   const [characters,      setCharacters]       = useState<CharacterDef[]>([]);   // Phase 86: game.json characters
+  setUiCharacters(characters);   // deep panels (player settings, enemy AI) read it during render
   const [prefabTick,      setPrefabTick]       = useState(0);   // bumps on instance add/remove → refreshes counts
   // Non-null = the "can't delete prefab yet" dialog is open, listing its instances.
   const [prefabDeleteBlocked, setPrefabDeleteBlocked] = useState<{ prefabId: string; rows: PrefabInstanceRow[] } | null>(null);
@@ -348,6 +350,9 @@ export default function App() {
   const editingCharacterRef = useRef(false);
   const characterStageRef = useRef<CharacterStage | null>(null);
   const [characterConfirmClose, setCharacterConfirmClose] = useState(false);
+  // TRY IT: the draft plays as the player in the level; Esc (preview:stop) reopens the editor.
+  const [characterTrying, setCharacterTrying] = useState(false);
+  const characterTryRef = useRef<CharacterDef | null>(null);
   const characterSaveRef = useRef<(() => void) | null>(null);
   const brushSessionRef  = useRef<BrushEditSession | null>(null);
   // v4.99.6/7: Edit Brush has no solid ground plane and a 30 m grid instead of the level's 100 m one.
@@ -491,6 +496,7 @@ export default function App() {
     worldRef.current = world;
     const objectPlacer = new ObjectPlacer(bus);
     objectPlacerRef.current = objectPlacer;
+    objectPlacer.setCharacterLookup(id => world.gameCharacters?.find(c => c.id === id) ?? null);   // Phase 86
     const movers    = new MoverSystem(bus);
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     zones.enableEditorGhosts();   // see-through editorGhost ceilings (editor shell only)
@@ -3517,6 +3523,14 @@ export default function App() {
     applyCharacters([...characters, def]);
     setPlayerCharacter(def.id);
   };
+  /** PLACE: the object tool, armed with the character's model; clicks place it (Esc stops). */
+  const handleCharacterPlace = (id: string): void => {
+    const c = characters.find(x => x.id === id);
+    if (!c || inIsolatedEdit() || isPreview) return;
+    setActiveTool("object");
+    busRef.current.emit("tool:select", { tool: "object" });
+    busRef.current.emit("asset:selected", { assetId: c.modelAssetId, characterId: c.id });
+  };
   const handleCharacterDuplicate = (id: string): void => {
     const c = characters.find(x => x.id === id);
     if (c) applyCharacters([...characters, { ...structuredClone(c), id: newCharacterId(), name: `${c.name} copy` }]);
@@ -3554,6 +3568,32 @@ export default function App() {
     setCharacterConfirmClose(false);
   };
   characterSaveRef.current = handleCharacterSave;
+  const handleCharacterTryIt = (): void => {
+    const e = editingCharacterNow.current;
+    if (!e || characterTryRef.current) return;
+    const stage = characterStageRef.current;
+    characterStageRef.current = null;
+    characterTryRef.current = structuredClone(e.draft);
+    setCharacterTrying(true);
+    void (async () => {
+      await stage?.exit();                               // the level comes back
+      previewRef.current?.enter("preview", { character: characterTryRef.current! });
+    })();
+  };
+  // Back from TRY IT: the editor reopens on the same (still unsaved) draft.
+  useEffect(() => busRef.current.on("preview:stop", () => {
+    const draft = characterTryRef.current;
+    if (!draft) return;
+    characterTryRef.current = null;
+    const scene = sceneRef.current, world = worldRef.current, zones = zonesRef.current;
+    if (!scene || !world || !zones) return;
+    window.setTimeout(() => {
+      const stage = new CharacterStage(scene, world, zones, effectiveCharacterScale(world.world?.playerSettings ?? DEFAULT_PLAYER_SETTINGS));
+      characterStageRef.current = stage;
+      setCharacterTrying(false);
+      void stage.enter(structuredClone(draft));
+    }, 0);
+  }), []);
   const handleCharacterClose = (discard = false): void => {
     const e = editingCharacterNow.current;
     if (!e) return;
@@ -4202,6 +4242,7 @@ export default function App() {
         onCharacterNew={handleCharacterNew}
         onCharacterEdit={id => { const c = characters.find(x => x.id === id); if (c) openCharacterEditor(c); }}
         onCharacterDuplicate={handleCharacterDuplicate}
+        onCharacterPlace={handleCharacterPlace}
         onCharacterDelete={handleCharacterDelete}
         onCharacterUseAsPlayer={setPlayerCharacter}
         onCharacterFromPlayer={handleCharacterFromPlayer}
@@ -4236,10 +4277,10 @@ export default function App() {
           } : null}
         />
       )}
-      {editingCharacter && characterStageRef.current && (
-        <CharacterEditor draft={editingCharacter.draft} onChange={handleCharacterDraft} stage={characterStageRef.current} assets={assets} />
+      {editingCharacter && !characterTrying && characterStageRef.current && (
+        <CharacterEditor draft={editingCharacter.draft} onChange={handleCharacterDraft} stage={characterStageRef.current} assets={assets} onTryIt={handleCharacterTryIt} />
       )}
-      {editingCharacter && (
+      {editingCharacter && !characterTrying && (
         <EditModeBar
           title="Character"
           name={editingCharacter.draft.name || "(no name)"}

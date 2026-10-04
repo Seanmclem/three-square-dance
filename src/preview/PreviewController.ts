@@ -7,6 +7,7 @@ import type { ZoneManager } from "@/world/ZoneManager";
 import type { MoverSystem } from "@/world/MoverSystem";
 import { CharacterController, effectiveCharacterScale } from "./CharacterController";
 import { characterFor } from "@/characters/characterRuntime";
+import type { CharacterDef } from "@/types";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
 import { loadBindings, resolveGameBindings } from "@/input/bindings";
@@ -80,7 +81,7 @@ export class PreviewController {
     return { subMode: this._subMode, cullView: this._cullView };
   }
 
-  enter(mode: PreviewMode, opts?: { resume?: boolean }): void {
+  enter(mode: PreviewMode, opts?: { resume?: boolean; character?: CharacterDef }): void {
     if (this._controller) return;
 
     // Occlusion mode needs the editor orbit camera as its vantage — the runtime
@@ -122,7 +123,8 @@ export class PreviewController {
         return null;
       },
       // Phase 86: the player's character, if the game has one picked (else the older settings).
-      characterFor(settings as Parameters<typeof characterFor>[0], this._world.gameCharacters));
+      // TRY IT (character editor) passes its unsaved draft.
+      opts?.character ?? characterFor(settings as Parameters<typeof characterFor>[0], this._world.gameCharacters));
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);

@@ -28,6 +28,7 @@ export class ObjectTool implements IEditorModule {
   private _state: ObjectToolState = "IDLE";
   private _active    = false;
   private _assetId:  string | null = null;
+  private _characterId: string | null = null;   // Phase 86: placing a game character
   private _ghost:    THREE.Object3D | null = null;
   private _ghostBox: THREE.Mesh | null = null;
   private _activeZoneId = "demo";
@@ -52,9 +53,10 @@ export class ObjectTool implements IEditorModule {
         if (!this._active) this._reset();
       }),
       this._bus.on("floor:select", ({ level }) => { this._activeLevel = level; }),
-      this._bus.on("asset:selected", ({ assetId }) => {
+      this._bus.on("asset:selected", ({ assetId, characterId }) => {
         if (!this._active) return;
         this._assetId = assetId;
+        this._characterId = characterId ?? null;
         void this._beginPlacing(assetId);
       }),
       this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
@@ -147,6 +149,7 @@ export class ObjectTool implements IEditorModule {
       scale:    { x: 1, y: 1, z: 1 },
       floor:    this._activeLevel,
       zoneId:   this._activeZoneId,
+      ...(this._characterId ? { characterId: this._characterId } : {}),
       properties: {
         interactable:   false,
         npcSpawn:       false,
@@ -188,6 +191,7 @@ export class ObjectTool implements IEditorModule {
     this._clearGhost();
     this._state   = "IDLE";
     this._assetId = null;
+    this._characterId = null;
     document.body.style.cursor = "";
     // Tell the panel we disarmed, so its highlight doesn't outlive the ghost. A stale
     // highlight makes the next click on that tile a "deselect" that places nothing.

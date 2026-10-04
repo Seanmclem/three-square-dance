@@ -19,6 +19,7 @@ import { SoundPicker } from "@/ui/SoundPicker";
 import { SoundVariantList } from "@/ui/SoundVariantList";
 import { SoundPickerModal } from "@/ui/SoundPickerModal";
 import { resolveShapeParams, isBrush, ShapeBuilder } from "@/builders/ShapeBuilder";
+import { uiCharacters, missingMoves, PLAYER_MOVES, ENEMY_MOVES, moveLabel } from "@/characters/uiCharacters";
 import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, insetFace, splitEdge, isBentQuad, faceFold, loopCut, loopCutRing, edgeLoop, flatAreaOutline, extrudeRegion, insetRegion, followRegion, roundsOf, holesOf, edgeLoopEdges, type LoopCutRing, type RegionOpResult } from "@/editor/brushOps";
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
@@ -6602,9 +6603,30 @@ function SpawnSettingsView({
     </div>
   );
 
+  // Phase 86: a game character (Characters panel) brings the model, size and moves.
+  const gameChars = uiCharacters();
+  const playerChar = settings.characterId ? gameChars.find(c => c.id === settings.characterId) : undefined;
+  const playerMissing = playerChar ? missingMoves(playerChar, PLAYER_MOVES) : [];
   if (screen === "spawn-character") return (
     <div style={PAGE}>
       <div>
+        <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER</div>
+        <select aria-label="Player character"
+          value={playerChar?.id ?? ""}
+          onChange={e => onChange({ characterId: e.target.value || null })}
+          style={{ width: "100%", background: "rgba(40,40,40,0.9)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, color: "#dde3f0", fontSize: 10, fontFamily: "monospace", padding: "4px 6px" }}
+        >
+          <option value="">None (the model and animations below)</option>
+          {gameChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {playerChar && (
+          <div style={{ ...BLURB, marginTop: 6 }}>
+            Model, size, colors and animations come from {playerChar.name} (Characters panel).
+            {playerMissing.length > 0 && <span style={{ color: "#ffb86b" }}> No clip for: {playerMissing.map(moveLabel).join(", ")}.</span>}
+          </div>
+        )}
+      </div>
+      {!playerChar && <div>
         <div style={{ ...LABEL, marginBottom: 4 }}>CHARACTER MODEL</div>
         <select
           value={settings.modelAssetId ?? ""}
@@ -6616,14 +6638,14 @@ function SpawnSettingsView({
             <option key={a.id} value={a.id}>{a.label}</option>
           ))}
         </select>
-      </div>
+      </div>}
       {numField("CHARACTER SCALE (3RD PERSON)", "characterScale", 0.1, 1,
         "Third-person character size — the visible avatar AND its collision capsule. 2 = twice as tall; 0.5 = half. Does not affect FPS mode (that has its own FPS Character Scale). After scaling up you may want to raise Camera Height/Distance.")}
       {numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,
         "FPS collision-capsule size (and default eye height). Independent of the third-person Character Scale — a small third-person avatar keeps a normal FPS viewpoint. Default 1.")}
       {numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1,
         "Playback speed of the jump animation (3rd person — FPS shows no avatar).")}
-      {modelClips.length > 0 && (
+      {!playerChar && modelClips.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
           {animSlots.map(({ slot, label }) => animField(slot, label))}
@@ -7345,9 +7367,24 @@ function EnemyAIScreen({ selected, assets, onObjectUpdate, bus }: {
           {!ai?.freeRoam &&
             numRow("LEASH RADIUS", "leashRadius", 12, 1, "Max distance from its placed spot — beyond it, gives up and walks home", "#58a6ff")}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
-          {clipRow("IDLE CLIP", "idleClip", "Played while standing guard")}
-          {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}
-          {clipRow("ATTACK CLIP", "attackClip", "Played once per bite (auto also matches 'bite')")}
+          {(() => {
+            // Phase 86: a placed character's clips come from its moves.
+            const ch = obj.characterId ? uiCharacters().find(c => c.id === obj.characterId) : undefined;
+            if (obj.characterId) {
+              const miss = ch ? missingMoves(ch, ENEMY_MOVES) : [];
+              return (
+                <div style={{ color: "#c2cadb", fontSize: 10, lineHeight: 1.5 }}>
+                  {ch ? <>Clips come from {ch.name}'s moves (idle, walk, attack).{miss.length > 0 && <span style={{ color: "#ffb86b" }}> No clip for: {miss.join(", ")}.</span>}</>
+                      : <span style={{ color: "#ff9b8a" }}>Its character ({obj.characterId}) isn't in this game.</span>}
+                </div>
+              );
+            }
+            return <>
+              {clipRow("IDLE CLIP", "idleClip", "Played while standing guard")}
+              {clipRow("WALK CLIP", "walkClip", "Played while chasing / returning (auto also matches 'run')")}
+              {clipRow("ATTACK CLIP", "attackClip", "Played once per bite (auto also matches 'bite')")}
+            </>;
+          })()}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", margin: "8px 0" }} />
           <div style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5, marginBottom: 6 }}>SOUNDS</div>
           {soundRow("ON DETECT", "detectSound", "detectVolume",

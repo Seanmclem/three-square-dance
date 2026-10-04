@@ -1,7 +1,8 @@
 # Phase 86 · Characters: models, rigs and animation libraries, set up in a character editor
 
-> Status: **Parts A and B IMPLEMENTED** (v4.111.0, v4.112.0; see
-> `test-plans/phase-86-characters.md`). Part C planned. Built in
+> Status: **IMPLEMENTED** (parts A, B, C: v4.111.0, v4.112.0, v4.113.0; see
+> `test-plans/phase-86-characters.md`). Deviation in C: the engine has no enemy health,
+> so an enemy's hit and death are played by scripts (play move), not automatically. Built in
 > three parts (A, B, C below), each shipped and tested on its own. Decisions at the end.
 > Visual overview: the HTML page linked from the chat.
 

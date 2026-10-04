@@ -250,6 +250,9 @@ export class CharacterController {
   private _offSavePos:  (() => void) | null = null;
   private _offLaunch:   (() => void) | null = null;
   private _offScriptAnim: (() => void) | null = null;
+  private _offPlayMove: (() => void) | null = null;   // Phase 86
+  private _offTalk: (() => void) | null = null;
+  private _offTalkEnd: (() => void) | null = null;
   private _offFlash:    (() => void) | null = null;
   // Damage flash (flash_player). `_flashMats` is captured on the FIRST flash: the
   // avatar comes from SkeletonUtils.clone, which SHARES materials with the source
@@ -359,6 +362,24 @@ export class CharacterController {
     this._offScriptAnim = this._bus.on("character:play-animation", ({ clipName, loop, hold }) => {
       if (clipName === "__auto__") { this._clearScriptAnim(); return; }
       this._anim?.playScript(clipName, !!loop, !!hold);   // overrides locomotion until it ends (CharacterAnimator)
+    });
+    // Phase 86: moves. A script's play move works for any player; the automatic ones
+    // (death before a respawn, hit on damage, talk in dialogue) only for a player that
+    // uses a character, so older games look exactly as before.
+    this._offPlayMove = this._bus.on("character:play-move", ({ move, loop, hold, auto }) => {
+      if (auto && !this._character) return;
+      if (this._climbLadder) return;   // the climb owns the animation
+      const clip = this._anim?.clipFor(move);
+      if (clip) this._anim!.playScriptClip(clip, !!loop, !!hold);
+    });
+    this._offTalk = this._bus.on("dialogue:show", () => {
+      if (!this._character || this._climbLadder || this._anim?.scripted) return;
+      const clip = this._anim?.clipFor("talk");
+      if (clip) this._anim!.playScriptClip(clip, true, false);   // a looping script clip: ends if the player moves
+    });
+    this._offTalkEnd = this._bus.on("dialogue:closed", () => {
+      const a = this._anim, talk = a?.clipFor("talk");
+      if (a && talk && a.current === `script:${talk.name}`) this._clearScriptAnim();
     });
     // Damage flash. In FPS the avatar is hidden (see the visible= line in update),
     // so there is nothing to tint — hand it to the screen overlay instead.
@@ -1209,6 +1230,9 @@ export class CharacterController {
     this._offSavePos?.();     this._offSavePos    = null;
     this._offLaunch?.();      this._offLaunch     = null;
     this._offScriptAnim?.();  this._offScriptAnim = null;
+    this._offPlayMove?.();    this._offPlayMove = null;
+    this._offTalk?.();        this._offTalk = null;
+    this._offTalkEnd?.();     this._offTalkEnd = null;
     this._offFlash?.();       this._offFlash      = null;
     this._offFootstep?.();    this._offFootstep   = null;
     // The flash clones are ours alone (the source asset's materials were never touched).
