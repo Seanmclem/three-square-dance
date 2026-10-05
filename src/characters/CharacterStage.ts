@@ -19,6 +19,7 @@ export interface StagePlayback {
   source: string | null;     // the file it came from
   time: number; duration: number;
   playing: boolean; loop: boolean; speed: number;
+  testing: boolean;          // a BLEND TEST is running (its button reads STOP)
 }
 
 /** One clip the character can use, for the ANIMATIONS list. */
@@ -46,6 +47,7 @@ export class CharacterStage {
   private _speed = 1;
   private _source: string | null = null;
   private _blend: { to: string; at: number } | null = null;
+  private _testing = false;   // from blendTest until STOP or any other clip / move
   private _rig: RigInfo | null = null;
   private _baseColors: Record<string, string> = {};
   private _materials: string[] = [];
@@ -121,7 +123,7 @@ export class CharacterStage {
     const p = this._pool.find(x => x.clip.name === name && x.source === source);
     if (!p || !this._anim) return;
     this._source = source;
-    this._blend = null;
+    this._blend = null; this._testing = false;
     this._anim.playClip(this._prep(p.clip), this._loop, this._speed, `clip:${name}`);
     this._paused = false;
   }
@@ -132,7 +134,7 @@ export class CharacterStage {
     const clip = this._anim.clipFor(move);
     if (!clip) return;
     this._source = this._def.moves[move]?.source ?? this._pool.find(p => p.clip.name === clip.name)?.source ?? null;
-    this._blend = null;
+    this._blend = null; this._testing = false;
     this._loop = LOOPING_MOVES.has(move);
     this._anim.playClip(clip, this._loop, this._speed, `move:${move}`);
     this._paused = false;
@@ -142,6 +144,13 @@ export class CharacterStage {
   blendTest(from: string, to: string): void {
     this.playMove(from);
     this._blend = { to, at: 1.2 };
+    this._testing = true;
+  }
+
+  /** STOP on the blend test: back to idle. */
+  stopTest(): void {
+    this._blend = null; this._testing = false;   // even when idle has no clip
+    this.playMove("idle");
   }
 
   setPaused(on: boolean): void { this._paused = on; }
@@ -172,7 +181,7 @@ export class CharacterStage {
     return {
       label: !c ? null : key.startsWith("move:") ? `${key.slice(5)} · ${c.name}` : c.name,
       source: this._source, time: a ? Math.min(a.time, c?.duration ?? 0) : 0, duration: c?.duration ?? 0,
-      playing: !!a && !this._paused, loop: this._loop, speed: this._speed,
+      playing: !!a && !this._paused, loop: this._loop, speed: this._speed, testing: this._testing,
     };
   }
 

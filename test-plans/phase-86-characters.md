@@ -86,3 +86,8 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
 
 - [x] TRY IT on level_1 and level_3 (camera focus left elsewhere): the player stands at
       the level spawn, grounded, idle (before: spawned at the camera focus and fell forever).
+
+## BLEND TEST stop (v4.115.4)
+
+- [x] TEST (walk → run) turns into STOP; walk, then run; STOP goes back to idle and TEST
+      returns; playing another move also ends the test.

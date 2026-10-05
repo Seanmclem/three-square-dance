@@ -331,7 +331,9 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
           <select aria-label="Blend from" value={blend.from} onChange={e => setBlend({ ...blend, from: e.target.value })} style={INPUT}>{moveNames.filter(m => draft.moves[m]?.clip).map(m => <option key={m} value={m}>{label(m)}</option>)}</select>
           →
           <select aria-label="Blend to" value={blend.to} onChange={e => setBlend({ ...blend, to: e.target.value })} style={INPUT}>{moveNames.filter(m => draft.moves[m]?.clip).map(m => <option key={m} value={m}>{label(m)}</option>)}</select>
-          <button style={BTN()} title="Play the first move, then blend into the second the way the game does" onClick={() => stage.blendTest(blend.from, blend.to)}>TEST</button>
+          {pb?.testing
+            ? <button style={BTN(true)} title="End the test (back to idle)" onClick={() => stage.stopTest()}>STOP</button>
+            : <button style={BTN()} title="Play the first move, then blend into the second the way the game does" onClick={() => stage.blendTest(blend.from, blend.to)}>TEST</button>}
         </span>
         {onTryIt && <button style={{ ...BTN(true), borderColor: "rgba(60,207,145,0.6)", color: "#7fe0b5", background: "rgba(60,207,145,0.15)" }}
           title="Walk this character around the level with the real controls (unsaved changes included). Esc comes back here."
