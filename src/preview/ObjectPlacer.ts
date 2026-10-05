@@ -10,7 +10,7 @@ import type { WorldObject, Vec3 } from "@/types";
 import { reportTransformWrite } from "@/world/transformWatchdog";
 import { CharacterAnimator } from "@/characters/CharacterAnimator";
 import { legacyGuess } from "@/characters/autoFill";
-import { loadCharacter, moveResolver, topBoneNames, applyCharacterLook, keepInPlace } from "@/characters/characterRuntime";
+import { loadCharacter, moveResolver, topBoneNames, applyCharacterLook, keepInPlace, moveSpeedOf, clipSpeedOf } from "@/characters/characterRuntime";
 import type { CharacterDef } from "@/types";
 
 /** Default crossfade duration (seconds) when switching animation clips. */
@@ -145,6 +145,7 @@ export class ObjectPlacer {
       let mesh: THREE.Object3D;
       let clips: THREE.AnimationClip[] = [];
       let resolve: ((move: string) => THREE.AnimationClip | null) | undefined;
+      let speeds: { move: (m: string) => number; clip: (n: string) => number } | undefined;
       const character = obj.characterId ? this._characterLookup(obj.characterId) : null;
       if (character) {
         // A game character: its model, its clips (own + borrowed), its moves and its look.
@@ -160,6 +161,7 @@ export class ObjectPlacer {
         // KEEP IN PLACE applies to every clip (the AI and scripts play clips by name too).
         clips = loaded.pool.map(p => character.inPlace === false ? p.clip : keepInPlace(p.clip, tops));
         resolve = moveResolver(character, loaded.pool, tops);
+        speeds = { move: m => moveSpeedOf(character, m), clip: n => clipSpeedOf(character, n) };   // each move's SPEED
       } else if (isGltf) {
         const gltf = await assetManager.loadGLTF(obj.assetId) as {
           scene: THREE.Object3D;
@@ -193,7 +195,7 @@ export class ObjectPlacer {
       // Which model this mesh was built from — ZoneManager compares it against
       // object:updated payloads to detect a model swap needing a full rebuild.
       mesh.userData["assetId"] = obj.assetId;
-      if (clips.length) this._setupMixer(obj, mesh, clips, resolve);
+      if (clips.length) this._setupMixer(obj, mesh, clips, resolve, speeds);
       if (obj.material) void this._applyMaterial(obj.id, obj.material, mesh);
       return this._register(obj.id, mesh);
     } catch (err) {
@@ -462,7 +464,8 @@ export class ObjectPlacer {
     });
   }
 
-  private _setupMixer(obj: WorldObject, mesh: THREE.Object3D, clips: THREE.AnimationClip[], resolve?: (move: string) => THREE.AnimationClip | null): void {
+  private _setupMixer(obj: WorldObject, mesh: THREE.Object3D, clips: THREE.AnimationClip[], resolve?: (move: string) => THREE.AnimationClip | null,
+                      speeds?: { move: (m: string) => number; clip: (n: string) => number }): void {
     const clipMap = new Map<string, THREE.AnimationClip>();
     // A character's pool lists its own clips first (first name wins); a plain model keeps
     // the old map (a later clip of the same name wins).
@@ -472,7 +475,7 @@ export class ObjectPlacer {
     const anim = new CharacterAnimator(mesh, clips, resolve ?? (move => {
       const n = legacyGuess(move, names);
       return n ? clipMap.get(n) ?? null : null;
-    }), `object ${obj.id}`);
+    }), `object ${obj.id}`, speeds);
     this._anims.set(obj.id, anim);
     if (resolve) this._characterObjs.add(obj.id); else this._characterObjs.delete(obj.id);
     this._clips.set(obj.id, clipMap);

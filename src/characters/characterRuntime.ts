@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { assetManager } from "@/core/AssetManager";
 import { BUILT_IN_MOVES, legacyGuess } from "./autoFill";
-import type { CharacterDef, CharacterMove, LocomotionState, PlayerSettings } from "@/types";
+import type { CharacterDef, CharacterMove, LocomotionState, PlayerFeel, PlayerSettings } from "@/types";
 
 /**
  * Phase 86: loading a character: its model plus the clips it borrows from other files
@@ -119,6 +119,43 @@ export function modelHeight(root: THREE.Object3D): number {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(root);
   return box.isEmpty() ? 0 : box.max.y - box.min.y;
+}
+
+/** A move's playback rate (its SPEED, 1 when unset). */
+export function moveSpeedOf(def: Pick<CharacterDef, "moves">, move: string): number {
+  const s = def.moves[move]?.speed;
+  return s && s > 0 ? s : 1;
+}
+
+/** The rate for a clip played by name (enemy AI, scripts): the SPEED of the first move set
+ *  to that clip that has one, else 1. */
+export function clipSpeedOf(def: Pick<CharacterDef, "moves">, clipName: string): number {
+  const m = Object.values(def.moves).find(x => x.clip === clipName && x.speed && x.speed > 0);
+  return m?.speed ?? 1;
+}
+
+/**
+ * The player settings with the character's own sounds and FEEL laid over them: each sound
+ * slot the character sets replaces the game's (footstep = sound + volume + variants +
+ * wobble; jump; land; stride); a FEEL switch is off when either turns it off.
+ */
+export function playerSettingsWithCharacter(settings: PlayerSettings, def: Pick<CharacterDef, "sounds" | "feel">): PlayerSettings {
+  const s = def.sounds ?? {};
+  const out: PlayerSettings = { ...settings };
+  if (s.footstepSound) {
+    out.footstepSound = s.footstepSound; out.footstepVolume = s.footstepVolume;
+    out.footstepVariants = s.footstepVariants; out.footstepPitchWobble = s.footstepPitchWobble;
+  }
+  if (s.jumpSound) { out.jumpSound = s.jumpSound; out.jumpVolume = s.jumpVolume; }
+  if (s.landSound) { out.landSound = s.landSound; out.landVolume = s.landVolume; }
+  if (s.footstepDistance) out.footstepDistance = s.footstepDistance;
+  const cf = def.feel;
+  if (cf && Object.values(cf).some(v => v === false)) {
+    const feel: PlayerFeel = { ...settings.feel };
+    for (const k of Object.keys(cf) as (keyof PlayerFeel)[]) if (cf[k] === false) feel[k] = false;
+    out.feel = feel;
+  }
+  return out;
 }
 
 /**

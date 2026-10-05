@@ -26,6 +26,9 @@ export class CharacterAnimator {
     readonly clips: THREE.AnimationClip[],
     private readonly _resolve: MoveResolver,
     private readonly _label = "character",
+    // Phase 86: the character's per-move SPEED (by move for drivers that play moves, by
+    // clip name for placed objects whose AI plays clips). Absent = every rate as given.
+    private readonly _speeds: { move?: (move: string) => number; clip?: (clipName: string) => number } = {},
   ) {
     this.mixer = new THREE.AnimationMixer(root);
   }
@@ -35,6 +38,8 @@ export class CharacterAnimator {
   get currentAction(): THREE.AnimationAction | null { return this._action; }
 
   clipFor(move: string): THREE.AnimationClip | null { return this._resolve(move); }
+  /** The character's SPEED for a move (1 when unset). */
+  moveSpeed(move: string): number { return this._speeds.move?.(move) ?? 1; }
   has(move: string): boolean { return this._resolve(move) != null; }
 
   update(dt: number): void { this.mixer.update(dt); }
@@ -45,14 +50,14 @@ export class CharacterAnimator {
     if (move === this._current) return;
     const clip = this._resolve(move);
     if (!clip) return;
-    this._crossfadeTo(this.mixer.clipAction(clip), loop, speed);
+    this._crossfadeTo(this.mixer.clipAction(clip), loop, speed * this.moveSpeed(move));
     this._clip = clip;
     this._current = move;
   }
 
   /** Retime the playing move (only if it is `move`). */
   setSpeed(move: string, speed: number): void {
-    if (this._action && this._current === move) this._action.timeScale = speed;
+    if (this._action && this._current === move) this._action.timeScale = speed * this.moveSpeed(move);
   }
 
   /** Has the current one-shot reached its end? (Only meaningful for a clamped LoopOnce.) */
@@ -106,6 +111,7 @@ export class CharacterAnimator {
     next.clampWhenFinished = !opts.loop;
     next.enabled = true;
     next.setEffectiveWeight(1);
+    if (this._speeds.clip) next.timeScale = this._speeds.clip(clip.name);
     next.play();
     const prev = this._action;
     if (prev && prev !== next) {
@@ -121,6 +127,7 @@ export class CharacterAnimator {
   /** Start a looping clip with no fade (a placed object's auto-play clip at build). */
   startLoop(clip: THREE.AnimationClip): void {
     const a = this.mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity);
+    if (this._speeds.clip) a.timeScale = this._speeds.clip(clip.name);
     a.play();
     this._action = a;
     this._clip = clip;
@@ -167,9 +174,9 @@ export class CharacterAnimator {
   }
 
   /** Script override with a given clip (a move resolved to its clip, from its own file). */
-  playScriptClip(clip: THREE.AnimationClip, loop: boolean, hold: boolean): void {
+  playScriptClip(clip: THREE.AnimationClip, loop: boolean, hold: boolean, speed = 1): void {
     this._script = { name: clip.name, loop, hold };
-    this._crossfadeTo(this.mixer.clipAction(clip), loop, 1);
+    this._crossfadeTo(this.mixer.clipAction(clip), loop, speed);
     this._clip = clip;
     this._current = `script:${clip.name}`;
   }
@@ -205,7 +212,7 @@ export class CharacterAnimator {
     const a = this.mixer.clipAction(clip);
     a.reset();
     a.setLoop(THREE.LoopRepeat, Infinity);
-    a.timeScale = 1;
+    a.timeScale = this.moveSpeed(move);
     a.setEffectiveWeight(1);
     a.play();
     this._action = a;

@@ -13,7 +13,7 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
 import { CharacterAnimator } from "@/characters/CharacterAnimator";
-import { loadCharacter, legacyCharacter, moveResolver, topBoneNames, applyCharacterLook } from "@/characters/characterRuntime";
+import { loadCharacter, legacyCharacter, moveResolver, topBoneNames, applyCharacterLook, moveSpeedOf } from "@/characters/characterRuntime";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const MAX_PITCH = Math.PI * 80 / 180;   // look-up/down clamp
@@ -370,12 +370,12 @@ export class CharacterController {
       if (auto && !this._character) return;
       if (this._climbLadder) return;   // the climb owns the animation
       const clip = this._anim?.clipFor(move);
-      if (clip) this._anim!.playScriptClip(clip, !!loop, !!hold);
+      if (clip) this._anim!.playScriptClip(clip, !!loop, !!hold, this._anim!.moveSpeed(move));
     });
     this._offTalk = this._bus.on("dialogue:show", () => {
       if (!this._character || this._climbLadder || this._anim?.scripted) return;
       const clip = this._anim?.clipFor("talk");
-      if (clip) this._anim!.playScriptClip(clip, true, false);   // a looping script clip: ends if the player moves
+      if (clip) this._anim!.playScriptClip(clip, true, false, this._anim!.moveSpeed("talk"));   // a looping script clip: ends if the player moves
     });
     this._offTalkEnd = this._bus.on("dialogue:closed", () => {
       const a = this._anim, talk = a?.clipFor("talk");
@@ -942,7 +942,8 @@ export class CharacterController {
       root.traverse(c => { c.raycast = NO_RAYCAST; });
       const def = this._character ?? legacyCharacter(this._settings, loaded.pool.map(p => p.clip.name));
       this._modelRoot = root;
-      this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root)), "CharacterController");
+      this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root)), "CharacterController",
+        { move: m => moveSpeedOf(def, m) });
       // Phase 86: the character's own size (height) and colors; 1 / none for older settings.
       const look = this._character ? applyCharacterLook(root, this._character) : 1;
       this._modelBaseScale = effectiveCharacterScale(this._settings) * look;   // squash multiplies this
@@ -1168,7 +1169,7 @@ export class CharacterController {
       case "jump":                                        // takeoff one-shot
         if (!airborne) this._enterLand(isMoving, running);
         else if (this._animDone() && this._has("jump_idle")) {
-          this._play("jump_idle", true, this._jumpSpeed()); // still airborne past takeoff → loop air pose
+          this._play("jump_idle", true, this._jumpSpeed("jump_idle")); // still airborne past takeoff → loop air pose
           this._animPhase = "airidle";
         }
         break;
@@ -1206,7 +1207,8 @@ export class CharacterController {
     this._anim?.setSpeed(intent, speed);
   }
 
-  private _jumpSpeed(): number { return this._settings.jumpAnimSpeed ?? 1; }
+  /** JUMP ANIM SPEED, for jump moves the character gives no SPEED of its own. */
+  private _jumpSpeed(move: string): number { return this._character?.moves[move]?.speed ? 1 : this._settings.jumpAnimSpeed ?? 1; }
 
   /** Fire a locomotion one-shot (jump/land/footstep) — a non-positional SFX-bus sound. */
   private _emitSound(id?: string, volume?: number, rate?: number): void {
@@ -1228,9 +1230,8 @@ export class CharacterController {
   }
 
   private _enterJump(): void {
-    const s = this._jumpSpeed();
-    if      (this._has("jump"))      { this._play("jump", false, s);     this._animPhase = "jump"; }
-    else if (this._has("jump_idle")) { this._play("jump_idle", true, s); this._animPhase = "airidle"; }
+    if      (this._has("jump"))      { this._play("jump", false, this._jumpSpeed("jump"));          this._animPhase = "jump"; }
+    else if (this._has("jump_idle")) { this._play("jump_idle", true, this._jumpSpeed("jump_idle")); this._animPhase = "airidle"; }
     else                             { this._animPhase = "airidle"; }   // no jump clips: keep current
   }
 
@@ -1240,7 +1241,7 @@ export class CharacterController {
     // used to play it to the end first — 0.37s of frozen legs while travelling 2.2m at
     // walk speed (user report, v4.81.3). Moving = straight back to walk/run; the Phase 70
     // squash still marks the impact.
-    if (!isMoving && this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed()); this._animPhase = "land"; }
+    if (!isMoving && this._has("jump_land")) { this._play("jump_land", false, this._jumpSpeed("jump_land")); this._animPhase = "land"; }
     else                                     { this._playGround(isMoving, running); this._animPhase = "ground"; }
   }
 

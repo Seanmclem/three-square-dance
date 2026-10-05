@@ -115,7 +115,19 @@ export interface CharacterDef {
   height?:      number;
   /** Part B: material name → color (#rrggbb), replacing that material's base color. */
   colors?:      Record<string, string>;
+  /** The character's own footstep / jump / land sounds (player). Each slot (footstep with
+   *  its volume, variants and wobble; jump; land; stride) is used when its sound / value is
+   *  set here, else the game's player settings. */
+  sounds?:      CharacterSounds;
+  /** The character's FEEL: a switch set to false here turns that effect off for this
+   *  character (the player's Feel page can turn more off; an effect plays only when both
+   *  allow it). */
+  feel?:        PlayerFeel;
 }
+
+export type CharacterSounds = Pick<PlayerSettings,
+  "footstepSound" | "footstepVariants" | "footstepPitchWobble" | "footstepVolume" | "footstepDistance"
+  | "jumpSound" | "jumpVolume" | "landSound" | "landVolume">;
 
 /** Phase 86: a model's skeleton: its bone names (sorted), an id made from them (same
  *  bones = same id = clips can be shared), and its height in its own units. */

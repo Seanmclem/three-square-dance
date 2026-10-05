@@ -6643,7 +6643,7 @@ function SpawnSettingsView({
       {numField("FPS CHARACTER SCALE", "fpsCharacterScale", 0.1, 1,
         "FPS collision-capsule size (and default eye height). Independent of the third-person Character Scale — a small third-person avatar keeps a normal FPS viewpoint. Default 1.")}
       {numField("JUMP ANIM SPEED", "jumpAnimSpeed", 0.1, 1,
-        "Playback speed of the jump animation (3rd person — FPS shows no avatar).")}
+        "Playback speed of the jump animation (3rd person — FPS shows no avatar). A character's jump moves with their own SPEED (character editor) use that instead.")}
       {!playerChar && modelClips.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ ...LABEL, marginBottom: 0 }}>CHARACTER ANIMATIONS</div>
@@ -6666,9 +6666,17 @@ function SpawnSettingsView({
 
   // The SAME page the root Audio menu opens (audio-character) — one component,
   // two entry points, so the two routes can't drift.
-  if (screen === "spawn-sounds") return (
-    <CharacterSoundsPage playerSettings={settings} onPlayerSettingsChange={onChange} />
-  );
+  if (screen === "spawn-sounds") {
+    // Phase 86: the player's character can bring its own sounds; say which ones win.
+    const cs = playerChar?.sounds;
+    const own = cs ? [cs.footstepSound && "footstep", cs.jumpSound && "jump", cs.landSound && "land", cs.footstepDistance && "stride"].filter(Boolean) : [];
+    return (
+      <>
+        {own.length > 0 && <div style={{ ...BLURB, padding: "12px 16px 0", color: "#ffb86b" }}>{playerChar!.name} brings its own {own.join(", ")} (character editor, SOUNDS); those settings here are used by characters without their own.</div>}
+        <CharacterSoundsPage playerSettings={settings} onPlayerSettingsChange={onChange} />
+      </>
+    );
+  }
 
   // Phase 86 follow-up: the third-person feel (Phase 70), all or each part.
   if (screen === "spawn-feel") {
@@ -6700,6 +6708,14 @@ function SpawnSettingsView({
         {row("turnRoll", "ROLL INTO TURNS", "Banks into a turn, more at speed.")}
         {row("skid", "RUN SKID", "Reversing at a run slides about 0.9 m with the facing held, leaning back, then whips round. This one also changes movement: off = a sharp stop and turn.")}
         <div style={BLURB}>Third person only, whatever character is the player. The others only change how the character looks, never where it goes.</div>
+        {(() => {
+          // Phase 86: the player's character can turn effects off too (an effect plays only when both allow it).
+          const cf = playerChar?.feel;
+          if (!cf) return null;
+          const names: Record<string, string> = { squash: "squash and stretch", speedLean: "lean with speed", startStopLean: "lean on start / stop", turnRoll: "roll into turns", skid: "run skid" };
+          const off = cf.enabled === false ? ["all of them"] : Object.keys(names).filter(k => cf[k as keyof PlayerFeel] === false).map(k => names[k]);
+          return off.length ? <div style={{ ...BLURB, color: "#ffb86b" }}>{playerChar!.name} turns off: {off.join(", ")} (character editor, FEEL).</div> : null;
+        })()}
       </div>
     );
   }

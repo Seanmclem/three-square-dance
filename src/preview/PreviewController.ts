@@ -6,7 +6,7 @@ import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
 import type { MoverSystem } from "@/world/MoverSystem";
 import { CharacterController, effectiveCharacterScale } from "./CharacterController";
-import { characterFor } from "@/characters/characterRuntime";
+import { characterFor, playerSettingsWithCharacter } from "@/characters/characterRuntime";
 import type { CharacterDef } from "@/types";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
@@ -116,7 +116,11 @@ export class PreviewController {
     const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, resolveGameBindings(loadBindings(), this._world.gameInput));
     input.init();
 
-    const controller = new CharacterController(settings, this._scene.scene, this._bus, input, this._movers,
+    // Phase 86: the player's character, if the game has one picked (else the older settings).
+    // TRY IT (character editor) passes its unsaved draft. Its own sounds and FEEL lie over
+    // the player settings.
+    const character = opts?.character ?? characterFor(settings as Parameters<typeof characterFor>[0], this._world.gameCharacters);
+    const controller = new CharacterController(character ? playerSettingsWithCharacter(settings, character) : settings, this._scene.scene, this._bus, input, this._movers,
       (ladderId) => {
         for (const zone of this._world.zones.values()) {
           const l = zone.ladders?.find(l => l.id === ladderId);
@@ -124,9 +128,7 @@ export class PreviewController {
         }
         return null;
       },
-      // Phase 86: the player's character, if the game has one picked (else the older settings).
-      // TRY IT (character editor) passes its unsaved draft.
-      opts?.character ?? characterFor(settings as Parameters<typeof characterFor>[0], this._world.gameCharacters));
+      character);
     controller.init(spawnPos, facingDeg);
 
     const triggers = new TriggerSystem(this._zones.doorSensorMap, this._bus);

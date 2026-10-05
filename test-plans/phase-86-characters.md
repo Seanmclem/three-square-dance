@@ -91,3 +91,13 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
 
 - [x] TEST (walk → run) turns into STOP; walk, then run; STOP goes back to idle and TEST
       returns; playing another move also ends the test.
+
+## Character move speeds, sounds, FEEL (v4.116.0)
+
+- [x] Regression recording SAME (player + crab) after the animator change.
+- [x] SPEED box: "1.5" types through; walk previews at 1.5; editing retimes it.
+- [x] SOUNDS footstep chop, VOL 0.5, STRIDE 1.2; FEEL squash off; Save writes them.
+- [x] TRY IT: character footstep + stride, game jump sound; squash off, lean on; walking
+      at 1.5; jump at its own 0.8 (JUMP ANIM SPEED 1.2 skipped), land at the game's 1.2.
+- [ ] By hand: a placed character / enemy walking at its walk SPEED; the player Feel and
+      Character Sounds pages showing the character's notes; footsteps heard in game.

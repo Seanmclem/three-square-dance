@@ -106,7 +106,11 @@ because the camera follows the look direction; a reversal just brakes a little l
 A **character** is a model plus how it moves, saved per game in `game.json`
 (`characters`): the model, other files it borrows clips from (same skeleton, e.g.
 Quaternius's Universal Animation Library on either mannequin), which clip each move plays,
-and KEEP IN PLACE (on by default: root-motion clips stay under the character). The player
+and KEEP IN PLACE (on by default: root-motion clips stay under the character), plus each
+move's SPEED, its own footstep / jump / land sounds and its FEEL switches (v4.116.0; unset
+sounds use the game's, a FEEL effect plays only when both the character and the game's Feel
+page allow it). Movement (speed, jump height, run), CHARACTER SCALE and the camera stay
+with the game, since levels are built around them. The player
 uses one when the player settings name it (`characterId`); without one, the older
 MODEL + ANIMATIONS settings still describe the player, exactly as before.
 

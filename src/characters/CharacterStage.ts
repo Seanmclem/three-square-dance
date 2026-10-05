@@ -4,7 +4,7 @@ import { assetManager } from "@/core/AssetManager";
 import { CharacterAnimator } from "./CharacterAnimator";
 import { rigInfo } from "./rig";
 import {
-  loadCharacter, moveResolver, topBoneNames, keepInPlace, clipTravels, applyCharacterLook,
+  loadCharacter, moveResolver, topBoneNames, keepInPlace, clipTravels, applyCharacterLook, moveSpeedOf,
   modelHeight, materialNames, materialColors, CAPSULE_HEIGHT, type PooledClip,
 } from "./characterRuntime";
 import { LOOPING_MOVES } from "./autoFill";
@@ -47,7 +47,8 @@ export class CharacterStage {
   private _speed = 1;
   private _source: string | null = null;
   private _blend: { to: string; at: number } | null = null;
-  private _testing = false;   // from blendTest until STOP or any other clip / move
+  private _testing = false;
+  private _moveK = 1;         // the playing move's SPEED (1 for a clip preview); the speed menu multiplies it   // from blendTest until STOP or any other clip / move
   private _rig: RigInfo | null = null;
   private _baseColors: Record<string, string> = {};
   private _materials: string[] = [];
@@ -103,6 +104,13 @@ export class CharacterStage {
     this._def = def;
     if (!prev) return;
     const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+    // A move's SPEED changed while it plays: retime it now.
+    const key = this._anim?.current ?? "";
+    if (key.startsWith("move:")) {
+      this._moveK = moveSpeedOf(def, key.slice(5));
+      const a = this._anim?.currentAction;
+      if (a) a.timeScale = this._speed * this._moveK;
+    }
     if (prev.modelAssetId !== def.modelAssetId || !same(prev.clipSources, def.clipSources)
       || !same(prev.colors ?? {}, def.colors ?? {}) || prev.height !== def.height || prev.inPlace !== def.inPlace) {
       await this._rebuild(prev.modelAssetId !== def.modelAssetId);
@@ -123,7 +131,7 @@ export class CharacterStage {
     const p = this._pool.find(x => x.clip.name === name && x.source === source);
     if (!p || !this._anim) return;
     this._source = source;
-    this._blend = null; this._testing = false;
+    this._blend = null; this._testing = false; this._moveK = 1;
     this._anim.playClip(this._prep(p.clip), this._loop, this._speed, `clip:${name}`);
     this._paused = false;
   }
@@ -136,7 +144,8 @@ export class CharacterStage {
     this._source = this._def.moves[move]?.source ?? this._pool.find(p => p.clip.name === clip.name)?.source ?? null;
     this._blend = null; this._testing = false;
     this._loop = LOOPING_MOVES.has(move);
-    this._anim.playClip(clip, this._loop, this._speed, `move:${move}`);
+    this._moveK = moveSpeedOf(this._def, move);
+    this._anim.playClip(clip, this._loop, this._speed * this._moveK, `move:${move}`);
     this._paused = false;
   }
 
@@ -162,7 +171,7 @@ export class CharacterStage {
   setSpeed(speed: number): void {
     this._speed = speed;
     const a = this._anim?.currentAction;
-    if (a) a.timeScale = speed;
+    if (a) a.timeScale = speed * this._moveK;
   }
   /** Scrub: jump the playing clip to `t` seconds (pauses, so the pose holds). */
   seek(t: number): void {
@@ -200,7 +209,7 @@ export class CharacterStage {
         const to = this._blend.to;
         this._blend = null;
         const clip = this._anim.clipFor(to);
-        if (clip) { this._loop = LOOPING_MOVES.has(to); this._anim.playClip(clip, this._loop, this._speed, `move:${to}`); }
+        if (clip) { this._loop = LOOPING_MOVES.has(to); this._moveK = this._def ? moveSpeedOf(this._def, to) : 1; this._anim.playClip(clip, this._loop, this._speed * this._moveK, `move:${to}`); }
       }
     }
   }
@@ -230,7 +239,7 @@ export class CharacterStage {
     // Carry on with what was playing, else idle.
     const was = keep.label && this._pool.find(p => keep.label === p.clip.name || keep.label?.endsWith(` · ${p.clip.name}`));
     if (was) {
-      this._anim.playClip(this._prep(was.clip), keep.loop, keep.speed);
+      this._anim.playClip(this._prep(was.clip), keep.loop, keep.speed * this._moveK);
       // Same moment of the clip; paused (after a scrub) holds that pose, not the bind pose.
       const a = this._anim.currentAction;
       if (a) { a.time = keep.time; a.weight = 1; a.fadeIn(0); this._anim.mixer.update(0); }

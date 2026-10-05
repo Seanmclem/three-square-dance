@@ -11,6 +11,7 @@ interface SoundPickerProps {
   // OVERRIDES the SoundDef's own volume (absent = def volume), capped at 4.
   previewVolume?: number;
   style?:     React.CSSProperties;
+  noneLabel?: string;    // what an empty field reads (default "— none —")
 }
 
 // One shared editor-preview output (module-level: browsers cap live AudioContexts,
@@ -54,7 +55,7 @@ async function playPreview(soundId: string, volume: number | undefined): Promise
  * and, with `allowNone`, a ✕ clear. The modal remembers its filter state across
  * open/close, shared by every picker.
  */
-export function SoundPicker({ value, onChange, allowNone, previewVolume, style }: SoundPickerProps) {
+export function SoundPicker({ value, onChange, allowNone, previewVolume, style, noneLabel }: SoundPickerProps) {
   const [open, setOpen] = useState(false);
   const label = value ? (assetManager.getSoundDef(value)?.label ?? value) : undefined;
 
@@ -80,7 +81,7 @@ export function SoundPicker({ value, onChange, allowNone, previewVolume, style }
           cursor: "pointer", background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.08)",
           color: label ? "#c8c8c8" : "#8b94a8", fontSize: 11, fontFamily: "monospace",
           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {label ?? (allowNone ? "— none —" : "Select a sound…")}
+        {label ?? (allowNone ? noneLabel ?? "— none —" : "Select a sound…")}
       </button>
       <button type="button" onClick={preview} disabled={!value} title="Preview"
         style={SIDE_BTN(!!value, "blue")}>▶</button>

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AssetDef, CharacterDef, CharacterMove } from "@/types";
+import type { AssetDef, CharacterDef, CharacterMove, CharacterSounds, PlayerFeel } from "@/types";
 import type { CharacterStage, StageClip, StagePlayback } from "@/characters/CharacterStage";
 import { rigOfAsset } from "@/characters/CharacterStage";
 import { rigOverlap } from "@/characters/rig";
 import { BUILT_IN_MOVES, LOOPING_MOVES, guessClip } from "@/characters/autoFill";
 import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
 import { SearchSelect } from "@/ui/SearchSelect";
+import { SoundPicker } from "@/ui/SoundPicker";
 
 /** + ADD FILE: how a file's skeleton compares with the model's. */
 interface FileFit { state: "checking" | "same" | "close" | "different" | "none"; missing?: string[]; why?: string }
@@ -24,6 +25,20 @@ const BTN = (on = false): React.CSSProperties => ({
   border: `1px solid ${on ? C.blueLine : "rgba(255,255,255,0.14)"}`, background: on ? C.blueFill : "rgba(46,46,48,0.9)", color: on ? C.blue : C.text,
 });
 const INPUT: React.CSSProperties = { background: "#141416", color: C.text, border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, fontSize: 11, fontFamily: "monospace", padding: "3px 5px" };
+
+/** A move's SPEED box: its own text while typing ("0." / "1.") so partial numbers survive;
+ *  a number above 0 is saved as you type, empty clears it (= 1). */
+function SpeedField({ label: name, value, disabled, onChange }: { label: string; value?: number; disabled: boolean; onChange: (v: number | undefined) => void }) {
+  const [text, setText] = useState(value != null ? String(value) : "");
+  useEffect(() => { setText(t => (parseFloat(t) || undefined) === value ? t : value != null ? String(value) : ""); }, [value]);
+  return (
+    <input aria-label={`Speed for ${name}`} type="number" min={0.1} step={0.1} placeholder="1×" disabled={disabled}
+      title="SPEED: how fast this move's clip plays (1 = as made; 1.5 = half again faster). Empty = 1."
+      value={text}
+      onChange={e => { setText(e.target.value); const v = parseFloat(e.target.value); if (e.target.value === "") onChange(undefined); else if (v > 0) onChange(v); }}
+      style={{ ...INPUT, width: 40, minWidth: 0, padding: "3px 4px", opacity: disabled ? 0.35 : 1 }} />
+  );
+}
 
 /**
  * Phase 86 part B: the character editor's panels, over the isolated stage. Left:
@@ -75,6 +90,17 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
     && (filter === "all" || (filter === "loops" && c.loop) || (filter === "once" && !c.loop) || (filter === "travels" && c.travels)));
   const candidates = assets.filter(a => a.animations?.length && !sources.includes(a.id) && /\.(glb|gltf)$/i.test(a.path));
 
+  // SOUNDS / FEEL: unset keys are dropped, an empty group is removed (the game's settings apply).
+  const setSounds = (patch: Partial<CharacterSounds>) => {
+    const next: Record<string, unknown> = { ...draft.sounds, ...patch };
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    onChange({ ...draft, sounds: Object.keys(next).length ? next as CharacterSounds : undefined });
+  };
+  const setFeel = (patch: Partial<PlayerFeel>) => {
+    const next: PlayerFeel = { ...draft.feel, ...patch };
+    for (const k of Object.keys(next) as (keyof PlayerFeel)[]) if (next[k] !== false) delete next[k];   // absent = on
+    onChange({ ...draft, feel: Object.keys(next).length ? next : undefined });
+  };
   const setMove = (move: string, m: CharacterMove | null) => {
     const moves = { ...draft.moves };
     if (m) moves[move] = m; else delete moves[move];
@@ -280,7 +306,7 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             const cur = draft.moves[m];
             const custom = !(BUILT_IN_MOVES as readonly string[]).includes(m);
             return (
-              <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "96px 1fr auto auto", alignItems: "center", gap: 4 }}>
+              <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "96px 1fr 40px auto auto", alignItems: "center", gap: 4 }}>
                 <span style={{ color: custom ? "#ffc58a" : C.text, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }} title={LOOPING_MOVES.has(m) ? "loops" : "plays once"}>{label(m)}</span>
                 <SearchSelect ariaLabel={`Clip for ${label(m)}`} value={clipValue(cur)} onChange={v => pickClip(m, v)} placeholder="no clip · search…"
                   dataAttr={`clip-${m}`}
@@ -291,6 +317,8 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
                       hint: c.loop ? "loop" : "once" }))),
                     ...(cur?.clip && !clips.some(c => c.name === cur.clip) ? [{ value: clipValue(cur), label: `${cur.clip} (missing)` }] : []),
                   ]} />
+                <SpeedField label={label(m)} value={cur?.speed} disabled={!cur?.clip}
+                  onChange={v => { const { speed: _s, ...rest } = cur ?? { clip: null }; setMove(m, v ? { ...rest, speed: v } : rest); }} />
                 {selected
                   ? <button style={{ ...BTN(), padding: "3px 6px" }} title={`Use the clip picked on the left (${selected.name})`} onClick={() => setMove(m, { ...cur, clip: selected.name, source: selected.source === draft.modelAssetId ? undefined : selected.source })}>◀</button>
                   : <span />}
@@ -310,7 +338,51 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             }}>+ ADD MOVE</button>
           </div>
           <span style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
-            Pick a clip on the left, then ◀ on a move to use it. The engine plays idle, walk, run, jump, in air, land and climb for the player by itself; scripts can play any move.
+            Pick a clip on the left, then ◀ on a move to use it. The engine plays idle, walk, run, jump, in air, land and climb for the player by itself; scripts can play any move. The number is the move's SPEED (1 = as made).
+          </span>
+        </div>
+        <div data-character-sounds style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${C.line}` }}>
+          <span style={LBL}>SOUNDS</span>
+          {([["FOOTSTEP", "footstepSound", "footstepVolume"], ["JUMP", "jumpSound", "jumpVolume"], ["LAND", "landSound", "landVolume"]] as const).map(([name, key, vol]) => (
+            <div key={key} style={{ display: "grid", gridTemplateColumns: "64px 1fr 44px", alignItems: "center", gap: 4 }}>
+              <span style={{ color: C.text, fontSize: 11, fontFamily: "monospace" }}>{name}</span>
+              <SoundPicker value={draft.sounds?.[key]} allowNone noneLabel="game's" previewVolume={draft.sounds?.[vol]} style={{ minWidth: 0 }}
+                onChange={id => setSounds(id ? { [key]: id } : { [key]: undefined, [vol]: undefined, ...(key === "footstepSound" ? { footstepPitchWobble: undefined } : {}) })} />
+              <input aria-label={`${name} volume`} type="number" min={0} step={0.1} placeholder="1" title="Volume: 1 = the clip's own level, higher boosts (up to 4)"
+                disabled={!draft.sounds?.[key]} value={draft.sounds?.[vol] ?? ""}
+                onChange={e => setSounds({ [vol]: e.target.value === "" ? undefined : Math.max(0, Number(e.target.value)) })}
+                style={{ ...INPUT, width: 44, minWidth: 0, opacity: draft.sounds?.[key] ? 1 : 0.35 }} />
+            </div>
+          ))}
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: C.text, fontSize: 11, opacity: draft.sounds?.footstepSound ? 1 : 0.4 }}>
+            <input type="checkbox" disabled={!draft.sounds?.footstepSound} checked={!!draft.sounds?.footstepPitchWobble}
+              onChange={e => setSounds({ footstepPitchWobble: e.target.checked || undefined })} />
+            footstep pitch wobble
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: C.text, fontSize: 11, fontFamily: "monospace" }}>STRIDE</span>
+            <input aria-label="Stride length" type="number" min={0.3} step={0.1} placeholder="game's" value={draft.sounds?.footstepDistance ?? ""}
+              onChange={e => setSounds({ footstepDistance: e.target.value === "" ? undefined : Math.max(0.3, Number(e.target.value)) })}
+              style={{ ...INPUT, width: 64 }} />
+            <span style={{ color: C.text2, fontSize: 11 }}>m between footsteps</span>
+          </div>
+          <span style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
+            As the player, the character uses these; any left empty use the game's (player settings, Character Sounds).
+          </span>
+        </div>
+        <div data-character-feel style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${C.line}` }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" className="wb-switch" aria-label="Feel (all)" checked={draft.feel?.enabled !== false} onChange={e => setFeel({ enabled: e.target.checked })} />
+            <span style={LBL}>FEEL</span>
+          </label>
+          {([["squash", "squash and stretch"], ["speedLean", "lean with speed"], ["startStopLean", "lean on start / stop"], ["turnRoll", "roll into turns"], ["skid", "run skid"]] as const).map(([key, name]) => (
+            <label key={key} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", color: C.text, fontSize: 11, opacity: draft.feel?.enabled !== false ? 1 : 0.4 }}>
+              <input type="checkbox" className="wb-switch" aria-label={`Feel: ${name}`} disabled={draft.feel?.enabled === false} checked={draft.feel?.[key] !== false} onChange={e => setFeel({ [key]: e.target.checked })} />
+              {name}
+            </label>
+          ))}
+          <span style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
+            As the player (third person). Off here = off for this character; the game's Feel page can turn more off. An effect plays only when both allow it.
           </span>
         </div>
       </div>
