@@ -104,7 +104,7 @@
 <p>EDIT opens the character alone, like Edit Brush: the level is set aside and the character stands on a dark grid inside a wireframe of its collision capsule. Orbit all the way around, underneath too.</p>
 <ul>
   <li><b>Left, ANIMATIONS:</b> every clip it can use, grouped by file, with search and filters (loops, one-shots, clips that move the body). Click one to play it. <b>+ ADD FILE</b> (at the bottom) opens a list of every imported file with clips, checked against the model's skeleton (see <a href="#files">Borrowing clips</a>); ✕ on a file's heading stops borrowing from it.</li>
-  <li><b>Right, CHARACTER:</b> the name, <b>HEIGHT</b> (FIT TO CAPSULE makes it as tall as the collision capsule, 1.8 m at character scale 1; AS IMPORTED goes back), <b>KEEP IN PLACE</b>, and a color for each material.</li>
+  <li><b>Right, CHARACTER:</b> the name (rename freely: the player, placed characters and enemies point at the character, never its name), <b>MODEL</b> (a search box: change the model any time, see below), <b>HEIGHT</b> (FIT TO CAPSULE makes it as tall as the collision capsule, 1.8 m at character scale 1; AS IMPORTED goes back), <b>KEEP IN PLACE</b>, and a color for each material.</li>
   <li><b>Right, SOUNDS:</b> the character's own footstep, jump and land sounds (each with a volume), footstep pitch wobble and STRIDE (meters between footsteps). Any left on <i>game's</i> use the player settings' Character Sounds.</li>
   <li><b>Right, FEEL:</b> squash and stretch, the leans, roll into turns and run skid for this character (third person). Off here means off for this character; the game's Feel page can turn more off, and an effect plays only when both allow it. The Feel page says which ones the player's character turns off.</li>
   <li><b>Right, MOVES:</b> one list for the character. Pick a clip for each move from its search box (type words in any order, such as "walk loop"; spaces match underscores), or click a clip on the left and then ◀ on the move. ▶ plays the move. The small number is the move's <b>SPEED</b> (1 = as made, 1.5 = half again faster; empty = 1): use it when a walk looks slow for how fast the player moves. It applies wherever the character is used (player, placed, enemy). For jump moves it replaces the game's JUMP ANIM SPEED; jump moves without one keep the game's. <b>AUTO FILL</b> guesses the empty ones; <b>+ ADD MOVE</b> adds your own (wave, sit, cheer …).</li>
@@ -112,6 +112,9 @@
   <li><b>TRY IT ▸</b> plays the level with this character as the player, unsaved changes included, starting at the level's spawn point. <kbd>Esc</kbd> comes back to the editor, changes still there.</li>
   <li><b>Save</b> (or <kbd>Cmd</kbd>+<kbd>S</kbd>) writes the character to the game and keeps editing; <b>Close</b> asks first if there are unsaved changes.</li>
 </ul>
+
+<h2 id="model">Changing the model</h2>
+<p>Pick another model in MODEL. With the <b>same skeleton</b> (the male mannequin inside UAL1 / UAL2 and Mannequin F share one), it just changes: every move keeps its clip, and the old model's own clips are now borrowed from it (it joins the files on the left). With a <b>different skeleton</b> (the mannequin to the bunny) it asks first and lists the moves that lose their clip: borrowed files can't play on it, so they're removed, and a move keeps its clip only if the new model has one of the same name. CHANGE MODEL, then AUTO FILL picks clips for the empty moves. Either way the name, height, colors, sounds, FEEL and move speeds stay.</p>
 
 <h2 id="moves">Moves: what plays when</h2>
 <p>Every move works for every use; scripts can play any of them. What differs is which moves the engine plays <i>by itself</i>:</p>

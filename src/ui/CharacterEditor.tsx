@@ -4,7 +4,8 @@ import type { CharacterStage, StageClip, StagePlayback } from "@/characters/Char
 import { rigOfAsset } from "@/characters/CharacterStage";
 import { rigOverlap } from "@/characters/rig";
 import { BUILT_IN_MOVES, LOOPING_MOVES, guessClip } from "@/characters/autoFill";
-import { CAPSULE_HEIGHT } from "@/characters/characterRuntime";
+import { CAPSULE_HEIGHT, swapCharacterModel, movesLostBySwap } from "@/characters/characterRuntime";
+import { characterModelOptions } from "@/ui/CharacterPanel";
 import { SearchSelect } from "@/ui/SearchSelect";
 import { SoundPicker } from "@/ui/SoundPicker";
 
@@ -66,6 +67,9 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
   const [newMove, setNewMove] = useState("");
   const [blend, setBlend] = useState<{ from: string; to: string }>({ from: "walk", to: "run" });
   const [, setRev] = useState(0);
+  // MODEL swap: a different skeleton asks first (it lists the moves that lose their clip).
+  const [swap, setSwap] = useState<{ id: string; state: "checking" | "different"; lose?: string[] } | null>(null);
+  const [swapNote, setSwapNote] = useState<string | null>(null);
 
   // The stage loads asynchronously (and reloads when files / size / colors change):
   // poll it for its clip list and the playback state.
@@ -163,6 +167,28 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
     })();
     return () => { alive = false; };
   }, [pickerOpen, draft.modelAssetId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setFits({}); }, [draft.modelAssetId]);   // skeleton checks are against the model
+  const pickModel = async (id: string) => {
+    if (!id || id === draft.modelAssetId) return;
+    setSwapNote(null);
+    setSwap({ id, state: "checking" });
+    const oldA = assets.find(a => a.id === draft.modelAssetId), newA = assets.find(a => a.id === id);
+    const [oldRig, newRig] = await Promise.all([rigOfAsset(draft.modelAssetId, oldA?.rig), rigOfAsset(id, newA?.rig)]);
+    const sameSkeleton = !!oldRig && !!newRig && rigOverlap(oldRig, newRig).share >= 0.9;
+    const newClips = newA?.animations ?? [];
+    if (sameSkeleton) {
+      onChange(swapCharacterModel(draft, id, { sameSkeleton, oldClips: oldA?.animations ?? [], newClips }));
+      setSwap(null);
+      setSwapNote(`Now ${assetLabel(id)}: same skeleton, every move kept${oldA?.animations?.length ? ` (${assetLabel(draft.modelAssetId)}'s clips are borrowed now)` : ""}.`);
+    } else setSwap({ id, state: "different", lose: movesLostBySwap(draft, id, newClips) });
+  };
+  const confirmSwap = () => {
+    if (!swap) return;
+    const lose = swap.lose ?? [];
+    onChange(swapCharacterModel(draft, swap.id, { sameSkeleton: false, oldClips: [], newClips: assets.find(a => a.id === swap.id)?.animations ?? [] }));
+    setSwapNote(`Now ${assetLabel(swap.id)}.${lose.length ? ` AUTO FILL can pick clips for the ${lose.length} empty move${lose.length === 1 ? "" : "s"}.` : ""}`);
+    setSwap(null);
+  };
   const addFile = (id: string) => {
     const fit = fits[id];
     onChange({ ...draft, clipSources: [...draft.clipSources, id] });
@@ -265,7 +291,27 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
         <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 8, borderBottom: `1px solid ${C.line}` }}>
           <span style={LBL}>CHARACTER</span>
           <input aria-label="Character name" value={draft.name} onChange={e => onChange({ ...draft, name: e.target.value })} style={{ ...INPUT, fontSize: 13, fontWeight: 600 }} />
-          <div style={{ color: C.text2, fontSize: 11, fontFamily: "monospace" }}>model: {assetLabel(draft.modelAssetId)}{stage.rig ? ` · ${stage.rig.bones.length} bones` : ""}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ ...LBL, marginRight: 2 }}>MODEL</span>
+            <SearchSelect ariaLabel="Character model" value={swap?.id ?? draft.modelAssetId} onChange={v => void pickModel(v)} placeholder="search models…"
+              style={{ flex: 1 }} options={characterModelOptions(assets)} />
+            {stage.rig && <span style={{ color: C.text2, fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap" }}>{stage.rig.bones.length} bones</span>}
+          </div>
+          {swap?.state === "checking" && <span style={{ color: C.text2, fontSize: 10 }}>Checking {assetLabel(swap.id)}'s skeleton…</span>}
+          {swap?.state === "different" && (
+            <div data-model-swap style={{ border: "1px solid rgba(255,184,107,0.45)", borderRadius: 5, padding: "6px 8px", display: "flex", flexDirection: "column", gap: 6, background: "rgba(255,184,107,0.07)" }}>
+              <span style={{ color: C.text, fontSize: 11, lineHeight: 1.4 }}>
+                {assetLabel(swap.id)} has a different skeleton, so clips borrowed from other files can't play on it{draft.clipSources.length ? ` (${draft.clipSources.map(assetLabel).join(", ")} will be removed)` : ""}.
+                {swap.lose?.length ? <> These moves lose their clip: <b>{swap.lose.map(label).join(", ")}</b>.</> : " Every move keeps its clip (the new model has clips of the same names)."}
+                {" "}Name, height, colors, sounds, FEEL and speeds stay.
+              </span>
+              <span style={{ display: "flex", gap: 6 }}>
+                <button style={BTN(true)} onClick={confirmSwap}>CHANGE MODEL</button>
+                <button style={BTN()} onClick={() => setSwap(null)}>CANCEL</button>
+              </span>
+            </div>
+          )}
+          {swapNote && <span style={{ color: C.green, fontSize: 10, lineHeight: 1.4 }}>{swapNote}</span>}
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ ...LBL, marginRight: 2 }}>HEIGHT</span>
             <input aria-label="Height in meters" type="number" min={0.1} step={0.05} style={{ ...INPUT, width: 64 }}

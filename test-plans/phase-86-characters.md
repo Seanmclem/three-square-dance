@@ -101,3 +101,12 @@ Harness with the temp asset library (UAL1 / UAL2 / Mannequin_F), real clicks:
       at 1.5; jump at its own 0.8 (JUMP ANIM SPEED 1.2 skipped), land at the game's 1.2.
 - [ ] By hand: a placed character / enemy walking at its walk SPEED; the player Feel and
       Character Sounds pages showing the character's notes; footsteps heard in game.
+
+## Change a character's model (v4.117.0)
+
+- [x] UAL1 → Mannequin F (same skeleton): no question, note shown, UAL1 + UAL2 borrowed,
+      moves resolve to the same clips, 254 clips; Save keeps the name and id.
+- [x] → the bunny (different skeleton): asks, lists lost moves and removed files; CANCEL
+      keeps the model; CHANGE MODEL keeps only same-name clips (land); AUTO FILL fills the rest.
+- [ ] By hand: the swapped character as the player in Play; a placed one rebuilding with
+      the new model.

@@ -121,6 +121,39 @@ export function modelHeight(root: THREE.Object3D): number {
   return box.isEmpty() ? 0 : box.max.y - box.min.y;
 }
 
+/**
+ * Change a character's model. Same skeleton: every move keeps its clip (the old model's
+ * own clips are now borrowed from it, so it joins the files; the new model leaves them).
+ * Different skeleton: borrowed files can't play on it, so they go, and a move keeps its
+ * clip only when the new model has a clip of that name. Everything else stays (name,
+ * height in meters, colors by material name, sounds, FEEL, move speeds).
+ */
+export function swapCharacterModel(def: CharacterDef, newId: string, o: { sameSkeleton: boolean; oldClips: readonly string[]; newClips: readonly string[] }): CharacterDef {
+  const old = def.modelAssetId;
+  if (o.sameSkeleton) {
+    const borrowOld = o.oldClips.length > 0;
+    const moves = Object.fromEntries(Object.entries(def.moves).map(([k, m]) => {
+      if (m.source === newId) { const { source: _s, ...rest } = m; return [k, rest]; }
+      if (!m.source && m.clip && borrowOld && o.oldClips.includes(m.clip)) return [k, { ...m, source: old }];
+      return [k, m];
+    }));
+    const clipSources = [...new Set([...(borrowOld ? [old] : []), ...def.clipSources])].filter(s => s !== newId);
+    return { ...def, modelAssetId: newId, clipSources, moves };
+  }
+  const moves = Object.fromEntries(Object.entries(def.moves).map(([k, m]) => {
+    const { source: _s, ...rest } = m;
+    const keeps = !!m.clip && o.newClips.includes(m.clip);   // the new model's own clip of that name
+    return [k, keeps ? rest : { ...rest, clip: null }];
+  }));
+  return { ...def, modelAssetId: newId, clipSources: [], moves };
+}
+
+/** The moves that lose their clip when swapping to a model with a different skeleton. */
+export function movesLostBySwap(def: CharacterDef, newId: string, newClips: readonly string[]): string[] {
+  const after = swapCharacterModel(def, newId, { sameSkeleton: false, oldClips: [], newClips });
+  return Object.keys(def.moves).filter(k => def.moves[k]!.clip && !after.moves[k]!.clip);
+}
+
 /** A move's playback rate (its SPEED, 1 when unset). */
 export function moveSpeedOf(def: Pick<CharacterDef, "moves">, move: string): number {
   const s = def.moves[move]?.speed;

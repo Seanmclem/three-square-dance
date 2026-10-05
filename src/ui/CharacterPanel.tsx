@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { SearchSelect } from "@/ui/SearchSelect";
+import { SearchSelect, type SearchOption } from "@/ui/SearchSelect";
 import type { AssetDef, CharacterDef } from "@/types";
 
 /**
@@ -9,6 +9,21 @@ import type { AssetDef, CharacterDef } from "@/types";
  * the player's MODEL + ANIMATIONS settings into a character lives on the player's
  * Character page, next to those settings: SAVE AS A CHARACTER.)
  */
+/** Every model a character can use, for a search box: grouped with headings (the
+ *  Characters category, then other models that animate, then the rest by category). */
+export function characterModelOptions(assets: AssetDef[]): SearchOption[] {
+  const models = assets.filter(a => /\.(glb|gltf)$/i.test(a.path)).sort((a, b) => a.label.localeCompare(b.label));
+  const animates = (a: AssetDef) => !!(a.animations?.length || a.rig);
+  const groups: Array<{ label: string; items: AssetDef[] }> = [
+    { label: "Characters", items: models.filter(a => a.category === "Characters") },
+    { label: "Other models that animate", items: models.filter(a => a.category !== "Characters" && animates(a)) },
+  ];
+  const rest = models.filter(a => a.category !== "Characters" && !animates(a));
+  for (const cat of [...new Set(rest.map(a => a.category))].sort()) groups.push({ label: `${cat} (no animations)`, items: rest.filter(a => a.category === cat) });
+  return groups.flatMap(g => g.items.map(a => ({ value: a.id, label: a.label, group: g.label,
+    hint: a.animations?.length ? `${a.animations.length} clips` : a.rig ? "skeleton, no clips" : undefined })));
+}
+
 export function CharacterPanel({ characters, assets, playerCharacterId, onNew, onEdit, onDuplicate, onDelete, onUseAsPlayer, onPlace }: {
   characters:        CharacterDef[];
   assets:            AssetDef[];
@@ -22,16 +37,6 @@ export function CharacterPanel({ characters, assets, playerCharacterId, onNew, o
 }) {
   const [model, setModel] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  // Grouped with headings: the Characters category, then other models that animate
-  // (clips or a skeleton), then everything else by category.
-  const models = assets.filter(a => /\.(glb|gltf)$/i.test(a.path)).sort((a, b) => a.label.localeCompare(b.label));
-  const animates = (a: AssetDef) => !!(a.animations?.length || a.rig);
-  const groups: Array<{ label: string; items: AssetDef[] }> = [
-    { label: "Characters", items: models.filter(a => a.category === "Characters") },
-    { label: "Other models that animate", items: models.filter(a => a.category !== "Characters" && animates(a)) },
-  ];
-  const rest = models.filter(a => a.category !== "Characters" && !animates(a));
-  for (const cat of [...new Set(rest.map(a => a.category))].sort()) groups.push({ label: `${cat} (no animations)`, items: rest.filter(a => a.category === cat) });
   const label = (id: string) => assets.find(a => a.id === id)?.label ?? id;
   const btn = (primary = false): React.CSSProperties => ({
     padding: "5px 8px", borderRadius: 4, cursor: "pointer", fontFamily: "monospace", fontSize: 10,
@@ -44,9 +49,7 @@ export function CharacterPanel({ characters, assets, playerCharacterId, onNew, o
         <span style={{ color: "#c2cadb", fontSize: 10, fontFamily: "monospace", letterSpacing: 1 }}>NEW CHARACTER FROM A MODEL</span>
         <div style={{ display: "flex", gap: 6 }}>
           <SearchSelect value={model} onChange={setModel} ariaLabel="Model for a new character" placeholder="search models…"
-            style={{ flex: 1, padding: "4px 6px" }}
-            options={groups.flatMap(g => g.items.map(a => ({ value: a.id, label: a.label, group: g.label,
-              hint: a.animations?.length ? `${a.animations.length} clips` : a.rig ? "skeleton, no clips" : undefined })))} />
+            style={{ flex: 1, padding: "4px 6px" }} options={characterModelOptions(assets)} />
           <button style={btn(!!model)} disabled={!model} onClick={() => { if (model) { onNew(model); setModel(""); } }}>NEW</button>
         </div>
       </div>
