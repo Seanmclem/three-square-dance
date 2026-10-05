@@ -2479,7 +2479,8 @@
     "jumpVolume": 0.1,
     "landSound": "footstep_grass_001",
     "landVolume": 0.1,
-    "runMultiplier": 1.4
+    "runMultiplier": 1.4,
+    "characterId": "chr_777d2b37"
   },
   "lighting": {
     "ambientLight": {
@@ -2621,6 +2622,42 @@
           "clip": "Jump_Loop"
         }
       }
+    },
+    {
+      "id": "chr_777d2b37",
+      "name": "Character",
+      "modelAssetId": "character",
+      "clipSources": [],
+      "moves": {
+        "idle": {
+          "clip": "Idle"
+        },
+        "walk": {
+          "clip": "Run"
+        },
+        "run": {
+          "clip": "Run"
+        },
+        "jump": {
+          "clip": "Jump"
+        },
+        "jump_idle": {
+          "clip": "Jump_Idle"
+        },
+        "jump_land": {
+          "clip": "Jump_Land"
+        },
+        "climb": {
+          "clip": "Climb"
+        },
+        "hit": {
+          "clip": "HitReact"
+        },
+        "death": {
+          "clip": "Death"
+        }
+      },
+      "inPlace": false
     }
   ]
 }
