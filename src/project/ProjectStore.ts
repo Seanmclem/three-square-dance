@@ -1,4 +1,5 @@
 import type { SceneFile, GameConfig } from "@/types";
+import { NEW_GAME_INPUT } from "@/input/gameControls";
 import type { RuntimeManifest } from "@/runtime/manifest";
 import { desktop } from "@/shared/desktopApi";
 
@@ -74,7 +75,8 @@ export class ProjectStore {
       assetsBase: "/",       // /assets/** resolves against the app origin (demo precedent)
       game: "game.json",
     };
-    const store = new ProjectStore(manifest, structuredClone(DEFAULT_GAME));
+    // A new game starts with Fire and Aim (Phase 89) ready to wire up.
+    const store = new ProjectStore(manifest, { ...structuredClone(DEFAULT_GAME), input: structuredClone(NEW_GAME_INPUT) });
     await store.writeGame();
     // manifest written by the first addScene (entryScene must exist first)
     return store;

@@ -30,6 +30,9 @@ export class KeyboardMouseSource implements InputSource {
   private readonly _onKeyUp:       (e: KeyboardEvent) => void;
   private readonly _onWheel:       (e: WheelEvent) => void;
   private readonly _onPointerDown: (e: PointerEvent) => void;
+  private readonly _onMouseDown:   (e: MouseEvent) => void;
+  private readonly _onMouseUp:     (e: MouseEvent) => void;
+  private readonly _onContextMenu: (e: MouseEvent) => void;
 
   constructor(private readonly _bindings: BindingsConfig) {
     this._onMouseMove = e => {
@@ -60,6 +63,20 @@ export class KeyboardMouseSource implements InputSource {
     // pointerType) claims the scheme — it's also the gesture pointer-lock
     // re-entry piggybacks on.
     this._onPointerDown = e => { if (e.pointerType === "mouse") this._activity = true; };
+    // Phase 89: mouse buttons are keys ("Mouse0" left, "Mouse2" right …) once the game has
+    // the mouse (pointer lock): the first click only captures it, as before.
+    this._onMouseDown = e => {
+      if (!document.pointerLockElement) return;
+      const code = `Mouse${e.button}`;
+      this._keys.add(code);
+      this._pressSeq.set(code, ++this._seq);
+      const k = this._bindings.kbm;
+      if (k.interact.includes(code)) this._interactQueued = true;
+      if (k.cancel.includes(code))   this._cancelQueued   = true;
+      if (k.bag.includes(code))      this._bagQueued      = true;
+    };
+    this._onMouseUp = e => { const code = `Mouse${e.button}`; this._keys.delete(code); this._pressSeq.delete(code); };
+    this._onContextMenu = e => { if (document.pointerLockElement) e.preventDefault(); };
   }
 
   attach(): void {
@@ -68,6 +85,9 @@ export class KeyboardMouseSource implements InputSource {
     document.addEventListener("keyup",       this._onKeyUp);
     document.addEventListener("wheel",       this._onWheel, { passive: true });
     document.addEventListener("pointerdown", this._onPointerDown);
+    document.addEventListener("mousedown",   this._onMouseDown);
+    document.addEventListener("mouseup",     this._onMouseUp);
+    document.addEventListener("contextmenu", this._onContextMenu);
   }
 
   detach(): void {
@@ -76,6 +96,9 @@ export class KeyboardMouseSource implements InputSource {
     document.removeEventListener("keyup",       this._onKeyUp);
     document.removeEventListener("wheel",       this._onWheel);
     document.removeEventListener("pointerdown", this._onPointerDown);
+    document.removeEventListener("mousedown",   this._onMouseDown);
+    document.removeEventListener("mouseup",     this._onMouseUp);
+    document.removeEventListener("contextmenu", this._onContextMenu);
     this._keys.clear();
     this._pressSeq.clear();
     this._lookPx.x = this._lookPx.y = 0;
@@ -98,7 +121,7 @@ export class KeyboardMouseSource implements InputSource {
     if (this._anyDown(b.run))          state.run = true;
 
     state.look.x  += this._lookPx.x * b.lookSensitivity;
-    state.look.y  += this._lookPx.y * b.lookSensitivity;
+    state.look.y  += this._lookPx.y * b.lookSensitivity * (b.invertLookY ? -1 : 1);
     state.zoomDelta += this._wheel * ZOOM_PER_DELTA;
     this._lookPx.x = this._lookPx.y = 0;
     this._wheel = 0;
@@ -123,6 +146,7 @@ export class KeyboardMouseSource implements InputSource {
       state.menuNav = this._menuNavQueued;
       this._menuNavQueued = 0;
     }
+    for (const btn of this._bindings.buttons ?? []) if (this._anyDown(btn.kbm)) state.buttonsHeld.add(btn.id);
   }
 
   /** −1 / 0 / +1 for an opposing pair of bindings; both held → the one pressed LAST wins. */

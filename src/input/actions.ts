@@ -25,6 +25,9 @@ export interface ActionState {
   bagPressed:      boolean;   // inventory-bag toggle (Phase 32)
   /** D-pad up/down edge, for future menu/choice UIs. */
   menuNav: -1 | 0 | 1;
+  /** Phase 89: the game's own buttons (by id) held this frame; the manager turns them into
+   *  press / release events. */
+  buttonsHeld: Set<string>;
 }
 
 /** Analog run trigger (Phase 71): fraction of full stick travel at which walking becomes running.
@@ -43,6 +46,7 @@ export function createActionState(): ActionState {
     cancelPressed:   false,
     bagPressed:      false,
     menuNav: 0,
+    buttonsHeld: new Set(),
   };
 }
 
@@ -55,6 +59,7 @@ export function zeroActionState(s: ActionState): void {
   s.run = false;
   s.interactPressed = s.confirmPressed = s.cancelPressed = s.bagPressed = false;
   s.menuNav = 0;
+  s.buttonsHeld.clear();
 }
 
 /**

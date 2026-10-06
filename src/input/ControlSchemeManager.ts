@@ -39,6 +39,8 @@ export class ControlSchemeManager {
   private _bagOpen      = false;
   private _uiMenuOpen   = false;   // custom GUI menu (Phase 49)
   private _unsub: Array<() => void> = [];
+  // Phase 89: what was held last frame (game buttons by id, plus "jump" / "run"), for edges.
+  private _held = new Set<string>();
 
   private get _menuMode(): boolean { return this._dialogueOpen || this._pauseOpen || this._bagOpen || this._uiMenuOpen; }
 
@@ -138,10 +140,30 @@ export class ControlSchemeManager {
       this.state.menuNav = nav;
       this.state.bagPressed = bag;
     }
+    this._buttonEdges();
     if (this.state.cancelPressed) this._bus.emit("action:cancel", {});
     // Always emitted (open needs gameplay mode, close needs menu mode) — the
     // shells decide whether to act (ignored during dialogue/pause/occlusion).
     if (this.state.bagPressed) this._bus.emit("bag:toggle", {});
+  }
+
+  /** Phase 89: press / release events for the game's buttons and jump / run, and a press for
+   *  interact. Menus and fades zero the state, so holding through one releases. */
+  private _buttonEdges(): void {
+    const now = new Set(this.state.buttonsHeld);
+    if (this.state.jump) now.add("jump");
+    if (this.state.run)  now.add("run");
+    const def = (id: string) => this.bindings.buttons?.find(b => b.id === id);
+    for (const id of now) if (!this._held.has(id)) { const d = def(id); this._bus.emit("input:button", { id, edge: "press", kind: d?.kind, does: d?.does }); }
+    for (const id of this._held) if (!now.has(id)) { const d = def(id); this._bus.emit("input:button", { id, edge: "release", kind: d?.kind, does: d?.does }); }
+    if (this.state.interactPressed) this._bus.emit("input:button", { id: "interact", edge: "press" });
+    this._held = now;
+  }
+
+  /** Phase 89: a player changed their own controls mid-session: play on with the new ones
+   *  (the sources read this object every frame). */
+  setBindings(b: BindingsConfig): void {
+    Object.assign(this.bindings, structuredClone(b));
   }
 
   dispose(): void {

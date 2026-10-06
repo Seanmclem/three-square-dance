@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Fragment } from "react";
+import { uiGameButtons } from "@/input/gameControls";
 import { hasEnabledMover } from "@/world/moverDefs";
 import { gameState } from "@/scripting/GameState";
 import type {
@@ -166,6 +167,8 @@ const TRIGGER_TYPES: TriggerType[] = [
   "on_player_detected",
   "on_player_lost",
   "on_enemy_attack",
+  // Phase 89 — the player presses / releases / holds a button (Controls page)
+  "on_button",
 ];
 
 // npc_alive/npc_dead removed from authoring (Phase 60) — never implemented;
@@ -1244,6 +1247,7 @@ function ScriptEditor({
             : t.type === "on_state_changed" ? `when ${scopeKey} changes`
             : t.type === "on_state_equals" ? `when ${scopeKey} becomes ${fmtVal(t.stateValue)}`
             : t.type === "on_dialogue_end" ? `when "${zoneDialogues.find(d => d.id === t.targetId)?.label ?? t.targetId ?? "…"}" ends`
+            : t.type === "on_button" ? `when the player ${t.buttonEdge === "release" ? "releases" : t.buttonEdge === "held" ? "holds" : "presses"} ${uiGameButtons().find(b => b.id === t.targetId)?.name ?? t.targetId ?? "…"}${t.buttonEdge === "held" ? ` (every ${t.interval ?? 0.5}s)` : ""}`
             : TRIGGER_LABELS[t.type];
           const icon = t.type === "on_timer" ? "clock"
             : t.type === "on_player_enter" || t.type === "on_player_exit" || t.type === "on_interact" ? "enter"
@@ -1307,6 +1311,28 @@ function ScriptEditor({
               ))}
             </select>
           </F>
+
+          {/* Phase 89 — which button, and press / release / held (repeats). */}
+          {script.trigger.type === "on_button" && <>
+            <F style={{ marginTop: 4 }} label="Button">
+              <select style={S.select} aria-label="Button" value={script.trigger.targetId ?? ""} onChange={(e) => setTrigger({ targetId: e.target.value || undefined })}>
+                <option value="">pick a button…</option>
+                {uiGameButtons().map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </F>
+            <F style={{ marginTop: 4 }} label="When">
+              <select style={S.select} aria-label="Button edge" value={script.trigger.buttonEdge ?? "press"} onChange={(e) => setTrigger({ buttonEdge: e.target.value as "press" | "release" | "held" })}>
+                <option value="press">it's pressed</option><option value="release">it's released</option><option value="held">while it's held (repeats)</option>
+              </select>
+            </F>
+            {script.trigger.buttonEdge === "held" && (
+              <F style={{ marginTop: 4 }} label="Every (s)">
+                <input style={S.field} type="number" min={0.05} step={0.05} aria-label="Repeat every" value={script.trigger.interval ?? 0.5}
+                  onChange={(e) => setTrigger({ interval: Math.max(0.05, Number(e.target.value) || 0.5) })} />
+              </F>
+            )}
+            <div style={{ color: "#98a2b8", fontSize: 10, margin: "4px 0" }}>Buttons and their keys are on the Controls page (main menu, nothing selected).</div>
+          </>}
 
           {/* State triggers' target is a state KEY, never "this entity" — the
               picker must render even on entity-owned scripts (else the key is
@@ -2211,6 +2237,7 @@ const TRIGGER_LABELS: Record<TriggerType, string> = {
   on_level_load: "when the level starts", on_game_start: "on game start", on_health_zero: "when health reaches 0",
   on_dialogue_end: "when a dialogue ends", on_player_detected: "when this enemy spots the player",
   on_player_lost: "when this enemy loses the player", on_enemy_attack: "when this enemy attacks",
+  on_button: "when the player presses a button",
 };
 
 /** Small stroke icons, one style, so cards read at a glance. */

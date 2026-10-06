@@ -77,7 +77,8 @@ import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
 import { BagOverlay } from "@/ui/BagOverlay";
 import { GameGuiOverlay } from "@/ui/GameGuiOverlay";
-import { resolveGameBindings, interactDisplay, DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
+import { interactDisplay, DEFAULT_BINDINGS, loadBindings, saveBindings, resetBindings } from "@/input/bindings";
+import { effectiveBindings, loadPlayerControls, setUiGameButtons } from "@/input/gameControls";
 import { PropertiesPanel } from "@/ui/PropertiesPanel";
 import { CoordinateDisplay } from "@/ui/CoordinateDisplay";
 import { FpsCounter } from "@/ui/FpsCounter";
@@ -300,7 +301,7 @@ export default function App() {
   // Effective interact display for the active device — resolved once per
   // scheme/binding change, consumed by the HUD pill + {interact} label token.
   const interactName = useMemo(
-    () => interactDisplay(previewScheme, resolveGameBindings(loadBindings(), worldRef.current?.gameInput)),
+    () => interactDisplay(previewScheme, effectiveBindings(worldRef.current?.gameInput, loadPlayerControls(worldRef.current?.gameId))),
     [previewScheme, gameInputRev, isPreview]);   // eslint-disable-line react-hooks/exhaustive-deps
   const dialogueOpenRef = useRef(false);   // bus handlers need the current value, not a stale closure
   const [pauseOpen, setPauseOpen] = useState(false);
@@ -769,6 +770,8 @@ export default function App() {
           world.gameUiElements  = store.game.uiElements;
           world.gameScripts     = store.game.scripts;
           world.gameInput  = store.game.input;
+          world.gameId     = store.id;
+          setUiGameButtons(store.game.input);
           setWorldItems(store.game.items ?? []);
           setWorldUiElements(store.game.uiElements ?? []);
           setGameSchema(store.game.stateSchema ?? {});
@@ -902,6 +905,8 @@ export default function App() {
               worldRef.current!.gameUiElements  = proj.store.game.uiElements;
               worldRef.current!.gameScripts     = proj.store.game.scripts;
               worldRef.current!.gameInput  = proj.store.game.input;
+              worldRef.current!.gameId     = proj.store.id;
+              setUiGameButtons(proj.store.game.input);
               const next = { ...proj, sceneId: back };
               projectRef.current = next; setProject(next);
               void persistLastProject(proj.store.id, back);
@@ -960,6 +965,8 @@ export default function App() {
       world.gameScripts     = proj.store.game.scripts;
             world.gameScripts     = proj.store.game.scripts;
             world.gameInput  = proj.store.game.input;
+            world.gameId     = proj.store.id;
+            setUiGameButtons(proj.store.game.input);
             // Keep proj.sceneId in lockstep with the loaded world so any save targets the right file.
             const next = { ...projectRef.current!, sceneId };
             projectRef.current = next; setProject(next);
@@ -1522,6 +1529,7 @@ export default function App() {
       worldRef.current.gameUiElements = undefined;
       worldRef.current.gameScripts    = undefined;
       worldRef.current.gameInput = undefined;
+      worldRef.current.gameId    = undefined;
       worldRef.current.prefabLibrary = loadSessionPrefabs();
       setPrefabs(worldRef.current.prefabLibrary);
       worldRef.current.gameCharacters = undefined;
@@ -1631,6 +1639,8 @@ export default function App() {
       worldRef.current.gameUiElements  = store.game.uiElements;
       worldRef.current.gameScripts     = store.game.scripts;
       worldRef.current.gameInput  = store.game.input;
+      worldRef.current.gameId     = store.id;
+      setUiGameButtons(store.game.input);
       worldRef.current.prefabLibrary   = store.game.prefabs;
     }
     // Phase 68 — seed game-wide player settings on first contact: the game
@@ -1723,6 +1733,8 @@ export default function App() {
       world.gameUiElements  = proj.store.game.uiElements;
       world.gameScripts     = proj.store.game.scripts;
       world.gameInput  = proj.store.game.input;
+      world.gameId     = proj.store.id;
+      setUiGameButtons(proj.store.game.input);
       world.setGamePlayerSettings(proj.store.game.playerSettings);
       world.setGameLighting(proj.store.game.lighting);
       world.setGameAudioMix(proj.store.game.audio?.mix);
@@ -3436,6 +3448,7 @@ export default function App() {
     proj.store.game.input = input;
     void proj.store.writeGame().catch(e => console.warn("[input] game.json write failed:", e));
     if (worldRef.current) worldRef.current.gameInput = input;
+    setUiGameButtons(input);
     setGameInputRev(v => v + 1);
     setIsDirty(true);
   };

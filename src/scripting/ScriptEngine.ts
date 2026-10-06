@@ -204,6 +204,7 @@ export class ScriptEngine {
       this.fire("on_player_exit", volumeId);
     });
     sub("character:interact",    ({ objectId })  => this.fire("on_interact",     objectId));
+    sub("input:button",          ({ id, edge })  => this._onButton(id, edge));   // Phase 89
     sub("trigger:volume-interact", ({ volumeId }) => this.fire("on_interact",     volumeId));   // v4.79.76 — volume on_interact
     sub("zone:enter",            ({ zoneId })    => this.fire("on_level_load",  zoneId));
     sub("state:changed",         ({ key, value }) => {
@@ -241,6 +242,8 @@ export class ScriptEngine {
     this._timers = [];
     for (const i of this._intervals) clearInterval(i);
     this._intervals = [];
+    for (const i of this._buttonTimers.values()) clearInterval(i);
+    this._buttonTimers.clear();
   }
 
   onGameStart(): void { this.fire("on_game_start", null); }
@@ -363,6 +366,26 @@ export class ScriptEngine {
       ...(key !== wildcard ? (this._index.get(wildcard) ?? []) : []),
     ];
     for (const s of scripts) this._evalAndRun(s);
+  }
+
+  /** Phase 89: on_button scripts for this button: press / release fire once; "held" fires on
+   *  the press and then every `interval` s (default 0.5) until the release. */
+  private _buttonTimers = new Map<string, ReturnType<typeof setInterval>>();
+  private _onButton(id: string, edge: "press" | "release"): void {
+    if (!this._active) return;
+    const scripts = this._index.get(`on_button:${id}`) ?? [];
+    for (const s of scripts) {
+      const want = s.trigger.buttonEdge ?? "press";
+      if (want === edge) { this._evalAndRun(s); continue; }
+      if (want !== "held") continue;
+      const key = `${s.id}:${id}`;
+      clearInterval(this._buttonTimers.get(key));
+      this._buttonTimers.delete(key);
+      if (edge === "press") {
+        this._evalAndRun(s);
+        this._buttonTimers.set(key, setInterval(() => { if (this._active) this._evalAndRun(s); }, Math.max(0.05, s.trigger.interval ?? 0.5) * 1000));
+      }
+    }
   }
 
   // volumeId → script ids already fired during the CURRENT occupancy (v4.76.3).

@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useEffect, useRef, useState } from "react";
-import { loadBindings, resolveGameBindings, interactDisplay } from "@/input/bindings";
+import { interactDisplay } from "@/input/bindings";
+import { effectiveBindings, loadPlayerControls } from "@/input/gameControls";
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
 import { assetManager } from "@/core/AssetManager";
@@ -63,7 +64,7 @@ export default function RuntimeApp() {
   // v4.79.78 — effective interact display for the active device (HUD pill +
   // {interact} label token); re-resolved on scheme change / scene load.
   const interactName = useMemo(
-    () => interactDisplay(previewScheme, resolveGameBindings(loadBindings(), worldRef.current?.gameInput)),
+    () => interactDisplay(previewScheme, effectiveBindings(worldRef.current?.gameInput, loadPlayerControls(worldRef.current?.gameId))),
     [previewScheme, shell]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [dialogueState, setDialogueState] = useState<DialogueOverlayProps["dialogue"]>(null);
   const [fadeState, setFadeState]   = useState<FadeRequest | null>(null);

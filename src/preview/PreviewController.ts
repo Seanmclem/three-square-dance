@@ -10,7 +10,7 @@ import { characterFor, playerSettingsWithCharacter } from "@/characters/characte
 import type { CharacterDef } from "@/types";
 import { TriggerSystem } from "./TriggerSystem";
 import { ControlSchemeManager } from "@/input/ControlSchemeManager";
-import { loadBindings, resolveGameBindings } from "@/input/bindings";
+import { effectiveBindings, loadPlayerControls } from "@/input/gameControls";
 import { zeroActionState } from "@/input/actions";
 import { isGameplayMode, type PreviewMode } from "@/types";
 
@@ -113,7 +113,7 @@ export class PreviewController {
       spawnPos = new THREE.Vector3(0, 1.5, 0);
     }
 
-    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, resolveGameBindings(loadBindings(), this._world.gameInput));
+    const input = new ControlSchemeManager(this._scene.renderer.domElement, this._bus, effectiveBindings(this._world.gameInput, loadPlayerControls(this._world.gameId)));
     input.init();
 
     // Phase 86: the player's character, if the game has one picked (else the older settings).

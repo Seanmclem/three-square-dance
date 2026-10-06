@@ -17,6 +17,7 @@ export class TouchSource implements InputSource {
     interactQueued: false,     // tap on the look region
     cancelQueued: false,       // ✕ button
     bagQueued: false,          // 🎒 button (Phase 32)
+    buttonsHeld: new Set<string>(),   // Phase 89: the game's own on-screen buttons held
     activity: false,           // any pointerdown on the overlay (scheme-switch signal)
   };
 
@@ -40,6 +41,7 @@ export class TouchSource implements InputSource {
     s.lookPx.x = s.lookPx.y = 0;
     s.jumpHeld = false;
     s.interactQueued = s.cancelQueued = s.bagQueued = s.activity = false;
+    s.buttonsHeld.clear();
   }
 
   hadActivity(): boolean {
@@ -71,6 +73,7 @@ export class TouchSource implements InputSource {
       state.bagPressed = true;
       s.bagQueued = false;
     }
+    for (const id of s.buttonsHeld) state.buttonsHeld.add(id);
   }
 }
 

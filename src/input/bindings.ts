@@ -17,10 +17,11 @@ export interface BindingsConfig {
     bag:      string[];        // inventory-bag toggle (Phase 32)
     menuNav:  { up: string[]; down: string[] };  // dialogue-option / menu highlight (menu mode only)
     lookSensitivity: number;   // rad per px of mouse movement
+    invertLookY?: boolean;     // Phase 89: the game's / player's "invert mouse up / down"
   };
   gamepad: {
     // standard-mapping button indices
-    buttons: Record<"jump" | "interact" | "confirm" | "cancel" | "bag", number[]>;
+    buttons: Record<"jump" | "interact" | "confirm" | "cancel" | "bag", number[]> & { run?: number[] };
     lookRate: number;          // rad/s at full stick deflection
     deadzone: number;          // radial, 0..1
     invertLookY: boolean;
@@ -29,7 +30,12 @@ export interface BindingsConfig {
     lookSensitivity: number;   // rad per px of drag
     joystickRadius: number;    // px
     layout: "right-jump" | "left-jump";
+    /** Phase 89: where the on-screen buttons sit (% of the screen) and whether they show. */
+    spots?: Record<string, { x: number; y: number; size: number; on: boolean }>;
   };
+  /** Phase 89: the game's own buttons (Fire, Aim …) and what they do without a script. */
+  buttons?: Array<{ id: string; name: string; kind: "press" | "hold"; kbm: string[]; gamepad: number[];
+    does: { type: "move"; move: string } | { type: "aim" } | null }>;
 }
 
 export const DEFAULT_BINDINGS: BindingsConfig = {
@@ -100,9 +106,7 @@ export function resetBindings(): void {
   localStorage.removeItem(BINDINGS_KEY);
 }
 
-// ── Per-game interact binding + display names (v4.79.78) ─────────────────────
-
-export type GameInputConfig = { interact?: { kbm?: string[]; gamepadButtons?: number[] } };
+// ── Display names (v4.79.78) ───────────────────────────────────────────────────
 
 const KEY_PRETTY: Record<string, string> = {
   Space: "Space", Enter: "Enter", Tab: "Tab", Escape: "Esc",
@@ -111,6 +115,7 @@ const KEY_PRETTY: Record<string, string> = {
   AltLeft: "Alt", AltRight: "Alt", Backquote: "`", Minus: "-", Equal: "=",
   Comma: ",", Period: ".", Slash: "/", Semicolon: ";", Quote: "'",
   BracketLeft: "[", BracketRight: "]", Backslash: "\\",
+  Mouse0: "left click", Mouse1: "middle click", Mouse2: "right click", Mouse3: "mouse back", Mouse4: "mouse forward",
 };
 export function prettyKey(code: string): string {
   if (KEY_PRETTY[code]) return KEY_PRETTY[code];
@@ -124,18 +129,6 @@ export const GAMEPAD_BUTTON_NAMES: Record<number, string> = {
   8: "Back", 9: "Start", 10: "LS", 11: "RS", 12: "DPad ↑", 13: "DPad ↓", 14: "DPad ←", 15: "DPad →",
 };
 export const gamepadButtonName = (i: number): string => GAMEPAD_BUTTON_NAMES[i] ?? `B${i}`;
-
-/** Apply the game's interact default UNDER any player-explicit rebind: a stored
- *  binding that differs from stock means the player chose it — it wins. */
-export function resolveGameBindings(base: BindingsConfig, game?: GameInputConfig | null): BindingsConfig {
-  if (!game?.interact) return base;
-  const b = structuredClone(base);
-  const playerKbm = JSON.stringify(base.kbm.interact) !== JSON.stringify(DEFAULT_BINDINGS.kbm.interact);
-  const playerPad = JSON.stringify(base.gamepad.buttons.interact) !== JSON.stringify(DEFAULT_BINDINGS.gamepad.buttons.interact);
-  if (game.interact.kbm?.length && !playerKbm)            b.kbm.interact = [...game.interact.kbm];
-  if (game.interact.gamepadButtons?.length && !playerPad) b.gamepad.buttons.interact = [...game.interact.gamepadButtons];
-  return b;
-}
 
 /** The active scheme's display name for the effective interact control —
  *  resolve ONCE per scheme/binding change; cheap string, no per-frame work. */

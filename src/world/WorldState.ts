@@ -40,7 +40,8 @@ export class WorldState {
   gameStateSchema?: Record<string, StateSchema>;
   gameUiElements?:  UiElementDef[];
   gameScripts?:     ScriptDef[];   // Phase 77 — game.json scripts, indexed in every scene (non-serialized, like gameItems)
-  gameInput?:       import("@/types").GameConfig["input"];   // v4.79.78 — per-game interact binding
+  gameInput?:       import("@/types").GameConfig["input"];   // Phase 89: the game's controls (was the interact binding only)
+  gameId?:          string;                                  // Phase 89: keys a player's own control changes (device-local)
   // Prefab library (Phase 44) — session-only mirror of the App's library state
   // (game.json prefabs when a project is open, else the localStorage session
   // library). Same non-serialized contract as gameItems.

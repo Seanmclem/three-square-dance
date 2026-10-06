@@ -125,6 +125,7 @@ export class SceneRouter {
       world.gameUiElements  = this.deps.manifest.game?.uiElements;
       world.gameScripts     = this.deps.manifest.game?.scripts;   // Phase 77
       world.gameInput  = this.deps.manifest.game?.input;
+      world.gameId     = this.deps.manifest.manifest.id;
       world.setGamePlayerSettings(this.deps.manifest.game?.playerSettings);   // Phase 68 — re-resolves
       world.setGameLighting(this.deps.manifest.game?.lighting);
       world.setGameAudioMix(this.deps.manifest.game?.audio?.mix);

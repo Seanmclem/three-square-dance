@@ -73,6 +73,8 @@ export class GamepadSource implements InputSource {
 
     // Buttons — held for jump, edges for the rest.
     if (this._anyHeld(pad, b.buttons.jump)) state.jump = true;
+    if (b.buttons.run && this._anyHeld(pad, b.buttons.run)) state.run = true;
+    for (const btn of this._bindings.buttons ?? []) if (this._anyHeld(pad, btn.gamepad)) state.buttonsHeld.add(btn.id);
     if (this._anyEdge(pad, b.buttons.interact)) state.interactPressed = true;
     if (this._anyEdge(pad, b.buttons.confirm))  state.confirmPressed  = true;
     if (this._anyEdge(pad, b.buttons.cancel))   state.cancelPressed   = true;

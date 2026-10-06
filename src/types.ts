@@ -578,6 +578,11 @@ export interface BusEvents {
   // death before a respawn, hit on damage), which only a player using a character plays.
   "character:play-move":   { move: string; loop?: boolean; hold?: boolean; auto?: boolean; stop?: boolean };
   "character:aim":         { on: boolean };
+  /** Phase 89: a game button (or jump / run / interact) went down or up this frame. */
+  "input:button":          { id: string; edge: "press" | "release"; kind?: "press" | "hold";
+                             does?: { type: "move"; move: string } | { type: "aim" } | null };
+  /** Phase 89: the player changed their own controls (pause menu); the session re-reads them. */
+  "input:player-controls": Record<string, never>;
   "object:aim":            { id: string; on: boolean };
   // Phase 86: play a MOVE on a placed object / character (play move action).
   "object:play-move":      { id: string; move: string; loop?: boolean; hold?: boolean; stop?: boolean };
@@ -1460,7 +1465,10 @@ export type TriggerType =
   // script with these fires for EVERY enemy (wildcard bucket).
   | 'on_player_detected' // enemy acquired the player (idle/return → chase)
   | 'on_player_lost'     // gave up (hysteresis radius / leash break)
-  | 'on_enemy_attack';   // a bite LANDED — fires at the damage moment, after the damage write
+  | 'on_enemy_attack'    // a bite LANDED — fires at the damage moment, after the damage write
+  // Phase 89 — the player presses / releases / holds a button: targetId = the button's id
+  // (a game button, or "jump" / "run" / "interact"); buttonEdge picks which (default press).
+  | 'on_button';
 
 export type ConditionType =
   | 'has_state'
@@ -1541,6 +1549,8 @@ export interface ScriptTrigger {
   // on_state_equals): watch this ENTITY's key instead of the global one.
   // "self" = the owning entity (resolved at index time); absent = global.
   entityId?:  string;
+  /** Phase 89 (on_button): "press" (default), "release", or "held" (every `interval` s while held). */
+  buttonEdge?: "press" | "release" | "held";
 }
 
 export interface ScriptCondition {
@@ -1606,7 +1616,7 @@ export interface GameConfig {
   scripts?:     ScriptDef[];
   // v4.79.78 — per-game default for the interact control (dev-authored; a
   // device/player override still wins; prompts use the {interact} token).
-  input?: { interact?: { kbm?: string[]; gamepadButtons?: number[] } };
+  input?: import("@/input/gameControls").GameInputConfig;   // Phase 89: the game's controls (was interact only)
 }
 
 /** @deprecated legacy linear dialogue — migrated to DialogueTreeDef on load. */

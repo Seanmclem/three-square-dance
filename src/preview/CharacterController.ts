@@ -260,6 +260,7 @@ export class CharacterController {
   private _offTalk: (() => void) | null = null;
   private _offTalkEnd: (() => void) | null = null;
   private _offAim: (() => void) | null = null;   // Phase 88
+  private _offButton: (() => void) | null = null;   // Phase 89
   private _startPitch = 0;                        // the camera's authored tilt: aiming is level there
   private _offFlash:    (() => void) | null = null;
   // Damage flash (flash_player). `_flashMats` is captured on the FIRST flash: the
@@ -388,6 +389,14 @@ export class CharacterController {
     this._offTalkEnd = this._bus.on("dialogue:closed", () => { this._stopMove("talk"); });
     // Phase 88: aiming on / off (the aim angle follows the camera's up / down look).
     this._offAim = this._bus.on("character:aim", ({ on }) => { this._anim?.setAim(on); });
+    // Phase 89: a game button's built-in action (no script): play a move (a PRESS button
+    // once, a HOLD button from press to release) or aim while held.
+    this._offButton = this._bus.on("input:button", ({ edge, kind, does }) => {
+      if (!does) return;
+      if (does.type === "aim") { this._anim?.setAim(edge === "press"); return; }
+      if (edge === "press") { if (!this._climbLadder) this._playMove(does.move, kind === "hold", false); }
+      else if (kind === "hold") this._stopMove(does.move);
+    });
     // Damage flash. In FPS the avatar is hidden (see the visible= line in update),
     // so there is nothing to tint — hand it to the screen overlay instead.
     this._offFlash = this._bus.on("character:flash", ({ color, duration }) => {
@@ -1326,6 +1335,7 @@ export class CharacterController {
     this._offTalk?.();        this._offTalk = null;
     this._offTalkEnd?.();     this._offTalkEnd = null;
     this._offAim?.();         this._offAim = null;
+    this._offButton?.();      this._offButton = null;
     this._offFlash?.();       this._offFlash      = null;
     this._offFootstep?.();    this._offFootstep   = null;
     // The flash clones are ours alone (the source asset's materials were never touched).
