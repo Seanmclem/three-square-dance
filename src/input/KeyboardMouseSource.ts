@@ -11,6 +11,9 @@ const ZOOM_PER_DELTA = 0.005;
  */
 export class KeyboardMouseSource implements InputSource {
   private readonly _keys = new Set<string>();
+  // Phase 89: keys / mouse buttons that went down since the last apply(), so a tap shorter
+  // than a frame still reaches the game's buttons (held for that one frame).
+  private readonly _tapped = new Set<string>();
   // Press ORDER of the held keys (v4.87.1). Opposite movement keys resolve to the one pressed
   // LAST instead of cancelling to zero: a person reversing direction presses the new key a few
   // frames before lifting the old one, and W+S = 0 turned every reversal into a dead stop first.
@@ -46,7 +49,7 @@ export class KeyboardMouseSource implements InputSource {
     this._onKeyDown = e => {
       if (this._isTypingTarget(e)) return;
       this._keys.add(e.code);
-      if (!e.repeat) this._pressSeq.set(e.code, ++this._seq);   // auto-repeat must not reorder a held key
+      if (!e.repeat) { this._pressSeq.set(e.code, ++this._seq); this._tapped.add(e.code); }   // auto-repeat must not reorder a held key
       if (this._bindings.kbm.interact.includes(e.code)) this._interactQueued = true;
       if (this._bindings.kbm.confirm.includes(e.code))  this._confirmQueued  = true;
       if (this._bindings.kbm.cancel.includes(e.code))   this._cancelQueued   = true;
@@ -69,6 +72,7 @@ export class KeyboardMouseSource implements InputSource {
       if (!document.pointerLockElement) return;
       const code = `Mouse${e.button}`;
       this._keys.add(code);
+      this._tapped.add(code);
       this._pressSeq.set(code, ++this._seq);
       const k = this._bindings.kbm;
       if (k.interact.includes(code)) this._interactQueued = true;
@@ -100,6 +104,7 @@ export class KeyboardMouseSource implements InputSource {
     document.removeEventListener("mouseup",     this._onMouseUp);
     document.removeEventListener("contextmenu", this._onContextMenu);
     this._keys.clear();
+    this._tapped.clear();
     this._pressSeq.clear();
     this._lookPx.x = this._lookPx.y = 0;
     this._wheel = 0;
@@ -146,7 +151,8 @@ export class KeyboardMouseSource implements InputSource {
       state.menuNav = this._menuNavQueued;
       this._menuNavQueued = 0;
     }
-    for (const btn of this._bindings.buttons ?? []) if (this._anyDown(btn.kbm)) state.buttonsHeld.add(btn.id);
+    for (const btn of this._bindings.buttons ?? []) if (this._anyDown(btn.kbm) || btn.kbm.some(c => this._tapped.has(c))) state.buttonsHeld.add(btn.id);
+    this._tapped.clear();
   }
 
   /** −1 / 0 / +1 for an opposing pair of bindings; both held → the one pressed LAST wins. */

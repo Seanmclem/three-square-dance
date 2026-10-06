@@ -32,4 +32,5 @@ with the app (Vite copies `public/` into `dist/`) and open inside the editor.
 | Page | Covers |
 |---|---|
 | `brush-editing.html` | Brush select modes, every brush op, loop cut, face and corner sets, outer walls, soft falloff, ROUND and editable curves, texture wrapping, folds, the brush editor; `help-…` anchors for right-click help |
+| `controls.html` | The game's Controls page (Phase 89): every action per device, Xbox / PlayStation names, touch layout, your own buttons and what they do, the button script trigger, feel defaults, players' own changes in the pause menu |
 | `characters.html` | Characters (Phase 86): the Characters panel, the character editor, moves and what plays when, borrowing clips from files with the same skeleton, keep in place, using characters as the player, enemies and in scripts |

@@ -397,12 +397,16 @@ export default function RuntimeApp() {
           shared={input.touch.shared}
           joystickRadius={input.bindings.touch.joystickRadius}
           layout={input.bindings.touch.layout}
+          spots={input.bindings.touch.spots}
+          buttons={input.bindings.buttons}
         />
       )}
 
       {shell === "playing" && pauseOpen && (
         <PauseMenu
           bus={busRef.current}
+          game={worldRef.current?.gameInput}
+          gameId={worldRef.current?.gameId}
           onResume={() => {
             pauseOpenRef.current = false;
             setPauseOpen(false);

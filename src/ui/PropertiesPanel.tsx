@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BrushOpIcon } from "@/ui/BrushOpIcons";
-import { prettyKey, GAMEPAD_BUTTON_NAMES } from "@/input/bindings";
+import { prettyKey } from "@/input/bindings";
 import { hasEnabledMover } from "@/world/moverDefs";
 import { pageOverridden, type SettingsPage } from "@/shared/playerSettingsDefaults";
 import type {
@@ -24,7 +24,8 @@ import { facesFromCloud, splitFaceQuad, quadCorners, splitSides, extrudeFace, in
 import type { EventBus } from "@/core/EventBus";
 import { MaterialCategoryPills, orderedMaterialCategories, materialSwatchUrl } from "@/ui/materialCategories";
 import { HelpTooltip } from "@/ui/HelpTooltip";
-import { ControlsSection } from "@/ui/ControlsSection";
+import { ControlsPage } from "@/ui/ControlsPage";
+import { gameKbm } from "@/input/gameControls";
 import { CreditsModal } from "@/ui/CreditsModal";
 import { GENERATORS } from "@/prefab/generators";
 import { gameState } from "@/scripting/GameState";
@@ -226,7 +227,7 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 type ScreenId = "geo" | "mat" | "brush-view" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
-  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-feel" | "spawn-sounds" | "spawn-controls";
+  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-feel" | "spawn-sounds" | "spawn-controls" | "controls";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", "brush-view": "Brush View", open: "Openings", seg: "Segments", vert: "Vertices",
@@ -236,6 +237,7 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
   ai: "Enemy AI",
   "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character",
   "spawn-sounds": "Character Sounds", "spawn-controls": "Controls", "spawn-feel": "Feel",
+  controls: "Controls",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -262,7 +264,8 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   "spawn-character": "MODEL · SCALE · ANIMATIONS",
   "spawn-sounds": "FOOTSTEP · JUMP · LAND",
   "spawn-feel": "SQUASH · LEAN · ROLL · SKID",
-  "spawn-controls": "THIS DEVICE · SENSITIVITY",
+  "spawn-controls": "MOVED TO THE MAIN MENU",
+  controls: "KEYS · GAMEPAD · TOUCH",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -402,6 +405,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "spawn-feel":
     case "spawn-sounds":
     case "spawn-controls":
+    case "controls":
       return "";   // non-object screens — never listed for a selected object (spawn rows build their own summaries)
   }
 }
@@ -757,7 +761,7 @@ export function PropertiesPanel({
             </button>
           )}
         </div>
-        {(selected || currentScreen === "lights" || currentScreen?.startsWith("audio")) && (
+        {(selected || currentScreen === "lights" || currentScreen?.startsWith("audio") || currentScreen === "controls") && (
           <div style={{ padding: "0 16px 10px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {canRename && editingLabel ? (
@@ -910,6 +914,11 @@ export function PropertiesPanel({
               )}
               <LightListSection lights={zoneLights} onSelect={onSelectLight} />
             </>
+          ) : currentScreen === "controls" ? (
+            onGameInputChange ? <ControlsPage input={gameInput} onChange={onGameInputChange}
+              moveNames={(() => { const ch = uiCharacters().find(c => c.id === gamePlayerSettings?.characterId);
+                return ch ? Object.keys(ch.moves).filter(m => ch.moves[m]?.clip) : ["attack", "hit", "talk"]; })()} />
+              : <div style={{ padding: 16, color: "#98a2b8", fontSize: 11 }}>Open a game to set its controls.</div>
           ) : currentScreen === "audio" ? (
             <AudioMenuSection audio={worldAudio} playerSettings={playerSettings} onOpen={push} />
           ) : currentScreen === "audio-mixer" ? (
@@ -933,6 +942,7 @@ export function PropertiesPanel({
               gameInput={gameInput} onGameInputChange={onGameInputChange}
               lightCount={zoneLights.length} onOpenLights={() => push("lights")}
               onOpenAudio={() => push("audio")}
+              onOpenControls={() => push("controls")}
               showPerfCounter={showPerfCounter} onTogglePerfCounter={onTogglePerfCounter}
               showJumpStats={showJumpStats} onToggleJumpStats={onToggleJumpStats}
               showCrosshair={showCrosshair} onToggleCrosshair={onToggleCrosshair}
@@ -6721,8 +6731,10 @@ function SpawnSettingsView({
   }
 
   if (screen === "spawn-controls") return (
-    <div style={{ padding: "14px 16px" }}>
-      <ControlsSection />
+    <div style={{ padding: "14px 16px", color: "#c2cadb", fontSize: 11, lineHeight: 1.5 }}>
+      Controls moved to the main menu: click empty space (nothing selected), then <b>Controls</b>.
+      There you set every key, gamepad button and touch button, your own buttons (Fire, Aim …),
+      and the game's mouse speed and other feel defaults.
     </div>
   );
 
@@ -6766,7 +6778,7 @@ function SpawnSettingsView({
         })()}
         onPress={() => onOpen("spawn-sounds")} />
       <CategoryRow label="Controls"
-        summary="this device"
+        summary="moved to the main menu"
         onPress={() => onOpen("spawn-controls")} />
     </>
   );
@@ -8812,67 +8824,13 @@ function LightListSection({ lights, onSelect }: { lights: LightDef[]; onSelect?:
   );
 }
 
-/** v4.79.78 — per-game interact binding editor (GAME INPUT on the no-selection view). */
-function GameInputSection({ gameInput, onChange }: {
-  gameInput?: GameConfig["input"];
-  onChange:   (input: GameConfig["input"]) => void;
-}) {
-  const [capturing, setCapturing] = useState(false);
-  const kbm = gameInput?.interact?.kbm?.[0];
-  const pad = gameInput?.interact?.gamepadButtons?.[0];
-  useEffect(() => {
-    if (!capturing) return;
-    const onKey = (e: KeyboardEvent): void => {
-      e.preventDefault(); e.stopPropagation();
-      setCapturing(false);
-      if (e.code === "Escape") return;
-      onChange({ ...gameInput, interact: { ...gameInput?.interact, kbm: [e.code] } });
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const BTN: React.CSSProperties = {
-    padding: "3px 8px", borderRadius: 4, cursor: "pointer", fontSize: 10, fontFamily: "monospace",
-    background: "rgba(46,46,46,0.9)", border: "1px solid rgba(255,255,255,0.12)", color: "#c2cadb",
-  };
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>INTERACT KEY</span>
-        <button
-          onClick={() => setCapturing(c => !c)}
-          title="Click, then press the key this game uses for interact (Esc cancels). Default: E."
-          style={{ ...BTN, ...(capturing ? { borderColor: "rgba(80,140,255,0.6)", color: "#80aaff" } : {}) }}
-        >{capturing ? "press a key…" : `${prettyKey(kbm ?? "KeyE")}${kbm ? "" : " (default)"}`}</button>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <span style={{ color: "#9aa3b5", fontSize: 10, letterSpacing: 0.5 }}>GAMEPAD BUTTON</span>
-        <select
-          value={pad ?? ""}
-          onChange={e => onChange({ ...gameInput, interact: { ...gameInput?.interact,
-            gamepadButtons: e.target.value === "" ? undefined : [Number(e.target.value)] } })}
-          style={{ ...BTN, cursor: "pointer" }}
-        >
-          <option value="">LB (default)</option>
-          {Object.entries(GAMEPAD_BUTTON_NAMES).map(([i, name]) => (
-            <option key={i} value={i}>{name}</option>
-          ))}
-        </select>
-      </div>
-      {(kbm || pad != null) && (
-        <button onClick={() => onChange({ ...gameInput, interact: undefined })}
-          style={{ ...BTN, alignSelf: "flex-start", color: "#9090a0" }}>Reset to defaults</button>
-      )}
-      <div style={{ color: "#8a92a6", fontSize: 9, fontFamily: "monospace", lineHeight: 1.5 }}>
-        The game&apos;s default interact control. A player&apos;s own rebind (or switching
-        device) still wins — write prompts as &quot;Press {"{interact}"}&quot; and they
-        re-resolve to the live control automatically.
-      </div>
-    </div>
-  );
+/** Phase 89: the main menu's Controls summary: "WASD · Space · E · Fire · Aim". */
+function controlsSummary(input: GameConfig["input"]): string {
+  const k = (a: "jump" | "interact") => prettyKey(gameKbm(input, a)[0] ?? "?");
+  return ["WASD", k("jump"), k("interact"), ...(input?.buttons ?? []).map(b => b.name)].join(" · ");
 }
 
-function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio,
+function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onOpenAudio, onOpenControls,
   showPerfCounter, onTogglePerfCounter, showJumpStats, onToggleJumpStats, showCrosshair, onToggleCrosshair,
   showGridFloor, onToggleGridFloor, gameInput, onGameInputChange }: {
   gameInput?:         GameConfig["input"];
@@ -8882,6 +8840,7 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
   lightCount?:   number;
   onOpenLights?: () => void;
   onOpenAudio?:  () => void;
+  onOpenControls?: () => void;
   showPerfCounter?:     boolean;
   onTogglePerfCounter?: () => void;
   showJumpStats?:       boolean;
@@ -8916,14 +8875,13 @@ function ToolView({ activeTool, onShowCredits, lightCount = 0, onOpenLights, onO
           onPress={onOpenAudio}
         />
       )}
-      {/* GAME INPUT (v4.79.78) — the per-game default for the interact control.
-          Shown with a project open; a device/player rebind still wins, and
-          prompts written as "Press {interact}" re-resolve automatically. */}
-      {activeTool === "select" && onGameInputChange && (
-        <div style={{ margin: "10px 16px 0", paddingTop: 2, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ ...LABEL, marginBottom: 6 }}>GAME INPUT</div>
-          <GameInputSection gameInput={gameInput} onChange={onGameInputChange} />
-        </div>
+      {/* Phase 89: the game's Controls page (replaces the interact-only GAME INPUT block). */}
+      {activeTool === "select" && onGameInputChange && onOpenControls && (
+        <CategoryRow
+          label="Controls"
+          summary={controlsSummary(gameInput)}
+          onPress={onOpenControls}
+        />
       )}
       {/* Home for global editor settings/links — grows over time; credits first. */}
       {activeTool === "select" && onShowCredits && (

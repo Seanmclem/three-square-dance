@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controls Guide</title>
+<!--
+  In-app HTML guide (see public/docs/README.md). Self-contained: inline CSS.
+  Opened from the editor's ? menu (CONTROLS section). Keep it current with the
+  Controls page (Phase 89 onward).
+-->
+<style>
+  :root { --bg: #1c1c1e; --panel: #26272b; --line: #3a3f4a; --text: #dde3f0; --text-quiet: #c2cadb; --accent: #80aaff; --xb: #4cc24c; --ps: #4a9eff; --amber: #ffb86b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 28px 0 8px; }
+  p, li { color: var(--text); }
+  .meta { color: var(--text-quiet); font-size: 13px; margin-bottom: 24px; }
+  a { color: var(--accent); }
+  nav.toc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 20px; font-size: 14px; }
+  nav.toc ol { margin: 4px 0; padding-left: 20px; }
+  .shots { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  figure { margin: 20px 0; }
+  figure img { max-width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); }
+  figcaption { color: var(--text-quiet); font-size: 13px; margin-top: 8px; max-width: 300px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--text-quiet); font-weight: 600; background: var(--panel); }
+  kbd, code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #33353b; border: 1px solid #454a55; border-radius: 4px; padding: 1px 5px; color: var(--text); }
+  .xb { border-color: var(--xb); color: #d4f5d4; border-radius: 10px; }
+  .ps { border-color: var(--ps); color: #d6e8ff; border-radius: 10px; }
+  .touch { background: transparent; border-color: #8a8f9a; border-radius: 6px; }
+  .dash { background: transparent; border-style: dashed; }
+  .amber { color: var(--amber); }
+  :target { scroll-margin-top: 20px; animation: help-flash 2.4s ease-out; border-radius: 4px; }
+  @keyframes help-flash { 0%, 30% { background: rgba(128,170,255,0.28); } 100% { background: transparent; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Controls Guide</h1>
+<div class="meta">Every key, gamepad button and touch button your game uses, your own buttons, and what players can change · editor v4.120 · 2026-10-06 · <kbd>Cmd</kbd>+<kbd>F</kbd> searches</div>
+
+<nav class="toc"><ol>
+  <li><a href="#where">Where it is</a></li>
+  <li><a href="#compact">The list: every action, every device</a></li>
+  <li><a href="#edit">Changing keys and buttons</a></li>
+  <li><a href="#gamepad">Gamepads: Xbox and PlayStation</a></li>
+  <li><a href="#touch">Touch screens</a></li>
+  <li><a href="#buttons">Your own buttons (Fire, Aim …)</a></li>
+  <li><a href="#scripts">Scripts: "when the player presses a button"</a></li>
+  <li><a href="#feel">Feel: mouse speed, deadzone …</a></li>
+  <li><a href="#players">What players can change</a></li>
+  <li><a href="#tips">Tips</a></li>
+</ol></nav>
+
+<h2 id="where">Where it is</h2>
+<p>Click empty space so nothing is selected; the right-hand panel shows the main menu. <b>Controls</b> sits under Lights and Audio, with a summary such as "WASD · Space · E · Fire · Aim". Everything here is saved in the game (game.json), so every level uses it.</p>
+
+<h2 id="compact">The list: every action, every device</h2>
+<div class="shots">
+  <figure><img src="img/controls/compact.png" alt="The Controls list: Move, Look, Jump, Run, Interact, Bag, Pause, each with keyboard, gamepad and touch chips"><figcaption>The list your obby opens with (Interact's gamepad button was set to A before).</figcaption></figure>
+  <div style="flex:1;min-width:260px">
+    <p>Each row is an action; its chips say how to do it on each kind of device:</p>
+    <ul>
+      <li><kbd>Space</kbd> grey: keyboard and mouse.</li>
+      <li><kbd class="xb">RB</kbd> <kbd class="ps">R1</kbd> a gamepad button by both names, Xbox (green) and PlayStation (blue). They are the same button.</li>
+      <li><kbd style="border-color:var(--xb) var(--ps) var(--ps) var(--xb);border-radius:10px">L stick</kbd> the same on both pads (sticks).</li>
+      <li><kbd class="touch">▯ jump</kbd> touch, on phones and tablets.</li>
+    </ul>
+    <p><b>Click any chip</b> to change it: it opens that action on that device's tab, highlighted. <b>EDIT</b> opens the keyboard tab; <b>+ ADD BUTTON</b> makes a button of your own.</p>
+  </div>
+</div>
+
+<h2 id="edit">Changing keys and buttons</h2>
+<p>EDIT shows a tab per device: <b>KEYBOARD + MOUSE</b>, <b>GAMEPAD</b>, <b>TOUCH</b>. <b>DONE</b> goes back to the list.</p>
+<ul>
+  <li><b>Change one:</b> click its key cap, then press the new key. To use a mouse button, click with it in the "click here" box that appears (clicking anywhere else cancels, so left click never gets bound by accident).</li>
+  <li><b>Add another:</b> the dashed <kbd class="dash">+</kbd> after the caps. An action works with any of its keys.</li>
+  <li><b>Remove one:</b> click it, then <b>REMOVE</b>. (Delete or Backspace while it's waiting also removes it.) <b>CANCEL</b> or Esc leaves it as it was.</li>
+  <li><b>Clashes:</b> a key two actions use turns <span class="amber">amber</span> with a note such as "E is also Interact". Both actions would fire; that's allowed, just usually not what you want.</li>
+  <li><b>Esc</b> can't be bound: it always leaves Play.</li>
+  <li><b>Mouse buttons in Play:</b> the first click captures the mouse (as always); after that, left and right click are buttons.</li>
+</ul>
+
+<h2 id="gamepad">Gamepads: Xbox and PlayStation</h2>
+<p>Clicking a gamepad chip (or its +) opens a controller layout: triggers and shoulders across the top, the D-pad, Back and Start, the face buttons, and pressing each stick. Pick one; no controller needs to be connected. <b>XBOX</b> / <b>PLAYSTATION</b> only changes the names shown (A is ✕, RB is R1, Start is Options …): both pads have the same buttons. The one you're changing is ringed in white; one another action uses is outlined in amber.</p>
+<p>Move and look are always the left and right stick. Run also happens with the left stick pushed nearly all the way; you can add a run button too.</p>
+
+<h2 id="touch">Touch screens</h2>
+<div class="shots">
+  <figure><img src="img/controls/touch.png" alt="The TOUCH tab: a phone screen with JUMP, BAG and FIRE buttons, and every action listed below it"><figcaption>Drag the buttons on the phone; the list below says what each action is on a touch screen.</figcaption></figure>
+  <div style="flex:1;min-width:260px">
+    <ul>
+      <li><b>The phone:</b> drag Jump, Bag and your on-screen buttons to where thumbs rest. Selecting one shows its size and "show on screen".</li>
+      <li><b>Always there:</b> Move is the joystick, Look is dragging the screen, Run is the joystick pushed far, Interact is a tap anywhere, Pause is the ⚙ menu button.</li>
+      <li><b>On screen or not:</b> Jump, Bag and your buttons show <kbd class="touch">▯ jump</kbd> "on screen", or a dashed <kbd class="dash">+</kbd> "not on screen": click the + to put it on the screen.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="buttons">Your own buttons (Fire, Aim …)</h2>
+<p>A new game starts with <b>Fire</b> (left click, RT / R2: plays the attack move) and <b>Aim</b> (right click, LT / L2: aims while held). Add more with + ADD BUTTON; click a button's <b>›</b> (or any of its chips in the list) for its page:</p>
+<ul>
+  <li><b>NAME</b>, and <b>PRESS</b> (once per press) or <b>HOLD</b> (on while held).</li>
+  <li><b>Buttons:</b> its keys and mouse buttons, gamepad buttons, and whether it's on the touch screen (PLACE… takes you to the phone).</li>
+  <li><b>What it does, with no script:</b> <i>nothing</i>; <i>play a move</i> of the player's character (a PRESS button plays it once, a HOLD button from press to release); or <i>aim</i> (HOLD buttons: the player aims where the camera looks while it's held). A move set to play on the upper body (its timeline in the character editor, PLAYS ON) plays over walking, running and jumping, so Fire shoots while you run, and holding Aim tilts it to where you look.</li>
+  <li><b>DELETE BUTTON</b> asks first; scripts that listened to it stop firing.</li>
+</ul>
+
+<h2 id="scripts">Scripts: "when the player presses a button"</h2>
+<p>A script trigger for any of your buttons, and for Jump, Run and Interact: <b>it's pressed</b>, <b>it's released</b>, or <b>while it's held</b> (repeats every so many seconds). Use it for anything beyond the built-in action: counting ammo, a sound, only firing if the player has the item (a condition), spawning something. The built-in action and scripts both run.</p>
+
+<h2 id="feel">Feel: mouse speed, deadzone …</h2>
+<p>Each tab ends with the game's defaults for its device: mouse speed and invert (keyboard + mouse); look speed, deadzone and invert (gamepad); look speed and joystick size (touch). They used to be per device on the spawn point's Controls page; they're now part of the game.</p>
+
+<h2 id="players">What players can change</h2>
+<div class="shots">
+  <figure><img src="img/controls/pause-menu.png" alt="The pause menu's CONTROLS list with a CHANGE button per action and a mouse speed slider"><figcaption>The pause menu while playing: the player's own Jump key (L) in amber.</figcaption></figure>
+  <div style="flex:1;min-width:260px">
+    <p>With <b>Players can change keys and feel in the pause menu</b> on (the default), the pause menu has a <b>CONTROLS</b> list: CHANGE any key, and a mouse speed slider. Their changes are saved on their own device for this game, take effect at once, and win over yours. <b>USE THE GAME'S CONTROLS</b> undoes them. Turn the switch off and everyone plays with your keys.</p>
+    <p>Prompts written as "Press {interact}" always show the key the player actually uses.</p>
+  </div>
+</div>
+
+<h2 id="tips">Tips</h2>
+<ul>
+  <li>Keep Fire and Aim on the mouse and triggers: that's where players look for them.</li>
+  <li>An amber clash is fine for actions that never happen together, but Jump and Fire on one key will do both.</li>
+  <li>Test in Play: click the game view first so the keys go to the game, not a text box.</li>
+</ul>
+</main>
+</body>
+</html>

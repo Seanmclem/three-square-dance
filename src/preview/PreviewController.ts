@@ -177,6 +177,9 @@ export class PreviewController {
     this._controller = controller;
     this._triggers   = triggers;
     this._input      = input;
+    // Phase 89: a player changed their own controls in the pause menu: play on with them.
+    this._offPause.push(this._bus.on("input:player-controls", () =>
+      input.setBindings(effectiveBindings(this._world.gameInput, loadPlayerControls(this._world.gameId)))));
 
     // Pointer lock is a kbm concern — touch has no pointer to lock (the call
     // throws on most mobile browsers) and gamepad doesn't need one.

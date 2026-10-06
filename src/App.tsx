@@ -4515,12 +4515,16 @@ export default function App() {
           shared={previewRef.current.input.touch.shared}
           joystickRadius={previewRef.current.input.bindings.touch.joystickRadius}
           layout={previewRef.current.input.bindings.touch.layout}
+          spots={previewRef.current.input.bindings.touch.spots}
+          buttons={previewRef.current.input.bindings.buttons}
         />
       )}
 
       {isPreview && pauseOpen && (
         <PauseMenu
           bus={busRef.current}
+          game={worldRef.current?.gameInput}
+          gameId={worldRef.current?.gameId}
           onResume={() => {
             pauseOpenRef.current = false;
             setPauseOpen(false);

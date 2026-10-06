@@ -9,6 +9,10 @@ interface Props {
   shared: TouchShared;     // written imperatively — per-pointer-move state must not re-render React
   joystickRadius: number;
   layout: "right-jump" | "left-jump";
+  /** Phase 89: the game's touch layout (% of the screen, size, shown) for jump, bag and its
+   *  own buttons; absent = the older fixed places. */
+  spots?: Record<string, { x: number; y: number; size: number; on: boolean }>;
+  buttons?: Array<{ id: string; name: string }>;
 }
 
 /**
@@ -17,7 +21,7 @@ interface Props {
  * tap = interact, plus jump and ✕ exit buttons. Multi-touch safe: the
  * joystick and look pointers are tracked independently by pointerId.
  */
-export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) {
+export function TouchControlsOverlay({ shared, joystickRadius, layout, spots, buttons }: Props) {
   const [joyOrigin, setJoyOrigin] = useState<{ x: number; y: number } | null>(null);
   // The origin must ALSO live in a ref: a pointermove can arrive before React
   // re-renders with the new state, and the handler closure would still see null.
@@ -83,6 +87,10 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
   };
   const jumpSide = layout === "right-jump" ? { right: "calc(28px + env(safe-area-inset-right))" }
                                            : { left:  "calc(28px + env(safe-area-inset-left))" };
+  // Phase 89: a button placed by the game's touch layout (centered on its spot).
+  const at = (spot: { x: number; y: number; size: number }): React.CSSProperties => ({
+    left: `${spot.x}%`, top: `${spot.y}%`, width: spot.size, height: spot.size, transform: "translate(-50%, -50%)",
+  });
 
   return (
     <div
@@ -120,16 +128,27 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
       )}
 
       {/* Jump */}
-      <div
+      {(spots?.jump?.on ?? true) && <div
         onPointerDown={e => { e.stopPropagation(); shared.jumpHeld = true; }}
         onPointerUp={e => { e.stopPropagation(); shared.jumpHeld = false; }}
         onPointerCancel={e => { e.stopPropagation(); shared.jumpHeld = false; }}
-        style={{ ...btnBase, ...jumpSide,
-                 bottom: "calc(44px + env(safe-area-inset-bottom))",
-                 width: 64, height: 64, fontSize: 11, letterSpacing: 1 }}
+        style={{ ...btnBase, ...(spots?.jump ? at(spots.jump) : { ...jumpSide, bottom: "calc(44px + env(safe-area-inset-bottom))", width: 64, height: 64 }),
+                 fontSize: 11, letterSpacing: 1 }}
       >
         JUMP
-      </div>
+      </div>}
+
+      {/* Phase 89: the game's own buttons that are on screen (held while touched) */}
+      {(buttons ?? []).filter(b => spots?.[b.id]?.on).map(b => (
+        <div key={b.id} data-touch-button={b.id}
+          onPointerDown={e => { e.stopPropagation(); shared.buttonsHeld.add(b.id); }}
+          onPointerUp={e => { e.stopPropagation(); shared.buttonsHeld.delete(b.id); }}
+          onPointerCancel={e => { e.stopPropagation(); shared.buttonsHeld.delete(b.id); }}
+          style={{ ...btnBase, ...at(spots![b.id]!), fontSize: 10, letterSpacing: 1, textTransform: "uppercase",
+                   border: "1px solid rgba(255,184,107,0.6)" }}>
+          {b.name}
+        </div>
+      ))}
 
       {/* Pause menu (cancel action → App toggles the pause overlay) */}
       <div
@@ -144,16 +163,15 @@ export function TouchControlsOverlay({ shared, joystickRadius, layout }: Props) 
       </div>
 
       {/* Inventory bag (bag toggle → App/Runtime toggles the bag overlay) */}
-      <div
+      {(spots?.bag?.on ?? true) && <div
         onPointerDown={e => e.stopPropagation()}
         onPointerUp={e => { e.stopPropagation(); shared.bagQueued = true; }}
         style={{ ...btnBase,
-                 top: "calc(64px + env(safe-area-inset-top))",
-                 right: "calc(16px + env(safe-area-inset-right))",
-                 width: 40, height: 40, fontSize: 16 }}
+                 ...(spots?.bag ? at(spots.bag) : { top: "calc(64px + env(safe-area-inset-top))", right: "calc(16px + env(safe-area-inset-right))", width: 40, height: 40 }),
+                 fontSize: 16 }}
       >
         🎒
-      </div>
+      </div>}
     </div>
   );
 }

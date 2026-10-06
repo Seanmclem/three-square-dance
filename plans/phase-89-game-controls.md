@@ -1,6 +1,7 @@
 # Phase 89 · One place for a game's controls
 
-> Status: **PLANNED** (2026-10-06). Design page: "Game Controls Page" (claude.ai artifact).
+> Status: **IMPLEMENTED** as v4.120.0 (2026-10-06); see `test-plans/phase-89-game-controls.md`.
+> Design page: "Game Controls Page" (claude.ai artifact).
 > Working prototype: `plans/mockups/controls-prototype.html` (open it in a browser).
 > Follows Phase 88 (actions on a body part, aiming), which is started by scripts only.
 
@@ -127,10 +128,10 @@ filled by each source; the controller handles "what it does"; the script engine 
   phase: the pause menu's Controls list, as in the prototype).
 - Analog values in scripts (how far a trigger is pulled).
 
-## 7. Still open
+## 7. Decided at the end (2026-10-06, user)
 
-1. Should your own buttons have a built-in action chosen on their page ("the player plays
-   the shoot move", "aim while held"), or only trigger scripts ("when the player presses
-   Fire → play move shoot")? The prototype has both.
-2. Should a brand-new game's Controls page already list Fire (left click, RT / R2) and Aim
-   (right click, LT / L2) under Your buttons, or start that section empty?
+1. Buttons keep a built-in action chosen on their page (play a move, aim while held), next
+   to the script trigger. A move set to play on the upper body combines with walking and
+   running.
+2. A new game starts with Fire (left click, RT / R2: plays attack) and Aim (right click,
+   LT / L2: aims while held).

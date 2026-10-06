@@ -111,8 +111,8 @@ export function resetBindings(): void {
 const KEY_PRETTY: Record<string, string> = {
   Space: "Space", Enter: "Enter", Tab: "Tab", Escape: "Esc",
   ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
-  ShiftLeft: "Shift", ShiftRight: "Shift", ControlLeft: "Ctrl", ControlRight: "Ctrl",
-  AltLeft: "Alt", AltRight: "Alt", Backquote: "`", Minus: "-", Equal: "=",
+  ShiftLeft: "Shift", ShiftRight: "R Shift", ControlLeft: "Ctrl", ControlRight: "R Ctrl",
+  AltLeft: "Alt", AltRight: "R Alt", Backquote: "`", Minus: "-", Equal: "=",
   Comma: ",", Period: ".", Slash: "/", Semicolon: ";", Quote: "'",
   BracketLeft: "[", BracketRight: "]", Backslash: "\\",
   Mouse0: "left click", Mouse1: "middle click", Mouse2: "right click", Mouse3: "mouse back", Mouse4: "mouse forward",

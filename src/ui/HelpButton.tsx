@@ -12,6 +12,11 @@ const BRUSH_GUIDE: DocGuide = {
   src: "/docs/brush-editing.html",
 };
 
+const CONTROLS_GUIDE: DocGuide = {
+  title: "Controls guide",
+  src: "/docs/controls.html",
+};
+
 const CHARACTERS_GUIDE: DocGuide = {
   title: "Characters guide",
   src: "/docs/characters.html",
@@ -62,6 +67,15 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["RMB click wall"],         action: "Split the wall there (insert a vertex)" },
       { keys: ["RMB click brush corner"], action: "Delete that corner" },
       { keys: ["RMB click"],              action: "Menu: move initial spawn here" },
+    ],
+  },
+  {
+    label: "CONTROLS  (main menu, nothing selected)",
+    guide: CONTROLS_GUIDE,
+    rows: [
+      { keys: ["Controls"],           action: "Every action's keys, gamepad and touch buttons; click a chip to change it; EDIT for a tab per device" },
+      { keys: ["+ ADD BUTTON"],       action: "A button of your own (Fire, Aim …): keys per device, press or hold, play a move or aim with no script" },
+      { keys: ["Scripts"],            action: "Trigger: when the player presses / releases / holds a button" },
     ],
   },
   {
