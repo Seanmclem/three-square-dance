@@ -1,7 +1,19 @@
 # Phase 89 · One place for a game's controls
 
 > Status: **PLANNED** (2026-10-06). Design page: "Game Controls Page" (claude.ai artifact).
+> Working prototype: `plans/mockups/controls-prototype.html` (open it in a browser).
 > Follows Phase 88 (actions on a body part, aiming), which is started by scripts only.
+
+## Decided so far (2026-10-06, user)
+
+- **Layout A** (a tab per device) for editing, opened from a **compact read-only view in
+  layout B's shape** (every action, every device, one list) with an **EDIT** button; the
+  compact view has no + ADD BUTTON.
+- **Feel is saved in the game** as its defaults (mouse speed, invert, gamepad look speed,
+  deadzone, invert, touch look speed, joystick size): "it should be saved to game, no? like
+  as a default. then players can edit that in menu." Players' own changes (keys and feel)
+  live on their device and win, when the game allows it ("Players can change keys and feel
+  in the pause menu", on by default).
 
 User: "it should kind of be both, no? Like it could be scripted to trigger from a button
 press? Right now we just have this game-input option for the action button from the main
@@ -25,8 +37,8 @@ selected."
 - **Controls** row on the main menu (with Lights and Audio), summary "WASD · Space · E ·
   Fire · Aim". It replaces the GAME INPUT block; the spawn point's Controls page links here.
 - **Layout A, a tab per device** (KEYBOARD + MOUSE / GAMEPAD / TOUCH). Sections MOVING
-  (move, look, jump, run), GAME (interact, bag, pause), YOUR BUTTONS, FEEL (this device
-  only). Each binding is a key cap: click it and press the new key or button (Esc cancels),
+  (move, look, jump, run), GAME (interact, bag, pause), YOUR BUTTONS, FEEL (the game's
+  defaults). Each binding is a key cap: click it and press the new key or button (Esc cancels),
   + adds another, an empty dashed cap means none on that device. A key used twice shows in
   amber ("E is also Interact").
 - **Your buttons** (+ ADD BUTTON): a page each with NAME, KIND (PRESS / HOLD), keys per
@@ -37,8 +49,9 @@ selected."
   go, each with size and on / off; replaces "jump on left / right".
 - **Script trigger**: "when the player presses / releases <button>" (and "every N s while
   held"), for your buttons and the built-ins (jump, interact).
-- **Saved in the game** (game.json `input`): the game's bindings for every action and your
-  buttons. Device feel stays per device. A player's own rebind still wins (today's rule).
+- **Saved in the game** (game.json `input`): the game's bindings for every action, your
+  buttons, and the feel defaults. A player's own keys and feel (pause menu, per device) win
+  over them when "Players can change" is on (today's rule for interact, now for everything).
 - **Mouse buttons**: the first click in Play captures the mouse as today; after that left /
   right click are buttons.
 
@@ -53,6 +66,9 @@ GameConfig.input = {
                    touch?: { x: number; y: number; size: number } | null;
                    does?: { playMove?: string; whileHeld?: boolean } | { aim: true } }>;
   touchLayout?: Record<string, { x: number; y: number; size: number; on: boolean }>;
+  feel?: { mouseSpeed?: number; mouseInvertY?: boolean; padLookRate?: number; padDeadzone?: number;
+           padInvertY?: boolean; touchLook?: number; joystick?: number };
+  playersCanChange?: boolean;   // default true
   interact?: …   // today's field, read as a binding for "interact" (migrated)
 };
 TriggerType += "on_button"   // trigger.buttonId, trigger.buttonEdge: "press" | "release" | "held"
@@ -73,14 +89,29 @@ filled by each source; the controller handles "what it does"; the script engine 
 4. Touch arranger and on-screen buttons for your buttons.
 5. Guide (a Controls page in the ? menu), architecture doc, test plan.
 
-## 5. Out (later)
+## 5. Edge cases the prototype covers (and the build must)
 
-- Players rebinding keys in the game's pause menu (the same list, saved per device).
+- Click a key cap and press the new key; Delete / Backspace removes it; Esc or a click
+  anywhere else cancels; Esc itself can't be bound (it leaves Play).
+- Mouse buttons bind only in the "click here with the mouse button" box, so clicking away
+  never binds left click by accident; left click notes that the first click in Play captures
+  the mouse.
+- A key used by two actions shows amber with "E is also Interact" (allowed: both fire).
+- Gamepad: press a button on a connected pad, or pick from the list (no pad needed).
+- An action stays held while any of its keys is down (Shift + R Shift; F + left click).
+- PRESS vs HOLD: a hold button's move plays from press to release; aim needs HOLD.
+- Deleting a button: confirm; scripts that used it show "its button was deleted".
+- Players' own keys win only when allowed; the pause menu shows "yours (game: …)".
+- Window losing focus releases everything held.
+
+## 6. Out (later)
+
+- Players rebinding gamepad buttons in the pause menu (keyboard keys and feel are in this
+  phase: the pause menu's Controls list, as in the prototype).
 - Analog values in scripts (how far a trigger is pulled).
 
-## 6. Questions (on the design page)
+## 7. Still open
 
-1. Layout A (a tab per device) or B (one list, all devices)?
-2. A button's built-in "what it does" (play a move, aim while held), or scripts only?
-3. Players rebinding in the pause menu: this phase or later?
-4. New games: start with no buttons of your own, or with Fire and Aim ready?
+1. A button's built-in "what it does" (play a move, aim while held), or scripts only? (The
+   prototype has it.)
+2. New games: start with no buttons of your own, or with Fire and Aim ready?

@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controls Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+  :root { color-scheme: dark; --bg:#121317; --app:#1a1b1f; --app2:#222329; --app3:#2b2d34; --line:rgba(255,255,255,.09);
+    --t1:#dde3f0; --t2:#c2cadb; --t3:#98a2b8; --blue:#9dbdff; --blueFill:rgba(80,140,255,.16); --blueLine:rgba(80,140,255,.5);
+    --green:#7fe0b5; --amber:#ffb86b; --red:#ff9b8a; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace; --sans:"IBM Plex Sans",system-ui,sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--t2); font: 11px/1.45 var(--mono); padding-inline: 16px; }
+  button { font: inherit; }
+  .k { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:20px; padding:0 6px; border-radius:4px; background:#30323a;
+       border:1px solid rgba(255,255,255,.18); border-bottom-width:2px; color:var(--t1); font-size:10px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .k:hover { border-color: var(--blueLine); }
+  .k.pad { border-radius:10px; background:#2a2f3e; border-color:rgba(157,189,255,.35); color:var(--blue); }
+  .k.capture { background:var(--blueFill); border-color:var(--blue); color:var(--blue); animation: blink 1.1s ease-in-out infinite; }
+  .k.add { background:transparent; border-style:dashed; color:var(--t3); }
+  .k.clash { border-color: var(--amber); color: var(--amber); }
+  .k.fixed { cursor: default; background:#26272d; color:var(--t2); }
+  .k.lit { background: rgba(127,224,181,.25); border-color: var(--green); color: var(--green); }
+  @keyframes blink { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .k.capture { animation: none; } }
+  .btn { display:inline-flex; align-items:center; gap:4px; padding:4px 8px; border-radius:4px; border:1px solid rgba(255,255,255,.14); background:rgba(46,46,48,.9); color:var(--t1); font-size:10px; cursor:pointer; white-space:nowrap; }
+  .btn:hover { border-color: var(--blueLine); }
+  .btn.on { border-color: var(--blueLine); background: var(--blueFill); color: var(--blue); }
+  .btn.go { border-color: rgba(60,207,145,.6); background: rgba(60,207,145,.15); color: var(--green); }
+  .btn.danger { color: var(--red); }
+  .field { background:#141416; border:1px solid rgba(255,255,255,.15); border-radius:4px; padding:4px 6px; color:var(--t1); font: inherit; }
+  .lbl { color: var(--t3); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .mini { color: var(--t3); font-size: 10px; line-height: 1.5; }
+  .warn { color: var(--amber); font-size: 10px; }
+  .ok { color: var(--green); }
+  .chip { padding:2px 6px; border-radius:4px; background:var(--app3); color:var(--t1); white-space:nowrap; }
+  .chip.b { background: var(--blueFill); color: var(--blue); }
+  input[type=range] { accent-color: #4d8cff; }
+  input[type=checkbox] { accent-color: #4d8cff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel" data-presets="react">
+/*
+ * Phase 89 prototype: the Controls page (plans/phase-89-game-controls.md), clickable and
+ * working. Right: the editor's right-hand panel (main menu → Controls compact view → EDIT →
+ * tabs per device, your buttons, touch arranger, game feel). Left: TRY YOUR CONTROLS (live
+ * keyboard / mouse / gamepad, which actions fire, what your buttons do, demo script
+ * triggers) and the PLAYER'S PAUSE MENU (a player's own changes win over the game's).
+ * Data is shaped like the planned GameConfig.input.
+ */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+// ── vocabulary ─────────────────────────────────────────────────────────────────
+const PAD = ["A","B","X","Y","LB","RB","LT","RT","Back","Start","LS","RS","D-pad ↑","D-pad ↓","D-pad ←","D-pad →"];
+const KEY_PRETTY = { Space:"Space", Enter:"Enter", Tab:"Tab", Escape:"Esc", ArrowUp:"↑", ArrowDown:"↓", ArrowLeft:"←", ArrowRight:"→",
+  ShiftLeft:"Shift", ShiftRight:"R Shift", ControlLeft:"Ctrl", ControlRight:"R Ctrl", AltLeft:"Alt", AltRight:"R Alt", Backquote:"`",
+  Minus:"-", Equal:"=", Comma:",", Period:".", Slash:"/", Semicolon:";", Quote:"'", BracketLeft:"[", BracketRight:"]", Backslash:"\\",
+  Mouse0:"left click", Mouse1:"middle click", Mouse2:"right click", Mouse3:"mouse back", Mouse4:"mouse forward", CapsLock:"Caps" };
+const pretty = c => KEY_PRETTY[c] ?? (c.startsWith("Key") ? c.slice(3) : c.startsWith("Digit") ? c.slice(5) : c.startsWith("Numpad") ? "Num " + c.slice(6) : c);
+const padName = i => PAD[i] ?? `B${i}`;
+const RESERVED = { Escape: "Esc is kept for leaving Play" };
+
+// Built-in actions per device. fixed = not rebindable (shown, explained).
+const BUILT_IN = [
+  { id: "move_forward", name: "Move forward", group: "Moving" },
+  { id: "move_back",    name: "Move back",    group: "Moving" },
+  { id: "move_left",    name: "Move left",    group: "Moving" },
+  { id: "move_right",   name: "Move right",   group: "Moving" },
+  { id: "jump",         name: "Jump",         group: "Moving" },
+  { id: "run",          name: "Run (hold)",   group: "Moving" },
+  { id: "interact",     name: "Interact",     group: "Game" },
+  { id: "bag",          name: "Bag",          group: "Game" },
+  { id: "pause",        name: "Pause",        group: "Game" },
+];
+const PAD_BUILT_IN = BUILT_IN.filter(a => !a.id.startsWith("move_"));
+const MOVES = ["shoot", "punch", "wave", "reload", "throw", "attack"];
+
+const DEFAULT_INPUT = () => ({
+  bindings: {
+    kbm: { move_forward: ["KeyW", "ArrowUp"], move_back: ["KeyS", "ArrowDown"], move_left: ["KeyA", "ArrowLeft"], move_right: ["KeyD", "ArrowRight"],
+           jump: ["Space"], run: ["ShiftLeft", "ShiftRight"], interact: ["KeyE"], bag: ["KeyI", "Tab"], pause: ["Enter"] },
+    gamepad: { jump: [5, 0], run: [], interact: [4], bag: [3], pause: [9] },
+  },
+  buttons: [
+    { id: "fire", name: "Fire", kind: "press", kbm: ["Mouse0", "KeyF"], gamepad: [7], touch: true, does: { type: "move", move: "shoot", mode: "once" } },
+    { id: "aim",  name: "Aim",  kind: "hold",  kbm: ["Mouse2"],          gamepad: [6], touch: false, does: { type: "aim" } },
+  ],
+  touch: { jump: { x: 86, y: 74, size: 56, on: true }, bag: { x: 92, y: 22, size: 40, on: true }, fire: { x: 72, y: 56, size: 52, on: true }, aim: { x: 88, y: 44, size: 44, on: false } },
+  feel: { mouseSpeed: 0.002, mouseInvertY: false, padLookRate: 2.5, padDeadzone: 0.15, padInvertY: false, touchLook: 0.004, joystick: 60 },
+  playersCanChange: true,
+});
+const DEMO_SCRIPTS = () => ([
+  { id: "s1", name: "Ammo count",  button: "fire", edge: "press",   every: 0.2 },
+  { id: "s2", name: "Charge shot", button: "aim",  edge: "held",    every: 0.5 },
+  { id: "s3", name: "Lower weapon", button: "aim", edge: "release", every: 0.2 },
+]);
+
+// Every binding as a flat list, for clash checks: [{device, action, actionName, code}]
+function allBindings(input) {
+  const out = [];
+  const nameOf = id => BUILT_IN.find(a => a.id === id)?.name ?? input.buttons.find(b => b.id === id)?.name ?? id;
+  for (const [id, codes] of Object.entries(input.bindings.kbm)) for (const c of codes) out.push({ device: "kbm", action: id, actionName: nameOf(id), code: c });
+  for (const [id, codes] of Object.entries(input.bindings.gamepad)) for (const c of codes) out.push({ device: "gamepad", action: id, actionName: nameOf(id), code: c });
+  for (const b of input.buttons) { for (const c of b.kbm) out.push({ device: "kbm", action: b.id, actionName: b.name, code: c }); for (const c of b.gamepad) out.push({ device: "gamepad", action: b.id, actionName: b.name, code: c }); }
+  return out;
+}
+const clashWith = (input, device, action, code) => allBindings(input).filter(x => x.device === device && x.code === code && x.action !== action);
+// Movement keys sharing a key with each other is a real problem; a menu key reused is fine (menus aren't modeled here).
+
+// Effective = player's change (when allowed) else the game's.
+function effective(input, player) {
+  if (!input.playersCanChange || !player) return input;
+  const e = structuredClone(input);
+  for (const [id, codes] of Object.entries(player.kbm ?? {})) { if (e.bindings.kbm[id]) e.bindings.kbm[id] = codes; else { const b = e.buttons.find(x => x.id === id); if (b) b.kbm = codes; } }
+  if (player.feel) e.feel = { ...e.feel, ...player.feel };
+  return e;
+}
+
+// ── small parts ────────────────────────────────────────────────────────────────
+function Cap({ code, device, capture, clash, onClick, lit, title }) {
+  const cls = ["k", device === "gamepad" ? "pad" : "", capture ? "capture" : "", clash ? "clash" : "", lit ? "lit" : ""].join(" ");
+  return <span className={cls} role="button" tabIndex={0} title={title} onClick={onClick}
+    onKeyDown={e => { if (e.key === "Enter" && !capture) onClick?.(); }}>{capture ? "press…" : device === "gamepad" ? padName(code) : pretty(code)}</span>;
+}
+
+/** One action's caps on one device, with capture. */
+function BindingCaps({ input, device, action, codes, setCodes, capturing, setCapturing, lit }) {
+  const isCap = i => capturing && capturing.device === device && capturing.action === action && capturing.index === i;
+  const clashes = codes.map(c => clashWith(input, device, action, c));
+  return (
+    <span style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+      {codes.map((c, i) => (
+        <Cap key={i} code={c} device={device} capture={isCap(i)} clash={clashes[i].length > 0} lit={lit?.has(c)}
+          title={clashes[i].length ? `${device === "gamepad" ? padName(c) : pretty(c)} is also ${clashes[i].map(x => x.actionName).join(", ")}` : "Click, then press the new one. Delete removes it, Esc cancels."}
+          onClick={() => setCapturing({ device, action, index: i })} />
+      ))}
+      {isCap(codes.length) ? <Cap capture device={device} /> :
+        <span className="k add" role="button" tabIndex={0} title="Add another" onClick={() => setCapturing({ device, action, index: codes.length })}>+</span>}
+      {clashes.flat().length > 0 && <span className="warn">{[...new Set(clashes.flat().map(x => `${device === "gamepad" ? padName(x.code) : pretty(x.code)} is also ${x.actionName}`))].join(" · ")}</span>}
+    </span>
+  );
+}
+
+/** Capture the next key / mouse button / gamepad button while `capturing` is set. */
+function useCapture(capturing, setCapturing, apply) {
+  useEffect(() => {
+    if (!capturing) return;
+    let done = false;
+    const finish = v => { if (done) return; done = true; setCapturing(null); if (v !== undefined) apply(capturing, v); };
+    if (capturing.device === "kbm") {
+      const onKey = e => {
+        e.preventDefault(); e.stopPropagation();
+        if (e.code === "Escape") return finish(undefined);
+        if (e.code === "Delete" || e.code === "Backspace") return finish(null);
+        finish(e.code);
+      };
+      // Mouse buttons bind only in the "click here" box; a click anywhere else cancels
+      // (so clicking away never binds left click by accident).
+      const onMouse = e => {
+        if (e.target.closest?.("[data-mousezone]")) { e.preventDefault(); e.stopPropagation(); finish(`Mouse${e.button}`); return; }
+        if (!e.target.closest?.("[data-nocapture]")) finish(undefined);
+      };
+      const onCtx = e => e.preventDefault();
+      window.addEventListener("keydown", onKey, true); window.addEventListener("mousedown", onMouse, true); window.addEventListener("contextmenu", onCtx, true);
+      return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("mousedown", onMouse, true); window.removeEventListener("contextmenu", onCtx, true); };
+    }
+    // gamepad: poll for a newly pressed button; Esc / Delete from the keyboard still work
+    const start = new Set(); for (const p of navigator.getGamepads?.() ?? []) p?.buttons.forEach((b, i) => { if (b.pressed) start.add(`${p.index}:${i}`); });
+    let raf = 0;
+    const poll = () => { for (const p of navigator.getGamepads?.() ?? []) p?.buttons.forEach((b, i) => { if (b.pressed && !start.has(`${p.index}:${i}`)) finish(i); }); if (!done) raf = requestAnimationFrame(poll); };
+    raf = requestAnimationFrame(poll);
+    const onKey = e => { if (e.code === "Escape") { e.preventDefault(); finish(undefined); } if (e.code === "Delete" || e.code === "Backspace") { e.preventDefault(); finish(null); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("keydown", onKey, true); };
+  }, [capturing]);
+}
+
+// ── the right-hand panel ───────────────────────────────────────────────────────
+const PANEL = { width: 340, maxWidth: "100%", background: "var(--app2)", border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden", alignSelf: "flex-start" };
+const SEC = { padding: "10px 16px", borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 6 };
+const HEAD = (title, back, right) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px 8px", color: "var(--blue)", letterSpacing: ".12em" }}>
+    <span>{title}</span><span style={{ flex: 1 }} />{right}{back && <button className="btn" onClick={back} style={{ letterSpacing: 0 }}>← Back</button>}
+  </div>
+);
+const ROW = { display: "grid", gridTemplateColumns: "96px 1fr", alignItems: "center", gap: 6, minHeight: 26 };
+
+function Panel({ input, setInput, view, setView, player, lit }) {
+  const [tab, setTab] = useState("kbm");
+  const [capturing, setCapturing] = useState(null);
+  const [touchSel, setTouchSel] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const setKbm = (action, codes) => setInput(i => {
+    const n = structuredClone(i);
+    if (n.bindings.kbm[action]) n.bindings.kbm[action] = codes; else n.buttons.find(b => b.id === action).kbm = codes;
+    return n;
+  });
+  const setPad = (action, codes) => setInput(i => {
+    const n = structuredClone(i);
+    if (action in n.bindings.gamepad) n.bindings.gamepad[action] = codes; else n.buttons.find(b => b.id === action).gamepad = codes;
+    return n;
+  });
+  const codesOf = (device, action) => device === "kbm" ? (input.bindings.kbm[action] ?? input.buttons.find(b => b.id === action)?.kbm ?? [])
+    : (input.bindings.gamepad[action] ?? input.buttons.find(b => b.id === action)?.gamepad ?? []);
+  useCapture(capturing, setCapturing, (cap, v) => {
+    const codes = [...codesOf(cap.device, cap.action)];
+    if (v === null) codes.splice(cap.index, 1);
+    else if (cap.device === "kbm" && RESERVED[v]) { alertNote(RESERVED[v]); return; }
+    else if (codes.includes(v) && codes.indexOf(v) !== cap.index) { /* already on this action: no duplicate */ }
+    else codes[cap.index] = v;
+    (cap.device === "kbm" ? setKbm : setPad)(cap.action, codes.filter(x => x !== undefined));
+  });
+  const [note, setNote] = useState(null);
+  const alertNote = t => { setNote(t); setTimeout(() => setNote(null), 2500); };
+  const caps = (device, action) => <BindingCaps input={input} device={device} action={action} codes={codesOf(device, action)}
+    setCodes={c => (device === "kbm" ? setKbm : setPad)(action, c)} capturing={capturing} setCapturing={setCapturing} lit={device === "kbm" ? lit.kbm : lit.pad} />;
+  // While waiting for a key: what to do, the mouse-button box, the gamepad pick list.
+  const captureHint = capturing && <div style={{ ...SEC, borderTop: "none", paddingTop: 0 }} data-nocapture><span className="mini" style={{ color: "var(--blue)" }}>
+        {capturing.device === "kbm" ? "Press a key, or use a mouse button in the box." : "Press a button on the gamepad, or pick one:"} Delete removes it, Esc or a click elsewhere cancels.</span>
+        {capturing.device === "kbm" && <div data-mousezone role="button" aria-label="Mouse button zone" style={{ border: "1px dashed var(--blueLine)", borderRadius: 6, padding: "10px 8px", textAlign: "center", color: "var(--blue)", cursor: "crosshair" }}>click here with the mouse button you want (left, right, middle)</div>}
+        {capturing.device === "gamepad" && <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{PAD.map((n, i) => <button key={i} className="btn" data-nocapture onClick={() => {
+          const codes = [...codesOf("gamepad", capturing.action)]; codes[capturing.index] = i; setPad(capturing.action, [...new Set(codes)]); setCapturing(null); }}>{n}</button>)}</span>}
+      </div>;
+  const btn = view.startsWith("button:") ? input.buttons.find(b => b.id === view.slice(7)) : null;
+  const setBtn = patch => setInput(i => ({ ...i, buttons: i.buttons.map(b => b.id === btn.id ? { ...b, ...patch } : b) }));
+
+  // ── main menu ──
+  if (view === "menu") return (
+    <div style={PANEL} data-view="menu">
+      {HEAD("PROPERTIES")}
+      <div style={{ padding: "0 16px 10px", color: "var(--t3)" }}>Select: click an object to edit it</div>
+      {[["Lights", "sun + ambient · 3 placed"], ["Audio", "mixer · ambient · music"]].map(([n, s]) => (
+        <div key={n} style={{ display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--line)", color: "var(--t1)", fontSize: 12 }}><span>{n}</span><span className="mini">{s}</span></div>
+      ))}
+      <button onClick={() => setView("compact")} data-open="controls"
+        style={{ all: "unset", cursor: "pointer", display: "flex", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--line)", color: "var(--t1)", fontSize: 12, width: "100%", boxSizing: "border-box", background: "rgba(80,140,255,.08)" }}>
+        <span>Controls</span><span className="mini">{summary(input)}</span>
+      </button>
+      <div style={SEC}><span className="lbl">Editor</span><span className="mini">credits, perf counter, crosshair…</span></div>
+    </div>
+  );
+
+  // ── compact (layout B, read-only) ──
+  if (view === "compact") {
+    const row = (name, kb, pad, touch, color) => (
+      <React.Fragment key={name}>
+        <span style={{ color: color ?? "var(--t1)" }}>{name}</span>
+        <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{kb.map((c, i) => <span key={"k" + i} className="k fixed">{c}</span>)}{pad.map((c, i) => <span key={"p" + i} className="k pad fixed">{c}</span>)}{touch && <span className="k add fixed" style={{ borderStyle: "solid" }}>{touch}</span>}</span>
+      </React.Fragment>
+    );
+    const kb = id => input.bindings.kbm[id].slice(0, 2).map(pretty);
+    const pd = id => (input.bindings.gamepad[id] ?? []).map(padName);
+    return (
+      <div style={PANEL} data-view="compact">
+        {HEAD("CONTROLS", () => setView("menu"), <button className="btn on" data-edit onClick={() => setView("edit")}>EDIT</button>)}
+        <div style={{ ...SEC, borderTop: "none" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "76px 1fr", gap: "6px 8px", alignItems: "center" }}>
+            {row("Move", ["WASD"], ["L stick"], "joystick")}
+            {row("Look", ["mouse"], ["R stick"], "drag")}
+            {row("Jump", kb("jump"), pd("jump"), input.touch.jump.on ? "jump btn" : null)}
+            {row("Run", kb("run").slice(0, 1), ["stick far", ...pd("run")], null)}
+            {row("Interact", kb("interact"), pd("interact"), "tap")}
+            {row("Bag", kb("bag"), pd("bag"), input.touch.bag.on ? "bag btn" : null)}
+            {row("Pause", kb("pause"), pd("pause"), "✕ btn")}
+            {input.buttons.map(b => row(b.name + (b.kind === "hold" ? " (hold)" : ""), b.kbm.slice(0, 2).map(pretty), b.gamepad.map(padName), input.touch[b.id]?.on ? "on screen" : null, "var(--amber)"))}
+          </div>
+        </div>
+        <div style={SEC}>
+          <span className="mini">Mouse speed {input.feel.mouseSpeed} · deadzone {input.feel.padDeadzone} · {input.playersCanChange ? "players can change keys and feel in the pause menu" : "players can't change them"}</span>
+          <span className="mini">Grey = keyboard and mouse, blue = gamepad, outlined = touch.</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── a button's page ──
+  if (btn) {
+    const t = input.touch[btn.id] ?? { x: 70, y: 50, size: 48, on: false };
+    return (
+      <div style={PANEL} data-view={view}>
+        {HEAD(`CONTROLS · ${btn.name.toUpperCase()}`, () => { setView("edit"); setConfirmDel(false); })}
+        <div style={{ ...SEC, borderTop: "none" }}>
+          <div style={ROW}><span className="lbl">Name</span><input className="field" aria-label="Button name" value={btn.name} onChange={e => setBtn({ name: e.target.value })} /></div>
+          <div style={ROW}><span className="lbl">Kind</span><span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <button className={"btn" + (btn.kind === "press" ? " on" : "")} onClick={() => setBtn({ kind: "press" })}>PRESS</button>
+            <button className={"btn" + (btn.kind === "hold" ? " on" : "")} onClick={() => setBtn({ kind: "hold", does: btn.does?.type === "move" ? { ...btn.does, mode: "held" } : btn.does })}>HOLD</button>
+            <span className="mini">{btn.kind === "hold" ? "on while held" : "once per press"}</span></span></div>
+        </div>
+        {captureHint}
+        <div style={SEC}><span className="lbl">Buttons</span>
+          <div style={ROW}><span>Keyboard, mouse</span>{caps("kbm", btn.id)}</div>
+          <div style={ROW}><span>Gamepad</span>{caps("gamepad", btn.id)}</div>
+          <div style={ROW}><span>Touch</span><span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <label style={{ display: "flex", gap: 4, alignItems: "center", cursor: "pointer" }}><input type="checkbox" aria-label="On screen" checked={t.on} onChange={e => setInput(i => ({ ...i, touch: { ...i.touch, [btn.id]: { ...t, on: e.target.checked } } }))} />on screen</label>
+            <button className="btn" onClick={() => { setTab("touch"); setTouchSel(btn.id); setView("edit"); }}>PLACE…</button></span></div>
+          {btn.kbm.includes("Mouse0") && <span className="mini">Left click: in Play the first click captures the mouse; after that it's {btn.name}.</span>}
+        </div>
+        <div style={SEC}><span className="lbl">{btn.kind === "hold" ? "While held" : "When pressed"} (no script needed)</span>
+          <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            <button className={"btn" + (!btn.does ? " on" : "")} onClick={() => setBtn({ does: null })}>nothing</button>
+            <button className={"btn" + (btn.does?.type === "move" ? " on" : "")} onClick={() => setBtn({ does: { type: "move", move: btn.does?.move ?? "shoot", mode: btn.kind === "hold" ? "held" : "once" } })}>play a move</button>
+            <button className={"btn" + (btn.does?.type === "aim" ? " on" : "")} disabled={btn.kind !== "hold"} title={btn.kind !== "hold" ? "Aiming needs a HOLD button" : ""} style={{ opacity: btn.kind === "hold" ? 1 : .4 }} onClick={() => setBtn({ does: { type: "aim" } })}>aim</button>
+          </span>
+          {btn.does?.type === "move" && <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span>the player plays</span>
+            <select className="field" aria-label="Move" value={btn.does.move} onChange={e => setBtn({ does: { ...btn.does, move: e.target.value } })}>{MOVES.map(m => <option key={m}>{m}</option>)}</select>
+            {btn.kind === "hold" ? <span className="mini">from press to release</span> : <span className="mini">once</span>}</span>}
+          {btn.does?.type === "aim" && <span className="mini">The player aims where the camera looks while it's held (the character's AIM poses, or the spine turns).</span>}
+        </div>
+        <div style={SEC}><span className="lbl">Scripts</span>
+          <span className="mini">Triggers: <span className="chip b">presses {btn.name}</span> <span className="chip b">releases {btn.name}</span> <span className="chip b">while {btn.name} held</span></span>
+          <span className="mini">Try them on the left (TRY YOUR CONTROLS → scripts).</span>
+        </div>
+        <div style={SEC}>
+          {confirmDel ? <span style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="warn">Delete {btn.name}? Scripts that use it stop firing.</span>
+            <button className="btn danger" data-confirm-delete onClick={() => { setInput(i => { const n = structuredClone(i); n.buttons = n.buttons.filter(b => b.id !== btn.id); delete n.touch[btn.id]; return n; }); setView("edit"); setConfirmDel(false); }}>DELETE</button>
+            <button className="btn" onClick={() => setConfirmDel(false)}>KEEP</button></span>
+            : <button className="btn danger" style={{ alignSelf: "flex-start" }} onClick={() => setConfirmDel(true)}>DELETE BUTTON</button>}
+        </div>
+      </div>
+    );
+  }
+
+  // ── edit (layout A) ──
+  const tabBtn = (id, label) => <button key={id} className={"btn" + (tab === id ? " on" : "")} style={{ flex: 1, justifyContent: "center" }} onClick={() => { setTab(id); setCapturing(null); }}>{label}</button>;
+  const addButton = () => {
+    let n = 1; while (input.buttons.some(b => b.name === `Button ${n}`)) n++;
+    const id = "btn" + Date.now().toString(36);
+    setInput(i => ({ ...i, buttons: [...i.buttons, { id, name: `Button ${n}`, kind: "press", kbm: [], gamepad: [], touch: false, does: null }] }));
+    setView("button:" + id);
+  };
+  const yours = (
+    <div style={SEC}><span className="lbl">Your buttons</span>
+      {input.buttons.length === 0 && <span className="mini">None yet. A button of your own (Fire, Aim, Reload…) can play a move or aim, and scripts can listen to it.</span>}
+      {input.buttons.map(b => (
+        <div key={b.id} style={{ ...ROW, gridTemplateColumns: "96px 1fr auto" }}>
+          <span style={{ color: "var(--amber)" }}>{b.name}{b.kind === "hold" ? " (hold)" : ""}</span>
+          {tab === "touch" ? <span className="mini">{input.touch[b.id]?.on ? "on screen" : "not on screen"}</span> : caps(tab, b.id)}
+          <button className="btn" aria-label={`Open ${b.name}`} onClick={() => setView("button:" + b.id)}>›</button>
+        </div>
+      ))}
+      <button className="btn" data-add-button style={{ alignSelf: "flex-start" }} onClick={addButton}>+ ADD BUTTON</button>
+    </div>
+  );
+  const feelNum = (label, key, step, min, max) => (
+    <div style={ROW} key={key}><span>{label}</span><input className="field" type="number" step={step} min={min} max={max} aria-label={label} value={input.feel[key]}
+      onChange={e => { const v = parseFloat(e.target.value); if (Number.isFinite(v)) setInput(i => ({ ...i, feel: { ...i.feel, [key]: v } })); }} style={{ width: 90 }} /></div>
+  );
+  const feelBool = (label, key) => (
+    <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }} key={key}><input type="checkbox" aria-label={label} checked={input.feel[key]} onChange={e => setInput(i => ({ ...i, feel: { ...i.feel, [key]: e.target.checked } }))} />{label}</label>
+  );
+  return (
+    <div style={PANEL} data-view="edit">
+      {HEAD("CONTROLS", () => { setView("compact"); setCapturing(null); }, <button className="btn" onClick={() => { setView("compact"); setCapturing(null); }}>DONE</button>)}
+      <div style={{ display: "flex", gap: 4, padding: "0 16px 10px" }}>{tabBtn("kbm", "KEYBOARD + MOUSE")}{tabBtn("gamepad", "GAMEPAD")}{tabBtn("touch", "TOUCH")}</div>
+      {note && <div style={{ ...SEC, borderTop: "none", paddingTop: 0 }}><span className="warn">{note}</span></div>}
+      {captureHint}
+
+      {tab === "kbm" && <>
+        <div style={SEC}><span className="lbl">Moving</span>
+          {BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
+          <div style={ROW}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k fixed">mouse</span></span></div>
+        </div>
+        <div style={SEC}><span className="lbl">Game</span>
+          {BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
+          <span className="mini">Esc always leaves Play.</span>
+        </div>
+        {yours}
+        <div style={SEC}><span className="lbl">Feel (the game's defaults)</span>
+          {feelNum("Mouse speed", "mouseSpeed", 0.0005, 0.0005, 0.02)}
+          {feelBool("Invert mouse up / down", "mouseInvertY")}
+        </div>
+      </>}
+
+      {tab === "gamepad" && <>
+        <div style={SEC}><span className="lbl">Moving</span>
+          <div style={ROW}><span style={{ color: "var(--t1)" }}>Move</span><span><span className="k pad fixed">left stick</span></span></div>
+          <div style={ROW}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k pad fixed">right stick</span></span></div>
+          {PAD_BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
+          <span className="mini">Run also happens with the left stick pushed nearly all the way.</span>
+        </div>
+        <div style={SEC}><span className="lbl">Game</span>
+          {PAD_BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
+        </div>
+        {yours}
+        <div style={SEC}><span className="lbl">Feel (the game's defaults)</span>
+          {feelNum("Look speed (turns / s)", "padLookRate", 0.25, 0.5, 8)}
+          {feelNum("Deadzone (0 to 0.9)", "padDeadzone", 0.01, 0, 0.9)}
+          {feelBool("Invert look up / down", "padInvertY")}
+        </div>
+      </>}
+
+      {tab === "touch" && <TouchArranger input={input} setInput={setInput} sel={touchSel} setSel={setTouchSel} yours={yours} feelNum={feelNum} />}
+
+      <div style={SEC}>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", color: "var(--t1)" }}>
+          <input type="checkbox" aria-label="Players can change" checked={input.playersCanChange} onChange={e => setInput(i => ({ ...i, playersCanChange: e.target.checked }))} />
+          Players can change keys and feel in the pause menu</label>
+        <span className="mini">Their changes are saved on their own device and win over these. Prompts like "Press {"{Fire}"}" show the key they use.</span>
+        <button className="btn" style={{ alignSelf: "flex-start" }} onClick={() => setInput(DEFAULT_INPUT())}>RESET TO DEFAULTS</button>
+      </div>
+    </div>
+  );
+}
+
+function summary(input) {
+  const k = id => pretty(input.bindings.kbm[id][0] ?? "?");
+  return ["WASD", k("jump"), k("interact"), ...input.buttons.map(b => b.name)].join(" · ");
+}
+
+// ── touch arranger ─────────────────────────────────────────────────────────────
+function TouchArranger({ input, setInput, sel, setSel, yours, feelNum }) {
+  const ref = useRef(null);
+  const [drag, setDrag] = useState(null);
+  const items = [
+    { id: "jump", name: "JUMP", color: "#9dbdff" }, { id: "bag", name: "BAG", color: "#9dbdff" },
+    ...input.buttons.map(b => ({ id: b.id, name: b.name.toUpperCase(), color: "#ffb86b" })),
+  ];
+  const t = id => input.touch[id] ?? { x: 70, y: 50, size: 48, on: false };
+  const setT = (id, patch) => setInput(i => ({ ...i, touch: { ...i.touch, [id]: { ...t(id), ...patch } } }));
+  const move = e => {
+    if (!drag) return;
+    const r = ref.current.getBoundingClientRect();
+    setT(drag, { x: Math.round(Math.max(4, Math.min(96, ((e.clientX - r.left) / r.width) * 100))), y: Math.round(Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100))) });
+  };
+  const s = sel ? t(sel) : null;
+  return <>
+    <div style={SEC}><span className="lbl">Drag the buttons where thumbs go</span>
+      <div ref={ref} data-phone onPointerMove={move} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}
+        style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", background: "#1d1f26", border: "2px solid #3a3f4a", borderRadius: 12, touchAction: "none", overflow: "hidden" }}>
+        <div style={{ position: "absolute", left: "8%", bottom: "10%", width: input.feel.joystick * 1.2, height: input.feel.joystick * 1.2, maxWidth: "30%", aspectRatio: "1", borderRadius: "50%", border: "2px solid #98a2b8", opacity: .7 }} title="Move joystick (fixed)" />
+        <div style={{ position: "absolute", right: "3%", top: "6%", padding: "0 6px", border: "1px solid #98a2b8", borderRadius: 4, color: "#98a2b8" }}>✕</div>
+        <div className="mini" style={{ position: "absolute", left: 0, right: 0, top: "40%", textAlign: "center" }}>tap anywhere = Interact · drag = look</div>
+        {items.filter(it => t(it.id).on).map(it => {
+          const v = t(it.id), size = v.size * 0.55;
+          return <div key={it.id} data-touch={it.id} onPointerDown={e => { e.currentTarget.setPointerCapture?.(e.pointerId); setDrag(it.id); setSel(it.id); }}
+            style={{ position: "absolute", left: `${v.x}%`, top: `${v.y}%`, width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#dde3f0", cursor: "grab", userSelect: "none",
+              background: it.color + "33", border: `2px solid ${it.color}`, outline: sel === it.id ? "2px solid #fff" : "none", outlineOffset: 2 }}>{it.name}</div>;
+        })}
+      </div>
+      <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{items.map(it => (
+        <button key={it.id} className={"btn" + (sel === it.id ? " on" : "")} style={{ opacity: t(it.id).on ? 1 : .55 }} onClick={() => setSel(it.id)}>{it.name}{t(it.id).on ? "" : " (off)"}</button>))}</span>
+      {s && <div style={{ display: "flex", flexDirection: "column", gap: 6, border: "1px solid var(--line)", borderRadius: 6, padding: 8 }}>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}><input type="checkbox" aria-label="Show on screen" checked={s.on} onChange={e => setT(sel, { on: e.target.checked })} />show {items.find(i => i.id === sel)?.name} on screen</label>
+        <div style={ROW}><span>Size</span><input type="range" aria-label="Button size" min={32} max={88} value={s.size} onChange={e => setT(sel, { size: Number(e.target.value) })} /></div>
+        <span className="mini">x {s.x}% · y {s.y}% of the screen</span>
+      </div>}
+    </div>
+    {yours}
+    <div style={SEC}><span className="lbl">Feel (the game's defaults)</span>
+      {feelNum("Look speed", "touchLook", 0.001, 0.001, 0.02)}
+      {feelNum("Joystick size (px)", "joystick", 5, 30, 120)}
+    </div>
+  </>;
+}
+
+// ── TRY YOUR CONTROLS ──────────────────────────────────────────────────────────
+function Tester({ input, scripts, setScripts, onLit }) {
+  const [active, setActive] = useState(false);
+  const [held, setHeld] = useState(new Set());          // action ids held now
+  const [log, setLog] = useState([]);
+  const [state, setState] = useState({ aiming: false, move: null, moveVec: [0, 0] });
+  const downCodes = useRef(new Set());
+  const padDown = useRef(new Set());
+  const timers = useRef({});
+  const add = (text, kind = "") => setLog(l => [{ t: performance.now(), text, kind }, ...l].slice(0, 40));
+  // code → actions (effective bindings)
+  const map = useMemo(() => {
+    const m = { kbm: new Map(), pad: new Map() };
+    for (const x of allBindings(input)) { const mm = x.device === "kbm" ? m.kbm : m.pad; if (!mm.has(x.code)) mm.set(x.code, []); mm.get(x.code).push(x.action); }
+    return m;
+  }, [input]);
+  const nameOf = id => BUILT_IN.find(a => a.id === id)?.name ?? input.buttons.find(b => b.id === id)?.name ?? id;
+  const heldRef = useRef(new Set());
+  const press = (action, how) => {
+    if (heldRef.current.has(action)) return;
+    heldRef.current.add(action); setHeld(new Set(heldRef.current));
+    const b = input.buttons.find(x => x.id === action);
+    add(`${nameOf(action)} pressed (${how})`, b ? "amber" : "");
+    if (b?.does?.type === "move") { add(`  → the player plays ${b.does.move}${b.kind === "hold" ? " until released" : " once"}`, "green"); setState(s => ({ ...s, move: b.does.move })); }
+    if (b?.does?.type === "aim") { add("  → aiming (where the camera looks)", "green"); setState(s => ({ ...s, aiming: true })); }
+    for (const sc of scripts.filter(s => s.button === action)) {
+      if (sc.edge === "press") add(`  script "${sc.name}" (when the player presses ${nameOf(action)})`, "blue");
+      if (sc.edge === "held") { add(`  script "${sc.name}" (while ${nameOf(action)} held, every ${sc.every} s)`, "blue");
+        timers.current[sc.id] = setInterval(() => add(`  script "${sc.name}" (still held)`, "blue"), sc.every * 1000); }
+    }
+  };
+  const release = (action, how) => {
+    if (!heldRef.current.has(action)) return;
+    heldRef.current.delete(action); setHeld(new Set(heldRef.current));
+    const b = input.buttons.find(x => x.id === action);
+    add(`${nameOf(action)} released (${how})`);
+    if (b?.does?.type === "move" && b.kind === "hold") { add(`  → ${b.does.move} stops`, "green"); setState(s => ({ ...s, move: null })); }
+    if (b?.does?.type === "move" && b.kind === "press") setTimeout(() => setState(s => ({ ...s, move: s.move === b.does.move ? null : s.move })), 600);
+    if (b?.does?.type === "aim") { add("  → stops aiming", "green"); setState(s => ({ ...s, aiming: false })); }
+    for (const sc of scripts.filter(s => s.button === action)) {
+      if (sc.edge === "release") add(`  script "${sc.name}" (when the player releases ${nameOf(action)})`, "blue");
+      if (sc.edge === "held") { clearInterval(timers.current[sc.id]); delete timers.current[sc.id]; }
+    }
+  };
+  // An action stays held while ANY of its bound codes is down.
+  const recompute = (how) => {
+    const want = new Set();
+    for (const c of downCodes.current) for (const a of map.kbm.get(c) ?? []) want.add(a);
+    for (const c of padDown.current) for (const a of map.pad.get(c) ?? []) want.add(a);
+    for (const a of [...heldRef.current]) if (!want.has(a)) release(a, how);
+    for (const a of want) if (!heldRef.current.has(a)) press(a, how);
+    const has = id => want.has(id);
+    setState(s => ({ ...s, moveVec: [(has("move_right") ? 1 : 0) - (has("move_left") ? 1 : 0), (has("move_forward") ? 1 : 0) - (has("move_back") ? 1 : 0)] }));
+    onLit({ kbm: new Set(downCodes.current), pad: new Set(padDown.current) });
+  };
+  useEffect(() => {
+    if (!active) return;
+    const kd = e => { if (e.code === "Escape") { setActive(false); return; } e.preventDefault(); if (e.repeat) return; downCodes.current.add(e.code); recompute(pretty(e.code)); };
+    const ku = e => { downCodes.current.delete(e.code); recompute(pretty(e.code)); };
+    const md = e => { if (!e.target.closest?.("[data-tester]")) return; e.preventDefault(); downCodes.current.add(`Mouse${e.button}`); recompute(pretty(`Mouse${e.button}`)); };
+    const mu = e => { if (!downCodes.current.has(`Mouse${e.button}`)) return; downCodes.current.delete(`Mouse${e.button}`); recompute(pretty(`Mouse${e.button}`)); };
+    const ctx = e => { if (e.target.closest?.("[data-tester]")) e.preventDefault(); };
+    const blur = () => { downCodes.current.clear(); padDown.current.clear(); recompute("window lost focus"); };
+    let raf = 0;
+    const poll = () => {
+      const now = new Set();
+      for (const p of navigator.getGamepads?.() ?? []) p?.buttons.forEach((b, i) => { if (b.pressed) now.add(i); });
+      const same = now.size === padDown.current.size && [...now].every(x => padDown.current.has(x));
+      if (!same) { const diff = [...now].find(x => !padDown.current.has(x)) ?? [...padDown.current].find(x => !now.has(x)); padDown.current = now; recompute(padName(diff)); }
+      raf = requestAnimationFrame(poll);
+    };
+    raf = requestAnimationFrame(poll);
+    window.addEventListener("keydown", kd, true); window.addEventListener("keyup", ku, true);
+    window.addEventListener("mousedown", md, true); window.addEventListener("mouseup", mu, true); window.addEventListener("contextmenu", ctx, true);
+    window.addEventListener("blur", blur);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true);
+      window.removeEventListener("mousedown", md, true); window.removeEventListener("mouseup", mu, true); window.removeEventListener("contextmenu", ctx, true); window.removeEventListener("blur", blur);
+      downCodes.current.clear(); padDown.current.clear(); for (const a of [...heldRef.current]) release(a, "testing stopped"); for (const t of Object.values(timers.current)) clearInterval(t); timers.current = {}; onLit({ kbm: new Set(), pad: new Set() }); };
+  }, [active, map, scripts]);
+  const all = [...BUILT_IN.map(a => ({ id: a.id, name: a.name })), ...input.buttons.map(b => ({ id: b.id, name: b.name, yours: true }))];
+  const [mx, my] = state.moveVec;
+  return (
+    <div data-tester style={{ background: "var(--app)", border: `1px solid ${active ? "var(--blueLine)" : "var(--line)"}`, borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 12, userSelect: "none" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span className="lbl" style={{ color: "var(--blue)" }}>Try your controls</span>
+        <span style={{ flex: 1 }} />
+        <button className={"btn" + (active ? " on" : " go")} data-test-toggle onClick={() => setActive(a => !a)}>{active ? "STOP TESTING (Esc)" : "START TESTING"}</button>
+        <button className="btn" onClick={() => setLog([])}>CLEAR LOG</button>
+      </div>
+      <span className="mini">{active ? "Keys, mouse buttons (click in this box) and a gamepad now go to the game, not the page. Esc stops." : "Start testing, then press keys, click in this box, or use a gamepad. The keys you press light up on the right."}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 6 }}>
+        {all.map(a => <div key={a.id} data-action-tile={a.id} style={{ padding: "6px 8px", borderRadius: 6, border: `1px solid ${held.has(a.id) ? "var(--green)" : "var(--line)"}`, background: held.has(a.id) ? "rgba(127,224,181,.18)" : "var(--app2)", color: held.has(a.id) ? "var(--green)" : a.yours ? "var(--amber)" : "var(--t2)" }}>{a.name}</div>)}
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <svg width="84" height="84" viewBox="-42 -42 84 84" aria-label="Move direction">
+          <circle r="38" fill="#1d1f26" stroke="#3a3f4a" strokeWidth="2" />
+          <line x1="0" y1="0" x2={mx * 30 / (Math.hypot(mx, my) || 1)} y2={-my * 30 / (Math.hypot(mx, my) || 1)} stroke="#7fe0b5" strokeWidth="4" strokeLinecap="round" />
+          <circle r="4" fill="#98a2b8" />
+        </svg>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span>Character: <span className={state.aiming ? "ok" : ""}>{state.aiming ? "aiming" : "not aiming"}</span>{state.move ? <> · playing <span className="ok">{state.move}</span></> : null}</span>
+          <span className="mini">The green line is the move direction (keys); a gamepad stick would steer it in the game.</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span className="lbl">Scripts (demo)</span>
+        {scripts.map(sc => (
+          <div key={sc.id} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 8px" }}>
+            <span style={{ color: "var(--t1)", minWidth: 90 }}>{sc.name}</span>
+            <span>when the player</span>
+            <select className="field" aria-label={`${sc.name} edge`} value={sc.edge} onChange={e => setScripts(s => s.map(x => x.id === sc.id ? { ...x, edge: e.target.value } : x))}>
+              <option value="press">presses</option><option value="release">releases</option><option value="held">holds (repeats)</option></select>
+            <select className="field" aria-label={`${sc.name} button`} value={sc.button} onChange={e => setScripts(s => s.map(x => x.id === sc.id ? { ...x, button: e.target.value } : x))}>
+              {input.buttons.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              <option disabled>──</option>
+              {BUILT_IN.filter(a => !a.id.startsWith("move_")).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            {sc.edge === "held" && <><span>every</span><input className="field" type="number" min={0.1} step={0.1} value={sc.every} style={{ width: 56 }} aria-label={`${sc.name} interval`}
+              onChange={e => setScripts(s => s.map(x => x.id === sc.id ? { ...x, every: Math.max(0.1, Number(e.target.value) || 0.1) } : x))} /><span>s</span></>}
+            {!input.buttons.some(b => b.id === sc.button) && !BUILT_IN.some(a => a.id === sc.button) && <span className="warn">its button was deleted: it never fires</span>}
+            <button className="btn" style={{ marginLeft: "auto" }} onClick={() => setScripts(s => s.filter(x => x.id !== sc.id))}>✕</button>
+          </div>
+        ))}
+        <button className="btn" style={{ alignSelf: "flex-start" }} onClick={() => setScripts(s => [...s, { id: "s" + Date.now(), name: `Script ${s.length + 1}`, button: input.buttons[0]?.id ?? "jump", edge: "press", every: 0.5 }])}>+ SCRIPT</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, maxHeight: 240, overflowY: "auto", background: "#141416", borderRadius: 6, padding: 8 }} data-log>
+        {log.length === 0 && <span className="mini">Nothing yet.</span>}
+        {log.map((l, i) => <span key={l.t + ":" + i} style={{ color: l.kind === "green" ? "var(--green)" : l.kind === "blue" ? "var(--blue)" : l.kind === "amber" ? "var(--amber)" : "var(--t2)", whiteSpace: "pre" }}>{l.text}</span>)}
+      </div>
+    </div>
+  );
+}
+
+// ── the player's pause menu ────────────────────────────────────────────────────
+function PauseMenu({ input, player, setPlayer }) {
+  const [capturing, setCapturing] = useState(null);
+  const eff = effective(input, player);
+  const rows = [...BUILT_IN.filter(a => !a.id.startsWith("move_") || a.id === "move_forward").map(a => ({ id: a.id, name: a.name })), ...input.buttons.map(b => ({ id: b.id, name: b.name }))];
+  const codes = id => eff.bindings.kbm[id] ?? eff.buttons.find(b => b.id === id)?.kbm ?? [];
+  useCapture(capturing, setCapturing, (cap, v) => {
+    if (v === null || RESERVED[v]) return;
+    setPlayer(p => ({ ...p, kbm: { ...p.kbm, [cap.action]: [v] } }));
+  });
+  if (!input.playersCanChange) return (
+    <div style={{ background: "var(--app)", border: "1px solid var(--line)", borderRadius: 10, padding: 16 }}>
+      <span className="lbl" style={{ color: "var(--blue)" }}>The player's pause menu</span>
+      <p className="mini">This game doesn't let players change controls (Controls → EDIT → "Players can change…" is off). The game's keys apply.</p>
+    </div>
+  );
+  return (
+    <div data-pause style={{ background: "var(--app)", border: "1px solid var(--line)", borderRadius: 10, padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span className="lbl" style={{ color: "var(--blue)" }}>The player's pause menu (keyboard)</span><span style={{ flex: 1 }} />
+        <button className="btn" onClick={() => setPlayer({ kbm: {}, feel: {} })}>RESET MY CHANGES</button></div>
+      <span className="mini">What someone playing sees. Their changes are theirs (this device) and win over the game's; TRY YOUR CONTROLS uses them.</span>
+      {rows.map(r => {
+        const mine = player.kbm?.[r.id];
+        return (
+          <div key={r.id} style={{ display: "grid", gridTemplateColumns: "110px 1fr auto", gap: 6, alignItems: "center" }}>
+            <span style={{ color: "var(--t1)" }}>{r.name}</span>
+            <span style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              {capturing?.action === r.id ? <Cap capture /> : codes(r.id).slice(0, 2).map((c, i) => <span key={i} className="k fixed">{pretty(c)}</span>)}
+              {mine && <span className="mini" style={{ color: "var(--amber)" }}>yours (game: {(input.bindings.kbm[r.id] ?? input.buttons.find(b => b.id === r.id)?.kbm ?? []).map(pretty).join(", ") || "none"})</span>}
+            </span>
+            <button className="btn" aria-label={`Change ${r.name}`} onClick={() => setCapturing({ device: "kbm", action: r.id, index: 0 })}>CHANGE</button>
+          </div>
+        );
+      })}
+      <div style={{ display: "grid", gridTemplateColumns: "110px 1fr", gap: 6, alignItems: "center" }}>
+        <span style={{ color: "var(--t1)" }}>Mouse speed</span>
+        <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input type="range" aria-label="Player mouse speed" min={0.0005} max={0.006} step={0.0005} value={eff.feel.mouseSpeed} onChange={e => setPlayer(p => ({ ...p, feel: { ...p.feel, mouseSpeed: Number(e.target.value) } }))} />
+          <span>{eff.feel.mouseSpeed}</span>{player.feel?.mouseSpeed != null && <span className="mini" style={{ color: "var(--amber)" }}>yours (game: {input.feel.mouseSpeed})</span>}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── page ───────────────────────────────────────────────────────────────────────
+function App() {
+  const [input, setInput] = useState(DEFAULT_INPUT);
+  const [view, setView] = useState("menu");
+  const [scripts, setScripts] = useState(DEMO_SCRIPTS);
+  const [player, setPlayer] = useState({ kbm: {}, feel: {} });
+  const [lit, setLit] = useState({ kbm: new Set(), pad: new Set() });
+  // One object per change of the game's controls or the player's, so the tester doesn't
+  // re-subscribe (and release every held button) on each render.
+  const eff = useMemo(() => effective(input, player), [input, player]);
+  useEffect(() => { if (view.startsWith("button:") && !input.buttons.some(b => "button:" + b.id === view)) setView("edit"); }, [input, view]);
+  return (
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: "24px 0 64px", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
+        <h1 style={{ margin: 0, font: "700 22px/1.2 var(--sans)", color: "var(--t1)" }}>Controls · working prototype</h1>
+        <span className="mini">Phase 89 · everything here is clickable. Data resets on reload.</span>
+        <span style={{ flex: 1 }} />
+        <button className="btn" onClick={() => { setInput(DEFAULT_INPUT()); setScripts(DEMO_SCRIPTS()); setPlayer({ kbm: {}, feel: {} }); setView("menu"); }}>RESET EVERYTHING</button>
+      </div>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 480px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+          <Tester input={eff} scripts={scripts} setScripts={setScripts} onLit={setLit} />
+          <PauseMenu input={input} player={player} setPlayer={setPlayer} />
+          <details style={{ background: "var(--app)", border: "1px solid var(--line)", borderRadius: 10, padding: "8px 16px" }}>
+            <summary className="lbl" style={{ cursor: "pointer" }}>game.json input (what would be saved)</summary>
+            <pre style={{ whiteSpace: "pre-wrap", color: "var(--t2)", fontSize: 10 }}>{JSON.stringify(input, null, 2)}</pre>
+          </details>
+        </div>
+        <Panel input={input} setInput={setInput} view={view} setView={setView} player={player} lit={lit} />
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
