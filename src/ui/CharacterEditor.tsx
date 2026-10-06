@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import type { AssetDef, CharacterDef, CharacterMove, CharacterSounds, PlayerFeel } from "@/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AssetDef, BodyPart, CharacterDef, CharacterMove, CharacterSounds, PlayerFeel, PlayerSettings } from "@/types";
 import type { CharacterStage, StageClip, StagePlayback } from "@/characters/CharacterStage";
 import { rigOfAsset } from "@/characters/CharacterStage";
 import { rigOverlap } from "@/characters/rig";
 import { BUILT_IN_MOVES, LOOPING_MOVES, guessClip } from "@/characters/autoFill";
 import { CAPSULE_HEIGHT, swapCharacterModel, movesLostBySwap } from "@/characters/characterRuntime";
 import { characterModelOptions } from "@/ui/CharacterPanel";
+import { BODY_PARTS } from "@/characters/mix";
+import type { SearchOption } from "@/ui/SearchSelect";
 import { SearchSelect } from "@/ui/SearchSelect";
 import { SoundPicker } from "@/ui/SoundPicker";
 
@@ -48,8 +50,9 @@ function SpeedField({ label: name, value, disabled, onChange }: { label: string;
  * list; pick a clip per move, ▶ to preview, AUTO FILL for empty ones, + ADD MOVE).
  * Bottom: the player bar (play / pause, scrub, speed, loop, BLEND TEST).
  */
-export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
+export function CharacterEditor({ draft, onChange, stage, assets, onTryIt, playerSettings }: {
   onTryIt?: () => void;   // walk it around the level with the real controls (Esc returns)
+  playerSettings: PlayerSettings;   // the game's walk / run speeds (feet checks)
   draft: CharacterDef;
   onChange: (next: CharacterDef) => void;
   stage: CharacterStage;
@@ -201,6 +204,13 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
     const moves = Object.fromEntries(Object.entries(draft.moves).map(([k, m]) => [k, m.source === id ? { ...m, clip: null, source: undefined } : m]));
     onChange({ ...draft, clipSources: draft.clipSources.filter(s => s !== id), moves });
   };
+  // Phase 87: the move whose timeline is open (click a move's name), and the ground speed the
+  // game moves at for walk / run (what the feet have to keep up with).
+  const [openMove, setOpenMove] = useState<string | null>(null);
+  const gameSpeedFor = (m: string): number | null =>
+    m === "walk" ? playerSettings.moveSpeed : m === "run" ? playerSettings.moveSpeed * (playerSettings.runMultiplier ?? 1) : null;
+  const clipOptions: SearchOption[] = sources.flatMap(src => clips.filter(c => c.source === src).map(c => ({
+    value: `${src === draft.modelAssetId ? "" : src}::${c.name}`, label: c.name, group: assetLabel(src), hint: c.loop ? "loop" : "once" })));
   const moveNames = useMemo(() => [...BUILT_IN_MOVES, ...Object.keys(draft.moves).filter(m => !(BUILT_IN_MOVES as readonly string[]).includes(m))], [draft.moves]);
   const fmt = (t: number) => t.toFixed(2);
 
@@ -353,14 +363,23 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             const custom = !(BUILT_IN_MOVES as readonly string[]).includes(m);
             return (
               <div key={m} data-move={m} style={{ display: "grid", gridTemplateColumns: "96px 1fr 40px auto auto", alignItems: "center", gap: 4 }}>
-                <span style={{ color: custom ? "#ffc58a" : C.text, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }} title={LOOPING_MOVES.has(m) ? "loops" : "plays once"}>{label(m)}</span>
+                <button data-open-move={m} onClick={() => setOpenMove(openMove === m ? null : m)}
+                  title={`${LOOPING_MOVES.has(m) ? "Loops" : "Plays once"}. Click: open its timeline (feet, footsteps, layers, handoffs).`}
+                  style={{ all: "unset", cursor: "pointer", display: "flex", flexDirection: "column", gap: 0, borderRadius: 4, padding: "2px 4px", margin: "-2px -4px",
+                    background: openMove === m ? C.blueFill : "transparent", outline: openMove === m ? `1px solid ${C.blueLine}` : "none" }}>
+                  <span style={{ color: custom ? "#ffc58a" : C.text, fontSize: 11, fontFamily: "monospace", fontWeight: 600 }}>{label(m)}{cur?.layers?.length ? <span style={{ color: "#ffb86b", fontWeight: 400 }}> · mix</span> : null}</span>
+                  {(() => {   // walk / run: are the feet keeping up with the game's speed?
+                    const v = gameSpeedFor(m), gs = cur?.clip && v ? stage.feetOfMove(m)?.groundSpeed : null;
+                    if (!v || !gs) return null;
+                    const slide = Math.abs(v - gs * (cur?.speed ?? 1)) / v;
+                    return <span style={{ fontSize: 10, color: slide > 0.12 ? "#ffb86b" : C.green }}>{slide > 0.12 ? `feet slide ${Math.round(slide * 100)}%` : "feet planted"}</span>;
+                  })()}
+                </button>
                 <SearchSelect ariaLabel={`Clip for ${label(m)}`} value={clipValue(cur)} onChange={v => pickClip(m, v)} placeholder="no clip · search…"
                   dataAttr={`clip-${m}`}
                   options={[
                     { value: "", label: "no clip" },
-                    ...sources.flatMap(src => clips.filter(c => c.source === src).map(c => ({
-                      value: `${src === draft.modelAssetId ? "" : src}::${c.name}`, label: c.name, group: assetLabel(src),
-                      hint: c.loop ? "loop" : "once" }))),
+                    ...clipOptions,
                     ...(cur?.clip && !clips.some(c => c.name === cur.clip) ? [{ value: clipValue(cur), label: `${cur.clip} (missing)` }] : []),
                   ]} />
                 <SpeedField label={label(m)} value={cur?.speed} disabled={!cur?.clip}
@@ -431,10 +450,15 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
             As the player (third person). Off here = off for this character; the game's Feel page can turn more off. An effect plays only when both allow it.
           </span>
         </div>
+        <AimSection draft={draft} onChange={onChange} stage={stage} clipOptions={clipOptions} clips={clips} />
       </div>
 
       {/* ── Bottom: PLAYER BAR ───────────────────────────────────────────── */}
       <div data-character-editor="player" style={{ position: "absolute", left: 334, right: 330, bottom: 0, zIndex: 9, background: "rgba(22,23,27,0.94)", borderTop: `1px solid ${C.line}`, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontFamily: "monospace", fontSize: 11, color: C.text2 }}>
+        {openMove && draft.moves[openMove] && (
+          <MoveTimeline move={openMove} draft={draft} onChange={onChange} stage={stage} pb={pb} clipOptions={clipOptions}
+            moveNames={moveNames} gameSpeed={gameSpeedFor(openMove)} onClose={() => setOpenMove(null)} />
+        )}
         <button style={BTN()} aria-label={pb?.playing ? "Pause" : "Play"} onClick={() => stage.setPaused(!!pb?.playing)}>{pb?.playing ? "❚❚" : "▶"}</button>
         <span style={{ minWidth: 0, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: C.blue }}>{pb?.label ?? "nothing playing"}</span>
         <input aria-label="Scrub" type="range" min={0} max={pb?.duration || 1} step={0.01} value={pb?.time ?? 0}
@@ -458,5 +482,305 @@ export function CharacterEditor({ draft, onChange, stage, assets, onTryIt }: {
           onClick={onTryIt}>TRY IT ▸</button>}
       </div>
     </>
+  );
+}
+
+// ── Phase 87: one move's timeline ───────────────────────────────────────────────
+
+const HANDOFF_PRESETS: Array<[string, number]> = [["snap", 0], ["quick", 0.08], ["smooth", 0.15], ["slow", 0.3]];
+const FIT_MIN = 0.8, FIT_MAX = 1.25;   // a clip "fits" when it needs this little speeding up / slowing down
+
+/**
+ * The open move, as rows over its loop: LAYERS (other clips on a body part), the move's
+ * CLIP, FEET (when each foot is down), STEPS (footstep moments: from the feet, or your
+ * own: drag, click the row to add, double-click to remove) and HANDOFFS (how fast other
+ * moves blend into this one). For walk and run it also says whether the feet keep up with
+ * the game's speed, with MATCH FEET and FIND A CLIP THAT FITS.
+ */
+function MoveTimeline({ move, draft, onChange, stage, pb, clipOptions, moveNames, gameSpeed, onClose }: {
+  move: string; draft: CharacterDef; onChange: (next: CharacterDef) => void; stage: CharacterStage;
+  pb: StagePlayback | null; clipOptions: SearchOption[]; moveNames: string[]; gameSpeed: number | null; onClose: () => void;
+}) {
+  const cur = draft.moves[move] ?? { clip: null };
+  const setMove = (m: CharacterMove) => onChange({ ...draft, moves: { ...draft.moves, [move]: m } });
+  const D = stage.moveDuration(move) || 1;
+  const info = stage.feetOfMove(move);
+  const rate = cur.speed ?? 1;
+  const [fits, setFits] = useState<Array<{ name: string; source: string; rate: number }> | "checking" | null>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const [over, setOver] = useState("walk");   // Phase 88: the legs move an action previews over
+  useEffect(() => { setFits(null); }, [move]);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const pct = (t: number) => `${Math.max(0, Math.min(100, (100 * t) / D))}%`;
+  const playing = !!pb?.label && pb.label.startsWith(`${move} · `);
+
+  // Feet vs the game's speed (walk / run only).
+  const gs = info?.groundSpeed ?? null;
+  const match = gameSpeed && gs ? Math.round((gameSpeed / gs) * 100) / 100 : null;
+  const slide = gameSpeed && gs ? Math.abs(gameSpeed - gs * rate) / gameSpeed : null;
+  const findFits = () => {
+    setFits("checking");
+    setTimeout(() => {
+      const out: Array<{ name: string; source: string; rate: number }> = [];
+      for (const c of stage.clips()) {
+        if (!c.loop || !gameSpeed) continue;
+        const g = stage.feetOfPoolClip(c.name, c.source)?.groundSpeed;
+        if (!g) continue;
+        const r = gameSpeed / g;
+        if (r >= FIT_MIN && r <= FIT_MAX) out.push({ name: c.name, source: c.source, rate: Math.round(r * 100) / 100 });
+      }
+      out.sort((a, b) => Math.abs(Math.log(a.rate)) - Math.abs(Math.log(b.rate)));
+      setFits(out.slice(0, 5));
+    }, 0);
+  };
+
+  // Steps: your own (fractions of the loop) or each touchdown.
+  const auto = !cur.steps;
+  const steps = cur.steps ?? (info?.feet.flatMap(f => f.touchdowns).map(t => t / D).sort((a, b) => a - b) ?? []);
+  const setSteps = (next: number[] | null) => {
+    const { steps: _s, ...rest } = cur;
+    setMove(next ? { ...rest, steps: [...next].map(f => Math.round(f * 1000) / 1000).sort((a, b) => a - b) } : rest);
+  };
+  const fracAt = (clientX: number) => {
+    const r = trackRef.current?.getBoundingClientRect();
+    return r ? Math.max(0, Math.min(0.999, (clientX - r.left) / r.width)) : 0;
+  };
+
+  // Layers.
+  const layers = cur.layers ?? [];
+  const setLayers = (next: typeof layers) => { const { layers: _l, ...rest } = cur; setMove(next.length ? { ...rest, layers: next } : rest); };
+  const [, setTick] = useState(0);   // re-render after a preview switch (the stage holds it)
+  const splitClip = (v: string) => { const [src, name] = v.split("::"); return { clip: name ?? "", ...(src ? { source: src } : {}) }; };
+
+  // Handoffs into this move.
+  const into = Object.entries(draft.handoffs ?? {}).filter(([k]) => k.endsWith(`>${move}`)).map(([k, v]) => ({ from: k.slice(0, -move.length - 1), secs: v }));
+  const setHandoff = (from: string, secs: number | null) => {
+    const h = { ...draft.handoffs };
+    if (secs == null) delete h[`${from}>${move}`]; else h[`${from}>${move}`] = Math.max(0, Math.round(secs * 100) / 100);
+    onChange({ ...draft, handoffs: Object.keys(h).length ? h : undefined });
+  };
+
+  const ROW: React.CSSProperties = { display: "grid", gridTemplateColumns: "104px 1fr", alignItems: "center", gap: 8, minHeight: 22 };
+  const TRACK: React.CSSProperties = { position: "relative", height: 18, background: "#141416", borderRadius: 4, border: "1px solid rgba(255,255,255,0.08)" };
+  const segs = (a: number, b: number): Array<[number, number]> => b >= a ? [[a, b]] : [[a, D], [0, b]];   // a contact that wraps past the loop end
+
+  return (
+    <div data-move-timeline={move} style={{ flexBasis: "100%", display: "flex", flexDirection: "column", gap: 6, paddingBottom: 8, borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ color: C.text, fontWeight: 600 }}>{label(move)}</span>
+        <span>{cur.clip ?? "no clip"}{rate !== 1 ? ` · ${rate}×` : ""}{layers.length ? ` + ${layers.length} layer${layers.length > 1 ? "s" : ""}` : ""} · {D.toFixed(2)} s</span>
+        <button style={BTN()} onClick={() => cur.part ? stage.previewAction(move, over) : stage.playMove(move)} disabled={!cur.clip}
+          title={cur.part ? `Play it on the ${BODY_PARTS.find(p => p.id === cur.part)?.label} over ${label(over)}` : "Play it"}>▶ PLAY</button>
+        <span>plays on</span>
+        <select aria-label="Plays on" value={cur.part ?? ""} style={INPUT}
+          title="Whole body: a script's play move takes over the character. A body part: it plays there only, while the rest keeps walking, running, jumping (e.g. shooting while walking)."
+          onChange={e => { const { part: _p, aims: _a, ...rest } = cur; setMove(e.target.value ? { ...rest, part: e.target.value as BodyPart, ...(cur.aims ? { aims: true } : {}) } : rest); }}>
+          <option value="">whole body</option>
+          {BODY_PARTS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        {cur.part && <>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }} title="Aim while this plays (the AIM section: where the camera looks up / down)">
+            <input type="checkbox" aria-label="Aims while playing" checked={!!cur.aims} onChange={e => { const { aims: _a, ...rest } = cur; setMove(e.target.checked ? { ...rest, aims: true } : rest); }} />
+            aims
+          </label>
+          <span>preview over</span>
+          <select aria-label="Preview over" value={over} style={INPUT} onChange={e => setOver(e.target.value)}>
+            {["idle", "walk", "run"].filter(m => draft.moves[m]?.clip).map(m => <option key={m} value={m}>{label(m)}</option>)}
+          </select>
+        </>}
+        <span style={{ flex: 1 }} />
+        {gameSpeed != null && gs != null && slide != null && (
+          <span data-feet-status style={{ color: slide > 0.12 ? "#ffb86b" : C.green }} title={`The clip walks at ${gs.toFixed(2)} m/s; at ${rate}× that's ${(gs * rate).toFixed(2)} m/s. The game moves ${gameSpeed.toFixed(1)} m/s.`}>
+            {slide > 0.12 ? `feet slide ${Math.round(slide * 100)}%` : "feet planted"}
+          </span>
+        )}
+        {match != null && <button style={BTN(slide != null && slide > 0.12)} title={`Play the clip at ${match}× so a planted foot moves with the ground at ${gameSpeed} m/s`} onClick={() => setMove({ ...cur, speed: match })}>MATCH FEET ({match}×)</button>}
+        {gameSpeed != null && <button style={BTN()} title="Look through every looping clip for ones that keep the feet planted at this speed without much speeding up or slowing down" onClick={findFits}>FIND A CLIP THAT FITS</button>}
+        <button style={BTN()} onClick={onClose} title="Close the timeline">✕</button>
+      </div>
+      {match != null && (match < FIT_MIN * 0.85 || match > FIT_MAX * 1.2) && fits == null && (
+        <span style={{ color: "#ffb86b", fontSize: 10 }}>At {match}× this clip will look {match > 1 ? "rushed" : "slow-motion"}: a clip made for {gameSpeed?.toFixed(1)} m/s fits better (FIND A CLIP THAT FITS).</span>
+      )}
+      {fits === "checking" && <span style={{ fontSize: 10 }}>Checking every looping clip's feet…</span>}
+      {Array.isArray(fits) && (
+        <div data-fits style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: 10 }}>{fits.length ? "Fits at this speed (click to use):" : `No clip keeps the feet planted at ${gameSpeed} m/s within ${FIT_MIN}× to ${FIT_MAX}×.`}</span>
+          {fits.map(f => (
+            <button key={`${f.source}::${f.name}`} style={BTN()} onClick={() => { setMove({ ...cur, clip: f.name, source: f.source === draft.modelAssetId ? undefined : f.source, speed: f.rate }); setFits(null); }}>
+              {f.name} at {f.rate}×
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* LAYERS */}
+      {layers.map((l, i) => (
+        <div key={i} data-layer={i} style={{ ...ROW, opacity: stage.layerOn(move, i) ? 1 : 0.5 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} title="Preview with or without this layer. Editor only: the game always plays every layer.">
+            <input type="checkbox" className="wb-switch" aria-label={`Layer ${i + 1} on in the preview`} checked={stage.layerOn(move, i)}
+              onChange={e => { stage.setLayerOn(move, i, e.target.checked); setTick(t => t + 1); }} />
+            <span style={LBL}>LAYER {i + 1}</span>
+          </label>
+          <span style={{ display: "flex", gap: 6, alignItems: "center", minWidth: 0 }}>
+            <SearchSelect ariaLabel={`Layer ${i + 1} clip`} value={l.clip ? `${l.source ?? ""}::${l.clip}` : ""} placeholder="pick a clip…" style={{ flex: 1 }}
+              options={clipOptions} onChange={v => setLayers(layers.map((x, j) => j === i ? { ...splitClip(v), part: x.part } : x))} />
+            <span>on the</span>
+            <select aria-label={`Layer ${i + 1} body part`} value={l.part} style={INPUT} onChange={e => setLayers(layers.map((x, j) => j === i ? { ...x, part: e.target.value as BodyPart } : x))}>
+              {BODY_PARTS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+            <button style={BTN()} title="Remove this layer" onClick={() => { stage.resetLayerSwitches(move); setLayers(layers.filter((_, j) => j !== i)); }}>✕</button>
+          </span>
+        </div>
+      ))}
+
+      {/* CLIP */}
+      <div style={ROW}>
+        <span style={LBL}>CLIP</span>
+        <div style={TRACK}>
+          <div style={{ position: "absolute", inset: 1, borderRadius: 3, background: "rgba(80,140,255,0.25)", display: "flex", alignItems: "center", paddingLeft: 6, color: C.text, fontSize: 10, overflow: "hidden", whiteSpace: "nowrap" }}>
+            {cur.clip ?? "no clip"}{layers.length ? `, with ${layers.map(l => `${l.clip || "?"} on the ${BODY_PARTS.find(p => p.id === l.part)?.label}`).join(", ")}` : ""}
+          </div>
+          {playing && <div style={{ position: "absolute", top: -3, bottom: -3, width: 2, background: "#ff9b8a", left: pct(pb!.time) }} />}
+        </div>
+      </div>
+
+      {/* FEET */}
+      <div style={ROW}>
+        <span style={LBL}>FEET</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          {info ? info.feet.map((f, k) => (
+            <div key={k} style={{ ...TRACK, height: 8 }} title={`${f.name}: green = on the ground`}>
+              {f.contacts.flatMap(([a, b]) => segs(a, b)).map(([a, b], j) => (
+                <div key={j} style={{ position: "absolute", top: 1, bottom: 1, left: pct(a), width: `calc(${pct(b)} - ${pct(a)})`, background: "rgba(127,224,181,0.7)", borderRadius: 3 }} />
+              ))}
+            </div>
+          )) : <span style={{ fontSize: 10 }}>No feet found on this skeleton (footsteps fall back to every STRIDE meters).</span>}
+        </div>
+      </div>
+
+      {/* STEPS */}
+      <div style={ROW}>
+        <span style={LBL}>STEPS</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div ref={trackRef} data-steps-track style={{ ...TRACK, flex: 1, cursor: "copy" }}
+            title="Click to add a footstep here; drag one to move it; double-click one to remove it"
+            onClick={e => { if (e.target === e.currentTarget) setSteps([...steps, fracAt(e.clientX)]); }}>
+            {steps.map((f, i) => (
+              <div key={i} data-step={i}
+                onPointerDown={e => { e.stopPropagation(); (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); setDragging(i); }}
+                onPointerMove={e => { if (dragging === i) setSteps(steps.map((x, j) => j === i ? fracAt(e.clientX) : x)); }}
+                onPointerUp={() => setDragging(null)}
+                onDoubleClick={e => { e.stopPropagation(); setSteps(steps.filter((_, j) => j !== i)); }}
+                style={{ position: "absolute", top: 3, width: 10, height: 10, marginLeft: -5, left: `${f * 100}%`, transform: "rotate(45deg)", background: auto ? C.green : "#ffb86b", cursor: "ew-resize", borderRadius: 2 }} />
+            ))}
+          </div>
+          <span style={{ fontSize: 10, color: auto ? C.green : "#ffb86b", whiteSpace: "nowrap" }}>{auto ? (steps.length ? "from the feet" : "none") : "your own"}</span>
+          {!auto && <button style={BTN()} title="Go back to a step each time a foot touches down" onClick={() => setSteps(null)}>FROM THE FEET</button>}
+        </div>
+      </div>
+
+      {/* HANDOFFS */}
+      <div style={ROW}>
+        <span style={LBL}>HANDOFFS</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10 }}>into {label(move)} from:</span>
+          {into.map(h => {
+            const preset = HANDOFF_PRESETS.find(([, v]) => v === h.secs)?.[0] ?? "custom";
+            return (
+              <span key={h.from} data-handoff={h.from} style={{ display: "flex", gap: 4, alignItems: "center", border: `1px solid ${C.line}`, borderRadius: 4, padding: "2px 4px" }}>
+                <span style={{ color: C.text }}>{label(h.from)}</span>
+                <select aria-label={`Handoff from ${label(h.from)}`} value={preset} style={INPUT}
+                  onChange={e => { const p = HANDOFF_PRESETS.find(([n]) => n === e.target.value); if (p) setHandoff(h.from, p[1]); }}>
+                  {HANDOFF_PRESETS.map(([n, v]) => <option key={n} value={n}>{n} {v} s</option>)}
+                  {preset === "custom" && <option value="custom">custom</option>}
+                </select>
+                <input aria-label={`Handoff seconds from ${label(h.from)}`} type="number" min={0} step={0.01} value={h.secs} style={{ ...INPUT, width: 52 }}
+                  onChange={e => { const v = parseFloat(e.target.value); if (v >= 0) setHandoff(h.from, v); }} />
+                <span>s</span>
+                <button style={BTN()} title={`Play ${label(h.from)}, then blend into ${label(move)}`} onClick={() => stage.blendTest(h.from, move)}>▶</button>
+                <button style={BTN()} title="Back to the usual 0.15 s" onClick={() => setHandoff(h.from, null)}>✕</button>
+              </span>
+            );
+          })}
+          <select aria-label="Add a handoff from" value="" style={INPUT} onChange={e => { if (e.target.value) setHandoff(e.target.value, 0.15); }}>
+            <option value="">+ from…</option>
+            {moveNames.filter(m => m !== move && draft.moves[m]?.clip && !into.some(h => h.from === m)).map(m => <option key={m} value={m}>{label(m)}</option>)}
+          </select>
+          <span style={{ fontSize: 10 }}>others: 0.15 s</span>
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button style={BTN()} title="Mix another clip in on a body part (legs, upper body, arms, head)"
+          onClick={() => setLayers([...layers, { clip: "", part: "upper" }])}>+ LAYER</button>
+        <span style={{ fontSize: 10, alignSelf: "center" }}>A layer plays another clip on one body part, e.g. Idle_Talking_Loop on the upper body while the legs walk.</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Phase 88: AIM ──────────────────────────────────────────────────────────────
+
+/**
+ * The character's aim poses: up / straight / down clips on a body part and how far up /
+ * down they reach, with a preview slider. Without all three the spine turns instead.
+ * Quick picks fill the three from a family of clips named *_Aim_Up / _Neutral / _Down.
+ */
+function AimSection({ draft, onChange, stage, clipOptions, clips }: {
+  draft: CharacterDef; onChange: (next: CharacterDef) => void; stage: CharacterStage; clipOptions: SearchOption[]; clips: StageClip[];
+}) {
+  const aim = draft.aim ?? {};
+  const [pv, setPv] = useState(stage.aimPreview);
+  const setAim = (patch: Partial<NonNullable<CharacterDef["aim"]>>) => {
+    const next: Record<string, unknown> = { ...aim, ...patch };
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    onChange({ ...draft, aim: Object.keys(next).length ? next as CharacterDef["aim"] : undefined });
+  };
+  const ref = (v: string) => { const [src, name] = v.split("::"); return name ? { clip: name, ...(src ? { source: src } : {}) } : undefined; };
+  const val = (r?: { clip: string; source?: string }) => r ? `${r.source ?? ""}::${r.clip}` : "";
+  const families = [...new Set(clips.filter(c => /_aim_up$/i.test(c.name)).map(c => c.name.replace(/_aim_up$/i, "")))]
+    .filter(f => ["Neutral", "Down"].every(s => clips.some(c => c.name.toLowerCase() === `${f}_aim_${s}`.toLowerCase())));
+  const pick = (f: string) => {
+    const r = (s: string) => { const c = clips.find(x => x.name.toLowerCase() === `${f}_aim_${s}`.toLowerCase())!; return { clip: c.name, ...(c.source !== draft.modelAssetId ? { source: c.source } : {}) }; };
+    setAim({ up: r("up"), neutral: r("neutral"), down: r("down") });
+  };
+  const preview = (on: boolean, deg: number) => { setPv({ on, deg }); stage.setAimPreview(on, deg); };
+  const full = !!(aim.up && aim.neutral && aim.down);
+  return (
+    <div data-character-aim style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ ...LBL, flex: 1 }}>AIM</span>
+        {families.map(f => <button key={f} style={BTN()} title={`Use ${f}_Aim_Up / _Neutral / _Down`} onClick={() => pick(f)}>{f.toUpperCase()}</button>)}
+      </div>
+      {([["UP", "up"], ["STRAIGHT", "neutral"], ["DOWN", "down"]] as const).map(([name, k]) => (
+        <div key={k} style={{ display: "grid", gridTemplateColumns: "72px 1fr", alignItems: "center", gap: 4 }}>
+          <span style={{ color: C.text, fontSize: 11, fontFamily: "monospace" }}>{name}</span>
+          <SearchSelect ariaLabel={`Aim ${name.toLowerCase()} clip`} value={val(aim[k])} placeholder="pick a clip…" options={[{ value: "", label: "none" }, ...clipOptions]}
+            onChange={v => setAim({ [k]: ref(v) })} />
+        </div>
+      ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ color: C.text, fontSize: 11 }}>on the</span>
+        <select aria-label="Aim body part" value={aim.part ?? "upper"} style={INPUT} onChange={e => setAim({ part: e.target.value as BodyPart })}>
+          {BODY_PARTS.filter(p => p.id !== "legs").map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        <span style={{ color: C.text, fontSize: 11 }}>reach up</span>
+        <input aria-label="Aim reach up" type="number" min={5} max={90} step={5} value={aim.upDeg ?? 60} style={{ ...INPUT, width: 44 }} onChange={e => setAim({ upDeg: Number(e.target.value) || undefined })} />
+        <span style={{ color: C.text, fontSize: 11 }}>down</span>
+        <input aria-label="Aim reach down" type="number" min={5} max={90} step={5} value={aim.downDeg ?? 60} style={{ ...INPUT, width: 44 }} onChange={e => setAim({ downDeg: Number(e.target.value) || undefined })} />
+        <span style={{ color: C.text2, fontSize: 11 }}>°</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: C.text, fontSize: 11 }}>
+          <input type="checkbox" className="wb-switch" aria-label="Preview aiming" checked={pv.on} onChange={e => preview(e.target.checked, pv.deg)} />
+          preview
+        </label>
+        <input aria-label="Aim angle" type="range" min={-90} max={90} step={1} value={pv.deg} disabled={!pv.on} style={{ flex: 1 }} onChange={e => preview(true, Number(e.target.value))} />
+        <span style={{ color: C.text, fontSize: 11, width: 36, textAlign: "right" }}>{pv.deg}°</span>
+      </div>
+      <span style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
+        {full ? "While aiming, the " + (BODY_PARTS.find(p => p.id === (aim.part ?? "upper"))?.label ?? "upper body") + " takes the pose for the angle (straight between). " : "Without all three clips the spine and head turn toward the aim instead. "}
+        In the game the angle is where the camera looks up or down. Aiming starts with a script (aim on / off) or a move set to aim while it plays (its timeline).
+      </span>
+    </div>
   );
 }

@@ -844,13 +844,20 @@ export class ScriptEngine {
       // Phase 86: a character's MOVE (whatever clip it maps to). Loop / hold as play_animation.
       case "play_move":
         if (action.move) {
+          const stop = action.moveStop || undefined;   // Phase 88
           if (action.targetId === "player") {
-            this._bus.emit("character:play-move", { move: action.move, loop: action.animationLoop, hold: action.animationHold });
+            this._bus.emit("character:play-move", { move: action.move, loop: action.animationLoop, hold: action.animationHold, stop });
             break;
           }
           for (const id of this._resolveTargets(action.targetId))
-            this._bus.emit("object:play-move", { id, move: action.move, loop: action.animationLoop, hold: action.animationHold });
+            this._bus.emit("object:play-move", { id, move: action.move, loop: action.animationLoop, hold: action.animationHold, stop });
         }
+        break;
+
+      // Phase 88: aiming on / off (the player aims where the camera looks up / down).
+      case "set_aim":
+        if (action.targetId === "player") { this._bus.emit("character:aim", { on: action.aimOn !== false }); break; }
+        for (const id of this._resolveTargets(action.targetId)) this._bus.emit("object:aim", { id, on: action.aimOn !== false });
         break;
 
       case "change_material": {

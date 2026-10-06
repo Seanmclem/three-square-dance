@@ -68,6 +68,9 @@
   <li><a href="#what">What a character is</a></li>
   <li><a href="#panel">The Characters panel</a></li>
   <li><a href="#editor">The character editor</a></li>
+  <li><a href="#model">Changing the model</a></li>
+  <li><a href="#timeline">A move's timeline: feet, footsteps, mixing, handoffs</a></li>
+  <li><a href="#actions">Actions on a body part, and aiming</a></li>
   <li><a href="#moves">Moves: what plays when</a></li>
   <li><a href="#files">Borrowing clips from other files</a></li>
   <li><a href="#using">Using characters: player, enemies, scripts</a></li>
@@ -116,6 +119,27 @@
 <h2 id="model">Changing the model</h2>
 <p>Pick another model in MODEL. With the <b>same skeleton</b> (the male mannequin inside UAL1 / UAL2 and Mannequin F share one), it just changes: every move keeps its clip, and the old model's own clips are now borrowed from it (it joins the files on the left). With a <b>different skeleton</b> (the mannequin to the bunny) it asks first and lists the moves that lose their clip: borrowed files can't play on it, so they're removed, and a move keeps its clip only if the new model has one of the same name. CHANGE MODEL, then AUTO FILL picks clips for the empty moves. Either way the name, height, colors, sounds, FEEL and move speeds stay.</p>
 
+<h2 id="timeline">A move's timeline: feet, footsteps, mixing, handoffs</h2>
+<p>Click a move's name in MOVES (walk, run, your own) to open its timeline above the player bar. Walk and run also say under their name whether the feet keep up with the game: <b>feet planted</b> (green) or <b>feet slide 44%</b> (amber). ✕ closes the timeline.</p>
+<ul>
+  <li><b>Sliding feet</b> (walk and run): the clip is measured for how fast it walks (how fast a planted foot moves back under the body) and compared with the game's speed (MOVE SPEED, and × RUN for run). <b>MATCH FEET</b> sets the move's SPEED so the feet stay planted. If that speed would look rushed or slow-motion, <b>FIND A CLIP THAT FITS</b> lists clips made for about that pace (needing 0.8× to 1.25×); click one to use it at the right speed. Example: at the obby's 6 m/s, UAL's <code>Walk_Loop</code> would need 7.3×, while <code>Sprint_Loop</code> fits at 0.84×.</li>
+  <li><b>FEET</b>: green where each foot is on the ground.</li>
+  <li><b>STEPS</b>: when footstep sounds play. Green diamonds = a step each time a foot touches down (the default). Click the row to add a step, drag one to move it, double-click to remove it; they turn amber ("your own"), and <b>FROM THE FEET</b> goes back. In the game, a character's walk and run play their steps here; a clip with no feet found (and the plain capsule, and players without a character) still steps every STRIDE meters.</li>
+  <li><b>LAYERS</b> (mixing): <b>+ LAYER</b> plays another clip on one body part: <i>upper body</i> (spine, arms and head), <i>arms</i>, <i>head</i> or <i>legs</i>. Example: walk = <code>Sprint_Loop</code> with <code>Idle_Talking_Loop</code> on the upper body makes a talking jog. The move list marks it <b>mix</b>. Make a new move with + ADD MOVE and give it layers for moves no clip has. The move's own clip covers every body part the layers don't, so for "punch while walking" use the walk as the clip and Punch_Jab on the upper body (or the punch as the clip and the walk on the legs). A layer keeps facing the way it does in its own clip, even when the legs lean (a punch over a run still punches forward). The switch at the start of each LAYER row turns it off and on <i>in the preview only</i>, to compare; the game always plays every layer. Loops line up: the mix lasts a whole number of the move's loops, and the layer is stretched a little to fit.</li>
+  <li><b>HANDOFFS</b>: how quickly another move blends into this one. <b>+ from…</b> picks the move it comes from, then <i>snap 0</i>, <i>quick 0.08</i>, <i>smooth 0.15</i>, <i>slow 0.3</i> s or any number; ▶ plays the pair. Pairs you don't set use the usual 0.15 s. The BLEND test in the player bar uses them too.</li>
+</ul>
+<p>Speeds, steps and handoffs apply to the player. Placed characters and enemies play the mixed moves and SPEEDs too; their handoffs and footsteps are unchanged for now.</p>
+
+<h2 id="actions">Actions on a body part, and aiming</h2>
+<p>For things like shooting while walking: the game keeps choosing the legs (idle, walk, run, jump) and the action plays on top, on one body part. One <code>shoot</code> move then works standing, walking, running and jumping.</p>
+<ul>
+  <li><b>Make the action:</b> + ADD MOVE (e.g. <code>shoot</code>), give it a clip (<code>Pistol_Shoot</code>), click its name to open its timeline, and set <b>plays on</b> to <i>upper body</i> (or arms, head, legs). Leave it on <i>whole body</i> for moves that should take over the character (death, a dance). <b>preview over</b> picks idle, walk or run, and ▶ PLAY shows the action on top of it.</li>
+  <li><b>Start and stop it:</b> a script's <b>play move</b> (Loop for a continuous one); the same action with <b>Stop it</b> on ends it. A looping action keeps going while the player moves; a one-shot ends by itself. It keeps facing the way it does in its own clip, whatever the legs do.</li>
+  <li><b>Aiming:</b> the <b>AIM</b> section (under FEEL) takes three clips, aiming up, straight and down; <b>PISTOL</b> and <b>BOW</b> fill them from UAL's <code>Pistol_Aim_*</code> and <code>Bow_Aim_*</code>. Choose the body part and how far up and down they reach; <b>preview</b> with the slider. While aiming, that part takes the pose for the angle; over an action (tick <b>aims</b> in its timeline) the action is tilted by the angle, so <code>Pistol_Shoot</code> fires where you aim. In the game the angle is where the third-person camera looks up or down, level at the camera's starting tilt.</li>
+  <li><b>No aim clips</b> (the bunny): the spine and head turn toward the angle instead.</li>
+  <li><b>Scripts:</b> <b>aim on / off</b> starts and stops aiming (the player, or a placed character, which aims straight ahead for now); a move set to <b>aims</b> aims while it plays. Buttons for shooting and aiming come in a later phase; for now any trigger works (E, volumes, timers, game state).</li>
+</ul>
+
 <h2 id="moves">Moves: what plays when</h2>
 <p>Every move works for every use; scripts can play any of them. What differs is which moves the engine plays <i>by itself</i>:</p>
 <table>
@@ -146,7 +170,7 @@
   <li><b>Player:</b> the CHARACTER menu on the player settings' Character page (or USE AS PLAYER in the panel). On that page, with CHARACTER set to None, <b>SAVE AS A CHARACTER</b> turns the MODEL and ANIMATIONS settings there into a character and picks it: it plays exactly as before, and from then on you edit it in the character editor. The character brings the model, size, colors, animations and their speeds, its sounds and its FEEL switches; jump height, move speed, run, CHARACTER SCALE and the camera stay with the game (levels are built around them).</li>
   <li><b>Placing one:</b> PLACE arms the object tool with it; click to drop it (keep clicking for more, <kbd>Esc</kbd> stops). A placed character idles in its idle move and plays moves from scripts.</li>
   <li><b>Enemies:</b> select a placed character and turn on ENEMY AI on its AI screen. Its idle, walk and attack clips come from the character's moves.</li>
-  <li><b>Scripts, play move:</b> pick the target (the player or an object) and a move name; Loop and Hold at end work as in play animation. It plays whatever clip that character's move is set to, so swapping a clip never touches the script.</li>
+  <li><b>Scripts, play move:</b> pick the target (the player or an object) and a move name; Loop and Hold at end work as in play animation. It plays whatever clip that character's move is set to, so swapping a clip never touches the script. A move that plays on a body part plays over whatever the character is doing (see <a href="#actions">Actions</a>); <b>Stop it</b> ends a move. <b>Aim on / off</b> starts and stops aiming.</li>
 </ul>
 
 <h2 id="tips">Tips</h2>

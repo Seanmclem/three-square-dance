@@ -10,8 +10,10 @@ import type { WorldObject, Vec3 } from "@/types";
 import { reportTransformWrite } from "@/world/transformWatchdog";
 import { CharacterAnimator } from "@/characters/CharacterAnimator";
 import { legacyGuess } from "@/characters/autoFill";
-import { loadCharacter, moveResolver, topBoneNames, applyCharacterLook, keepInPlace, moveSpeedOf, clipSpeedOf } from "@/characters/characterRuntime";
+import { loadCharacter, moveResolver, topBoneNames, applyCharacterLook, keepInPlace, moveSpeedOf, clipSpeedOf, aimPosesOf } from "@/characters/characterRuntime";
+import { mixRig } from "@/characters/mix";
 import type { CharacterDef } from "@/types";
+type AnimatorOptions = ConstructorParameters<typeof CharacterAnimator>[4];
 
 /** Default crossfade duration (seconds) when switching animation clips. */
 const BLEND_SEC = 0.3;
@@ -37,6 +39,7 @@ const ANIM_SCRIPT   = 2;
 export class ObjectPlacer {
   private readonly _anims    = new Map<string, CharacterAnimator>();   // Phase 86: was a raw mixer per object
   private readonly _characterObjs = new Set<string>();                  // Phase 86: objects that are game characters
+  private readonly _charDefs = new Map<string, CharacterDef>();          // Phase 88: …and which (their moves' body parts)
   private readonly _clips    = new Map<string, Map<string, THREE.AnimationClip>>();
   private readonly _autoPlay = new Map<string, string | null>();
   private readonly _finish   = new Map<string, () => void>();
@@ -60,9 +63,12 @@ export class ObjectPlacer {
     this._bus.on("object:play-animation", ({ id, clipName, loop, hold, blend }) =>
       clipName === "__auto__" ? this.stopPreview(id) : this.previewClip(id, clipName, { loop, hold, blend }));
     // Phase 86: play move (a character's move, else the model's clip that the name guess picks).
-    this._bus.on("object:play-move", ({ id, move, loop, hold }) => {
+    this._bus.on("object:play-move", ({ id, move, loop, hold, stop }) => {
+      if (stop) { this.stopMove(id, move); return; }
       if (!this.playMove(id, move, { loop, hold })) console.warn(`ObjectPlacer: object "${id}" has no move "${move}"`);
     });
+    // Phase 88: aiming on / off (straight ahead: no aim angle for objects yet).
+    this._bus.on("object:aim", ({ id, on }) => { this._anims.get(id)?.setAim(on); });
     this._bus.on("object:updated", ({ id, changes }) => {
       if (import.meta.env.DEV && this._meshes.get(id)?.userData["_instanced"] &&
           (changes.material || changes.position || changes.rotation || changes.scale)) {
@@ -145,7 +151,7 @@ export class ObjectPlacer {
       let mesh: THREE.Object3D;
       let clips: THREE.AnimationClip[] = [];
       let resolve: ((move: string) => THREE.AnimationClip | null) | undefined;
-      let speeds: { move: (m: string) => number; clip: (n: string) => number } | undefined;
+      let speeds: AnimatorOptions | undefined;
       const character = obj.characterId ? this._characterLookup(obj.characterId) : null;
       if (character) {
         // A game character: its model, its clips (own + borrowed), its moves and its look.
@@ -160,8 +166,13 @@ export class ObjectPlacer {
         const tops = topBoneNames(model);
         // KEEP IN PLACE applies to every clip (the AI and scripts play clips by name too).
         clips = loaded.pool.map(p => character.inPlace === false ? p.clip : keepInPlace(p.clip, tops));
-        resolve = moveResolver(character, loaded.pool, tops);
-        speeds = { move: m => moveSpeedOf(character, m), clip: n => clipSpeedOf(character, n) };   // each move's SPEED
+        const rig = mixRig(model);
+        resolve = moveResolver(character, loaded.pool, tops, rig);
+        // Mixed moves (Phase 87) play a clip of their own: list it with the rest, so the
+        // enemy AI and scripts (which play clips by name) find it.
+        for (const m of Object.keys(character.moves)) { const c = character.moves[m]!.layers?.length ? resolve(m) : null; if (c && !clips.includes(c)) clips.push(c); }
+        speeds = { move: m => moveSpeedOf(character, m), clip: n => clipSpeedOf(character, n), rig, aim: () => aimPosesOf(character, loaded.pool) };   // each move's SPEED; actions + aim (Phase 88)
+        this._charDefs.set(obj.id, character);
       } else if (isGltf) {
         const gltf = await assetManager.loadGLTF(obj.assetId) as {
           scene: THREE.Object3D;
@@ -279,6 +290,7 @@ export class ObjectPlacer {
     }
     this._anims.delete(objectId);
     this._characterObjs.delete(objectId);
+    this._charDefs.delete(objectId);
     this._clips.delete(objectId);
     this._autoPlay.delete(objectId);
     this._channel.delete(objectId);
@@ -465,7 +477,7 @@ export class ObjectPlacer {
   }
 
   private _setupMixer(obj: WorldObject, mesh: THREE.Object3D, clips: THREE.AnimationClip[], resolve?: (move: string) => THREE.AnimationClip | null,
-                      speeds?: { move: (m: string) => number; clip: (n: string) => number }): void {
+                      speeds?: AnimatorOptions): void {
     const clipMap = new Map<string, THREE.AnimationClip>();
     // A character's pool lists its own clips first (first name wins); a plain model keeps
     // the old map (a later clip of the same name wins).
@@ -498,10 +510,22 @@ export class ObjectPlacer {
   /** Phase 86: play a MOVE on an object (play move action): the clip its moves give,
    *  through the script channel like play_animation. False when it has no such move. */
   playMove(objectId: string, move: string, opts?: { loop?: boolean; hold?: boolean }): boolean {
+    // Phase 88: a move that plays on a body part plays over whatever the object is doing.
+    const part = this._charDefs.get(objectId)?.moves[move]?.part;
+    const anim = this._anims.get(objectId);
+    if (part && anim?.playAction(move, part, { loop: !!opts?.loop, hold: !!opts?.hold, aims: this._charDefs.get(objectId)?.moves[move]?.aims })) return true;
     const clip = this._anims.get(objectId)?.clipFor(move);
     if (!clip) return false;
     this.previewClip(objectId, clip.name, opts);
     return true;
+  }
+
+  /** Phase 88: stop a move a script started (its body-part action, or the clip). */
+  stopMove(objectId: string, move: string): void {
+    const anim = this._anims.get(objectId);
+    if (!anim) return;
+    if (anim.action === `action:${move}`) { anim.stopAction(); return; }
+    this.stopPreview(objectId);
   }
 
   private _fallbackBox(obj: WorldObject, zoneId: string): THREE.Object3D {

@@ -95,7 +95,23 @@ export interface AssetDef {
 /** Phase 86: one move of a character: the clip it plays (null = none), from which file
  *  (`source` = an asset id; absent = the first file that has a clip of that name: the
  *  model's own, then `clipSources` in order). */
-export interface CharacterMove { clip: string | null; source?: string; loop?: boolean; speed?: number }
+export interface CharacterMove {
+  clip: string | null; source?: string; loop?: boolean; speed?: number;
+  /** Phase 87: other clips mixed in on a body part (the move's clip drives the rest). */
+  layers?: MoveLayer[];
+  /** Phase 87: footstep moments as fractions of the loop (0..1); absent = when each foot
+   *  touches down, read from the clip. */
+  steps?: number[];
+  /** Phase 88: played by a script (or hit / talk), the move plays on this body part only
+   *  and the rest keeps doing what the game picked; absent = the whole body. */
+  part?: BodyPart;
+  /** Phase 88: aim (see CharacterDef.aim) while this move plays. */
+  aims?: boolean;
+}
+
+/** Phase 87: a body part a mixed-in clip plays on. "upper" = spine, arms and head. */
+export type BodyPart = "upper" | "arms" | "head" | "legs";
+export interface MoveLayer { clip: string; source?: string; part: BodyPart }
 
 /**
  * Phase 86: a character, saved per game (GameConfig.characters, like prefabs): a model
@@ -123,7 +139,16 @@ export interface CharacterDef {
    *  character (the player's Feel page can turn more off; an effect plays only when both
    *  allow it). */
   feel?:        PlayerFeel;
+  /** Phase 87: how long one move takes to blend into another, in seconds, by
+   *  "from>to" (e.g. "walk>jump"); a pair not listed uses the game's 0.15 s. */
+  handoffs?:    Record<string, number>;
+  /** Phase 88: aiming. Three poses (up / straight / down) on a body part, blended by the
+   *  aim angle; without them the spine turns toward the angle instead. */
+  aim?:         { up?: ClipRef; neutral?: ClipRef; down?: ClipRef; part?: BodyPart; upDeg?: number; downDeg?: number };
 }
+
+/** Phase 88: a clip by name, from a file (absent = the first that has it). */
+export interface ClipRef { clip: string; source?: string }
 
 export type CharacterSounds = Pick<PlayerSettings,
   "footstepSound" | "footstepVariants" | "footstepPitchWobble" | "footstepVolume" | "footstepDistance"
@@ -551,9 +576,11 @@ export interface BusEvents {
   "character:play-animation": { clipName: string; loop?: boolean; hold?: boolean };
   // Phase 86: play a MOVE on the player (play move action), or an automatic one (`auto`:
   // death before a respawn, hit on damage), which only a player using a character plays.
-  "character:play-move":   { move: string; loop?: boolean; hold?: boolean; auto?: boolean };
+  "character:play-move":   { move: string; loop?: boolean; hold?: boolean; auto?: boolean; stop?: boolean };
+  "character:aim":         { on: boolean };
+  "object:aim":            { id: string; on: boolean };
   // Phase 86: play a MOVE on a placed object / character (play move action).
-  "object:play-move":      { id: string; move: string; loop?: boolean; hold?: boolean };
+  "object:play-move":      { id: string; move: string; loop?: boolean; hold?: boolean; stop?: boolean };
   // start/stop/toggle_mover script actions → MoverSystem (targetId already group-expanded)
   "mover:set":             { targetId: string; op: "start" | "stop" | "toggle"; moverId?: string };
   "state:changed":         { key: string; value: JsonValue };
@@ -1454,6 +1481,7 @@ export type ActionType =
   | 'move_object'
   | 'play_animation'
   | 'play_move'
+  | 'set_aim'          // Phase 88: a character aims (on) or stops aiming (off)
   | 'spawn_npc'
   | 'despawn_object'
   | 'spawn_object'
@@ -1626,6 +1654,8 @@ export interface ScriptAction {
   animationLoop?: boolean;   // play_animation: loop the clip forever
   animationHold?: boolean;   // play_animation: freeze on the final frame (e.g. death)
   move?:          string;    // play_move (Phase 86): the move to play (idle, walk, death, a custom one …)
+  moveStop?:      boolean;   // play_move (Phase 88): stop that move instead (an action on a body part, or a looping one)
+  aimOn?:         boolean;   // set_aim (Phase 88): true = aim, false = stop aiming
   animationBlend?: number;   // play_animation: crossfade seconds into the clip (overrides default)
   sound?:        string;       // play_sound / stop_sound: SoundDef id
   soundVariants?: string[];    // set_footstep (Phase 73): extra sounds for the override — same random pick as PlayerSettings.footstepVariants

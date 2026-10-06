@@ -109,7 +109,13 @@ Quaternius's Universal Animation Library on either mannequin), which clip each m
 and KEEP IN PLACE (on by default: root-motion clips stay under the character), plus each
 move's SPEED, its own footstep / jump / land sounds and its FEEL switches (v4.116.0; unset
 sounds use the game's, a FEEL effect plays only when both the character and the game's Feel
-page allow it). Movement (speed, jump height, run), CHARACTER SCALE and the camera stay
+page allow it). Phase 87 (v4.118.0) adds a timeline per move: feet checked against the
+game's speed (MATCH FEET, FIND A CLIP THAT FITS), footsteps on touchdown (or your own
+STEPS), LAYERS that mix another clip onto a body part, and HANDOFFS (blend time per pair of
+moves). See `public/docs/characters.html#timeline`. Phase 88 (v4.119.0): a move can play on a
+body part over the locomotion (PLAYS ON, e.g. shoot on the upper body while walking), and a
+character can aim (AIM poses blended by the camera's up / down look; the spine turns when
+there are none). Scripts: play move (Stop it), aim on / off. Movement (speed, jump height, run), CHARACTER SCALE and the camera stay
 with the game, since levels are built around them. The player
 uses one when the player settings name it (`characterId`); without one, the older
 MODEL + ANIMATIONS settings still describe the player, exactly as before.

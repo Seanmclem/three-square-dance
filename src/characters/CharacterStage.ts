@@ -4,10 +4,12 @@ import { assetManager } from "@/core/AssetManager";
 import { CharacterAnimator } from "./CharacterAnimator";
 import { rigInfo } from "./rig";
 import {
-  loadCharacter, moveResolver, topBoneNames, keepInPlace, clipTravels, applyCharacterLook, moveSpeedOf,
+  loadCharacter, moveResolver, topBoneNames, keepInPlace, clipTravels, applyCharacterLook, moveSpeedOf, handoffOf, aimPosesOf,
   modelHeight, materialNames, materialColors, CAPSULE_HEIGHT, type PooledClip,
 } from "./characterRuntime";
 import { LOOPING_MOVES } from "./autoFill";
+import { footInfo, type FootInfo } from "./feet";
+import { mixRig } from "./mix";
 import type { SceneManager } from "@/core/SceneManager";
 import type { ZoneManager } from "@/world/ZoneManager";
 import type { WorldState } from "@/world/WorldState";
@@ -35,6 +37,9 @@ export interface StageClip { name: string; source: string; duration: number; loo
 export class CharacterStage {
   private _def: CharacterDef | null = null;
   private _root: THREE.Object3D | null = null;
+  private _sample: THREE.Object3D | null = null;
+  private _mutedLayers = new Map<string, Set<number>>();
+  private _aimPreview = { on: false, deg: 0 };   // Phase 88: the AIM section's preview   // move → layer indexes switched off for previewing
   private _anim: CharacterAnimator | null = null;
   private _pool: PooledClip[] = [];
   private _tops: string[] = [];
@@ -46,9 +51,9 @@ export class CharacterStage {
   private _loop = true;
   private _speed = 1;
   private _source: string | null = null;
-  private _blend: { to: string; at: number } | null = null;
-  private _testing = false;
-  private _moveK = 1;         // the playing move's SPEED (1 for a clip preview); the speed menu multiplies it   // from blendTest until STOP or any other clip / move
+  private _blend: { from: string; to: string; at: number } | null = null;
+  private _testing = false;   // from blendTest until STOP or any other clip / move
+  private _moveK = 1;         // the playing move's SPEED (1 for a clip preview); the speed menu multiplies it
   private _rig: RigInfo | null = null;
   private _baseColors: Record<string, string> = {};
   private _materials: string[] = [];
@@ -110,6 +115,8 @@ export class CharacterStage {
       this._moveK = moveSpeedOf(def, key.slice(5));
       const a = this._anim?.currentAction;
       if (a) a.timeScale = this._speed * this._moveK;
+      // Its clip changed (another clip, or its layers): play the new one.
+      if (this._anim && this._anim.clipFor(key.slice(5)) !== this._anim.currentClip) this.playMove(key.slice(5));
     }
     if (prev.modelAssetId !== def.modelAssetId || !same(prev.clipSources, def.clipSources)
       || !same(prev.colors ?? {}, def.colors ?? {}) || prev.height !== def.height || prev.inPlace !== def.inPlace) {
@@ -132,6 +139,7 @@ export class CharacterStage {
     if (!p || !this._anim) return;
     this._source = source;
     this._blend = null; this._testing = false; this._moveK = 1;
+    this._anim.stopAction();
     this._anim.playClip(this._prep(p.clip), this._loop, this._speed, `clip:${name}`);
     this._paused = false;
   }
@@ -145,6 +153,7 @@ export class CharacterStage {
     this._blend = null; this._testing = false;
     this._loop = LOOPING_MOVES.has(move);
     this._moveK = moveSpeedOf(this._def, move);
+    this._anim.stopAction();
     this._anim.playClip(clip, this._loop, this._speed * this._moveK, `move:${move}`);
     this._paused = false;
   }
@@ -152,7 +161,7 @@ export class CharacterStage {
   /** BLEND TEST: `from` for a moment, then blend into `to` the way the game does. */
   blendTest(from: string, to: string): void {
     this.playMove(from);
-    this._blend = { to, at: 1.2 };
+    this._blend = { from, to, at: 1.2 };
     this._testing = true;
   }
 
@@ -202,14 +211,14 @@ export class CharacterStage {
 
   private _update(dt: number): void {
     if (!this._anim) return;
-    if (!this._paused) this._anim.update(dt);
+    this._anim.update(this._paused ? 0 : dt);   // paused: re-pose only (the aim slider still shows)
     if (this._blend) {
       this._blend.at -= dt;
       if (this._blend.at <= 0) {
-        const to = this._blend.to;
+        const { from, to } = this._blend;
         this._blend = null;
         const clip = this._anim.clipFor(to);
-        if (clip) { this._loop = LOOPING_MOVES.has(to); this._moveK = this._def ? moveSpeedOf(this._def, to) : 1; this._anim.playClip(clip, this._loop, this._speed * this._moveK, `move:${to}`); }
+        if (clip) { this._loop = LOOPING_MOVES.has(to); this._moveK = this._def ? moveSpeedOf(this._def, to) : 1; this._anim.playClip(clip, this._loop, this._speed * this._moveK, `move:${to}`, this._anim.handoff(from, to)); }
       }
     }
   }
@@ -232,9 +241,21 @@ export class CharacterStage {
     this._pool = loaded.pool;
     this._tops = topBoneNames(root);
     // The resolver reads this._def live, so editing moves needs no rebuild.
-    const resolve = (move: string) => moveResolver(this._def ?? def, this._pool, this._tops)(move);
-    this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), resolve, "Character editor");
+    const rig = mixRig(root);
+    const resolve = (move: string) => {
+      // Layers switched off for previewing are left out here only (the saved move keeps them).
+      const d = this._def ?? def, off = this._mutedLayers.get(move), m = d.moves[move];
+      const view = off?.size && m?.layers ? { ...d, moves: { ...d.moves, [move]: { ...m, layers: m.layers.filter((_, i) => !off.has(i)) } } } : d;
+      return moveResolver(view, this._pool, this._tops, rig)(move);
+    };
+    this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), resolve, "Character editor",
+      { handoff: (from, to) => handoffOf(this._def ?? def, from, to), rig, aim: () => aimPosesOf(this._def ?? def, this._pool) });
+    this._anim.setAim(this._aimPreview.on);
+    this._anim.setAimPitch(THREE.MathUtils.degToRad(this._aimPreview.deg));
     this._root = root;
+    // Phase 87: a spare copy at the same scale, never shown, for reading clips' feet.
+    this._sample = cloneSkinned(loaded.scene);
+    this._sample.scale.setScalar(s);
     this._scene.scene.add(root);
     // Carry on with what was playing, else idle.
     const was = keep.label && this._pool.find(p => keep.label === p.clip.name || keep.label?.endsWith(` · ${p.clip.name}`));
@@ -246,6 +267,45 @@ export class CharacterStage {
     } else this.playMove("idle");
     if (frame) this._frame();
   }
+
+  /** Phase 87: when a clip's feet are down and how fast it walks (see feet.ts). */
+  feetOfClip(clip: THREE.AnimationClip): FootInfo | null { return this._sample ? footInfo(clip, this._sample) : null; }
+  /** Preview a move with one of its layers off (or back on). Editor only: the move as saved,
+   *  and so the game, keeps every layer. Replays the move if it is playing. */
+  setLayerOn(move: string, index: number, on: boolean): void {
+    const set = this._mutedLayers.get(move) ?? new Set<number>();
+    if (on) set.delete(index); else set.add(index);
+    this._mutedLayers.set(move, set);
+    if (this._anim?.current === `move:${move}`) this.playMove(move);
+  }
+  layerOn(move: string, index: number): boolean { return !this._mutedLayers.get(move)?.has(index); }
+  /** Forget a move's switched-off layers (its layer list changed, so the indexes moved). */
+  resetLayerSwitches(move: string): void { this._mutedLayers.delete(move); }
+
+  /** Phase 88: preview an action move (one that plays on a body part) over a legs move. */
+  previewAction(move: string, over: string): void {
+    const part = this._def?.moves[move]?.part;
+    if (!this._anim || !part) { this.playMove(move); return; }
+    this.playMove(over);
+    this._anim.playAction(move, part, { loop: true, hold: false, aims: this._def?.moves[move]?.aims });
+  }
+  /** Phase 88: preview aiming at an angle (degrees, up = positive). */
+  setAimPreview(on: boolean, deg: number): void {
+    this._aimPreview = { on, deg };
+    this._anim?.setAim(on);
+    this._anim?.setAimPitch(THREE.MathUtils.degToRad(deg));
+  }
+  get aimPreview(): { on: boolean; deg: number } { return this._aimPreview; }
+
+  /** The length of the clip a move plays (0 = none). */
+  moveDuration(move: string): number { return this._anim?.clipFor(move)?.duration ?? 0; }
+  /** …of a clip in the pool, as it would play (KEEP IN PLACE applied). */
+  feetOfPoolClip(name: string, source: string): FootInfo | null {
+    const p = this._pool.find(x => x.clip.name === name && x.source === source);
+    return p ? this.feetOfClip(this._prep(p.clip)) : null;
+  }
+  /** …of the clip a move plays. */
+  feetOfMove(move: string): FootInfo | null { const c = this._anim?.clipFor(move); return c ? this.feetOfClip(c) : null; }
 
   private _clearModel(): void {
     if (!this._root) return;

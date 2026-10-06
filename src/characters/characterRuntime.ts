@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { assetManager } from "@/core/AssetManager";
 import { BUILT_IN_MOVES, legacyGuess } from "./autoFill";
+import { layerClips, mixClip, type MixRig } from "./mix";
+import type { AimPoses } from "./partLayers";
 import type { CharacterDef, CharacterMove, LocomotionState, PlayerFeel, PlayerSettings } from "@/types";
 
 /**
@@ -78,15 +80,37 @@ export function keepInPlace(clip: THREE.AnimationClip, topBones: readonly string
   return out;
 }
 
-/** Move name → clip for a character, over its loaded clip pool. */
-export function moveResolver(def: Pick<CharacterDef, "moves" | "inPlace">, pool: readonly PooledClip[], topBones: readonly string[]): (move: string) => THREE.AnimationClip | null {
-  return move => {
-    const m: CharacterMove | undefined = def.moves[move];
-    if (!m?.clip) return null;
-    const hit = pool.find(p => p.clip.name === m.clip && (!m.source || p.source === m.source));
+/** Move name → clip for a character, over its loaded clip pool. A move with layers
+ *  (Phase 87) plays one mixed clip, built once; `groups` sorts the bones into body parts. */
+export function moveResolver(def: Pick<CharacterDef, "moves" | "inPlace">, pool: readonly PooledClip[], topBones: readonly string[], rig?: MixRig): (move: string) => THREE.AnimationClip | null {
+  const find = (clip: string, source?: string) => {
+    const hit = pool.find(p => p.clip.name === clip && (!source || p.source === source));
     if (!hit) return null;
     return def.inPlace === false ? hit.clip : keepInPlace(hit.clip, topBones);
   };
+  return move => {
+    const m: CharacterMove | undefined = def.moves[move];
+    if (!m?.clip) return null;
+    const base = find(m.clip, m.source);
+    if (!base || !m.layers?.length || !rig) return base;
+    const layers = layerClips(m.layers, find);
+    return layers.length ? mixClip(`mix:${move}`, base, layers, rig) : base;
+  };
+}
+
+/** Phase 88: the character's aim poses as clips, or null (none set / not loaded: the spine
+ *  turns instead). */
+export function aimPosesOf(def: Pick<CharacterDef, "aim" | "inPlace">, pool: readonly PooledClip[]): AimPoses | null {
+  const a = def.aim;
+  const find = (r?: { clip: string; source?: string }) => r?.clip ? pool.find(p => p.clip.name === r.clip && (!r.source || p.source === r.source))?.clip ?? null : null;
+  const up = find(a?.up), neutral = find(a?.neutral), down = find(a?.down);
+  return up && neutral && down ? { up, neutral, down, part: a?.part ?? "upper", upDeg: a?.upDeg ?? 60, downDeg: a?.downDeg ?? 60 } : null;
+}
+
+/** A move's handoff time into another (Phase 87), else undefined (the caller's default). */
+export function handoffOf(def: Pick<CharacterDef, "handoffs">, from: string, to: string): number | undefined {
+  const h = def.handoffs?.[`${from}>${to}`];
+  return h != null && h >= 0 ? h : undefined;
 }
 
 /**
@@ -132,20 +156,26 @@ export function swapCharacterModel(def: CharacterDef, newId: string, o: { sameSk
   const old = def.modelAssetId;
   if (o.sameSkeleton) {
     const borrowOld = o.oldClips.length > 0;
-    const moves = Object.fromEntries(Object.entries(def.moves).map(([k, m]) => {
-      if (m.source === newId) { const { source: _s, ...rest } = m; return [k, rest]; }
-      if (!m.source && m.clip && borrowOld && o.oldClips.includes(m.clip)) return [k, { ...m, source: old }];
-      return [k, m];
-    }));
+    const keep = <T extends { clip: string | null; source?: string }>(m: T): T => {
+      if (m.source === newId) { const { source: _s, ...rest } = m; return rest as T; }
+      if (!m.source && m.clip && borrowOld && o.oldClips.includes(m.clip)) return { ...m, source: old };
+      return m;
+    };
+    const moves = Object.fromEntries(Object.entries(def.moves).map(([k, m]) =>
+      [k, m.layers ? { ...keep(m), layers: m.layers.map(keep) } : keep(m)]));
     const clipSources = [...new Set([...(borrowOld ? [old] : []), ...def.clipSources])].filter(s => s !== newId);
-    return { ...def, modelAssetId: newId, clipSources, moves };
+    const aim = def.aim && { ...def.aim, ...Object.fromEntries((["up", "neutral", "down"] as const).filter(k => def.aim![k]).map(k => [k, keep(def.aim![k]!)])) };
+    return { ...def, modelAssetId: newId, clipSources, moves, ...(aim ? { aim } : {}) };
   }
   const moves = Object.fromEntries(Object.entries(def.moves).map(([k, m]) => {
-    const { source: _s, ...rest } = m;
+    const { source: _s, layers, ...rest } = m;
     const keeps = !!m.clip && o.newClips.includes(m.clip);   // the new model's own clip of that name
-    return [k, keeps ? rest : { ...rest, clip: null }];
+    const kept = layers?.filter(l => o.newClips.includes(l.clip)).map(({ source: _ls, ...l }) => l);
+    return [k, { ...(keeps ? rest : { ...rest, clip: null }), ...(kept?.length ? { layers: kept } : {}) }];
   }));
-  return { ...def, modelAssetId: newId, clipSources: [], moves };
+  const aim = def.aim && Object.fromEntries(Object.entries(def.aim).flatMap(([k, v]): Array<[string, unknown]> =>
+    typeof v === "object" ? (o.newClips.includes(v.clip) ? [[k, { clip: v.clip }]] : []) : [[k, v]])) as CharacterDef["aim"];
+  return { ...def, modelAssetId: newId, clipSources: [], moves, ...(aim ? { aim } : {}) };
 }
 
 /** The moves that lose their clip when swapping to a model with a different skeleton. */

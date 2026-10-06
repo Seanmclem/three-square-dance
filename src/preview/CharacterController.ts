@@ -13,7 +13,9 @@ import { physicsWorld } from "@/physics/PhysicsWorld";
 import { assetManager } from "@/core/AssetManager";
 import { gameState } from "@/scripting/GameState";
 import { CharacterAnimator } from "@/characters/CharacterAnimator";
-import { loadCharacter, legacyCharacter, moveResolver, topBoneNames, applyCharacterLook, moveSpeedOf } from "@/characters/characterRuntime";
+import { loadCharacter, legacyCharacter, moveResolver, topBoneNames, applyCharacterLook, moveSpeedOf, handoffOf, aimPosesOf } from "@/characters/characterRuntime";
+import { footInfo } from "@/characters/feet";
+import { mixRig } from "@/characters/mix";
 
 const MIN_DIST = 0.6;   // closest the spring-arm camera may sit to the pivot
 const MAX_PITCH = Math.PI * 80 / 180;   // look-up/down clamp
@@ -178,6 +180,10 @@ export class CharacterController {
   private _squash = 1;
   private _squashVel = 0;
   private _modelBaseScale = 1;
+  // Phase 87: footsteps on touchdown. A spare copy of the model (never shown) reads each
+  // clip's feet; `_stepClock` is the playing move and where its clip was last frame.
+  private _stepSample: THREE.Object3D | null = null;
+  private _stepClock: { move: string; t: number } | null = null;
   private _leanPitch = 0;
   private _leanRoll = 0;
   private _prevModelYaw = 0;
@@ -253,6 +259,8 @@ export class CharacterController {
   private _offPlayMove: (() => void) | null = null;   // Phase 86
   private _offTalk: (() => void) | null = null;
   private _offTalkEnd: (() => void) | null = null;
+  private _offAim: (() => void) | null = null;   // Phase 88
+  private _startPitch = 0;                        // the camera's authored tilt: aiming is level there
   private _offFlash:    (() => void) | null = null;
   // Damage flash (flash_player). `_flashMats` is captured on the FIRST flash: the
   // avatar comes from SkeletonUtils.clone, which SHARES materials with the source
@@ -284,6 +292,7 @@ export class CharacterController {
     if (_settings.cameraMode === "thirdperson") {
       const deg = _settings.thirdPersonPitch ?? 0;
       this._pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, -THREE.MathUtils.degToRad(deg)));
+      this._startPitch = this._pitch;
     }
   }
 
@@ -366,21 +375,19 @@ export class CharacterController {
     // Phase 86: moves. A script's play move works for any player; the automatic ones
     // (death before a respawn, hit on damage, talk in dialogue) only for a player that
     // uses a character, so older games look exactly as before.
-    this._offPlayMove = this._bus.on("character:play-move", ({ move, loop, hold, auto }) => {
+    this._offPlayMove = this._bus.on("character:play-move", ({ move, loop, hold, auto, stop }) => {
       if (auto && !this._character) return;
+      if (stop) { this._stopMove(move); return; }
       if (this._climbLadder) return;   // the climb owns the animation
-      const clip = this._anim?.clipFor(move);
-      if (clip) this._anim!.playScriptClip(clip, !!loop, !!hold, this._anim!.moveSpeed(move));
+      this._playMove(move, !!loop, !!hold);
     });
     this._offTalk = this._bus.on("dialogue:show", () => {
       if (!this._character || this._climbLadder || this._anim?.scripted) return;
-      const clip = this._anim?.clipFor("talk");
-      if (clip) this._anim!.playScriptClip(clip, true, false, this._anim!.moveSpeed("talk"));   // a looping script clip: ends if the player moves
+      this._playMove("talk", true, false);   // whole body: a looping script clip that ends if the player moves
     });
-    this._offTalkEnd = this._bus.on("dialogue:closed", () => {
-      const a = this._anim, talk = a?.clipFor("talk");
-      if (a && talk && a.current === `script:${talk.name}`) this._clearScriptAnim();
-    });
+    this._offTalkEnd = this._bus.on("dialogue:closed", () => { this._stopMove("talk"); });
+    // Phase 88: aiming on / off (the aim angle follows the camera's up / down look).
+    this._offAim = this._bus.on("character:aim", ({ on }) => { this._anim?.setAim(on); });
     // Damage flash. In FPS the avatar is hidden (see the visible= line in update),
     // so there is nothing to tint — hand it to the screen overlay instead.
     this._offFlash = this._bus.on("character:flash", ({ color, duration }) => {
@@ -635,19 +642,27 @@ export class CharacterController {
     // horizontal travel while grounded and moving (so a treadmill/wall makes no steps).
     // The override (set_footstep action) wins over the authored default — surface swaps.
     const steps = this._footstepOverride ?? this._footstepDefault;
+    const stepNow = () => {
+      const id = steps.length > 1 ? steps[Math.floor(Math.random() * steps.length)] : steps[0];
+      // Pitch wobble (opt-in): ±FOOTSTEP_WOBBLE of playback rate, so even ONE sample stops
+      // sounding like a loop. Applies to surface overrides too (same path).
+      const rate = this._settings.footstepPitchWobble ? 1 + (Math.random() * 2 - 1) * FOOTSTEP_WOBBLE : undefined;
+      this._emitSound(id, this._settings.footstepVolume, rate);
+    };
     if (steps.length && this._body.isGrounded && isMoving && !this._climbLadder) {
-      const dx = pos.x - this._stepPrevX, dz = pos.z - this._stepPrevZ;
-      this._stepAccum += Math.sqrt(dx * dx + dz * dz);
-      if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
-        this._stepAccum = 0;
-        const id = steps.length > 1 ? steps[Math.floor(Math.random() * steps.length)] : steps[0];
-        // Pitch wobble (opt-in): ±FOOTSTEP_WOBBLE of playback rate, so even ONE sample stops
-        // sounding like a loop. Applies to surface overrides too (same path).
-        const rate = this._settings.footstepPitchWobble ? 1 + (Math.random() * 2 - 1) * FOOTSTEP_WOBBLE : undefined;
-        this._emitSound(id, this._settings.footstepVolume, rate);
+      // Phase 87: a character steps when its clip's feet touch down (or its own STEPS);
+      // without either, every footstepDistance metres as before.
+      if (!this._timedSteps(stepNow)) {
+        const dx = pos.x - this._stepPrevX, dz = pos.z - this._stepPrevZ;
+        this._stepAccum += Math.sqrt(dx * dx + dz * dz);
+        if (this._stepAccum >= (this._settings.footstepDistance ?? 1.8)) {
+          this._stepAccum = 0;
+          stepNow();
+        }
       }
     } else {
       this._stepAccum = 0;   // reset when stopped/airborne so the next step isn't instant
+      this._stepClock = null;
     }
     this._stepPrevX = pos.x; this._stepPrevZ = pos.z;
 
@@ -699,6 +714,8 @@ export class CharacterController {
       }
       this._updatePresentation(dt);   // yaw + lean + squash on the root
       this._modelRoot.visible = (this._settings.cameraMode === "thirdperson");
+      // Phase 88: looking up from the camera's starting tilt aims up.
+      this._anim?.setAimPitch(this._pitch - this._startPitch);
       this._anim?.update(dt);
       this._updateAnim(!this._body.isGrounded, isMoving, running);
       if (this._flash) this._updateFlash(dt);
@@ -942,12 +959,19 @@ export class CharacterController {
       root.traverse(c => { c.raycast = NO_RAYCAST; });
       const def = this._character ?? legacyCharacter(this._settings, loaded.pool.map(p => p.clip.name));
       this._modelRoot = root;
-      this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root)), "CharacterController",
-        { move: m => moveSpeedOf(def, m) });
+      const rig = mixRig(root);
+      this._anim = new CharacterAnimator(root, loaded.pool.map(p => p.clip), moveResolver(def, loaded.pool, topBoneNames(root), rig), "CharacterController",
+        { move: m => moveSpeedOf(def, m), handoff: (from, to) => handoffOf(def, from, to),
+          rig, aim: () => aimPosesOf(def, loaded.pool) });
       // Phase 86: the character's own size (height) and colors; 1 / none for older settings.
       const look = this._character ? applyCharacterLook(root, this._character) : 1;
       this._modelBaseScale = effectiveCharacterScale(this._settings) * look;   // squash multiplies this
       root.scale.setScalar(this._modelBaseScale);
+      if (this._character) {
+        this._stepSample = cloneSkinned(loaded.scene);
+        this._stepSample.scale.setScalar(this._modelBaseScale);
+        this._stepTimes("walk"); this._stepTimes("run");   // read now, not on the first step
+      }
       this._scene.add(root);
       this._modelYaw = this._yaw;
       this._play("idle", true);
@@ -1125,6 +1149,53 @@ export class CharacterController {
   // `speed` scales playback rate (used for the configurable jump-anim speed).
   private _play(intent: string, loop: boolean, speed = 1): void { this._anim?.play(intent, loop, speed); }
 
+  /** A script's (or hit / talk's) move: on its body part over the locomotion (Phase 88),
+   *  else the whole body as a script clip. */
+  private _playMove(move: string, loop: boolean, hold: boolean): void {
+    const a = this._anim, m = this._character?.moves[move];
+    if (!a) return;
+    if (m?.part && a.playAction(move, m.part, { loop, hold, aims: m.aims })) return;
+    const clip = a.clipFor(move);
+    if (clip) a.playScriptClip(clip, loop, hold, a.moveSpeed(move));
+  }
+
+  /** Stop a move a script started: its body-part action, or the whole-body script clip. */
+  private _stopMove(move: string): void {
+    const a = this._anim;
+    if (!a) return;
+    if (a.action === `action:${move}`) a.stopAction();
+    const clip = a.clipFor(move);
+    if (clip && a.current === `script:${clip.name}`) this._clearScriptAnim();
+  }
+
+  /** A move's footstep moments in its clip (seconds): its own STEPS, else each touchdown;
+   *  null when it has neither (no feet found, or a move that never lands). */
+  private _stepTimes(move: string): number[] | null {
+    if (!this._character || !this._anim || !this._stepSample) return null;
+    const clip = this._anim.clipFor(move);
+    if (!clip) return null;
+    const own = this._character.moves[move]?.steps;
+    if (own) return own.map(f => f * clip.duration);
+    const t = footInfo(clip, this._stepSample)?.feet.flatMap(f => f.touchdowns) ?? [];
+    return t.length ? t.sort((a, b) => a - b) : null;
+  }
+
+  /** Phase 87: play a step each time the walking / running clip passes a footstep moment.
+   *  False when the playing move has none (the caller counts metres instead). */
+  private _timedSteps(step: () => void): boolean {
+    const a = this._anim, move = a?.current ?? "";
+    const times = this._stepTimes(move);
+    const action = a?.currentAction;
+    if (!times || !action) { this._stepClock = null; return false; }
+    const t = action.time;
+    const prev = this._stepClock?.move === move ? this._stepClock.t : null;
+    this._stepClock = { move, t };
+    if (prev == null || t === prev) return true;
+    const crossed = t > prev ? times.some(x => x > prev && x <= t) : times.some(x => x > prev || x <= t);   // wrapped past the loop end
+    if (crossed) step();
+    return true;
+  }
+
   // Has the current one-shot reached its end? (Only meaningful for a clamped LoopOnce.)
   private _animDone(): boolean { return !!this._anim?.done(); }
 
@@ -1254,6 +1325,7 @@ export class CharacterController {
     this._offPlayMove?.();    this._offPlayMove = null;
     this._offTalk?.();        this._offTalk = null;
     this._offTalkEnd?.();     this._offTalkEnd = null;
+    this._offAim?.();         this._offAim = null;
     this._offFlash?.();       this._offFlash      = null;
     this._offFootstep?.();    this._offFootstep   = null;
     // The flash clones are ours alone (the source asset's materials were never touched).

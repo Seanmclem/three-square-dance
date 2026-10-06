@@ -4277,7 +4277,8 @@ export default function App() {
         />
       )}
       {editingCharacter && !characterTrying && characterStageRef.current && (
-        <CharacterEditor draft={editingCharacter.draft} onChange={handleCharacterDraft} stage={characterStageRef.current} assets={assets} onTryIt={handleCharacterTryIt} />
+        <CharacterEditor draft={editingCharacter.draft} onChange={handleCharacterDraft} stage={characterStageRef.current} assets={assets} onTryIt={handleCharacterTryIt}
+          playerSettings={worldRef.current?.world?.playerSettings ?? DEFAULT_PLAYER_SETTINGS} />
       )}
       {editingCharacter && !characterTrying && (
         <EditModeBar
