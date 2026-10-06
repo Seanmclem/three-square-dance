@@ -14,6 +14,11 @@
   as a default. then players can edit that in menu." Players' own changes (keys and feel)
   live on their device and win, when the game allows it ("Players can change keys and feel
   in the pause menu", on by default).
+- **Gamepad buttons by both names**: Xbox and PlayStation pads report the same buttons, so
+  each gamepad binding shows its Xbox name with a green outline and its PlayStation name with
+  a blue outline (RB / R1, A / ✕, Start / Options); sticks, the same on both, get one chip
+  outlined half green, half blue. Touch chips are outlined and named by the button (jump,
+  bag, fire, exit), with no "btn" suffix.
 
 User: "it should kind of be both, no? Like it could be scripted to trigger from a button
 press? Right now we just have this game-input option for the action button from the main
