@@ -105,7 +105,12 @@ filled by each source; the controller handles "what it does"; the script engine 
   never binds left click by accident; left click notes that the first click in Play captures
   the mouse.
 - A key used by two actions shows amber with "E is also Interact" (allowed: both fire).
-- Gamepad: press a button on a connected pad, or pick from the list (no pad needed).
+- Gamepad: picked from a controller layout in the editor (shoulders and triggers, D-pad,
+  Back / Start, face buttons, stick presses), no controller needed and no "press a button"
+  prompt; XBOX / PLAYSTATION switches the names shown (same buttons). The current one is
+  ringed, a button another action uses is amber.
+- Every binding being changed shows **REMOVE <key>** and **CANCEL** (Delete / Backspace still
+  work as shortcuts).
 - An action stays held while any of its keys is down (Shift + R Shift; F + left click).
 - PRESS vs HOLD: a hold button's move plays from press to release; aim needs HOLD.
 - Deleting a button: confirm; scripts that used it show "its button was deleted".
@@ -120,6 +125,8 @@ filled by each source; the controller handles "what it does"; the script engine 
 
 ## 7. Still open
 
-1. A button's built-in "what it does" (play a move, aim while held), or scripts only? (The
-   prototype has it.)
-2. New games: start with no buttons of your own, or with Fire and Aim ready?
+1. Should your own buttons have a built-in action chosen on their page ("the player plays
+   the shoot move", "aim while held"), or only trigger scripts ("when the player presses
+   Fire → play move shoot")? The prototype has both.
+2. Should a brand-new game's Controls page already list Fire (left click, RT / R2) and Aim
+   (right click, LT / L2) under Your buttons, or start that section empty?

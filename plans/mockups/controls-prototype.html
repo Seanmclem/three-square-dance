@@ -151,7 +151,7 @@ function Cap({ code, device, capture, clash, onClick, lit, title }) {
     return <span className={["pair", clash ? "clash" : "", lit ? "lit" : ""].join(" ")} role="button" tabIndex={0} title={title} onClick={onClick} onKeyDown={key}><PadPair i={code} /></span>;
   }
   const cls = ["k", device === "gamepad" ? "xb" : "", capture ? "capture" : "", clash ? "clash" : "", lit ? "lit" : ""].join(" ");
-  return <span className={cls} role="button" tabIndex={0} title={title} onClick={onClick} onKeyDown={key}>{capture ? "press…" : pretty(code)}</span>;
+  return <span className={cls} role="button" tabIndex={0} title={title} onClick={onClick} onKeyDown={key}>{capture ? (device === "gamepad" ? "picking…" : "press…") : pretty(code)}</span>;
 }
 
 /** One action's caps on one device, with capture. */
@@ -195,15 +195,55 @@ function useCapture(capturing, setCapturing, apply) {
       window.addEventListener("keydown", onKey, true); window.addEventListener("mousedown", onMouse, true); window.addEventListener("contextmenu", onCtx, true);
       return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("mousedown", onMouse, true); window.removeEventListener("contextmenu", onCtx, true); };
     }
-    // gamepad: poll for a newly pressed button; Esc / Delete from the keyboard still work
-    const start = new Set(); for (const p of navigator.getGamepads?.() ?? []) p?.buttons.forEach((b, i) => { if (b.pressed) start.add(`${p.index}:${i}`); });
-    let raf = 0;
-    const poll = () => { for (const p of navigator.getGamepads?.() ?? []) p?.buttons.forEach((b, i) => { if (b.pressed && !start.has(`${p.index}:${i}`)) finish(i); }); if (!done) raf = requestAnimationFrame(poll); };
-    raf = requestAnimationFrame(poll);
+    // gamepad: picked from the controller layout (no controller needed); Esc or a click
+    // outside the picker cancels, Delete removes.
     const onKey = e => { if (e.code === "Escape") { e.preventDefault(); finish(undefined); } if (e.code === "Delete" || e.code === "Backspace") { e.preventDefault(); finish(null); } };
-    window.addEventListener("keydown", onKey, true);
-    return () => { cancelAnimationFrame(raf); window.removeEventListener("keydown", onKey, true); };
+    const onDown = e => { if (!e.target.closest?.("[data-nocapture]")) finish(undefined); };
+    window.addEventListener("keydown", onKey, true); window.addEventListener("mousedown", onDown, true);
+    return () => { window.removeEventListener("keydown", onKey, true); window.removeEventListener("mousedown", onDown, true); };
   }, [capturing]);
+}
+
+// ── gamepad picker ─────────────────────────────────────────────────────────────
+/**
+ * Pick a gamepad button from a controller layout, no controller needed. XBOX / PLAYSTATION
+ * only changes the names (both pads report the same buttons). The current button is ringed,
+ * this action's other buttons are ticked, one another action uses is amber.
+ */
+function PadPicker({ platform, setPlatform, current, mine, usedBy, onPick }) {
+  const ps = platform === "ps";
+  const b = (i, wide) => {
+    const others = usedBy(i), own = mine.includes(i) && i !== current;
+    return <button key={i} data-pad-index={i} className={"k " + (ps ? "ps" : "xb")} onClick={() => onPick(i)}
+      title={`${padBoth(i)}${others.length ? ` · also ${others.join(", ")}` : ""}${own ? " · already on this action" : ""}`}
+      style={{ minWidth: wide ? 44 : 26, height: 24, cursor: "pointer", font: "inherit", fontSize: 10, fontWeight: 600,
+        outline: i === current ? "2px solid #fff" : others.length ? "1px solid var(--amber)" : "none", outlineOffset: 1, opacity: own ? 0.55 : 1 }}>
+      {ps ? psName(i) : padName(i)}{own ? " ✓" : ""}</button>;
+  };
+  const col = { display: "flex", flexDirection: "column", alignItems: "center", gap: 3 };
+  return (
+    <div data-pad-picker style={{ display: "flex", flexDirection: "column", gap: 8, border: "1px solid var(--line)", borderRadius: 8, padding: 10, background: "#1b1c21" }}>
+      <span style={{ display: "flex", gap: 4 }}>
+        <button className={"btn" + (!ps ? " on" : "")} onClick={() => setPlatform("xbox")}>XBOX</button>
+        <button className={"btn" + (ps ? " on" : "")} onClick={() => setPlatform("ps")}>PLAYSTATION</button>
+        <span className="mini" style={{ alignSelf: "center" }}>same buttons, its names shown</span>
+      </span>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <span style={{ display: "flex", gap: 3 }}>{b(6, true)}{b(4, true)}</span>
+        <span style={{ display: "flex", gap: 3 }}>{b(5, true)}{b(7, true)}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 6 }}>
+        <div style={col}>{b(12)}<span style={{ display: "flex", gap: 3 }}>{b(14)}{b(15)}</span>{b(13)}</div>
+        <div style={col}>{b(8, true)}{b(9, true)}</div>
+        <div style={col}>{b(3)}<span style={{ display: "flex", gap: 3 }}>{b(2)}{b(1)}</span>{b(0)}</div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ display: "flex", gap: 3, alignItems: "center" }}>{b(10, true)}<span className="mini">press left stick</span></span>
+        <span style={{ display: "flex", gap: 3, alignItems: "center" }}><span className="mini">press right stick</span>{b(11, true)}</span>
+      </div>
+      <span className="mini">White ring: the one you're changing. Amber: another action uses it (both would fire).</span>
+    </div>
+  );
 }
 
 // ── the right-hand panel ───────────────────────────────────────────────────────
@@ -220,6 +260,7 @@ function Panel({ input, setInput, view, setView, player, lit }) {
   const [tab, setTab] = useState("kbm");
   const [capturing, setCapturing] = useState(null);
   const [touchSel, setTouchSel] = useState(null);
+  const [padStyle, setPadStyle] = useState("xbox");   // the gamepad picker's names: Xbox or PlayStation
   // From the compact view: the action to show (its row highlighted and scrolled to).
   const [focus, setFocus] = useState(null);
   useEffect(() => {
@@ -262,11 +303,26 @@ function Panel({ input, setInput, view, setView, player, lit }) {
   const caps = (device, action) => <BindingCaps input={input} device={device} action={action} codes={codesOf(device, action)}
     setCodes={c => (device === "kbm" ? setKbm : setPad)(action, c)} capturing={capturing} setCapturing={setCapturing} lit={device === "kbm" ? lit.kbm : lit.pad} />;
   // While waiting for a key: what to do, the mouse-button box, the gamepad pick list.
-  const captureHint = capturing && <div style={{ ...SEC, borderTop: "none", paddingTop: 0 }} data-nocapture><span className="mini" style={{ color: "var(--blue)" }}>
-        {capturing.device === "kbm" ? "Press a key, or use a mouse button in the box." : "Press a button on the gamepad, or pick one:"} Delete removes it, Esc or a click elsewhere cancels.</span>
+  const capCodes = capturing ? codesOf(capturing.device, capturing.action) : [];
+  const replacing = capturing && capturing.index < capCodes.length;   // an existing binding (not +)
+  const capLabel = c => capturing?.device === "gamepad" ? padBoth(c) : pretty(c);
+  const removeCap = () => { const codes = [...capCodes]; codes.splice(capturing.index, 1); (capturing.device === "kbm" ? setKbm : setPad)(capturing.action, codes); setCapturing(null); };
+  const pickPad = i => {
+    const codes = [...capCodes];
+    if (!(codes.includes(i) && codes.indexOf(i) !== capturing.index)) codes[capturing.index] = i;   // already on this action: no duplicate
+    setPad(capturing.action, codes); setCapturing(null);
+  };
+  // While changing a binding: what to do, the mouse-button box or the controller picker, REMOVE / CANCEL.
+  const captureHint = capturing && <div style={{ ...SEC, borderTop: "none", paddingTop: 0 }} data-nocapture>
+        <span className="mini" style={{ color: "var(--blue)" }}>
+          {capturing.device === "kbm" ? "Press the new key, or click in the box with a mouse button." : "Pick a button."} Esc or a click elsewhere cancels.</span>
         {capturing.device === "kbm" && <div data-mousezone role="button" aria-label="Mouse button zone" style={{ border: "1px dashed var(--blueLine)", borderRadius: 6, padding: "10px 8px", textAlign: "center", color: "var(--blue)", cursor: "crosshair" }}>click here with the mouse button you want (left, right, middle)</div>}
-        {capturing.device === "gamepad" && <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{PAD.map((n, i) => <button key={i} className="btn" data-nocapture title={padBoth(i)} onClick={() => {
-          const codes = [...codesOf("gamepad", capturing.action)]; codes[capturing.index] = i; setPad(capturing.action, [...new Set(codes)]); setCapturing(null); }}>{n}</button>)}</span>}
+        {capturing.device === "gamepad" && <PadPicker platform={padStyle} setPlatform={setPadStyle} current={replacing ? capCodes[capturing.index] : null}
+          mine={capCodes} usedBy={i => clashWith(input, "gamepad", capturing.action, i).map(x => x.actionName)} onPick={pickPad} />}
+        <span style={{ display: "flex", gap: 6 }}>
+          {replacing && <button className="btn danger" data-remove onClick={removeCap}>REMOVE {capLabel(capCodes[capturing.index])}</button>}
+          <button className="btn" onClick={() => setCapturing(null)}>CANCEL</button>
+        </span>
       </div>;
   const btn = view.startsWith("button:") ? input.buttons.find(b => b.id === view.slice(7)) : null;
   const setBtn = patch => setInput(i => ({ ...i, buttons: i.buttons.map(b => b.id === btn.id ? { ...b, ...patch } : b) }));
