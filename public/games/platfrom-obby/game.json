@@ -2556,7 +2556,7 @@
   "characters": [
     {
       "id": "chr_864e191c",
-      "name": "Mannequin F",
+      "name": "Mannequin Female",
       "modelAssetId": "mannequin_f",
       "clipSources": [
         "ual1",
@@ -2579,7 +2579,7 @@
     },
     {
       "id": "chr_13e910a4",
-      "name": "UAL1",
+      "name": "Mannequin Male",
       "modelAssetId": "ual1",
       "clipSources": [
         "ual2"
@@ -2625,7 +2625,7 @@
     },
     {
       "id": "chr_777d2b37",
-      "name": "Character",
+      "name": "Bunny Character",
       "modelAssetId": "character",
       "clipSources": [],
       "moves": {
