@@ -6,9 +6,11 @@
 
 ## Decided so far (2026-10-06, user)
 
-- **Layout A** (a tab per device) for editing, opened from a **compact read-only view in
-  layout B's shape** (every action, every device, one list) with an **EDIT** button; the
-  compact view has no + ADD BUTTON.
+- **Layout A** (a tab per device) for editing, opened from a **compact view in layout B's
+  shape** (every action, every device, one list). **EDIT** opens the keyboard tab; **clicking
+  any chip** opens that action on its device's tab, its row highlighted and scrolled to (a
+  touch chip selects that touch button; a chip of your own button opens its page); **+ ADD
+  BUTTON** sits at the bottom.
 - **Feel is saved in the game** as its defaults (mouse speed, invert, gamepad look speed,
   deadzone, invert, touch look speed, joystick size): "it should be saved to game, no? like
   as a default. then players can edit that in menu." Players' own changes (keys and feel)

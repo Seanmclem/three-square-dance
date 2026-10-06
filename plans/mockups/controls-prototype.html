@@ -30,6 +30,8 @@
   .k.add { background:transparent; border-style:dashed; color:var(--t3); }
   .k.clash { border-color: var(--amber); color: var(--amber); }
   .k.fixed { cursor: default; }
+  .k.go, .pair[role=button] { cursor: pointer; }
+  .k.go:hover, .pair[role=button]:hover .k { border-color: var(--blue); }
   .k.fixed:not(.xb):not(.ps):not(.both):not(.touch) { background:#26272d; color:var(--t2); }
   .k.lit { background: rgba(127,224,181,.25); border-color: var(--green); color: var(--green); }
   @keyframes blink { 50% { opacity: .45; } }
@@ -218,6 +220,22 @@ function Panel({ input, setInput, view, setView, player, lit }) {
   const [tab, setTab] = useState("kbm");
   const [capturing, setCapturing] = useState(null);
   const [touchSel, setTouchSel] = useState(null);
+  // From the compact view: the action to show (its row highlighted and scrolled to).
+  const [focus, setFocus] = useState(null);
+  useEffect(() => {
+    if (!focus) return;
+    document.querySelector(`[data-row="${focus}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const t = setTimeout(() => setFocus(null), 2000);
+    return () => clearTimeout(t);
+  }, [focus, tab, view]);
+  const hl = id => focus && (focus === id || (focus === "move" && id.startsWith("move")))
+    ? { ...ROW, background: "rgba(80,140,255,.12)", outline: "1px solid var(--blueLine)", outlineOffset: 2, borderRadius: 4 } : ROW;
+  /** Compact view → edit that action on that device (your buttons: their own page). */
+  const openAction = (device, id) => {
+    if (input.buttons.some(b => b.id === id)) { setView("button:" + id); return; }
+    setTab(device); setView("edit"); setFocus(id);
+    if (device === "touch" && (id === "jump" || id === "bag")) setTouchSel(id);
+  };
   const [confirmDel, setConfirmDel] = useState(false);
   const setKbm = (action, codes) => setInput(i => {
     const n = structuredClone(i);
@@ -253,6 +271,13 @@ function Panel({ input, setInput, view, setView, player, lit }) {
   const btn = view.startsWith("button:") ? input.buttons.find(b => b.id === view.slice(7)) : null;
   const setBtn = patch => setInput(i => ({ ...i, buttons: i.buttons.map(b => b.id === btn.id ? { ...b, ...patch } : b) }));
 
+  const addButton = () => {
+    let n = 1; while (input.buttons.some(b => b.name === `Button ${n}`)) n++;
+    const id = "btn" + Date.now().toString(36);
+    setInput(i => ({ ...i, buttons: [...i.buttons, { id, name: `Button ${n}`, kind: "press", kbm: [], gamepad: [], touch: false, does: null }] }));
+    setView("button:" + id);
+  };
+
   // ── main menu ──
   if (view === "menu") return (
     <div style={PANEL} data-view="menu">
@@ -272,13 +297,16 @@ function Panel({ input, setInput, view, setView, player, lit }) {
   // ── compact (layout B, read-only) ──
   if (view === "compact") {
     // pad: button indices (shown as an Xbox + PlayStation pair) or a string (same on both pads)
-    const row = (name, kb, pad, touch, color) => (
+    // Every chip opens that action for editing, on its device's tab.
+    const go = (device, id) => ({ role: "button", tabIndex: 0, onClick: () => openAction(device, id), onKeyDown: e => { if (e.key === "Enter") openAction(device, id); } });
+    const row = (name, id, kb, pad, touch, color) => (
       <React.Fragment key={name}>
         <span style={{ color: color ?? "var(--t1)" }}>{name}</span>
-        <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {kb.map((c, i) => <span key={"k" + i} className="k fixed">{c}</span>)}
-          {pad.map((c, i) => typeof c === "string" ? <span key={"p" + i} className="k both fixed">{c}</span> : <span key={"p" + i} className="pair" style={{ cursor: "default" }}><PadPair i={c} fixed /></span>)}
-          {touch && <span className="k touch fixed" title="Touch (phones, tablets)"><Phone />{touch}</span>}
+        <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }} data-compact-row={id}>
+          {kb.map((c, i) => <span key={"k" + i} className="k fixed go" title="Edit (keyboard + mouse)" {...go("kbm", id)}>{c}</span>)}
+          {pad.map((c, i) => typeof c === "string" ? <span key={"p" + i} className="k both fixed go" title="Edit (gamepad)" {...go("gamepad", id)}>{c}</span>
+            : <span key={"p" + i} className="pair" title="Edit (gamepad)" {...go("gamepad", id)}><PadPair i={c} fixed /></span>)}
+          {touch && <span className="k touch fixed go" title="Edit (touch: phones, tablets)" {...go("touch", id)}><Phone />{touch}</span>}
         </span>
       </React.Fragment>
     );
@@ -286,20 +314,22 @@ function Panel({ input, setInput, view, setView, player, lit }) {
     const pd = id => input.bindings.gamepad[id] ?? [];
     return (
       <div style={PANEL} data-view="compact">
-        {HEAD("CONTROLS", () => setView("menu"), <button className="btn on" data-edit onClick={() => setView("edit")}>EDIT</button>)}
+        {HEAD("CONTROLS", () => setView("menu"), <button className="btn on" data-edit onClick={() => { setTab("kbm"); setView("edit"); }}>EDIT</button>)}
         <div style={{ ...SEC, borderTop: "none" }}>
           <div style={{ display: "grid", gridTemplateColumns: "76px 1fr", gap: "6px 8px", alignItems: "center" }}>
-            {row("Move", ["WASD"], ["L stick"], "joystick")}
-            {row("Look", ["mouse"], ["R stick"], "drag")}
-            {row("Jump", kb("jump"), pd("jump"), input.touch.jump.on ? "jump" : null)}
-            {row("Run", kb("run").slice(0, 1), ["stick far", ...pd("run")], null)}
-            {row("Interact", kb("interact"), pd("interact"), "tap")}
-            {row("Bag", kb("bag"), pd("bag"), input.touch.bag.on ? "bag" : null)}
-            {row("Pause", kb("pause"), pd("pause"), "exit")}
-            {input.buttons.map(b => row(b.name + (b.kind === "hold" ? " (hold)" : ""), b.kbm.slice(0, 2).map(pretty), b.gamepad, input.touch[b.id]?.on ? b.name.toLowerCase() : null, "var(--amber)"))}
+            {row("Move", "move", ["WASD"], ["L stick"], "joystick")}
+            {row("Look", "look", ["mouse"], ["R stick"], "drag")}
+            {row("Jump", "jump", kb("jump"), pd("jump"), input.touch.jump.on ? "jump" : null)}
+            {row("Run", "run", kb("run").slice(0, 1), ["stick far", ...pd("run")], null)}
+            {row("Interact", "interact", kb("interact"), pd("interact"), "tap")}
+            {row("Bag", "bag", kb("bag"), pd("bag"), input.touch.bag.on ? "bag" : null)}
+            {row("Pause", "pause", kb("pause"), pd("pause"), "exit")}
+            {input.buttons.map(b => row(b.name + (b.kind === "hold" ? " (hold)" : ""), b.id, b.kbm.slice(0, 2).map(pretty), b.gamepad, input.touch[b.id]?.on ? b.name.toLowerCase() : null, "var(--amber)"))}
           </div>
         </div>
         <div style={SEC}>
+          <span className="mini">Click any chip to change it.</span>
+          <button className="btn" data-add-button style={{ alignSelf: "flex-start" }} onClick={addButton}>+ ADD BUTTON</button>
           <span className="mini">Mouse speed {input.feel.mouseSpeed} · deadzone {input.feel.padDeadzone} · {input.playersCanChange ? "players can change keys and feel in the pause menu" : "players can't change them"}</span>
           <span className="mini">Grey = keyboard and mouse. Gamepad buttons by both names: <span className="k xb fixed">RB</span> Xbox, <span className="k ps fixed">R1</span> PlayStation; <span className="k both fixed">stick</span> = same on both. <span className="k touch fixed"><Phone />jump</span> = touch (phones, tablets).</span>
         </div>
@@ -357,12 +387,6 @@ function Panel({ input, setInput, view, setView, player, lit }) {
 
   // ── edit (layout A) ──
   const tabBtn = (id, label) => <button key={id} className={"btn" + (tab === id ? " on" : "")} style={{ flex: 1, justifyContent: "center" }} onClick={() => { setTab(id); setCapturing(null); }}>{label}</button>;
-  const addButton = () => {
-    let n = 1; while (input.buttons.some(b => b.name === `Button ${n}`)) n++;
-    const id = "btn" + Date.now().toString(36);
-    setInput(i => ({ ...i, buttons: [...i.buttons, { id, name: `Button ${n}`, kind: "press", kbm: [], gamepad: [], touch: false, does: null }] }));
-    setView("button:" + id);
-  };
   const yours = (
     <div style={SEC}><span className="lbl">Your buttons</span>
       {input.buttons.length === 0 && <span className="mini">None yet. A button of your own (Fire, Aim, Reload…) can play a move or aim, and scripts can listen to it.</span>}
@@ -392,11 +416,11 @@ function Panel({ input, setInput, view, setView, player, lit }) {
 
       {tab === "kbm" && <>
         <div style={SEC}><span className="lbl">Moving</span>
-          {BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
-          <div style={ROW}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k fixed">mouse</span></span></div>
+          {BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} data-row={a.id} style={hl(a.id)}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
+          <div data-row="look" style={hl("look")}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k fixed">mouse</span></span></div>
         </div>
         <div style={SEC}><span className="lbl">Game</span>
-          {BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
+          {BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} data-row={a.id} style={hl(a.id)}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("kbm", a.id)}</div>)}
           <span className="mini">Esc always leaves Play.</span>
         </div>
         {yours}
@@ -408,13 +432,13 @@ function Panel({ input, setInput, view, setView, player, lit }) {
 
       {tab === "gamepad" && <>
         <div style={SEC}><span className="lbl">Moving</span>
-          <div style={ROW}><span style={{ color: "var(--t1)" }}>Move</span><span><span className="k both fixed">left stick</span></span></div>
-          <div style={ROW}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k both fixed">right stick</span></span></div>
-          {PAD_BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
+          <div data-row="move" style={hl("move")}><span style={{ color: "var(--t1)" }}>Move</span><span><span className="k both fixed">left stick</span></span></div>
+          <div data-row="look" style={hl("look")}><span style={{ color: "var(--t1)" }}>Look</span><span><span className="k both fixed">right stick</span></span></div>
+          {PAD_BUILT_IN.filter(a => a.group === "Moving").map(a => <div key={a.id} data-row={a.id} style={hl(a.id)}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
           <span className="mini">Run also happens with the left stick pushed nearly all the way.</span>
         </div>
         <div style={SEC}><span className="lbl">Game</span>
-          {PAD_BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} style={ROW}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
+          {PAD_BUILT_IN.filter(a => a.group === "Game").map(a => <div key={a.id} data-row={a.id} style={hl(a.id)}><span style={{ color: "var(--t1)" }}>{a.name}</span>{caps("gamepad", a.id)}</div>)}
         </div>
         {yours}
         <div style={SEC}><span className="lbl">Feel (the game's defaults)</span>
