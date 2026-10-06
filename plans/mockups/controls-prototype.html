@@ -82,6 +82,9 @@ function PadPair({ i, fixed }) {
   return <><span className={"k xb" + (fixed ? " fixed" : "")}>{padName(i)}</span><span className={"k ps" + (fixed ? " fixed" : "")}>{psName(i)}</span></>;
 }
 const RESERVED = { Escape: "Esc is kept for leaving Play" };
+/** The mark on every touch chip: a small phone. */
+const Phone = () => <svg width="8" height="11" viewBox="0 0 8 11" aria-hidden="true" style={{ marginRight: 4, flexShrink: 0 }}>
+  <rect x="0.6" y="0.6" width="6.8" height="9.8" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.2" /><circle cx="4" cy="8.4" r="0.7" fill="currentColor" /></svg>;
 
 // Built-in actions per device. fixed = not rebindable (shown, explained).
 const BUILT_IN = [
@@ -275,7 +278,7 @@ function Panel({ input, setInput, view, setView, player, lit }) {
         <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {kb.map((c, i) => <span key={"k" + i} className="k fixed">{c}</span>)}
           {pad.map((c, i) => typeof c === "string" ? <span key={"p" + i} className="k both fixed">{c}</span> : <span key={"p" + i} className="pair" style={{ cursor: "default" }}><PadPair i={c} fixed /></span>)}
-          {touch && <span className="k touch fixed">{touch}</span>}
+          {touch && <span className="k touch fixed" title="Touch (phones, tablets)"><Phone />{touch}</span>}
         </span>
       </React.Fragment>
     );
@@ -298,7 +301,7 @@ function Panel({ input, setInput, view, setView, player, lit }) {
         </div>
         <div style={SEC}>
           <span className="mini">Mouse speed {input.feel.mouseSpeed} · deadzone {input.feel.padDeadzone} · {input.playersCanChange ? "players can change keys and feel in the pause menu" : "players can't change them"}</span>
-          <span className="mini">Grey = keyboard and mouse. Gamepad buttons by both names: <span className="k xb fixed">RB</span> Xbox, <span className="k ps fixed">R1</span> PlayStation; <span className="k both fixed">stick</span> = same on both. Outlined = touch.</span>
+          <span className="mini">Grey = keyboard and mouse. Gamepad buttons by both names: <span className="k xb fixed">RB</span> Xbox, <span className="k ps fixed">R1</span> PlayStation; <span className="k both fixed">stick</span> = same on both. <span className="k touch fixed"><Phone />jump</span> = touch (phones, tablets).</span>
         </div>
       </div>
     );
