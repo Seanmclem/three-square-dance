@@ -504,7 +504,8 @@ function Panel({ input, setInput, view, setView, player, lit }) {
         </div>
       </>}
 
-      {tab === "touch" && <TouchArranger input={input} setInput={setInput} sel={touchSel} setSel={setTouchSel} yours={yours} feelNum={feelNum} />}
+      {tab === "touch" && <TouchArranger input={input} setInput={setInput} sel={touchSel} setSel={setTouchSel} feelNum={feelNum} hl={hl}
+        addButton={addButton} openButton={id => setView("button:" + id)} />}
 
       <div style={SEC}>
         <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", color: "var(--t1)" }}>
@@ -523,7 +524,7 @@ function summary(input) {
 }
 
 // ── touch arranger ─────────────────────────────────────────────────────────────
-function TouchArranger({ input, setInput, sel, setSel, yours, feelNum }) {
+function TouchArranger({ input, setInput, sel, setSel, feelNum, hl, addButton, openButton }) {
   const ref = useRef(null);
   const [drag, setDrag] = useState(null);
   const items = [
@@ -538,6 +539,13 @@ function TouchArranger({ input, setInput, sel, setSel, yours, feelNum }) {
     setT(drag, { x: Math.round(Math.max(4, Math.min(96, ((e.clientX - r.left) / r.width) * 100))), y: Math.round(Math.max(8, Math.min(92, ((e.clientY - r.top) / r.height) * 100))) });
   };
   const s = sel ? t(sel) : null;
+  // On screen: a phone chip (click: select it on the phone). Not on screen: a dashed + (click: put it on screen).
+  const chip = (id, name) => t(id).on
+    ? <span style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="k touch go" data-touch-chip={id} role="button" tabIndex={0} title="Select it on the phone"
+        onClick={() => setSel(id)} style={{ outline: sel === id ? "2px solid #fff" : "none", outlineOffset: 1 }}><Phone />{name}</span><span className="mini">on screen</span></span>
+    : <span style={{ display: "flex", gap: 6, alignItems: "center" }}><span className="k add" data-touch-add={id} role="button" tabIndex={0} title="Put it on screen"
+        onClick={() => { setT(id, { on: true }); setSel(id); }}>+</span><span className="mini">not on screen</span></span>;
+  const fixedChip = name => <span className="k touch fixed" title="Always there"><Phone />{name}</span>;
   return <>
     <div style={SEC}><span className="lbl">Drag the buttons where thumbs go</span>
       <div ref={ref} data-phone onPointerMove={move} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}
@@ -553,15 +561,36 @@ function TouchArranger({ input, setInput, sel, setSel, yours, feelNum }) {
               background: it.color + "33", border: `2px solid ${it.color}`, outline: sel === it.id ? "2px solid #fff" : "none", outlineOffset: 2 }}>{it.name}</div>;
         })}
       </div>
-      <span style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{items.map(it => (
-        <button key={it.id} className={"btn" + (sel === it.id ? " on" : "")} style={{ opacity: t(it.id).on ? 1 : .55 }} onClick={() => setSel(it.id)}>{it.name}{t(it.id).on ? "" : " (off)"}</button>))}</span>
       {s && <div style={{ display: "flex", flexDirection: "column", gap: 6, border: "1px solid var(--line)", borderRadius: 6, padding: 8 }}>
         <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}><input type="checkbox" aria-label="Show on screen" checked={s.on} onChange={e => setT(sel, { on: e.target.checked })} />show {items.find(i => i.id === sel)?.name} on screen</label>
         <div style={ROW}><span>Size</span><input type="range" aria-label="Button size" min={32} max={88} value={s.size} onChange={e => setT(sel, { size: Number(e.target.value) })} /></div>
         <span className="mini">x {s.x}% · y {s.y}% of the screen</span>
       </div>}
     </div>
-    {yours}
+    {/* Every action, as on the other tabs: what it is on a touch screen, or + when it has nothing. */}
+    <div style={SEC}><span className="lbl">Moving</span>
+      <div data-row="move" style={hl("move")}><span style={{ color: "var(--t1)" }}>Move</span><span>{fixedChip("joystick")}</span></div>
+      <div data-row="look" style={hl("look")}><span style={{ color: "var(--t1)" }}>Look</span><span>{fixedChip("drag the screen")}</span></div>
+      <div data-row="jump" style={hl("jump")}><span style={{ color: "var(--t1)" }}>Jump</span>{chip("jump", "jump")}</div>
+      <div data-row="run" style={hl("run")}><span style={{ color: "var(--t1)" }}>Run (hold)</span><span>{fixedChip("joystick pushed far")}</span></div>
+    </div>
+    <div style={SEC}><span className="lbl">Game</span>
+      <div data-row="interact" style={hl("interact")}><span style={{ color: "var(--t1)" }}>Interact</span><span>{fixedChip("tap anywhere")}</span></div>
+      <div data-row="bag" style={hl("bag")}><span style={{ color: "var(--t1)" }}>Bag</span>{chip("bag", "bag")}</div>
+      <div data-row="pause" style={hl("pause")}><span style={{ color: "var(--t1)" }}>Pause</span><span>{fixedChip("exit")}</span></div>
+      <span className="mini">Joystick, drag, tap and exit are always there.</span>
+    </div>
+    <div style={SEC}><span className="lbl">Your buttons</span>
+      {input.buttons.length === 0 && <span className="mini">None yet.</span>}
+      {input.buttons.map(b => (
+        <div key={b.id} data-row={b.id} style={{ ...hl(b.id), gridTemplateColumns: "96px 1fr auto" }}>
+          <span style={{ color: "var(--amber)" }}>{b.name}{b.kind === "hold" ? " (hold)" : ""}</span>
+          {chip(b.id, b.name.toLowerCase())}
+          <button className="btn" aria-label={`Open ${b.name}`} onClick={() => openButton(b.id)}>›</button>
+        </div>
+      ))}
+      <button className="btn" style={{ alignSelf: "flex-start" }} onClick={addButton}>+ ADD BUTTON</button>
+    </div>
     <div style={SEC}><span className="lbl">Feel (the game's defaults)</span>
       {feelNum("Look speed", "touchLook", 0.001, 0.001, 0.02)}
       {feelNum("Joystick size (px)", "joystick", 5, 30, 120)}

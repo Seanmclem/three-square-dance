@@ -54,7 +54,11 @@ selected."
   on-screen touch button), an optional built-in **what it does** (when pressed: play a move,
   once or while held; while held: aim), and the scripts that use it.
 - **Touch tab**: a phone screen to drag the buttons (jump, bag, your buttons) to where thumbs
-  go, each with size and on / off; replaces "jump on left / right".
+  go, each with size and on / off; replaces "jump on left / right". Below it, every action
+  listed like the other tabs: the fixed ones as phone chips (Move = joystick, Look = drag the
+  screen, Run = joystick pushed far, Interact = tap anywhere, Pause = exit), Jump / Bag / your
+  buttons as a phone chip "on screen" (click: select it on the phone) or a dashed + "not on
+  screen" (click: put it on screen).
 - **Script trigger**: "when the player presses / releases <button>" (and "every N s while
   held"), for your buttons and the built-ins (jump, interact).
 - **Saved in the game** (game.json `input`): the game's bindings for every action, your
