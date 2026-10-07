@@ -206,7 +206,7 @@ export class GizmoManager implements IEditorModule {
         // gizmo, which uses the same keys): don't silently change this hidden gizmo's mode.
         if (this._suspends.size > 0) return;
         if (code === "KeyT") { this._controls.setMode("translate"); this._syncAxisVisibility(); }
-        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "ladder" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape" || (this._selType === "light" && this._getLight()?.kind === "directional"))) {
+        if (code === "KeyR" && (this._selType === "platform" || this._selType === "stair" || this._selType === "ladder" || this._selType === "wall" || this._selType === "object" || this._selType === "trigger-volume" || this._selType === "spawn" || this._selType === "checkpoint" || this._selType === "shape" || (this._selType === "light" && (this._getLight()?.kind ?? "point") !== "point"))) {
           this._controls.setMode("rotate");
           this._syncAxisVisibility();
         }
@@ -375,7 +375,7 @@ export class GizmoManager implements IEditorModule {
       const cp = this._worldState.zones.get(payload.zoneId)?.checkpoints?.find(c => c.id === payload.id);
       rotY = THREE.MathUtils.degToRad(cp?.facingDeg ?? 0);
     }
-    // "light": default pivot (marker position + 0.3). A directional light's pivot is
+    // "light": default pivot (marker position + 0.3). A spot or directional light's pivot is
     // turned to its aim so the rotate rings start from it (see _setLightAim).
 
     this._pivot.position.set(px, py, pz);
@@ -1406,11 +1406,12 @@ export class GizmoManager implements IEditorModule {
       case "light": {
         // The pivot's -Z is the aim (_setLightAim); read it back as pitch/yaw.
         const l = this._getLight();
-        if (!l || l.kind !== "directional") break;
+        if (!l || l.kind === "point") break;
         const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(this._pivot.quaternion);
         const DEG = THREE.MathUtils.radToDeg;
         const pitchDeg = round2(DEG(Math.asin(THREE.MathUtils.clamp(-dir.y, -1, 1))));
-        const yawDeg   = round2(DEG(Math.atan2(-dir.x, -dir.z)));
+        // Straight up / down has no yaw (atan2 of ~0 is noise): keep the authored one.
+        const yawDeg   = Math.abs(pitchDeg) > 89.99 ? (l.yawDeg ?? 0) : round2(DEG(Math.atan2(-dir.x, -dir.z)));
         const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
         if (near(pitchDeg, l.pitchDeg ?? 90) && near(yawDeg, l.yawDeg ?? 0)) { this._resetLiveRotate(); break; }
         this._worldState.updateLight(this._selZoneId!, this._selId!, { pitchDeg, yawDeg });
@@ -1457,11 +1458,11 @@ export class GizmoManager implements IEditorModule {
     return this._worldState.zones.get(this._selZoneId ?? "")?.lights?.find(l => l.id === this._selId);
   }
 
-  /** Turn the pivot so its -Z points along a directional light's aim (same math as
-   *  ZoneManager's lightAimDir: yaw 0 = -Z, pitch 90 = down). Other lights stay unturned. */
+  /** Turn the pivot so its -Z points along a spot or directional light's aim (same math as
+   *  ZoneManager's lightAimDir: yaw 0 = -Z, pitch 90 = down). Point lights stay unturned. */
   private _setLightAim(): void {
     const l = this._getLight();
-    if (l?.kind !== "directional") return;
+    if (!l || l.kind === "point") return;
     const RAD = THREE.MathUtils.degToRad;
     // Via the quaternion so the pivot's Euler order stays XYZ for every other type.
     this._pivot.quaternion.setFromEuler(new THREE.Euler(-RAD(l.pitchDeg ?? 90), RAD(l.yawDeg ?? 0), 0, "YXZ"));
