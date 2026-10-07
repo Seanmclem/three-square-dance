@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>From a Model to a Fire Button</title>
+<!--
+  In-app HTML guide (see public/docs/README.md). Self-contained: inline CSS and SVG.
+  Opened from the editor's ? menu (GETTING STARTED section). A walkthrough tying the
+  character editor (Phases 86 to 88) to the Controls page (Phase 89); the details live in
+  characters.html and controls.html. Keep it current when either changes.
+-->
+<style>
+:root{color-scheme:dark;--bg:#1c1c1e;--card:#26272b;--ink:#dde3f0;--muted:#c2cadb;--line:#3a3f4a;--accent:#80aaff;--soft:#2d3550;--amber:#ffbf73;--d1:#8fb0ff;--d2:#6fd8ab;--d3:#c7a6ff;--d4:#ffab7a;--d5:#7dd3fc}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;padding-inline:16px;padding-block:36px 80px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+h1,h2,h3{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;line-height:1.1;text-wrap:balance}
+h1{font-size:clamp(32px,5vw,50px);font-weight:800} h2{font-size:26px;font-weight:800} h3{font-size:18px}
+p{margin:0;max-width:70ch} .lede{font-size:18px;color:var(--muted)}
+.eyebrow{font:500 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.flow{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.flow svg{display:block;min-width:860px;width:100%;height:auto}
+.step{display:grid;grid-template-columns:48px 1fr;gap:16px;align-items:start}
+.num{font:800 26px/1 system-ui,sans-serif;color:var(--accent);border:2px solid var(--accent);border-radius:50%;width:44px;height:44px;display:flex;align-items:center;justify-content:center}
+.body{display:flex;flex-direction:column;gap:10px}
+.body ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.where{font:500 13px ui-monospace,Menlo,monospace;color:var(--muted)}
+figure{margin:0} figure img{max-width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line)}
+figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.pair{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start} .pair figure{flex:1 1 260px}
+code{font:500 13px ui-monospace,Menlo,monospace;background:var(--soft);color:var(--accent);padding:1px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;font-size:15px} th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 12px ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+.note{background:var(--card);border-left:4px solid var(--accent);border-radius:6px;padding:12px 16px}
+
+:target{scroll-margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header style="display:flex;flex-direction:column;gap:14px">
+  <span class="eyebrow">Characters · animation · controls</span>
+  <h1>From a model to a Fire button</h1>
+  <p class="lede">How the last few phases fit together, as one example: a mannequin that walks and runs with planted feet, steps on its footfalls, shoots while running, aims where you look, and does it all from a mouse click or a trigger pull. No scripts needed until you want extras.</p>
+</header>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+  <h2>The five pieces</h2>
+  <div class="flow"><svg viewBox="0 0 900 250" role="img" aria-label="Files feed a Character; the Character is used by the Player; the Controls page's buttons play the Character's moves; Scripts add extras.">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+    <g font-family="system-ui, sans-serif" font-size="13">
+      <g style="color:var(--d1)"><rect x="10" y="40" width="150" height="150" rx="12" fill="none" stroke="currentColor" stroke-width="2"/><text x="85" y="66" text-anchor="middle" font-weight="700" fill="currentColor">1 · Files</text>
+        <text x="85" y="96" text-anchor="middle" fill="var(--ink)">model (Mannequin)</text><text x="85" y="118" text-anchor="middle" fill="var(--ink)">clip files</text><text x="85" y="140" text-anchor="middle" fill="var(--ink)">(UAL1, UAL2)</text><text x="85" y="172" text-anchor="middle" fill="var(--muted)" font-size="11">Assets / import</text></g>
+      <g style="color:var(--d2)"><rect x="200" y="20" width="200" height="190" rx="12" fill="none" stroke="currentColor" stroke-width="2"/><text x="300" y="46" text-anchor="middle" font-weight="700" fill="currentColor">2 · Character</text>
+        <text x="300" y="72" text-anchor="middle" fill="var(--ink)">moves: idle, walk, run, jump…</text><text x="300" y="94" text-anchor="middle" fill="var(--ink)">each: clip, speed, footsteps,</text><text x="300" y="114" text-anchor="middle" fill="var(--ink)">handoffs, layers, plays on</text><text x="300" y="138" text-anchor="middle" fill="var(--ink)">shoot (upper body, aims)</text><text x="300" y="160" text-anchor="middle" fill="var(--ink)">AIM poses · sounds · feel</text><text x="300" y="192" text-anchor="middle" fill="var(--muted)" font-size="11">Characters → EDIT</text></g>
+      <g style="color:var(--d3)"><rect x="440" y="40" width="140" height="150" rx="12" fill="none" stroke="currentColor" stroke-width="2"/><text x="510" y="66" text-anchor="middle" font-weight="700" fill="currentColor">3 · Player</text>
+        <text x="510" y="96" text-anchor="middle" fill="var(--ink)">uses the character</text><text x="510" y="118" text-anchor="middle" fill="var(--ink)">speed, jump, camera</text><text x="510" y="140" text-anchor="middle" fill="var(--ink)">stay the game's</text><text x="510" y="172" text-anchor="middle" fill="var(--muted)" font-size="11">spawn → Character</text></g>
+      <g style="color:var(--d4)"><rect x="620" y="40" width="130" height="150" rx="12" fill="none" stroke="currentColor" stroke-width="2"/><text x="685" y="66" text-anchor="middle" font-weight="700" fill="currentColor">4 · Controls</text>
+        <text x="685" y="96" text-anchor="middle" fill="var(--ink)">Fire → plays</text><text x="685" y="116" text-anchor="middle" fill="var(--ink)">shoot</text><text x="685" y="140" text-anchor="middle" fill="var(--ink)">Aim → aims</text><text x="685" y="172" text-anchor="middle" fill="var(--muted)" font-size="11">main menu → Controls</text></g>
+      <g style="color:var(--d5)"><rect x="790" y="40" width="100" height="150" rx="12" fill="none" stroke="currentColor" stroke-width="2"/><text x="840" y="66" text-anchor="middle" font-weight="700" fill="currentColor">5 · Scripts</text>
+        <text x="840" y="96" text-anchor="middle" fill="var(--ink)">extras:</text><text x="840" y="116" text-anchor="middle" fill="var(--ink)">ammo,</text><text x="840" y="136" text-anchor="middle" fill="var(--ink)">sounds</text><text x="840" y="172" text-anchor="middle" fill="var(--muted)" font-size="11">optional</text></g>
+      <g stroke-width="2" fill="none"><path d="M160 115 L196 115" stroke="var(--d1)" marker-end="url(#ar)" style="color:var(--d1)"/><path d="M400 115 L436 115" stroke="var(--d2)" marker-end="url(#ar)" style="color:var(--d2)"/>
+        <path d="M580 115 L616 115" stroke="var(--d3)" marker-end="url(#ar)" style="color:var(--d3)"/><path d="M750 115 L786 115" stroke="var(--d4)" marker-end="url(#ar)" style="color:var(--d4)"/>
+        <path d="M685 190 C685 240 300 240 300 214" stroke="var(--d4)" stroke-dasharray="5 4" marker-end="url(#ar)" style="color:var(--d4)"/></g>
+      <text x="492" y="246" text-anchor="middle" fill="var(--muted)" font-size="11">a button plays the character's move by name (dashed)</text>
+    </g></svg></div>
+  <p>The character is the hub: everything about <i>how it moves and looks</i> lives there, so the same character works as the player, a placed character or an enemy. The game keeps <i>how the player plays</i> (speed, jump height, camera). Controls only say which button plays which move.</p>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <h2>The example, step by step</h2>
+
+  <div class="step"><div class="num">1</div><div class="body"><h3>Bring in the files</h3><span class="where">Assets · import</span>
+    <p>A model with a skeleton (Mannequin F, or the male one inside UAL1) and files full of clips with the same skeleton (UAL1, UAL2: 254 clips). Done already for your obby.</p></div></div>
+
+  <div class="step"><div class="num">2</div><div class="body"><h3>Make the character</h3><span class="where">Characters (left toolbar) → model → NEW, or EDIT an existing one</span>
+    <ul><li><b>+ ADD FILE</b> to borrow UAL2's clips; <b>AUTO FILL</b> guesses every move.</li><li><b>HEIGHT</b> → FIT TO CAPSULE; colors; name it.</li><li>MODEL can be swapped later (same skeleton keeps every move).</li></ul>
+    <figure><img src="img/model-to-fire/editor.jpg" alt="The character editor: clips on the left, the character in its capsule, moves and settings on the right, a move's timeline at the bottom"><figcaption>The character editor: clips on the left, MOVES on the right, the open move's timeline at the bottom.</figcaption></figure></div></div>
+
+  <div class="step"><div class="num">3</div><div class="body"><h3>Make walking and running look right</h3><span class="where">click <b>walk</b> (then <b>run</b>) in MOVES → its timeline</span>
+    <ul><li>The list says <b>feet slide 86%</b> or <b>feet planted</b>.</li><li><b>FIND A CLIP THAT FITS</b> (e.g. <code>Sprint_Loop</code> at 0.84×) or <b>MATCH FEET</b>.</li><li>Footsteps now land on the green diamonds (each footfall) automatically.</li><li>Optional: <b>HANDOFFS</b> into jump "quick" so takeoff feels snappy.</li></ul>
+    <div class="pair"><figure><img src="img/model-to-fire/moves.jpg" alt="MOVES list with feet planted and feet slide labels"><figcaption>"feet planted" / "feet slide" under walk and run.</figcaption></figure>
+      <figure><img src="img/model-to-fire/timeline.jpg" alt="A move's timeline: layer, clip, feet, steps, handoffs rows"><figcaption>A move's timeline: layers, clip, feet, steps, handoffs.</figcaption></figure></div></div></div>
+
+  <div class="step"><div class="num">4</div><div class="body"><h3>Add a shoot move that works while moving</h3><span class="where">+ ADD MOVE <code>shoot</code> → clip <code>Pistol_Shoot</code> → its timeline</span>
+    <ul><li><b>plays on: upper body</b>: the legs keep doing whatever the game picks.</li><li>tick <b>aims</b>: it aims while it plays.</li><li><b>preview over walk</b> + ▶ PLAY to see it combined.</li></ul>
+    <figure><img src="img/model-to-fire/playson.jpg" alt="Timeline header: shoot Pistol_Shoot, plays on upper body, aims, preview over walk"><figcaption>The shoot move set to play on the upper body and aim.</figcaption></figure></div></div>
+
+  <div class="step"><div class="num">5</div><div class="body"><h3>Give it aim poses</h3><span class="where">the AIM section (under FEEL)</span>
+    <p>Press <b>PISTOL</b>: up / straight / down fill from <code>Pistol_Aim_*</code>. Drag the preview slider to check. (No aim clips? The spine turns instead.)</p>
+    <figure style="max-width:340px"><img src="img/model-to-fire/aim.jpg" alt="AIM section with up, straight, down clips and a preview angle slider"><figcaption>AIM: three poses and a preview slider.</figcaption></figure>
+    <p>Save the character.</p></div></div>
+
+  <div class="step"><div class="num">6</div><div class="body"><h3>Make it the player</h3><span class="where">select the spawn point → Character → CHARACTER</span>
+    <p>Pick the character (or USE AS PLAYER in the Characters panel). Move speed, jump height, camera stay the game's; model, moves, sounds and feel come from the character.</p></div></div>
+
+  <div class="step"><div class="num">7</div><div class="body"><h3>Wire the buttons</h3><span class="where">click empty space → main menu → Controls</span>
+    <ul><li><b>+ ADD BUTTON</b> Fire: left click, RT / R2, PRESS, <i>play a move</i> → <code>shoot</code>.</li><li>+ ADD BUTTON Aim: right click, LT / L2, HOLD, <i>aim</i>.</li><li>Touch tab: put Fire on screen and drag it under the right thumb.</li></ul>
+    <div class="pair"><figure style="max-width:290px"><img src="img/controls/compact.png" alt="The Controls list: every action, every device"><figcaption>The Controls list (your obby's); click any chip to change it.</figcaption></figure>
+      <div style="flex:1 1 260px;display:flex;flex-direction:column;gap:10px"><p>New games start with Fire (plays attack) and Aim already there; your obby predates that, so add them once.</p>
+        <p>Hold Aim and click Fire: the character shoots where the camera looks, while running.</p></div></div></div></div>
+
+  <div class="step"><div class="num">8</div><div class="body"><h3>Extras with scripts (optional)</h3><span class="where">Scripts → trigger "when the player presses a button"</span>
+    <p>Fire → play a sound, adjust number <code>ammo</code> −1, only if ammo &gt; 0. "while it's held" repeats (charge shots). The button's built-in move and the script both run.</p></div></div>
+
+  <div class="step"><div class="num">9</div><div class="body"><h3>Try it</h3><span class="where">TRY IT in the character editor, or Play</span>
+    <p>Click the game view first so keys go to the game. Players can change their own keys and mouse speed in the pause menu (Esc / Enter).</p>
+    <figure style="max-width:330px"><img src="img/controls/pause-menu.png" alt="Pause menu with CONTROLS list"><figcaption>The pause menu's CONTROLS (a player's own Jump in amber).</figcaption></figure></div></div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+  <h2>Where each thing lives</h2>
+  <div class="tbl"><table><thead><tr><th>You want…</th><th>It's on</th></tr></thead><tbody>
+    <tr><td>a clip for a move, its speed, its footsteps, blend times</td><td>the character editor → click the move → timeline</td></tr>
+    <tr><td>two clips at once (talk while walking)</td><td>the move's timeline → + LAYER</td></tr>
+    <tr><td>an action over running (shoot, wave)</td><td>the move's timeline → plays on</td></tr>
+    <tr><td>aiming up and down</td><td>the character editor → AIM</td></tr>
+    <tr><td>footstep / jump sounds, squash and lean</td><td>the character editor → SOUNDS, FEEL</td></tr>
+    <tr><td>how fast the player runs, jump height, camera</td><td>spawn point → Movement, Camera</td></tr>
+    <tr><td>which key does what, your own buttons, touch layout</td><td>main menu → Controls</td></tr>
+    <tr><td>anything beyond "play a move" or "aim"</td><td>Scripts → when the player presses a button</td></tr>
+  </tbody></table></div>
+  <div class="note">In the editor, the <b>?</b> menu opens the full Characters and Controls guides.</div>
+</section>
+</div>
+</body>
+</html>

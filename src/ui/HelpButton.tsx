@@ -12,6 +12,11 @@ const BRUSH_GUIDE: DocGuide = {
   src: "/docs/brush-editing.html",
 };
 
+const WALKTHROUGH_GUIDE: DocGuide = {
+  title: "From a model to a Fire button",
+  src: "/docs/model-to-fire-button.html",
+};
+
 const CONTROLS_GUIDE: DocGuide = {
   title: "Controls guide",
   src: "/docs/controls.html",
@@ -67,6 +72,15 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["RMB click wall"],         action: "Split the wall there (insert a vertex)" },
       { keys: ["RMB click brush corner"], action: "Delete that corner" },
       { keys: ["RMB click"],              action: "Menu: move initial spawn here" },
+    ],
+  },
+  {
+    label: "GETTING STARTED  (a character that runs, shoots and aims)",
+    guide: WALKTHROUGH_GUIDE,
+    rows: [
+      { keys: ["1 · Characters"],    action: "Make the character: model, borrowed clip files, AUTO FILL, height" },
+      { keys: ["2 · Timeline"],      action: "Click walk / run: planted feet, footsteps; add shoot (plays on the upper body, aims) and AIM poses" },
+      { keys: ["3 · Controls"],      action: "Fire plays shoot, Aim aims; scripts for extras" },
     ],
   },
   {

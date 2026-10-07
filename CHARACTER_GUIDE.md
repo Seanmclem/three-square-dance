@@ -112,7 +112,9 @@ sounds use the game's, a FEEL effect plays only when both the character and the 
 page allow it). Phase 87 (v4.118.0) adds a timeline per move: feet checked against the
 game's speed (MATCH FEET, FIND A CLIP THAT FITS), footsteps on touchdown (or your own
 STEPS), LAYERS that mix another clip onto a body part, and HANDOFFS (blend time per pair of
-moves). See `public/docs/characters.html#timeline`. Phase 88 (v4.119.0): a move can play on a
+moves). See `public/docs/characters.html#timeline`. The walkthrough tying characters to
+the Controls page (Fire / Aim) is `public/docs/model-to-fire-button.html` (? menu, GETTING
+STARTED). Phase 88 (v4.119.0): a move can play on a
 body part over the locomotion (PLAYS ON, e.g. shoot on the upper body while walking), and a
 character can aim (AIM poses blended by the camera's up / down look; the spine turns when
 there are none). Scripts: play move (Stop it), aim on / off. Movement (speed, jump height, run), CHARACTER SCALE and the camera stay
