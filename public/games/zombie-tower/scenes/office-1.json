@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -28.283303900345086,
-        "y": 4.106762436734733,
-        "z": -31.890862353184215
+        "x": -30.376851269986513,
+        "y": 10.540276118403842,
+        "z": -32.20010528931712
       },
-      "radius": 24.72345110625026,
-      "phi": 1.0457963267949013,
-      "theta": 18.571899999962348
+      "radius": 4.236022278244117,
+      "phi": 0.02,
+      "theta": 18.841440000305823
     }
   },
   "world": {
@@ -41,7 +41,15 @@
     "playerSettings": {},
     "lightingFromGame": true,
     "stateSchema": {},
-    "audio": {}
+    "audio": {},
+    "defaultSpawn": {
+      "position": {
+        "x": -32.144656639234306,
+        "y": 0.004000000189989805,
+        "z": -25.97896004449325
+      },
+      "facingDeg": 0
+    }
   },
   "terrain": null,
   "zones": [
@@ -57,109 +65,147 @@
       },
       "nodes": [
         {
-          "id": "aca67241-5cb7-4cd8-807c-1c1633dfb638",
-          "x": -25,
-          "z": -25
-        },
-        {
-          "id": "71ca134c-7625-48fa-9c44-34931e9dc8de",
-          "x": -23.5,
-          "z": -27.5
-        },
-        {
           "id": "1aafb132-1010-4733-8f5a-5ad2e56cc762",
-          "x": -33.56761392250814,
-          "z": -21.98272204777859,
+          "x": -33.5,
+          "z": -24.5,
           "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
         },
         {
           "id": "23790aa1-4ae3-4802-b021-f693d4bbdd96",
-          "x": -28.067613922508137,
-          "z": -21.98272204777859,
+          "x": -28,
+          "z": -24.5,
           "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
         },
         {
           "id": "2732602c-e022-4720-a2e2-04002cb060f5",
           "x": -28.067613922508137,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
         },
         {
           "id": "4088010a-c638-4314-a4a0-e304b4950d41",
           "x": -33.56761392250814,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
         },
         {
           "id": "7ddf4493-c56c-4152-9f16-695c3415398d",
-          "x": -33.56761392250814,
-          "z": -21.98272204777859,
+          "x": -33.5,
+          "z": -24.5,
           "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
         },
         {
           "id": "8a7f7675-4e6e-4560-add3-06c3ae725910",
-          "x": -28.067613922508137,
-          "z": -21.98272204777859,
+          "x": -28,
+          "z": -24.5,
           "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
         },
         {
           "id": "6f4eea06-c296-4f47-bbe1-ba18fd7022b0",
           "x": -28.067613922508137,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
         },
         {
           "id": "44adc939-1086-4787-b12d-e8f24aba4d56",
           "x": -33.56761392250814,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
         },
         {
           "id": "b6f54fba-0fd2-4a96-a906-9ce686bca25b",
-          "x": -33.56761392250814,
-          "z": -21.98272204777859,
+          "x": -33.5,
+          "z": -24.5,
           "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
         },
         {
           "id": "33b54042-4a4e-40b5-824f-3f4acd5599bf",
-          "x": -28.067613922508137,
-          "z": -21.98272204777859,
+          "x": -28,
+          "z": -24.5,
           "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
         },
         {
           "id": "8ea00591-a09b-4e0f-bd72-6e77abc55189",
           "x": -28.067613922508137,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
         },
         {
           "id": "3bc8889e-0976-4814-b0bd-94245d0d1e36",
           "x": -33.56761392250814,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
         },
         {
           "id": "bca8b9c9-7800-47ee-87f1-1c1a7c7fcdef",
-          "x": -33.56761392250814,
-          "z": -21.98272204777859,
+          "x": -33.5,
+          "z": -24.5,
           "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
         },
         {
           "id": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
-          "x": -28.067613922508137,
-          "z": -21.98272204777859,
+          "x": -28,
+          "z": -24.5,
           "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
         },
         {
           "id": "ce743128-d1f7-4c48-8738-be7b176d320b",
           "x": -28.067613922508137,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
           "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
         },
         {
           "id": "2a6fdf0e-24ea-4ca3-8251-45eb0bdae32d",
           "x": -33.56761392250814,
-          "z": -36.982722047778594,
+          "z": -35.482722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "701e4e75-af6f-4ad3-ad76-74cd35f3832b",
+          "x": -33.5,
+          "z": -24.5,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "ed9e49cd-a2ca-4797-ab4a-e822abbbaa6c",
+          "x": -28,
+          "z": -24.5,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "4c6d9360-ad57-402b-b0a3-eb4f8bd4881b",
+          "x": -28.067613922508137,
+          "z": -35.482722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "907475e7-196d-4ba2-99be-ae01792e8dce",
+          "x": -33.56761392250814,
+          "z": -35.482722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "64e3d204-d5be-4060-b912-3d83a8ce3788",
+          "x": -33.5,
+          "z": -24.5,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "885c0c1c-4cd9-42c2-8147-0e55af8306dc",
+          "x": -28,
+          "z": -24.5,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "87a30c81-2759-4177-ad5a-6d71f0797f12",
+          "x": -28.067613922508137,
+          "z": -35.482722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
+          "x": -33.56761392250814,
+          "z": -35.482722047778594,
           "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
         }
       ],
@@ -391,6 +437,102 @@
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
           "openings": []
+        },
+        {
+          "id": "wall_76da695c",
+          "startNodeId": "701e4e75-af6f-4ad3-ad76-74cd35f3832b",
+          "endNodeId": "ed9e49cd-a2ca-4797-ab4a-e822abbbaa6c",
+          "floor": 4,
+          "elevation": 12,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_d9b10a37",
+          "startNodeId": "ed9e49cd-a2ca-4797-ab4a-e822abbbaa6c",
+          "endNodeId": "4c6d9360-ad57-402b-b0a3-eb4f8bd4881b",
+          "floor": 4,
+          "elevation": 12,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_f3a80a85",
+          "startNodeId": "4c6d9360-ad57-402b-b0a3-eb4f8bd4881b",
+          "endNodeId": "907475e7-196d-4ba2-99be-ae01792e8dce",
+          "floor": 4,
+          "elevation": 12,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_294af355",
+          "startNodeId": "907475e7-196d-4ba2-99be-ae01792e8dce",
+          "endNodeId": "701e4e75-af6f-4ad3-ad76-74cd35f3832b",
+          "floor": 4,
+          "elevation": 12,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_53d3114e",
+          "startNodeId": "64e3d204-d5be-4060-b912-3d83a8ce3788",
+          "endNodeId": "885c0c1c-4cd9-42c2-8147-0e55af8306dc",
+          "floor": 5,
+          "elevation": 15,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_d3d7ea32",
+          "startNodeId": "885c0c1c-4cd9-42c2-8147-0e55af8306dc",
+          "endNodeId": "87a30c81-2759-4177-ad5a-6d71f0797f12",
+          "floor": 5,
+          "elevation": 15,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_cae8cc13",
+          "startNodeId": "87a30c81-2759-4177-ad5a-6d71f0797f12",
+          "endNodeId": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
+          "floor": 5,
+          "elevation": 15,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_029d6a59",
+          "startNodeId": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
+          "endNodeId": "64e3d204-d5be-4060-b912-3d83a8ce3788",
+          "floor": 5,
+          "elevation": 15,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
         }
       ],
       "platforms": [],
@@ -404,8 +546,8 @@
           },
           "end": {
             "x": -29.5,
-            "y": 4.6,
-            "z": -34.5
+            "y": 3,
+            "z": -33
           },
           "width": 2.5,
           "style": "straight",
@@ -413,7 +555,7 @@
           "hasRailing": true,
           "riserUvJitter": 0.5,
           "treadUvJitter": 0.5,
-          "numSteps": 15,
+          "numSteps": 11,
           "landing": {
             "depth": 2.5
           },
