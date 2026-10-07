@@ -1,5 +1,5 @@
 import { isSelectMode } from "@/editor/selectMode";
-import { snapToStep } from "@/editor/dragSnap";
+import { dragSnapStep, round2, snapToStep } from "@/editor/dragSnap";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -307,10 +307,12 @@ export class NodeDragger {
         const dx = ax === "lock_x" ? 0 : (this._altDown ? rawDx : snap(rawDx));
         const dz = ax === "lock_z" ? 0 : (this._altDown ? rawDz : snap(rawDz));
 
-        const newX1 = this._dragEdgeOrig.x1 + dx;
-        const newZ1 = this._dragEdgeOrig.z1 + dz;
-        const newX2 = this._dragEdgeOrig.x2 + dx;
-        const newZ2 = this._dragEdgeOrig.z2 + dz;
+        // Snapped: keep 2 decimals (start + snapped move picks up float noise).
+        const tidy = !this._altDown && dragSnapStep() > 0 ? round2 : (v: number) => v;
+        const newX1 = tidy(this._dragEdgeOrig.x1 + dx);
+        const newZ1 = tidy(this._dragEdgeOrig.z1 + dz);
+        const newX2 = tidy(this._dragEdgeOrig.x2 + dx);
+        const newZ2 = tidy(this._dragEdgeOrig.z2 + dz);
 
         this._world.updateNode(this._activeZoneId, edge.nodeId1, { x: newX1, z: newZ1 });
         this._world.updateNode(this._activeZoneId, edge.nodeId2, { x: newX2, z: newZ2 });

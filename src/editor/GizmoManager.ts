@@ -8,7 +8,7 @@ import type {
   PlatformDef, StairDef, LadderDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
 } from "@/types";
 import { isGameplayMode } from "@/types";
-import { dragSnapStep, snapToStep } from "@/editor/dragSnap";
+import { dragSnapStep, round2, snapToStep } from "@/editor/dragSnap";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
@@ -1166,13 +1166,15 @@ export class GizmoManager implements IEditorModule {
         if (Math.abs(delta.x) < 1e-4 && Math.abs(delta.z) < 1e-4 && Math.abs(delta.y) < 1e-4) break;
         const zone = this._worldState.zones.get(this._selZoneId!);
         if (!zone) break;
+        // Snapped move: corners and heights keep 2 decimals (start + move picks up float noise).
+        const tidy = !this._altDown && dragSnapStep() > 0 ? round2 : (v: number) => v;
         if (Math.abs(delta.x) >= 1e-4 || Math.abs(delta.z) >= 1e-4) {
           for (const nodeId of this._wallNodeIds) {
             const node = zone.nodes.find(n => n.id === nodeId) as WallNode | undefined;
             if (node) {
               this._worldState.updateNode(this._selZoneId!, nodeId, {
-                x: node.x + delta.x,
-                z: node.z + delta.z,
+                x: tidy(node.x + delta.x),
+                z: tidy(node.z + delta.z),
               });
             }
           }
@@ -1182,7 +1184,7 @@ export class GizmoManager implements IEditorModule {
             const wall = zone.walls.find(w => w.id === wallId) as WallDef | undefined;
             if (wall) {
               this._worldState.updateWall(this._selZoneId!, wallId, {
-                elevation: (wall.elevation ?? 0) + delta.y,
+                elevation: tidy((wall.elevation ?? 0) + delta.y),
               });
             }
           }
@@ -1193,7 +1195,7 @@ export class GizmoManager implements IEditorModule {
             if (!fIds?.length) continue;
             if (fIds.every(id => movedNodes.has(id))) {
               this._worldState.updateFloor(this._selZoneId!, floor.id, {
-                elevation: floor.elevation + delta.y,
+                elevation: tidy(floor.elevation + delta.y),
               });
             }
           }
@@ -1203,7 +1205,7 @@ export class GizmoManager implements IEditorModule {
             if (!pIds?.length) continue;
             if (pIds.every(id => movedNodes.has(id))) {
               this._worldState.updatePlatform(this._selZoneId!, plat.id, {
-                position: { ...plat.position, y: plat.position.y + delta.y },
+                position: { ...plat.position, y: tidy(plat.position.y + delta.y) },
               });
             }
           }
