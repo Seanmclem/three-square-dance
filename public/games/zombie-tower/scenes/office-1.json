@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -38.50409144162703,
+        "x": -36.4669038246593,
         "y": 6.413416117888859,
-        "z": -30.46831738803096
+        "z": -24.713786249360144
       },
-      "radius": 25.150000000000006,
-      "phi": 0.675796326794902,
-      "theta": 27.57765999919019
+      "radius": 10.630767334997648,
+      "phi": 1.1707963267948993,
+      "theta": 27.962659999190233
     }
   },
   "world": {
@@ -582,10 +582,12 @@
           "underside": {
             "mode": "diagonal",
             "thickness": 0.25
-          }
+          },
+          "railingMaterial": "white_smooth_concrete"
         }
       ],
-      "objects": []
+      "objects": [],
+      "lights": []
     }
   ],
   "transitions": [],
