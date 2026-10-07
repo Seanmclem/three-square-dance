@@ -3,16 +3,15 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { HistoryManager } from "@/editor/HistoryManager";
 import type { Vec2, Vec3, WallDef, WallNode } from "@/types";
+import { dragSnapStep, snapToStep } from "@/editor/dragSnap";
 
 
 type WallToolState = "IDLE" | "DRAWING";
 
-const GRID        = 0.5;
 const SNAP_RADIUS = 0.5;
 
-function snap(v: number): number {
-  return Math.round(v / GRID) * GRID;
-}
+// The panel's SNAP step (shared with brushes and corner drags; 0 = free).
+const snap = snapToStep;
 
 function makePreviewMesh(height: number, thickness: number): THREE.Mesh {
   const geo = new THREE.BoxGeometry(1, height, thickness);
@@ -231,7 +230,7 @@ export class WallTool {
     if (!sp || !startNodeId) return;
 
     const epSnapped = this._calcEnd(worldPos);
-    if (Math.hypot(epSnapped.x - sp.x, epSnapped.z - sp.z) < GRID) { this._reset(); return; }
+    if (Math.hypot(epSnapped.x - sp.x, epSnapped.z - sp.z) < Math.max(dragSnapStep(), 0.05)) { this._reset(); return; }
 
     const zone = this._getActiveZone();
     const wallElevation =

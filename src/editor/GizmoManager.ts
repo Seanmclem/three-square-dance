@@ -8,6 +8,7 @@ import type {
   PlatformDef, StairDef, LadderDef, FloorDef, WallDef, WallNode, WorldObject, TriggerVolume, DecalDef, ShapeDef,
 } from "@/types";
 import { isGameplayMode } from "@/types";
+import { dragSnapStep, snapToStep } from "@/editor/dragSnap";
 
 // Decals are translate-only: roll-around-surface-normal maps badly to the world-Y
 // rotate ring, so rotation edits stay in the panel / placement scroll.
@@ -42,6 +43,7 @@ export class GizmoManager implements IEditorModule {
     origParent:     THREE.Object3D | null; // parent to restore to after pivot-attach
   }> = [];
   private _pivotStart       = new THREE.Vector3();
+  private _altDown          = false;   // Alt held: the wall move ignores the SNAP step
   private _rotateStartAngle = 0;
   private _rotateAttached   = false;
 
@@ -194,6 +196,8 @@ export class GizmoManager implements IEditorModule {
         this._applyControlsEnabled();
       }),
 
+      this._bus.on("input:keydown", ({ code }) => { if (code === "AltLeft" || code === "AltRight") this._altDown = true; }),
+      this._bus.on("input:keyup",   ({ code }) => { if (code === "AltLeft" || code === "AltRight") this._altDown = false; }),
       this._bus.on("input:keydown", ({ code, ctrl, meta }) => {
         if (!this._controls || (this._selId === null && !this._groupMode)) return;
         if (ctrl || meta) return;  // T/R/S are bare keys — don't fire on Cmd+S, Cmd+R, etc.
@@ -961,6 +965,13 @@ export class GizmoManager implements IEditorModule {
     if (!this._controls?.dragging) return;
     const mode = this._controls.getMode();
     if (mode === "translate") {
+      // A wall moves by whole SNAP steps from where the drag started (not to grid
+      // points), so corners already on the grid stay on it. Alt = free.
+      const step = this._selType === "wall" && !this._altDown ? dragSnapStep() : 0;
+      if (step > 0) {
+        const p = this._pivot.position, s0 = this._pivotStart;
+        p.set(s0.x + snapToStep(p.x - s0.x), s0.y + snapToStep(p.y - s0.y), s0.z + snapToStep(p.z - s0.z));
+      }
       // Rotate is handled by the pivot-attach hierarchy — no manual orbit needed.
       const pivotPos = this._pivot.position;
       for (const { obj, offset } of this._trackedMeshes) {

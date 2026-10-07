@@ -5,6 +5,8 @@ import type { EventBus } from "@/core/EventBus";
  * for every brush drag (0 = off), chosen in the panel's SNAP row and remembered in
  * localStorage. Alt held while dragging is still "free" for that drag. Corner sets keep
  * their own 15° rotate and 0.1 scale steps; this is the move step.
+ * Since v4.122.0 the same step drives wall / floor / platform corner and edge drags
+ * (NodeDragger), Wall tool placement and the wall gizmo move (was a fixed 0.5 m / none).
  */
 export const SNAP_STEPS = [0, 0.05, 0.1, 0.25, 0.5, 1] as const;
 const KEY = "brushDragSnap";

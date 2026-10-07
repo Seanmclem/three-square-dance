@@ -1,4 +1,5 @@
 import { isSelectMode } from "@/editor/selectMode";
+import { snapToStep } from "@/editor/dragSnap";
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
@@ -7,12 +8,10 @@ import { isGameplayMode } from "@/types";
 
 const SNAP_RADIUS = 0.5;
 const EDGE_RADIUS = 0.35; // lower than SNAP_RADIUS so nodes take priority
-const GRID        = 0.5;
 const MIN_SIZE    = 0.5;  // smallest allowed rect-platform width/depth
 
-function snap(v: number): number {
-  return Math.round(v / GRID) * GRID;
-}
+// The panel's SNAP step (shared with brushes; 0 = free). Alt still drags free.
+const snap = snapToStep;
 
 // Rect-platform corner/edge handles. Corners 0-3 wind (-,-),(+,-),(+,+),(-,+) in
 // the platform's local XZ; edge i joins corner i→(i+1). Local axes in world are

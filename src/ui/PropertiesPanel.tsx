@@ -1780,9 +1780,17 @@ function GeoScreen({ selected, onObjectUpdate, onSegmentUpdate, onFloorNodesUpda
   materialList?:   MaterialDef[];
   onEditBrush?:    () => void;
 }) {
-  if (selected.type === "wall")     return <WallGeoView     selected={selected} onObjectUpdate={onObjectUpdate} />;
-  if (selected.type === "floor")    return <FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />;
-  if (selected.type === "platform") return <PlatformGeoView selected={selected} onObjectUpdate={onObjectUpdate} />;
+  // SNAP (shared with brushes): the step for corner / edge drags, the Wall tool and the
+  // wall gizmo move (v4.122.0).
+  const withSnap = (view: React.ReactNode) => bus ? (
+    <>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}><SnapRow bus={bus} /></div>
+      {view}
+    </>
+  ) : view;
+  if (selected.type === "wall")     return withSnap(<WallGeoView     selected={selected} onObjectUpdate={onObjectUpdate} />);
+  if (selected.type === "floor")    return withSnap(<FloorGeoView    selected={selected} zones={zones} bus={bus} onObjectUpdate={onObjectUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} />);
+  if (selected.type === "platform") return withSnap(<PlatformGeoView selected={selected} onObjectUpdate={onObjectUpdate} />);
   if (selected.type === "stair")    return <StairGeoView    selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "ladder")   return <LadderGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
   if (selected.type === "object")   return <ObjectGeoView   selected={selected} onObjectUpdate={onObjectUpdate} />;
@@ -2814,7 +2822,8 @@ function Group({ title, hint, children }: { title: string; hint?: string; childr
   );
 }
 
-/** SNAP (v4.106.0): the move step for every face / edge / corner drag and PUSH. */
+/** SNAP (v4.106.0): the move step for every brush face / edge / corner drag and PUSH, and
+ *  (v4.122.0) for wall / floor / platform corner and edge drags, the Wall tool and the wall gizmo. */
 function SnapRow({ bus }: { bus: EventBus }) {
   const [v, setV] = useState(dragSnapStep());
   useEffect(() => bus.on("brush:snap-changed", ({ step }) => setV(step)), [bus]);
