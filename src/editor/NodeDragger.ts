@@ -207,6 +207,14 @@ export class NodeDragger {
       this._bus.on("wall:rebuilt", () => {
         if (isSelectMode(this._activeTool) && this._state !== "DRAG") this._refresh();
       }),
+      // Mid-drag the refreshes above are muted, so the drag code moves the grabbed dots
+      // itself — but a grabbed corner's link-mates on other floors (propagateNodeLink)
+      // move too, and their dots would stay behind. Follow every moved node here.
+      this._bus.on("node:updated", ({ nodeId, pos }) => {
+        if (this._state !== "DRAG") return;
+        this._nodeDots.get(nodeId)?.position.set(pos.x, this._dotY(nodeId), pos.z);
+        this._updateEdgeLinesForNode(nodeId, pos.x, pos.z);
+      }),
       // Deleting a wall run removes the walls then their nodes (separate removeNode calls
       // emit no event). Defer a microtask so the refresh runs after the whole delete, then
       // _refresh rebuilds dots from the remaining geometry — clearing the orphaned dots.
