@@ -71,7 +71,7 @@ import { FlashOverlay, type FlashRequest } from "@/preview/FlashOverlay";
 import { installTestHelpers } from "@/dev/testHelpers";
 import { physicsWorld } from "@/physics/PhysicsWorld";
 import { Toolbar } from "@/ui/Toolbar";
-import { TopBar } from "@/ui/TopBar";
+import { TopBar, type FloorSummary } from "@/ui/TopBar";
 import { PreviewHUD } from "@/ui/PreviewHUD";
 import { TouchControlsOverlay } from "@/ui/TouchControlsOverlay";
 import { PauseMenu } from "@/ui/PauseMenu";
@@ -1363,6 +1363,33 @@ export default function App() {
     busRef.current.emit("floor:select", { level });
   };
 
+  /** The floor menu's rows: every level something sits on (plus G), with what's
+   *  there and its height. Read when the menu opens, so it needs no live sync. */
+  const getFloorSummaries = (): FloorSummary[] => {
+    const world = worldRef.current;
+    const zone = world?.activeZoneId ? world.zones.get(world.activeZoneId) : null;
+    const counts = new Map<number, Map<string, number>>([[0, new Map()]]);
+    const add = (level: number | undefined, kind: string): void => {
+      const l = level ?? 0;
+      if (!counts.has(l)) counts.set(l, new Map());
+      const m = counts.get(l)!;
+      m.set(kind, (m.get(kind) ?? 0) + 1);
+    };
+    for (const w of zone?.walls ?? [])     add(w.floor, "wall");
+    for (const f of zone?.floors ?? [])    add(f.level, "floor");
+    for (const p of zone?.platforms ?? []) add(p.floorLevel, "platform");
+    for (const s of zone?.shapes ?? [])    add(s.floorLevel, "shape");
+    for (const l of zone?.ladders ?? [])   add(l.floorLevel, "ladder");
+    for (const o of zone?.objects ?? [])   add(o.floor, "object");
+    return [...counts].map(([level, m]) => ({
+      level,
+      contents: [...m].map(([kind, n]) => `${n} ${kind}${n > 1 ? "s" : ""}`).join(" · "),
+      elevation: zone?.floors.find(f => f.level === level)?.elevation
+        ?? zone?.walls.find(w => w.floor === level)?.elevation
+        ?? level * 3,
+    }));
+  };
+
   const handleQualityChange = (q: QualityScale): void => {
     setQuality(q);
     localStorage.setItem('editorQuality', q);
@@ -2314,7 +2341,9 @@ export default function App() {
   const getNodeLinks = (zoneId: string, nodeId: string): NodeLinks =>
     worldRef.current?.getNodeLinks(zoneId, nodeId) ?? { wallIds: [], floorIds: [], platformIds: [] };
 
-  const handleCopyRunToFloor = (targetLevel: number): void => {
+  /** Copy the selected run onto each of `levels` (Actions page, COPY TO FLOORS) as
+   *  one undo step. Every copy's corners join the source's link group. */
+  const handleCopyRunToFloors = (levels: number[]): void => {
     const world = worldRef.current;
     if (!selected || selected.type !== "wall" || !world) return;
     const walls = selected.runWalls ?? (selected.data ? [selected.data as WallDef] : []);
@@ -2322,35 +2351,37 @@ export default function App() {
     const zone = world.zones.get(selected.zoneId);
     if (!zone) return;
     const wallHeight = (selected.data as WallDef)?.height ?? 3.0;
-    const targetElevation =
-      zone.floors.find(f => f.level === targetLevel)?.elevation ?? targetLevel * wallHeight;
-    worldRef.current?.beginTransaction("copy walls to floor");
-    const nodeMap = new Map<string, string>();
-    for (const w of walls) {
-      for (const oldId of [w.startNodeId, w.endNodeId]) {
-        if (nodeMap.has(oldId)) continue;
-        const oldNode = zone.nodes.find(n => n.id === oldId);
-        if (!oldNode) continue;
-        // Link the copy to its source so dragging either corner moves both
-        // floors. The source adopts a linkId on its first copy (existing nodes
-        // have none), and later copies of the same run join that same group.
-        const linkId = oldNode.linkId ?? crypto.randomUUID();
-        if (!oldNode.linkId) world.setNodeLink(selected.zoneId, oldId, linkId);
-        const newNode = { id: crypto.randomUUID(), x: oldNode.x, z: oldNode.z, linkId };
-        world.addNode(selected.zoneId, newNode);
-        nodeMap.set(oldId, newNode.id);
+    worldRef.current?.beginTransaction(levels.length > 1 ? `copy walls to ${levels.length} floors` : "copy walls to floor");
+    for (const targetLevel of levels) {
+      const targetElevation =
+        zone.floors.find(f => f.level === targetLevel)?.elevation ?? targetLevel * wallHeight;
+      const nodeMap = new Map<string, string>();
+      for (const w of walls) {
+        for (const oldId of [w.startNodeId, w.endNodeId]) {
+          if (nodeMap.has(oldId)) continue;
+          const oldNode = zone.nodes.find(n => n.id === oldId);
+          if (!oldNode) continue;
+          // Link the copy to its source so dragging either corner moves both
+          // floors. The source adopts a linkId on its first copy (existing nodes
+          // have none), and later copies of the same run join that same group.
+          const linkId = oldNode.linkId ?? crypto.randomUUID();
+          if (!oldNode.linkId) world.setNodeLink(selected.zoneId, oldId, linkId);
+          const newNode = { id: crypto.randomUUID(), x: oldNode.x, z: oldNode.z, linkId };
+          world.addNode(selected.zoneId, newNode);
+          nodeMap.set(oldId, newNode.id);
+        }
       }
-    }
-    for (const w of walls) {
-      world.addWall(selected.zoneId, {
-        ...w,
-        id: `wall_${crypto.randomUUID().slice(0, 8)}`,
-        startNodeId: nodeMap.get(w.startNodeId) ?? w.startNodeId,
-        endNodeId:   nodeMap.get(w.endNodeId)   ?? w.endNodeId,
-        floor:       targetLevel,
-        elevation:   targetElevation,
-        openings:    [],
-      });
+      for (const w of walls) {
+        world.addWall(selected.zoneId, {
+          ...w,
+          id: `wall_${crypto.randomUUID().slice(0, 8)}`,
+          startNodeId: nodeMap.get(w.startNodeId) ?? w.startNodeId,
+          endNodeId:   nodeMap.get(w.endNodeId)   ?? w.endNodeId,
+          floor:       targetLevel,
+          elevation:   targetElevation,
+          openings:    [],
+        });
+      }
     }
     worldRef.current?.commitTransaction();
     syncHistory();
@@ -4313,6 +4344,7 @@ export default function App() {
         brushEditing={!!editingBrush}
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
+        getFloorSummaries={getFloorSummaries}
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
         onSave={handleSave}
         onLoad={handleLoad}
@@ -4364,7 +4396,7 @@ export default function App() {
         getNodeLinks={getNodeLinks}
         onImportMaterial={openMaterialImporter}
         onQualityChange={handleQualityChange}
-        onCopyRunToFloor={handleCopyRunToFloor}
+        onCopyRunToFloors={handleCopyRunToFloors}
         onFillRunWithFloor={isWallRunClosed() && !runHasFloorFill() ? handleFillRunWithFloor : undefined}
         onAddCeilingToRun={isWallRunClosed() && !findRunCeiling() ? handleAddCeilingToRun : undefined}
         onToggleCeilingGhost={findRunCeiling() ? handleToggleCeilingGhost : undefined}

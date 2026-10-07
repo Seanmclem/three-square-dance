@@ -5,6 +5,7 @@ import { isDesktop } from "@/shared/desktopApi";
 interface TopBarProps {
   activeFloor:     number;
   onFloorChange:   (level: number) => void;
+  getFloorSummaries?: () => FloorSummary[];
   onCameraTopDown: () => void;
   onSave:          () => Promise<void>;
   onLoad:          (json: unknown) => void;
@@ -30,12 +31,10 @@ interface TopBarProps {
   brushEditing?:   boolean;   // isolated brush editor open → help shows brush sections only
 }
 
-const FLOORS = [
-  { level: 0, label: "G", name: "Ground" },
-  { level: 1, label: "1", name: "Floor 1" },
-  { level: 2, label: "2", name: "Floor 2" },
-  { level: 3, label: "3", name: "Floor 3" },
-];
+/** One row of the floor menu: a level something sits on, what's there, its height. */
+export interface FloorSummary { level: number; contents: string; elevation: number }
+
+const floorLabel = (level: number): string => (level === 0 ? "G" : String(level));
 
 /** "saved 24m ago" — relative to the last autosave, re-rendered every 10s. */
 function useSavedLabel(lastAutosaveAt: number | null | undefined): string | null {
@@ -132,7 +131,7 @@ function Popover({ open, onClose, align = "left", children }: { open: boolean; o
 
 const SEP = <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />;
 
-export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
+export function TopBar({ activeFloor, onFloorChange, getFloorSummaries, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
   project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport, onProjectPublish,
   onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange, brushEditing }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -162,7 +161,15 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
     fileRef.current?.click();
   };
 
-  const floor = FLOORS.find(f => f.level === activeFloor) ?? FLOORS[0]!;
+  // Floor menu rows, top floor first (like a lift panel). The floor being edited is
+  // listed even when nothing is on it yet (e.g. right after "Add top floor").
+  const floorRows = ((): FloorSummary[] => {
+    if (!floorMenuOpen) return [];
+    const rows = getFloorSummaries?.() ?? [{ level: 0, contents: "", elevation: 0 }];
+    if (!rows.some(r => r.level === activeFloor)) rows.push({ level: activeFloor, contents: "", elevation: activeFloor * 3 });
+    return rows.sort((a, b) => b.level - a.level);
+  })();
+  const topFloor = floorRows.length ? floorRows[0]!.level : activeFloor;
   const canDeleteScene = !!project && project.currentSceneId !== project.entryScene && project.sceneIds.length > 1;
   const hover = (e: React.MouseEvent<HTMLElement>, on: boolean) => {
     const el = e.currentTarget as HTMLElement;
@@ -303,16 +310,23 @@ export function TopBar({ activeFloor, onFloorChange, onCameraTopDown, onSave, on
       {/* Floor menu */}
       <div style={{ position: "relative" }}>
         <button title="Which floor you're editing" onClick={() => setFloorMenuOpen(o => !o)} style={ibStyle({ on: floorMenuOpen })}>
-          <Ic name="layers" /> Floor {floor.label} <Ic name="chev" size={11} />
+          <Ic name="layers" /> Floor {floorLabel(activeFloor)} <Ic name="chev" size={11} />
         </button>
         <Popover open={floorMenuOpen} onClose={() => setFloorMenuOpen(false)} align="right">
-          {FLOORS.map(f => (
-            <button key={f.level} style={{ ...popBtn, color: f.level === activeFloor ? "#80aaff" : "#c2cadb" }}
+          {floorRows.map(f => (
+            <button key={f.level} style={{ ...popBtn, color: f.level === activeFloor ? "#80aaff" : "#c2cadb", justifyContent: "space-between", gap: 16, minWidth: 240 }}
               onClick={() => { setFloorMenuOpen(false); onFloorChange(f.level); }}
               onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
-              <span style={{ width: 14, textAlign: "center", color: "#8b94a8" }}>{f.label}</span>{f.name}
+              <span>Floor {floorLabel(f.level)}</span>
+              <span style={{ color: "#98a2b8" }}>{f.contents || "empty"} · {+f.elevation.toFixed(2)} m</span>
             </button>
           ))}
+          <div style={popHr} />
+          <button style={popBtn} title={`Edit floor ${topFloor + 1}, one above the top floor`}
+            onClick={() => { setFloorMenuOpen(false); onFloorChange(topFloor + 1); }}
+            onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}>
+            + Add top floor
+          </button>
         </Popover>
       </div>
       <button onClick={onCameraTopDown} title="Top-down view" style={ibStyle({})}>

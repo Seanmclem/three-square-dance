@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Children, useEffect, useRef, useState } from "react";
 import { BrushOpIcon } from "@/ui/BrushOpIcons";
 import { prettyKey } from "@/input/bindings";
 import { hasEnabledMover } from "@/world/moverDefs";
@@ -227,7 +227,7 @@ function LevelStepper({ value, onChange }: { value: number; onChange: (n: number
 
 type ScreenId = "geo" | "mat" | "brush-view" | "open" | "seg" | "vert" | "animations" | "colliders" | "motion" | "lights" | "sound" | "audio"
   | "audio-mixer" | "audio-music" | "audio-ambient" | "audio-character" | "scripts" | "ai"
-  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-feel" | "spawn-sounds" | "spawn-controls" | "controls";
+  | "spawn-movement" | "spawn-camera" | "spawn-character" | "spawn-feel" | "spawn-sounds" | "spawn-controls" | "controls" | "actions";
 
 const SCREEN_LABELS: Record<ScreenId, string> = {
   geo: "Geometry", mat: "Material", "brush-view": "Brush View", open: "Openings", seg: "Segments", vert: "Vertices",
@@ -238,6 +238,7 @@ const SCREEN_LABELS: Record<ScreenId, string> = {
   "spawn-movement": "Movement", "spawn-camera": "Camera", "spawn-character": "Character",
   "spawn-sounds": "Character Sounds", "spawn-controls": "Controls", "spawn-feel": "Feel",
   controls: "Controls",
+  actions: "Actions",
 };
 
 const SCREEN_SUBTITLES: Record<ScreenId, string> = {
@@ -266,6 +267,7 @@ const SCREEN_SUBTITLES: Record<ScreenId, string> = {
   "spawn-feel": "SQUASH · LEAN · ROLL · SKID",
   "spawn-controls": "MOVED TO THE MAIN MENU",
   controls: "KEYS · GAMEPAD · TOUCH",
+  actions: "BUILD · ORGANIZE · DELETE",
 };
 
 const GEO_SUBTITLES: Partial<Record<string, string>> = {
@@ -406,6 +408,7 @@ function summaryFor(s: ScreenId, selected: SelectedObjectPayload, materialList: 
     case "spawn-sounds":
     case "spawn-controls":
     case "controls":
+    case "actions":
       return "";   // non-object screens — never listed for a selected object (spawn rows build their own summaries)
   }
 }
@@ -467,7 +470,7 @@ interface PropertiesPanelProps {
   getNodeLinks?:            (zoneId: string, nodeId: string) => NodeLinks;
   onImportMaterial:         () => void;
   onQualityChange:          (q: QualityScale) => void;
-  onCopyRunToFloor?:        (targetLevel: number) => void;
+  onCopyRunToFloors?:       (levels: number[]) => void;
   onFillRunWithFloor?:      () => void;
   onAddCeilingToRun?:       () => void;
   onToggleCeilingGhost?:    () => void;
@@ -566,7 +569,7 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({
   activeTool, selected, materialList, quality, onObjectUpdate, onSegmentUpdate,
   onFloorNodesUpdate, getNodeLinks,
-  onImportMaterial, onQualityChange, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun,
+  onImportMaterial, onQualityChange, onCopyRunToFloors, onFillRunWithFloor, onAddCeilingToRun,
   onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onEditBrush,
   onVolumeScriptsChange,
   onEditScript,
@@ -590,7 +593,6 @@ export function PropertiesPanel({
   // (a click on a curve often opens the Geometry screen in the same moment, and the list
   // that mounts then reads this; before, it showed the curve closed).
   useEffect(() => bus?.on("shape:round-state", s => { roundStateNow = s; }), [bus]);
-  const [actionsOpen, setActionsOpen] = useState(true);
   const { width: panelW, handle: resizeHandle } = useRightPanelWidth();
   const [groupsOpen, setGroupsOpen]   = useState(false);
   const [labelDraft, setLabelDraft]   = useState("");
@@ -600,7 +602,7 @@ export function PropertiesPanel({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setStack([]); setActionsOpen(true); setGroupsOpen(false);
+    setStack([]); setGroupsOpen(false);
     setEditingLabel(false); setPrefabMenuOpen(false);
     setLabelDraft((selected?.data as { label?: string } | null)?.label ?? "");
   }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1022,28 +1024,28 @@ export function PropertiesPanel({
               onObjectUpdate={onObjectUpdate}
               onSelectGroup={onSelectGroup}
             />
-            <ActionsAccordion
-              open={actionsOpen}
-              onToggle={() => setActionsOpen(v => !v)}
-              selected={selected}
-              groups={groups}
-              onSelectGroup={onSelectGroup}
-              onEditBrush={onEditBrush}
-              onObjectUpdate={onObjectUpdate}
-              onCopyRunToFloor={onCopyRunToFloor}
-              onFillRunWithFloor={onFillRunWithFloor}
-              onAddCeilingToRun={onAddCeilingToRun}
-              onToggleCeilingGhost={onToggleCeilingGhost}
-              runCeilingGhosted={runCeilingGhosted}
-              onUnlinkRunCorners={onUnlinkRunCorners}
-              runLinkedFloors={runLinkedFloors}
-              onDelete={onDelete}
-              onBake={onBake}
-              onPrintExport={onPrintExport}
-              onCreatePrefab={onCreatePrefab}
-              isPrefabMember={!!prefabInfo}
-            />
+            <CategoryRow label="Actions" summary="" onPress={() => push("actions")} />
           </>
+        ) : currentScreen === "actions" ? (
+          <ActionsScreen
+            selected={selected}
+            groups={groups}
+            onSelectGroup={onSelectGroup}
+            onEditBrush={onEditBrush}
+            onObjectUpdate={onObjectUpdate}
+            onCopyRunToFloors={onCopyRunToFloors}
+            onFillRunWithFloor={onFillRunWithFloor}
+            onAddCeilingToRun={onAddCeilingToRun}
+            onToggleCeilingGhost={onToggleCeilingGhost}
+            runCeilingGhosted={runCeilingGhosted}
+            onUnlinkRunCorners={onUnlinkRunCorners}
+            runLinkedFloors={runLinkedFloors}
+            onDelete={onDelete}
+            onBake={onBake}
+            onPrintExport={onPrintExport}
+            onCreatePrefab={onCreatePrefab}
+            isPrefabMember={!!prefabInfo}
+          />
         ) : currentScreen === "geo" ? (
           <GeoScreen selected={selected} onObjectUpdate={onObjectUpdate} onSegmentUpdate={onSegmentUpdate} onFloorNodesUpdate={onFloorNodesUpdate} getNodeLinks={getNodeLinks} zones={zones} bus={bus} activeTool={activeTool} materialList={materialList} onEditBrush={onEditBrush} />
         ) : currentScreen === "mat" ? (
@@ -1122,15 +1124,16 @@ function CategoryRow({ label, summary, onPress }: { label: string; summary: stri
   );
 }
 
-// ── ActionsAccordion ──────────────────────────────────────────────────────────
+// ── ActionsScreen ─────────────────────────────────────────────────────────────
+// One page for every one-click action on the selection, grouped (room, floors,
+// shape, organize, delete) with a divider between groups. Before v4.121 these
+// were an always-open accordion on the root screen.
 
-function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup, onCopyRunToFloor, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onPrintExport, onCreatePrefab, isPrefabMember, onEditBrush, onObjectUpdate }: {
-  open:               boolean;
-  onToggle:           () => void;
+function ActionsScreen({ selected, groups = [], onSelectGroup, onCopyRunToFloors, onFillRunWithFloor, onAddCeilingToRun, onToggleCeilingGhost, runCeilingGhosted, onUnlinkRunCorners, runLinkedFloors, onDelete, onBake, onPrintExport, onCreatePrefab, isPrefabMember, onEditBrush, onObjectUpdate }: {
   selected:           SelectedObjectPayload;
   groups?:            GroupDef[];
   onSelectGroup?:     (groupId: string) => void;
-  onCopyRunToFloor?:  (level: number) => void;
+  onCopyRunToFloors?: (levels: number[]) => void;
   onFillRunWithFloor?: () => void;
   onAddCeilingToRun?: () => void;
   onToggleCeilingGhost?: () => void;
@@ -1146,41 +1149,13 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
   onObjectUpdate:     (c: Partial<WorldObject>) => void;
 }) {
   const wallData = selected.type === "wall" ? selected.data as WallDef : null;
-  const [hovered, setHovered] = useState(false);
   // Groups this entity actually belongs to, resolved to defs for their names.
   const joinedGroups = ((selected.data as { groupIds?: string[] } | null)?.groupIds ?? [])
     .map(id => groups.find(g => g.id === id))
     .filter((g): g is GroupDef => !!g);
 
-  return (
-    <div>
-      <button
-        onClick={onToggle}
-        style={{ ...ROW_BASE, background: hovered ? "rgba(255,255,255,0.03)" : "none", borderBottom: open ? "none" : "1px solid rgba(255,255,255,0.05)" }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-      >
-        <span style={{ color: "#d8d8d8", fontSize: 12, fontWeight: 500 }}>Actions</span>
-        <span style={{ color: "#505060", fontSize: 14, lineHeight: 1, display: "inline-block", transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
-      </button>
-
-      {open && (
-        <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          {/* One button per group this entity belongs to — named only when it's
-              in more than one, so the common case stays a plain "Select group". */}
-          {onSelectGroup && joinedGroups.map(g => (
-            <button
-              key={g.id}
-              onClick={() => onSelectGroup(g.id)}
-              title={`Select every member of “${g.name}”`}
-              style={{
-                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
-                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
-                color: "#80aaff", fontSize: 11, fontFamily: "monospace",
-              }}
-            >{joinedGroups.length > 1 ? `Select group: ${g.name}` : "Select group"}</button>
-          ))}
-
+  const room = (
+    <>
           {onFillRunWithFloor && (
             <button
               onClick={onFillRunWithFloor}
@@ -1217,6 +1192,10 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
             >{runCeilingGhosted ? "Show ceiling (un-ghost)" : "Hide ceiling (ghost)"}</button>
           )}
 
+    </>
+  );
+  const floors = (
+    <>
           {onUnlinkRunCorners && runLinkedFloors && runLinkedFloors.length > 0 && (
             <div>
               <div style={{ fontSize: 11, fontFamily: "monospace", color: "#98a2b8", marginBottom: 6 }}>
@@ -1234,32 +1213,14 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
             </div>
           )}
 
-          {onCopyRunToFloor && (
-            <div>
-              <div style={{ ...LABEL, marginBottom: 6 }}>COPY TO FLOOR</div>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[0, 1, 2, 3].map(level => {
-                  const isCurrent = level === (wallData?.floor ?? 0);
-                  return (
-                    <button
-                      key={level}
-                      disabled={isCurrent}
-                      onClick={() => onCopyRunToFloor(level)}
-                      style={{
-                        flex: 1, padding: "5px 0", borderRadius: 4,
-                        cursor: isCurrent ? "default" : "pointer",
-                        fontFamily: "monospace", fontSize: 11, border: "none",
-                        background: isCurrent ? "rgba(46,46,46,0.4)" : "rgba(80,140,255,0.1)",
-                        color: isCurrent ? "#98a2b8" : "#80aaff",
-                        outline: isCurrent ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(80,140,255,0.3)",
-                      }}
-                    >{level === 0 ? "G" : String(level)}</button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
+          {onCopyRunToFloors && wallData && (
+            <CopyToFloors current={wallData.floor ?? 0} has={runLinkedFloors ?? []} onCopy={onCopyRunToFloors} />
+          )}
+    </>
+  );
+  const shape = (
+    <>
           {/* Brush shortcuts (v4.99.5), the same as the Geometry screen's BRUSH buttons. */}
           {selected.type === "shape" && selected.data && (isBrush(selected.data as ShapeDef)
             ? onEditBrush && (
@@ -1308,6 +1269,23 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
             >Bake → GLB asset</button>
           )}
 
+    </>
+  );
+  const organize = (
+    <>
+          {onSelectGroup && joinedGroups.map(g => (
+            <button
+              key={g.id}
+              onClick={() => onSelectGroup(g.id)}
+              title={`Select every member of “${g.name}”`}
+              style={{
+                width: "100%", padding: "9px 0", borderRadius: 4, cursor: "pointer",
+                background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+                color: "#80aaff", fontSize: 11, fontFamily: "monospace",
+              }}
+            >{joinedGroups.length > 1 ? `Select group: ${g.name}` : "Select group"}</button>
+          ))}
+
           {/* Single-entity prefab capture (the multi-select view has its own button).
               Scripts on the entity ride along into the prefab definition. */}
           {onCreatePrefab && !isPrefabMember
@@ -1323,6 +1301,10 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
             >⬡ Create Prefab</button>
           )}
 
+    </>
+  );
+  const del = (
+    <>
           {onDelete && (
             <button
               onClick={onDelete}
@@ -1333,11 +1315,119 @@ function ActionsAccordion({ open, onToggle, selected, groups = [], onSelectGroup
               }}
             >Delete</button>
           )}
-        </div>
-      )}
+    </>
+  );
+  // A group renders only when it has a button; React drops false/undefined children,
+  // so ask the fragment's children rather than guessing from the props.
+  const filled = [room, floors, shape, organize, del].filter(g =>
+    Children.toArray((g.props as { children?: React.ReactNode }).children).length > 0);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {filled.map((g, i) => (
+        <div key={i} style={{
+          padding: "16px 16px", display: "flex", flexDirection: "column", gap: 10,
+          borderTop: i > 0 ? "1px solid rgba(255,255,255,0.08)" : "none",
+        }}>{g}</div>
+      ))}
     </div>
   );
 }
+
+// ── CopyToFloors ──────────────────────────────────────────────────────────────
+// Copy a wall run onto a range of floors: From / To / Every, plus one square per
+// floor (click to add or drop that one). Floors that already have the run (its
+// linked corners) are skipped. Floors are level numbers, nothing is created but walls.
+
+const floorLabel = (level: number): string => (level === 0 ? "G" : String(level));
+
+function CopyToFloors({ current, has, onCopy }: { current: number; has: number[]; onCopy: (levels: number[]) => void }) {
+  const hasSet  = new Set(has);
+  const nextUp  = Math.max(current, ...has) + 1;
+  const [from, setFrom]   = useState(nextUp);
+  const [to, setTo]       = useState(nextUp);
+  const [every, setEvery] = useState(1);
+  const [added, setAdded]     = useState<Set<number>>(new Set());
+  const [dropped, setDropped] = useState<Set<number>>(new Set());
+  const resetPicks = (): void => { setAdded(new Set()); setDropped(new Set()); };
+
+  const picked = new Set<number>();
+  for (let l = from; l <= to; l += every) picked.add(l);
+  for (const l of dropped) picked.delete(l);
+  for (const l of added) picked.add(l);
+  const targets = [...picked].filter(l => l !== current && !hasSet.has(l)).sort((a, b) => a - b);
+  const skipped = [...picked].filter(l => hasSet.has(l)).sort((a, b) => a - b);
+  const top = Math.max(to, nextUp, ...picked) + 1;
+
+  const step = (which: "from" | "to", d: number): void => {
+    const f = which === "from" ? Math.max(0, from + d) : Math.min(from, Math.max(0, to + d));
+    const t = which === "to"   ? Math.max(0, to + d)   : Math.max(to, f);
+    setFrom(which === "from" ? f : Math.min(f, t)); setTo(t); resetPicks();
+  };
+  const toggle = (l: number): void => {
+    if (picked.has(l)) { setDropped(s => new Set(s).add(l)); setAdded(s => { const n = new Set(s); n.delete(l); return n; }); }
+    else               { setAdded(s => new Set(s).add(l));   setDropped(s => { const n = new Set(s); n.delete(l); return n; }); }
+  };
+
+  const stepper = (which: "from" | "to", value: number) => (
+    <span style={{ display: "inline-flex", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 4, overflow: "hidden" }}>
+      <button aria-label={`${which} lower`} onClick={() => step(which, -1)} style={CTF_STEP}>−</button>
+      <span style={{ minWidth: 28, textAlign: "center", padding: "4px 0", color: "#dde3f0", fontVariantNumeric: "tabular-nums" }}>{floorLabel(value)}</span>
+      <button aria-label={`${which} higher`} onClick={() => step(which, 1)} style={CTF_STEP}>+</button>
+    </span>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontFamily: "monospace", fontSize: 11, color: "#c2cadb" }}>
+      <div style={LABEL}>COPY TO FLOORS</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span>From</span>{stepper("from", from)}<span>to</span>{stepper("to", to)}
+        <select value={every} aria-label="step" onChange={e => { setEvery(Number(e.target.value)); resetPicks(); }}
+          style={{ ...NUM_INPUT, width: "auto", color: "#dde3f0" }}>
+          <option value={1}>every floor</option>
+          <option value={2}>every 2nd</option>
+          <option value={3}>every 3rd</option>
+        </select>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {Array.from({ length: top + 1 }, (_, l) => {
+          const state = l === current ? "cur" : hasSet.has(l) ? "has" : picked.has(l) ? "pick" : "off";
+          const clickable = state === "pick" || state === "off";
+          return (
+            <button key={l} disabled={!clickable} onClick={() => toggle(l)}
+              title={state === "cur" ? "This run's floor" : state === "has" ? "Already has this run" : state === "pick" ? `Floor ${floorLabel(l)}: will copy (click to skip)` : `Floor ${floorLabel(l)}: click to add`}
+              style={{
+                width: 24, height: 24, padding: 0, borderRadius: 3, fontFamily: "monospace", fontSize: 11,
+                fontVariantNumeric: "tabular-nums", cursor: clickable ? "pointer" : "default",
+                background: state === "has" ? "rgba(60,180,100,0.12)" : state === "pick" ? "rgba(80,140,255,0.35)" : state === "cur" ? "rgba(46,46,46,0.6)" : "transparent",
+                color:      state === "has" ? "#6bc88a" : state === "pick" ? "#dde3f0" : "#98a2b8",
+                border:     state === "has" ? "1px solid rgba(60,180,100,0.4)" : state === "pick" ? "1px solid #80aaff" : state === "cur" ? "1px solid rgba(255,255,255,0.08)" : "1px dashed rgba(255,255,255,0.15)",
+              }}
+            >{floorLabel(l)}</button>
+          );
+        })}
+      </div>
+      <div style={{ color: "#98a2b8", lineHeight: 1.5 }}>
+        {targets.length
+          ? <>Copies to <span style={{ color: "#dde3f0" }}>{targets.length}</span> floor{targets.length > 1 ? "s" : ""}: {targets.map(floorLabel).join(", ")}</>
+          : "Nothing new to copy."}
+        {skipped.length > 0 && <> · skips {skipped.map(floorLabel).join(", ")} (already there)</>}
+      </div>
+      <button disabled={targets.length === 0} onClick={() => { onCopy(targets); resetPicks(); }}
+        style={{
+          width: "100%", padding: "9px 0", borderRadius: 4, cursor: targets.length ? "pointer" : "default",
+          background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+          color: "#80aaff", fontSize: 11, fontFamily: "monospace", opacity: targets.length ? 1 : 0.45,
+        }}
+      >{targets.length ? `Copy to ${targets.length} floor${targets.length > 1 ? "s" : ""}` : "Copy"}</button>
+    </div>
+  );
+}
+
+const CTF_STEP: React.CSSProperties = {
+  width: 22, background: "rgba(46,46,46,0.9)", color: "#c2cadb", border: "none",
+  cursor: "pointer", fontFamily: "monospace", fontSize: 12,
+};
 
 // ── GroupsAccordion ───────────────────────────────────────────────────────────
 
