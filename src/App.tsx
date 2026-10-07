@@ -204,6 +204,13 @@ async function sceneFileMtime(projectId: string, sceneId: string): Promise<numbe
   } catch { return null; }
 }
 
+/** A level's height: its floor slab, else its walls, else 3 m per level. */
+function levelElevation(zone: ZoneDef | null | undefined, level: number): number {
+  return zone?.floors.find(f => f.level === level)?.elevation
+    ?? zone?.walls.find(w => w.floor === level)?.elevation
+    ?? level * 3;
+}
+
 function createDemoZone(): ZoneDef {
   return {
     id: DEMO_ZONE_ID,
@@ -512,7 +519,10 @@ export default function App() {
     const preview = new PreviewController(bus, world, scene, zones, movers);
     previewRef.current = preview;
     const audio = new AudioSystem(bus, world, scene);
-    const input     = new InputManager(canvas, scene.camera, bus, scene.scene);
+    const input     = new InputManager(canvas, scene.camera, bus, scene.scene, level => {
+      const zone = world.activeZoneId ? world.zones.get(world.activeZoneId) : null;
+      return levelElevation(zone, level);
+    });
     const selection = new SelectionManager(scene.scene, scene.camera, canvas, world, bus);
     const floorTool    = new FloorTool(scene.scene, world, bus, history);
     const polyFloorTool = new PolygonFloorTool(scene.scene, world, bus, history);
@@ -1384,9 +1394,7 @@ export default function App() {
     return [...counts].map(([level, m]) => ({
       level,
       contents: [...m].map(([kind, n]) => `${n} ${kind}${n > 1 ? "s" : ""}`).join(" · "),
-      elevation: zone?.floors.find(f => f.level === level)?.elevation
-        ?? zone?.walls.find(w => w.floor === level)?.elevation
-        ?? level * 3,
+      elevation: levelElevation(zone, level),
     }));
   };
 

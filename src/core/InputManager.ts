@@ -22,6 +22,8 @@ export class InputManager implements IEditorModule {
   private readonly _raycaster    = new THREE.Raycaster();
   private readonly _groundPlane  = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly _hit          = new THREE.Vector3();
+  private readonly _levelPlane   = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private readonly _levelHit     = new THREE.Vector3();
   private _suppress = false;
   private _activeFloorLevel = 0;
   private _unsub: Array<() => void> = [];
@@ -38,7 +40,10 @@ export class InputManager implements IEditorModule {
   private readonly _onKeyDown:     (e: KeyboardEvent) => void;
   private readonly _onKeyUp:       (e: KeyboardEvent) => void;
 
-  constructor(domElement: HTMLCanvasElement, camera: THREE.PerspectiveCamera, bus: EventBus, scene: THREE.Scene) {
+  constructor(
+    domElement: HTMLCanvasElement, camera: THREE.PerspectiveCamera, bus: EventBus, scene: THREE.Scene,
+    private readonly _levelElevation: (level: number) => number = level => level * 3,
+  ) {
     this._dom    = domElement;
     this._camera = camera;
     this._bus    = bus;
@@ -102,7 +107,9 @@ export class InputManager implements IEditorModule {
    * tools use this for XZ and derive elevation themselves via the level selector).
    * `surfacePos` is a real raycast against buildable geometry, so surface-placed tools
    * (spawn point, object) can land on top of a floor/platform instead of falling through
-   * to the ground plane underneath it. Null when nothing is under the cursor.
+   * to the ground plane underneath it. On an upper floor a miss (e.g. a stairwell with no
+   * slab) lands on that floor's height instead of the y=0 ground far below / outside.
+   * Null when nothing is under the cursor on G.
    */
   private _computePositions(e: MouseEvent): { worldPos: Vec3; surfacePos: Vec3 | null } {
     const rect = this._dom.getBoundingClientRect();
@@ -123,7 +130,12 @@ export class InputManager implements IEditorModule {
         if (ud.floorLevel !== undefined && ud.floorLevel !== this._activeFloorLevel) return false;
         return true;
       });
-    const surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;
+    let surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;
+    if (!surfacePos) {
+      const elev = this._levelElevation(this._activeFloorLevel);
+      const p = elev !== 0 ? this._raycaster.ray.intersectPlane(this._levelPlane.set(this._levelPlane.normal, -elev), this._levelHit) : null;
+      if (p) surfacePos = { x: p.x, y: p.y, z: p.z };
+    }
 
     return { worldPos, surfacePos };
   }
