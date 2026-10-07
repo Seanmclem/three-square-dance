@@ -1,0 +1,13 @@
+{
+  "manifestVersion": 1,
+  "id": "zombie-tower",
+  "name": "Zombie Tower",
+  "version": "1.0.0",
+  "entryScene": "office-1",
+  "scenes": {
+    "office-1": "scenes/office-1.json",
+    "high_noon": "scenes/high_noon.json"
+  },
+  "assetsBase": "/",
+  "game": "game.json"
+}

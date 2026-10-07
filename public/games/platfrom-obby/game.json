@@ -2503,7 +2503,7 @@
   "audio": {
     "mix": {
       "master": 1,
-      "music": 0.5,
+      "music": 0.3,
       "sfx": 1,
       "ambient": 1
     }

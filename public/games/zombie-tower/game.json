@@ -1,0 +1,73 @@
+{
+  "gameVersion": 1,
+  "input": {
+    "buttons": [
+      {
+        "id": "fire",
+        "name": "Fire",
+        "kind": "press",
+        "kbm": [
+          "Mouse0"
+        ],
+        "gamepad": [
+          7
+        ],
+        "does": {
+          "type": "move",
+          "move": "attack"
+        }
+      },
+      {
+        "id": "aim",
+        "name": "Aim",
+        "kind": "hold",
+        "kbm": [
+          "Mouse2"
+        ],
+        "gamepad": [
+          6
+        ],
+        "does": {
+          "type": "aim"
+        }
+      }
+    ]
+  },
+  "playerSettings": {
+    "cameraMode": "fps",
+    "moveSpeed": 6,
+    "jumpHeight": 1.2,
+    "fov": 75,
+    "thirdPersonDistance": 5.5,
+    "thirdPersonHeight": 2,
+    "thirdPersonPitch": 20,
+    "jumpAnimSpeed": 1,
+    "characterScale": 1
+  },
+  "lighting": {
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 0.5
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 2,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012
+  },
+  "audio": {
+    "mix": {
+      "master": 1,
+      "music": 1,
+      "sfx": 1,
+      "ambient": 1
+    }
+  }
+}

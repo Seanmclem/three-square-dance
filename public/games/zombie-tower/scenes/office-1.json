@@ -1,0 +1,451 @@
+{
+  "metadata": {
+    "name": "Scene 1",
+    "version": "1.0",
+    "author": "",
+    "created": "2026-10-07T15:48:30.268Z",
+    "lastModified": "2026-10-07T15:48:30.269Z",
+    "uvVersion": 1,
+    "editorCamera": {
+      "focus": {
+        "x": -28.283303900345086,
+        "y": 4.106762436734733,
+        "z": -31.890862353184215
+      },
+      "radius": 24.72345110625026,
+      "phi": 1.0457963267949013,
+      "theta": 18.571899999962348
+    }
+  },
+  "world": {
+    "size": {
+      "width": 200,
+      "depth": 200
+    },
+    "ambientLight": {
+      "color": "#aabbcc",
+      "intensity": 0.5
+    },
+    "sunLight": {
+      "color": "#fff4e0",
+      "intensity": 2,
+      "position": {
+        "x": 30,
+        "y": 50,
+        "z": 20
+      }
+    },
+    "skybox": "sky",
+    "fogColor": "#1a1f2e",
+    "fogDensity": 0.012,
+    "playerSettings": {},
+    "lightingFromGame": true,
+    "stateSchema": {},
+    "audio": {}
+  },
+  "terrain": null,
+  "zones": [
+    {
+      "id": "demo",
+      "name": "Demo Zone",
+      "type": "outdoor",
+      "bounds": {
+        "x": -250,
+        "z": -250,
+        "width": 500,
+        "depth": 500
+      },
+      "nodes": [
+        {
+          "id": "aca67241-5cb7-4cd8-807c-1c1633dfb638",
+          "x": -25,
+          "z": -25
+        },
+        {
+          "id": "71ca134c-7625-48fa-9c44-34931e9dc8de",
+          "x": -23.5,
+          "z": -27.5
+        },
+        {
+          "id": "1aafb132-1010-4733-8f5a-5ad2e56cc762",
+          "x": -33.56761392250814,
+          "z": -21.98272204777859,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "23790aa1-4ae3-4802-b021-f693d4bbdd96",
+          "x": -28.067613922508137,
+          "z": -21.98272204777859,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "2732602c-e022-4720-a2e2-04002cb060f5",
+          "x": -28.067613922508137,
+          "z": -36.982722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "4088010a-c638-4314-a4a0-e304b4950d41",
+          "x": -33.56761392250814,
+          "z": -36.982722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "7ddf4493-c56c-4152-9f16-695c3415398d",
+          "x": -33.56761392250814,
+          "z": -21.98272204777859,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "8a7f7675-4e6e-4560-add3-06c3ae725910",
+          "x": -28.067613922508137,
+          "z": -21.98272204777859,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "6f4eea06-c296-4f47-bbe1-ba18fd7022b0",
+          "x": -28.067613922508137,
+          "z": -36.982722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "44adc939-1086-4787-b12d-e8f24aba4d56",
+          "x": -33.56761392250814,
+          "z": -36.982722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "b6f54fba-0fd2-4a96-a906-9ce686bca25b",
+          "x": -33.56761392250814,
+          "z": -21.98272204777859,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "33b54042-4a4e-40b5-824f-3f4acd5599bf",
+          "x": -28.067613922508137,
+          "z": -21.98272204777859,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "8ea00591-a09b-4e0f-bd72-6e77abc55189",
+          "x": -28.067613922508137,
+          "z": -36.982722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "3bc8889e-0976-4814-b0bd-94245d0d1e36",
+          "x": -33.56761392250814,
+          "z": -36.982722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "bca8b9c9-7800-47ee-87f1-1c1a7c7fcdef",
+          "x": -33.56761392250814,
+          "z": -21.98272204777859,
+          "linkId": "3891e927-fae7-4554-8ba8-8f4b480aec48"
+        },
+        {
+          "id": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
+          "x": -28.067613922508137,
+          "z": -21.98272204777859,
+          "linkId": "6abe3349-9b4c-439e-9bac-58c9f3a6590b"
+        },
+        {
+          "id": "ce743128-d1f7-4c48-8738-be7b176d320b",
+          "x": -28.067613922508137,
+          "z": -36.982722047778594,
+          "linkId": "78165901-42dc-4110-a664-9005a07b39e2"
+        },
+        {
+          "id": "2a6fdf0e-24ea-4ca3-8251-45eb0bdae32d",
+          "x": -33.56761392250814,
+          "z": -36.982722047778594,
+          "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        }
+      ],
+      "floors": [
+        {
+          "id": "be5554f1-445e-4a6e-964e-2b37950c2094",
+          "level": 0,
+          "elevation": 0,
+          "ceilingHeight": null,
+          "floorMesh": {
+            "shape": "polygon",
+            "points": [
+              {
+                "x": -20,
+                "z": -30
+              },
+              {
+                "x": -10,
+                "z": -30
+              },
+              {
+                "x": -10,
+                "z": -40
+              },
+              {
+                "x": -20,
+                "z": -40
+              }
+            ],
+            "nodeIds": [
+              "1aafb132-1010-4733-8f5a-5ad2e56cc762",
+              "23790aa1-4ae3-4802-b021-f693d4bbdd96",
+              "2732602c-e022-4720-a2e2-04002cb060f5",
+              "4088010a-c638-4314-a4a0-e304b4950d41"
+            ],
+            "material": "concrete_01"
+          }
+        }
+      ],
+      "walls": [
+        {
+          "id": "wall_4fbaebde",
+          "startNodeId": "1aafb132-1010-4733-8f5a-5ad2e56cc762",
+          "endNodeId": "23790aa1-4ae3-4802-b021-f693d4bbdd96",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_201e8b1b",
+          "startNodeId": "23790aa1-4ae3-4802-b021-f693d4bbdd96",
+          "endNodeId": "2732602c-e022-4720-a2e2-04002cb060f5",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_4d0300c2",
+          "startNodeId": "2732602c-e022-4720-a2e2-04002cb060f5",
+          "endNodeId": "4088010a-c638-4314-a4a0-e304b4950d41",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_542e9573",
+          "startNodeId": "4088010a-c638-4314-a4a0-e304b4950d41",
+          "endNodeId": "1aafb132-1010-4733-8f5a-5ad2e56cc762",
+          "floor": 0,
+          "elevation": 0,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_5844c79d",
+          "startNodeId": "7ddf4493-c56c-4152-9f16-695c3415398d",
+          "endNodeId": "8a7f7675-4e6e-4560-add3-06c3ae725910",
+          "floor": 1,
+          "elevation": 3,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_39cf27c5",
+          "startNodeId": "8a7f7675-4e6e-4560-add3-06c3ae725910",
+          "endNodeId": "6f4eea06-c296-4f47-bbe1-ba18fd7022b0",
+          "floor": 1,
+          "elevation": 3,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_87a1b8eb",
+          "startNodeId": "6f4eea06-c296-4f47-bbe1-ba18fd7022b0",
+          "endNodeId": "44adc939-1086-4787-b12d-e8f24aba4d56",
+          "floor": 1,
+          "elevation": 3,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_eee867eb",
+          "startNodeId": "44adc939-1086-4787-b12d-e8f24aba4d56",
+          "endNodeId": "7ddf4493-c56c-4152-9f16-695c3415398d",
+          "floor": 1,
+          "elevation": 3,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_b7858c64",
+          "startNodeId": "b6f54fba-0fd2-4a96-a906-9ce686bca25b",
+          "endNodeId": "33b54042-4a4e-40b5-824f-3f4acd5599bf",
+          "floor": 2,
+          "elevation": 6,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_7c2d864a",
+          "startNodeId": "33b54042-4a4e-40b5-824f-3f4acd5599bf",
+          "endNodeId": "8ea00591-a09b-4e0f-bd72-6e77abc55189",
+          "floor": 2,
+          "elevation": 6,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_e1c65d11",
+          "startNodeId": "8ea00591-a09b-4e0f-bd72-6e77abc55189",
+          "endNodeId": "3bc8889e-0976-4814-b0bd-94245d0d1e36",
+          "floor": 2,
+          "elevation": 6,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_74ffdc99",
+          "startNodeId": "3bc8889e-0976-4814-b0bd-94245d0d1e36",
+          "endNodeId": "b6f54fba-0fd2-4a96-a906-9ce686bca25b",
+          "floor": 2,
+          "elevation": 6,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_a5ba354f",
+          "startNodeId": "bca8b9c9-7800-47ee-87f1-1c1a7c7fcdef",
+          "endNodeId": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_75c362b5",
+          "startNodeId": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
+          "endNodeId": "ce743128-d1f7-4c48-8738-be7b176d320b",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_f1bfd030",
+          "startNodeId": "ce743128-d1f7-4c48-8738-be7b176d320b",
+          "endNodeId": "2a6fdf0e-24ea-4ca3-8251-45eb0bdae32d",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_c9555b73",
+          "startNodeId": "2a6fdf0e-24ea-4ca3-8251-45eb0bdae32d",
+          "endNodeId": "bca8b9c9-7800-47ee-87f1-1c1a7c7fcdef",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        }
+      ],
+      "platforms": [],
+      "stairs": [
+        {
+          "id": "stair_ceb8b640",
+          "start": {
+            "x": -29.5,
+            "y": 0,
+            "z": -27
+          },
+          "end": {
+            "x": -29.5,
+            "y": 4.6,
+            "z": -34.5
+          },
+          "width": 2.5,
+          "style": "straight",
+          "material": "concrete_01",
+          "hasRailing": true,
+          "riserUvJitter": 0.5,
+          "treadUvJitter": 0.5,
+          "numSteps": 15,
+          "landing": {
+            "depth": 2.5
+          },
+          "flights": 3,
+          "railing": {
+            "topRail": true,
+            "balusters": true,
+            "balustersInner": true,
+            "balustersOuter": true,
+            "landingPerimeter": false,
+            "height": 0.9,
+            "stepInterval": 1,
+            "barThickness": 0.1,
+            "postThickness": 0.06,
+            "sideInset": 0.1,
+            "overhang": 0.15,
+            "topLanding": {
+              "sideArrive": false,
+              "far": false,
+              "sideExit": false,
+              "close": true
+            }
+          },
+          "underside": {
+            "mode": "diagonal",
+            "thickness": 0.25
+          }
+        }
+      ],
+      "objects": []
+    }
+  ],
+  "transitions": [],
+  "groups": []
+}
