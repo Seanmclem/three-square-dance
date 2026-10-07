@@ -5648,8 +5648,12 @@ function StairMatView({ selected, materialList, onObjectUpdate, onAddMaterial }:
           label="RAILING"
           defaultExpanded={false}
           materialList={materialList}
-          currentMaterialId={stair?.railingMaterial ?? "concrete_01"}
+          currentMaterialId={stair?.railingMaterial ?? ""}
           overrides={stair?.railingMaterialOverrides}
+          builtIn={{
+            label: "Default metal", swatch: "linear-gradient(135deg, #b8c6d2, #8a9bab)",
+            onPick: () => onObjectUpdate({ railingMaterial: undefined, railingMaterialOverrides: undefined } as unknown as Partial<WorldObject>),
+          }}
           onMaterialChange={id => onObjectUpdate({ railingMaterial: id, railingMaterialOverrides: undefined } as unknown as Partial<WorldObject>)}
           onOverridesChange={ov => onObjectUpdate({ railingMaterialOverrides: ov } as unknown as Partial<WorldObject>)}
           onAddMaterial={onAddMaterial}
@@ -5866,7 +5870,7 @@ function VertScreen({ selected, onObjectUpdate }: {
 function MaterialSection({
   label = "MATERIAL", defaultExpanded = true,
   materialList, currentMaterialId, overrides, onMaterialChange, onOverridesChange, onAddMaterial,
-  extraTilingControls,
+  extraTilingControls, builtIn,
 }: {
   label?:            string;
   defaultExpanded?:  boolean;
@@ -5877,7 +5881,11 @@ function MaterialSection({
   onOverridesChange: (ov: MaterialOverrides) => void;
   onAddMaterial:     () => void;
   extraTilingControls?: React.ReactNode;   // rendered with the TILE/OFFSET cluster (e.g. riser TEXTURE VARIATION)
+  // A built-in look listed first (e.g. the stair rails' default metal); it is the current
+  // pick while currentMaterialId is "". Its texture controls are hidden (nothing to tile).
+  builtIn?:          { label: string; swatch: string; onPick: () => void };
 }) {
+  const builtInActive = !!builtIn && !currentMaterialId;
   const baseDef = materialList.find(m => m.id === currentMaterialId);
   const isColorMode = !!overrides?.color;
   const [open,    setOpen]    = useState(defaultExpanded);
@@ -5978,7 +5986,7 @@ function MaterialSection({
   const roughEnabled = effectiveEnabled("roughness");
   const dispEnabled  = effectiveEnabled("displacement");
 
-  const currentLabel = isColorMode ? `Color ${overrides?.color}` : (baseDef?.label ?? currentMaterialId);
+  const currentLabel = isColorMode ? `Color ${overrides?.color}` : builtInActive ? builtIn!.label : (baseDef?.label ?? currentMaterialId);
 
   return (
     <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -6036,6 +6044,21 @@ function MaterialSection({
           <MaterialCategoryPills categories={orderedCats} active={matCat} onSelect={setMatCat} />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 3, maxHeight: "min(52vh, 520px)", overflowY: "auto" }}>
+            {builtIn && (
+              <>
+                <div onClick={builtIn.onPick} style={{
+                  display: "flex", alignItems: "center", gap: 8, padding: "4px 8px",
+                  background: builtInActive ? "rgba(80,140,255,0.15)" : "rgba(46,46,46,0.9)",
+                  border: `1px solid ${builtInActive ? "rgba(80,140,255,0.4)" : "rgba(255,255,255,0.06)"}`,
+                  borderRadius: 4, color: builtInActive ? "#80aaff" : "#c2cadb",
+                  fontSize: 11, fontFamily: "monospace", cursor: "pointer",
+                }}>
+                  <div style={{ width: PICKER_SWATCH, height: PICKER_SWATCH, flexShrink: 0, borderRadius: 3, border: "1px solid rgba(255,255,255,0.1)", background: builtIn.swatch }} />
+                  <span>{builtIn.label}</span>
+                </div>
+                <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "3px 0" }} />
+              </>
+            )}
             {pinnedCurrent && (
               <>
                 <div style={{ color: "#98a2b8", fontSize: 9, letterSpacing: 1, padding: "0 2px" }}>
@@ -6047,6 +6070,7 @@ function MaterialSection({
             )}
             {inCategory.map(renderTile)}
           </div>
+          {!builtInActive && (<>
 
       {splitTile ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -6152,6 +6176,7 @@ function MaterialSection({
           })}
         </div>
       </div>
+          </>)}
             </>
           )}
 

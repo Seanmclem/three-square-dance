@@ -441,11 +441,12 @@ export class StairBuilder {
       const railMatOvr = stair.railingMaterialOverrides;
       let railMat: THREE.Material;
       let railMatOwned: boolean;
-      if (railMatId) {
+      // COLOR mode needs no material id (getMaterialWithOverrides builds a flat color).
+      if (railMatId || railMatOvr?.color) {
         railMat = railMatOvr
-          ? await assetManager.getMaterialWithOverrides(railMatId, railMatOvr)
+          ? await assetManager.getMaterialWithOverrides(railMatId ?? "", railMatOvr)
               .catch(() => assetManager.getDefaultMaterial(0x9aabb8))
-          : await assetManager.getMaterial(railMatId)
+          : await assetManager.getMaterial(railMatId!)
               .catch(() => assetManager.getDefaultMaterial(0x9aabb8));
         railMatOwned = !!railMatOvr;
       } else {
@@ -481,11 +482,44 @@ export class StairBuilder {
         const a = Math.PI / 8 + i * (Math.PI / 4);
         return [SEC_R * Math.sin(a), SEC_R * Math.cos(a)];
       });
+      // Rail bar UVs in meters, like the steps: u along the bar, v around it (arc
+      // length), so a texture's grain runs along the rail. ConvexGeometry has no UVs
+      // and is non-indexed, so each triangle is mapped on its own: faces across the
+      // bar's axis (end caps, miter cuts) get a flat map, and a side triangle that
+      // straddles the angle seam is unwrapped onto one side of it.
+      const railUVs = (geo: THREE.BufferGeometry, axis: THREE.Vector3, b1: THREE.Vector3, b2: THREE.Vector3): void => {
+        const pos = geo.attributes.position, nrm = geo.attributes.normal;
+        const uv = new Float32Array(pos.count * 2);
+        const p = new THREE.Vector3(), n = new THREE.Vector3();
+        for (let t = 0; t + 2 < pos.count; t += 3) {
+          n.set(0, 0, 0);
+          for (let k = 0; k < 3; k++) n.x += nrm.getX(t + k), n.y += nrm.getY(t + k), n.z += nrm.getZ(t + k);
+          const cap = Math.abs(n.normalize().dot(axis)) > 0.5;
+          const ang: number[] = [];
+          for (let k = 0; k < 3; k++) {
+            p.set(pos.getX(t + k), pos.getY(t + k), pos.getZ(t + k));
+            const along = p.dot(axis), y = p.dot(b1), z = p.dot(b2);
+            if (cap) { uv[(t + k) * 2] = y; uv[(t + k) * 2 + 1] = z; continue; }
+            uv[(t + k) * 2] = along;
+            ang.push(Math.atan2(z, y));
+          }
+          if (cap) continue;
+          const wrap = Math.max(...ang) - Math.min(...ang) > Math.PI;
+          for (let k = 0; k < 3; k++) uv[(t + k) * 2 + 1] = (wrap && ang[k] < 0 ? ang[k] + 2 * Math.PI : ang[k]) * SEC_R;
+        }
+        geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      };
       // Posts: 8-sided prisms (CylinderGeometry's side normals are already
-      // smooth, so they shade round out of the box).
+      // smooth, so they shade round out of the box). Their 0..1 UVs become meters
+      // with u along the post (like u along a rail bar), so grain runs up the post
+      // and a texture has the same size on posts as on the bars.
       const postR = (postT / 2) / Math.cos(Math.PI / 8);
-      const postGeo = (): THREE.BufferGeometry =>
-        new THREE.CylinderGeometry(postR, postR, handrailH, 8);
+      const postGeo = (): THREE.BufferGeometry => {
+        const geo = new THREE.CylinderGeometry(postR, postR, handrailH, 8);
+        const uv = geo.attributes.uv;
+        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getY(i) * handrailH, uv.getX(i) * 2 * Math.PI * postR);
+        return geo;
+      };
 
       let ownsMat = railMatOwned;
       const addRail = (
@@ -552,6 +586,7 @@ export class StairBuilder {
         end(len / 2, taperEnd, -1);
         const geo = new ConvexGeometry(pts);
         roundNormals(geo, X_AXIS);
+        railUVs(geo, X_AXIS, new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
         return geo;
       };
 
@@ -700,6 +735,7 @@ export class StairBuilder {
           addEnd(b, endB, -1);
           const geo = new ConvexGeometry(pts);
           roundNormals(geo, xAxis);
+          railUVs(geo, xAxis, yAxis, zAxis);
           return geo;
         };
 
