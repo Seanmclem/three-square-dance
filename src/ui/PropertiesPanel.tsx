@@ -7009,6 +7009,8 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resync position when moved externally (gizmo drag refreshes selected.data).
   useEffect(() => { setPosStr({ x: String(light?.position.x ?? 0), y: String(light?.position.y ?? 0), z: String(light?.position.z ?? 0) }); }, [light?.position.x, light?.position.y, light?.position.z]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Resync aim when the rotate gizmo changes it.
+  useEffect(() => { setNumStr(p => ({ ...p, pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0) })); }, [light?.pitchDeg, light?.yawDeg]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!light) return null;
 
