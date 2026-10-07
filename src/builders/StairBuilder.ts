@@ -716,7 +716,7 @@ export class StairBuilder {
           return Math.abs(cross) < EPS && dot > 0;
         };
 
-        for (const { points: path } of rl.paths) {
+        for (const { points: path, endJoin } of rl.paths) {
           // Non-degenerate segments with unit directions, for miter adjacency.
           const segs: { a: THREE.Vector3; b: THREE.Vector3; dir: THREE.Vector3 }[] = [];
           for (let i = 0; i + 1 < path.length; i++) {
@@ -739,6 +739,7 @@ export class StairBuilder {
             );
             if (showTopRail) {
               const endOf = (adjIdx: number): BarEnd => {
+                if (adjIdx === segs.length && endJoin) return { kind: endJoin };   // meets another rail
                 if (adjIdx < 0 || adjIdx >= segs.length) return { kind: "free" };
                 const adj = segs[adjIdx].dir;
                 if (planarBend(dir, adj)) return { kind: "miter", adj };

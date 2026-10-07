@@ -181,7 +181,11 @@ export function computeStairRamps(layout: StairLayout): StairRamp[] {
 
 export type RailSide = "inner" | "outer";
 export interface StairRailLayout {
-  paths: { points: Vec3[]; side: RailSide }[];        // polylines; consecutive points = one rail segment
+  // polylines; consecutive points = one rail segment. `endJoin`: the path's last
+  // vertex meets another rail there (the stairwell rail meets the inner rail at the
+  // top), so its bar end is cut like a 3D corner ("run" = the level bar runs
+  // through, "butt" = the sloped bar stops flush against it) instead of a free tip.
+  paths: { points: Vec3[]; side: RailSide; endJoin?: "run" | "butt" }[];
   posts: { position: Vec3; side: RailSide }[];        // post base positions (deduped per side)
 }
 
@@ -217,7 +221,9 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
   // Frame-space path points, converted to world at the end. `freeStart` marks
   // paths whose first vertex is an overhang tip (freeEnd) — no post there.
   type P = { u: number; v: number; y: number };
-  const paths: { pts: P[]; side: RailSide; freeStart?: boolean }[] = [];
+  // `endJoin` (see StairRailLayout) also decides the end post: "butt" keeps it on the
+  // exact vertex (the shared junction post), "run" places none (the other rail's post).
+  const paths: { pts: P[]; side: RailSide; freeStart?: boolean; endJoin?: "run" | "butt" }[] = [];
 
   const uLow  = (k: number) => (k % 2 === 0 ? 0 : run);       // flight k's low-end boundary
   const uHigh = (k: number) => (k % 2 === 0 ? run : 0);       // flight k's high-end boundary
@@ -262,6 +268,10 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     // always line up. The TOP landing gets no wrap: the rail runs one straight
     // tread-depth onto the landing and just ends (classic top-of-stairs
     // handrail extension) — the void hook there read as clutter.
+    // With the stairwell rail on, it meets the inner rail where the last flight
+    // reaches the top landing, so the inner rail stops there instead (an extension
+    // past that junction stuck out onto the landing).
+    const stairwellRail = r?.topLanding?.close ?? false;
     const ease = Math.min(0.3, D * 0.4);
     const inner: P[] = [freeEnd(vInner(0))];
     for (let k = 0; k < flightsCount; k++) {
@@ -269,6 +279,7 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
       const e    = last ? Math.min(stepDepth, D * 0.9) : ease;
       const uE   = uHigh(k) + (k % 2 === 0 ? e : -e);                // into the landing
       inner.push({ u: uHigh(k), v: vInner(k),     y: topY(k) });     // slope levels out at landing k
+      if (last && stairwellRail) break;                              // the stairwell rail takes over here
       inner.push({ u: uE,       v: vInner(k),     y: topY(k) });     // horizontal run onto the landing
       if (!last) {
         inner.push({ u: uE,       v: vInner(k + 1), y: topY(k) });   // level across behind the void
@@ -276,7 +287,7 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
       }
       // …then straight up flight k+1; on the top landing the straight run ends free.
     }
-    paths.push({ pts: inner, side: "inner", freeStart: true });
+    paths.push({ pts: inner, side: "inner", freeStart: true, ...(stairwellRail ? { endJoin: "butt" as const } : {}) });
 
     // TOP landing: its four edges are individually toggleable. The three
     // perimeter edges default to `landingPerimeter`; the 4th "close" rail
@@ -300,7 +311,12 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
       let chain: P[] | null = null;
       let glued = false;
       const flush = (): void => {
-        if (chain && !glued) paths.push({ pts: chain, side: "outer" });
+        if (chain) {
+          // A chain ending at topV[4] is the stairwell rail meeting the inner rail.
+          const endJoin = chain[chain.length - 1] === topV[4] ? "run" as const : undefined;
+          if (!glued) paths.push({ pts: chain, side: "outer", endJoin });
+          else if (endJoin) { const own = paths.find(e => e.pts === chain); if (own) own.endJoin = endJoin; }
+        }
         chain = null; glued = false;
       };
       for (let i = 0; i < 4; i++) {
@@ -369,11 +385,14 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
     return { u: p.u + du * t, v: p.v + dv * t, y: p.y + dy * t };
   };
 
-  for (const { pts, side, freeStart } of paths) {
+  for (const { pts, side, freeStart, endJoin } of paths) {
     curSide = side;
     for (let i = freeStart ? 1 : 0; i < pts.length; i++) {
       let p = pts[i];
-      if (pts.length >= 2 && i === pts.length - 1) p = pullIn(p, pts[i - 1]);
+      if (endJoin && i === pts.length - 1) {
+        if (endJoin === "run") continue;   // the junction post comes from the rail it meets
+      }
+      else if (pts.length >= 2 && i === pts.length - 1) p = pullIn(p, pts[i - 1]);
       else if (pts.length >= 2 && i === 0)         p = pullIn(p, pts[1]);
       addPost(p);
     }
@@ -421,7 +440,7 @@ export function computeRailPaths(stair: StairDef, layout: StairLayout): StairRai
 
   const toW = (p: P): Vec3 => frameToWorld(frame, p.u, p.v, p.y);
   return {
-    paths: paths.map(({ pts, side }) => ({ points: pts.map(toW), side })),
+    paths: paths.map(({ pts, side, endJoin }) => ({ points: pts.map(toW), side, endJoin })),
     posts: posts.map(({ p, side }) => ({ position: toW(p), side })),
   };
 }
