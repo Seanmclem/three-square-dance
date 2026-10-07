@@ -21,11 +21,9 @@ function makeVertexDot(): THREE.Mesh {
   return mesh;
 }
 
-const PREVIEW_Y = 0.006;
-const DOT_Y     = 0.12;
-
-function buildPreviewLine(pts: Vec2[]): THREE.Line {
-  const pts3 = pts.map(p => new THREE.Vector3(p.x, PREVIEW_Y, p.z));
+// Preview points sit at the height actually clicked, so dots stay under the cursor.
+function buildPreviewLine(pts: Vec3[]): THREE.Line {
+  const pts3 = pts.map(p => new THREE.Vector3(p.x, p.y, p.z));
   if (pts3.length >= 2) pts3.push(pts3[0]!.clone());
   const geo = new THREE.BufferGeometry().setFromPoints(pts3);
   const mat = new THREE.LineBasicMaterial({ color: 0x44aaff, depthTest: false, transparent: true, opacity: 0.7 });
@@ -36,6 +34,7 @@ export class PolygonPlatformTool {
   private _state: PolyPlatState = "IDLE";
   private _active          = false;
   private _points: Vec2[]  = [];
+  private _ys:     number[] = [];   // clicked height per point (preview only)
   private _dots:   THREE.Mesh[] = [];
   private _previewLine: THREE.Line | null = null;
   private _activeZoneId = "demo";
@@ -59,16 +58,16 @@ export class PolygonPlatformTool {
         if (!this._active) this._reset();
       }),
       this._bus.on("floor:select", ({ level }) => { this._activeLevel = level; }),
-      this._bus.on("input:click", ({ worldPos, button }) => {
+      this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
         if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
-        this._onLeftClick(worldPos);
+        this._onLeftClick(surfacePos ?? worldPos);
       }),
       this._bus.on("input:dblclick", () => {
         if (this._active && this._state === "DRAWING") this._commit();
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._active && this._state === "DRAWING") this._updatePreview(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        if (this._active && this._state === "DRAWING") this._updatePreview(surfacePos ?? worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._active) return;
@@ -109,10 +108,11 @@ export class PolygonPlatformTool {
     }
 
     this._points.push({ x, z });
+    this._ys.push(worldPos.y);
     if (this._state === "IDLE") this._state = "DRAWING";
 
     const dot = makeVertexDot();
-    dot.position.set(x, DOT_Y, z);
+    dot.position.set(x, worldPos.y, z);
     this._scene.add(dot);
     this._dots.push(dot);
 
@@ -126,15 +126,19 @@ export class PolygonPlatformTool {
     document.body.style.cursor = isSnapping ? "pointer" : "crosshair";
 
     this._clearPreviewLine();
-    this._previewLine = buildPreviewLine([...this._points, { x, z }]);
+    this._previewLine = buildPreviewLine([...this._preview3(), { x, y: worldPos.y, z }]);
     this._scene.add(this._previewLine);
   }
 
   private _rebuildPreviewLine(): void {
     this._clearPreviewLine();
     if (this._points.length < 2) return;
-    this._previewLine = buildPreviewLine(this._points);
+    this._previewLine = buildPreviewLine(this._preview3());
     this._scene.add(this._previewLine);
+  }
+
+  private _preview3(): Vec3[] {
+    return this._points.map((p, i) => ({ x: p.x, y: this._ys[i] ?? 0, z: p.z }));
   }
 
   private _clearPreviewLine(): void {
@@ -190,6 +194,7 @@ export class PolygonPlatformTool {
     }
     this._dots = [];
     this._points = [];
+    this._ys = [];
     this._state = "IDLE";
     document.body.style.cursor = "";
   }

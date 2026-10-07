@@ -21,11 +21,12 @@ function makeVertexDot(): THREE.Mesh {
   return mesh;
 }
 
-function buildPreviewMesh(pts: Vec2[]): THREE.Mesh {
+// Preview points sit at the height actually clicked, so dots stay under the cursor.
+function buildPreviewMesh(pts: Vec3[]): THREE.Mesh {
   if (pts.length < 2) {
     return new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial());
   }
-  const pts3 = pts.map(p => new THREE.Vector3(p.x, 0.006, p.z));
+  const pts3 = pts.map(p => new THREE.Vector3(p.x, p.y + 0.006, p.z));
   pts3.push(pts3[0]!.clone()); // close loop
   const geo = new THREE.BufferGeometry().setFromPoints(pts3);
   const mat = new THREE.LineBasicMaterial({ color: 0x4d8cff, depthTest: false, transparent: true, opacity: 0.7 });
@@ -36,6 +37,7 @@ export class PolygonFloorTool {
   private _state: PolyFloorState = "IDLE";
   private _active          = false;
   private _points: Vec2[]  = [];
+  private _ys:     number[] = [];   // clicked height per point (preview only)
   private _dots:   THREE.Mesh[] = [];
   private _previewLine: THREE.Object3D | null = null;
   private _activeZoneId = "demo";
@@ -58,16 +60,16 @@ export class PolygonFloorTool {
         if (!this._active) this._reset();
       }),
       this._bus.on("floor:select",  ({ level }) => { this._activeLevel = level; }),
-      this._bus.on("input:click", ({ worldPos, button }) => {
+      this._bus.on("input:click", ({ worldPos, surfacePos, button }) => {
         if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
-        this._onLeftClick(worldPos);
+        this._onLeftClick(surfacePos ?? worldPos);
       }),
       this._bus.on("input:dblclick", () => {
         if (this._active && this._state === "DRAWING") this._commit();
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._active && this._state === "DRAWING") this._updatePreview(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        if (this._active && this._state === "DRAWING") this._updatePreview(surfacePos ?? worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (!this._active) return;
@@ -99,13 +101,14 @@ export class PolygonFloorTool {
     }
 
     this._points.push({ x, z });
+    this._ys.push(worldPos.y);
 
     if (this._state === "IDLE") {
       this._state = "DRAWING";
     }
 
     const dot = makeVertexDot();
-    dot.position.set(x, 0.12, z);
+    dot.position.set(x, worldPos.y + 0.12, z);
     this._scene.add(dot);
     this._dots.push(dot);
 
@@ -123,7 +126,7 @@ export class PolygonFloorTool {
       this._scene.remove(this._previewLine);
       (this._previewLine as THREE.Line).geometry?.dispose();
     }
-    const pts = [...this._points, { x, z }];
+    const pts = [...this._preview3(), { x, y: worldPos.y, z }];
     this._previewLine = buildPreviewMesh(pts) as unknown as THREE.Object3D;
     this._scene.add(this._previewLine);
   }
@@ -133,8 +136,12 @@ export class PolygonFloorTool {
       this._scene.remove(this._previewLine);
       (this._previewLine as THREE.Line).geometry?.dispose();
     }
-    this._previewLine = buildPreviewMesh(this._points) as unknown as THREE.Object3D;
+    this._previewLine = buildPreviewMesh(this._preview3()) as unknown as THREE.Object3D;
     this._scene.add(this._previewLine);
+  }
+
+  private _preview3(): Vec3[] {
+    return this._points.map((p, i) => ({ x: p.x, y: this._ys[i] ?? 0, z: p.z }));
   }
 
   private _commit(): void {
@@ -179,6 +186,7 @@ export class PolygonFloorTool {
     }
     this._dots = [];
     this._points = [];
+    this._ys = [];
     this._state = "IDLE";
     document.body.style.cursor = "";
   }

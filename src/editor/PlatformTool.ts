@@ -50,13 +50,13 @@ export class PlatformTool implements IEditorModule {
         if (!this._active) this._reset();
       }),
       this._bus.on("floor:select",  ({ level }) => { this._activeLevel = level; }),
-      this._bus.on("input:click",   ({ worldPos, button }) => {
+      this._bus.on("input:click",   ({ worldPos, surfacePos, button }) => {
         if (!this._active) return;
         if (button !== 0) { this._reset(); return; }
-        this._onLeftClick(worldPos);
+        this._onLeftClick(surfacePos ?? worldPos);
       }),
-      this._bus.on("input:mousemove", ({ worldPos }) => {
-        if (this._active) this._onMouseMove(worldPos);
+      this._bus.on("input:mousemove", ({ worldPos, surfacePos }) => {
+        if (this._active) this._onMouseMove(surfacePos ?? worldPos);
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (this._active && code === "Escape") this._reset();
