@@ -2147,7 +2147,11 @@ export class ZoneManager {
     light.castShadow = def.castShadow;
     if (def.castShadow) {
       light.shadow.mapSize.set(512, 512);   // modest — these can multiply (perf, TESTING.md §7)
-      light.shadow.bias = -0.001;
+      // Point / spot: no depth bias. Their range is short (far = range), so even
+      // -0.001 detached the shadow enough to leak a bright line along every
+      // crease above the light (a landing meeting its wall); PCF soft keeps
+      // acne off without it.
+      light.shadow.bias = light instanceof THREE.DirectionalLight ? -0.001 : 0;
       if (light instanceof THREE.DirectionalLight) {
         const sc = light.shadow.camera;
         sc.near = 0.5; sc.far = 100;
