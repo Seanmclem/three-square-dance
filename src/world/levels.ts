@@ -22,10 +22,16 @@ export function levelAtHeight(zone: ZoneDef | null | undefined, y: number): numb
   return best;
 }
 
+// Top bar "All floors": every floor renders solid, so every floor is also
+// clickable and a placement surface (set by ZoneManager.setShowAllLevels).
+let showAllLevels = false;
+export function setAllLevelsActive(on: boolean): void { showAllLevels = on; }
+
 /** Whether geometry tagged `floorLevel` counts as part of the active floor (solid,
  *  clickable, a placement surface): its own level, plus for stairs the floor below,
- *  so the flight arriving at this floor shows with it. */
+ *  so the flight arriving at this floor shows with it. Every level while
+ *  "All floors" is on. */
 export function onActiveLevel(ud: { floorLevel?: number; editorType?: string }, active: number): boolean {
-  if (ud.floorLevel === undefined || ud.floorLevel === active) return true;
+  if (showAllLevels || ud.floorLevel === undefined || ud.floorLevel === active) return true;
   return ud.editorType === "stair" && ud.floorLevel === active - 1;
 }

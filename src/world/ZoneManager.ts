@@ -4,7 +4,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
-import { levelAtHeight, onActiveLevel } from "@/world/levels";
+import { levelAtHeight, onActiveLevel, setAllLevelsActive } from "@/world/levels";
 import { LadderBuilder } from "@/builders/LadderBuilder";
 import { ShapeBuilder } from "@/builders/ShapeBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
@@ -1847,10 +1847,11 @@ export class ZoneManager {
     this._applyDimming();
   }
 
-  /** Top bar "All floors": render every level solid while editing (picking still
-   *  prefers the active level). */
+  /** Top bar "All floors": render every level solid while editing, and make every
+   *  level clickable and a placement surface (what you see is what you click). */
   setShowAllLevels(on: boolean): void {
     this._showAllLevels = on;
+    setAllLevelsActive(on);
     this._applyDimming();
   }
 
