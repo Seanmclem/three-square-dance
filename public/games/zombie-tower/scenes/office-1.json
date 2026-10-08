@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -32.08393068692706,
-        "y": 7.69977468692656,
-        "z": -8.25881467061635
+        "x": -31.198837351106658,
+        "y": 6.3045353056702576,
+        "z": -7.315122613698761
       },
       "radius": 23.323961616942803,
-      "phi": 1.465796326794897,
-      "theta": 28.144739999447765
+      "phi": 1.1607963267949015,
+      "theta": 28.289739999447754
     }
   },
   "world": {
@@ -415,7 +415,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_75c362b5",
@@ -427,7 +437,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_f1bfd030",
@@ -439,7 +459,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_c9555b73",
@@ -451,7 +481,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_76da695c",
@@ -561,7 +601,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_745c61aa",
@@ -573,7 +623,17 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "materialOverrides": {
+            "maps": {
+              "ao": {
+                "enabled": true
+              },
+              "roughness": {
+                "enabled": false
+              }
+            }
+          }
         },
         {
           "id": "wall_c2200bd1",
@@ -687,13 +747,13 @@
         {
           "id": "light_7f04c056",
           "position": {
-            "x": -31,
-            "y": 10.879319726431579,
-            "z": -25.580522739653457
+            "x": -30.799060499646988,
+            "y": 10.743819680706222,
+            "z": -26.133285240691816
           },
           "kind": "point",
           "color": "#ffd9a0",
-          "intensity": 30,
+          "intensity": 25,
           "range": 8,
           "castShadow": true,
           "prefab": {
@@ -701,7 +761,8 @@
             "instanceId": "pfi_e36ff3fa",
             "memberKey": "light_db8f1528"
           },
-          "staticShadow": true
+          "staticShadow": true,
+          "bounce": 1
         }
       ],
       "prefabInstances": [
@@ -712,9 +773,9 @@
           "variables": {},
           "origin": {
             "position": {
-              "x": -31,
-              "y": 8.279319726431579,
-              "z": -25.580522739653457
+              "x": -30.799060499646988,
+              "y": 8.143819680706223,
+              "z": -26.133285240691816
             },
             "rotationY": 0
           }
