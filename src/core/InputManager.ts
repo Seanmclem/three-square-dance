@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { EventBus } from "@/core/EventBus";
 import type { IEditorModule, Vec3 } from "@/types";
+import { onActiveLevel } from "@/world/levels";
 
 /**
  * Centralizes all DOM input and re-emits it as typed bus events so tools never
@@ -127,7 +128,7 @@ export class InputManager implements IEditorModule {
         // Inactive-level geometry is dimmed to a see-through ghost — it must not catch
         // surface placement (e.g. an overhead level-1 floor or wall top grabbing a
         // ground-level stair start inside a room stack while editing floor G).
-        if (ud.floorLevel !== undefined && ud.floorLevel !== this._activeFloorLevel) return false;
+        if (!onActiveLevel(ud, this._activeFloorLevel)) return false;
         return true;
       });
     let surfacePos = hit ? { x: hit.point.x, y: hit.point.y, z: hit.point.z } : null;

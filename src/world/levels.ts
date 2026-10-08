@@ -21,3 +21,11 @@ export function levelAtHeight(zone: ZoneDef | null | undefined, y: number): numb
   }
   return best;
 }
+
+/** Whether geometry tagged `floorLevel` counts as part of the active floor (solid,
+ *  clickable, a placement surface): its own level, plus for stairs the floor below,
+ *  so the flight arriving at this floor shows with it. */
+export function onActiveLevel(ud: { floorLevel?: number; editorType?: string }, active: number): boolean {
+  if (ud.floorLevel === undefined || ud.floorLevel === active) return true;
+  return ud.editorType === "stair" && ud.floorLevel === active - 1;
+}

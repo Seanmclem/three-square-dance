@@ -4,7 +4,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
-import { levelAtHeight } from "@/world/levels";
+import { levelAtHeight, onActiveLevel } from "@/world/levels";
 import { LadderBuilder } from "@/builders/LadderBuilder";
 import { ShapeBuilder } from "@/builders/ShapeBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
@@ -1815,9 +1815,8 @@ export class ZoneManager {
     for (const [, zoneEntry] of this._loadedZones) {
       zoneEntry.group.traverse(child => {
         if (!(child instanceof THREE.Mesh)) return;
-        const ud    = child.userData as { floorLevel?: number; _ownsMaterial?: boolean };
-        const level = ud.floorLevel;
-        if (level === undefined || level === this._activeLevel) return;
+        const ud    = child.userData as { floorLevel?: number; editorType?: string; _ownsMaterial?: boolean };
+        if (onActiveLevel(ud, this._activeLevel)) return;
 
         // Don't re-dim something that's already a dim clone
         if (this._dimMaterials.has(child.material as THREE.Material)) return;

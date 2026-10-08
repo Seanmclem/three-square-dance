@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { castObjectBoxes } from "@/editor/objectPicking";
 import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
+import { onActiveLevel } from "@/world/levels";
 import type {
   IEditorModule, ToolId, EditorObjectType, ScreenPos,
   SelectedObjectPayload, SelectedRef, WorldObject, WallDef, WallNode, FaceGroup,
@@ -445,7 +446,7 @@ export class SelectionManager implements IEditorModule {
     const solid = hits.filter(h => {
       const ud = h.object.userData;
       if (ud.ghostPick) return false;
-      return ud.floorLevel === undefined || ud.floorLevel === this._activeFloorLevel;
+      return onActiveLevel(ud, this._activeFloorLevel);
     });
     return solid.length > 0 ? solid : hits;
   }
