@@ -10,6 +10,7 @@ import { assetManager } from "@/core/AssetManager";
 import { InputManager } from "@/core/InputManager";
 import { WorldState } from "@/world/WorldState";
 import { ZoneManager } from "@/world/ZoneManager";
+import { levelElevation } from "@/world/levels";
 import { MoverSystem } from "@/world/MoverSystem";
 import { armTransformWatchdog } from "@/world/transformWatchdog";
 import { SelectionManager } from "@/editor/SelectionManager";
@@ -202,13 +203,6 @@ async function sceneFileMtime(projectId: string, sceneId: string): Promise<numbe
     const lm = res.headers.get("last-modified");
     return lm ? Date.parse(lm) : null;
   } catch { return null; }
-}
-
-/** A level's height: its floor slab, else its walls, else 3 m per level. */
-function levelElevation(zone: ZoneDef | null | undefined, level: number): number {
-  return zone?.floors.find(f => f.level === level)?.elevation
-    ?? zone?.walls.find(w => w.floor === level)?.elevation
-    ?? level * 3;
 }
 
 function createDemoZone(): ZoneDef {

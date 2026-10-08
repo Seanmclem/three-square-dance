@@ -4,6 +4,7 @@ import { FloorBuilder } from "@/builders/FloorBuilder";
 import { WallBuilder } from "@/builders/WallBuilder";
 import { PlatformBuilder, type CutInfo } from "@/builders/PlatformBuilder";
 import { StairBuilder } from "@/builders/StairBuilder";
+import { levelAtHeight } from "@/world/levels";
 import { LadderBuilder } from "@/builders/LadderBuilder";
 import { ShapeBuilder } from "@/builders/ShapeBuilder";
 import { ColliderBuilder } from "@/physics/ColliderBuilder";
@@ -714,7 +715,7 @@ export class ZoneManager {
 
     // ── Stairs ────────────────────────────────────────────────────────────
     for (const stair of zone.stairs) {
-      const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
+      const { meshes, colliders } = await StairBuilder.build(stair, zoneId, y => levelAtHeight(zone, y));
       const stairGroup = makeStairGroup(stair.id, zoneId);
       for (const m of meshes) stairGroup.add(m);
       stairsGroup.add(stairGroup);
@@ -1268,7 +1269,8 @@ export class ZoneManager {
   private async _addStair(zoneId: string, stair: StairDef): Promise<void> {
     const entry = this._loadedZones.get(zoneId);
     if (!entry) return;
-    const { meshes, colliders } = await StairBuilder.build(stair, zoneId);
+    const zone = this._worldState.zones.get(zoneId);
+    const { meshes, colliders } = await StairBuilder.build(stair, zoneId, y => levelAtHeight(zone, y));
     const stairGroup = makeStairGroup(stair.id, zoneId);
     for (const m of meshes) stairGroup.add(m);
     entry.stairsGroup.add(stairGroup);

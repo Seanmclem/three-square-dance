@@ -77,7 +77,9 @@ function accumToGeo(acc: StepAccum): THREE.BufferGeometry {
 // ── Builder ───────────────────────────────────────────────────────────────────
 
 export class StairBuilder {
-  static async build(stair: StairDef, zoneId: string): Promise<StairBuildOutput> {
+  /** `levelAt` maps a height to its floor level, so each flight, landing and rail is
+   *  tagged with the floor it sits on (floor views dim the rest). Default: all G. */
+  static async build(stair: StairDef, zoneId: string, levelAt: (y: number) => number = () => 0): Promise<StairBuildOutput> {
     const ovr     = stair.materialOverrides;
     const baseDef = assetManager.getMaterialDef(stair.material);
     const ts      = ovr?.tileScale ?? baseDef?.tileScale ?? 1.0;
@@ -153,9 +155,16 @@ export class StairBuilder {
       lx * sinA1 + lz * cosA1 + cz,
     ];
 
-    const body:    StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
-    const riser:   StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
-    const landAcc: StepAccum = { pos: [], nrm: [], uv: [], idx: [], vi: 0 };
+    // One set of accumulators per floor level; emitFlight / emitLanding write into
+    // whichever set useLevel() last pointed body / riser / landAcc at.
+    const newAcc = (): StepAccum => ({ pos: [], nrm: [], uv: [], idx: [], vi: 0 });
+    const byLevel = new Map<number, { body: StepAccum; riser: StepAccum; land: StepAccum }>();
+    let body = newAcc(), riser = newAcc(), landAcc = newAcc();
+    const useLevel = (level: number): void => {
+      let a = byLevel.get(level);
+      if (!a) { a = { body: newAcc(), riser: newAcc(), land: newAcc() }; byLevel.set(level, a); }
+      body = a.body; riser = a.riser; landAcc = a.land;
+    };
 
     // ── One flight of steps (the pre-Phase-29 per-step loop, verbatim, with
     // the flight's own start/end in place of the def's) ─────────────────────
@@ -371,50 +380,64 @@ export class StairBuilder {
     for (let k = 0; k < layout.flights.length; k++) {
       const effMode: StairUndersideMode =
         undersideMode === "closed" && k > 0 ? "diagonal" : undersideMode;
+      useLevel(levelAt(layout.flights[k].start.y));
       emitFlight(layout.flights[k].start, layout.flights[k].end, effMode, k);
     }
-    for (const l of layout.landings) emitLanding(l);
+    for (const l of layout.landings) { useLevel(levelAt(l.topY)); emitLanding(l); }
 
     const meshes: THREE.Mesh[] = [];
 
     // UV offset (Phase 10.8); riser falls back to body overrides when no separate riser material
     const rOffX = riserOvr?.offsetX ?? ovr?.offsetX ?? 0;
     const rOffY = riserOvr?.offsetY ?? ovr?.offsetY ?? 0;
-    const bodyGeo = accumToGeo(body);
-    applyUVOffset(bodyGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
-    const bodyMesh = new THREE.Mesh(bodyGeo, mat);
-    bodyMesh.castShadow    = true;
-    bodyMesh.receiveShadow = true;
-    bodyMesh.userData = {
-      editorId: stair.id, editorType: "stair", zoneId,
-      selectable: true, floorLevel: 0, _ownsMaterial: !!ovr,
-    } satisfies MeshUserData;
-    meshes.push(bodyMesh);
+    // Body / riser / landing meshes per floor level. A shared material is owned
+    // (disposed) by the first mesh that uses it only, like the rails below.
+    let ownsBody = !!ovr, ownsRiser = !!(riserMatId && riserOvr), ownsLand = !!(landMatId && landOvr);
+    for (const [level, acc] of [...byLevel].sort((a, b) => a[0] - b[0])) {
+      if (acc.body.vi > 0) {
+        const bodyGeo = accumToGeo(acc.body);
+        applyUVOffset(bodyGeo, ovr?.offsetX ?? 0, ovr?.offsetY ?? 0);
+        const bodyMesh = new THREE.Mesh(bodyGeo, mat);
+        bodyMesh.castShadow    = true;
+        bodyMesh.receiveShadow = true;
+        bodyMesh.userData = {
+          editorId: stair.id, editorType: "stair", zoneId,
+          selectable: true, floorLevel: level, _ownsMaterial: ownsBody,
+        } satisfies MeshUserData;
+        ownsBody = false;
+        meshes.push(bodyMesh);
+      }
 
-    const riserGeo = accumToGeo(riser);
-    applyUVOffset(riserGeo, rOffX, rOffY);
-    const riserMesh = new THREE.Mesh(riserGeo, riserMat);
-    riserMesh.castShadow    = true;
-    riserMesh.receiveShadow = true;
-    riserMesh.userData = {
-      editorId: stair.id, editorType: "stair", zoneId,
-      selectable: false, floorLevel: 0, _ownsMaterial: !!(riserMatId && riserOvr),
-    } satisfies MeshUserData;
-    meshes.push(riserMesh);
+      if (acc.riser.vi > 0) {
+        const riserGeo = accumToGeo(acc.riser);
+        applyUVOffset(riserGeo, rOffX, rOffY);
+        const riserMesh = new THREE.Mesh(riserGeo, riserMat);
+        riserMesh.castShadow    = true;
+        riserMesh.receiveShadow = true;
+        riserMesh.userData = {
+          editorId: stair.id, editorType: "stair", zoneId,
+          selectable: false, floorLevel: level, _ownsMaterial: ownsRiser,
+        } satisfies MeshUserData;
+        ownsRiser = false;
+        meshes.push(riserMesh);
+      }
 
-    // Landing slabs get their own mesh so they can carry their own material.
-    if (landAcc.vi > 0) {
-      const landGeo = accumToGeo(landAcc);
-      applyUVOffset(landGeo, landOvr?.offsetX ?? ovr?.offsetX ?? 0, landOvr?.offsetY ?? ovr?.offsetY ?? 0);
-      const landMesh = new THREE.Mesh(landGeo, landMat);
-      landMesh.castShadow    = true;
-      landMesh.receiveShadow = true;
-      landMesh.userData = {
-        editorId: stair.id, editorType: "stair", zoneId,
-        selectable: true, floorLevel: 0, _ownsMaterial: !!(landMatId && landOvr),
-      } satisfies MeshUserData;
-      meshes.push(landMesh);
+      // Landing slabs get their own mesh so they can carry their own material.
+      if (acc.land.vi > 0) {
+        const landGeo = accumToGeo(acc.land);
+        applyUVOffset(landGeo, landOvr?.offsetX ?? ovr?.offsetX ?? 0, landOvr?.offsetY ?? ovr?.offsetY ?? 0);
+        const landMesh = new THREE.Mesh(landGeo, landMat);
+        landMesh.castShadow    = true;
+        landMesh.receiveShadow = true;
+        landMesh.userData = {
+          editorId: stair.id, editorType: "stair", zoneId,
+          selectable: true, floorLevel: level, _ownsMaterial: ownsLand,
+        } satisfies MeshUserData;
+        ownsLand = false;
+        meshes.push(landMesh);
+      }
     }
+    const splitCount = meshes.length;   // everything after this is tagged by its lowest point
 
     // ── Railings ─────────────────────────────────────────────────────────────
     // An open railing per side: a thin top rail following the slope, carried by
@@ -851,6 +874,13 @@ export class StairBuilder {
         selectable: false, floorLevel: 0, _ownsMaterial: true, editorOnly: true,
       } satisfies MeshUserData;
       meshes.push(wireframe as unknown as THREE.Mesh);
+    }
+
+    // Rails and editor wireframes: the floor of their lowest point.
+    const box = new THREE.Box3();
+    for (const m of meshes.slice(splitCount)) {
+      m.updateMatrixWorld(true);
+      m.userData.floorLevel = levelAt(box.setFromObject(m).min.y);
     }
 
     const colliders = ColliderBuilder.registerStairSteps(stair);
