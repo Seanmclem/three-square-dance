@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -22.206676871670982,
-        "y": 15.25813770052453,
-        "z": -9.409605278339477
+        "x": -40.26423624099915,
+        "y": 9.170583711829405,
+        "z": -11.455289336064423
       },
       "radius": 23.323961616942803,
-      "phi": 1.4507963267948927,
-      "theta": 28.677749999533688
+      "phi": 1.5507963267948965,
+      "theta": 27.784739999447872
     }
   },
   "world": {
@@ -685,33 +685,35 @@
           "id": "light_c109a436",
           "position": {
             "x": -30.839178227687682,
-            "y": 17.943512969530172,
+            "y": 18.127116946072782,
             "z": -25.801175875779254
           },
           "kind": "spot",
           "color": "#ffffff",
           "intensity": 60,
           "range": 40,
-          "angleDeg": 80,
+          "angleDeg": 90,
           "pitchDeg": 87.56,
           "yawDeg": 153.61,
-          "castShadow": false
+          "castShadow": true,
+          "staticShadow": true
         },
         {
-          "id": "light_52ef0f88",
+          "id": "light_7356309f",
           "position": {
-            "x": -29.977511246096306,
-            "y": 17.943512969530172,
-            "z": -25.610046883721267
+            "x": -30.876817828129937,
+            "y": 11.422805067497645,
+            "z": -25.835940037577707
           },
           "kind": "spot",
           "color": "#ffffff",
           "intensity": 60,
           "range": 40,
-          "angleDeg": 80,
+          "angleDeg": 90,
           "pitchDeg": 87.56,
           "yawDeg": 153.61,
-          "castShadow": false
+          "castShadow": true,
+          "staticShadow": true
         }
       ]
     }
