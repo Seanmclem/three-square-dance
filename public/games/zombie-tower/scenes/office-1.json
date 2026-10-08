@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -40.26423624099915,
-        "y": 9.170583711829405,
-        "z": -11.455289336064423
+        "x": -32.08393068692706,
+        "y": 7.69977468692656,
+        "z": -8.25881467061635
       },
       "radius": 23.323961616942803,
-      "phi": 1.5507963267948965,
-      "theta": 27.784739999447872
+      "phi": 1.3007963267949012,
+      "theta": 28.274739999447743
     }
   },
   "world": {
@@ -535,7 +535,8 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "hidden": false
         },
         {
           "id": "wall_029d6a59",
@@ -547,7 +548,8 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "hidden": false
         },
         {
           "id": "wall_2ba1ee91",
@@ -583,7 +585,8 @@
           "thickness": 0.2,
           "material": "brick_01",
           "exteriorMaterial": "brick_01",
-          "openings": []
+          "openings": [],
+          "hidden": false
         }
       ],
       "platforms": [
@@ -682,38 +685,39 @@
       "objects": [],
       "lights": [
         {
-          "id": "light_c109a436",
+          "id": "light_7f04c056",
           "position": {
-            "x": -30.839178227687682,
-            "y": 18.127116946072782,
-            "z": -25.801175875779254
+            "x": -31,
+            "y": 10.879319726431579,
+            "z": -25.941503110554958
           },
-          "kind": "spot",
-          "color": "#ffffff",
-          "intensity": 60,
-          "range": 40,
-          "angleDeg": 90,
-          "pitchDeg": 87.56,
-          "yawDeg": 153.61,
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 30,
+          "range": 8,
           "castShadow": true,
+          "prefab": {
+            "prefabId": "pfb_eb414b98",
+            "instanceId": "pfi_e36ff3fa",
+            "memberKey": "light_db8f1528"
+          },
           "staticShadow": true
-        },
+        }
+      ],
+      "prefabInstances": [
         {
-          "id": "light_7356309f",
-          "position": {
-            "x": -30.876817828129937,
-            "y": 11.422805067497645,
-            "z": -25.835940037577707
-          },
-          "kind": "spot",
-          "color": "#ffffff",
-          "intensity": 60,
-          "range": 40,
-          "angleDeg": 90,
-          "pitchDeg": 87.56,
-          "yawDeg": 153.61,
-          "castShadow": true,
-          "staticShadow": true
+          "id": "pfi_e36ff3fa",
+          "prefabId": "pfb_eb414b98",
+          "version": 2,
+          "variables": {},
+          "origin": {
+            "position": {
+              "x": -31,
+              "y": 8.279319726431579,
+              "z": -25.941503110554958
+            },
+            "rotationY": 0
+          }
         }
       ]
     }
