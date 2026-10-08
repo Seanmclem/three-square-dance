@@ -236,6 +236,8 @@ export default function App() {
   activeToolRef.current = activeTool;
   const [spawnMode,        setSpawnMode]        = useState<"initial" | "checkpoint">("initial");
   const [activeFloor,      setActiveFloor]      = useState<number>(0);
+  // Top bar "All floors" (per-viewer convenience, remembered in this browser).
+  const [showAllFloors,    setShowAllFloors]    = useState<boolean>(() => { try { return localStorage.getItem("editorShowAllFloors") === "1"; } catch { return false; } });
   const [coords,           setCoords]           = useState<Vec3>({ x: 0, y: 0, z: 0 });
   const [selected,         setSelected]         = useState<SelectedObjectPayload | null>(null);
   // Mirror for bus handlers registered once (their `selected` closure is stale).
@@ -503,6 +505,7 @@ export default function App() {
     const zones     = new ZoneManager(scene.scene, world, bus, objectPlacer, movers);
     zones.enableEditorGhosts();   // see-through editorGhost ceilings (editor shell only)
     zones.enableLevelDimming();   // translucent non-active floor levels (editor shell only)
+    zones.setShowAllLevels(showAllFloors);
     zonesRef.current = zones;
     const history   = new HistoryManager(world, syncHistory);
     historyRef.current = history;
@@ -4347,6 +4350,13 @@ export default function App() {
         activeFloor={activeFloor}
         onFloorChange={handleFloorChange}
         getFloorSummaries={getFloorSummaries}
+        showAllFloors={showAllFloors}
+        onToggleShowAllFloors={() => {
+          const on = !showAllFloors;
+          setShowAllFloors(on);
+          zonesRef.current?.setShowAllLevels(on);
+          try { localStorage.setItem("editorShowAllFloors", on ? "1" : "0"); } catch { /* storage blocked */ }
+        }}
         onCameraTopDown={() => busRef.current.emit("camera:topdown", {})}
         onSave={handleSave}
         onLoad={handleLoad}

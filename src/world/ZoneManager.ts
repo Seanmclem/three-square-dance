@@ -226,6 +226,7 @@ export class ZoneManager {
   private _activeLevel = 0;
   private _levelDimming = false;
   private _dimSuspended = false;
+  private _showAllLevels = false;   // top bar "All floors" toggle: no dimming at all
   private readonly _dimmedMeshes = new Map<THREE.Mesh, THREE.Material>();
   private readonly _dimMaterials = new Set<THREE.Material>();
 
@@ -1807,7 +1808,7 @@ export class ZoneManager {
     this._dimmedMeshes.clear();
     this._pruneDimMaterials();
 
-    if (!this._levelDimming || this._dimSuspended) {
+    if (!this._levelDimming || this._dimSuspended || this._showAllLevels) {
       this._applyGhosts();
       return;
     }
@@ -1843,6 +1844,13 @@ export class ZoneManager {
    *  solid there regardless of `_activeLevel`. */
   enableLevelDimming(): void {
     this._levelDimming = true;
+    this._applyDimming();
+  }
+
+  /** Top bar "All floors": render every level solid while editing (picking still
+   *  prefers the active level). */
+  setShowAllLevels(on: boolean): void {
+    this._showAllLevels = on;
     this._applyDimming();
   }
 

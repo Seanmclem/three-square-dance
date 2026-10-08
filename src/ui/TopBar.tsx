@@ -6,6 +6,8 @@ interface TopBarProps {
   activeFloor:     number;
   onFloorChange:   (level: number) => void;
   getFloorSummaries?: () => FloorSummary[];
+  showAllFloors?:  boolean;
+  onToggleShowAllFloors?: () => void;
   onCameraTopDown: () => void;
   onSave:          () => Promise<void>;
   onLoad:          (json: unknown) => void;
@@ -131,7 +133,7 @@ function Popover({ open, onClose, align = "left", children }: { open: boolean; o
 
 const SEP = <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />;
 
-export function TopBar({ activeFloor, onFloorChange, getFloorSummaries, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
+export function TopBar({ activeFloor, onFloorChange, getFloorSummaries, showAllFloors, onToggleShowAllFloors, onCameraTopDown, onSave, onLoad, onNew, onUndo, onRedo, canUndo, canRedo, isDirty, lastAutosaveAt,
   project, onProjectNew, onProjectOpen, onProjectClose, onProjectPlay, onProjectExport, onProjectPublish,
   onSceneSwitch, onSceneAdd, onSceneDelete, onEntrySceneChange, brushEditing }: TopBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -329,6 +331,12 @@ export function TopBar({ activeFloor, onFloorChange, getFloorSummaries, onCamera
           </button>
         </Popover>
       </div>
+      {onToggleShowAllFloors && (
+        <button onClick={onToggleShowAllFloors} style={ibStyle({ on: showAllFloors })}
+          title={showAllFloors ? "Showing every floor solid. Click to fade the floors you're not editing." : "Show every floor solid instead of fading the ones you're not editing"}>
+          All floors
+        </button>
+      )}
       <button onClick={onCameraTopDown} title="Top-down view" style={ibStyle({})}>
         <Ic name="top" /> Top
       </button>
