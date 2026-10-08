@@ -2194,7 +2194,11 @@ export class ZoneManager {
     );
     marker.add(halo);
     if (def.kind !== "point") {
-      marker.add(new THREE.ArrowHelper(lightAimDir(def), new THREE.Vector3(0, 0, 0), 1.1, color.getHex(), 0.3, 0.15));
+      const arrow = new THREE.ArrowHelper(lightAimDir(def), new THREE.Vector3(0, 0, 0), 1.1, color.getHex(), 0.3, 0.15);
+      // Lines pick within raycaster.params.Line.threshold (1 m by default), so the aim
+      // line would steal clicks meant for a neighboring light. Bulb, halo and cone pick.
+      arrow.line.raycast = () => {};
+      marker.add(arrow);
     }
 
     marker.userData = { editorId: def.id, editorType: "light", zoneId, selectable: true, editorOnly: true, hideInGame: true };
