@@ -4,11 +4,11 @@ import { remapScripts } from "@/prefab/expand";
 import type {
   SelectedObjectPayload, SelectedRef, EditorObjectType, GroupDef,
   WallDef, FloorDef, PlatformDef, StairDef, LadderDef, ShapeDef, WorldObject, TriggerVolume,
-  CheckpointDef, WallNode, Vec2, Vec3,
+  CheckpointDef, LightDef, WallNode, Vec2, Vec3,
 } from "@/types";
 
 /** Selection types that can be copied. (Openings/spawn/terrain are excluded.) */
-const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "ladder", "object", "trigger-volume", "shape", "checkpoint"]);
+const COPYABLE = new Set<EditorObjectType>(["wall", "floor", "platform", "stair", "ladder", "object", "trigger-volume", "shape", "checkpoint", "light"]);
 
 /** One copied entity, tagged with its type so paste can route per-entity. */
 export interface ClipEntity {
@@ -47,6 +47,7 @@ function newId(type: EditorObjectType): string {
     case "trigger-volume": return `vol_${uuid8()}`;
     case "shape":          return `shape_${uuid8()}`;
     case "checkpoint":     return `cp_${uuid8()}`;
+    case "light":          return `light_${uuid8()}`;
     default:               return uuid();  // floor + nodes use full uuids
   }
 }
@@ -92,6 +93,7 @@ function defsForRef(world: WorldState, ref: SelectedRef): ClipEntity[] {
     case "trigger-volume": { const v = zone.triggerVolumes?.find(x => x.id === ref.id); return v ? [{ type: ref.type, def: structuredClone(v) }] : []; }
     case "shape":          { const s = zone.shapes?.find(x => x.id === ref.id);         return s ? [{ type: ref.type, def: structuredClone(s) }] : []; }
     case "checkpoint":     { const c = zone.checkpoints?.find(x => x.id === ref.id);     return c ? [{ type: ref.type, def: structuredClone(c) }] : []; }
+    case "light":          { const l = zone.lights?.find(x => x.id === ref.id);          return l ? [{ type: ref.type, def: structuredClone(l) }] : []; }
     default:               return [];
   }
 }
@@ -292,6 +294,11 @@ export function pasteClipboard(
         case "checkpoint": {
           const c = ent.def as CheckpointDef;
           world.addCheckpoint(zoneId, { ...c, id, position: off3(c.position, dx, dz) });
+          break;
+        }
+        case "light": {
+          const l = ent.def as LightDef;
+          world.addLight(zoneId, { ...l, id, position: off3(l.position, dx, dz) });
           break;
         }
       }
