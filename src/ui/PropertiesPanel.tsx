@@ -7004,6 +7004,12 @@ const LIGHT_KIND_HELP: Record<string, string> = {
   directional: "Parallel rays from a direction (position doesn't affect the light) — an extra sun/moon.",
 };
 
+const BOUNCE_HELP = `Real rooms bounce light back off the floor and walls. The engine doesn't, so a wall or ceiling right next to a light stays dark: the light only skims across it.
+Bounce adds a second, shadowless light about 1 m out from the walls or ceiling this light sits against, at this fraction of its brightness. It follows the light's flicker and on/off.
+- 0 = off
+- 0.2 to 0.3 = a believable fill for a ceiling or wall fixture
+- 1 = as bright as the light itself (the most it goes)`;
+
 function LightView({ selected, onDelete, onObjectUpdate, onCreatePrefab, prefabSection }: {
   selected:       SelectedObjectPayload;
   onDelete?:      () => void;
@@ -7017,6 +7023,7 @@ function LightView({ selected, onDelete, onObjectUpdate, onCreatePrefab, prefabS
     intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
     angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
     famount: String(light?.flicker?.amount ?? 0), fspeed: String(light?.flicker?.speed ?? 1),
+    bounce: String(light?.bounce ?? 0),
   });
   const { schedule, flush } = useFieldDebounce(300);
 
@@ -7026,6 +7033,7 @@ function LightView({ selected, onDelete, onObjectUpdate, onCreatePrefab, prefabS
       intensity: String(light?.intensity ?? 0), range: String(light?.range ?? 0),
       angle: String(light?.angleDeg ?? 30), pitch: String(light?.pitchDeg ?? 90), yaw: String(light?.yawDeg ?? 0),
       famount: String(light?.flicker?.amount ?? 0), fspeed: String(light?.flicker?.speed ?? 1),
+      bounce: String(light?.bounce ?? 0),
     });
   }, [selected.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Resync position when moved externally (gizmo drag refreshes selected.data).
@@ -7078,6 +7086,7 @@ function LightView({ selected, onDelete, onObjectUpdate, onCreatePrefab, prefabS
 
       {numField("INTENSITY", "intensity", "intensity", isPoint || light.kind === "spot" ? 5 : 0.25)}
       {light.kind !== "directional" && numField("RANGE (M)", "range", "range", 1, 0, "0 = unlimited")}
+      {light.kind !== "directional" && numField("BOUNCE", "bounce", "bounce", 0.05, 0, "0 = off", BOUNCE_HELP)}
       {light.kind === "spot" && numField("CONE ANGLE (°)", "angle", "angleDeg", 5, 1, undefined, CONE_ANGLE_HELP)}
       {light.kind !== "point" && (
         <div style={{ display: "flex", gap: 10 }}>

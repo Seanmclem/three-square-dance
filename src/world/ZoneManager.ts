@@ -66,6 +66,7 @@ interface LightEntry {
   light:  THREE.PointLight | THREE.SpotLight | THREE.DirectionalLight;
   marker: THREE.Group;      // editor pick proxy (hideInGame)
   def:    LightDef;         // authored def (flicker params, base intensity)
+  bounce: THREE.PointLight | null;   // fake bounce fill (def.bounce > 0); follows the light's intensity
   // Runtime flicker/scripting state (reset by _restoreLightStates)
   scriptOff:   boolean;     // light_off'd by a script — flicker paused, stays dark
   flickerT:    number;      // elapsed flicker clock (s)
@@ -817,7 +818,7 @@ export class ZoneManager {
     }
 
     // Free light shadow-map resources; meshes/materials go with the group traverse below.
-    for (const le of entry.lightEntries.values()) le.light.dispose();
+    for (const le of entry.lightEntries.values()) { le.light.dispose(); le.bounce?.dispose(); }
 
     for (const id of entry.objectMeshes.keys()) {
       this._objectPlacer.remove(id);
@@ -2177,10 +2178,61 @@ export class ZoneManager {
 
     const marker = this._buildLightMarker(zoneId, def);
     entry.lightsGroup.add(marker);
-    entry.lightEntries.set(def.id, {
-      light, marker, def,
+    let bounce: THREE.PointLight | null = null;
+    if (def.kind !== "directional" && (def.bounce ?? 0) > 0) {
+      bounce = new THREE.PointLight(def.color, 0, def.range ?? 0);
+      bounce.userData = { editorId: def.id, editorType: "light", zoneId, selectable: false };
+      entry.lightsGroup.add(bounce);
+    }
+    const le: LightEntry = {
+      light, marker, def, bounce,
       scriptOff: false, flickerT: 0, electricOn: true, electricNext: 0,
+    };
+    entry.lightEntries.set(def.id, le);
+    this._placeBounce(entry, le);
+    this._syncBounce(le);
+  }
+
+  /** Fill light's intensity follows the main light (flicker, script on/off). */
+  private _syncBounce(le: LightEntry): void {
+    if (le.bounce) le.bounce.intensity = le.light.intensity * Math.min(1, le.def.bounce ?? 0);
+  }
+
+  /** Put the bounce fill where the light a fixture throws would come back from:
+   *  ~1 m out from the surfaces within 1.5 m of it (a flush ceiling light's
+   *  fill sits below it and lights the ceiling head-on). With nothing near,
+   *  1 m down (point) or along the aim (spot). Never through the next surface. */
+  private _placeBounce(entry: ZoneEntry, le: LightEntry): void {
+    if (!le.bounce) return;
+    const p = le.light.position;
+    const solids: THREE.Object3D[] = [];
+    entry.group.updateMatrixWorld(true);
+    entry.group.traverse(o => {
+      if (!(o instanceof THREE.Mesh) || o.parent === entry.lightsGroup) return;
+      const ud = o.userData;
+      if (ud.editorOnly || ud.hideInGame || ud.ghostPick || !o.visible) return;
+      solids.push(o);
     });
+    const rc = new THREE.Raycaster();
+    const nearHit = (dir: THREE.Vector3, far: number): number | null => {
+      rc.set(p, dir); rc.far = far;
+      return rc.intersectObjects(solids, false)[0]?.distance ?? null;
+    };
+    const REACH = 1.5;
+    const away = new THREE.Vector3();
+    for (const d of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]] as const) {
+      const dir = new THREE.Vector3(...d);
+      const hit = nearHit(dir, REACH);
+      if (hit !== null) away.addScaledVector(dir, -(1 - hit / REACH));   // nearer surface pushes harder
+    }
+    if (away.lengthSq() < 1e-6) {
+      if (le.def.kind === "spot") { const a = lightAimDir(le.def); away.set(a.x, a.y, a.z); }
+      else away.set(0, -1, 0);
+    }
+    away.normalize();
+    const room = nearHit(away, 1.2);
+    const dist = room === null ? 1 : Math.max(0, room - 0.2);
+    le.bounce.position.copy(p).addScaledVector(away, dist);
   }
 
   private _buildLightMarker(zoneId: string, def: LightDef): THREE.Group {
@@ -2230,6 +2282,7 @@ export class ZoneManager {
       const turnOn = op === "on" || (op === "toggle" && (le.scriptOff || le.light.intensity === 0));
       le.scriptOff = !turnOn;   // pauses/resumes authored flicker too
       le.light.intensity = turnOn ? def.intensity : 0;
+      this._syncBounce(le);
       if (le.light.castShadow) {
         // Off: stop paying the per-frame shadow pass. On: resume. Static maps are
         // NOT re-poked here — geometry pokes keep them fresh even while off (see
@@ -2249,6 +2302,7 @@ export class ZoneManager {
         le.scriptOff = false;
         le.flickerT = 0; le.electricOn = true; le.electricNext = 0;
         le.light.intensity = def.intensity;
+        this._syncBounce(le);
         if (le.light.castShadow) {
           le.light.shadow.autoUpdate = !def.staticShadow;
           le.light.shadow.needsUpdate = true;
@@ -2286,6 +2340,7 @@ export class ZoneManager {
           }
           le.light.intensity = le.electricOn ? le.def.intensity : le.def.intensity * (1 - fl.amount);
         }
+        this._syncBounce(le);
       }
     }
   }
@@ -2299,6 +2354,7 @@ export class ZoneManager {
     for (const le of entry.lightEntries.values()) {
       if (le.light.castShadow && !le.light.shadow.autoUpdate)
         le.light.shadow.needsUpdate = true;
+      this._placeBounce(entry, le);   // the surfaces around it may have moved
     }
   }
 
@@ -2306,6 +2362,7 @@ export class ZoneManager {
     const le = entry.lightEntries.get(id);
     if (!le) return;
     le.light.dispose();
+    if (le.bounce) { le.bounce.dispose(); entry.lightsGroup.remove(le.bounce); }
     if ("target" in le.light && le.light.target.parent === entry.lightsGroup)
       entry.lightsGroup.remove(le.light.target);
     entry.lightsGroup.remove(le.light);
