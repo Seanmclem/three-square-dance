@@ -667,7 +667,7 @@ export function PropertiesPanel({
       .join(" · ");
     const memberLabelFor = (r: SelectedRef): string => {
       const zone = zones?.find(z => z.id === r.zoneId);
-      const pools = [zone?.objects, zone?.triggerVolumes, zone?.shapes, zone?.stairs, zone?.ladders, zone?.checkpoints] as
+      const pools = [zone?.objects, zone?.triggerVolumes, zone?.shapes, zone?.stairs, zone?.ladders, zone?.checkpoints, zone?.lights] as
         Array<Array<{ id: string; label?: string; assetId?: string }> | undefined>;
       for (const p of pools) { const e = p?.find(x => x.id === r.id); if (e) return e.label || e.assetId || r.id.slice(0, 12); }
       return r.id.slice(0, 12);
@@ -730,7 +730,7 @@ export function PropertiesPanel({
               title="Save the selected shapes as one 3MF / STL for a 3D printer"
               onClick={() => onPrintExport(multiSelected.filter(r => r.type === "shape"))}>Export for 3D printing…</button>
           )}
-          {onCreatePrefab && !prefabInfo && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder"].includes(r.type)) && (
+          {onCreatePrefab && !prefabInfo && multiSelected.some(r => ["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint", "light"].includes(r.type)) && (
             <button
               style={{ ...ACTION_BTN, color: "#9db8e8", borderColor: "rgba(80,140,255,0.3)" }}
               title="Save this selection as a reusable prefab; the selection becomes its first linked instance"
@@ -986,7 +986,26 @@ export function PropertiesPanel({
         ) : selected.type === "checkpoint" ? (
           <CheckpointView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
         ) : selected.type === "light" ? (
-          <LightView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} />
+          <LightView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate}
+            onCreatePrefab={onCreatePrefab && !prefabInfo
+              ? () => onCreatePrefab([{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef])
+              : undefined}
+            prefabSection={prefabInfo ? (
+              <PrefabSection
+                key={prefabInfo.record.id}
+                info={prefabInfo}
+                defaultOpen={false}
+                onVariablesChange={onPrefabVariablesChange}
+                onOriginChange={onPrefabOriginChange}
+                onReexpand={onPrefabReexpand}
+                onPushToPrefab={onPrefabPushToPrefab}
+                onUnlink={onPrefabUnlink}
+                onDeleteInstance={onPrefabDeleteInstance}
+                onSelectAll={onSelectInstance}
+                onEdit={prefabInfo.prefab && onEditPrefab ? () => onEditPrefab(prefabInfo.prefab!.id) : undefined}
+              />
+            ) : null}
+          />
         ) : selected.type === "decal" ? (
           <DecalView selected={selected} onDelete={onDelete} onObjectUpdate={onObjectUpdate} decalTextures={decalTextures} />
         ) : isRoot ? (
@@ -6985,10 +7004,12 @@ const LIGHT_KIND_HELP: Record<string, string> = {
   directional: "Parallel rays from a direction (position doesn't affect the light) — an extra sun/moon.",
 };
 
-function LightView({ selected, onDelete, onObjectUpdate }: {
+function LightView({ selected, onDelete, onObjectUpdate, onCreatePrefab, prefabSection }: {
   selected:       SelectedObjectPayload;
   onDelete?:      () => void;
   onObjectUpdate: (changes: Partial<WorldObject>) => void;
+  onCreatePrefab?: () => void;          // capture this light as a reusable prefab
+  prefabSection?:  React.ReactNode;     // PrefabSection when this light is an instance member
 }) {
   const light = selected.data as LightDef | null;
   const [posStr, setPosStr] = useState({ x: String(light?.position.x ?? 0), y: String(light?.position.y ?? 0), z: String(light?.position.z ?? 0) });
@@ -7042,6 +7063,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
                     borderRadius: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
         {LIGHT_KIND_HELP[light.kind]}
       </div>
+      {prefabSection}
 
       <div>
         <div style={LABEL}>COLOR</div>
@@ -7149,6 +7171,14 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
         </div>
       </div>
 
+      {onCreatePrefab && (
+        <button onClick={onCreatePrefab}
+          title="Save this light, with all its settings, as a reusable prefab (this light becomes its first placed copy)"
+          style={{ padding: "8px 0", background: "rgba(80,140,255,0.10)", border: "1px solid rgba(80,140,255,0.3)",
+                   borderRadius: 4, color: "#80aaff", fontSize: 11, fontFamily: "monospace", cursor: "pointer" }}>
+          ⬡ Create Prefab
+        </button>
+      )}
       {onDelete && (
         <button onClick={onDelete}
           style={{ padding: "8px 0", background: "rgba(204,102,102,0.12)", border: "1px solid rgba(204,102,102,0.4)",

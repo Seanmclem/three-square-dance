@@ -1,6 +1,6 @@
 import type { WorldState } from "@/world/WorldState";
 import type {
-  CheckpointDef, EditorObjectType, LadderDef, PrefabDef, PrefabInstanceRecord, PrefabStamp,
+  CheckpointDef, EditorObjectType, LadderDef, LightDef, PrefabDef, PrefabInstanceRecord, PrefabStamp,
   PrefabTemplateEntity, PrefabVarValue, ScriptDef, ShapeDef, StairDef,
   TriggerVolume, Vec3, WorldObject,
 } from "@/types";
@@ -15,7 +15,7 @@ import { GENERATORS } from "@/prefab/generators";
 
 /** Entity types a prefab may contain (position-anchored; node-backed types are
  *  not capturable — wall/floor/platform diffing over shared nodes is deferred). */
-export const PREFABABLE = new Set<EditorObjectType>(["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint"]);
+export const PREFABABLE = new Set<EditorObjectType>(["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint", "light"]);
 
 const uuid8 = (): string => crypto.randomUUID().slice(0, 8);
 
@@ -27,6 +27,7 @@ function newMemberId(type: EditorObjectType): string {
     case "stair":          return `stair_${uuid8()}`;
     case "ladder":         return `ladder_${uuid8()}`;
     case "checkpoint":     return `cp_${uuid8()}`;
+    case "light":          return `light_${uuid8()}`;
     default:               return crypto.randomUUID();
   }
 }
@@ -200,6 +201,14 @@ function materializeMembers(
         c.facingDeg = c.facingDeg + record.origin.rotationY;
         break;
       }
+      case "light": {
+        // Aim yaw turns with the instance (yaw 0 = -Z; toWorld's rotation adds to it).
+        const l = def as LightDef;
+        l.id = id; l.prefab = stamp;
+        l.position = toWorld(l.position, record.origin);
+        if (l.yawDeg !== undefined || record.origin.rotationY !== 0) l.yawDeg = (l.yawDeg ?? 0) + record.origin.rotationY;
+        break;
+      }
     }
     return { type: member.type, id, memberKey: member.memberKey, def };
   });
@@ -213,6 +222,7 @@ function addMember(world: WorldState, zoneId: string, m: Materialized): void {
     case "stair":          world.addStair(zoneId, m.def as StairDef); break;
     case "ladder":         world.addLadder(zoneId, m.def as LadderDef); break;
     case "checkpoint":     world.addCheckpoint(zoneId, m.def as CheckpointDef); break;
+    case "light":          world.addLight(zoneId, m.def as LightDef); break;
   }
 }
 
@@ -224,6 +234,7 @@ function removeMember(world: WorldState, zoneId: string, type: EditorObjectType,
     case "stair":          world.removeStair(zoneId, id); break;
     case "ladder":         world.removeLadder(zoneId, id); break;
     case "checkpoint":     world.removeCheckpoint(zoneId, id); break;
+    case "light":          world.removeLight(zoneId, id); break;
   }
 }
 
@@ -245,6 +256,7 @@ export function collectInstanceMembers(
   scan("stair", zone.stairs);
   scan("ladder", zone.ladders);
   scan("checkpoint", zone.checkpoints);
+  scan("light", zone.lights);
   return out;
 }
 
@@ -322,6 +334,7 @@ export function unlinkInstance(world: WorldState, zoneId: string, instanceId: st
         case "stair":          world.updateStair(zoneId, e.id, changes); break;
         case "ladder":         world.updateLadder(zoneId, e.id, changes); break;
         case "checkpoint":     world.updateCheckpoint(zoneId, e.id, changes); break;
+        case "light":          world.updateLight(zoneId, e.id, changes); break;
       }
     }
     world.removePrefabInstance(zoneId, instanceId);
@@ -382,6 +395,7 @@ export function captureSnapshotPrefab(
       case "stair":          return zone.stairs.find(e => e.id === id);
       case "ladder":         return zone.ladders?.find(e => e.id === id);
       case "checkpoint":     return zone.checkpoints?.find(e => e.id === id);
+      case "light":          return zone.lights?.find(e => e.id === id);
       default:               return undefined;
     }
   };
@@ -452,6 +466,7 @@ export function captureInstanceToPrefab(
       case "stair":          return zone.stairs.find(e => e.id === id);
       case "ladder":         return zone.ladders?.find(e => e.id === id);
       case "checkpoint":     return zone.checkpoints?.find(e => e.id === id);
+      case "light":          return zone.lights?.find(e => e.id === id);
       default:               return undefined;
     }
   };
@@ -507,6 +522,12 @@ export function captureInstanceToPrefab(
         const c = def as unknown as CheckpointDef;
         c.position  = toLocal(c.position, record.origin);
         c.facingDeg = c.facingDeg - record.origin.rotationY;
+        break;
+      }
+      case "light": {
+        const l = def as unknown as LightDef;
+        l.position = toLocal(l.position, record.origin);
+        if (l.yawDeg !== undefined || record.origin.rotationY !== 0) l.yawDeg = (l.yawDeg ?? 0) - record.origin.rotationY;
         break;
       }
     }

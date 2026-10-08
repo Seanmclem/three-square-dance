@@ -167,6 +167,7 @@ export class TriggerVolumeTool {
           gatherMembers("stair", zone?.stairs);
           gatherMembers("ladder", zone?.ladders);
           gatherMembers("checkpoint", zone?.checkpoints);
+          gatherMembers("light", zone?.lights);
           if (refs.length > 1) { this._bus.emit("selection:set", { refs }); return; }
         }
         this._bus.emit("object:deselected", {});  // clear any SelectionManager floor/wall tint

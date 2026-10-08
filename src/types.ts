@@ -741,6 +741,7 @@ export interface LightDef {
   // ZoneManager re-renders it when zone geometry rebuilds.
   staticShadow?: boolean;
   flicker?:      LightFlickerDef;
+  prefab?:       PrefabStamp;     // member of a placed prefab instance (v4.128.0)
 }
 
 // Locomotion states the third-person animation state machine drives (intent strings).

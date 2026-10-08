@@ -55,9 +55,27 @@ the Prefabs panel. **The original build IS an instance now** — its pieces show
 prefab line in their properties header (below), and it counts toward the
 library's instance badge.
 
-What can be captured: objects, trigger volumes, shapes, stairs, ladders.
-Walls, floors, and platforms are skipped (they're corner-node-based; a console
-warning lists anything skipped).
+What can be captured: objects, trigger volumes, shapes, stairs, ladders,
+checkpoints and lights. Walls, floors, and platforms are skipped (they're
+corner-node-based; a console warning lists anything skipped). A single selected
+light has its own **⬡ Create Prefab** button above Delete Light.
+
+**Light prefabs** (v4.128.0). A light prefab hangs its light at a height above
+the point you click, so set that height once in **Edit prefab** (select the
+light, type POSITION Y, Save). Pressing **R** while placing turns a spot or
+directional light's aim with the prefab. The placement ghost for a light is a
+thin column from the click point up to where the light will hang. Zombie Tower
+ships four, all sized for 3 m rooms:
+
+| Prefab | Light | Hangs | Use |
+|---|---|---|---|
+| **Ceiling Light** | point, warm, intensity 30, range 8 | 2.6 m up | the default room light: lights the ceiling, walls and floor |
+| **Recessed Downlight** | spot, white, 40° cone straight down, range 6 | 2.95 m up | a pool of light under a fixture set into the ceiling |
+| **Wall Sconce** | spot, warm, intensity 40, 80° cone tipped 25° down, range 6 | 2 m up, 0.25 m out | click the floor at the foot of a wall and press R until the arrow points into the room |
+| **Flickering Bulb** | point, cool white, intensity 25, range 6, Electric flicker | 2.6 m up | a failing bulb (the flicker runs in Play) |
+
+Clicking a capped room from above lands on its ceiling, so place ceiling lights
+with the ceiling ghosted (the wall run's Actions › Hide ceiling) or from below.
 
 **Script gotcha:** scripts inside a captured prefab are re-targeted per
 instance — each placed door's trigger opens *its own* door. But literal
@@ -282,8 +300,8 @@ the instance settings automatically.
 - **Prefab-local space.** Emit positions relative to the placement point
   (the pipeline applies the instance's position + rotation). For the Tiled
   Platform convention, y=0 at the origin with walkable surfaces above it.
-- **Allowed piece types:** object, trigger-volume, shape, stair, ladder —
-  same set as snapshot capture. `assetId`s must exist in the model library
+- **Allowed piece types:** object, trigger-volume, shape, stair, ladder,
+  checkpoint, light (same set as snapshot capture). `assetId`s must exist in the model library
   (missing ones render as fallback boxes).
 - **Clamp your inputs.** The panel enforces min/max, but hand-edited JSON
   reaches `expand` too — clamp defensively like the example.

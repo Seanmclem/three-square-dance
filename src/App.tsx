@@ -2131,7 +2131,8 @@ export default function App() {
         ref.type === "shape"          ? zone.shapes?.find(e => e.id === ref.id) :
         ref.type === "stair"          ? zone.stairs?.find(e => e.id === ref.id) :
         ref.type === "ladder"         ? zone.ladders?.find(e => e.id === ref.id) :
-        ref.type === "checkpoint"     ? zone.checkpoints?.find(e => e.id === ref.id) : undefined;
+        ref.type === "checkpoint"     ? zone.checkpoints?.find(e => e.id === ref.id) :
+        ref.type === "light"          ? zone.lights?.find(e => e.id === ref.id) : undefined;
       const instId = (ent as { prefab?: { instanceId?: string } } | undefined)?.prefab?.instanceId;
       if (!instId) continue;
       if (!stamps.has(ref.zoneId)) stamps.set(ref.zoneId, new Set());
@@ -3779,7 +3780,7 @@ export default function App() {
     if (!record || !zone) return null;
     if (multiSelected.length > 1) {
       const memberIds = new Set<string>();
-      for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? [], zone.checkpoints ?? []]) {
+      for (const arr of [zone.objects, zone.triggerVolumes ?? [], zone.shapes ?? [], zone.stairs, zone.ladders ?? [], zone.checkpoints ?? [], zone.lights ?? []]) {
         for (const e of arr as Array<{ id: string; prefab?: { instanceId: string } }>) {
           if (e.prefab?.instanceId === record.id) memberIds.add(e.id);
         }
@@ -3827,7 +3828,8 @@ export default function App() {
         prev.type === "shape" ? zone?.shapes :
         prev.type === "stair" ? zone?.stairs :
         prev.type === "ladder" ? zone?.ladders :
-        prev.type === "checkpoint" ? zone?.checkpoints : undefined;
+        prev.type === "checkpoint" ? zone?.checkpoints :
+        prev.type === "light" ? zone?.lights : undefined;
       const data = arr?.find(e => e.id === prev.id);
       if (!data) { busRef.current.emit("object:deselected", {}); return null; }
       return { ...prev, data: data as SelectedObjectPayload["data"] };
@@ -3962,6 +3964,9 @@ export default function App() {
       const updated = await session.saveAndExit();
       editingPrefabRef.current = false;
       setEditingPrefab(null);
+      // Whatever was selected inside the editor no longer exists out here.
+      busRef.current.emit("object:deselected", {});
+      setSelected(null);
       if (!updated) return;
       applyPrefabs(prefabs.map(p => p.id === updated.id ? updated : p));
       // Propagate: re-expand every open-scene instance in ONE undoable transaction.
@@ -3985,6 +3990,8 @@ export default function App() {
     void session.cancel().then(() => {
       editingPrefabRef.current = false;
       setEditingPrefab(null);
+      busRef.current.emit("object:deselected", {});
+      setSelected(null);
     });
   };
 
@@ -4085,7 +4092,7 @@ export default function App() {
 
   // Prefabs panel "Create from selection": handler present only when the current
   // selection can be captured; otherwise the hint explains why the button is off.
-  const PREFABABLE_TYPES = ["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint"];
+  const PREFABABLE_TYPES = ["object", "trigger-volume", "shape", "stair", "ladder", "checkpoint", "light"];
   const prefabSelectionRefs: SelectedRef[] =
     multiSelected.length > 1 ? multiSelected
     : selected && selected.id !== "__spawn__" ? [{ id: selected.id, type: selected.type, zoneId: selected.zoneId } as SelectedRef]
@@ -4095,7 +4102,7 @@ export default function App() {
     prefabSelectionRefs.some(r => PREFABABLE_TYPES.includes(r.type as string)) && !selPrefabInfo && !editingPrefab && !editingBrush;
   const prefabSelectionHint =
     editingPrefab || editingBrush ? "Leave the prefab or brush editor to make a prefab"
-    : prefabSelectionRefs.length === 0 ? "Select an object, trigger volume, shape, stair, ladder, or checkpoint first"
+    : prefabSelectionRefs.length === 0 ? "Select an object, trigger volume, shape, stair, ladder, checkpoint, or light first"
     : selPrefabInfo ? "Prefab members can't be re-captured — unlink the instance first"
     : "Selection has no capturable entities (walls/floors/platforms are node-backed)";
   const prefabCreateFromSelection = prefabSelectionEligible

@@ -155,6 +155,15 @@ function memberExtents(prefab: PrefabDef): { min: Vec3; max: Vec3 } {
   };
   for (const m of expandPrefab(prefab, defaultVars(prefab))) {
     if (!PREFABABLE.has(m.type)) continue;
+    if (m.type === "light") {
+      // A light is a point: a thin column from the click point up to it shows
+      // where it will hang (a 2 m box per light would float well above it).
+      const p = (m.def as { position: Vec3 }).position;
+      min.x = Math.min(min.x, p.x - 0.25); max.x = Math.max(max.x, p.x + 0.25);
+      min.y = Math.min(min.y, 0, p.y - 0.25); max.y = Math.max(max.y, p.y + 0.25);
+      min.z = Math.min(min.z, p.z - 0.25); max.z = Math.max(max.z, p.z + 0.25);
+      continue;
+    }
     const d = m.def as { position?: Vec3; start?: Vec3; end?: Vec3 };
     if (d.position) take(d.position);
     if (d.start) take(d.start);

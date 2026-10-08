@@ -514,6 +514,10 @@ export class GizmoManager implements IEditorModule {
         const c = zone.checkpoints?.find(x => x.id === ref.id);
         return c ? new THREE.Vector3(c.position.x, c.position.y, c.position.z) : null;
       }
+      case "light": {
+        const l = zone.lights?.find(x => x.id === ref.id);
+        return l ? new THREE.Vector3(l.position.x, l.position.y, l.position.z) : null;
+      }
       default:
         return null;
     }
@@ -594,8 +598,8 @@ export class GizmoManager implements IEditorModule {
    *  the stale origin. Applies only when the dragged refs are exactly one
    *  instance's full member set — partial subsets leave the origin alone. Runs
    *  inside the caller's move transaction so undo reverts origin + members together. */
-  private _syncPrefabOrigin(delta: THREE.Vector3): void {
-    const zoneId = this._groupRefs[0]?.zoneId;
+  private _syncPrefabOrigin(delta: THREE.Vector3, refs: SelectedRef[] = this._groupRefs): void {
+    const zoneId = refs[0]?.zoneId;
     const zone = zoneId ? this._worldState.zones.get(zoneId) : undefined;
     if (!zone) return;
     const findStamp = (ref: SelectedRef): string | null => {
@@ -605,10 +609,11 @@ export class GizmoManager implements IEditorModule {
         ref.type === "shape" ? zone.shapes :
         ref.type === "stair" ? zone.stairs :
         ref.type === "ladder" ? zone.ladders :
-        ref.type === "checkpoint" ? zone.checkpoints : undefined;
+        ref.type === "checkpoint" ? zone.checkpoints :
+        ref.type === "light" ? zone.lights : undefined;
       return arr?.find(e => e.id === ref.id)?.prefab?.instanceId ?? null;
     };
-    const ids = this._groupRefs.map(findStamp);
+    const ids = refs.map(findStamp);
     const instanceId = ids[0];
     if (!instanceId || !ids.every(id => id === instanceId)) return;
     const record = zone.prefabInstances?.find(r => r.id === instanceId);
@@ -620,8 +625,9 @@ export class GizmoManager implements IEditorModule {
       (zone.shapes ?? []).filter(s => s.prefab?.instanceId === instanceId).length +
       zone.stairs.filter(s => s.prefab?.instanceId === instanceId).length +
       (zone.ladders ?? []).filter(l => l.prefab?.instanceId === instanceId).length +
-      (zone.checkpoints ?? []).filter(c => c.prefab?.instanceId === instanceId).length;
-    if (memberCount !== this._groupRefs.length) return;
+      (zone.checkpoints ?? []).filter(c => c.prefab?.instanceId === instanceId).length +
+      (zone.lights ?? []).filter(l => l.prefab?.instanceId === instanceId).length;
+    if (memberCount !== refs.length) return;
     this._worldState.updatePrefabInstance(zoneId!, instanceId, {
       origin: {
         position: {
@@ -738,6 +744,14 @@ export class GizmoManager implements IEditorModule {
         if (!c) break;
         this._worldState.updateCheckpoint(zoneId, ref.id, {
           position: { x: c.position.x + delta.x, y: c.position.y + delta.y, z: c.position.z + delta.z },
+        });
+        break;
+      }
+      case "light": {
+        const l = zone.lights?.find(x => x.id === ref.id);
+        if (!l) break;
+        this._worldState.updateLight(zoneId, ref.id, {
+          position: { x: l.position.x + delta.x, y: l.position.y + delta.y, z: l.position.z + delta.z },
         });
         break;
       }
@@ -1244,6 +1258,11 @@ export class GizmoManager implements IEditorModule {
       }
     }
 
+    // A one-piece prefab instance (e.g. a light prefab) selects as a single entity,
+    // not a group: carry its origin along too, or the next rebuild snaps it back.
+    if (delta.lengthSq() >= 1e-6 && this._selId && this._selType && this._selZoneId) {
+      this._syncPrefabOrigin(delta, [{ id: this._selId, type: this._selType, zoneId: this._selZoneId } as SelectedRef]);
+    }
     this._pivotStart.copy(this._pivot.position);
   }
 

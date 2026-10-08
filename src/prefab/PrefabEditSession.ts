@@ -3,7 +3,7 @@ import type { ZoneManager } from "@/world/ZoneManager";
 import type { HistoryManager } from "@/editor/HistoryManager";
 import type { EditorCamera } from "@/editor/EditorCamera";
 import type {
-  CheckpointDef, EditorCameraPose, EditorObjectType, LadderDef, PrefabDef, PrefabTemplateEntity, ShapeDef, StairDef,
+  CheckpointDef, EditorCameraPose, EditorObjectType, LadderDef, LightDef, PrefabDef, PrefabTemplateEntity, ShapeDef, StairDef,
   TriggerVolume, WorldObject, ZoneDef,
 } from "@/types";
 import { expandPrefab } from "@/prefab/expand";
@@ -62,6 +62,7 @@ export class PrefabEditSession {
         case "stair":          temp.stairs.push(def as unknown as StairDef); break;
         case "ladder":         (temp.ladders ??= []).push(def as unknown as LadderDef); break;
         case "checkpoint":     (temp.checkpoints ??= []).push(def as unknown as CheckpointDef); break;
+        case "light":          (temp.lights ??= []).push(def as unknown as LightDef); break;
       }
     }
 
@@ -100,6 +101,7 @@ export class PrefabEditSession {
       grab("stair", zone.stairs);
       grab("ladder", zone.ladders);
       grab("checkpoint", zone.checkpoints);
+      grab("light", zone.lights);
     }
     const updated: PrefabDef = { ...prefab, template, version: prefab.version + 1 };
     await this._teardown();

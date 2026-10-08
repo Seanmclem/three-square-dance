@@ -69,5 +69,126 @@
       "sfx": 1,
       "ambient": 1
     }
-  }
+  },
+  "prefabs": [
+    {
+      "id": "pfb_eb414b98",
+      "name": "Ceiling Light",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "light_db8f1528",
+          "type": "light",
+          "def": {
+            "id": "light_db8f1528",
+            "position": {
+              "x": 0,
+              "y": 2.6,
+              "z": 0
+            },
+            "kind": "point",
+            "color": "#ffd9a0",
+            "intensity": 30,
+            "range": 8,
+            "castShadow": false
+          }
+        }
+      ],
+      "dateAdded": "2026-10-08"
+    },
+    {
+      "id": "pfb_b8efeeef",
+      "name": "Recessed Downlight",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "light_cd680b4f",
+          "type": "light",
+          "def": {
+            "id": "light_cd680b4f",
+            "position": {
+              "x": 0,
+              "y": 2.95,
+              "z": 0
+            },
+            "kind": "spot",
+            "color": "#ffffff",
+            "intensity": 60,
+            "range": 6,
+            "angleDeg": 40,
+            "pitchDeg": 90,
+            "yawDeg": 0,
+            "castShadow": false
+          }
+        }
+      ],
+      "dateAdded": "2026-10-08"
+    },
+    {
+      "id": "pfb_fb161545",
+      "name": "Wall Sconce",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "light_f641c77b",
+          "type": "light",
+          "def": {
+            "id": "light_f641c77b",
+            "position": {
+              "x": 0,
+              "y": 2,
+              "z": -0.25
+            },
+            "kind": "spot",
+            "color": "#ffd9a0",
+            "intensity": 40,
+            "range": 6,
+            "angleDeg": 80,
+            "pitchDeg": 25,
+            "yawDeg": 0,
+            "castShadow": false
+          }
+        }
+      ],
+      "dateAdded": "2026-10-08"
+    },
+    {
+      "id": "pfb_fa8e5a14",
+      "name": "Flickering Bulb",
+      "kind": "snapshot",
+      "version": 2,
+      "variables": [],
+      "template": [
+        {
+          "memberKey": "light_3f40c9ef",
+          "type": "light",
+          "def": {
+            "id": "light_3f40c9ef",
+            "position": {
+              "x": 0,
+              "y": 2.6,
+              "z": 0
+            },
+            "kind": "point",
+            "color": "#dfe8ff",
+            "intensity": 25,
+            "range": 6,
+            "castShadow": false,
+            "flicker": {
+              "style": "electric",
+              "amount": 1,
+              "speed": 1
+            }
+          }
+        }
+      ],
+      "dateAdded": "2026-10-08"
+    }
+  ]
 }
