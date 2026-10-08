@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -36.201742270605685,
+        "x": -43.2534049113318,
         "y": 11.139592562208595,
-        "z": -16.860693418367067
+        "z": -15.851648407567664
       },
-      "radius": 22.673961616942794,
-      "phi": 1.2249999999999976,
-      "theta": 27.86527999936192
+      "radius": 23.323961616942803,
+      "phi": 1.3057963267948993,
+      "theta": 27.55027999936199
     }
   },
   "world": {
@@ -207,6 +207,21 @@
           "x": -33.55,
           "z": -35.6,
           "linkId": "f11cab56-3d65-40e4-bb55-bd4362f19a7c"
+        },
+        {
+          "id": "81a4a234-1a90-409c-88f6-2cac8e24c602",
+          "x": -31.75453226225818,
+          "z": -24.4
+        },
+        {
+          "id": "b6a32e81-359d-4a79-be46-e0cf6aecc7f5",
+          "x": -32.713810868830016,
+          "z": -24.4
+        },
+        {
+          "id": "161bf0d6-ebc2-48e7-934e-feeb2f6718f5",
+          "x": -31.987081973839597,
+          "z": -35.6
         }
       ],
       "floors": [
@@ -393,7 +408,7 @@
         {
           "id": "wall_a5ba354f",
           "startNodeId": "bca8b9c9-7800-47ee-87f1-1c1a7c7fcdef",
-          "endNodeId": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
+          "endNodeId": "b6a32e81-359d-4a79-be46-e0cf6aecc7f5",
           "floor": 3,
           "elevation": 9,
           "height": 3,
@@ -513,7 +528,7 @@
         {
           "id": "wall_cae8cc13",
           "startNodeId": "87a30c81-2759-4177-ad5a-6d71f0797f12",
-          "endNodeId": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
+          "endNodeId": "161bf0d6-ebc2-48e7-934e-feeb2f6718f5",
           "floor": 5,
           "elevation": 15,
           "height": 3,
@@ -526,6 +541,42 @@
           "id": "wall_029d6a59",
           "startNodeId": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
           "endNodeId": "64e3d204-d5be-4060-b912-3d83a8ce3788",
+          "floor": 5,
+          "elevation": 15,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_2ba1ee91",
+          "startNodeId": "81a4a234-1a90-409c-88f6-2cac8e24c602",
+          "endNodeId": "7fbbeb7d-1dd9-4d1f-b4bf-c12427af1576",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_745c61aa",
+          "startNodeId": "b6a32e81-359d-4a79-be46-e0cf6aecc7f5",
+          "endNodeId": "81a4a234-1a90-409c-88f6-2cac8e24c602",
+          "floor": 3,
+          "elevation": 9,
+          "height": 3,
+          "thickness": 0.2,
+          "material": "brick_01",
+          "exteriorMaterial": "brick_01",
+          "openings": []
+        },
+        {
+          "id": "wall_c2200bd1",
+          "startNodeId": "161bf0d6-ebc2-48e7-934e-feeb2f6718f5",
+          "endNodeId": "bd488eb8-9687-4aaf-bfe2-f9609162c968",
           "floor": 5,
           "elevation": 15,
           "height": 3,
@@ -631,19 +682,20 @@
       "objects": [],
       "lights": [
         {
-          "id": "light_649b9060",
+          "id": "light_c109a436",
           "position": {
-            "x": -30.7158285533392,
-            "y": 13.589786425400586,
-            "z": -24.984876515051536
+            "x": -31.20285286453154,
+            "y": 17.847515636393535,
+            "z": -25.801175875779254
           },
-          "kind": "directional",
+          "kind": "spot",
           "color": "#ffffff",
-          "intensity": 1.5,
-          "pitchDeg": 50,
-          "yawDeg": 0,
-          "castShadow": true,
-          "staticShadow": true
+          "intensity": 60,
+          "range": 40,
+          "angleDeg": 80,
+          "pitchDeg": 87.56,
+          "yawDeg": 153.61,
+          "castShadow": false
         }
       ]
     }
