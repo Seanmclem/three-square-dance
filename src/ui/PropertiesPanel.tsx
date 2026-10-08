@@ -7018,9 +7018,8 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
   const commitPos  = (axis: "x" | "y" | "z", val: string) => { const n = parseFloat(val); if (Number.isFinite(n)) update({ position: { ...light.position, [axis]: n } }); };
   const commitNum  = (key: keyof LightDef, val: string, min = -Infinity) => { const n = parseFloat(val); if (Number.isFinite(n)) update({ [key]: Math.max(min, n) }); };
 
-  const numField = (label: string, stateKey: keyof typeof numStr, defKey: keyof LightDef, step: number, min = 0, suffix?: string) => (
-    <div>
-      <div style={LABEL}>{label}</div>
+  const numField = (label: string, stateKey: keyof typeof numStr, defKey: keyof LightDef, step: number, min = 0, suffix?: string, info?: string) => {
+    const row = (
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input type="number" step={step} value={numStr[stateKey]} style={{ ...NUM_INPUT, width: 90 }}
           onChange={e => { const v = e.target.value; setNumStr(p => ({ ...p, [stateKey]: v })); schedule(() => commitNum(defKey, v, min)); }}
@@ -7029,8 +7028,10 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
         />
         {suffix && <span style={{ color: "#98a2b8", fontSize: 10, fontFamily: "monospace" }}>{suffix}</span>}
       </div>
-    </div>
-  );
+    );
+    if (info) return <InfoBlurb heading={label} text={info}>{row}</InfoBlurb>;
+    return <div><div style={LABEL}>{label}</div>{row}</div>;
+  };
 
   const isPoint = light.kind === "point";
 
@@ -7055,7 +7056,7 @@ function LightView({ selected, onDelete, onObjectUpdate }: {
 
       {numField("INTENSITY", "intensity", "intensity", isPoint || light.kind === "spot" ? 5 : 0.25)}
       {light.kind !== "directional" && numField("RANGE (M)", "range", "range", 1, 0, "0 = unlimited")}
-      {light.kind === "spot" && numField("CONE ANGLE (°)", "angle", "angleDeg", 5, 1)}
+      {light.kind === "spot" && numField("CONE ANGLE (°)", "angle", "angleDeg", 5, 1, undefined, CONE_ANGLE_HELP)}
       {light.kind !== "point" && (
         <div style={{ display: "flex", gap: 10 }}>
           {numField("AIM PITCH (°)", "pitch", "pitchDeg", 5, -90)}
@@ -7354,6 +7355,12 @@ function Section({ title, summary, open, onToggle, children }: {
   );
 }
 
+// Measured from the beam's center to its edge (three's SpotLight.angle, max 90°).
+const CONE_ANGLE_HELP = "Measured from the center of the beam to its edge:\n"
+  + "• 30 (the default) is a 60° beam, a flashlight.\n"
+  + "• 60 is a 120° spread, a lamp shade.\n"
+  + "• 85 to 90 is close to a full half-sphere: everything in front of the wall gets light, nothing behind it.";
+
 /** Phase 69 — caption row with a ⓘ toggle; the explainer only renders when
  *  pressed, at a readable size. `children` render under the caption always. */
 function InfoBlurb({ heading, text, children }: { heading: string; text: string; children?: React.ReactNode }) {
@@ -7370,7 +7377,7 @@ function InfoBlurb({ heading, text, children }: { heading: string; text: string;
       </div>
       {children}
       {open && (
-        <div style={{ marginTop: 5, color: "#b9c2d6", fontSize: 11, lineHeight: 1.55, padding: "7px 9px",
+        <div style={{ marginTop: 5, color: "#b9c2d6", fontSize: 11, lineHeight: 1.55, padding: "7px 9px", whiteSpace: "pre-line",
                       background: "rgba(255,255,255,0.03)", borderLeft: "2px solid rgba(80,140,255,0.5)", borderRadius: 4 }}>
           {text}
         </div>
