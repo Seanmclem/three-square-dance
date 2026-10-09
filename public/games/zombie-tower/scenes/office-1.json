@@ -8,13 +8,13 @@
     "uvVersion": 1,
     "editorCamera": {
       "focus": {
-        "x": -29.484886359781672,
-        "y": 4.556637620761953,
-        "z": -8.578017374747944
+        "x": -22.10825832784383,
+        "y": 4.788319187842669,
+        "z": -56.57177847944188
       },
-      "radius": 23.323961616942803,
-      "phi": 1.1007963267949004,
-      "theta": 28.322610000048584
+      "radius": 27.94574533459003,
+      "phi": 1.455796326794897,
+      "theta": 24.766239999876973
     }
   },
   "world": {
@@ -24,11 +24,11 @@
     },
     "ambientLight": {
       "color": "#aabbcc",
-      "intensity": 0.5
+      "intensity": 0
     },
     "sunLight": {
       "color": "#fff4e0",
-      "intensity": 2,
+      "intensity": 0,
       "position": {
         "x": 30,
         "y": 50,
@@ -761,6 +761,81 @@
             "instanceId": "pfi_e36ff3fa",
             "memberKey": "light_db8f1528"
           },
+          "staticShadow": true,
+          "bounce": 1
+        },
+        {
+          "id": "light_8864f416",
+          "position": {
+            "x": -30.791181720619402,
+            "y": 15.156087797547213,
+            "z": -26.179927177673
+          },
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 25,
+          "range": 8,
+          "castShadow": true,
+          "staticShadow": true,
+          "bounce": 1
+        },
+        {
+          "id": "light_0adeb658",
+          "position": {
+            "x": -30.67026493252064,
+            "y": 17.344967132971902,
+            "z": -34.29939469775539
+          },
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 25,
+          "range": 8,
+          "castShadow": true,
+          "staticShadow": true,
+          "bounce": 1
+        },
+        {
+          "id": "light_b50f96cf",
+          "position": {
+            "x": -30.59654201250638,
+            "y": 13.452443792774806,
+            "z": -34.003303983680006
+          },
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 25,
+          "range": 8,
+          "castShadow": true,
+          "staticShadow": true,
+          "bounce": 1
+        },
+        {
+          "id": "light_71ec1352",
+          "position": {
+            "x": -30.950438961547064,
+            "y": 7.383333708235965,
+            "z": -34.050454544328176
+          },
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 25,
+          "range": 8,
+          "castShadow": true,
+          "staticShadow": true,
+          "bounce": 1
+        },
+        {
+          "id": "light_1ef29265",
+          "position": {
+            "x": -29.950438961547064,
+            "y": 7.428662940911743,
+            "z": -33.050454544328176
+          },
+          "kind": "point",
+          "color": "#ffd9a0",
+          "intensity": 25,
+          "range": 8,
+          "castShadow": true,
           "staticShadow": true,
           "bounce": 1
         }
