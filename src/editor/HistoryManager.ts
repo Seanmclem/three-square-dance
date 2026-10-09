@@ -1,10 +1,11 @@
 import type { WorldState } from "@/world/WorldState";
 
-/** Entity kinds tracked by the change journal. "spawn" is the world-level default spawn. */
+/** Entity kinds tracked by the change journal. "spawn" is the world-level default spawn;
+ *  "worldLighting" the scene's ambient / sun / environment / quality (one record, no id). */
 export type ChangeKind =
   | "floor" | "wall" | "node" | "platform" | "stair" | "ladder" | "shape"
   | "object" | "triggerVolume" | "checkpoint" | "decal" | "group" | "spawn" | "transition" | "light"
-  | "prefabInstance";
+  | "prefabInstance" | "worldLighting";
 
 /**
  * One entity's before/after for a single transaction. `null` = entity absent

@@ -564,7 +564,7 @@ export class WorldState {
     this._bus.emit("light:removed", { zoneId, id });
   }
 
-  /** World-level ambient/sun/environment edit. Not journaled (matches playerSettings edits). */
+  /** World-level ambient/sun/environment edit. Journaled ("worldLighting") inside a transaction. */
   updateWorldLighting(changes: { ambient?: Partial<WorldConfig["ambientLight"]>; sun?: Partial<WorldConfig["sunLight"]>; envIntensity?: number; quality?: "fancy" | "fast" }): void {
     if (!this.world) {
       // Fresh session with no loaded/saved world yet — seed the default config
@@ -577,11 +577,17 @@ export class WorldState {
         playerSettings: { ...DEFAULT_PLAYER_SETTINGS },
       };
     }
+    this._touch("worldLighting", undefined, undefined);
     if (changes.ambient || changes.sun || changes.envIntensity !== undefined) this.world.lightingFromGame = undefined;   // Phase 68 — editing takes ownership
     if (changes.ambient) this.world.ambientLight = { ...this.world.ambientLight, ...changes.ambient };
     if (changes.sun)     this.world.sunLight     = { ...this.world.sunLight,     ...changes.sun };
     if (changes.envIntensity !== undefined) this.world.envIntensity = changes.envIntensity;
     if (changes.quality !== undefined) this.world.lightingQuality = changes.quality;
+    this._emitWorldLighting();
+  }
+
+  private _emitWorldLighting(): void {
+    if (!this.world) return;
     this._bus.emit("world:lighting", {
       ambient: { color: this.world.ambientLight.color, intensity: this.world.ambientLight.intensity },
       sun:     { color: this.world.sunLight.color,     intensity: this.world.sunLight.intensity },
@@ -903,6 +909,9 @@ export class WorldState {
       case "spawn":
         if (target) this._bus.emit("spawn:updated", { position: (target as SpawnDef).position });
         break;
+      case "worldLighting":
+        this._emitWorldLighting();
+        break;
       case "transition":
         if (state !== "removed") this._bus.emit("transition:added", { transition: target as TransitionDef });
         break;
@@ -926,6 +935,11 @@ export class WorldState {
   private _findEntity(kind: ChangeKind, zoneId: string | undefined, id: string | undefined): unknown | undefined {
     if (kind === "group")      return this.groups.find(g => g.id === id);
     if (kind === "spawn")      return this.world?.defaultSpawn;
+    if (kind === "worldLighting") {
+      const w = this.world;
+      return w && { ambientLight: w.ambientLight, sunLight: w.sunLight, envIntensity: w.envIntensity,
+                    lightingQuality: w.lightingQuality, lightingFromGame: w.lightingFromGame };
+    }
     if (kind === "transition") return this.transitions.get(id!);
     return this._zoneArr(kind, zoneId)?.find(e => (e as { id: string }).id === id);
   }
@@ -938,6 +952,10 @@ export class WorldState {
     }
     if (kind === "spawn") {
       if (this.world && value) this.world.defaultSpawn = value as SpawnDef;
+      return;
+    }
+    if (kind === "worldLighting") {
+      if (this.world && value) Object.assign(this.world, value as Partial<WorldConfig>);
       return;
     }
     if (kind === "transition") {

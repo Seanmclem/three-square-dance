@@ -8413,33 +8413,23 @@ function WorldLightSection({ lighting, onChange }: {
 
   const commitEnv = (val: string) => { const n = parseFloat(val); if (Number.isFinite(n) && n >= 0) onChange({ envIntensity: n }); };
 
-  // Not undoable, so the first click arms it and the second resets (the button says so).
-  const [confirmReset, setConfirmReset] = useState(false);
   const d = DEFAULT_WORLD_LIGHT;
   const isDefault = lighting.ambient.color.toLowerCase() === d.ambient.color && lighting.ambient.intensity === d.ambient.intensity
     && lighting.sun.color.toLowerCase() === d.sun.color && lighting.sun.intensity === d.sun.intensity && envVal === d.envIntensity;
-  useEffect(() => { if (isDefault) setConfirmReset(false); }, [isDefault]);
 
   return (
     <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ ...LABEL, marginBottom: 0, flex: 1 }}>WORLD LIGHT</div>
         <button disabled={isDefault}
-          onClick={() => {
-            if (!confirmReset) { setConfirmReset(true); return; }
-            setConfirmReset(false);
-            onChange({ ambient: { ...d.ambient }, sun: { ...d.sun }, envIntensity: d.envIntensity });
-          }}
-          onBlur={() => setConfirmReset(false)}
+          onClick={() => onChange({ ambient: { ...d.ambient }, sun: { ...d.sun }, envIntensity: d.envIntensity })}
           title={isDefault
             ? "Already the default world light"
-            : `Set AMBIENT ${d.ambient.color} ${d.ambient.intensity}, SUN ${d.sun.color} ${d.sun.intensity}, ENVIRONMENT ${d.envIntensity} (the values a new scene starts with). Can't be undone`}
+            : `Set AMBIENT ${d.ambient.color} ${d.ambient.intensity}, SUN ${d.sun.color} ${d.sun.intensity}, ENVIRONMENT ${d.envIntensity} (the values a new scene starts with). Cmd+Z undoes it`}
           style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontFamily: "monospace", whiteSpace: "nowrap",
-            border: `1px solid ${confirmReset ? "rgba(232,193,75,0.5)" : "rgba(255,255,255,0.12)"}`,
-            background: confirmReset ? "rgba(232,193,75,0.12)" : "rgba(255,255,255,0.05)",
-            color: isDefault ? "#6f7a90" : confirmReset ? "#e8c14b" : "#c2cadb",
-            cursor: isDefault ? "default" : "pointer" }}>
-          {confirmReset ? "Click again to reset" : "Reset to defaults"}
+            border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.05)",
+            color: isDefault ? "#6f7a90" : "#c2cadb", cursor: isDefault ? "default" : "pointer" }}>
+          Reset to defaults
         </button>
       </div>
       {row("ambient", "AMBIENT")}

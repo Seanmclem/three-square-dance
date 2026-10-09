@@ -2003,15 +2003,25 @@ export default function App() {
       position: l.position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 },
       data: l,
     });
+    // Glide to it (targets only, like handleInstanceGoTo), pulling in to 8 m so a light
+    // inside a room isn't framed from outside its walls.
+    const cam = sceneRef.current?.editorCamera;
+    if (cam) {
+      cam.targetFocus.set(l.position.x, l.position.y, l.position.z);
+      cam.targetSpherical.radius = Math.min(cam.targetSpherical.radius, 8);
+    }
   }, []);
 
   const handleWorldLightingChange = useCallback((changes: { ambient?: Partial<{ color: string; intensity: number }>; sun?: Partial<{ color: string; intensity: number }>; envIntensity?: number; quality?: "fancy" | "fast" }): void => {
     const world = worldRef.current;
     if (!world) return;
     // Emits world:lighting → SceneManager applies it and the bus listener syncs panel state.
-    world.updateWorldLighting(changes);
+    // One undo step per edit; repeats of the same field (a color drag, typed digits) merge.
+    const fields = Object.entries(changes).flatMap(([k, v]) => v && typeof v === "object" ? Object.keys(v).map(f => `${k}.${f}`) : [k]);
+    world.transaction("edit world light", () => world.updateWorldLighting(changes), `world-light:${fields.join(",")}`);
     setIsDirty(true);
-  }, []);
+    syncHistory();
+  }, [syncHistory]);
 
   const handleWorldAudioChange = useCallback((changes: Partial<WorldAudio>): void => {
     const world = worldRef.current;
