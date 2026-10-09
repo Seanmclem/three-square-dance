@@ -5735,13 +5735,14 @@ function newDoorOpening(existing: Opening[]): Opening {
 
 /** The wall's openings with one edited; a type change resets height / elevation to that type's defaults. */
 function openingsWithChange(wall: WallDef, openingId: string, changes: Partial<Opening>): Opening[] {
+  const openings = wall.openings ?? [];
   let extra: Partial<Opening> = {};
-  if (changes.type && changes.type !== wall.openings.find(o => o.id === openingId)?.type) {
+  if (changes.type && changes.type !== openings.find(o => o.id === openingId)?.type) {
     extra = (changes.type === "window" || changes.type === "passage")
       ? { height: 1.0, elevation: 1.0 }
       : { height: 2.1, elevation: 0 };
   }
-  return wall.openings.map(o => o.id === openingId ? { ...o, ...changes, ...extra } : o);
+  return openings.map(o => o.id === openingId ? { ...o, ...changes, ...extra } : o);
 }
 
 // ── OpeningsScreen ────────────────────────────────────────────────────────────
@@ -5752,6 +5753,9 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
   zones:           ZoneDef[];
   activeZoneId:    string | null;
 }) {
+  // The page stack resets in an effect after a selection change, so this page renders
+  // once with the new selection (e.g. a clicked window) before closing: walls only.
+  if (selected.type !== "wall") return null;
   const wallData = selected.data as WallDef | null;
   const allWalls = selected.runWalls ?? (wallData ? [wallData] : []);
   const allOpenings: Array<{ wallId: string; opening: Opening }> = allWalls.flatMap(w =>
@@ -5822,6 +5826,7 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
   zones:           ZoneDef[];
   activeZoneId:    string | null;
 }) {
+  if (selected.type !== "wall") return null;   // see OpeningsScreen
   const wallData = selected.data as WallDef | null;
   const runWalls = selected.runWalls ?? (wallData ? [wallData] : []);
 
@@ -6427,6 +6432,7 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
   });
   const [tileStr, setTileStr] = useState(String(wall.materialOverrides?.tileScale ?? ""));
   const hoveringRef = useRef(false);
+  const openings = wall.openings ?? [];
 
   useEffect(() => {
     setTileStr(String(wall.materialOverrides?.tileScale ?? ""));
@@ -6484,12 +6490,12 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
       </div>
 
       {/* This segment's own openings (the Openings page lists the whole run's). */}
-      <div style={{ display: "flex", alignItems: "center", marginTop: 6, marginBottom: wall.openings.length ? 4 : 0 }}>
+      <div style={{ display: "flex", alignItems: "center", marginTop: 6, marginBottom: openings.length ? 4 : 0 }}>
         <div style={{ ...LABEL, marginBottom: 0, flex: 1 }}>
-          OPENINGS{wall.openings.length ? ` (${wall.openings.length})` : ""}
+          OPENINGS{openings.length ? ` (${openings.length})` : ""}
         </div>
         <button
-          onClick={() => onUpdate({ openings: [...wall.openings, newDoorOpening(wall.openings)] })}
+          onClick={() => onUpdate({ openings: [...openings, newDoorOpening(openings)] })}
           title="Add a door to this segment (change it to a window or passage below)"
           style={{
             background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
@@ -6498,14 +6504,14 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
           }}
         >+ Add opening</button>
       </div>
-      {wall.openings.map(op => (
+      {openings.map(op => (
         <OpeningRow
           key={op.id}
           opening={op}
           zones={zones}
           activeZoneId={activeZoneId}
           onUpdate={changes => onUpdate({ openings: openingsWithChange(wall, op.id, changes) })}
-          onDelete={() => onUpdate({ openings: wall.openings.filter(o => o.id !== op.id) })}
+          onDelete={() => onUpdate({ openings: openings.filter(o => o.id !== op.id) })}
         />
       ))}
     </div>
