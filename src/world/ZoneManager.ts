@@ -147,6 +147,33 @@ function resolvePlatformNodes(platform: PlatformDef, zone: ZoneDef): PlatformDef
   };
 }
 
+/** Shadow setup shared by a placed light and its bounce fill (which must be
+ *  blocked by the same floors and walls, or it shines through them). */
+function configureShadow(light: THREE.PointLight | THREE.SpotLight | THREE.DirectionalLight, def: LightDef): void {
+  light.castShadow = def.castShadow;
+  if (def.castShadow) {
+    light.shadow.mapSize.set(512, 512);   // modest — these can multiply (perf, TESTING.md §7)
+    // Point / spot: no depth bias. Their range is short (far = range), so even
+    // -0.001 detached the shadow enough to leak a bright line along every
+    // crease above the light (a landing meeting its wall); PCF soft keeps
+    // acne off without it.
+    light.shadow.bias = light instanceof THREE.DirectionalLight ? -0.001 : 0;
+    if (light instanceof THREE.DirectionalLight) {
+      const sc = light.shadow.camera;
+      sc.near = 0.5; sc.far = 100;
+      sc.left = -20; sc.right = 20; sc.top = 20; sc.bottom = -20;
+    } else {
+      light.shadow.camera.far = def.range || 50;
+    }
+    if (def.staticShadow) {
+      // Render the map once, then freeze — _refreshStaticShadows re-pokes it
+      // when zone geometry rebuilds. Movers won't update a frozen shadow.
+      light.shadow.autoUpdate = false;
+      light.shadow.needsUpdate = true;
+    }
+  }
+}
+
 export class ZoneManager {
   private readonly _loadedZones = new Map<string, ZoneEntry>();
   private readonly _unsubs: Array<() => void> = [];
@@ -2145,28 +2172,7 @@ export class ZoneManager {
     // Tagged (selectable:false) so gizmo translate drags move the light live with
     // the marker; the commit's light:updated rebuild lands on the same transform.
     light.userData = { editorId: def.id, editorType: "light", zoneId, selectable: false };
-    light.castShadow = def.castShadow;
-    if (def.castShadow) {
-      light.shadow.mapSize.set(512, 512);   // modest — these can multiply (perf, TESTING.md §7)
-      // Point / spot: no depth bias. Their range is short (far = range), so even
-      // -0.001 detached the shadow enough to leak a bright line along every
-      // crease above the light (a landing meeting its wall); PCF soft keeps
-      // acne off without it.
-      light.shadow.bias = light instanceof THREE.DirectionalLight ? -0.001 : 0;
-      if (light instanceof THREE.DirectionalLight) {
-        const sc = light.shadow.camera;
-        sc.near = 0.5; sc.far = 100;
-        sc.left = -20; sc.right = 20; sc.top = 20; sc.bottom = -20;
-      } else {
-        light.shadow.camera.far = def.range || 50;
-      }
-      if (def.staticShadow) {
-        // Render the map once, then freeze — _refreshStaticShadows re-pokes it
-        // when zone geometry rebuilds. Movers won't update a frozen shadow.
-        light.shadow.autoUpdate = false;
-        light.shadow.needsUpdate = true;
-      }
-    }
+    configureShadow(light, def);
     entry.lightsGroup.add(light);
 
     if (light instanceof THREE.SpotLight || light instanceof THREE.DirectionalLight) {
@@ -2182,6 +2188,7 @@ export class ZoneManager {
     if (def.kind !== "directional" && (def.bounce ?? 0) > 0) {
       bounce = new THREE.PointLight(def.color, 0, def.range ?? 0);
       bounce.userData = { editorId: def.id, editorType: "light", zoneId, selectable: false };
+      configureShadow(bounce, def);   // same blockers as its light, same Static freeze
       entry.lightsGroup.add(bounce);
     }
     const le: LightEntry = {
@@ -2191,6 +2198,14 @@ export class ZoneManager {
     entry.lightEntries.set(def.id, le);
     this._placeBounce(entry, le);
     this._syncBounce(le);
+  }
+
+  /** Fill light's shadow follows the main light's: paused while off, frozen
+   *  when Static, re-rendered whenever the main map is poked. */
+  private _syncBounceShadow(le: LightEntry): void {
+    if (!le.bounce?.castShadow) return;
+    le.bounce.shadow.autoUpdate = le.light.shadow.autoUpdate;
+    if (le.light.shadow.needsUpdate) le.bounce.shadow.needsUpdate = true;
   }
 
   /** Fill light's intensity follows the main light (flicker, script on/off). */
@@ -2289,6 +2304,7 @@ export class ZoneManager {
         // _refreshStaticShadows), so a fast flicker costs zero shadow renders.
         le.light.shadow.autoUpdate = turnOn && !def.staticShadow;
         if (turnOn && !def.staticShadow) le.light.shadow.needsUpdate = true;
+        this._syncBounceShadow(le);
       }
     }
   }
@@ -2306,6 +2322,7 @@ export class ZoneManager {
         if (le.light.castShadow) {
           le.light.shadow.autoUpdate = !def.staticShadow;
           le.light.shadow.needsUpdate = true;
+          this._syncBounceShadow(le);
         }
       }
     }
@@ -2355,6 +2372,7 @@ export class ZoneManager {
       if (le.light.castShadow && !le.light.shadow.autoUpdate)
         le.light.shadow.needsUpdate = true;
       this._placeBounce(entry, le);   // the surfaces around it may have moved
+      this._syncBounceShadow(le);
     }
   }
 

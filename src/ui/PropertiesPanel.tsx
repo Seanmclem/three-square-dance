@@ -7005,7 +7005,7 @@ const LIGHT_KIND_HELP: Record<string, string> = {
 };
 
 const BOUNCE_HELP = `Real rooms bounce light back off the floor and walls. The engine doesn't, so a wall or ceiling right next to a light stays dark: the light only skims across it.
-Bounce adds a second, shadowless light about 1 m out from the walls or ceiling this light sits against, at this fraction of its brightness. It follows the light's flicker and on/off.
+Bounce adds a second light about 1 m out from the walls or ceiling this light sits against, at this fraction of its brightness. It follows the light's flicker, on/off and shadow settings.
 - 0 = off
 - 0.2 to 0.3 = a believable fill for a ceiling or wall fixture
 - 1 = as bright as the light itself (the most it goes)`;

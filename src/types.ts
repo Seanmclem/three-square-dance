@@ -741,7 +741,7 @@ export interface LightDef {
   // ZoneManager re-renders it when zone geometry rebuilds.
   staticShadow?: boolean;
   flicker?:      LightFlickerDef;
-  // Fake bounce light (point / spot): a shadowless fill light at this fraction of
+  // Fake bounce light (point / spot): a fill light (shadowed like its light) at this fraction of
   // the intensity, set ~1 m out from the walls / ceiling the light sits against,
   // so the surface around a flush fixture isn't left at ambient. 0 / absent = off.
   bounce?:       number;
