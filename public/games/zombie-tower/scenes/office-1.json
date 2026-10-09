@@ -24,7 +24,7 @@
     },
     "ambientLight": {
       "color": "#aabbcc",
-      "intensity": 0
+      "intensity": 0.05
     },
     "sunLight": {
       "color": "#fff4e0",
@@ -754,7 +754,7 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "prefab": {
             "prefabId": "pfb_eb414b98",
@@ -762,7 +762,7 @@
             "memberKey": "light_db8f1528"
           },
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0.25
         },
         {
           "id": "light_8864f416",
@@ -774,10 +774,10 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0
         },
         {
           "id": "light_0adeb658",
@@ -789,10 +789,10 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0.25
         },
         {
           "id": "light_b50f96cf",
@@ -804,10 +804,10 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0
         },
         {
           "id": "light_71ec1352",
@@ -819,10 +819,10 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0
         },
         {
           "id": "light_1ef29265",
@@ -834,10 +834,10 @@
           "kind": "point",
           "color": "#ffd9a0",
           "intensity": 25,
-          "range": 8,
+          "range": 4.5,
           "castShadow": true,
           "staticShadow": true,
-          "bounce": 1
+          "bounce": 0
         }
       ],
       "prefabInstances": [
