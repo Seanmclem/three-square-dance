@@ -41,6 +41,7 @@ export class SelectionManager implements IEditorModule {
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
   private readonly _paused = new Set<string>();   // Phase 85: selection:pause sources
+  private readonly _tintable = new WeakMap<THREE.Object3D, Set<THREE.MeshStandardMaterial>>();   // see _ownMaterial
   private _previewing = false;   // Play: no hover / selection tints (the selection itself is kept)
   private _activeFloorLevel   = 0;
   // Sub-object selection on the selected shape (Phase 23 face/vertex/edge modes).
@@ -85,6 +86,12 @@ export class SelectionManager implements IEditorModule {
         }
       }),
       this._bus.on("floor:select",    ({ level })     => { this._activeFloorLevel = level; }),
+      // ZoneManager swapped materials (floor dimming / ceiling ghosts): put the tints back on.
+      this._bus.on("materials:swapped", () => {
+        if (this._selected) this._applyTint(this._selected, SELECT_EMISSIVE, SELECT_INTENSITY);
+        this._retintExtras();
+        if (this._hovered && !this._isSelected(this._hovered)) this._applyTint(this._hovered, HOVER_EMISSIVE, HOVER_INTENSITY);
+      }),
       // Tints are editor-only: strip them for Play, put the selection's back after.
       this._bus.on("preview:start", () => {
         if (this._hovered && !this._isSelected(this._hovered)) this._restore(this._hovered);
@@ -765,33 +772,55 @@ export class SelectionManager implements IEditorModule {
     });
   }
 
+  /** Untint every material this manager ever tinted on the root's meshes, not just the
+   *  current one: floor dimming / ceiling ghosts swap a mesh's material out and back, so a
+   *  tint left on the swapped-out original would come back when it does (v4.129.9). */
   private _restore(root: THREE.Object3D): void {
     root.traverse(child => {
-      if (!(child instanceof THREE.Mesh) || !child.userData._ownsMaterial) return;
-      const mat = child.material;
-      if (Array.isArray(mat) || !(mat instanceof THREE.MeshStandardMaterial)) return;
-      mat.emissive.setHex(child.userData._origEmissive ?? 0x000000);
-      mat.emissiveIntensity = child.userData._origEmissiveIntensity ?? 0;
-      if (child.userData._origOpacity !== undefined) mat.opacity = child.userData._origOpacity;
+      if (!(child instanceof THREE.Mesh)) return;
+      const mats = this._tintable.get(child);
+      if (!mats) return;
+      const ud = child.userData;
+      const all = new Set(mats);
+      // The current material too: a dim / ghost copy made from a tinted material is tinted.
+      if (child.material instanceof THREE.MeshStandardMaterial) all.add(child.material);
+      for (const m of all) {
+        m.emissive.setHex(ud._origEmissive ?? 0x000000);
+        m.emissiveIntensity = ud._origEmissiveIntensity ?? 0;
+        if (ud._selectOpacity !== undefined && ud._origOpacity !== undefined) m.opacity = ud._origOpacity;
+      }
     });
   }
 
   /**
-   * Clone the material on first touch so tinting never mutates a shared
-   * material, and capture the pristine emissive once for later restore.
+   * The material to tint on this mesh: one this manager copied for it, or the mesh's own
+   * built material (builder `_ownsMaterial`, recorded at first touch). Anything else (a
+   * shared cache material, or a dim / ghost copy ZoneManager swapped in) is copied first,
+   * so a tint never lands on a material other meshes use. The untinted look is captured
+   * once per mesh, at first touch.
    */
   private _ownMaterial(child: THREE.Object3D): THREE.MeshStandardMaterial | null {
     if (!(child instanceof THREE.Mesh)) return null;
-    let mat = child.material;
+    const mat = child.material;
     if (Array.isArray(mat) || !(mat instanceof THREE.MeshStandardMaterial)) return null;
-    if (!child.userData._ownsMaterial) {
-      mat = mat.clone();
-      child.material = mat;
-      child.userData._ownsMaterial = true;
-      child.userData._origEmissive = mat.emissive.getHex();
-      child.userData._origEmissiveIntensity = mat.emissiveIntensity;
-      if (mat.transparent) child.userData._origOpacity = mat.opacity;
+    const ud = child.userData;
+    let mats = this._tintable.get(child);
+    if (!mats) {
+      mats = new Set();
+      this._tintable.set(child, mats);
+      if (ud._origEmissive === undefined) {
+        ud._origEmissive = mat.emissive.getHex();
+        ud._origEmissiveIntensity = mat.emissiveIntensity;
+      }
+      if (ud._ownsMaterial) mats.add(mat);
     }
-    return mat;
+    if (mats.has(mat)) return mat;
+    const copy = mat.clone();
+    copy.emissive.setHex(ud._origEmissive ?? 0x000000);   // a swap-in copy of a tinted material carries the tint
+    copy.emissiveIntensity = ud._origEmissiveIntensity ?? 0;
+    mats.add(copy);
+    child.material = copy;
+    ud._ownsMaterial = true;   // disposed with the mesh
+    return copy;
   }
 }

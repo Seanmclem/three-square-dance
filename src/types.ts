@@ -303,6 +303,9 @@ export interface BusEvents {
   "node:updated":          { zoneId: string; nodeId: string; pos: { x: number; z: number } };
   // Panel segment-row hover → canvas highlight (null wallId clears it).
   "wall:segment-hover":    { zoneId: string; wallId: string | null };
+  // ZoneManager swapped mesh materials (floor dimming / ceiling ghosts, both put the
+  // originals back later): SelectionManager re-applies its selection / hover tints.
+  "materials:swapped":     Record<string, never>;
   // Panel vertex-row hover → highlight everything sharing the node (null clears).
   // sourceId: the selected entity emitting the hover — the highlighter skips it.
   "node:link-hover":       { zoneId: string; nodeId: string | null; sourceId?: string };

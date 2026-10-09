@@ -1902,7 +1902,8 @@ export class ZoneManager {
     for (const m of this._ghostMaterials) m.dispose();
     this._ghostMaterials.clear();
 
-    if (!this._editorGhosts || this._ghostsSolid) return;
+    // Dimming ends here too, so this one notice covers both swaps.
+    if (!this._editorGhosts || this._ghostsSolid) { this._bus.emit("materials:swapped", {}); return; }
 
     for (const [zoneId, entry] of this._loadedZones) {
       const zone = this._worldState.zones.get(zoneId);
@@ -1928,6 +1929,7 @@ export class ZoneManager {
         }
       }
     }
+    this._bus.emit("materials:swapped", {});
   }
 
   private _pruneDimMaterials(): void {
