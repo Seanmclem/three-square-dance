@@ -1080,7 +1080,7 @@ export function PropertiesPanel({
         ) : currentScreen === "open" ? (
           <OpeningsScreen selected={selected} onSegmentUpdate={onSegmentUpdate} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "seg" ? (
-          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} bus={bus} getNodeLinks={getNodeLinks} />
+          <SegmentsScreen selected={selected} materialList={materialList} onAddMaterial={onImportMaterial} onSegmentUpdate={onSegmentUpdate} bus={bus} getNodeLinks={getNodeLinks} zones={zones} activeZoneId={activeZoneId ?? null} />
         ) : currentScreen === "animations" ? (
           <AnimationsScreen
             selected={selected}
@@ -5716,6 +5716,34 @@ function ShapeMatView({ selected, materialList, onObjectUpdate, onAddMaterial, b
   );
 }
 
+// ── Opening helpers (Openings page + Segments page rows) ─────────────────────
+
+/** A new door placed 0.5 m past the wall's rightmost opening (or 0.5 m in). */
+function newDoorOpening(existing: Opening[]): Opening {
+  const rightmost = existing.reduce((max, o) => Math.max(max, o.offsetAlongWall + o.width), 0);
+  return {
+    id: crypto.randomUUID(),
+    type: "door",
+    offsetAlongWall: existing.length === 0 ? 0.5 : rightmost + 0.5,
+    width: 1.0,
+    height: 2.1,
+    elevation: 0,
+    linkedZoneId: null,
+    linkedTransitionId: null,
+  };
+}
+
+/** The wall's openings with one edited; a type change resets height / elevation to that type's defaults. */
+function openingsWithChange(wall: WallDef, openingId: string, changes: Partial<Opening>): Opening[] {
+  let extra: Partial<Opening> = {};
+  if (changes.type && changes.type !== wall.openings.find(o => o.id === openingId)?.type) {
+    extra = (changes.type === "window" || changes.type === "passage")
+      ? { height: 1.0, elevation: 1.0 }
+      : { height: 2.1, elevation: 0 };
+  }
+  return wall.openings.map(o => o.id === openingId ? { ...o, ...changes, ...extra } : o);
+}
+
 // ── OpeningsScreen ────────────────────────────────────────────────────────────
 
 function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
@@ -5733,31 +5761,13 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
   const addOpening = () => {
     if (!wallData) return;
     const primaryOpenings = wallData.openings ?? [];
-    const rightmost = primaryOpenings.reduce((max, o) => Math.max(max, o.offsetAlongWall + o.width), 0);
-    const smartOffset = primaryOpenings.length === 0 ? 0.5 : rightmost + 0.5;
-    const newOpening: Opening = {
-      id: crypto.randomUUID(),
-      type: "door",
-      offsetAlongWall: smartOffset,
-      width: 1.0,
-      height: 2.1,
-      elevation: 0,
-      linkedZoneId: null,
-      linkedTransitionId: null,
-    };
-    onSegmentUpdate(wallData.id, { openings: [...primaryOpenings, newOpening] });
+    onSegmentUpdate(wallData.id, { openings: [...primaryOpenings, newDoorOpening(primaryOpenings)] });
   };
 
   const updateOpening = (wallId: string, openingId: string, changes: Partial<Opening>) => {
     const targetWall = allWalls.find(w => w.id === wallId);
     if (!targetWall) return;
-    let extra: Partial<Opening> = {};
-    if (changes.type && changes.type !== targetWall.openings.find(o => o.id === openingId)?.type) {
-      extra = (changes.type === "window" || changes.type === "passage")
-        ? { height: 1.0, elevation: 1.0 }
-        : { height: 2.1, elevation: 0 };
-    }
-    onSegmentUpdate(wallId, { openings: targetWall.openings.map(o => o.id === openingId ? { ...o, ...changes, ...extra } : o) });
+    onSegmentUpdate(wallId, { openings: openingsWithChange(targetWall, openingId, changes) });
   };
 
   const deleteOpening = (wallId: string, openingId: string) => {
@@ -5802,13 +5812,15 @@ function OpeningsScreen({ selected, onSegmentUpdate, zones, activeZoneId }: {
 
 // ── SegmentsScreen ────────────────────────────────────────────────────────────
 
-function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate, bus, getNodeLinks }: {
+function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate, bus, getNodeLinks, zones, activeZoneId }: {
   selected:        SelectedObjectPayload;
   materialList:    MaterialDef[];
   onAddMaterial:   () => void;
   onSegmentUpdate: (wallId: string, changes: Partial<WallDef>) => void;
   bus?:            EventBus;
   getNodeLinks?:   (zoneId: string, nodeId: string) => NodeLinks;
+  zones:           ZoneDef[];
+  activeZoneId:    string | null;
 }) {
   const wallData = selected.data as WallDef | null;
   const runWalls = selected.runWalls ?? (wallData ? [wallData] : []);
@@ -5826,6 +5838,8 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
           onUpdate={changes => onSegmentUpdate(wall.id, changes)}
           bus={bus}
           getNodeLinks={getNodeLinks}
+          zones={zones}
+          activeZoneId={activeZoneId}
         />
       ))}
       <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 6 }}>
@@ -6393,7 +6407,7 @@ function OpeningRow({ opening, onUpdate, onDelete, hideDelete, zones = [], activ
 
 // ── WallSegmentRow ────────────────────────────────────────────────────────────
 
-function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUpdate, bus, getNodeLinks }: {
+function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUpdate, bus, getNodeLinks, zones, activeZoneId }: {
   index:         number;
   wall:          WallDef;
   zoneId:        string;
@@ -6402,6 +6416,8 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
   onUpdate:      (changes: Partial<WallDef>) => void;
   bus?:          EventBus;
   getNodeLinks?: (zoneId: string, nodeId: string) => NodeLinks;
+  zones:         ZoneDef[];
+  activeZoneId:  string | null;
 }) {
   // Linked = a floor/platform shares one of this wall's nodes. Wall–wall sharing is
   // ignored — chained walls always share nodes and would chip every row.
@@ -6466,6 +6482,32 @@ function WallSegmentRow({ index, wall, zoneId, materialList, onAddMaterial, onUp
           onBlur={e => flush(() => commitTile(e.target.value))}
         />
       </div>
+
+      {/* This segment's own openings (the Openings page lists the whole run's). */}
+      <div style={{ display: "flex", alignItems: "center", marginTop: 6, marginBottom: wall.openings.length ? 4 : 0 }}>
+        <div style={{ ...LABEL, marginBottom: 0, flex: 1 }}>
+          OPENINGS{wall.openings.length ? ` (${wall.openings.length})` : ""}
+        </div>
+        <button
+          onClick={() => onUpdate({ openings: [...wall.openings, newDoorOpening(wall.openings)] })}
+          title="Add a door to this segment (change it to a window or passage below)"
+          style={{
+            background: "rgba(80,140,255,0.1)", border: "1px solid rgba(80,140,255,0.3)",
+            borderRadius: 4, color: "#80aaff", fontSize: 9, cursor: "pointer",
+            padding: "3px 10px", fontFamily: "monospace",
+          }}
+        >+ Add opening</button>
+      </div>
+      {wall.openings.map(op => (
+        <OpeningRow
+          key={op.id}
+          opening={op}
+          zones={zones}
+          activeZoneId={activeZoneId}
+          onUpdate={changes => onUpdate({ openings: openingsWithChange(wall, op.id, changes) })}
+          onDelete={() => onUpdate({ openings: wall.openings.filter(o => o.id !== op.id) })}
+        />
+      ))}
     </div>
   );
 }
