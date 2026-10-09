@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
 
 import { EventBus } from "@/core/EventBus";
 import { SceneManager } from "@/core/SceneManager";
@@ -132,6 +133,8 @@ import { PublishModal } from "@/ui/PublishModal";
 import { resolveRunNodeIds } from "@/utils/wallRuns";
 
 const DEMO_ZONE_ID = "demo";
+// Solid geometry that can stand between the editor camera and a light it glides to.
+const FRAME_BLOCKERS = new Set(["wall", "floor", "platform", "stair", "shape", "object", "ladder"]);
 
 // ── Autosave storage (phase 55): workspace file via the desktop shell when
 // available (atomic, survives cache clears), localStorage in a plain browser.
@@ -2003,12 +2006,17 @@ export default function App() {
       position: l.position, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 },
       data: l,
     });
-    // Glide to it (targets only, like handleInstanceGoTo), pulling in to 8 m so a light
-    // inside a room isn't framed from outside its walls.
-    const cam = sceneRef.current?.editorCamera;
-    if (cam) {
-      cam.targetFocus.set(l.position.x, l.position.y, l.position.z);
-      cam.targetSpherical.radius = Math.min(cam.targetSpherical.radius, 8);
+    // Glide to it (targets only, like handleInstanceGoTo) from an angle with no wall
+    // between the camera and the light, within 8 m.
+    const sm = sceneRef.current, cam = sm?.editorCamera;
+    if (sm && cam) {
+      const blockers: THREE.Object3D[] = [];
+      sm.scene.traverse(o => {
+        const ud = o.userData;
+        if ((o as THREE.Mesh).isMesh && o.visible && !ud.editorOnly && !ud.ghostPick
+            && FRAME_BLOCKERS.has(ud.editorType)) blockers.push(o);
+      });
+      cam.frameClear(new THREE.Vector3(l.position.x, l.position.y, l.position.z), 8, blockers);
     }
   }, []);
 

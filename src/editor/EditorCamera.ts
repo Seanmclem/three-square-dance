@@ -90,6 +90,42 @@ export class EditorCamera {
     this._applyCamera();
   }
 
+  /**
+   * Glide to `target` from the clearest nearby angle: tries orbit directions around it
+   * (the current one first, kept if it's clear) and picks the one whose line back to the
+   * camera runs farthest before hitting a `blockers` mesh, ties going to the smallest
+   * turn. Radius = that clear distance less 0.3 m, capped at `maxRadius`.
+   */
+  frameClear(target: THREE.Vector3, maxRadius: number, blockers: THREE.Object3D[]): void {
+    const ray = new THREE.Raycaster();
+    ray.far = maxRadius;
+    const dir = new THREE.Vector3();
+    const s = new THREE.Spherical();
+    const free = (theta: number, phi: number): number => {
+      dir.setFromSpherical(s.set(1, phi, theta));
+      ray.set(target, dir);
+      return ray.intersectObjects(blockers, false)[0]?.distance ?? maxRadius;
+    };
+    const cur = this.targetSpherical;
+    const maxPhi = this.allowBelow ? Math.PI - 0.02 : Math.PI / 2 - 0.02;
+    let best = { theta: cur.theta, phi: Math.min(cur.phi, maxPhi), dist: 0, turn: 0 };
+    best.dist = free(best.theta, best.phi);
+    if (best.dist < maxRadius) {
+      for (const phi of [1.2, 1.45, 0.9, 0.6]) {
+        for (let k = 1; k < 12; k++) {
+          const turn = (k <= 6 ? k : k - 12) * (Math.PI / 6);   // ±30° steps, nearest first
+          const dist = free(cur.theta + turn, phi);
+          if (dist > best.dist + 0.25 || (Math.abs(dist - best.dist) <= 0.25 && Math.abs(turn) < Math.abs(best.turn)))
+            best = { theta: cur.theta + turn, phi, dist, turn };
+        }
+      }
+    }
+    this.targetFocus.copy(target);
+    cur.theta  = best.theta;
+    cur.phi    = best.phi;
+    cur.radius = Math.max(1.5, Math.min(maxRadius, best.dist - 0.3));
+  }
+
   private _handleMouseDown(e: MouseEvent): void {
     if (this._gizmoDragging) return;
     if (e.button === 2) { this._isOrbiting = true; this._mouse = { x: e.clientX, y: e.clientY }; }
