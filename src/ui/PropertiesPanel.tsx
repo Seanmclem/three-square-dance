@@ -5829,7 +5829,8 @@ function SegmentsScreen({ selected, materialList, onAddMaterial, onSegmentUpdate
         />
       ))}
       <div style={{ color: "#98a2b8", fontSize: 9, marginTop: 6 }}>
-        Right-click a wall in the canvas to insert a vertex (splits the segment).
+        Right-click a wall in the canvas → Split wall here to insert a vertex; right-click a
+        corner dot → Remove node to merge its two segments.
       </div>
     </div>
   );

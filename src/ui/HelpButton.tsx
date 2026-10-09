@@ -69,7 +69,8 @@ const SECTIONS: ShortcutSection[] = [
       { keys: ["Alt"],               action: "Free drag (no grid snap)" },
       { keys: ["Esc"],               action: "Cancel drag, restore position" },
       // Right-CLICK = pressed and released without dragging (a right-drag is the camera orbit).
-      { keys: ["RMB click wall"],         action: "Split the wall there (insert a vertex)" },
+      { keys: ["RMB click wall"],         action: "Menu: Split wall here (insert a vertex)" },
+      { keys: ["RMB click wall corner"],  action: "Menu: Remove node (merge its two walls)" },
       { keys: ["RMB click brush corner"], action: "Delete that corner" },
       { keys: ["RMB click"],              action: "Menu: move initial spawn here" },
     ],

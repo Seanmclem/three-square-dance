@@ -8,11 +8,11 @@ import type { Vec3 } from "@/types";
  * a small list of things to do AT the clicked point, which InputManager already raycast
  * (`surfacePos` = the real surface hit, else the ground plane).
  *
- * Existing right-click gestures keep priority: WallSplitter (right-click a wall = split it)
- * and BrushVertexEditor (right-click a corner = delete it) mark the event `handled`; every
- * listener runs synchronously inside emit(), so the flag is read a tick later.
- *
- * One entry today: move the initial spawn here. Add entries to `items` as they come.
+ * A listener that uses the click itself marks the event `handled` (BrushVertexEditor:
+ * right-click a corner = delete it), and no menu opens. Listeners can instead add entries
+ * to `menuItems` (WallSplitter: Split wall here; NodeDragger: Remove node), listed above
+ * the menu's own. Every listener runs synchronously inside emit(), so both are read a
+ * tick later.
  */
 export function ViewportContextMenu({ bus, enabled, hasSpawn }: {
   bus: EventBus;
@@ -20,7 +20,8 @@ export function ViewportContextMenu({ bus, enabled, hasSpawn }: {
   enabled: boolean;
   hasSpawn: boolean;
 }) {
-  const [menu, setMenu] = useState<{ x: number; y: number; at: Vec3 } | null>(null);
+  type Item = { label: string; run: () => void; disabled?: string };
+  const [menu, setMenu] = useState<{ x: number; y: number; at: Vec3; extra: Item[] } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
@@ -29,7 +30,7 @@ export function ViewportContextMenu({ bus, enabled, hasSpawn }: {
     if (!enabledRef.current) return;
     setTimeout(() => {
       if (e.handled || !enabledRef.current) return;
-      setMenu({ x: e.screenPos.x, y: e.screenPos.y, at: e.surfacePos ?? e.worldPos });
+      setMenu({ x: e.screenPos.x, y: e.screenPos.y, at: e.surfacePos ?? e.worldPos, extra: e.menuItems ?? [] });
     }, 0);
   }), [bus]);
 
@@ -51,7 +52,8 @@ export function ViewportContextMenu({ bus, enabled, hasSpawn }: {
   }, [menu]);
 
   if (!menu) return null;
-  const items = [
+  const items: Item[] = [
+    ...menu.extra,
     { label: hasSpawn ? "Move initial spawn here" : "Set initial spawn here",
       run: () => bus.emit("spawn:move-to", { position: menu.at }) },
   ];
@@ -69,12 +71,14 @@ export function ViewportContextMenu({ bus, enabled, hasSpawn }: {
         AT {f(menu.at.x)}, {f(menu.at.y)}, {f(menu.at.z)}
       </div>
       {items.map(it => (
-        <button key={it.label} onClick={() => { it.run(); setMenu(null); }}
-          onMouseEnter={e => { e.currentTarget.style.background = "rgba(77,140,255,0.22)"; }}
+        <button key={it.label} disabled={!!it.disabled} title={it.disabled}
+          onClick={() => { it.run(); setMenu(null); }}
+          onMouseEnter={e => { if (!it.disabled) e.currentTarget.style.background = "rgba(77,140,255,0.22)"; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
           style={{ display: "block", width: "100%", height: ITEM_H, textAlign: "left", padding: "0 8px",
-                   background: "transparent", border: "none", borderRadius: 4, cursor: "pointer",
-                   color: "#dde3f0", fontSize: 12, fontFamily: "monospace" }}>
+                   background: "transparent", border: "none", borderRadius: 4,
+                   cursor: it.disabled ? "default" : "pointer",
+                   color: it.disabled ? "#6f7a90" : "#dde3f0", fontSize: 12, fontFamily: "monospace" }}>
           {it.label}
         </button>
       ))}

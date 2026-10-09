@@ -469,7 +469,11 @@ export interface BusEvents {
   // Stationary right-click (RMB press+release under the drag threshold — orbit drags never fire this).
   // `handled` (Phase 76): set by a listener that ACTED on this right-click (wall split, brush-corner
   // delete) so the viewport context menu stays closed. Listeners run synchronously inside emit().
-  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; handled?: boolean };
+  // handled = a listener used the click itself (no menu). menuItems = entries listeners add
+  // to the viewport right-click menu (ViewportContextMenu lists them above its own);
+  // disabled = the reason it can't run (shown greyed, as its tooltip).
+  "input:rightclick":      { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; handled?: boolean;
+                             menuItems?: Array<{ label: string; run: () => void; disabled?: string }> };
   "input:mousemove":       { screenPos: ScreenPos; worldPos: Vec3; surfacePos: Vec3 | null; delta: ScreenPos };
   "input:mousedown":       { button: number; screenPos: ScreenPos; shift: boolean; ctrl: boolean; meta: boolean };
   "input:mouseup":         { button: number; screenPos: ScreenPos };

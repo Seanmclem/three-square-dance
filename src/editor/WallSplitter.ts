@@ -8,10 +8,11 @@ import type { IEditorModule, Opening, ScreenPos, ToolId, WallDef } from "@/types
 const MIN_END_DIST = 0.15;
 
 /**
- * Right-click on a wall (Select tool) inserts a vertex at the clicked point,
- * splitting the wall into two connected segments that share the new node.
- * Camera orbit is unaffected: InputManager only emits `input:rightclick` for a
- * stationary RMB press+release (drags never fire it).
+ * Right-click on a wall (Select tool) offers **Split wall here** in the viewport menu,
+ * which inserts a vertex at the clicked point, splitting the wall into two connected
+ * segments that share the new node. (Before v4.129.6 the right-click split at once,
+ * which was easy to do by accident.) Camera orbit is unaffected: InputManager only
+ * emits `input:rightclick` for a stationary RMB press+release (drags never fire it).
  */
 export class WallSplitter implements IEditorModule {
   private readonly _scene:  THREE.Scene;
@@ -41,7 +42,10 @@ export class WallSplitter implements IEditorModule {
 
   init(): void {
     this._unsub.push(
-      this._bus.on("input:rightclick", (e) => { if (this._onRightClick(e.screenPos)) e.handled = true; }),
+      this._bus.on("input:rightclick", (e) => {
+        const split = this._splitAt(e.screenPos);
+        if (split) (e.menuItems ??= []).push({ label: "Split wall here", run: split });
+      }),
       this._bus.on("tool:select",      ({ tool })      => { this._activeTool = tool; }),
     );
   }
@@ -53,10 +57,10 @@ export class WallSplitter implements IEditorModule {
     this._unsub = [];
   }
 
-  /** True when the click landed on a wall — that right-click is ours (even if the split is
-   *  refused for being too near an end), so the viewport context menu must not open too. */
-  private _onRightClick(screenPos: ScreenPos): boolean {
-    if (!isSelectMode(this._activeTool)) return false;
+  /** The split a right-click at `screenPos` would make, or null (no wall there, or too
+   *  near an end to leave a usable piece). */
+  private _splitAt(screenPos: ScreenPos): (() => void) | null {
+    if (!isSelectMode(this._activeTool)) return null;
 
     const rect = this._dom.getBoundingClientRect();
     this._mouse.x =  ((screenPos.x - rect.left) / rect.width)  * 2 - 1;
@@ -69,11 +73,11 @@ export class WallSplitter implements IEditorModule {
     // Like SelectionManager: hidden-wall ghosts only count when no solid wall is hit.
     const solid = wallHits.filter(h => !h.object.userData.ghostPick);
     const hit   = (solid.length > 0 ? solid : wallHits)[0];
-    if (!hit) return false;
+    if (!hit) return null;
 
     const zoneId = hit.object.userData.zoneId as string;
     const zone   = this._world.zones.get(zoneId);
-    if (!zone) return true;
+    if (!zone) return null;
 
     // A run mesh spans several walls — find the segment nearest the hit point.
     const wallIds = (hit.object.userData.wallIds as string[] | undefined)
@@ -94,13 +98,13 @@ export class WallSplitter implements IEditorModule {
       const d2 = (hit.point.x - px) ** 2 + (hit.point.z - pz) ** 2;
       if (!best || d2 < best.d2) best = { wall: w, t: tc, x: px, z: pz, len: Math.sqrt(len2), d2 };
     }
-    if (!best) return true;
+    if (!best) return null;
 
     const splitDist = best.t * best.len;
-    if (splitDist < MIN_END_DIST || best.len - splitDist < MIN_END_DIST) return true;
+    if (splitDist < MIN_END_DIST || best.len - splitDist < MIN_END_DIST) return null;
 
-    this._split(zoneId, best.wall, { x: best.x, z: best.z }, splitDist);
-    return true;
+    const { wall, x, z } = best;
+    return () => this._split(zoneId, wall, { x, z }, splitDist);
   }
 
   private _split(zoneId: string, wall: WallDef, pt: { x: number; z: number }, splitDist: number): void {

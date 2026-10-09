@@ -5,6 +5,7 @@ import type { EventBus } from "@/core/EventBus";
 import type { WorldState } from "@/world/WorldState";
 import type { ToolId, Vec2 } from "@/types";
 import { isGameplayMode } from "@/types";
+import { mergeWallsAtNode, nodeMergePlan } from "@/editor/wallNodeOps";
 
 const SNAP_RADIUS = 0.5;
 const EDGE_RADIUS = 0.35; // lower than SNAP_RADIUS so nodes take priority
@@ -172,6 +173,23 @@ export class NodeDragger {
       }),
       this._bus.on("input:mouseup", ({ button }) => {
         if (button === 0) this._onMouseUp();
+      }),
+      // Right-click on the lit (hovered) corner dot of a wall: Remove node merges its two
+      // walls into one (greyed with the reason when it can't).
+      this._bus.on("input:rightclick", (e) => {
+        if (!isSelectMode(this._activeTool) || this._state === "DRAG" || !this._hoveredNodeId) return;
+        const zoneId = this._activeZoneId, nodeId = this._hoveredNodeId;
+        if (!this._world.getNodeLinks(zoneId, nodeId).wallIds.length) return;
+        const plan = nodeMergePlan(this._world, zoneId, nodeId);
+        (e.menuItems ??= []).push({
+          label: "Remove node",
+          disabled: "reason" in plan ? plan.reason : undefined,
+          run: () => {
+            const r = mergeWallsAtNode(this._world, zoneId, nodeId);
+            this._clearHover();
+            if ("wallId" in r) this._bus.emit("tool:placed", { type: "wall", id: r.wallId, zoneId });
+          },
+        });
       }),
       this._bus.on("input:keydown", ({ code }) => {
         if (code === "AltLeft"    || code === "AltRight")   this._altDown = true;
