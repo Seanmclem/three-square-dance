@@ -41,6 +41,7 @@ export class SelectionManager implements IEditorModule {
   private _activeTool:        ToolId = "select";
   private _suppressNextClick  = false;
   private readonly _paused = new Set<string>();   // Phase 85: selection:pause sources
+  private _previewing = false;   // Play: no hover / selection tints (the selection itself is kept)
   private _activeFloorLevel   = 0;
   // Sub-object selection on the selected shape (Phase 23 face/vertex/edge modes).
   private _subFace:   number | null = null;
@@ -84,6 +85,22 @@ export class SelectionManager implements IEditorModule {
         }
       }),
       this._bus.on("floor:select",    ({ level })     => { this._activeFloorLevel = level; }),
+      // Tints are editor-only: strip them for Play, put the selection's back after.
+      this._bus.on("preview:start", () => {
+        if (this._hovered && !this._isSelected(this._hovered)) this._restore(this._hovered);
+        this._hovered = null;
+        if (this._selected) this._restore(this._selected);
+        for (const ref of this._extraRefs) {
+          const mesh = this._findMesh(ref.id, ref.zoneId);
+          if (mesh) this._restore(mesh);
+        }
+        this._previewing = true;
+      }),
+      this._bus.on("preview:stop", () => {
+        this._previewing = false;
+        if (this._selected) this._applyTint(this._selected, SELECT_EMISSIVE, SELECT_INTENSITY);
+        this._retintExtras();
+      }),
       this._bus.on("object:updated",    ({ id, changes }) => this._onExternalUpdate(id, changes)),
       this._bus.on("wall:rebuilt",     ({ zoneId, wallId }) => this._onWallRebuilt(zoneId, wallId)),
       this._bus.on("platform:rebuilt", ({ zoneId, platformId }) => this._onPlatformRebuilt(zoneId, platformId)),
@@ -400,7 +417,7 @@ export class SelectionManager implements IEditorModule {
   }
 
   private _onMove(screenPos: ScreenPos): void {
-    if (!isSelectMode(this._activeTool)) return;
+    if (this._previewing || !isSelectMode(this._activeTool)) return;
     const selectable = this._cast(screenPos);
     const hovered = selectable.length
       ? this._resolveRoot(this._pickByPriority(selectable).object)
@@ -738,6 +755,7 @@ export class SelectionManager implements IEditorModule {
   // ─── Emissive tinting ───────────────────────────────────────────────────────
 
   private _applyTint(root: THREE.Object3D, color: number, intensity: number): void {
+    if (this._previewing) return;   // a mid-Play rebuild re-tints on preview:stop instead
     root.traverse(child => {
       const mat = this._ownMaterial(child);
       if (!mat) return;
